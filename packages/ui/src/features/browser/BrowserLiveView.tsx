@@ -123,7 +123,9 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     if (event.tabId !== props.tabId) return;
     if (event.type === "stopped") {
       abandonStream();
-      setState(() => ({ live: false, message: sourceText(event.reason) }));
+      // The reason is free text from the host, and a host that sends none would leave the panel
+      // with no cause and no next step, so the panel names the end itself.
+      setState(() => ({ live: false, message: sourceText(event.reason) || t("browser.liveView.ended") }));
       return;
     }
     if (!state.live) setState(() => ({ live: true, message: "" }));

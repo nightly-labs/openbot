@@ -60,6 +60,9 @@ export const messages = defineMessages("browser", {
   "browser.liveView.label": "Live view of the page on the host",
   "browser.liveView.connecting": "Connecting to the page on the host…",
   "browser.liveView.failed": "This page could not be shown live.",
+  // The English a host sends when it ends a live view, so the panel can show it in the reader's
+  // language and fall back to it when a host sends no reason at all.
+  "browser.liveView.ended": "The live view of this page ended.",
   "browser.previews.label": "Browser previews",
   "browser.previews.resize": "Resize right panel",
   "browser.previews.collapse": "Collapse browser previews",

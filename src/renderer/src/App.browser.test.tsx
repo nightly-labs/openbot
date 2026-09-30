@@ -385,6 +385,23 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("names the end when the host stops the live view with no reason", async () => {
+    listHostThatStreamsItsBrowser();
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    stubCanvasDrawing();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    // The reason is free text from the host. An empty one left the panel blank, with no cause and
+    // no next step, because the connecting text only covers a message that was never set.
+    emitBrowserLiveView?.({ type: "stopped", tabId: tab.id, reason: "" });
+
+    expect(await screen.findByText("The live view of this page ended.")).toBeDefined();
+  });
+
   it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {
     listHostThatStreamsItsBrowser();
     const tab = browserTab("remote-live-tab", "Remote live page");
