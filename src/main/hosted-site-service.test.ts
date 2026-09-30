@@ -175,6 +175,27 @@ describe("hosted site upload recovery", () => {
   });
 });
 
+describe("hosted sites of a joined server", () => {
+  it("never shows or deletes the owner's unlinked sites for a member", async () => {
+    const requests: string[] = [];
+    const auth = authClient(async (path, init) => {
+      requests.push(`${init.method} ${path} ${new Headers(init.headers).get("OpenBot-Host-Id") ?? "no-server"}`);
+      if (init.method === "GET") return { sites: [], limit: 3, used: 0 };
+      throw Object.assign(new Error("This site belongs to another server."), { code: "site_other_server" });
+    });
+    const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
+
+    await expect(service.listServerSites()).resolves.toEqual({ sites: [], limit: 3, used: 0 });
+    await expect(service.deleteServerSite("site-unlinked")).rejects.toThrow("another server");
+    expect(requests).toEqual(["GET /v1/sites/ host-1", "DELETE /v1/sites/site-unlinked host-1"]);
+
+    const unregistered = new HostedSiteDesktopService(auth);
+    await expect(unregistered.listServerSites()).rejects.toThrow("not registered");
+    await expect(unregistered.deleteServerSite("site-unlinked")).rejects.toThrow("not registered");
+    expect(requests).toHaveLength(2);
+  });
+});
+
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "openbot-site-test-"));
   roots.push(root);

@@ -77,6 +77,7 @@ export const messages = defineMessages("error.team", {
   "error.team.mcpUnsupported": "MCP servers are not supported by this connection.",
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.hostedSitesUnsupported": "Sites are not supported by this connection.",
+  "error.team.hostedSitesUnregistered": "This server is not registered with OpenBot, so it has no sites.",
   "error.team.markUnreadUnsupported": "This client does not support marking conversations unread.",
   "error.team.inviteServiceUnavailable": "Invitation service is unavailable.",
   "error.team.logoNotFound": "Server logo not found.",

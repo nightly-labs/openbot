@@ -130,7 +130,7 @@ export type TeamApiMcpServers = Pick<
 /** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
 /** `hosted-sites-v1`: the openbot.site sites of this server. Members list; only admins delete. */
-export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "list" | "delete">;
+export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites" | "deleteServerSite">;
 
 /** Its presence is what `#protocolSupport` advertises `agent-import-v1` on. Any member can use it. */
 export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;

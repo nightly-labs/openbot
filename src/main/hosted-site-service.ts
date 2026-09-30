@@ -101,27 +101,45 @@ export class HostedSiteDesktopService {
     return this.upload(input, input.siteId, allowedRoots);
   }
 
-  /** Deletes a site of this server, or an unlinked site of this account. */
+  /** Deletes a site of this server, or an unlinked site of this account. Only for this computer's own user. */
   async delete(siteId: string): Promise<void> {
-    const path = `/v1/sites/${encodeURIComponent(siteId)}`;
     const key = operationKey("delete");
     const credential = this.serverCredential();
     if (credential) {
       try {
-        await this.auth.requestAuthorized(
-          path,
-          { method: "DELETE", headers: { "Idempotency-Key": key, ...serverHeaders(credential) } },
-          decodeDeleteResult,
-        );
+        await this.deleteSite(siteId, key, serverHeaders(credential));
         return;
       } catch (error) {
         // An unlinked site is not the server's. The Worker refuses it before it claims the key.
         if (!(error instanceof Error && "code" in error && error.code === "site_other_server")) throw error;
       }
     }
+    await this.deleteSite(siteId, key, {}, UNLINKED_SCOPE);
+  }
+
+  /**
+   * The sites of this server only, for a member on a joined server. The unlinked sites belong to the owner's
+   * account, not to the server, so a member never sees or deletes them.
+   */
+  async listServerSites(): Promise<HostedSiteList> {
+    const headers = serverHeaders(this.requireServerCredential());
+    return this.auth.requestAuthorized("/v1/sites/", { method: "GET", headers }, decodeSiteList);
+  }
+
+  async deleteServerSite(siteId: string): Promise<void> {
+    return this.deleteSite(siteId, operationKey("delete"), serverHeaders(this.requireServerCredential()));
+  }
+
+  private requireServerCredential(): HostedSiteServerCredential {
+    const credential = this.serverCredential();
+    if (!credential) throw new Error(sourceText("error.team.hostedSitesUnregistered"));
+    return credential;
+  }
+
+  private async deleteSite(siteId: string, key: string, headers: Record<string, string>, query = ""): Promise<void> {
     await this.auth.requestAuthorized(
-      `${path}${UNLINKED_SCOPE}`,
-      { method: "DELETE", headers: { "Idempotency-Key": key } },
+      `/v1/sites/${encodeURIComponent(siteId)}${query}`,
+      { method: "DELETE", headers: { "Idempotency-Key": key, ...headers } },
       decodeDeleteResult,
     );
   }

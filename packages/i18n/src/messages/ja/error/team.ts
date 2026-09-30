@@ -77,6 +77,7 @@ export const messages = {
   "error.team.mcpUnsupported": "この接続では MCP サーバーを利用できません。",
   "error.team.storageUnsupported": "この接続ではストレージを利用できません。",
   "error.team.hostedSitesUnsupported": "この接続ではサイトを利用できません。",
+  "error.team.hostedSitesUnregistered": "このサーバーは OpenBot に登録されていないため、サイトがありません。",
   "error.team.markUnreadUnsupported": "このクライアントは会話を未読にする操作に対応していません。",
   "error.team.inviteServiceUnavailable": "招待サービスを利用できません。",
   "error.team.logoNotFound": "サーバーのロゴが見つかりません。",

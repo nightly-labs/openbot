@@ -1115,7 +1115,7 @@ create a site, but it can replace one, and the extra sites end at their expiry.
 `hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
 optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and
 `POST /v1/hosted-sites/delete` for an owner or admin, with the frozen codec in
-`team-protocol/hosted-sites-v1.ts`. The host answers with its own account and credential. Sites are
+`team-protocol/hosted-sites-v1.ts`. The host answers with its own account and credential, and only with the server's own sites: the owner's unlinked sites never reach a member, and the Team API has no fallback to delete one. Sites are
 managed in Server settings > Sites, on the desktop and in the browser.
 
 ### Leaving a server
