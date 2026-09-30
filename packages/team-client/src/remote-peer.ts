@@ -512,7 +512,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       const data = event.data;
       state.signalChain = state.signalChain
         .then(async () => {
-          if (state.closed || peer !== state) return;
+          // A frame still queued from a socket that `renewSignal` replaced belongs to a removed connection.
+          if (state.closed || peer !== state || state.socket !== socket) return;
           let message: SignalServerMessage | null;
           try {
             message = decodeSignalServerMessage(JSON.parse(data));
@@ -528,7 +529,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         })
         // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
         // browser refused, or a host that said it went away. Those are connections failing.
-        .catch((error) => failPeer(state, error, actions));
+        .catch((error) => {
+          if (state.socket === socket) failPeer(state, error, actions);
+        });
     };
     socket.onerror = () => socket.close();
     socket.onclose = () => {
