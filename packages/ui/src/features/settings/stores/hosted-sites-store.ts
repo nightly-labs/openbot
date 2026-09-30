@@ -10,7 +10,7 @@ interface HostedSitesStoreProps {
   serverId: string;
   hostedSitesApi?: Pick<HostedSitesDesktopApi, "list" | "delete"> | undefined;
   /** Called as a deletion starts. It returns the call that records the result, for the account that started it. */
-  trackDelete?: () => (result: HostedSiteDeleteResult) => void;
+  trackDelete?: (() => (result: HostedSiteDeleteResult) => void) | undefined;
 }
 
 interface HostedSitesPanel {
