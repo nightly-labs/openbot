@@ -1406,6 +1406,63 @@ describe("MailboxStore", () => {
     );
     await expect(store.reorderQueue("chief", [deliveryId])).rejects.toThrow("Queue order is stale");
   });
+
+  it("writes only changed rows and keeps every delivery and idempotency key across a restart", async () => {
+    const database = new OpenBotDatabase(join(root, "user-data"));
+    const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
+    await mailbox.initialize();
+    const send = (recipient: string, text: string, idempotencyKey?: string) =>
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "planner" },
+        recipientAgentIds: [recipient],
+        text,
+        idempotencyKey,
+      });
+    const finished = required((await send("chief", "Finished work")).deliveries[0]).id;
+    await mailbox.markStarting(finished);
+    await mailbox.markRunning(finished, "turn-finished");
+    await mailbox.markTerminal(finished, "completed");
+    const running = required((await send("sales", "Running work")).deliveries[0]).id;
+    await mailbox.markStarting(running);
+    await mailbox.markRunning(running, "turn-running");
+    const queued = await send("chief", "Queued work", "thread:turn:call");
+    await send("gone", "Removed with its agent");
+    const rowSequence = (deliveryId: string) =>
+      database.connection
+        .prepare("SELECT last_event_sequence FROM projection_deliveries WHERE delivery_id = ?")
+        .get(deliveryId);
+    const finishedRow = rowSequence(finished);
+
+    await mailbox.markStarting(required(queued.deliveries[0]).id);
+    await mailbox.deleteAgentData("gone");
+
+    expect(rowSequence(finished)).toEqual(finishedRow);
+    expect(rowSequence(required(queued.deliveries[0]).id)).not.toEqual(finishedRow);
+    const event = database.connection
+      .prepare("SELECT payload_json FROM orchestration_events WHERE aggregate_type = 'mailbox'")
+      .all();
+    expect(JSON.stringify(event)).not.toContain("Finished work");
+
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    for (const agentId of ["chief", "sales", "gone"]) {
+      expect(restored.listQueue(agentId)).toEqual(mailbox.listQueue(agentId));
+    }
+    expect(restored.listQueue("chief").deliveries.map((delivery) => delivery.status)).toEqual([
+      "completed",
+      "starting",
+    ]);
+    expect(restored.listQueue("sales").deliveries).toMatchObject([{ id: running, status: "running" }]);
+    expect(restored.listQueue("gone").deliveries).toEqual([]);
+    await expect(
+      restored.enqueue({
+        sender: { kind: "agent", agentId: "planner" },
+        recipientAgentIds: ["chief"],
+        text: "Queued work",
+        idempotencyKey: "thread:turn:call",
+      }),
+    ).resolves.toMatchObject({ messageId: queued.messageId });
+  });
 });
 
 function required<T>(value: T | null | undefined): T {
