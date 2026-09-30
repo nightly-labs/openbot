@@ -491,15 +491,26 @@ export class OpenBotToolRouter {
     if (params.tool === "create_agent") {
       const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
+      const caller = this.#requireAgent(senderAgentId);
+      const listed = this.#hooks.listModels();
       // Checked before the agent exists: a named model the provider does not list, or an effort the
       // model does not support, is an error the calling agent can correct, never a silent default.
-      const requested = requestedToolModel(args, this.#hooks.listModels());
+      const named = requestedToolModel(args, listed);
+      // A request that names no provider and no model gives the new agent the caller's own model, so
+      // a team that one agent recruits runs where that agent runs. When the caller's provider no
+      // longer lists that model, the new agent starts where one the user creates does.
+      const inherited =
+        named === null
+          ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
+          : null;
+      if (inherited && args.reasoningEffort !== undefined) requireReasoningEffort(inherited, args.reasoningEffort);
+      const requested = named ?? inherited;
+      const reasoningEffort = args.reasoningEffort ?? (inherited ? caller.reasoningEffort : undefined);
       // An effort alone applies to the model the new agent starts on, known only once it exists.
       const lateEffort = requested === null ? args.reasoningEffort : undefined;
       const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
       // A new agent starts with Full access and Computer Use. A caller without them passes its limits
       // on, so it cannot get around them through an agent it creates.
-      const caller = this.#requireAgent(senderAgentId);
       const limits: Pick<UpdateAgentInput, "access" | "computerUse"> = {
         ...(workspaceAccessEnforced(caller) ? { access: "workspace" } : {}),
         ...(agentComputerUseEnabled(caller) ? {} : { computerUse: false }),
@@ -516,7 +527,7 @@ export class OpenBotToolRouter {
               ? {
                   provider: requested.provider,
                   model: requested.id,
-                  ...(args.reasoningEffort ? { reasoningEffort: args.reasoningEffort } : {}),
+                  ...(reasoningEffort ? { reasoningEffort } : {}),
                 }
               : {}),
           },
