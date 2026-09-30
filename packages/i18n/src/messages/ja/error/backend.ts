@@ -5,6 +5,8 @@ export const messages = {
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
   "error.backend.browserViewUnsupported": "このリモートホストはライブブラウザービューに対応していません。",
   "error.backend.browserViewLimit": "このホストで開いているブラウザービューが多すぎます。",
+  "error.backend.browserViewEnded": "このページのライブビューは終了しました。",
+  "error.backend.browserViewFailed": "このページのライブビューは失敗しました。",
   "error.backend.windowTemporarilyUnavailable": "OpenBot ウィンドウは一時的に使用できません。",
   "error.backend.windowUnavailable": "OpenBot ウィンドウを使用できません。",
   "error.backend.sunshineApiHttp": "Sunshine API が HTTP {status} で失敗しました。",

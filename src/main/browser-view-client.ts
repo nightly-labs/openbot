@@ -70,8 +70,8 @@ export class BrowserViewClient {
           socket.close(1000, "Invalid browser view frame");
         }
       });
-      socket.addEventListener("close", () => this.#viewEnded(view, "The live view of this page ended."));
-      socket.addEventListener("error", () => this.#viewEnded(view, "The live view of this page failed."));
+      socket.addEventListener("close", () => this.#viewEnded(view, sourceText("error.backend.browserViewEnded")));
+      socket.addEventListener("error", () => this.#viewEnded(view, sourceText("error.backend.browserViewFailed")));
     });
   }
 
