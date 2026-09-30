@@ -182,6 +182,11 @@ interface PeerState {
   connectedTimer: ReturnType<typeof setTimeout> | null;
   disconnectedTimer: ReturnType<typeof setTimeout> | null;
   iceRecoveryTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * Signal sent `ready` on the current socket. Signal gives each `hello` a new connection ID, so a
+   * frame sent before `ready` carries the old ID, and Signal rejects it.
+   */
+  signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
 }
@@ -294,9 +299,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   }
   function canRecoverPeer(state: PeerState): boolean {
     const connectionState = state.connection?.connectionState;
+    // An authenticated peer is `connecting` only during an ICE restart.
     return (
       state.authenticated &&
-      (connectionState === "disconnected" || connectionState === "failed") &&
+      (connectionState === "disconnected" || connectionState === "failed" || connectionState === "connecting") &&
       CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
     );
   }
@@ -315,7 +321,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.iceRecoveryTimer = setTimeout(() => {
       state.iceRecoveryTimer = null;
       if (!canContinue()) return;
-      if (state.socket?.readyState === WebSocket.OPEN) void restartIce(state).catch(() => undefined);
+      // A socket that did not get `ready` yet restarts ICE when `ready` arrives.
+      if (canSignal(state)) void restartIce(state).catch(() => undefined);
       else if (!state.socket) renewSignal(state, actions);
       state.iceRecoveryTimer = setTimeout(() => {
         state.iceRecoveryTimer = null;
@@ -463,6 +470,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       connectedTimer: null,
       disconnectedTimer: null,
       iceRecoveryTimer: null,
+      signalReady: false,
       answeredRequest: false,
     };
     peer = state;
@@ -487,6 +495,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (!active || state.closed || peer !== state || state.socket) return;
     const socket = new WebSocket(state.signalUrl);
     state.socket = socket;
+    state.signalReady = false;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
       state.reconnectAttempt = 0;
@@ -525,6 +534,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     socket.onclose = () => {
       if (state.socket !== socket) return;
       state.socket = null;
+      state.signalReady = false;
       if (state.closed || peer !== state) return;
       scheduleReconnect(state, actions);
     };
@@ -556,6 +566,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       state.iceServers = message.iceServers;
       if (!state.connectionId || state.iceServers.length === 0)
         throw new Error("Signal returned an incomplete connection.");
+      state.signalReady = true;
       scheduleTurnRefresh(state);
       if (state.connection) {
         state.connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" });
@@ -610,7 +621,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     connection.onicecandidate = (event) => {
-      if (!event.candidate || !state.connectionId || state.socket?.readyState !== WebSocket.OPEN) return;
+      if (!event.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
         type: "ice-candidate",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -1052,9 +1063,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     });
   }
 
+  function canSignal(state: PeerState): boolean {
+    return state.signalReady && state.socket?.readyState === WebSocket.OPEN;
+  }
+
   function sendSignal(state: PeerState, message: SignalClientMessage): void {
-    if (state.socket?.readyState !== WebSocket.OPEN) throw new Error(sourceText("error.remote.signalOffline"));
-    state.socket.send(JSON.stringify(message));
+    const socket = state.socket;
+    if (!socket || !canSignal(state)) throw new Error(sourceText("error.remote.signalOffline"));
+    socket.send(JSON.stringify(message));
   }
 
   function scheduleReconnect(state: PeerState, actions: ActionsRef): void {
@@ -1081,7 +1097,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.turnRefreshDueAt = Date.now() + delay;
     state.turnRefreshTimer = setTimeout(() => {
       state.turnRefreshTimer = null;
-      if (state.socket?.readyState === WebSocket.OPEN) {
+      if (canSignal(state)) {
         try {
           sendSignal(state, {
             type: "turn-refresh",
