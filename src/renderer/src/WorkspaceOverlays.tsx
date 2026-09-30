@@ -1,4 +1,5 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
@@ -358,12 +359,24 @@ function ServerSettings() {
     };
   };
 
-  /** Another server's providers are managed after a switch to it, in its own Providers section. */
+  /**
+   * Another server's providers are managed after a switch to it, in its own Providers section. A
+   * failed switch shows the error and opens the section again, with its switch button.
+   */
   const switchToManageProviders = (server: ServerSummary) => {
     setServerSettingsOpen(false);
-    void selectServer(server.id).then((selected) => {
-      if (selected) openServerSettings(server.id, null, "providers");
-    });
+    void selectServer(server.id).then(
+      (selected) => {
+        if (selected) openServerSettings(server.id, null, "providers");
+      },
+      (error: unknown) => {
+        const text = currentText();
+        toast.error(text.t("server.select.failedTitle"), {
+          description: text.errorMessage(error, text.t("server.select.failedDescription")),
+        });
+        openServerSettings(server.id, null, "providers");
+      },
+    );
   };
 
   const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
