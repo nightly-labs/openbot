@@ -10,7 +10,11 @@ interface TextSegment {
   node: Text;
   start: number;
   end: number;
-  /** Node offsets of each lowercased unit, when lowercasing changed the length. */
+}
+
+/** Lowercased text. When lowercasing changed the length, each unit keeps its source offsets. */
+interface LowercaseText {
+  text: string;
   starts?: number[];
   ends?: number[];
 }
@@ -107,36 +111,54 @@ function searchPattern(query: string): RegExp | null {
 }
 
 /**
- * Text lowercased for the locale, as the query is. Lowercasing can change the length, such as `İ`
- * outside Turkish, so a segment that changes length keeps the node offsets of each lowercased unit.
+ * The text lowercased for the locale, as the query is. The whole text is lowercased at once, so a
+ * context rule such as the Greek final sigma applies across text nodes. Lowercasing can change the
+ * length, such as `İ` outside Turkish. Then each character that changes length is lowercased alone,
+ * each run between them is lowercased as a whole, and each unit keeps its source offsets.
  */
-function lowercased(data: string): Pick<TextSegment, "starts" | "ends"> & { text: string } {
-  const text = data.toLocaleLowerCase();
-  if (text.length === data.length) return { text };
+function lowercase(source: string): LowercaseText {
+  const whole = source.toLocaleLowerCase();
+  if (whole.length === source.length) return { text: whole };
   const starts: number[] = [];
   const ends: number[] = [];
-  let offset = 0;
-  let folded = "";
-  for (const character of data) {
-    const lower = character.toLocaleLowerCase();
+  let text = "";
+  const append = (value: string, at: number, length: number) => {
+    const lower = value.toLocaleLowerCase();
     for (let unit = 0; unit < lower.length; unit += 1) {
-      starts.push(offset);
-      ends.push(offset + character.length);
+      starts.push(at);
+      ends.push(at + length);
     }
-    folded += lower;
+    text += lower;
+  };
+  let runStart = 0;
+  const flush = (end: number) => {
+    const run = source.slice(runStart, end);
+    const lower = run.toLocaleLowerCase();
+    if (lower.length === run.length) {
+      for (let unit = 0; unit < run.length; unit += 1) {
+        starts.push(runStart + unit);
+        ends.push(runStart + unit + 1);
+      }
+      text += lower;
+    } else {
+      let at = runStart;
+      for (const character of run) {
+        append(character, at, character.length);
+        at += character.length;
+      }
+    }
+  };
+  let offset = 0;
+  for (const character of source) {
+    if (character.toLocaleLowerCase().length !== character.length) {
+      flush(offset);
+      append(character, offset, character.length);
+      runStart = offset + character.length;
+    }
     offset += character.length;
   }
-  return { text: folded, starts, ends };
-}
-
-function startOffset(segment: TextSegment, index: number): number {
-  const local = index - segment.start;
-  return segment.starts?.[local] ?? local;
-}
-
-function endOffset(segment: TextSegment, index: number): number {
-  const local = index - segment.start;
-  return segment.ends?.[local - 1] ?? local;
+  flush(source.length);
+  return { text, starts, ends };
 }
 
 export function findChatSearchMatches(root: HTMLElement, query: string): ChatSearchMatch[] {
@@ -168,10 +190,9 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
         if (segments.length > 0 && (lineBreak || container !== line)) text += " ";
         lineBreak = false;
         line = container;
-        const { text: lower, starts, ends } = lowercased(node.data);
         const start = text.length;
-        text += lower;
-        segments.push({ node, start, end: text.length, starts, ends });
+        text += node.data;
+        segments.push({ node, start, end: text.length });
       } else {
         lineBreak = true;
       }
@@ -181,10 +202,12 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
     // Matches come in order, so each lookup continues from the segment of the previous match. A
     // match starts and ends on a query character, never on an added space, so both ends are in a
     // segment.
+    const lower = lowercase(text);
     let index = 0;
-    for (const found of text.matchAll(pattern)) {
-      const matchStart = found.index;
-      const matchEnd = matchStart + found[0].length;
+    for (const found of lower.text.matchAll(pattern)) {
+      const matchStart = lower.starts?.[found.index] ?? found.index;
+      const lastUnit = found.index + found[0].length - 1;
+      const matchEnd = lower.ends?.[lastUnit] ?? lastUnit + 1;
       while ((segments[index]?.end ?? Number.POSITIVE_INFINITY) <= matchStart) index += 1;
       let endIndex = index;
       while ((segments[endIndex]?.end ?? Number.POSITIVE_INFINITY) < matchEnd) endIndex += 1;
@@ -192,8 +215,8 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
       const endSegment = segments[endIndex];
       if (!startSegment || !endSegment) break;
       const range = document.createRange();
-      range.setStart(startSegment.node, startOffset(startSegment, matchStart));
-      range.setEnd(endSegment.node, endOffset(endSegment, matchEnd));
+      range.setStart(startSegment.node, matchStart - startSegment.start);
+      range.setEnd(endSegment.node, matchEnd - endSegment.start);
       matches.push({ range, message });
     }
   }
