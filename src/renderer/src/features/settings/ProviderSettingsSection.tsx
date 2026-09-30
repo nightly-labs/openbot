@@ -204,10 +204,7 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
  * with a save or a removal. Absent until the first read, and on a read failure, so the row shows no
  * key badge rather than a wrong one.
  */
-export function createProviderKeyState(props: {
-  readonly open: boolean;
-  readonly providerKeys?: ProviderKeyApi | undefined;
-}) {
+function createProviderKeyState(props: { readonly open: boolean; readonly providerKeys?: ProviderKeyApi | undefined }) {
   const [keyDialogOpen, setKeyDialogOpen] = createSignal(false);
   const [openCodeKeyStatus, setOpenCodeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   async function refreshOpenCodeKeyStatus(): Promise<void> {
@@ -247,10 +244,10 @@ export function createProviderKeyState(props: {
   };
 }
 
-export type ProviderKeyState = ReturnType<typeof createProviderKeyState>;
+type ProviderKeyState = ReturnType<typeof createProviderKeyState>;
 
 /** The key and code sign-in dialogs the section opens. Both portal over the dialog they open from. */
-export function ProviderSettingsDialogs(props: {
+function ProviderSettingsDialogs(props: {
   keys: ProviderKeyState;
   providerKeys?: ProviderKeyApi | undefined;
   codeLogin?: ProviderCodeLoginApi | undefined;

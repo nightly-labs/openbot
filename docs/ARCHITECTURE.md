@@ -425,9 +425,9 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-The Providers section of Server settings starts the shared renderer runtime store. The store announces each provider that gains an
-offer as one notification, from an effect over both the runtime snapshot and the agent status,
-because the two arrive separately and either one can complete an offer. An explicit update opens
+`ProvidersProvider` starts the shared renderer runtime store for the active server. The store
+announces each provider that gains an offer as one notification, from an effect over both the
+runtime snapshot and the agent status, because the two arrive separately and either one can complete an offer. An explicit update opens
 the same notification; revisioned snapshots move it through progress, failure, retry, and
 completion. Only the crossing into "update available" is announced, so a dismissed notification
 stays dismissed until the offer changes. Closing the notification does not cancel the download,
