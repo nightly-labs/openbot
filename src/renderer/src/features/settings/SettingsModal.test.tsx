@@ -2,6 +2,7 @@ import type {
   AccountSession,
   AgentProviderId,
   AgentStatus,
+  AppLogoColor,
   AvatarImageInput,
   CentralAuthUser,
   CustomProviderRestart,
@@ -16,7 +17,7 @@ import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCode
 import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
@@ -62,6 +63,20 @@ const idleUpdateStatus: UpdateStatus = {
   message: null,
   errorCode: null,
 };
+
+/** The General tab reads and watches the logo color in main. */
+function logoColorPort() {
+  return {
+    getAppLogoColorPreference: vi.fn(async () => ({ color: "lavender" as const })),
+    onAppLogoColorPreference: vi.fn(() => () => undefined),
+    setAppLogoColorPreference: vi.fn(async ({ color }: { color: AppLogoColor }) => ({ color })),
+  };
+}
+
+// Every describe block renders the modal, and the General tab is open by default.
+beforeEach(() => {
+  vi.stubGlobal("openbot", logoColorPort());
+});
 
 describe("SettingsModal", () => {
   it("disconnects another desktop from the account session list and preserves the current device", async () => {
@@ -514,7 +529,7 @@ describe("SettingsModal", () => {
       delete: vi.fn(async () => undefined),
     };
     const openUrl = vi.fn(async () => undefined);
-    vi.stubGlobal("openbot", { openUrl });
+    vi.stubGlobal("openbot", { ...logoColorPort(), openUrl });
     render(() => (
       <SettingsModal
         open

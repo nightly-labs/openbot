@@ -7,7 +7,7 @@ import { Toaster } from "@openbot/ui";
 import type { ProviderUpdate } from "@openbot/ui/features/provider-updates/provider-update";
 import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { SettingsModal } from "../settings/SettingsModal";
 import { createProviderRuntimeStore } from "./provider-runtime-store";
@@ -20,10 +20,19 @@ const offer: ProviderUpdate = {
   availableVersion: "2.1.250",
 };
 
+// The Settings General tab reads and watches the logo color in main.
+beforeEach(() => {
+  vi.stubGlobal("openbot", {
+    getAppLogoColorPreference: vi.fn(async () => ({ color: "lavender" as const })),
+    onAppLogoColorPreference: vi.fn(() => () => undefined),
+  });
+});
+
 afterEach(() => {
   dismissProviderUpdateToast("claude");
   dismissProviderUpdateToast("codex");
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1]) {
