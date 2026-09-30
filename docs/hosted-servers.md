@@ -385,10 +385,13 @@ are only on a hosted server; the desktop app does not change.
 The unit (`openbot.service`):
 
 - `MemoryMax=90%`: the OOM killer of the unit acts before the kernel's own, so the desktop, sshd and
-  the boat agent keep running.
-- `OOMScoreAdjust=-500` for main. Every 5 s, main gives each process that it starts, other than the
-  Electron processes, an `oom_score_adj` of 500. So the OOM killer picks a provider CLI, an MCP server
-  or an agent tool before main.
+  the boat agent keep running. The limit counts memory only, not swap. The boat image has a 2 GB
+  swap file, so a process that grows first fills the swap, and then the kernel's own OOM killer acts.
+  It also picks the process with the highest value, as below.
+- `OOMScoreAdjust=-500` for main. Every 5 s, main gives each process that it starts an
+  `oom_score_adj` of 500. So the OOM killer picks a provider CLI, an MCP server or an agent tool
+  before main. The processes of the Electron binary do not change: Chromium sets the values of its
+  renderers and GPU process, and its zygotes keep -500, because a new renderer starts from them.
 - `OOMPolicy=continue`: one killed agent process does not stop the unit.
 - `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
 
@@ -438,6 +441,19 @@ ID (2 vCPU/4 GB, then 4 vCPU/8 GB, then 2 vCPU/4 GB). Files in `/srv` and in the
 and an enabled systemd unit started again after each resume. The stop took 25 to 31 s, and the
 sandbox was `idle` 3 to 6 s after the resume call.
 
+A memory test on 2026-09-30 (one `small` sandbox with `noEnv`, the scripts and the Linux AppImage of
+main, and a `HostedServerMemory` driver in a unit with the same limits as `openbot.service`)
+confirmed:
+
+- boat VMs use cgroup v2 with the memory controller, and the unit gets `memory.max` = 90% (3.4 GiB);
+- the kernel has zram. `provision.sh` adds `/dev/zram0` (1.9 GB, priority 100) in front of the
+  2 GB swap file of the image, and it is active again after a stop and a resume;
+- the level went `ok`, `low`, `critical` and back to `ok` while a child process grew by 64 MB/s;
+- the OOM killer killed the child (`oom_score_adj` 500), not the driver (-500). The unit stayed
+  active. The kill was the kernel's own (`global_oom`), after the child filled the swap, and not the
+  unit limit;
+- the app in hosted mode gives 500 to `cua-driver`, and keeps -500 for main.
+
 A boat trial account refuses a sandbox with no auto-stop, or a TTL longer than 2 hours
 (`trial_auto_stop_required`), and the Worker shows it as `provider_billing`. The Worker sends a
 2-hour lease, so it works on a trial. A probe on 2026-09-28 confirmed that
@@ -465,7 +481,7 @@ These were not tested on boat. Test them before a user gets access:
 - that boat frees the key of a refused create, so a retry of a setup that failed works;
 - the menu path of the Stripe failed-payment setting in [Production](#production), and whether test
   mode and live mode keep separate values;
-- the [memory guards](#memory): that boat VMs use cgroup v2 with the memory controller, that
-  their kernel has zram, and that the OOM killer of the unit kills an agent process and not main;
+- the [memory guards](#memory) with real agents: the held message, the turn slots and the release of
+  idle provider threads on a server with a signed-in account;
 - whether boat stops a sandbox that runs for weeks. The Worker restarts it, but work in progress
   at that time stops.

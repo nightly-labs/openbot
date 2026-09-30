@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, readlink, writeFile } from "node:fs/promises";
 import type { HostMemory, HostMemoryLevel } from "../backend/host-memory";
 
 const SAMPLE_INTERVAL_MS = 5_000;
@@ -16,8 +16,6 @@ const RECOVER_MARGIN_BYTES = 256 * MIB;
 const CHILD_OOM_SCORE_ADJ = 500;
 
 export interface HostedServerMemoryOptions {
-  /** The Electron processes. Chromium sets their OOM values itself. */
-  electronPids: () => readonly number[];
   /** Called one time when the memory files cannot be read (the level then stays "ok"), and when a listener fails. */
   onError: (message: string, error: unknown) => void;
   now?: () => number;
@@ -96,7 +94,7 @@ export class HostedServerMemory implements HostMemory {
   async #tick(): Promise<void> {
     this.#sample = await this.#read();
     this.#level = this.#nextLevel();
-    await raiseChildOomScores(new Set([process.pid, ...this.#options.electronPids()]));
+    await raiseChildOomScores();
     for (const listener of this.#listeners) {
       try {
         listener();
@@ -171,10 +169,16 @@ async function readUnitMemory(): Promise<{ max: number; current: number } | null
 }
 
 /**
- * Gives each descendant of main, other than the skipped processes, at least `CHILD_OOM_SCORE_ADJ`.
+ * Gives each descendant of main, other than the Electron processes, at least `CHILD_OOM_SCORE_ADJ`.
  * A process can end during the walk, so each read and write can fail and is ignored.
+ *
+ * An Electron process runs the same binary as main. Chromium sets the values of its renderers and GPU
+ * process itself, and the zygotes and the GPU broker keep the -500 of main. `app.getAppMetrics()` does
+ * not list the zygotes or the broker, so the binary is the test: with 500, the OOM killer could kill a
+ * zygote, and then no new renderer can start.
  */
-async function raiseChildOomScores(skip: ReadonlySet<number>): Promise<void> {
+async function raiseChildOomScores(): Promise<void> {
+  const electron = await readlink("/proc/self/exe").catch(() => null);
   const children = new Map<number, number[]>();
   const entries = await readdir("/proc").catch(() => []);
   await Promise.all(
@@ -197,14 +201,13 @@ async function raiseChildOomScores(skip: ReadonlySet<number>): Promise<void> {
     pending.push(...(children.get(pid) ?? []));
   }
   await Promise.all(
-    descendants
-      .filter((pid) => !skip.has(pid))
-      .map(async (pid) => {
-        const path = `/proc/${pid}/oom_score_adj`;
-        const text = await readFile(path, "utf8").catch(() => null);
-        if (text !== null && Number(text.trim()) < CHILD_OOM_SCORE_ADJ) {
-          await writeFile(path, String(CHILD_OOM_SCORE_ADJ)).catch(() => undefined);
-        }
-      }),
+    descendants.map(async (pid) => {
+      if (electron === null || (await readlink(`/proc/${pid}/exe`).catch(() => null)) === electron) return;
+      const path = `/proc/${pid}/oom_score_adj`;
+      const text = await readFile(path, "utf8").catch(() => null);
+      if (text !== null && Number(text.trim()) < CHILD_OOM_SCORE_ADJ) {
+        await writeFile(path, String(CHILD_OOM_SCORE_ADJ)).catch(() => undefined);
+      }
+    }),
   );
 }

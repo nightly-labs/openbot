@@ -487,7 +487,6 @@ export async function createApplicationServices({
   // Only a hosted server: its machine is small, and one unit holds OpenBot and every agent process.
   const hostMemory = hostedServer
     ? new HostedServerMemory({
-        electronPids: () => app.getAppMetrics().map((metric) => metric.pid),
         onError: (message, error) => logger.warn(message, toLogValue(error)),
       })
     : null;
