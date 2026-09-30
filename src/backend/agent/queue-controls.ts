@@ -119,10 +119,11 @@ export class QueueControls {
           input.attachmentDraftIds,
           input.editId,
         );
-        // Loads the chat when main dropped it from memory, so an open chat shows the new text.
-        const snapshot = this.#conversation.ensureSnapshot(agentId, null);
-        this.#mailboxSync.syncMailboxMessages(snapshot);
-        this.#conversation.emitConversation(snapshot, "queue.message-updated");
+        const snapshot = this.#conversation.snapshotToUpdate(agentId);
+        if (snapshot) {
+          this.#mailboxSync.syncMailboxMessages(snapshot);
+          this.#conversation.emitConversation(snapshot, "queue.message-updated");
+        }
       }
       if (input.action === "cancel") this.#mailbox.finishQueueEdit(agentId, input.deliveryId, input.editId);
       this.#drain.scheduleDrain(agentId);
@@ -141,10 +142,10 @@ export class QueueControls {
       input.keepAttachmentIds,
       input.attachmentDraftIds,
     );
-    const snapshot = this.#conversation.ensureSnapshot(input.agentId, null);
-    this.#mailboxSync.syncMailboxMessages(snapshot);
+    const snapshot = this.#conversation.snapshotToUpdate(input.agentId);
+    if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(input.agentId);
-    this.#conversation.emitConversation(snapshot, "queue.message-updated");
+    if (snapshot) this.#conversation.emitConversation(snapshot, "queue.message-updated");
     this.#drain.scheduleDrain(input.agentId);
   }
 

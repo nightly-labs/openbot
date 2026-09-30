@@ -588,7 +588,7 @@ export class TurnLifecycle {
       expectsReply: false,
       idempotencyKey: `auto-result:${turnId}:${messageId}`,
     });
-    const senderSnapshot = this.#conversation.snapshot(agentId);
+    const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
     if (senderSnapshot) {
       this.#mailboxSync.syncMailboxMessages(senderSnapshot);
       this.#conversation.emitConversation(senderSnapshot);
