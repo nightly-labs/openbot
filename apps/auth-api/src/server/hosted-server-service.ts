@@ -779,22 +779,34 @@ export class HostedServerService {
   async #resize(row: HostedServerRow): Promise<void> {
     const boat = this.#boat;
     if (!boat || !row.provider_sandbox_id || !row.pending_size) return;
-    if (row.desired_state !== "running" || row.observed_state !== "running") return;
-    if ((row.last_active_at ?? 0) > this.#now() - RESIZE_AFTER_NO_USE_MS) return;
+    // Claimed before the stop: the cron reads its rows first, and activity that comes in after that keeps
+    // the server running.
+    const now = this.#now();
+    const claimed = await this.#database
+      .prepare(
+        `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
+         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
+           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ?`,
+      )
+      .bind(now, row.server_id, now - RESIZE_AFTER_NO_USE_MS)
+      .run();
+    if (claimed.meta.changes !== 1) return;
     try {
       await boat.stopSandbox(row.provider_sandbox_id);
     } catch (error) {
       // 409: the sandbox cannot stop in its current state. The cron tries again.
-      if (error instanceof BoatApiError && error.status === 409) return;
+      if (error instanceof BoatApiError && error.status === 409) {
+        await this.#database
+          .prepare(
+            `UPDATE hosted_servers SET observed_state = 'running', updated_at = ?
+             WHERE server_id = ? AND observed_state = 'stopping'`,
+          )
+          .bind(this.#now(), row.server_id)
+          .run();
+        return;
+      }
       throw error;
     }
-    await this.#database
-      .prepare(
-        `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
-         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'`,
-      )
-      .bind(this.#now(), row.server_id)
-      .run();
   }
 
   /** Makes the server match its plan. `getServerEntitlement` is the only place that decides the plan. */
