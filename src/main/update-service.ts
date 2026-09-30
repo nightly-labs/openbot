@@ -161,6 +161,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #phaseTimer: ReturnType<typeof setTimeout> | null = null;
   #started = false;
   #installStarted = false;
+  #pendingInstallRequests = 0;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   #logWrite = Promise.resolve();
@@ -369,14 +370,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#cancellationToken = result?.cancellationToken ?? null;
       if (result?.isUpdateAvailable) {
         if (result.updateInfo.version !== this.#downloadedVersion) this.#downloadedVersion = null;
-        this.#setStatus({
-          phase: "available",
-          availableVersion: result.updateInfo.version,
-          progress: null,
-          message: null,
-          errorCode: null,
-          checkedAt: new Date().toISOString(),
-        });
+        this.#markAvailable(result.updateInfo.version);
       } else {
         this.#downloadedVersion = null;
         this.#setStatus({
@@ -404,13 +398,14 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
    * Installing a downloaded update that a newer release has superseded restarts into a version that
    * is already out of date, and the next launch offers another update: one restart per release
    * (issue #1192). This check runs without leaving "ready", so the restart action stays available,
-   * and replaces the download only when the feed names a different release. A failed check keeps
-   * the download, which is still a valid update.
+   * and replaces the download only with a newer release. A failed check keeps the download, which is
+   * still a valid update. With automatic downloads off the download stays as well: replacing it
+   * would take away the restart and start a transfer the user did not ask for.
    */
   async #checkSupersedingRelease(): Promise<UpdateStatus> {
     // Scheduled before the request, because a request that never settles must not end the loop.
     this.#scheduleCheck(this.#options.checkIntervalMs);
-    if (this.#checkRequest) return this.getStatus();
+    if (!this.#autoDownload || this.#checkRequest) return this.getStatus();
     const downloaded = this.#downloadedVersion;
     let result: UpdateCheckOutcome | null;
     try {
@@ -418,29 +413,26 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     } catch {
       return this.getStatus();
     }
-    // The user can start the install, or a host can take over, while the request is out.
+    // An install can start, a host can take over, or the preference can change while the request
+    // is out. An install still in its sibling scan counts: it expects the download it was asked for.
     if (
       this.#status.phase !== "ready" ||
       this.#downloadedVersion !== downloaded ||
       this.#installStarted ||
+      this.#pendingInstallRequests > 0 ||
       this.#managedByHost ||
       this.#teardownCommitted ||
+      !this.#autoDownload ||
       !result?.isUpdateAvailable ||
-      result.updateInfo.version === downloaded
+      downloaded === null ||
+      !isNewerRelease(result.updateInfo.version, downloaded)
     ) {
       return this.getStatus();
     }
     this.#cancellationToken = result.cancellationToken ?? null;
     this.#downloadedVersion = null;
-    this.#setStatus({
-      phase: "available",
-      availableVersion: result.updateInfo.version,
-      progress: null,
-      message: null,
-      errorCode: null,
-      checkedAt: new Date().toISOString(),
-    });
-    if (this.#autoDownload) void this.downloadUpdate();
+    this.#markAvailable(result.updateInfo.version);
+    void this.downloadUpdate();
     return this.getStatus();
   }
 
@@ -496,7 +488,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     // Replacing the application bundle while another login session runs OpenBot from it breaks
     // that session, so refuse before the one-shot install latch and before shutdown preparation.
     // Nothing is torn down, the update stays ready, and the user retries once every session stopped.
-    const siblings = (await this.#options.checkSiblingInstances?.()) ?? [];
+    this.#pendingInstallRequests += 1;
+    let siblings: readonly OpenBotSiblingInstance[];
+    try {
+      siblings = (await this.#options.checkSiblingInstances?.()) ?? [];
+    } finally {
+      this.#pendingInstallRequests -= 1;
+    }
     if (siblings.length > 0) {
       throw new Error(SIBLING_SESSION_MESSAGE);
     }
@@ -593,6 +591,17 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#cancellationToken = null;
     }
     return this.#cancellationToken;
+  }
+
+  #markAvailable(version: string): void {
+    this.#setStatus({
+      phase: "available",
+      availableVersion: version,
+      progress: null,
+      message: null,
+      errorCode: null,
+      checkedAt: new Date().toISOString(),
+    });
   }
 
   #markReady(version: string | null): void {
@@ -780,6 +789,21 @@ export async function pruneShipItLogs(directory: string): Promise<void> {
   } catch {
     // ShipIt creates this directory only after its first update.
   }
+}
+
+/**
+ * Compares the release numbers only. The feed offers no prereleases (`allowPrerelease` is off), so
+ * a candidate with the same numbers is not newer. A stale feed answer that names an older release
+ * must not replace a newer download.
+ */
+function isNewerRelease(candidate: string, current: string): boolean {
+  const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
+  const [left, right] = [parse(candidate), parse(current)];
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
 }
 
 function clampProgress(value: number): number {
