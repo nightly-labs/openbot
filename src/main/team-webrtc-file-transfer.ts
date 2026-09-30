@@ -66,6 +66,8 @@ export class TeamWebRtcFileTransfer {
   readonly #acceptPeer: (peerId: string) => boolean;
   readonly #incoming = new Map<string, IncomingTransfer>();
   readonly #outgoing = new Map<string, OutgoingTransfer>();
+  /** The streams that `sendStream` still writes to disk, with the bytes written so far. */
+  readonly #writing = new Set<{ peerId: string; size: number }>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
   readonly #expirationTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #waiters = new Map<
@@ -132,25 +134,31 @@ export class TeamWebRtcFileTransfer {
     await mkdir(this.#directory, { recursive: true, mode: 0o700 });
     const path = join(this.#directory, `${randomUUID()}.outgoing`);
     let file: FileHandle | null = null;
+    // The bytes on disk count against the file set limit while they are written, so parallel
+    // streams cannot write more than the limit before the check.
+    const pending = { peerId, size: 0 };
+    this.#writing.add(pending);
     try {
       const hash = createHash("sha256");
-      let size = 0;
+      const check = (size: number) => this.#checkOutgoing(peerId, size, pending);
       await pipeline(
         Readable.from(input.body),
         async function* (chunks: AsyncIterable<Uint8Array>) {
           for await (const chunk of chunks) {
-            size += chunk.byteLength;
-            if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error(sourceText("error.remote.fileTooLarge"));
+            pending.size += chunk.byteLength;
+            check(pending.size);
             hash.update(chunk);
             yield chunk;
           }
         },
         createWriteStream(path, { flags: "wx", mode: 0o600 }),
       );
+      const size = pending.size;
       const source = await open(path, "r");
       file = source;
       // No `await` between this check and `#sendOutgoing`, which adds the transfer: two parallel
       // streams cannot both pass the file set limit.
+      this.#writing.delete(pending);
       this.#checkOutgoing(peerId, size);
       const transferId = await this.#sendOutgoing(peerId, {
         name: input.name,
@@ -166,15 +174,17 @@ export class TeamWebRtcFileTransfer {
       });
       return { transferId, size };
     } finally {
+      this.#writing.delete(pending);
       await file?.close().catch(() => undefined);
       await rm(path, { force: true });
     }
   }
 
-  #checkOutgoing(peerId: string, size: number): void {
+  /** `own` is the stream that asks, so its bytes on disk are not counted twice. */
+  #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error(sourceText("error.remote.fileTooLarge"));
-    const activeBytes = [...this.#outgoing.values()]
+    const activeBytes = [...this.#outgoing.values(), ...[...this.#writing].filter((stream) => stream !== own)]
       .filter((transfer) => transfer.peerId === peerId)
       .reduce((sum, transfer) => sum + transfer.size, 0);
     if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
