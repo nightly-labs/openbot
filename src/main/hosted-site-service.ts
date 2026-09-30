@@ -138,8 +138,9 @@ export class HostedSiteDesktopService {
   }
 
   async deleteServerSite(siteId: string): Promise<void> {
-    // The list refuses a Worker that ignores the credential, which would delete any site of the owner.
-    await this.listServerSites();
+    // A Worker that ignores the credential deletes any site of the owner, also one that its list does not show.
+    const { sites } = await this.listServerSites();
+    if (!sites.some((site) => site.id === siteId)) throw new Error(sourceText("error.team.hostedSiteNotFound"));
     return this.deleteSite(siteId, operationKey("delete"), serverHeaders(this.requireServerCredential()));
   }
 
