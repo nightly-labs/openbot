@@ -149,8 +149,9 @@ const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
 /**
  * An agent's tab that nobody used for this long unloads its page, and loads it again on its next use,
- * so a long run does not keep one renderer process for each tab an agent left open. When memory is
- * low, the tab unloads after `LOW_MEMORY_TAB_SLEEP_MS`.
+ * so a long run does not keep in memory the page of each tab an agent left open. The tab keeps a
+ * blank page, as a restored tab does. When memory is low, the tab unloads after
+ * `LOW_MEMORY_TAB_SLEEP_MS`.
  */
 const IDLE_TAB_SLEEP_MS = 30 * 60_000;
 const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
@@ -349,7 +350,8 @@ export class BrowserHost {
   #tabInUse(tab: BrowserHostTab): boolean {
     return (
       this.#activeTabId === tab.id ||
-      tab.pendingOperations > 0 ||
+      // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
+      tab.pendingOperations > (tab.previewCapture ? 1 : 0) ||
       tab.viewInvalidations.size > 0 ||
       tab.recording ||
       tab.secret !== undefined ||
