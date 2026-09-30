@@ -48,6 +48,9 @@ vi.mock("electron", async () => {
     isLoading() {
       return false;
     }
+    isCurrentlyAudible() {
+      return false;
+    }
     isDestroyed() {
       return false;
     }
@@ -175,6 +178,9 @@ vi.mock("./browser-cdp", () => ({
       return async () => undefined;
     }
     async setEnvironment() {}
+    hasUploadDocuments() {
+      return false;
+    }
     async navigate(url: string) {
       await this.contents.loadURL(url);
     }
@@ -593,6 +599,24 @@ describe("browser tab capacity", () => {
     await host.activate("tab-c");
     await vi.waitFor(() => expect(title("tab-c")).toBe("https://example.com/c"));
     expect(title("tab-a")).toBe("example.com");
+  });
+
+  it("unloads an idle agent tab and loads it again on its next use", async () => {
+    vi.useFakeTimers();
+    await host.destroy();
+    host = new BrowserHost(browserWindow, directory, statePath);
+    const url = "https://example.com/idle-agent-tab";
+    const idle = await host.open(url, "thread-a", "agent-a");
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL() === url);
+    assert(page);
+    await host.open("https://example.com/active-agent-tab", "thread-a", "agent-a");
+
+    await vi.advanceTimersByTimeAsync(31 * 60_000);
+    expect(page.getURL()).toBe("about:blank");
+    expect(host.listTabs().find((tab) => tab.id === idle.id)).toMatchObject({ url, title: url });
+
+    await host.activate(idle.id);
+    await vi.waitFor(() => expect(page.getURL()).toBe(url));
   });
 
   it("applies restored limits after resolving legacy owners", async () => {

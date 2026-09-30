@@ -237,6 +237,7 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
+| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads. The next use loads the page again. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
 

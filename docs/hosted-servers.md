@@ -417,6 +417,13 @@ routine runs and teammate messages, and the oldest first in each group. No turn 
 that another turn holds, because a message to a teammate ends the turn that sends it. A queued
 message counts as use, so the server does not stop while messages wait.
 
+An agent's browser tab that nobody uses for 30 minutes unloads its page, and its renderer process
+stops. The tab stays in the list with its URL, title and last preview. The next use by the agent or
+a person loads the page again, without its history and page state. When memory is `low`, a tab
+unloads after 5 minutes. The active tab, a popup and its opener, and a tab with a
+takeover, a secret, a recording, a live view, staged uploads or sound do not unload. This also
+applies to the desktop app.
+
 ## Tested on boat
 
 The `boat` scenario of `scripts/stripe-flows-e2e.ts` (see `apps/auth-api/README.md`) passed on
