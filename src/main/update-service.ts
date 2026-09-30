@@ -162,6 +162,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #started = false;
   #installStarted = false;
   #pendingInstallRequests = 0;
+  #installHandedOver = false;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   #logWrite = Promise.resolve();
@@ -235,7 +236,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       // Both awaited calls reject on failure, so this only has to cover errors raised outside them,
       // and only for an operation still in flight. An abandoned operation reporting late must not
       // replace the state the user is now looking at.
-      if (this.#operation === "install" && this.#isInstallLive()) {
+      // Before the handover only a check can raise an error, such as the quiet check that runs while
+      // an update is ready. Reading that as an install failure would abandon an install whose
+      // shutdown preparation is already under way.
+      if (this.#operation === "install" && this.#installHandedOver && this.#isInstallLive()) {
         // quitAndInstall can return without quitting. Shutdown preparation has already run by then,
         // so the app cannot install again; it reports the failure and asks to be relaunched.
         this.#installGeneration += 1;
@@ -515,6 +519,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       // attempt as failed, or a retry has taken over, this attempt must not go on to restart the
       // app behind a UI that says it did not happen.
       if (this.#installGeneration !== generation) return;
+      this.#installHandedOver = true;
       this.#updater.quitAndInstall(false, true);
       // The handover is where a restart is most likely to stall, and shutdown preparation may have
       // torn down the deadline along with everything else, so re-arm it here as well.
