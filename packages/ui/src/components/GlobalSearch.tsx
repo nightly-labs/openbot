@@ -754,10 +754,9 @@ export function GlobalSearch(props: GlobalSearchProps) {
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
     const index = Number(event.key) - 1;
     if (!Number.isInteger(index) || index < 0 || index > 8) return;
-    const result = flatResults()[index];
-    if (!result) return;
+    // With no such result, the key still stops here: the server rail uses the same shortcut.
     event.preventDefault();
-    activate(result);
+    activate(flatResults()[index]);
   }
 
   return (

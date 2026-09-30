@@ -57,7 +57,6 @@ import { createEffect, createMemo, createSignal, Loading, lazy, onCleanup, onSet
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
-import { globalSearchChannels } from "../../global-search-sources";
 import { LayoutProvider, useLayout } from "../../layout";
 import { PlatformProvider } from "../../platform";
 import { WorkspaceFrame } from "../../WorkspaceFrame";
@@ -76,6 +75,7 @@ import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
 import { ChannelsControllerProvider } from "../channels/channels-context";
 import { createChannelsController } from "../channels/channels-controller";
+import { globalSearchChannels } from "../channels/global-search-channels";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";

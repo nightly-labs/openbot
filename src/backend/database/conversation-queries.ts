@@ -15,7 +15,7 @@ import {
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { COLLAPSE_WHITESPACE_FUNCTION, type DatabaseCore } from "./database-core";
+import { COLLAPSE_WHITESPACE_FUNCTION, type DatabaseCore, LOWERCASE_FUNCTION } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -351,7 +351,9 @@ export class ConversationQueries {
     const offset = cursor ? decodeSearchCursor(cursor) : 0;
     const threadId = "substr(attachment.owner_id, 1, instr(attachment.owner_id, ':') - 1)";
     const messageId = "substr(attachment.owner_id, instr(attachment.owner_id, ':') + 1)";
-    const nameFilter = normalized ? "AND LOWER(attachment.name) LIKE ? ESCAPE '\\'" : "";
+    const nameFilter = normalized
+      ? `AND ${LOWERCASE_FUNCTION}(${COLLAPSE_WHITESPACE_FUNCTION}(attachment.name)) LIKE ? ESCAPE '\\'`
+      : "";
     const parameters = normalized ? [`%${escapeLike(normalized)}%`] : [];
     const rows = databaseRows(
       this.#core.connection

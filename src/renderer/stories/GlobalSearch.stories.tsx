@@ -220,7 +220,7 @@ export const ManyResults: Story = {
   },
 };
 
-/** A joined server or the web client: no files and no routines, so those filters do not show. */
+/** Only agents and messages, as on a web client host with no channels: no other filter shows. */
 export const AgentsAndMessagesOnly: Story = {
   args: { channels: undefined, routines: undefined, actions: undefined, onSearchFiles: undefined },
 };

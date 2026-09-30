@@ -97,7 +97,14 @@ const Navigation = createSimpleContext({
       await openDirectConversation(memberId);
     }
 
+    // The element that had focus before the search opened. A dialog that the search opens returns
+    // focus to it, because the search input is gone when that dialog closes.
+    let globalSearchOpener: HTMLElement | null = null;
+
     function setGlobalSearchVisibility(open: boolean): void {
+      if (open && !globalSearchOpen()) {
+        globalSearchOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
       setGlobalSearchOpen(open);
     }
 
@@ -125,7 +132,9 @@ const Navigation = createSimpleContext({
           nextCursor: page.nextCursor,
         };
       } catch (error) {
-        analytics.track("search_action", { scope: "global", result: "failed", failure_code: "search_failed" });
+        if (cursor === undefined) {
+          analytics.track("search_action", { scope: "global", result: "failed", failure_code: "search_failed" });
+        }
         throw error;
       }
     }
@@ -173,6 +182,7 @@ const Navigation = createSimpleContext({
       messageFocusRequest,
       globalSearchOpen,
       setGlobalSearchVisibility,
+      globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
     };

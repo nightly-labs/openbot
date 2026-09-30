@@ -83,15 +83,19 @@ export function trackResultHighlight(
     highlight.style.transform = `translateY(${offsetWithin(row, results)}px)`;
   };
   place(true);
-  // Rows also render and leave as the list scrolls, so a changed row alone is not a new list.
+  // Rows also render and leave as the list scrolls, so a changed row alone is not a new list. A row
+  // moves through its style after the list changes, so a style change places the highlight again.
+  // The highlight's own style changes are left out: they come from `place`.
   const observer = new MutationObserver((records) => {
-    place(records.some((record) => record.attributeName === "data-list"));
+    const changes = records.filter((record) => record.target !== highlight);
+    if (changes.length === 0) return;
+    place(changes.some((record) => record.attributeName === "data-list"));
   });
   observer.observe(results, {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ["data-highlighted", "data-first", "data-list"],
+    attributeFilter: ["data-highlighted", "data-first", "data-list", "style"],
   });
   return () => observer.disconnect();
 }

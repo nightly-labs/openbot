@@ -1274,6 +1274,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
               })),
           ),
         );
+        // Newest first, as the backend returns them.
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         const offset = Number(input.cursor ?? 0);
         const end = offset + (input.limit ?? 50);
         return { results: results.slice(offset, end), nextCursor: end < results.length ? String(end) : null };

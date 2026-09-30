@@ -515,9 +515,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .global-search-dialog,
-  .global-search-status,
   .global-search-empty {
     animation: none;
+  }
+
+  /* Keep the delay: a fast search still shows no status. */
+  .global-search-status {
+    animation-duration: 0s;
   }
 
   .global-search-filter-pill,
