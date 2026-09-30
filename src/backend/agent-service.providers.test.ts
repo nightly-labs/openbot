@@ -505,7 +505,7 @@ describe.sequential("AgentService: providers", () => {
     expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
       tools: CODEX_TOOLS,
       mcp_servers: {
-        "Signed in": { url: "https://mcp.example.com/mcp", http_headers: { Authorization: `Bearer ${token}` } },
+        Signed_in: { url: "https://mcp.example.com/mcp", http_headers: { Authorization: `Bearer ${token}` } },
       },
     });
     const reported = events.filter((event) => event.type === "error");
@@ -665,7 +665,7 @@ describe.sequential("AgentService: providers", () => {
     expect(starts).toHaveLength(2);
     const config = paramsRecord(starts.at(-1)?.params)?.config;
     expect(isDynamicRecord(config) ? config.mcp_servers : undefined).toMatchObject({
-      "Npx tool": expect.anything(),
+      Npx_tool: expect.anything(),
     });
   });
 

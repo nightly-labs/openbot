@@ -48,9 +48,10 @@ import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./
  * the replacement flow. Bump it when what Codex is sent changes; 2 is HTTP servers joining
  * the payload, 3 is the sweep that turns off the servers `~/.codex/config.toml` declares, and 4 is
  * the managed tool runtimes joining the fingerprint, so a session started before Bun finished
- * downloading is replaced once its servers can actually start, and 5 is the plan tool below.
+ * downloading is replaced once its servers can actually start, 5 is the plan tool below, and 6 is
+ * server names in the form Codex accepts.
  */
-const CODEX_MCP_ADAPTER_VERSION = 5;
+const CODEX_MCP_ADAPTER_VERSION = 6;
 
 /**
  * Codex offers `update_plan` only when this is on, and without it a turn sends no
