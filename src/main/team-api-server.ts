@@ -650,6 +650,12 @@ export class TeamApiServer {
       const message = expected ? error.message : sourceText("error.team.requestFailed");
       const code = error instanceof RemoteScreenError ? error.code : undefined;
       if (!expected) (this.#options.logger ?? logger).error("Team API request failed:", toLogValue(error));
+      // A streamed file can fail after its head is on the wire. A second head is not possible, so
+      // the socket closes and the client sees an incomplete download.
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
       return this.#json(response, status, { error: message, ...(code ? { code } : {}) });
     }
   }

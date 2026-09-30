@@ -2,7 +2,9 @@
 
 // Attachments, shared files and workspace files: `src/main/team-api/route-files.ts`.
 
+import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import { join } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, describe, expect, it } from "vitest";
@@ -76,5 +78,57 @@ describe("TeamApiServer files", () => {
 
     const unauthorizedWorkspace = await fetch(`${base}/v1/workspace-files?botId=chief&path=app/page.tsx`);
     expect(unauthorizedWorkspace.status).toBe(401);
+  });
+
+  // The routes stream files and read uploads into one array. A file of many chunks checks that the
+  // released head and bytes did not change.
+  it("sends and receives many-chunk files with the same head and bytes", async () => {
+    const { root, start, signIn } = await createTeamApiFixture("attachment-stream", { configure: true });
+    const path = join(root, "photo one.png");
+    const bytes = randomBytes(1024 * 1024 + 7);
+    await writeFile(path, bytes);
+    const uploads: Uint8Array[] = [];
+    const agents = createAgents({
+      prepareImportedAttachments: async (_paths, data) => {
+        uploads.push(...data.map((item) => item.bytes));
+        return data.map((item) => ({
+          id: "draft-1",
+          name: item.name,
+          size: item.bytes.byteLength,
+          kind: "file" as const,
+          mimeType: item.mimeType,
+          previewKind: "none" as const,
+          previewUrl: null,
+        }));
+      },
+    });
+    const { base } = await start({
+      agents,
+      mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png", name: "photo one.png" }) },
+    });
+    const authorization = `Bearer ${await signIn()}`;
+
+    const download = await fetch(`${base}/v1/attachments/image`, { headers: { Authorization: authorization } });
+    expect(download.status).toBe(200);
+    expect(download.headers.get("content-type")).toBe("image/png");
+    expect(download.headers.get("content-length")).toBe(String(bytes.length));
+    expect(download.headers.get("content-disposition")).toBe("attachment; filename*=UTF-8''photo%20one.png");
+    expect(Buffer.from(await download.arrayBuffer()).equals(bytes)).toBe(true);
+
+    const upload = `${base}/v1/attachments?name=${encodeURIComponent("photo one.png")}&mime=image%2Fpng`;
+    const sized = await fetch(upload, { method: "POST", headers: { Authorization: authorization }, body: bytes });
+    expect(sized.status).toBe(201);
+    // A body written in parts has no `Content-Length`, so it arrives chunked.
+    const chunked = await new Promise<number | undefined>((resolve, reject) => {
+      const request = httpRequest(upload, { method: "POST", headers: { Authorization: authorization } }, (response) => {
+        response.resume();
+        resolve(response.statusCode);
+      });
+      request.on("error", reject);
+      request.write(bytes.subarray(0, 1000));
+      request.end(bytes.subarray(1000));
+    });
+    expect(chunked).toBe(201);
+    expect(uploads.map((item) => Buffer.from(item).equals(bytes))).toEqual([true, true]);
   });
 });

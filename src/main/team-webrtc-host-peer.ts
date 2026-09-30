@@ -1,4 +1,5 @@
 import { createHash, randomBytes, verify } from "node:crypto";
+import { openAsBlob } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -51,7 +52,7 @@ import {
 } from "./remote-desktop-signal";
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
-import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
+import { type ReceivedWebRtcFile, TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
@@ -435,9 +436,28 @@ export class TeamWebRtcHostPeer {
       [...peerCapabilities].some((capability) => !this.#peerCapabilities.has(capability));
     this.#peerCapabilities = peerCapabilities;
     if (capabilitiesChanged) this.#sendAgentEventScope();
-    const preserveSemanticTags = supportsTeamSemanticTags(this.#peerCapabilities);
+    const request = { url, peerId, peerCapabilities, preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities) };
+    // An uploaded body stays on disk: the request reads it from the file, and the file is removed
+    // after the response is complete.
+    if (input.bodyTransferId) {
+      return this.#files.useReceived(peerId, input.bodyTransferId, (uploaded) =>
+        this.#forwardHttp(input, request, uploaded),
+      );
+    }
+    return this.#forwardHttp(input, request, null);
+  }
+
+  async #forwardHttp(
+    input: HttpRequestPayload,
+    {
+      url,
+      peerId,
+      peerCapabilities,
+      preserveSemanticTags,
+    }: { url: URL; peerId: string; peerCapabilities: Set<string>; preserveSemanticTags: boolean },
+    uploaded: ReceivedWebRtcFile | null,
+  ): Promise<TeamProtocolV2Json> {
     const sideRoute = teamSideRouteCodec(input.path);
-    const uploaded = input.bodyTransferId ? await this.#files.consume(peerId, input.bodyTransferId) : null;
     const response = await fetch(url, {
       method: input.method,
       headers: {
@@ -458,7 +478,7 @@ export class TeamWebRtcHostPeer {
         input.method === "GET"
           ? undefined
           : uploaded
-            ? Buffer.from(uploaded.bytes)
+            ? await openAsBlob(uploaded.path)
             : input.body === null
               ? undefined
               : JSON.stringify(
@@ -486,17 +506,18 @@ export class TeamWebRtcHostPeer {
       );
     }
     if (response.status !== 204 && (isFile || !contentType.includes("json"))) {
-      const bytes = new Uint8Array(await response.arrayBuffer());
       const name = contentDispositionFileName(response.headers.get("content-disposition"), "remote-file");
-      const transferId = await this.#files.send(peerId, {
+      // The body goes to disk in chunks and not to one buffer, so a 100 MB download does not stay in
+      // main for the minutes that the data channel needs to send it.
+      const { transferId, size } = await this.#files.sendStream(peerId, {
         name,
         mimeType: contentType || "application/octet-stream",
-        bytes,
+        body: response.body ?? [],
       });
       return {
         status: response.status,
         body: null,
-        file: { transferId, name, mimeType: contentType || "application/octet-stream", size: bytes.byteLength },
+        file: { transferId, name, mimeType: contentType || "application/octet-stream", size },
       };
     }
     return {
