@@ -136,6 +136,7 @@ interface HostedServerRow {
   billing_interval: BillingInterval;
   currency: BillingCurrency;
   checkout_session_id: string | null;
+  idempotency_key: string;
   desired_state: DesiredState;
   observed_state: HostedServerState;
   observed_error: HostedServerError | null;
@@ -149,7 +150,7 @@ interface HostedServerRow {
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
-  checkout_session_id, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
+  checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, created_at, updated_at`;
 
 /** The billing calls that hosted servers use. */
@@ -755,13 +756,14 @@ export class HostedServerService {
       target: returnTo.target,
       origin: returnTo.origin,
     });
+    // A new plan choice changes the key of an unpaid server, so a page for the plan before it is not stored.
     const stored = await this.#database
       .prepare(
         `UPDATE hosted_servers SET checkout_session_id = ?, updated_at = ?
-         WHERE server_id = ? AND checkout_session_id IS ?
+         WHERE server_id = ? AND checkout_session_id IS ? AND idempotency_key = ?
            AND ((observed_state = 'awaiting_payment' AND desired_state = 'running') OR desired_state = 'stopped')`,
       )
-      .bind(session.sessionId, this.#now(), row.server_id, previous)
+      .bind(session.sessionId, this.#now(), row.server_id, previous, row.idempotency_key)
       .run();
     if (stored.meta.changes !== 1) {
       // A second request stored its page first. This page closes, so only that one can take a payment.
