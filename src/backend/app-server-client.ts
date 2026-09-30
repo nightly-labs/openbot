@@ -2,6 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
   type AppServerNotification,
@@ -64,10 +65,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     this.#stopping = false;
     this.#decoder = new JsonLineDecoder();
-    const child = spawn(this.#executable, ["app-server", "--listen", "stdio://"], {
+    const target = cliSpawnTarget(this.#executable, ["app-server", "--listen", "stdio://"]);
+    const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
-      shell: process.platform === "win32",
+      windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
     });
     this.#process = child;

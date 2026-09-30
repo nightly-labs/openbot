@@ -35,7 +35,7 @@ import {
   claudeWorkspaceSkillPlugin,
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
-import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
+import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -470,11 +470,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   async #readAuthStatus(): Promise<DynamicRecord> {
     let stdout: unknown;
     let failure: unknown = null;
+    const target = cliSpawnTarget(this.#cli.executable, ["auth", "status", "--json"]);
     try {
-      ({ stdout } = await execFileAsync(this.#cli.executable, ["auth", "status", "--json"], {
+      ({ stdout } = await execFileAsync(target.command, target.args, {
         timeout: 5_000,
         maxBuffer: 64 * 1024,
-        shell: process.platform === "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
         env: claudeEnvironment(this.#cli),
       }));
     } catch (error) {
