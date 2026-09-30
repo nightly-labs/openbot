@@ -4,6 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   codexTag,
+  cursorPackageUrl,
   providerRuntimeDescriptor,
   type RuntimeSpec,
   type RuntimeTarget,
@@ -18,7 +19,8 @@ import {
  *
  * Every download keeps a hash from its source: GitHub's asset `digest` for Codex and npm's
  * `dist.integrity` for Claude and OpenCode. x.ai publishes no hash for Grok, so a Grok release is
- * trusted on TLS alone. Bun is a tool runtime rather than a provider, and stays on the lock.
+ * trusted on TLS alone, and so are Antigravity and Cursor from the ACP registry. Bun is a tool
+ * runtime rather than a provider, and stays on the lock.
  */
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -42,6 +44,9 @@ const BLOCKED_VERSIONS_URL =
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 const VERSION = /^\d+\.\d+\.\d+$/u;
+/** Cursor's registry version is the date; the download folder adds the commit. */
+const CURSOR_DATE = /^\d{4}\.\d{2}\.\d{2}$/u;
+const CURSOR_BUILD = /^\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7,40}$/u;
 const HEADERS = { "User-Agent": "OpenBot-runtime-installer" };
 
 export type BlockedVersions = ReadonlyMap<ManagedProviderId, ReadonlySet<string>>;
@@ -145,6 +150,41 @@ const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext)
       entry.cmd !== `./${artifact.executable}`
     ) {
       throw new Error(sourceText("error.provider.antigravityReleaseShape"));
+    }
+    return {
+      ...pinned,
+      version,
+      packageVersion: version,
+      source: "latest",
+      url,
+      archiveDigest: null,
+      downloadBytes: await downloadSize(fetch, url),
+    };
+  },
+  /**
+   * Cursor publishes the CLI in the ACP registry, with no hash, so the latest release is trusted on
+   * TLS alone. The registry names the date; the build, a date and a commit, is only in the URL. The
+   * download must stay on Cursor's path for the pinned target and keep the pinned command.
+   */
+  cursor: async ({ target, lock, fetch }) => {
+    const pinned = providerRuntimeDescriptor("cursor").spec(target, lock);
+    const agent = await fetchJson(fetch, lock.cursor.registry);
+    const date = isString(agent.version) && CURSOR_DATE.test(agent.version) ? agent.version : null;
+    const binary = isDynamicRecord(agent.distribution) ? agent.distribution.binary : null;
+    const entry = isDynamicRecord(binary) ? binary[ACP_REGISTRY_TARGETS[target]] : null;
+    const artifact = lock.cursor.artifacts[target];
+    const url = isDynamicRecord(entry) && isString(entry.archive) ? entry.archive : null;
+    const prefix = `${lock.cursor.distribution}/`;
+    const version = url?.startsWith(prefix) ? url.slice(prefix.length).split("/")[0] : undefined;
+    const command =
+      target === "win32-x64" ? `./dist-package\\${artifact.executable}` : `./dist-package/${artifact.executable}`;
+    if (
+      !(date && version && CURSOR_BUILD.test(version) && version.startsWith(`${date}-`)) ||
+      url !== cursorPackageUrl(lock.cursor.distribution, version, artifact) ||
+      !isDynamicRecord(entry) ||
+      entry.cmd !== command
+    ) {
+      throw new Error(sourceText("error.provider.cursorReleaseShape"));
     }
     return {
       ...pinned,

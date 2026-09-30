@@ -6,7 +6,7 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, and Gemini through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, and [Cursor CLI](https://cursor.com/cli) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +19,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, or Gemini sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, or Cursor sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -32,7 +32,7 @@ messaging in one desktop app.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
-Grok connects to xAI, Gemini connects to Google,
+Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -122,6 +122,14 @@ that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself
 `bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
 `bin/`. When that path is set, OpenBot uses only it. Gemini agents stay on this computer: team
 members do not see them.
+
+Cursor uses a Cursor plan or a Cursor API key. OpenBot downloads and pins the Cursor CLI
+(`cursor-agent`) when you select Download on the Cursor row in More providers, and starts it with
+`cursor-agent acp`. Sign in opens Cursor's sign-in page in your browser. You can also set
+`CURSOR_API_KEY` in the environment used to launch OpenBot. If you installed `cursor-agent`
+yourself, OpenBot uses it until a download exists. OpenBot never uses the `cursor` command, which
+starts the Cursor editor. Set `OPENBOT_CURSOR_PATH` to select an executable yourself. Cursor
+agents stay on this computer: team members do not see them.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -442,6 +450,8 @@ video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts m
 - `~/.grok` — login and session history managed exclusively by Grok CLI.
 - `~/.gemini` (or `$GEMINI_HOME`) — login and session history managed exclusively by the
   Antigravity ACP server that Gemini uses.
+- `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
+  process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

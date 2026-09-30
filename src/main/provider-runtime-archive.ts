@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { type FileHandle, open, readdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { type FileHandle, mkdir, open, readdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
@@ -67,6 +67,7 @@ interface ZipEntry {
 const ZIP_END_MAX_BYTES = 22 + 0xffff;
 const ZIP_UNIX_TYPE_MASK = 0o170000;
 const ZIP_UNIX_REGULAR_FILE = 0o100000;
+const ZIP_UNIX_DIRECTORY = 0o040000;
 
 /**
  * Unpacks the named files of a flat zip archive into `destination`.
@@ -86,7 +87,8 @@ export async function extractZipFiles(
   const handle = await open(archive, "r");
   let entries: ZipEntry[];
   try {
-    entries = await readZipDirectory(handle, names, message);
+    entries = await readZipDirectory(handle, (name) => names.includes(name), message);
+    if (entries.length !== names.length) throw new Error(message);
     for (const entry of entries) {
       const dataStart = await zipDataOffset(handle, entry);
       await extractZipEntry(archive, dataStart, entry, join(destination, entry.name));
@@ -96,7 +98,47 @@ export async function extractZipFiles(
   }
 }
 
-async function readZipDirectory(handle: FileHandle, names: readonly string[], message: string): Promise<ZipEntry[]> {
+/**
+ * Unpacks a zip archive with folders into `destination`. Every name must be a relative path under
+ * the folder `root`, with no `.`, `..`, empty or drive part, so no entry is written outside
+ * `destination`. The other checks are those of `extractZipFiles`.
+ */
+export async function extractZipTree(
+  archive: string,
+  destination: string,
+  root: string,
+  message: string,
+): Promise<void> {
+  const handle = await open(archive, "r");
+  try {
+    const entries = await readZipDirectory(handle, (name) => isZipTreeName(name, root), message);
+    for (const entry of entries) {
+      const path = join(destination, ...entry.name.replace(/\/$/u, "").split("/"));
+      if (entry.name.endsWith("/")) {
+        await mkdir(path, { recursive: true });
+        continue;
+      }
+      await mkdir(dirname(path), { recursive: true });
+      const dataStart = await zipDataOffset(handle, entry);
+      await extractZipEntry(archive, dataStart, entry, path);
+    }
+  } finally {
+    await handle.close();
+  }
+}
+
+function isZipTreeName(name: string, root: string): boolean {
+  if (name.includes("\0") || name.includes("\\")) return false;
+  const parts = name.replace(/\/$/u, "").split("/");
+  // A `:` names an NTFS stream on Windows, which would write beside the file rather than into it.
+  return parts[0] === root && parts.every((part) => part && part !== "." && part !== ".." && !part.includes(":"));
+}
+
+async function readZipDirectory(
+  handle: FileHandle,
+  accepts: (name: string) => boolean,
+  message: string,
+): Promise<ZipEntry[]> {
   const { size } = await handle.stat();
   const tailBytes = Math.min(size, ZIP_END_MAX_BYTES);
   const tail = await readAt(handle, size - tailBytes, tailBytes);
@@ -137,17 +179,20 @@ async function readZipDirectory(handle: FileHandle, names: readonly string[], me
     };
     offset += 46 + nameBytes + extraBytes + commentBytes;
     // Unix is host 3; its mode is the high half of the external attributes. A link or device is
-    // refused here, as `assertSafeArchive` refuses one in a tarball.
-    if (madeBy === 3 && unixMode !== 0 && (unixMode & ZIP_UNIX_TYPE_MASK) !== ZIP_UNIX_REGULAR_FILE) {
+    // refused here, as `assertSafeArchive` refuses one in a tarball. A name that ends in `/` is a
+    // folder, and holds no data.
+    const folder = entry.name.endsWith("/");
+    const type = folder ? ZIP_UNIX_DIRECTORY : ZIP_UNIX_REGULAR_FILE;
+    if (madeBy === 3 && unixMode !== 0 && (unixMode & ZIP_UNIX_TYPE_MASK) !== type) {
       throw new Error(sourceText("error.provider.archiveSpecialFile"));
     }
+    if (folder && entry.bytes !== 0) throw new Error(sourceText("error.provider.archiveUnreadable"));
     if ((flags & 1) !== 0 || ![0, 8].includes(entry.method) || entry.compressedBytes === 0xffffffff) {
       throw new Error(sourceText("error.provider.archiveUnreadable"));
     }
-    if (!names.includes(entry.name) || entries.some((other) => other.name === entry.name)) throw new Error(message);
+    if (!accepts(entry.name) || entries.some((other) => other.name === entry.name)) throw new Error(message);
     entries.push(entry);
   }
-  if (entries.length !== names.length) throw new Error(message);
   return entries;
 }
 

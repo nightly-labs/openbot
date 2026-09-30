@@ -35,6 +35,7 @@ function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1
       grok: { ...offer.runtime, availableVersion: null },
       opencode: { ...offer.runtime, availableVersion: null },
       antigravity: { ...offer.runtime, availableVersion: null },
+      cursor: { ...offer.runtime, availableVersion: null },
     },
     toolRuntimes: { bun: { ...offer.runtime } },
   };

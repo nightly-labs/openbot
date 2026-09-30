@@ -171,6 +171,13 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
+  "error.provider.cursorChecksum": "Cursor runtime checksum mismatch.",
+  "error.provider.cursorReleaseShape": "The Cursor release has an unexpected shape.",
+  "error.provider.cursorMissing": "Cursor is not downloaded. Download it in OpenBot to continue.",
+  "error.provider.cursorNotStarted": "The Cursor agent was found, but its version cannot be read.",
+  "error.provider.cursorVersionUnreadable": "Unable to read the Cursor agent version.",
+  "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",

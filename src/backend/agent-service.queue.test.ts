@@ -350,6 +350,7 @@ describe.sequential("AgentService: queue", () => {
         { id: "grok", state: "not-installed", version: null },
         { id: "opencode", state: "not-installed", version: null },
         { id: "antigravity", state: "not-installed", version: null },
+        { id: "cursor", state: "not-installed", version: null },
         { id: "acp", state: "not-installed", version: null },
       ],
     });
@@ -440,6 +441,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
           { id: "antigravity", state: "not-installed" },
+          { id: "cursor", state: "not-installed" },
           { id: "acp", state: "not-installed" },
         ],
       });
@@ -453,6 +455,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
           { id: "antigravity", state: "not-installed" },
+          { id: "cursor", state: "not-installed" },
           { id: "acp", state: "not-installed" },
         ],
       });

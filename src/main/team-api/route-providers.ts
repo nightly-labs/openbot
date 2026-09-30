@@ -183,10 +183,22 @@ function managedProvider(body: DynamicRecord): ManagedProviderId {
   return id;
 }
 
-/** `providers-v2` knows every managed runtime, Gemini included. */
-function managedProviderV2(body: DynamicRecord): ManagedProviderId {
+/**
+ * The managed runtimes that `providers-v2` knows: Gemini, and not Cursor, which stays on this
+ * computer. A peer that names Cursor gets the same refusal as for a provider that does not exist.
+ */
+const WIRE_PROVIDERS_V2 = [...WIRE_PROVIDERS, "antigravity"] as const satisfies readonly ManagedProviderId[];
+type WireProviderIdV2 = (typeof WIRE_PROVIDERS_V2)[number];
+
+/** The `providers-v2` runtime snapshot. It has no entry for Cursor. */
+interface WireProviderRuntimeSnapshotV2 extends Omit<ProviderRuntimeSnapshot, "providers"> {
+  providers: Record<WireProviderIdV2, ProviderRuntimeStatus>;
+}
+
+function managedProviderV2(body: DynamicRecord): WireProviderIdV2 {
   const id = parseProviderId(body.provider);
   if (!isManagedRuntimeProvider(id)) throw new Error(sourceText("error.team.providerNotManaged"));
+  if (!isOneOf(WIRE_PROVIDERS_V2, id)) throw new Error("Unknown provider.");
   return id;
 }
 
@@ -212,8 +224,8 @@ function wireSnapshot(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSna
   };
 }
 
-/** The `providers-v2` runtime snapshot: every managed runtime. */
-function wireSnapshotV2(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
+/** The `providers-v2` runtime snapshot: every managed runtime that a peer can see. */
+function wireSnapshotV2(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSnapshotV2 {
   const wire = wireSnapshot(snapshot);
   return { ...wire, providers: { ...wire.providers, antigravity: wireStatus(snapshot.providers.antigravity) } };
 }

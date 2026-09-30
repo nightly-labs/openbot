@@ -25,7 +25,11 @@ export function isForeignReasoningError(message: string): boolean {
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
   if (
-    (provider !== "grok" && provider !== "opencode" && provider !== "antigravity" && provider !== "acp") ||
+    (provider !== "grok" &&
+      provider !== "opencode" &&
+      provider !== "antigravity" &&
+      provider !== "cursor" &&
+      provider !== "acp") ||
     !(error instanceof Error)
   ) {
     return false;

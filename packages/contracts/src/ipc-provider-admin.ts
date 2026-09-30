@@ -85,6 +85,8 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
         providers.antigravity === undefined
           ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
           : decodeProviderRuntimeStatus(providers.antigravity),
+      // No Team API protocol carries Cursor: it stays on the host computer.
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

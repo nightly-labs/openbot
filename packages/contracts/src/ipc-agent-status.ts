@@ -71,6 +71,7 @@ export type AgentAuthState =
   | { kind: "grok"; email: string | null }
   | { kind: "opencode"; email: string | null }
   | { kind: "antigravity"; email: string | null }
+  | { kind: "cursor"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {

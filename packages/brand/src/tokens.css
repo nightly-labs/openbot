@@ -381,6 +381,10 @@
   --openbot-provider-current: var(--openbot-provider-antigravity);
 }
 
+[data-provider="cursor"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

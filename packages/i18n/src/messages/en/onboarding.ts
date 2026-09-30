@@ -38,6 +38,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.included": "Included with OpenBot",
   "onboarding.provider.freeModels": "Free models, no account needed",
   "onboarding.provider.googlePlan": "Google AI Pro or Ultra plan",
+  "onboarding.provider.cursorPlan": "Cursor plan or API key",
   "onboarding.provider.tryFree": "Try it free",
   "onboarding.provider.noSignIn": "No sign-in needed",
   "onboarding.provider.more": "More providers",

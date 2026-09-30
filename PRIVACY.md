@@ -414,8 +414,9 @@ Network traffic can also occur when:
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
   OpenCode, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
-  `dl.google.com` (for the download size) for Gemini, and it reads a list of blocked versions from
-  `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
+  `dl.google.com` (for the download size) for Gemini, and the same registry and
+  `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
+  versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - a user opens an explicitly labeled external support or setup link.
 
@@ -533,6 +534,19 @@ and the server sends them to Google. Sign in opens Google's sign-in page in your
 server keeps its login and session files in `~/.gemini`, or in `$GEMINI_HOME`. OpenBot does not
 read, copy, or upload these files. Google's terms apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
+
+### Cursor
+
+OpenBot downloads the Cursor CLI from `downloads.cursor.com` when you select Download on the Cursor
+row. Each provider update check also asks `downloads.cursor.com` for the size of the newest
+download, also when you do not use Cursor. OpenBot starts the CLI as a local process. Prompts,
+attachments, and tool results go to that process, and the CLI sends them to Cursor. Sign in opens
+Cursor's sign-in page in your browser, or the CLI uses `CURSOR_API_KEY` from the environment that
+started OpenBot. OpenBot gives that key only to the local CLI, in its environment, and does
+not store it. The CLI keeps its login and session files
+in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
+upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
+on this computer: OpenBot does not show them to team members.
 
 ### Local model servers
 

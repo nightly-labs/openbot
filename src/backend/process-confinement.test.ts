@@ -5,7 +5,13 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { confineSpawnTarget, grokStatePaths, ProcessConfinementUnavailableError } from "./process-confinement";
+import {
+  confineSpawnTarget,
+  cursorConfinedEnv,
+  cursorStatePaths,
+  grokStatePaths,
+  ProcessConfinementUnavailableError,
+} from "./process-confinement";
 
 // The test folder must not be under the temporary folders, which the sandbox allows. The test runner
 // can move `HOME` there, so the folder is in the checkout.
@@ -38,11 +44,15 @@ afterEach(async () => {
 });
 
 /** True when a confined shell could write `path`. */
-function confinedWrite(path: string): boolean {
+function confinedWrite(path: string, state = grokStatePaths({ GROK_HOME: grokHome }, root)): boolean {
   const target = confineSpawnTarget(
-    { command: "/bin/sh", args: ["-c", 'printf x > "$1"', "sh", path], windowsVerbatimArguments: false },
+    {
+      command: "/bin/sh",
+      args: ["-c", 'mkdir -p "$(dirname "$1")" && printf x > "$1"', "sh", path],
+      windowsVerbatimArguments: false,
+    },
     { writableRoots: [workspace, shared] },
-    grokStatePaths({ GROK_HOME: grokHome }, root),
+    state,
     "darwin",
   );
   return spawnSync(target.command, target.args).status === 0 && existsSync(path);
@@ -85,6 +95,18 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     );
     expect(spawnSync(target.command, target.args).status).not.toBe(0);
     expect(existsSync(join(workspace, ".claude"))).toBe(false);
+  });
+
+  it("gives Cursor a config folder of its own, and denies the user's Cursor settings", () => {
+    const cursor = cursorStatePaths({}, root);
+    const config = cursorConfinedEnv(root).CURSOR_CONFIG_DIR ?? "";
+    expect(confinedWrite(join(config, "cli-config.json"), cursor)).toBe(true);
+    expect(confinedWrite(join(root, ".cursor", "auth.json"), cursor)).toBe(true);
+    expect(confinedWrite(join(root, ".cursor", "projects", "a", "store.json"), cursor)).toBe(true);
+    expect(confinedWrite(join(root, ".cursor", "cli-config.json"), cursor)).toBe(false);
+    expect(confinedWrite(join(root, ".cursor", "hooks.json"), cursor)).toBe(false);
+    expect(confinedWrite(join(root, ".cursor", "rules", "a.mdc"), cursor)).toBe(false);
+    expect(confinedWrite(join(workspace, ".cursor", "mcp.json"), cursor)).toBe(false);
   });
 });
 

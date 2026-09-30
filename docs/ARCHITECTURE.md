@@ -336,13 +336,15 @@ would refuse.
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, `x.ai/cli/stable`
-for Grok, and the ACP registry entry `antigravity-acp` for Gemini. The version in `native-runtime.lock.json` is what a first install uses before a check has
+for Grok, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
 Codex and npm `dist.integrity` for Claude and OpenCode. x.ai and the ACP registry publish no hash,
-so a Grok or Gemini release is trusted on TLS alone. A Gemini release must stay on
-`dl.google.com/agy-extensions/releases` and keep the pinned command name. An upstream install writes `openbot-install.json` with the SHA-256 of each
+so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
+`dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
+the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
+registry date, and keep the pinned command. An upstream install writes `openbot-install.json` with the SHA-256 of each
 file it installed, and every start verifies that record and the binary's `--version` before the
 install is used. The newest version in the store that verifies is the one that runs.
 
@@ -1269,6 +1271,29 @@ sign-in state from peers on those versions, and the `providers-v1` routes omit i
 carries Gemini, and the `providers-v2` runtime routes let an owner or admin download or cancel the
 host's Gemini runtime. Gemini signs in through a browser on the host, so no peer route signs it in.
 
+### Cursor
+
+The Cursor provider (id `cursor`) starts the Cursor CLI with `cursor-agent acp`. Cursor's terms do
+not allow redistribution, so the runtime manager downloads the archive on the user's computer.
+`extractZipTree` in `src/main/provider-runtime-archive.ts` extracts the Windows zip and accepts only
+entries in its `dist-package` folder; staging renames that folder to `bin`. The CLI's `--version`
+is not usable on Windows, where the launcher is a `.cmd` file, so staging writes
+`cursor-package.json` and `verifyInstalledRuntime` reads the version from it. A lock install also
+checks the SHA-256 of each file in `files`. `resolveCursorCli` looks for `cursor-agent` on `PATH`,
+never `cursor`, which starts the Cursor editor.
+
+Sign in is an ACP `authenticate` call with `cursor_login`, in a separate process, as for Gemini.
+`CURSOR_API_KEY` in the environment also signs the CLI in. A confined Cursor process gets
+`CURSOR_CONFIG_DIR=~/.cursor/openbot-confined` (`cursorConfinedEnv`): the CLI writes
+`cli-config.json` when a session starts and fails when it cannot, and that file also holds the
+user's permissions. `cursorStatePaths` lets it write `~/.cursor` and protects the user's settings,
+hooks, rules, MCP and permission files there and in the CLI config folder. Migration 24 adds
+`cursor` to `projection_provider_sessions`.
+
+No Team API protocol knows `cursor`. The host hides Cursor agents, models, status, and sign-in
+state from every peer, and the `providers-v1` and `providers-v2` routes omit it. A custom endpoint
+saved with the id `cursor` before the provider existed stays visible.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -1445,12 +1470,13 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 | `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
+| `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
 | `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
 | `~/.claude/skills/` | the user | Claude Code, OpenCode |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
 
-A confined agent (Grok, OpenCode or Gemini, not in Full access) cannot write the four workspace
-folders: `src/backend/process-confinement.ts` protects them as project settings.
+A confined agent (Grok, OpenCode, Gemini or Cursor, not in Full access) cannot write the workspace
+skill folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
 `.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and

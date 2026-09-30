@@ -506,5 +506,85 @@
         "platformDirectory": "windows"
       }
     }
+  },
+  "cursor": {
+    "registry": "https://raw.githubusercontent.com/agentclientprotocol/registry/main/cursor/agent.json",
+    "distribution": "https://downloads.cursor.com/lab",
+    "version": "2026.09.28-64d2043",
+    "license": "Proprietary",
+    "licenseUrl": "https://cursor.com/terms-of-service",
+    "artifacts": {
+      "darwin-arm64": {
+        "platformDirectory": "darwin",
+        "architecture": "arm64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "c0d7e9cd2e62438610b886d3439907dc1f98c2923b07b3a41416cc919aaf53c7",
+        "downloadBytes": 176795016,
+        "installedBytes": 620000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "ebd2d552c7bebde593dd0390530963ad28de56bccde6ce387cdbe55fb0b6fb8e",
+          "index.js": "0d0c83f5478c3dcd806cb9697123cee3f548005fbcd3acafe31f102d659f5a7b"
+        }
+      },
+      "darwin-x64": {
+        "platformDirectory": "darwin",
+        "architecture": "x64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "3efe0dff2f3d92a1e8139e33fef182801556b57ed50a6afd7bac19c4fad09549",
+        "downloadBytes": 184187482,
+        "installedBytes": 640000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "b80c6bc98d39051e6af607805845cd497387bbe882b6c173b4b581465cd1e8d6",
+          "index.js": "d7e18a70be158b836cf23873f16f01217f2c1ca4b5f84ce530f81acb30f418ea"
+        }
+      },
+      "linux-x64": {
+        "platformDirectory": "linux",
+        "architecture": "x64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "6e4cd936a4866b8a77c50ff51a564460d715772fabc477a01aa0f0455d9559f0",
+        "downloadBytes": 182618248,
+        "installedBytes": 590000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "e0e46d3a1c0667117303412647cafcbcefb1be7612493015ec8fd6b7440162a4",
+          "index.js": "45d9b1df85d0165cb2e690f96fa5fbe4b59e8a71ddd22176a301ba7e5b18a0b9"
+        }
+      },
+      "linux-arm64": {
+        "platformDirectory": "linux",
+        "architecture": "arm64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "c737599b27d3d8d6743c72b487204e335f3a8ea2fdbaf18302ee207a646ffd8d",
+        "downloadBytes": 180564349,
+        "installedBytes": 580000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "47befb5f57df96771ce343d6293349ecf4d46c91110b626423ec3a49d2fee7c1",
+          "index.js": "b85bd012fa887d3d8cfee87fb3593849ab3137d7708cd2a0cbf7cbd39dc9dace"
+        }
+      },
+      "win32-x64": {
+        "platformDirectory": "windows",
+        "architecture": "x64",
+        "asset": "agent-cli-package.zip",
+        "assetSha256": "2d7abd33929520e2169d7392360e71a7b137144077d1574818960fe0949ec52a",
+        "downloadBytes": 77143980,
+        "installedBytes": 260000000,
+        "executable": "cursor-agent.cmd",
+        "files": {
+          "cursor-agent.cmd": "299eaddf3327768e7fcd64f29ad01747c740f7e316931575fb3cee617c92ccfc",
+          "cursor-agent.ps1": "11169ef90694ac10c60e685761b25be5848f92d44cfe5ee6a89010ed5735eff7",
+          "node.exe": "56dbd529d1eaa0f59c8f015ea604fe3d505a77ef9592fc4aed8030dc79f1bc14",
+          "index.js": "9e3d6101a208743cb0c35236ece75acdcd268f329e912ade9901c9eabd52468c"
+        }
+      }
+    }
   }
 }

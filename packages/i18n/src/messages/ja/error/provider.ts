@@ -181,6 +181,14 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
+  "error.provider.cursorChecksum": "Cursor ランタイムのチェックサムが一致しません。",
+  "error.provider.cursorReleaseShape": "Cursor のリリースの形式が予期しないものです。",
+  "error.provider.cursorMissing":
+    "Cursor はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.cursorNotStarted": "Cursor エージェントは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.cursorVersionUnreadable": "Cursor エージェントのバージョンを読み取れません。",
+  "error.provider.cursorSignIn": "Cursor を使うには Cursor でサインインするか、CURSOR_API_KEY を設定してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",

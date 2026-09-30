@@ -193,6 +193,13 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Le serveur Gemini a été trouvé, mais sa version est illisible.",
   "error.provider.antigravityVersionUnreadable": "Impossible de lire la version du serveur Gemini.",
   "error.provider.antigravitySignIn": "Connectez-vous avec Google pour utiliser Gemini.",
+  "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
+  "error.provider.cursorChecksum": "La somme de contrôle de l’environnement d’exécution Cursor ne correspond pas.",
+  "error.provider.cursorReleaseShape": "La version Cursor a une forme inattendue.",
+  "error.provider.cursorMissing": "Cursor n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
+  "error.provider.cursorNotStarted": "L’agent Cursor a été trouvé, mais sa version est illisible.",
+  "error.provider.cursorVersionUnreadable": "Impossible de lire la version de l’agent Cursor.",
+  "error.provider.cursorSignIn": "Connectez-vous avec Cursor ou définissez CURSOR_API_KEY pour utiliser Cursor.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",

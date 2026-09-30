@@ -92,6 +92,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Included with OpenBot": "onboarding.provider.included",
   "Free models, no account needed": "onboarding.provider.freeModels",
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
+  "Cursor plan or API key": "onboarding.provider.cursorPlan",
 };
 
 /**

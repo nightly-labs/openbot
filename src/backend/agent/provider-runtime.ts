@@ -94,7 +94,7 @@ const PROVIDER_IDLE_CHECK_MS = 60_000;
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
  */
-const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = ["grok", "opencode", "antigravity", "acp"];
+const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = ["grok", "opencode", "antigravity", "cursor", "acp"];
 
 /**
  * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
@@ -203,6 +203,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "grok", state: "not-started", version: null, message: null },
     { id: "opencode", state: "not-started", version: null, message: null },
     { id: "antigravity", state: "not-started", version: null, message: null },
+    { id: "cursor", state: "not-started", version: null, message: null },
     { id: "acp", state: "not-started", version: null, message: null },
   ],
   capabilities: {

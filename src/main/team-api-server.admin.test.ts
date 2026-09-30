@@ -486,7 +486,7 @@ describe("Team API providers-v1", () => {
     };
     const snapshot: ProviderRuntimeSnapshot = {
       revision: 3,
-      providers: { codex: idle, claude: failed, grok: idle, opencode: idle, antigravity: idle },
+      providers: { codex: idle, claude: failed, grok: idle, opencode: idle, antigravity: idle, cursor: idle },
       toolRuntimes: { bun: idle },
     };
     const downloads: string[] = [];
@@ -600,6 +600,8 @@ describe("Team API providers-v1", () => {
         .status,
     ).toBe(403);
     expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "acp" }, v2)).status).toBe(400);
+    // Cursor stays on the host in every protocol.
+    expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "cursor" }, v2)).status).toBe(400);
     const gemini = await (
       await send("/v1/admin/providers/v2/runtimes/download", { provider: "antigravity" }, v2)
     ).json();

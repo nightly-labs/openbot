@@ -102,6 +102,23 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     message: null,
     fullAccess: true,
   },
+  cursor: {
+    phase: "blocked",
+    cliVersion: "2026.09.28-64d2043",
+    auth: { kind: "unknown" },
+    providers: [
+      {
+        id: "cursor",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "2026.09.28-64d2043",
+        message: null,
+      },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
   acp: {
     phase: "blocked",
     cliVersion: null,

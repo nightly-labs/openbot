@@ -152,6 +152,16 @@ SHA-256 and size, and the SHA-256 of `agy_acp_server` and `localharness_external
 each zip from the registry `archive` URL, hash the zip and the two files, and set `installedBytes`
 above the extracted size. Do not commit the zip: Google's license does not allow redistribution.
 
+## Pin the Cursor CLI
+
+`native-runtime.lock.json` pins the Cursor CLI by hand. Read the ACP registry entry `cursor`: its
+`version` is the date, and each `archive` URL has the build, a date and a commit such as
+`2026.09.28-64d2043`. Set `version` to the build. For each target, download
+`downloads.cursor.com/lab/<build>/<os>/<arch>/agent-cli-package.tar.gz` (`.zip` on Windows), and
+set the archive SHA-256 and size, `installedBytes` above the extracted size, and the SHA-256 of
+each file in `files`. The paths in `files` are relative to `dist-package/`. Do not commit the
+archives: Cursor's terms do not allow redistribution.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

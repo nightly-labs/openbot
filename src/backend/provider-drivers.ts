@@ -12,6 +12,7 @@ import {
   resolveAntigravityCli,
   resolveClaudeCli,
   resolveCodexCli,
+  resolveCursorCli,
   resolveGrokCli,
   resolveOpencodeCli,
 } from "./cli";
@@ -34,6 +35,8 @@ import { readOpenCodeGoUsage } from "./opencode-usage";
 import {
   antigravityStatePaths,
   confineSpawnTarget,
+  cursorConfinedEnv,
+  cursorStatePaths,
   customAgentStatePaths,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -370,6 +373,38 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "antigravity", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "cursor",
+    // `cursor_login` opens the Cursor sign-in page from the server. `CURSOR_API_KEY` in the user's
+    // environment signs the CLI in without it.
+    signIn: { kind: "acp-authenticate", methodId: "cursor_login", argv: ["acp"], timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    resolveCli: resolveCursorCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "cursor",
+        argv: ["acp"],
+        env: {},
+        ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, cursorStatePaths()) } : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? cursorConfinedEnv() : {}) }),
+        signInMessage: sourceText("error.provider.cursorSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpAuthorization: context.mcpAuthorization,
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "cursor",
+        argv: ["acp"],
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.cursorSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "cursor", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

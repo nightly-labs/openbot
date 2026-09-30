@@ -8,11 +8,11 @@ import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode and Antigravity take no sandbox per session, so a Workspace only agent on them gets a provider
- * process of its own, and OpenBot starts that process inside an operating system sandbox. The whole
- * process is confined: the file edit tools, the shell, and every command and MCP server it starts.
- * Nothing inside the process can take the sandbox away. Only macOS has the sandbox now: on Linux and
- * Windows the process does not start, and the user must choose Full access.
+ * Grok, OpenCode, Antigravity and Cursor take no sandbox per session, so a Workspace only agent on
+ * them gets a provider process of its own, and OpenBot starts that process inside an operating
+ * system sandbox. The whole process is confined: the file edit tools, the shell, and every command
+ * and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS has the
+ * sandbox now: on Linux and Windows the process does not start, and the user must choose Full access.
  */
 export interface ProcessConfinement {
   readonly writableRoots: readonly string[];
@@ -97,6 +97,60 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
 }
 
 /**
+ * The Cursor CLI keeps its settings in its config folder, and its sessions, project data and, on
+ * macOS, the sign-in file `auth.json` in `~/.cursor`, which the Cursor editor shares.
+ * `cli-config.json` holds the command permissions and approval mode that the user's own CLI runs
+ * with, and the CLI writes it when a session picks its model, so a confined process gets a config
+ * folder of its own:
+ * `cursorConfinedEnv`. The user's settings files, and the folders that hold extensions, plugins,
+ * skills, agents, commands and rules, load code or settings in the editor and in every other CLI
+ * process, so they stay read-only. The sessions stay in the shared data folder, so a thread
+ * continues when the agent changes between Workspace only and Full access.
+ */
+export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const xdgConfig = env.XDG_CONFIG_HOME?.trim();
+  const userConfig = env.CURSOR_CONFIG_DIR?.trim() || (xdgConfig ? join(xdgConfig, "cursor") : join(home, ".cursor"));
+  const dataHome = env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+  // `auth.json` and the `sandbox.json` and `hooks.json` files are always in `~/.cursor` on macOS.
+  const fixedHome = join(home, ".cursor");
+  const settings = [
+    "cli-config.json",
+    "permissions.json",
+    "acp-config.json",
+    "mcp.json",
+    "hooks.json",
+    "sandbox.json",
+    "argv.json",
+    "extensions",
+    "plugins",
+    "skills",
+    "skills-cursor",
+    "agents",
+    "commands",
+    "rules",
+  ];
+  return {
+    writable: unique([cursorConfinedConfig(home), dataHome, fixedHome, CURSOR_CONFINED_CACHE]),
+    protected: unique([userConfig, dataHome, fixedHome].flatMap((root) => settings.map((name) => join(root, name)))),
+  };
+}
+
+const CURSOR_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cursor-cache");
+
+/** The config folder of every confined Cursor process. Only confined processes read it. */
+function cursorConfinedConfig(home: string): string {
+  return join(home, ".cursor", "openbot-confined");
+}
+
+/**
+ * The environment of a confined Cursor process: its own config folder and its own compile cache, as
+ * the launcher keeps that cache outside the folders above.
+ */
+export function cursorConfinedEnv(home = homedir()): Readonly<Record<string, string>> {
+  return { CURSOR_CONFIG_DIR: cursorConfinedConfig(home), NODE_COMPILE_CACHE: CURSOR_CONFINED_CACHE };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -123,6 +177,8 @@ const PROJECT_SETTINGS = [
   ".opencode",
   "opencode.json",
   "opencode.jsonc",
+  // Cursor reads its project rules, MCP servers, hooks and skills from `.cursor`.
+  ".cursor",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.
   ".gemini",
   ".agents",

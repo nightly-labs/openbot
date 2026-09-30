@@ -183,6 +183,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       grok: emptyStatus(unsupportedMessage),
       opencode: emptyStatus(unsupportedMessage),
       antigravity: emptyStatus(unsupportedMessage),
+      cursor: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -1252,11 +1253,14 @@ async function digestMatches(path: string, digest: ArchiveDigest): Promise<boole
   return hash.digest("hex") === digest.hex;
 }
 
+/** A release number such as `1.2.3`, or a Cursor build such as `2026.09.28-64d2043`. */
 function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+$/.test(value);
+  return /^\d+\.\d+\.\d+(?:-[0-9a-f]{7,40})?$/u.test(value);
 }
 
+/** A commit orders nothing, so two Cursor builds of the same date are neither older nor newer. */
 function olderVersion(installed: string, target: string): boolean {
   if (!isVersion(installed) || !isVersion(target)) return false;
-  return installed.localeCompare(target, "en", { numeric: true }) < 0;
+  const release = (version: string) => version.split("-")[0] ?? version;
+  return release(installed).localeCompare(release(target), "en", { numeric: true }) < 0;
 }

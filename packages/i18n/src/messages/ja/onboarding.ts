@@ -42,6 +42,7 @@ export const messages = {
   "onboarding.provider.included": "OpenBot に含まれています",
   "onboarding.provider.freeModels": "無料のモデル、アカウント不要",
   "onboarding.provider.googlePlan": "Google AI Pro または Ultra プラン",
+  "onboarding.provider.cursorPlan": "Cursor プランまたは API キー",
   "onboarding.provider.tryFree": "無料で試す",
   "onboarding.provider.noSignIn": "サインイン不要",
   "onboarding.provider.more": "その他のプロバイダー",
