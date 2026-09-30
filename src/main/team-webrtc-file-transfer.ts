@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import { type FileHandle, mkdir, open, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { isString } from "@openbot/contracts/runtime-values";
 import {
   decodeTeamProtocolV2FileChunk,
@@ -37,7 +40,9 @@ interface OutgoingTransfer {
   transferId: string;
   name: string;
   mimeType: string;
-  bytes: Uint8Array;
+  size: number;
+  /** Returns `length` bytes at `offset`. The source is memory or a file in the transfer directory. */
+  read: (offset: number, length: number) => Promise<Uint8Array>;
   sha256: string;
   acknowledged: number;
   acknowledgementGeneration: number;
@@ -61,6 +66,8 @@ export class TeamWebRtcFileTransfer {
   readonly #acceptPeer: (peerId: string) => boolean;
   readonly #incoming = new Map<string, IncomingTransfer>();
   readonly #outgoing = new Map<string, OutgoingTransfer>();
+  /** The streams that `sendStream` still writes to disk, with the bytes written so far. */
+  readonly #writing = new Set<{ peerId: string; size: number }>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
   readonly #expirationTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #waiters = new Map<
@@ -102,24 +109,102 @@ export class TeamWebRtcFileTransfer {
   }
 
   async send(peerId: string, input: { name: string; mimeType: string; bytes: Uint8Array }): Promise<string> {
+    const { bytes } = input;
+    this.#checkOutgoing(peerId, bytes.byteLength);
+    return this.#sendOutgoing(peerId, {
+      name: input.name,
+      mimeType: input.mimeType,
+      size: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      read: async (offset, length) => bytes.subarray(offset, offset + length),
+    });
+  }
+
+  /**
+   * Sends a stream, such as a Team API response body, without holding it in memory. `file-open`
+   * needs the size and the SHA-256 before the first chunk, so the stream goes to a file in the
+   * transfer directory first. The chunks, also the ones sent again after a resume, come from that
+   * file. The file is removed when the transfer ends.
+   */
+  async sendStream(
+    peerId: string,
+    input: { name: string; mimeType: string; body: AsyncIterable<Uint8Array> | Iterable<Uint8Array> },
+  ): Promise<{ transferId: string; size: number }> {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
-    if (input.bytes.byteLength > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
-      throw new Error(sourceText("error.remote.fileTooLarge"));
-    const activeBytes = [...this.#outgoing.values()]
+    await mkdir(this.#directory, { recursive: true, mode: 0o700 });
+    const path = join(this.#directory, `${randomUUID()}.outgoing`);
+    let file: FileHandle | null = null;
+    // The bytes on disk count against the file set limit while they are written, so parallel
+    // streams cannot write more than the limit before the check.
+    const pending = { peerId, size: 0 };
+    this.#writing.add(pending);
+    try {
+      const hash = createHash("sha256");
+      const check = (size: number) => this.#checkOutgoing(peerId, size, pending);
+      await pipeline(
+        Readable.from(input.body),
+        async function* (chunks: AsyncIterable<Uint8Array>) {
+          for await (const chunk of chunks) {
+            pending.size += chunk.byteLength;
+            check(pending.size);
+            hash.update(chunk);
+            yield chunk;
+          }
+        },
+        createWriteStream(path, { flags: "wx", mode: 0o600 }),
+      );
+      const size = pending.size;
+      const source = await open(path, "r");
+      file = source;
+      // No `await` between this check and `#sendOutgoing`, which adds the transfer: two parallel
+      // streams cannot both pass the file set limit.
+      this.#writing.delete(pending);
+      this.#checkOutgoing(peerId, size);
+      const transferId = await this.#sendOutgoing(peerId, {
+        name: input.name,
+        mimeType: input.mimeType,
+        size,
+        sha256: hash.digest("hex"),
+        read: async (offset, length) => {
+          const bytes = new Uint8Array(length);
+          const { bytesRead } = await source.read(bytes, 0, length, offset);
+          if (bytesRead !== length) throw new Error("The outgoing WebRTC file is incomplete.");
+          return bytes;
+        },
+      });
+      return { transferId, size };
+    } finally {
+      this.#writing.delete(pending);
+      await file?.close().catch(() => undefined);
+      await rm(path, { force: true });
+    }
+  }
+
+  /** `own` is the stream that asks, so its bytes on disk are not counted twice. */
+  #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
+    if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
+    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error(sourceText("error.remote.fileTooLarge"));
+    const activeBytes = [...this.#outgoing.values(), ...[...this.#writing].filter((stream) => stream !== own)]
       .filter((transfer) => transfer.peerId === peerId)
-      .reduce((sum, transfer) => sum + transfer.bytes.byteLength, 0);
-    if (activeBytes + input.bytes.byteLength > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
+      .reduce((sum, transfer) => sum + transfer.size, 0);
+    if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
       throw new Error(sourceText("error.remote.fileSetTooLarge"));
     }
+  }
+
+  async #sendOutgoing(
+    peerId: string,
+    input: Pick<OutgoingTransfer, "name" | "mimeType" | "size" | "sha256" | "read">,
+  ): Promise<string> {
     const transferId = randomUUID();
-    const sha256 = createHash("sha256").update(input.bytes).digest("hex");
     const transfer: OutgoingTransfer = {
       peerId,
       transferId,
       name: basename(input.name) || "file",
       mimeType: input.mimeType || "application/octet-stream",
-      bytes: input.bytes,
-      sha256,
+      size: input.size,
+      read: input.read,
+      sha256: input.sha256,
       acknowledged: 0,
       acknowledgementGeneration: 0,
       lastProgressAt: Date.now(),
@@ -150,10 +235,19 @@ export class TeamWebRtcFileTransfer {
     });
   }
 
-  async consume(peerId: string, transferId: string): Promise<{ bytes: Uint8Array; name: string; mimeType: string }> {
+  consume(peerId: string, transferId: string): Promise<{ bytes: Uint8Array; name: string; mimeType: string }> {
+    return this.useReceived(peerId, transferId, async (file) => ({
+      bytes: new Uint8Array(await readFile(file.path)),
+      name: file.name,
+      mimeType: file.mimeType,
+    }));
+  }
+
+  /** Lends a received file to `use`, which can stream it from disk, and removes it after `use` ends. */
+  async useReceived<T>(peerId: string, transferId: string, use: (file: ReceivedWebRtcFile) => Promise<T>): Promise<T> {
     const file = await this.receive(peerId, transferId);
     try {
-      return { bytes: new Uint8Array(await readFile(file.path)), name: file.name, mimeType: file.mimeType };
+      return await use(file);
     } finally {
       const key = transferKey(peerId, transferId);
       this.#clearExpiration(key);
@@ -247,12 +341,7 @@ export class TeamWebRtcFileTransfer {
         );
       } else if (frame.type === "file-ack") {
         const outgoing = this.#outgoing.get(key);
-        if (
-          !outgoing ||
-          frame.receivedThrough < outgoing.acknowledged ||
-          frame.receivedThrough > outgoing.bytes.byteLength
-        )
-          return;
+        if (!outgoing || frame.receivedThrough < outgoing.acknowledged || frame.receivedThrough > outgoing.size) return;
         if (frame.receivedThrough > outgoing.acknowledged) outgoing.lastProgressAt = Date.now();
         outgoing.acknowledged = frame.receivedThrough;
         outgoing.acknowledgementGeneration += 1;
@@ -389,7 +478,7 @@ export class TeamWebRtcFileTransfer {
             type: "file-open",
             transferId: transfer.transferId,
             name: transfer.name,
-            size: transfer.bytes.byteLength,
+            size: transfer.size,
             mimeType: transfer.mimeType,
             sha256: transfer.sha256,
           }),
@@ -403,11 +492,11 @@ export class TeamWebRtcFileTransfer {
         );
         if (transfer.cancelled) throw transfer.cancelled;
         if (!this.#connectedPeers.has(transfer.peerId)) continue;
-        for (let offset = transfer.acknowledged; offset < transfer.bytes.byteLength; offset += FILE_CHUNK_BYTES) {
+        for (let offset = transfer.acknowledged; offset < transfer.size; offset += FILE_CHUNK_BYTES) {
           const chunk = encodeTeamProtocolV2FileChunk({
             transferId: transfer.transferId,
             offset,
-            bytes: transfer.bytes.slice(offset, Math.min(transfer.bytes.byteLength, offset + FILE_CHUNK_BYTES)),
+            bytes: await transfer.read(offset, Math.min(transfer.size, offset + FILE_CHUNK_BYTES) - offset),
           });
           const transferable = new Uint8Array(chunk.byteLength);
           transferable.set(chunk);
@@ -421,7 +510,7 @@ export class TeamWebRtcFileTransfer {
         await this.#waitUntil(
           () =>
             Boolean(transfer.cancelled) ||
-            transfer.acknowledged === transfer.bytes.byteLength ||
+            transfer.acknowledged === transfer.size ||
             !this.#connectedPeers.has(transfer.peerId),
           transfer.lastProgressAt + this.#resumeMilliseconds,
         );

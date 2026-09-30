@@ -9,17 +9,13 @@ import { RemoteScreenGateway } from "../src/main/remote-screen-gateway";
 
 const logger = createOpenBotLogger("remote-desktop-browser-harness");
 
+const platform = process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux";
 const runtimePaths = await resolveRemoteDesktopRuntime({
   isPackaged: false,
   resourcesPath: process.cwd(),
   sourceRoot: resolve("."),
-  platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
+  platform,
   architecture: process.arch,
-  overrideRoot: resolve(
-    "build/remote-desktop-runtime",
-    process.platform === "win32" ? "win32" : "darwin",
-    process.platform === "win32" ? "x64" : process.arch,
-  ),
 });
 if (!runtimePaths) throw new Error("Build the remote desktop runtime before the browser E2E test.");
 
@@ -31,7 +27,7 @@ const clientCount = z.coerce
   .parse(process.env.OPENBOT_REMOTE_E2E_CLIENTS ?? "1");
 const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-remote-browser-e2e-"));
 const gateway = new RemoteScreenGateway({
-  platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
+  platform,
   unattended: false,
   runtimePaths,
   runtimeStateDirectory: stateDirectory,

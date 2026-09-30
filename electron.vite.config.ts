@@ -10,7 +10,7 @@ export default defineConfig({
     // Workspace sources ship as TypeScript and must be bundled for the packaged app.
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@openbot/contracts", "@openbot/i18n", "@openbot/logging", "@openbot/team-client"],
+        exclude: ["@openbot/brand", "@openbot/contracts", "@openbot/i18n", "@openbot/logging", "@openbot/team-client"],
       }),
     ],
     build: {
@@ -52,6 +52,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve("src/renderer/index.html"),
+          helper: resolve("src/renderer/helper.html"),
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),

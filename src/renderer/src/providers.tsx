@@ -9,7 +9,7 @@ import { createCustomProvidersStore } from "./features/custom-providers/stores/c
 import { createProviderCodeLogin } from "./features/provider-updates/provider-code-login";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "./features/provider-updates/remote-provider-runtimes";
-import { remoteAdminServer } from "./features/servers/server-capabilities";
+import { codeSignInProviders, remoteAdminServer } from "./features/servers/server-capabilities";
 import { useServers } from "./features/servers/servers-context";
 import { hostProviderKeyApi, providerKeyApi } from "./features/settings/provider-key-api";
 import { providersPort } from "./providers-port";
@@ -188,6 +188,7 @@ const Providers = createSimpleContext({
         return serverId
           ? {
               start: (provider) => providerAdmin().startCodeLogin(provider, serverId),
+              submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, serverId),
               cancel: (provider) => providerAdmin().cancelCodeLogin(provider, serverId),
             }
           : {
@@ -195,6 +196,7 @@ const Providers = createSimpleContext({
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
             };
       },
+      providers: () => codeSignInProviders(providerAdminServerId() ? activeServer() : undefined),
       openVerificationUrl: (url) => void appPort().openUrl(url),
       connection: {
         begin: (provider) => {

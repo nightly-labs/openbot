@@ -11,9 +11,9 @@
 
 /** `--openbot-logo-production` */
 const LOGO_PRODUCTION = "#d6adf2";
-/** `--openbot-warning`, which `--openbot-logo-dev` aliases */
+/** `--openbot-warning` */
 const LOGO_DEV = "#ff9412";
-/** `--openbot-success`, which `--openbot-logo-preview` aliases */
+/** `--openbot-success` */
 const LOGO_PREVIEW = "#31cf76";
 /** `--openbot-accent` */
 const ACCENT = "#007cf7";

@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.25.1",
+  "version": "0.26.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -35,6 +35,7 @@
       "remote/api"
     ],
     "catalog": {
+      "@noble/hashes": "2.3.0",
       "@paper-design/shaders": "0.0.80",
       "@cloudflare/workers-types": "5.20260815.1",
       "@fontsource-variable/inter": "5.3.0",
@@ -104,6 +105,7 @@
     "dev:bootstrap": "bun scripts/prepare-dev-environment.ts",
     "dev": "bun scripts/dev-services.ts app",
     "dev:api": "bun scripts/dev-services.ts api",
+    "dev:apns-key": "bun scripts/dev-apns-key.ts",
     "dev:test-client": "bun scripts/dev-services.ts test-client",
     "dev:all": "bun scripts/dev-services.ts all",
     "dev:slack": "bun scripts/dev-services.ts app --slack",
@@ -221,7 +223,7 @@
     "package:verify": "bun run package && bun run verify:package",
     "package:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun scripts/install-cua-driver.ts win32 x64 && bun run build && electron-builder --dir --win --x64 --publish never",
     "verify:package:win": "bun scripts/verify-windows-package.ts",
-    "package:linux": "bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --dir --linux --x64 --publish never",
+    "package:linux": "bun scripts/prepare-remote-desktop-runtime.ts linux x64 && bun run verify:remote-desktop-runtime --linux && bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --dir --linux --x64 --publish never",
     "package:linux:arm64": "bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --dir --linux --arm64 --publish never",
     "verify:package:linux": "bun scripts/verify-linux-package.ts",
     "package:linux:verify": "bun run package:linux && bun run verify:package:linux",
@@ -229,7 +231,7 @@
     "package:win:verify": "bun run package:win && bun run verify:package:win",
     "dist:mac": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --config.mac.identity=null --config.mac.notarize=false",
     "dist:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun scripts/install-cua-driver.ts win32 x64 && bun run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist:linux": "bun scripts/prepare-remote-desktop-runtime.ts linux x64 && bun run verify:remote-desktop-runtime --linux && bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --linux AppImage --x64 --publish never",
     "dist:linux:arm64": "bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --linux AppImage --arm64 --publish never",
     "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --publish never"
   },
@@ -240,6 +242,7 @@
     "@fontsource-variable/inter": "catalog:",
     "@kobalte/core": "catalog:",
     "@modelcontextprotocol/sdk": "1.30.0",
+    "@noble/hashes": "catalog:",
     "@norbert_bodziony/bloub": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",

@@ -1,9 +1,18 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 
-export const REMOTE_RETRY_INTERVAL_MS = 10_000;
+/** The wait after the first failed attempt. Each next failed attempt doubles it: 2, 4, 8 and 16 seconds. */
+export const REMOTE_RETRY_INTERVAL_MS = 2_000;
 export const REMOTE_RETRY_LIMIT = 5;
 export const REMOTE_RETRY_COOLDOWN_MS = 120_000;
+/** Up to this fraction of a wait is added at random, so phones that lost the same service do not retry together. */
+const REMOTE_RETRY_JITTER = 0.2;
+
+function remoteRetryDelay(attempt: number): number {
+  const delay =
+    attempt >= REMOTE_RETRY_LIMIT ? REMOTE_RETRY_COOLDOWN_MS : REMOTE_RETRY_INTERVAL_MS * 2 ** Math.max(0, attempt - 1);
+  return Math.round(delay * (1 + REMOTE_RETRY_JITTER * Math.random()));
+}
 
 export interface RemoteRecoveryStatus {
   phase: "connecting" | "waiting" | "cooldown" | "online" | "suspended";
@@ -131,7 +140,7 @@ export function createRemoteConnectionRecovery(
 
   function scheduleRetry() {
     if (disposed || suspended) return;
-    retryAt ??= Date.now() + (attempt >= REMOTE_RETRY_LIMIT ? REMOTE_RETRY_COOLDOWN_MS : REMOTE_RETRY_INTERVAL_MS);
+    retryAt ??= Date.now() + remoteRetryDelay(attempt);
     if (!active) return;
     const remaining = Math.max(0, retryAt - Date.now());
     if (remaining === 0 && !running) {
@@ -239,9 +248,21 @@ export function createRemoteConnectionRecovery(
       scheduleRetry();
     },
     /**
+     * The platform saw the network come back. A wait that the lost network caused is over, so the
+     * next attempt starts now and counts from one. A connection that is online or connecting is
+     * left alone: the peer renews its own path.
+     */
+    networkRestored() {
+      if (disposed || suspended || online || running || retryAt === null) return;
+      retryAt = null;
+      attempt = 0;
+      cancelTimer();
+      if (active) void run();
+    },
+    /**
      * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
      * the same thing. Stops the loop rather than joining it -- `offline` would schedule five
-     * attempts ten seconds apart and then one every two minutes, for as long as the app is open.
+     * attempts and then one every two minutes, for as long as the app is open.
      * Reversible: `refresh`, returning to the foreground, and switching servers each clear it.
      */
     suspend(error?: unknown) {

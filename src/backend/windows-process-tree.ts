@@ -14,3 +14,13 @@ export async function stopWindowsProcessTree(child: ChildProcess): Promise<void>
   if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
   await exited;
 }
+
+/**
+ * Stops a process that may run under `cmd.exe`, such as a sign-in through a `.cmd` launcher, and
+ * does not wait for it. Elsewhere SIGTERM goes to the process itself.
+ */
+export function stopProcessTree(child: ChildProcess): void {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  if (process.platform === "win32") void stopWindowsProcessTree(child);
+  else child.kill("SIGTERM");
+}

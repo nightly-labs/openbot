@@ -52,6 +52,11 @@ export const messages = {
   "mobile.settings.feedback.footer": "Retour tactile pour les actions de l’app sur cet appareil.",
   "mobile.settings.feedback.haptics": "Retour haptique",
   "mobile.settings.feedback.retry": "Réessayer d’enregistrer le réglage haptique",
+  "mobile.settings.liveActivities.title": "Activités en direct",
+  "mobile.settings.liveActivities.footer":
+    "Affiche le travail, les messages, les questions et les approbations des agents sur l’écran verrouillé et dans la Dynamic Island pendant qu’OpenBot est ouvert.",
+  "mobile.settings.liveActivities.toggle": "Afficher l’activité des agents",
+  "mobile.settings.liveActivities.retry": "Réessayer d’enregistrer le réglage des activités en direct",
   "mobile.settings.privacy.title": "Confidentialité",
   "mobile.settings.privacy.footer":
     "Partagez l’utilisation des fonctions et les résultats de connexion de ce téléphone. Le contenu des messages et les fichiers ne sont pas envoyés.",

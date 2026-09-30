@@ -15,7 +15,7 @@ import type { ReorderQueueInput, SteerQueuedMessageInput, UpdateQueuedMessageInp
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, stringArray, stringField } from "./request-helpers";
+import { memberSender, readJson, stringArray, stringField } from "./request-helpers";
 
 export interface AgentQueueRouteDependencies {
   agents: Pick<
@@ -36,13 +36,16 @@ export async function routeAgentQueue(
   { agentId, action }: AgentRouteTarget,
   { agents }: AgentQueueRouteDependencies,
 ): Promise<RouteOutcome> {
-  const { method, request, json, empty } = context;
+  const { method, request, member, json, empty } = context;
 
   if (method === "POST" && action === "queue/edit") {
     if (context.protocol < 3 || !context.capabilities.has(TEAM_QUEUE_EDIT_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.queueEditUnsupported"));
     try {
-      return json(200, await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request))));
+      return json(
+        200,
+        await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request)), memberSender(member)),
+      );
     } catch (error) {
       if (error instanceof QueueEditRejectedError) throw new HttpError(409, error.message);
       throw error;
@@ -72,13 +75,16 @@ export async function routeAgentQueue(
   }
   if (method === "POST" && action === "queue/update") {
     const body = await readJson(request);
-    await agents.updateQueuedMessage({
-      agentId,
-      deliveryId: stringField(body, "deliveryId"),
-      text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-      keepAttachmentIds: stringArray(body, "keepAttachmentIds"),
-      attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-    } satisfies UpdateQueuedMessageInput);
+    await agents.updateQueuedMessage(
+      {
+        agentId,
+        deliveryId: stringField(body, "deliveryId"),
+        text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+        keepAttachmentIds: stringArray(body, "keepAttachmentIds"),
+        attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+      } satisfies UpdateQueuedMessageInput,
+      memberSender(member),
+    );
     return empty(204);
   }
   if (method === "POST" && action === "queue/reorder") {

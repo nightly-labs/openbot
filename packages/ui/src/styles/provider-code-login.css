@@ -138,6 +138,14 @@
   letter-spacing: var(--openbot-tracking-wide);
 }
 
+/* The pasted code and its button, full width under the steps. */
+.provider-code-login-paste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  align-self: stretch;
+}
+
 .provider-code-login-expiry {
   margin: 0;
   text-align: center;

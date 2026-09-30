@@ -24,10 +24,10 @@ afterEach(async () => {
 });
 
 describe("RemoteScreenGateway", () => {
-  it.each(["darwin", "win32"] as const)(
+  it.each(["darwin", "win32", "linux"] as const)(
     "allows a %s host with runtime components to create a session",
     async (platform) => {
-      const gateway = createGateway({ platform });
+      const gateway = createGateway({ platform, sessionEnvironment: { DISPLAY: ":99" } });
       expect(gateway.capabilities().ready).toBe(true);
       const session = await createSession(gateway, "http://127.0.0.1:9");
       expect(session.phase).toBe("connecting");
@@ -38,16 +38,27 @@ describe("RemoteScreenGateway", () => {
   it.each(["darwin", "win32", "linux"] as const)(
     "reports the setup failure for an unavailable %s host",
     async (platform) => {
-      const gateway = createGateway({ platform, runtimeInstalled: false });
+      const gateway = createGateway({ platform, runtimeInstalled: false, sessionEnvironment: { DISPLAY: ":99" } });
       expect(gateway.capabilities().ready).toBe(false);
       await expect(createSession(gateway, "http://127.0.0.1:9")).rejects.toMatchObject({
         code: "host_unavailable",
         message:
-          platform === "linux"
-            ? "Remote desktop hosting is not supported on Linux."
-            : "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on a Mac or a Windows x64 host, then restart OpenBot.",
+          "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on a Mac, a Windows x64 host or a Linux x64 host, then restart OpenBot.",
       });
       expect(gateway.list()).toEqual([]);
+      await gateway.stop();
+    },
+  );
+
+  it.each([{ XDG_SESSION_TYPE: "wayland", WAYLAND_DISPLAY: "wayland-0", DISPLAY: ":0" }, { XDG_SESSION_TYPE: "tty" }])(
+    "refuses a Linux host with no X11 session (%o)",
+    async (sessionEnvironment) => {
+      const gateway = createGateway({ platform: "linux", sessionEnvironment });
+      expect(gateway.capabilities().ready).toBe(false);
+      await expect(createSession(gateway, "http://127.0.0.1:9")).rejects.toMatchObject({
+        code: "host_unavailable",
+        message: "Remote desktop on Linux needs an X11 session. Wayland is not supported.",
+      });
       await gateway.stop();
     },
   );
@@ -633,6 +644,7 @@ function createGateway(
     checkSetup?: RemoteScreenRuntime["checkSetup"];
     test?: RemoteScreenRuntime["test"];
     platform?: "darwin" | "win32" | "linux";
+    sessionEnvironment?: Readonly<Record<string, string | undefined>>;
     runtimeInstalled?: boolean;
     now?: () => number;
     runtimeBaseUrl?: string;
@@ -643,6 +655,7 @@ function createGateway(
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
     platform: options.platform ?? "darwin",
+    ...(options.sessionEnvironment ? { sessionEnvironment: options.sessionEnvironment } : {}),
     unattended: true,
     runtimePaths:
       options.runtimeInstalled === false

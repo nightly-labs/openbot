@@ -12,6 +12,7 @@ import { messages as channel } from "./channel";
 import { messages as chat } from "./chat";
 import { messages as composer } from "./composer";
 import { messages as computerUse } from "./computerUse";
+import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
 import { messages as customProvider } from "./customProvider";
 import { messages as dialog } from "./dialog";
@@ -104,4 +105,5 @@ export const fr = {
   ...files,
   ...island,
   ...computerUse,
+  ...connector,
 } as const satisfies PartialTranslation<AppMessages>;

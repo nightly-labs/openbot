@@ -48,7 +48,7 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // ordinary words and `risk-register` came out as `ri[redacted]`, erasing the
 // part of a diagnostic that names what failed.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:sk-ant|sk-|xai-|ghp_|gho_|github_pat_|AKIA|xox[abeoprs]-|xapp-)[A-Za-z0-9._-]{8,}/g;
+  /(?<![A-Za-z0-9_-])(?:sk-ant|sk-|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-)[A-Za-z0-9._-]{8,}/g;
 // Bounded for the same reason as the label above, and more sharply: with `+`
 // on the local part, every character of a long payload consumed the rest of
 // the run looking for an `@` and then backtracked over all of it.

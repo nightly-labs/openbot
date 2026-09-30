@@ -6,12 +6,14 @@ import { AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
+import { type ApnsLiveActivitySender, sharedApnsSender } from "./live-activity-relay";
 import { MarketplaceQueryError } from "./marketplace-pagination";
 import {
   enforceMarketplaceMutation,
@@ -100,6 +102,76 @@ export function requireSitePublishingEnabled(): void {
 export function hostedSiteErrorResponse(error: unknown): Response {
   if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
+}
+
+/**
+ * One service for each key, so the imported key and the app ID are read once for each isolate. Only
+ * resolved values are kept: workerd refuses a promise that another request made.
+ */
+let githubInstallationTokens: { key: string; service: GitHubInstallationTokens } | null = null;
+
+export function requestGitHubInstallationTokens(): GitHubInstallationTokens {
+  const bindings = requireWorkerBindings(env);
+  const clientId = bindings.GITHUB_APP_CLIENT_ID?.trim();
+  const privateKey = bindings.GITHUB_APP_PRIVATE_KEY?.trim();
+  if (!clientId || !privateKey) {
+    throw new GitHubInstallationTokensError(503, "github_app_unavailable", "The OpenBot GitHub App is not configured.");
+  }
+  const key = `${clientId}\u0000${privateKey}`;
+  if (githubInstallationTokens?.key !== key) {
+    githubInstallationTokens = {
+      key,
+      service: new GitHubInstallationTokens({ clientId, privateKey, fetch: (input, init) => fetch(input, init) }),
+    };
+  }
+  return githubInstallationTokens.service;
+}
+
+export async function enforceGitHubTokenRateLimit(sourceIp: string): Promise<void> {
+  const result = await requireWorkerBindings(env).GITHUB_TOKEN_RATE_LIMITER.limit({ key: `ip:${sourceIp}` });
+  if (!result.success) {
+    throw new GitHubInstallationTokensError(429, "rate_limited", "Too many GitHub token requests. Try again later.");
+  }
+}
+
+export function githubInstallationTokensErrorResponse(error: unknown): Response {
+  if (error instanceof GitHubInstallationTokensError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.status === 429) response.headers.set("Retry-After", "60");
+    return response;
+  }
+  return authErrorResponse(error);
+}
+
+/**
+ * The Live Activity relay: the Apple sender and the limit for each host. `null` when this Worker has
+ * no Apple key or no limiter, so the relay is off.
+ */
+export function requestLiveActivityRelay(): {
+  sender: ApnsLiveActivitySender;
+  /** A host sends a few updates a minute for each phone. More is a fault or misuse. */
+  allow(hostId: string): Promise<boolean>;
+} | null {
+  const bindings = requireWorkerBindings(env);
+  const { APNS_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_ORIGIN, LIVE_ACTIVITY_RATE_LIMITER } = bindings;
+  if (!APNS_PRIVATE_KEY || !APNS_KEY_ID || !APNS_TEAM_ID || !APNS_TOPIC || !LIVE_ACTIVITY_RATE_LIMITER) return null;
+  const origin = developmentApnsOrigin(APNS_ORIGIN);
+  return {
+    sender: sharedApnsSender({
+      // A deploy passes the key as one line, with `\n` for each line break.
+      privateKey: APNS_PRIVATE_KEY.replaceAll("\\n", "\n"),
+      keyId: APNS_KEY_ID,
+      teamId: APNS_TEAM_ID,
+      topic: APNS_TOPIC,
+      ...(origin ? { origin } : {}),
+    }),
+    allow: async (hostId) => (await LIVE_ACTIVITY_RATE_LIMITER.limit({ key: `host:${hostId}` })).success,
+  };
+}
+
+/** Only a development server on this computer can stand in for Apple. */
+function developmentApnsOrigin(value: string | undefined): string | undefined {
+  return value && /^http:\/\/127\.0\.0\.1:\d+\/__dev\/apns$/u.test(value) ? value : undefined;
 }
 
 export function enforceMarketplaceMutationRateLimit(kind: MarketplaceMutationKind, principal: string): Promise<void> {

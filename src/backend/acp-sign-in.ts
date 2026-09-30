@@ -2,6 +2,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { cliSpawnTarget } from "./cli";
+import { stopProcessTree } from "./windows-process-tree";
 
 /** The messages this client sends: two requests, and a refusal for each request the server makes. */
 type AcpMessage =
@@ -25,9 +27,12 @@ export function startAcpAuthentication(options: {
   methodId: string;
   timeoutMs: number;
 }): { child: ChildProcess; done: Promise<void> } {
-  const child = spawn(options.executable, [...options.argv], {
+  // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
+  const target = cliSpawnTarget(options.executable, options.argv);
+  const child = spawn(target.command, target.args, {
     cwd: process.cwd(),
     env: { ...process.env, ...options.env },
+    windowsVerbatimArguments: target.windowsVerbatimArguments,
     // The server prints the sign-in URL on stderr. It opens the browser itself, so nothing reads it.
     stdio: ["pipe", "pipe", "ignore"],
     shell: false,
@@ -40,7 +45,7 @@ export function startAcpAuthentication(options: {
       settled = true;
       clearTimeout(timer);
       child.stdin.end();
-      if (child.exitCode === null) child.kill("SIGTERM");
+      stopProcessTree(child);
       if (error) reject(error);
       else resolve();
     };

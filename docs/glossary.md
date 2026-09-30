@@ -22,6 +22,10 @@ table, IPC channel or product string, or when a term in the code disagrees with 
   (`SidebarPinnedGroup`, `create_section`), an IPC endpoint group (`IpcEndpointGroup`,
   `define-ipc-group.ts`), or an ARIA `role="group"`. An IPC **channel** is the wire name of an
   endpoint in `IPC_ENDPOINTS` (`ipc-endpoints.ts`); the product contract is `ipc-chat-channels.ts`.
+- **connector**: a built-in sign-in to an outside service that OpenBot turns into agent tools, one
+  for each OpenBot computer (`GitHubConnectorService`, `github-connector:*`,
+  `GITHUB_CONNECTOR_MCP_SERVER_ID`). A user-added MCP server or a marketplace plugin is not a
+  connector.
 - **messaging connection**: one agent's link to an external chat platform, today Slack
   (`projection_messaging_connections`, `MessagingConnection`, `messaging:*`, `messaging-v1`). A
   **messaging thread** is one external conversation (a Slack thread or direct message) that the

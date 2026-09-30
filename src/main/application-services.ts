@@ -47,6 +47,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
+import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -100,16 +101,22 @@ import {
 } from "./development-remote-bootstrap";
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
+import { githubAppConfig } from "./github-connector-config";
+import { GitHubConnectorService } from "./github-connector-service";
+import { GitHubConnectorStore } from "./github-connector-store";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
+import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
+  computerUseDesktopPoint,
+  computerUseDesktopRect,
   computerUseDisplays,
   createComputerUseHighlightWindow,
   createComputerUsePermissionHelpWindow,
@@ -190,6 +197,8 @@ const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 /** The MCP sign-ins. Separate from the keys above: a key is typed by the user, a token is not. */
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
+/** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
+const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -212,6 +221,7 @@ const TEARDOWN_ORDER = {
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
+  hostedServerMemory: 16,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -230,6 +240,8 @@ const TEARDOWN_ORDER = {
   host: 90,
   teamWebRtcBridge: 100,
   mcpOAuthRedirect: 105,
+  // Before the agent service, so no agent is handed a token file that is being removed.
+  githubConnector: 107,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
@@ -269,6 +281,7 @@ export interface ApplicationServices {
   messaging: MessagingService;
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
+  githubConnector: GitHubConnectorService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   browser: BrowserHost;
@@ -370,7 +383,7 @@ export async function createApplicationServices({
     platform: process.platform,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
     createWindow: createDynamicIslandWindow,
-    loadWindow: loadDynamicIslandRenderer,
+    loadWindow: (window, display) => loadDynamicIslandRenderer(window, display, appVariant),
     getDisplays: () => screen.getAllDisplays(),
     getMainWindow: windows.getMainWindow,
     ensureMainWindow: windows.ensureMainWindow,
@@ -485,7 +498,19 @@ export async function createApplicationServices({
   });
   teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () => teamWebRtcBridge.stop());
-  const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE));
+  // Only a hosted server: its machine is small, and one unit holds OpenBot and every agent process.
+  const hostMemory = hostedServer
+    ? new HostedServerMemory({
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      })
+    : null;
+  if (hostMemory) {
+    hostMemory.start();
+    teardown.push(TEARDOWN_ORDER.hostedServerMemory, "the hosted server memory reading", () => hostMemory.stop());
+  }
+  const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
+    memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+  });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => browser.destroy());
   await browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId })));
   const browserPictureInPicture = new BrowserPictureInPicture({
@@ -652,6 +677,20 @@ export async function createApplicationServices({
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
   });
   mcpOAuthAuthority = mcpOAuth;
+  /*
+   * The built-in GitHub connection. Loaded before the agent service, because the first spawn reads
+   * its MCP server and its `gh` and `git` files. An unreadable file is logged by the service and
+   * treated as no sign-in.
+   */
+  const githubConnector = new GitHubConnectorService({
+    app: githubAppConfig(),
+    store: new GitHubConnectorStore(join(app.getPath("userData"), GITHUB_CONNECTOR_FILE), secretCipher),
+    toolDirectory: join(app.getPath("userData"), "provider-state", "github"),
+    apiUrl: centralAuthApiUrl,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  await githubConnector.load();
+  teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () => githubConnector.dispose());
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -717,14 +756,32 @@ export async function createApplicationServices({
     displays: computerUseDisplays,
     // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
-    readPointer: () => cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS),
+    readPointer: () => {
+      const pointer = cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS);
+      return pointer ? computerUseDesktopPoint(pointer) : null;
+    },
     readTarget: async (previous) => {
       if (!cuaDriver.mcpServerForProviders()) return null;
-      const session = liveSession(await computerUseReads.sessions());
+      // The rim marks work in progress, so it goes down with the last turn: completed, failed or
+      // cancelled. The driver's lease outlives the turn, so only an action made while a turn that
+      // still runs was running counts: a lease left by the turn before would put the rim over a
+      // turn that does not touch the desktop. Neither a lease nor an action names its agent, so the
+      // oldest running turn is the bound: a newer turn of another agent does not hide this one's
+      // rim. `service` is built below; the controller starts only after it.
+      const turnStartedAt = service.earliestRunningTurnStartedAt();
+      if (turnStartedAt === null) return null;
+      const session = liveSession(await computerUseReads.sessions(), (Date.now() - turnStartedAt) / 1000);
       if (!session) return null;
       const windows = await computerUseReads.listWindows();
       const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
-      return chooseTarget({ windows, session, action, ownPid: process.pid, previous });
+      return chooseTarget({
+        windows,
+        session,
+        action,
+        ownPid: process.pid,
+        previous,
+        toDesktop: computerUseDesktopRect,
+      });
     },
   });
   // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and
@@ -762,6 +819,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    hostMemory,
     requestTimeoutMs: 30_000,
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
@@ -794,11 +852,14 @@ export async function createApplicationServices({
       // service asks for one at each hand-off; only a test the user pressed may open a browser.
       mcpOAuth,
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
+      // Paths only: `gh` and `git` read the token from the files the connection keeps current.
+      agentEnvironment: (inherited) => githubConnector.agentEnvironment(inherited),
     },
     // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
     // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from
     // handing every provider a command it cannot start.
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
+    githubConnector,
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
     deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
@@ -887,6 +948,8 @@ export async function createApplicationServices({
     );
     teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
   }
+  // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
+  githubConnector.onAgentAccessChanged(() => service.notifyGitHubConnectorChanged());
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no
   // provider probe reaches the driver, because the driver is this process's child.
   // The held state first: the providers start at `unavailable`, and a listener hears only what
@@ -1102,6 +1165,7 @@ export async function createApplicationServices({
         credentials: providerCredentials,
         runtimes: providerRuntimes,
         customProviders: customProviderChanges,
+        pasteSignIn: pasteCodeLoginSupported(),
       },
       messaging,
       update: {
@@ -1122,6 +1186,7 @@ export async function createApplicationServices({
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
+    sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push),
     verifyRemoteSessionTicket: (ticket) => centralAuth.verifyRemoteSessionTicket(ticket),
     endRemoteSession: (sessionId) => centralAuth.endRemoteSession(sessionId),
     remoteControlPlaneUrl: centralAuth.resolveApiUrl("/"),
@@ -1501,6 +1566,7 @@ export async function createApplicationServices({
     providerCredentials,
     messaging,
     mcpOAuth,
+    githubConnector,
     mailbox,
     storageUsage,
     browser,

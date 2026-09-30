@@ -144,8 +144,11 @@
   --openbot-chart-storage-app: var(--openbot-text-dim);
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
-  --openbot-logo-dev: var(--openbot-warning);
-  --openbot-logo-preview: var(--openbot-success);
+  /* The build colors of the logo match the app icons in `build/icon-*.png`, so the Dock, the app
+     and the Dynamic Island show one color for each build. They are brand colors, not status
+     colors: a change to warning or success does not change them. */
+  --openbot-logo-dev: #e3b866;
+  --openbot-logo-preview: #61c985;
   --openbot-unread-surface: #74b9ff;
   --openbot-unread-text: #07131f;
   /* The last hue that had not been retuned with the rest. #61c985 was OKLCH chroma
@@ -376,6 +379,10 @@
 
 [data-provider="antigravity"] {
   --openbot-provider-current: var(--openbot-provider-antigravity);
+}
+
+[data-provider="cursor"] {
+  --openbot-provider-current: var(--openbot-text-primary);
 }
 
 [data-provider="acp"] {

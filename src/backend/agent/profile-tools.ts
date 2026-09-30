@@ -25,18 +25,22 @@ export const createAgentToolSchema = z
     initialMessage: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
     provider: z
       .enum(AGENT_PROVIDERS)
-      .describe("Provider for the new agent. Omit to use the user's default. See list_models.")
+      .describe(
+        "Provider for the new agent. Omit provider and model to give it your own provider and model. See list_models.",
+      )
       .optional(),
     model: z
       .string()
       .trim()
       .min(1)
       .max(INPUT_LIMITS.modelName)
-      .describe("Model id from list_models. Omit to use the provider's default model.")
+      .describe("Model id from list_models. Omit it with a provider to use that provider's default model.")
       .optional(),
     reasoningEffort: z
       .enum(AGENT_REASONING_EFFORTS)
-      .describe("Reasoning effort that the model supports, from list_models. Omit to use the model's default.")
+      .describe(
+        "Reasoning effort that the model supports, from list_models. Omit to use your own effort when the new agent gets your model, else the model's default.",
+      )
       .optional(),
   })
   .strict();

@@ -8,6 +8,7 @@ import {
   routineRunConversationEvent,
   skillConversationEvent,
 } from "@openbot/contracts/ipc";
+import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
   AgentDeliveryMarkerStatus,
   AgentMessage,
@@ -18,7 +19,6 @@ import type {
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
-import { cleanAgentMessageText } from "./features/agents/agent-message-text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
 export function toAgentProfile(stored: AgentSummary): AgentProfile {
@@ -63,6 +63,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     itemType: message.itemType,
     kind: message.questionPrompt ? "question" : actionMarker ? "action-marker" : plan ? "plan" : "text",
     senderAgentId: exchangeSenderId,
+    senderMember: message.author === "user" ? message.senderMember : undefined,
     replyToMessageId: message.replyToMessageId,
     attachments: message.attachments,
     imageGeneration: message.imageGeneration,
@@ -217,6 +218,8 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.itemType === right.itemType &&
     left.status === right.status &&
     left.senderAgentId === right.senderAgentId &&
+    left.senderMember?.id === right.senderMember?.id &&
+    left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
     left.reaction === right.reaction &&
     JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&

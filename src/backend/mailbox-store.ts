@@ -8,6 +8,7 @@ import type {
   AttachmentDataInput,
   AttachmentSummary,
   ConversationMessage,
+  ConversationMessageSender,
   ConversationReaction,
   ConversationReactionActor,
   ConversationSnapshot,
@@ -22,6 +23,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  isConversationMessageSender,
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -70,6 +72,11 @@ interface StoredMessage {
     | { kind: "user" }
     | { kind: "agent"; agentId: string }
     | { kind: "routine"; routineId: string; runId: string; routineName: string; scheduledFor: string };
+  /**
+   * The person who wrote a user message, stamped by the host. It sits beside `sender`, not in it,
+   * because `sender` is also the queue's and the transfer manifest's. Absent on older messages.
+   */
+  senderMember?: ConversationMessageSender;
   text: string;
   attachments: StoredAttachment[];
   replyToMessageId: string | null;
@@ -125,6 +132,7 @@ interface EnqueueInput {
   messaging?: MessagingOrigin;
   messagingReturn?: MessagingOrigin;
   sender: StoredMessage["sender"];
+  senderMember?: ConversationMessageSender;
   recipientAgentIds: string[];
   text: string;
   replyToMessageId?: string | null;
@@ -367,6 +375,7 @@ export class MailboxStore {
       ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
       id: messageId,
       sender: input.sender,
+      ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
       text: rewriteAttachmentReferences(text, (reference) => {
         const attachment = committedByDraftId.get(reference.attachmentId);
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
@@ -618,6 +627,7 @@ export class MailboxStore {
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
           senderAgentId: message.sender.kind === "agent" ? message.sender.agentId : undefined,
+          ...(message.senderMember ? { senderMember: { ...message.senderMember } } : {}),
           attachments: message.attachments.map(toAttachmentSummary),
           replyToMessageId: message.replyToMessageId,
           delivery: {
@@ -1194,11 +1204,12 @@ export class MailboxStore {
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
     editId?: string,
+    sender?: ConversationMessageSender,
   ): Promise<void> {
     this.#assertQueueNotUpdating(deliveryId);
     this.#queueUpdates.add(deliveryId);
     try {
-      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId);
+      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId, sender);
     } finally {
       this.#queueUpdates.delete(deliveryId);
     }
@@ -1210,7 +1221,8 @@ export class MailboxStore {
     text: string,
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
-    editId?: string,
+    editId: string | undefined,
+    sender: ConversationMessageSender | undefined,
   ): Promise<void> {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
@@ -1281,6 +1293,9 @@ export class MailboxStore {
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
       });
       message.attachments = replacementAttachments;
+      // The saved text is the editor's, so the editor is its sender. A member can edit another
+      // member's queued message, and the first name must not stay on words that person did not write.
+      if (message.sender.kind === "user") setSenderMember(message, sender);
       if (editId) {
         delete delivery.editId;
         recordFinishedQueueEdit(delivery, editId, {
@@ -1304,6 +1319,7 @@ export class MailboxStore {
     } catch (error) {
       message.text = previous.text;
       message.attachments = previous.attachments;
+      setSenderMember(message, previous.senderMember);
       if (editId) {
         delivery.editId = editId;
         if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
@@ -1363,6 +1379,15 @@ export class MailboxStore {
 
   async restoreQueued(deliveryId: string): Promise<void> {
     await this.#updateDelivery(deliveryId, ["starting"], {
+      status: "queued",
+      turnId: null,
+      error: null,
+    });
+  }
+
+  /** A delivery whose turn the provider refused before any work, back at its place in the queue. */
+  async requeueRefused(deliveryId: string): Promise<void> {
+    await this.#updateDelivery(deliveryId, ["starting", "running"], {
       status: "queued",
       turnId: null,
       error: null,
@@ -1762,8 +1787,21 @@ function toCurrentGeneratedAttachment(value: unknown): DynamicRecord | null {
   return isRecord(value) ? withCurrentAgentKeys(value, { ownerBotId: "ownerAgentId" }) : null;
 }
 
+function setSenderMember(message: StoredMessage, sender: ConversationMessageSender | undefined): void {
+  if (sender) message.senderMember = sender;
+  else delete message.senderMember;
+}
+
 function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {
-  return isRecord(value) ? { ...value, sender: toCurrentMailboxActor(value.sender) } : null;
+  if (!isRecord(value)) return null;
+  const { senderMember, ...message } = value;
+  // A sender that does not decode only loses the name on its message; it must not stop the whole
+  // mailbox from loading.
+  return {
+    ...message,
+    sender: toCurrentMailboxActor(value.sender),
+    ...(isConversationMessageSender(senderMember) ? { senderMember } : {}),
+  };
 }
 
 function toCurrentMailboxReaction(value: unknown): DynamicRecord | null {
@@ -1876,6 +1914,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
         isString(value.sender.runId) &&
         isString(value.sender.routineName) &&
         isString(value.sender.scheduledFor))) &&
+    (value.senderMember === undefined || isConversationMessageSender(value.senderMember)) &&
     isString(value.text) &&
     Array.isArray(value.attachments) &&
     value.attachments.every(isStoredAttachment) &&

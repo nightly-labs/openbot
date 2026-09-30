@@ -129,6 +129,8 @@ export interface RemoteTeamPeerActions {
   ) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => Promise<void>;
+  /** The platform reported that the network came back. A consumer that waits to retry can retry now. */
+  onNetworkRestored?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
 }
 interface ActionsRef {
@@ -169,6 +171,8 @@ interface PeerState {
   reconnectAttempt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   turnRefreshTimer: ReturnType<typeof setTimeout> | null;
+  /** When the TURN credentials must be renewed. Background time does not move it. */
+  turnRefreshDueAt: number;
   iceServers: RTCIceServer[];
   lastEventSequence: number;
   needsResync: boolean;
@@ -177,11 +181,26 @@ interface PeerState {
   connectedReject: ((error: Error) => void) | null;
   connectedTimer: ReturnType<typeof setTimeout> | null;
   disconnectedTimer: ReturnType<typeof setTimeout> | null;
+  iceRecoveryTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * Signal sent `ready` on the current socket. Signal gives each `hello` a new connection ID, so a
+   * frame sent before `ready` carries the old ID, and Signal rejects it.
+   */
+  signalReady: boolean;
+  /** The host answered a request on this peer, so its channels worked after authentication. */
+  answeredRequest: boolean;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
-const DISCONNECT_GRACE_MS = 5_000;
+/** How long a peer with a lost ICE path can recover before it is replaced with a new session. */
+const DISCONNECT_GRACE_MS = 15_000;
+/** ICE often recovers a short loss by itself. After this wait, the peer restarts ICE. */
+const ICE_RESTART_DELAY_MS = 2_000;
+/** A Signal socket from before a network change can read as open and deliver nothing. */
+const SIGNAL_RENEW_DELAY_MS = 8_000;
 const COMPATIBILITY_REQUEST_TIMEOUT_MS = 3_000;
+/** The first read on a new peer also waits for a slow relay path, such as TURN over TLS on mobile data. */
+const FIRST_COMPATIBILITY_REQUEST_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 
 export function createRemoteTeamPeer(actions: ActionsRef) {
@@ -234,7 +253,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
         if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
         if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+        if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
         state.disconnectedTimer = null;
+        state.iceRecoveryTimer = null;
         state.reconnectTimer = null;
         state.turnRefreshTimer = null;
         // The host can commit a sent write while the app is inactive. Keep its
@@ -246,18 +267,27 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (!state.authenticated) failPeer(state, new Error(sourceText("error.remote.appInBackground")), actions);
       } else {
         if (canRecoverPeer(state)) {
-          scheduleDisconnectedCheck(state, actions);
-          if (!state.socket) openSignal(state, actions);
+          recoverIce(state, actions, 0);
         } else if (!isPeerOnline(state)) {
           failPeer(state, new Error(sourceText("error.remote.desktopRestoreNeeded")), actions);
         } else {
-          scheduleTurnRefresh(state);
+          resumeTurnRefresh(state);
           if (!state.socket) openSignal(state, actions);
           // The recovery owner reloads workspace reads on every foreground return.
           // Do not request a second reload for reads canceled on background entry.
           state.needsResync = false;
         }
       }
+    },
+    /**
+     * The platform saw the network come back, such as after a dead zone on mobile data. The path
+     * and the Signal socket from before can both be dead, so renew the socket: its `ready` restarts
+     * ICE on the authenticated peer. An attempt that is still connecting keeps its own deadline.
+     */
+    networkRestored() {
+      const state = peer;
+      if (active && state && !state.closed && state.authenticated) renewSignal(state, actions);
+      void actions.current.onNetworkRestored?.().catch(() => undefined);
     },
   };
   function isPeerOnline(state: PeerState): boolean {
@@ -268,11 +298,47 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     );
   }
   function canRecoverPeer(state: PeerState): boolean {
+    const connectionState = state.connection?.connectionState;
+    // An authenticated peer is `connecting` only during an ICE restart.
     return (
       state.authenticated &&
-      state.connection?.connectionState === "disconnected" &&
+      (connectionState === "disconnected" || connectionState === "failed" || connectionState === "connecting") &&
       CHANNELS.every((kind) => state.channels[kind]?.readyState === "open")
     );
+  }
+
+  /**
+   * A lost ICE path, such as a phone that moved from Wi-Fi to mobile data, keeps the authenticated
+   * session. Restart ICE on the current Signal socket first. If the path is still lost, open a new
+   * socket, because the old one can be half-open after a network change; its `ready` restarts ICE
+   * again. Only the grace deadline replaces the peer.
+   */
+  function recoverIce(state: PeerState, actions: ActionsRef, delay: number): void {
+    scheduleDisconnectedCheck(state, actions);
+    if (!active || state.iceRecoveryTimer !== null) return;
+    // A restart moves the state to `connecting`, so wait for `online`, not for `disconnected`.
+    const canContinue = () => active && !state.closed && peer === state && state.authenticated && !isPeerOnline(state);
+    state.iceRecoveryTimer = setTimeout(() => {
+      state.iceRecoveryTimer = null;
+      if (!canContinue()) return;
+      // A socket that did not get `ready` yet restarts ICE when `ready` arrives.
+      if (canSignal(state)) void restartIce(state).catch(() => undefined);
+      else if (!state.socket) renewSignal(state, actions);
+      state.iceRecoveryTimer = setTimeout(() => {
+        state.iceRecoveryTimer = null;
+        if (canContinue()) renewSignal(state, actions);
+      }, SIGNAL_RENEW_DELAY_MS);
+    }, delay);
+  }
+
+  function renewSignal(state: PeerState, actions: ActionsRef): void {
+    if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+    const socket = state.socket;
+    // Clear it first, so the close handler does not schedule a second reconnect.
+    state.socket = null;
+    socket?.close();
+    openSignal(state, actions);
   }
 
   function scheduleDisconnectedCheck(state: PeerState, actions: ActionsRef): void {
@@ -296,7 +362,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (peer && peer.hostId === command.hostId && peer.hostPublicKey === command.hostPublicKey) {
           if (canRecoverPeer(peer)) {
             const recovering = peer;
-            scheduleDisconnectedCheck(recovering, actions);
+            recoverIce(recovering, actions, 0);
             recovering.connectedPromise ??= new Promise<void>((resolve, reject) => {
               recovering.connectedResolve = resolve;
               recovering.connectedReject = reject;
@@ -394,6 +460,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       reconnectAttempt: 0,
       reconnectTimer: null,
       turnRefreshTimer: null,
+      turnRefreshDueAt: 0,
       iceServers: [],
       lastEventSequence: 0,
       needsResync: false,
@@ -402,6 +469,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       connectedReject: null,
       connectedTimer: null,
       disconnectedTimer: null,
+      iceRecoveryTimer: null,
+      signalReady: false,
+      answeredRequest: false,
     };
     peer = state;
     const connected = new Promise<void>((resolve, reject) => {
@@ -425,6 +495,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (!active || state.closed || peer !== state || state.socket) return;
     const socket = new WebSocket(state.signalUrl);
     state.socket = socket;
+    state.signalReady = false;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
       state.reconnectAttempt = 0;
@@ -441,7 +512,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       const data = event.data;
       state.signalChain = state.signalChain
         .then(async () => {
-          if (state.closed || peer !== state) return;
+          // A frame still queued from a socket that `renewSignal` replaced belongs to a removed connection.
+          if (state.closed || peer !== state || state.socket !== socket) return;
           let message: SignalServerMessage | null;
           try {
             message = decodeSignalServerMessage(JSON.parse(data));
@@ -457,12 +529,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         })
         // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
         // browser refused, or a host that said it went away. Those are connections failing.
-        .catch((error) => failPeer(state, error, actions));
+        .catch((error) => {
+          if (state.socket === socket) failPeer(state, error, actions);
+        });
     };
     socket.onerror = () => socket.close();
     socket.onclose = () => {
       if (state.socket !== socket) return;
       state.socket = null;
+      state.signalReady = false;
       if (state.closed || peer !== state) return;
       scheduleReconnect(state, actions);
     };
@@ -494,6 +569,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       state.iceServers = message.iceServers;
       if (!state.connectionId || state.iceServers.length === 0)
         throw new Error("Signal returned an incomplete connection.");
+      state.signalReady = true;
       scheduleTurnRefresh(state);
       if (state.connection) {
         state.connection.setConfiguration({ iceServers: state.iceServers, bundlePolicy: "max-bundle" });
@@ -548,7 +624,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     connection.onicecandidate = (event) => {
-      if (!event.candidate || !state.connectionId || state.socket?.readyState !== WebSocket.OPEN) return;
+      if (!event.candidate || !state.connectionId || !canSignal(state)) return;
       sendSignal(state, {
         type: "ice-candidate",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -565,21 +641,29 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     };
     connection.onconnectionstatechange = () => {
       if (state.connection !== connection || state.closed || peer !== state) return;
-      if (connection.connectionState === "disconnected") {
-        // ICE can recover a short network interruption without replacing the authenticated session.
+      const connectionState = connection.connectionState;
+      // ICE can recover a network change without replacing the authenticated session. A failed
+      // path waits for nothing: only an ICE restart can recover it.
+      if (canRecoverPeer(state)) {
+        recoverIce(state, actions, connectionState === "failed" ? 0 : ICE_RESTART_DELAY_MS);
+        return;
+      }
+      if (connectionState === "disconnected") {
         scheduleDisconnectedCheck(state, actions);
         return;
       }
-      if (connection.connectionState === "connected" && state.disconnectedTimer !== null) {
-        clearTimeout(state.disconnectedTimer);
+      if (connectionState === "connected") {
+        if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+        if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
         state.disconnectedTimer = null;
+        state.iceRecoveryTimer = null;
       }
       if (isPeerOnline(state)) {
-        if (active && state.turnRefreshTimer === null) scheduleTurnRefresh(state);
+        if (active && state.turnRefreshTimer === null) resumeTurnRefresh(state);
         settleConnected(state);
         resyncIfNeeded(state, actions);
       }
-      if (connection.connectionState === "failed" || connection.connectionState === "closed") {
+      if (connectionState === "failed" || connectionState === "closed") {
         failPeer(state, new Error(sourceText("error.remote.desktopOffline")), actions);
       }
     };
@@ -672,6 +756,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (kind === "rpc") {
       const frame = decodeTeamProtocolV2RpcFrame(data);
       if (frame.type !== "response") throw new Error("The host returned an invalid RPC frame.");
+      state.answeredRequest = true;
       const pending = pendingRequests.get(frame.requestId);
       if (!pending) return;
       if ("error" in frame) pending.reject(new Error(frame.error.message));
@@ -824,6 +909,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
+    const compatibilityTimeout = state.answeredRequest
+      ? COMPATIBILITY_REQUEST_TIMEOUT_MS
+      : FIRST_COMPATIBILITY_REQUEST_TIMEOUT_MS;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
       const timer = setTimeout(
         () => {
@@ -834,7 +922,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           // Do not keep retrying reads on channels whose local state is stale.
           if (checksConnection) failPeer(state, error, actions);
         },
-        checksConnection ? COMPATIBILITY_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+        checksConnection ? compatibilityTimeout : REQUEST_TIMEOUT_MS,
       );
       pendingRequests.set(requestId, { method, path, resolve, reject, timer });
     });
@@ -978,28 +1066,41 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     });
   }
 
+  function canSignal(state: PeerState): boolean {
+    return state.signalReady && state.socket?.readyState === WebSocket.OPEN;
+  }
+
   function sendSignal(state: PeerState, message: SignalClientMessage): void {
-    if (state.socket?.readyState !== WebSocket.OPEN) throw new Error(sourceText("error.remote.signalOffline"));
-    state.socket.send(JSON.stringify(message));
+    const socket = state.socket;
+    if (!socket || !canSignal(state)) throw new Error(sourceText("error.remote.signalOffline"));
+    socket.send(JSON.stringify(message));
   }
 
   function scheduleReconnect(state: PeerState, actions: ActionsRef): void {
     if (!active || state.reconnectTimer !== null) return;
     // A signaling-only interruption can resume inside Signal's grace window while
-    // the data channels stay online. The recovery owner replaces dead peers.
-    const delay = isPeerOnline(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000;
+    // the data channels stay online. A peer that recovers its ICE path needs Signal
+    // for the restart. The recovery owner replaces dead peers.
+    const delay =
+      isPeerOnline(state) || canRecoverPeer(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000;
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;
       openSignal(state, actions);
     }, delay);
   }
 
-  function scheduleTurnRefresh(state: PeerState): void {
+  /** Keeps the deadline from before background entry. A new 45-minute wait could pass the credentials' expiry. */
+  function resumeTurnRefresh(state: PeerState): void {
+    scheduleTurnRefresh(state, Math.max(0, state.turnRefreshDueAt - Date.now()));
+  }
+
+  function scheduleTurnRefresh(state: PeerState, delay = SIGNAL_TURN_REFRESH_INTERVAL_MS): void {
     if (!active || state.closed || peer !== state) return;
     if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
+    state.turnRefreshDueAt = Date.now() + delay;
     state.turnRefreshTimer = setTimeout(() => {
       state.turnRefreshTimer = null;
-      if (state.socket?.readyState === WebSocket.OPEN) {
+      if (canSignal(state)) {
         try {
           sendSignal(state, {
             type: "turn-refresh",
@@ -1011,7 +1112,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         }
       }
       scheduleTurnRefresh(state);
-    }, SIGNAL_TURN_REFRESH_INTERVAL_MS);
+    }, delay);
   }
 
   function failPeer(
@@ -1065,6 +1166,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (state.turnRefreshTimer !== null) clearTimeout(state.turnRefreshTimer);
     if (state.connectedTimer !== null) clearTimeout(state.connectedTimer);
     if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
+    if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
     state.socket?.close();
     state.connection?.close();
     for (const decoder of Object.values(state.decoders)) decoder?.reset();

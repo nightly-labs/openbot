@@ -123,6 +123,16 @@ linux:
   extraResources:
     - from: build/linux/openbot.apparmor
       to: linux/openbot.apparmor
+    # A hosted server installs the packages, scripts and units of the release that it updates to.
+    - from: scripts/hosting
+      to: hosting
+      filter:
+        - "**/*"
+        - "!*.ts"
+    # Only the x64 build installs this runtime. For arm64 the directory does not exist, and
+    # electron-builder skips a missing source with a warning.
+    - from: build/remote-desktop-runtime
+      to: remote-desktop-runtime
     - from: build/cua-driver/linux/${arch}
       to: cua-driver/linux/${arch}
   # Electron takes its Linux app id from `desktopName` in package.json, and the window manager

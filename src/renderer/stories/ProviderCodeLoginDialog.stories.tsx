@@ -43,6 +43,7 @@ const meta = {
     state: waitingState(),
     onOpenVerificationUrl: fn(),
     onCancel: fn(),
+    onSubmitCode: fn(),
   },
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof ProviderCodeLoginDialog>;
@@ -77,6 +78,32 @@ export const AboutToExpire: Story = {
 /** Asking the provider for a code. Two seconds in the real flow, and nothing to do in them. */
 export const Starting: Story = {
   args: { state: { phase: "starting" } },
+};
+
+const PASTE_URL = "https://claude.com/cai/oauth/authorize?code=true&state=preview";
+
+/**
+ * Claude on a host with no visible browser: the user signs in on the page, and pastes back the
+ * code that the page shows.
+ */
+export const Paste: Story = {
+  args: {
+    providerName: "Claude",
+    state: { phase: "paste", verificationUrl: PASTE_URL, expiresAt: Date.now() + 10 * 60_000 },
+  },
+};
+
+/** The provider refused the pasted code. The field stays, so the user can fix it. */
+export const PasteRefused: Story = {
+  args: {
+    providerName: "Claude",
+    state: {
+      phase: "paste",
+      verificationUrl: PASTE_URL,
+      expiresAt: Date.now() + 10 * 60_000,
+      error: "Paste the code that the sign-in page shows.",
+    },
+  },
 };
 
 /** The code was accepted elsewhere. OpenBot is trading it for the session. */

@@ -1,5 +1,6 @@
-import { agentProviderName } from "@openbot/contracts/ipc";
+import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import { AppServerError } from "../app-server-client";
 import { type DynamicToolCallParams, getString, isRecord, reasoningText, type ThreadItem } from "../protocol";
@@ -12,9 +13,23 @@ export function isArchivedThreadError(error: unknown): boolean {
   return error instanceof AppServerError && /\bis archived\b/i.test(error.message);
 }
 
+/**
+ * The provider refused the session's own history. Grok keeps the `encrypted_content` of each
+ * reasoning item in its session and sends it back on every request, and xAI accepts it only from
+ * the caller it was issued to. After a sign-in to another account or a new API key, each turn of
+ * that session fails the same way, so only a new session, given the OpenBot transcript, recovers.
+ */
+export function isForeignReasoningError(message: string): boolean {
+  return /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message);
+}
+
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
   if (
-    (provider !== "grok" && provider !== "opencode" && provider !== "antigravity" && provider !== "acp") ||
+    (provider !== "grok" &&
+      provider !== "opencode" &&
+      provider !== "antigravity" &&
+      provider !== "cursor" &&
+      provider !== "acp") ||
     !(error instanceof Error)
   ) {
     return false;
@@ -171,6 +186,12 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     .filter(isString)
     .join(" ")
     .toLowerCase();
+  // Before the generic words below, because a driver tool such as `get_window_state` matches them.
+  // The completed text is what the user reads while the model decides the next action, so a long
+  // wait after it is the model, not the driver.
+  if (getString(item, "server") === COMPUTER_USE_MCP_SERVER_NAME || descriptor.includes(COMPUTER_USE_MCP_SERVER_NAME)) {
+    return sourceText(completed ? "status.computerUse.progressDeciding" : "status.computerUse.progressActing");
+  }
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
     return completed ? "Reviewing the sources and information I found…" : "Searching for current information…";
   }

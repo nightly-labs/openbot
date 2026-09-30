@@ -11,11 +11,18 @@
  * this app. So does a server this app configured - the user asked for it here, and the reason it
  * does not start is something only they can fix. `configuredNames` is what separates the two: a
  * server the user configured in their own provider files is still nobody's failure but theirs.
+ *
+ * Grok's CLI also loads the servers in `~/.claude.json`, `~/.cursor/mcp.json` and `.mcp.json`. One
+ * there that asks for OAuth ends its transport with the `rmcp` worker's own sentence,
+ * `worker quit with fatal: Transport channel closed, when AuthRequired(…)`, which names neither MCP
+ * nor the server. The session opens without that server, and the user read the line as a "Provider
+ * error" toast (#1199). The worker's sentence is matched as it stands, because no other part of a
+ * provider writes it.
  */
 export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
   if (/openbot/i.test(message)) return false;
   if (configuredNames.some((name) => name && message.includes(name))) return false;
-  return /\b(mcp|rmcp)\b/i.test(message);
+  return /\b(mcp|rmcp)\b|\bworker quit with (?:fatal|join error|reason):/i.test(message);
 }
 
 /**

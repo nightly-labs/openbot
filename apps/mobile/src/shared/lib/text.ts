@@ -1,4 +1,4 @@
-import { formatLocale, resolveLocale } from "@openbot/i18n/mobile";
+import { formatLocale, resolveLocale, type TranslatedLocale } from "@openbot/i18n/mobile";
 import { useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { useAppLanguage } from "@/features/settings/model/app-language";
@@ -15,6 +15,11 @@ export function currentText(): MobileText {
   const language = useAppLanguage.getState().value;
   const systemLocale = phoneLocale();
   return textFor(resolveLocale(language, systemLocale), formatLocale(language, systemLocale));
+}
+
+/** The interface language now, for text that the phone asks another computer to write. */
+export function currentLocale(): TranslatedLocale {
+  return resolveLocale(useAppLanguage.getState().value, phoneLocale());
 }
 
 export function useText(): MobileText {

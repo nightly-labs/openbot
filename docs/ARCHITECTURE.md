@@ -17,7 +17,7 @@ packages/
   contracts/         Process and network boundary types, limits, and pure validation
   i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
-  team-client/       Shared team connection, recovery, and WebRTC framing code
+  team-client/       Shared team connection, recovery, WebRTC framing, and Dynamic Island state
   user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
@@ -238,6 +238,7 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
+| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads. The next use loads the page again. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
 
@@ -336,13 +337,15 @@ would refuse.
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, `x.ai/cli/stable`
-for Grok, and the ACP registry entry `antigravity-acp` for Gemini. The version in `native-runtime.lock.json` is what a first install uses before a check has
+for Grok, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
 Codex and npm `dist.integrity` for Claude and OpenCode. x.ai and the ACP registry publish no hash,
-so a Grok or Gemini release is trusted on TLS alone. A Gemini release must stay on
-`dl.google.com/agy-extensions/releases` and keep the pinned command name. An upstream install writes `openbot-install.json` with the SHA-256 of each
+so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
+`dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
+the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
+registry date, and keep the pinned command. An upstream install writes `openbot-install.json` with the SHA-256 of each
 file it installed, and every start verifies that record and the binary's `--version` before the
 install is used. The newest version in the store that verifies is the one that runs.
 
@@ -882,7 +885,9 @@ the existing agent service and validate arguments before changing state.
 read-only `openbot.list_models` returns the models of each provider that the model picker shows, with
 their reasoning efforts and the default model for a request that names only a provider. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
-it creates the agent. Without these fields, the new agent starts on the user's default.
+it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
+provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
+When the caller's provider no longer lists its model, the new agent starts on the user's default.
 Creation stays this small. The calling agent then configures the new agent, or any other local
 agent, with the same tools that act on itself. `openbot.read_agent` returns one agent's setup:
 profile, runtime, access, Computer Use, notifications, auto-approve, installed skills, routines,
@@ -1154,6 +1159,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
+| `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 
@@ -1161,6 +1167,26 @@ These IPC groups take a required server id and route with `scopedHandler`. A key
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
 sign-in and folder import stay on the host.
+
+`providers-v1` signs in Codex only, with a device code. A host that serves `providers-v3` also signs
+in Grok (`grok login --device-auth`) and Claude (`claude auth login`), for a host with no visible
+browser, such as a hosted server. `src/backend/agent/cli-code-login.ts` reads the link, and for Grok
+the code, from the CLI output. The Claude CLI shows its paste prompt only on a terminal, so the host
+runs it under the util-linux `script`, and the admin sends back the code that the Claude page shows
+(`code-login/submit`). This flow runs only on a Linux host: the macOS `script` refuses a socket for
+stdin, and Windows has no `script`. So only a Linux host advertises `providers-v3`; a macOS or
+Windows host keeps `providers-v1`, and its clients offer the Codex code sign-in only. The CLI output and the pasted code are secrets; no log line or
+error quotes them. How a sign-in ends arrives in the host's agent status, as for Codex.
+`codeSignInProviders` in `server-capabilities.ts` picks the providers that the Providers list offers
+for a code sign-in, from the host's capabilities.
+
+When the account is an owner or admin of the active remote server, the server serves `providers-v1`,
+and the server has no agent, the workspace shows `ServerOnboarding` before the first-agent form, on
+desktop (`WorkspaceServerOnboarding`) and on the web (`WebWorkspace`). It shows the host's providers
+through `hostSetupProviderProps`, and Continue stays blocked until a provider is connected. The form
+then opens with that provider. The choice stays in memory for the server; it is not written to the
+setup file of this computer. A member, the local server, and a host without `providers-v1` open the
+form directly.
 
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until
@@ -1249,6 +1275,33 @@ sign-in state from peers on those versions, and the `providers-v1` routes omit i
 carries Gemini, and the `providers-v2` runtime routes let an owner or admin download or cancel the
 host's Gemini runtime. Gemini signs in through a browser on the host, so no peer route signs it in.
 
+### Cursor
+
+The Cursor provider (id `cursor`) starts the Cursor CLI with `cursor-agent acp`. Cursor's terms do
+not allow redistribution, so the runtime manager downloads the archive on the user's computer.
+`extractZipTree` in `src/main/provider-runtime-archive.ts` extracts the Windows zip and accepts only
+entries in its `dist-package` folder; staging renames that folder to `bin`. The CLI's `--version`
+is not usable on Windows, where the launcher is a `.cmd` file, so staging writes
+`cursor-package.json` and `verifyInstalledRuntime` reads the version from it. A lock install also
+checks the SHA-256 of each file in `files`. `resolveCursorCli` looks for `cursor-agent` on `PATH`,
+never `cursor`, which starts the Cursor editor.
+
+Sign in is an ACP `authenticate` call with `cursor_login`, in a separate process, as for Gemini.
+`CURSOR_API_KEY` in the environment also signs the CLI in. A confined Cursor process gets
+`CURSOR_CONFIG_DIR=~/.cursor/openbot-confined` (`cursorConfinedEnv`): the CLI writes
+`cli-config.json` when a session starts and fails when it cannot, and that file also holds the
+user's permissions. `cursorStatePaths` lets it write `~/.cursor` and protects the user's settings,
+hooks, rules, MCP and permission files there and in the CLI config folder, and the
+`.workspace-trusted` and `mcp-approvals.json` files in each folder in `projects`. Migration 24 adds
+`cursor` to `projection_provider_sessions`.
+
+No Team API protocol knows `cursor`. The host hides Cursor agents, models, status, and sign-in
+state from every peer, and the `providers-v1` and `providers-v2` routes omit it. A route that reads
+an agent ID from the body answers 404 for a hidden agent (`requireVisibleBodyAgent`). A peer cannot
+create an agent, or add one from a template, the marketplace or an import, when the host would start
+it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id `cursor` before the
+provider existed stays visible.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -1302,7 +1355,34 @@ reconciliation. The server context menu controls mute for local and remote serve
 `renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
 system notifications. Remote notification content uses the source server's agent list. Both
 server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
-not yet deliver system notifications; mute settings are not synchronized between devices.
+not deliver system notifications; it shows agent state in its Live Activity. Mute settings are not
+synchronized between devices.
+
+## iPhone Live Activity updates
+
+The phone and a host build the same Live Activity view with `@openbot/team-client`:
+`dynamic-island-coordinator.ts` gives the state, and `live-activity-props.ts` turns it into the props
+that the widget shows. While the app runs, `use-live-activity.ts` publishes them itself.
+
+iOS stops the app and its connections in the background. So the phone registers the push token of
+its activity with the active host (`live-activity-push-v1`, `POST /v1/live-activity/registration`),
+with `away: true` when it leaves the foreground. `LiveActivityPushService` in `src/main` keeps the
+registration in memory for that session. While the phone is away, each agent event (at most once a
+second) reads the runtime snapshot of the agents the member can see and the member's read state,
+builds the props, and sends a change. A change of state has priority 10; a change inside a state
+waits 5 seconds and has priority 5. An unchanged state is sent again every 10 minutes, so its stale
+date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
+state ends the activity.
+
+`live-activity-seal.ts` seals the props with keys derived from a secret that the phone makes for
+that host (an HMAC of the phone secret and the server ID). The
+host sends the sealed text to `POST /v2/remote/hosts/:hostId/live-activity` with its machine
+credential. The Worker checks the credential and a per-host rate limit, makes the APNs payload and
+provider token itself, and forwards the request. It stores and logs nothing. The widget cannot load a
+library, so the phone composes its layout with the two widget keys and the App Group folder, and
+`live-activity-open.ts` opens the sealed props with its own SHA-256. Button links that change host
+state carry an HMAC signature, which the app checks with the key of the host that the action goes
+to, so one host cannot sign an action for another.
 
 ## Shared channel chats
 
@@ -1445,16 +1525,17 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini |
-| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor |
+| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode, Cursor |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
+| `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
 | `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
 | `~/.claude/skills/` | the user | Claude Code, OpenCode |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
 
-A confined agent (Grok, OpenCode or Gemini, not in Full access) cannot write the four workspace
-folders: `src/backend/process-confinement.ts` protects them as project settings.
+A confined agent (Grok, OpenCode, Gemini or Cursor, not in Full access) cannot write the workspace
+skill folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
 `.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and
@@ -1462,7 +1543,7 @@ does not make links. `.openbot/skills-lock.json` in the workspace records the fi
 `.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
 marker.
 
-`src/main/skill-folder-discovery.ts` lists all other skills in the four workspace folders as
+`src/main/skill-folder-discovery.ts` lists all other skills in the five workspace folders as
 `workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
 they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
 skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
@@ -1481,6 +1562,36 @@ provider when the session starts. Claude starts with `strictMcpConfig`, so it ig
 and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
 environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
 `safeStorage`.
+
+The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
+in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps
+the tokens in `openbot-github-connector-v1.json`, encrypted with `safeStorage`. While it is
+connected, `McpGateway.enabled()` adds the `openbot-github` server (`api.githubcopilot.com/mcp/`),
+and `authorization()` gives it a fresh bearer at each hand-off. An enabled server that the user added
+with the name `github` wins. For `gh` and `git`, the service writes the token to
+`<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
+`GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
+token. Codex gets these values through `shell_environment_policy.set` in the thread config.
+
+A user token makes GitHub show "user with OpenBotGit". To show `openbotgit[bot]`, the desktop sends
+the user token to `POST /v1/github/installation-tokens` on the account Worker
+(`apps/auth-api/src/server/github-installation-tokens.ts`). The Worker holds the app's private key
+(`GITHUB_APP_PRIVATE_KEY`, PKCS #8) and signs an app JWT. It mints one installation token for each
+installation of this app, limited to the repositories where the user can push, maintain or
+administer, and stores nothing. With no key it answers 503, and the desktop keeps the user token.
+`src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
+- `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
+  `provider-state/github/repositories`, or else the user token.
+- MCP: `src/main/github-mcp-proxy.ts` is a loopback MCP server with a secret bearer. It forwards to
+  `api.githubcopilot.com/mcp/` with one upstream client for each token, because GitHub binds an MCP
+  session to its token. A tool call with `owner` and `repo` arguments uses that repository's bot
+  token. The port and the secret stay in the encrypted record, so a resumed Codex session keeps its
+  URL and header.
+- `gh` has one token for each host, so it acts as the user.
+
+A pull request that an agent opens with a bot token has `openbotgit[bot]` as its author, so the user
+who asked for it can approve it. A branch rule that needs one approval then passes with no second
+person.
 
 ## Local skill library
 
@@ -1644,6 +1755,11 @@ Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishi
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
 
+On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
+`XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
+sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
+capability. Linux has no permission checks: an X11 session is ready.
+
 ## Secure browser authentication
 
 `openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
@@ -1677,7 +1793,9 @@ and observed state. A server reports each minute while it is in use, and the Wor
 extends. When boat stops a server in use, the Worker resumes it, and clients ask the Worker to
 start a stopped server when a connection fails. No message
 waits in the Worker while a server is stopped; the client keeps it and connects again. The Worker's boat key cannot read files or run commands in a
-sandbox. See [hosted servers](hosted-servers.md) for the flow, the configuration and the template.
+sandbox. On a hosted server only, main reads the memory of the machine, and the backend holds new
+turns while it is low and limits the turns that run at the same time. See
+[hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
 
 ## Shared UI package
 

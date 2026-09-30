@@ -185,6 +185,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
   /** Where a Workspace only query keeps its skill plugin. Without it, such a query has no workspace skills. */
   readonly #stateDirectory: string | undefined;
+  /** Read at each session start, so a GitHub connection made while OpenBot runs reaches the next session. */
+  readonly #agentEnvironment: ((inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>) | undefined;
   /** Threads whose process was closed for being idle keep the config that resumes them. */
   readonly #threads = new IdleThreadPool<ThreadRuntime, ThreadConfig>({
     releaseAfterMs: CLAUDE_THREAD_IDLE_RELEASE_MS,
@@ -212,6 +214,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     mcpToolRuntimes?: McpToolRuntimeSource,
     mcpAuthorization?: McpAuthorizationSource,
     stateDirectory?: string,
+    agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>,
   ) {
     super();
     this.#cli = cli;
@@ -223,6 +226,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#mcpToolRuntimes = mcpToolRuntimes;
     this.#mcpAuthorization = mcpAuthorization;
     this.#stateDirectory = stateDirectory;
+    this.#agentEnvironment = agentEnvironment;
   }
 
   get running(): boolean {
@@ -242,6 +246,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     await Promise.allSettled(runtimes.map((runtime) => runtime.consume));
     this.#serverRequests.rejectAll("Claude session stopped.");
+  }
+
+  releaseIdleThreads(): void {
+    this.#threads.releaseIdle();
   }
 
   /**
@@ -572,6 +580,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         mcpServers,
         env: {
           ...claudeEnvironment(this.#cli),
+          ...this.#agentEnvironment?.(),
           CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
           // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
           // agent has no plan for OpenBot to show as a task list.

@@ -8,11 +8,11 @@ import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode and Antigravity take no sandbox per session, so a Workspace only agent on them gets a provider
- * process of its own, and OpenBot starts that process inside an operating system sandbox. The whole
- * process is confined: the file edit tools, the shell, and every command and MCP server it starts.
- * Nothing inside the process can take the sandbox away. Only macOS has the sandbox now: on Linux and
- * Windows the process does not start, and the user must choose Full access.
+ * Grok, OpenCode, Antigravity and Cursor take no sandbox per session, so a Workspace only agent on
+ * them gets a provider process of its own, and OpenBot starts that process inside an operating
+ * system sandbox. The whole process is confined: the file edit tools, the shell, and every command
+ * and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS has the
+ * sandbox now: on Linux and Windows the process does not start, and the user must choose Full access.
  */
 export interface ProcessConfinement {
   readonly writableRoots: readonly string[];
@@ -26,6 +26,11 @@ export interface ProviderStatePaths {
    * not confined. A confined agent that wrote them would reach outside at the next start of one.
    */
   readonly protected: readonly string[];
+  /**
+   * Folders in `writable` that hold a folder for each project, and the file names in there, at any
+   * depth, that trust a project or approve its MCP servers for the processes that are not confined.
+   */
+  readonly protectedInProjects?: { readonly folders: readonly string[]; readonly names: readonly string[] };
 }
 
 export interface SpawnTarget {
@@ -97,6 +102,65 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
 }
 
 /**
+ * The Cursor CLI keeps its settings in its config folder, and its sessions, project data and, on
+ * macOS, the sign-in file `auth.json` in `~/.cursor`, which the Cursor editor shares.
+ * `cli-config.json` holds the command permissions and approval mode that the user's own CLI runs
+ * with, and the CLI writes it when a session picks its model, so a confined process gets a config
+ * folder of its own:
+ * `cursorConfinedEnv`. The user's settings files, and the folders that hold extensions, plugins,
+ * skills, agents, commands and rules, load code or settings in the editor and in every other CLI
+ * process, so they stay read-only. So do the trust and MCP approval files of each project in
+ * `projects`. The sessions stay in the shared data folder, so a thread continues when the agent
+ * changes between Workspace only and Full access.
+ */
+export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const xdgConfig = env.XDG_CONFIG_HOME?.trim();
+  const userConfig = env.CURSOR_CONFIG_DIR?.trim() || (xdgConfig ? join(xdgConfig, "cursor") : join(home, ".cursor"));
+  const dataHome = env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+  // `auth.json` and the `sandbox.json` and `hooks.json` files are always in `~/.cursor` on macOS.
+  const fixedHome = join(home, ".cursor");
+  const settings = [
+    "cli-config.json",
+    "permissions.json",
+    "acp-config.json",
+    "mcp.json",
+    "hooks.json",
+    "sandbox.json",
+    "argv.json",
+    "extensions",
+    "plugins",
+    "skills",
+    "skills-cursor",
+    "agents",
+    "commands",
+    "rules",
+  ];
+  return {
+    writable: unique([cursorConfinedConfig(home), dataHome, fixedHome, CURSOR_CONFINED_CACHE]),
+    protected: unique([userConfig, dataHome, fixedHome].flatMap((root) => settings.map((name) => join(root, name)))),
+    protectedInProjects: {
+      folders: unique([dataHome, fixedHome].map((root) => join(root, "projects"))),
+      names: [".workspace-trusted", "mcp-approvals.json"],
+    },
+  };
+}
+
+const CURSOR_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cursor-cache");
+
+/** The config folder of every confined Cursor process. Only confined processes read it. */
+function cursorConfinedConfig(home: string): string {
+  return join(home, ".cursor", "openbot-confined");
+}
+
+/**
+ * The environment of a confined Cursor process: its own config folder and its own compile cache, as
+ * the launcher keeps that cache outside the folders above.
+ */
+export function cursorConfinedEnv(home = homedir()): Readonly<Record<string, string>> {
+  return { CURSOR_CONFIG_DIR: cursorConfinedConfig(home), NODE_COMPILE_CACHE: CURSOR_CONFINED_CACHE };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -123,6 +187,8 @@ const PROJECT_SETTINGS = [
   ".opencode",
   "opencode.json",
   "opencode.jsonc",
+  // Cursor reads its project rules, MCP servers, hooks and skills from `.cursor`.
+  ".cursor",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.
   ".gemini",
   ".agents",
@@ -150,7 +216,12 @@ export function confineSpawnTarget(
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
       command: SANDBOX_EXEC,
-      args: ["-p", seatbeltProfile(writable, protectedPaths), target.command, ...target.args],
+      args: [
+        "-p",
+        seatbeltProfile(writable, protectedPaths, state.protectedInProjects),
+        target.command,
+        ...target.args,
+      ],
       windowsVerbatimArguments: false,
     };
   }
@@ -168,11 +239,23 @@ function unavailable(tool: string): string {
  * in a Seatbelt profile the last rule that matches wins. Everything else stays open, as the Access
  * setting says: reads, the network and process starts.
  */
-function seatbeltProfile(writable: readonly string[], protectedPaths: readonly string[]): string {
+function seatbeltProfile(
+  writable: readonly string[],
+  protectedPaths: readonly string[],
+  inProjects: ProviderStatePaths["protectedInProjects"],
+): string {
   const allowed = unique(writable.flatMap(realPaths)).map((path) => `(subpath ${sbplString(path)})`);
-  const denied = unique(protectedPaths.flatMap(realPaths)).map(
-    (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
-  );
+  const names = inProjects?.names.map(regexText).join("|");
+  const denied = [
+    ...unique(protectedPaths.flatMap(realPaths)).map(
+      (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
+    ),
+    ...(names
+      ? unique(inProjects?.folders.flatMap(realPaths) ?? []).map(
+          (folder) => `(regex ${sbplString(`^${regexText(folder)}/(.+/)?(${names})(/|$)`)})`,
+        )
+      : []),
+  ];
   return [
     "(version 1)",
     "(allow default)",
@@ -200,6 +283,10 @@ function resolveExisting(path: string): string {
     const parent = dirname(path);
     return parent === path ? path : join(resolveExisting(parent), basename(path));
   }
+}
+
+function regexText(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function sbplString(value: string): string {

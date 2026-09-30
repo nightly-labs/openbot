@@ -81,6 +81,7 @@ export type VoiceDesktopApi = GroupApi<IpcEndpoints["voice"]>;
 export type SkillsDesktopApi = GroupApi<IpcEndpoints["skills"]>;
 
 export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
+export type GitHubConnectorDesktopApi = GroupApi<IpcEndpoints["githubConnector"]>;
 export type BillingDesktopApi = GroupApi<IpcEndpoints["billing"]>;
 
 export type HostedServersDesktopApi = GroupApi<IpcEndpoints["hostedServers"]>;
@@ -146,6 +147,7 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   storage: StorageDesktopApi;
   agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;
+  githubConnector: GitHubConnectorDesktopApi;
   billing: BillingDesktopApi;
   hostedServers: HostedServersDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;

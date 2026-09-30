@@ -71,6 +71,7 @@ export type AgentAuthState =
   | { kind: "grok"; email: string | null }
   | { kind: "opencode"; email: string | null }
   | { kind: "antigravity"; email: string | null }
+  | { kind: "cursor"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {
@@ -157,6 +158,12 @@ export interface SetProviderApiKeyInput {
   key: string;
 }
 
+/** The code a `paste` sign-in's page showed. It is a credential: it only travels towards the host. */
+export interface SubmitProviderCodeLoginInput {
+  provider: AgentProviderId;
+  code: string;
+}
+
 /**
  * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
  * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
@@ -184,7 +191,20 @@ export type ProviderCodeLoginStart =
       userCode: string;
       /** The page to type it on. Always https. */
       verificationUrl: string;
+      /** The same page with the code filled in, when the provider gives one. The dialog's QR code opens it. */
+      verificationUrlComplete?: string;
       /** Epoch milliseconds. When OpenBot gives up on this code, which is what the dialog counts down to. */
+      expiresAt: number;
+    }
+  | {
+      /**
+       * The user signs in on the page, which then shows a code for them to copy back. OpenBot types
+       * it into the provider's CLI with `submitProviderCodeLogin`.
+       */
+      kind: "paste";
+      /** The provider's sign-in page. Always https. */
+      verificationUrl: string;
+      /** Epoch milliseconds, as for `code`. */
       expiresAt: number;
     }
   | { kind: "connected" };

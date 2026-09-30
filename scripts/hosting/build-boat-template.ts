@@ -20,7 +20,18 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const logger = createOpenBotLogger("build-boat-template");
 const BOAT_API_URL = "https://boat.dev/api/v1";
-const TEMPLATE_FILES = ["provision.sh", "openbot-hosted-server", "openbot-hosted-env", "openbot.service"];
+const TEMPLATE_FILES = [
+  "provision.sh",
+  "packages.txt",
+  "openbot-hosted-server",
+  "openbot-hosted-env",
+  "openbot-hosted-update",
+  "openbot-hosted.apparmor",
+  "openbot.service",
+  "openbot-update.service",
+  "openbot-update.timer",
+  "openbot-update-apply.service",
+];
 const REMOTE_DIRECTORY = "/tmp/openbot-template";
 const READY_STATES = new Set(["ready", "idle", "running"]);
 const FAILED_STATES = new Set(["error", "cancelled", "archived"]);
@@ -80,6 +91,10 @@ async function main(): Promise<void> {
         "test -x /opt/OpenBot/app/openbot",
         "systemctl is-enabled --quiet openbot.service",
         "! systemctl is-active --quiet openbot.service",
+        // With more than one unit, `is-enabled` passes when one of them is enabled.
+        "systemctl is-enabled --quiet openbot-update.timer",
+        "systemctl is-enabled --quiet openbot-update-apply.service",
+        "! systemctl is-active --quiet openbot-update.timer",
         'test ! -e "$HOME/.config/OpenBot"',
         'test ! -e "$HOME/.config/openbot-hosted"',
         'test -z "$(ls -A /srv/openbot-hosted)"',

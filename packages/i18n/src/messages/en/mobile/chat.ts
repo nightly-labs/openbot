@@ -170,6 +170,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.exchange.messaged": "Messaged",
   "mobile.chat.exchange.messageFrom": "Message from",
   "mobile.chat.exchange.assignedTo": "Assigned to",
+  "mobile.chat.speaker.superseded": "{name} · Superseded",
+  "mobile.chat.speaker.memberFallback": "Team member",
   "mobile.chat.exchange.continuingWith": "Continuing with",
   "mobile.chat.exchange.unavailableAgent": "Unavailable agent",
   "mobile.chat.exchange.unknownAgent": "Unknown agent",

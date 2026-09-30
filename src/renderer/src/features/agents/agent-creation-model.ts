@@ -7,6 +7,12 @@ import {
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 
+/**
+ * The provider, and the model, that a new agent starts on when the catalog lists them: the saved
+ * setup choice of this computer, or the choice of a joined server's provider step.
+ */
+export type CreationPreference = Pick<AppSetupState, "preferredProvider" | "preferredModel">;
+
 export interface CreationModelChoice {
   provider: AgentProviderId;
   model: AgentModelId;
@@ -22,7 +28,7 @@ export interface CreationModelChoice {
  * with a provider the default does not cover.
  */
 export function resolveCreationModel(
-  setup: AppSetupState | null,
+  setup: CreationPreference | null,
   modelOptions: AgentModelOption[],
 ): CreationModelChoice | null {
   const preferred = setup?.preferredProvider ?? null;

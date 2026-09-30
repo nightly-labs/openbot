@@ -1,0 +1,20 @@
+{
+  "name": "OpenBotGit",
+  "url": "https://github.com/nightly-labs/openbot",
+  "description": "Gives OpenBot agents your repositories, issues and pull requests, through the GitHub MCP server, gh and git. The sign-in stays on the computer that runs OpenBot.",
+  "public": true,
+  "hook_attributes": { "url": "https://github.com/nightly-labs/openbot", "active": false },
+  "request_oauth_on_install": false,
+  "setup_on_update": false,
+  "default_permissions": {
+    "actions": "read",
+    "checks": "read",
+    "contents": "write",
+    "issues": "write",
+    "metadata": "read",
+    "pull_requests": "write",
+    "statuses": "read",
+    "workflows": "write"
+  },
+  "default_events": []
+}

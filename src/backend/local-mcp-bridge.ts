@@ -289,13 +289,17 @@ export class LocalMcpBridge {
   }
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<JSONRPCMessage | JSONRPCMessage[] | undefined> {
+/** The JSON-RPC messages of one MCP POST. It rejects a body larger than `maxBytes`. */
+export async function readJsonBody(
+  request: IncomingMessage,
+  maxBytes = 1_000_000,
+): Promise<JSONRPCMessage | JSONRPCMessage[] | undefined> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 1_000_000) throw new Error("MCP request body is too large.");
+    if (size > maxBytes) throw new Error("MCP request body is too large.");
     chunks.push(buffer);
   }
   if (chunks.length === 0) return undefined;

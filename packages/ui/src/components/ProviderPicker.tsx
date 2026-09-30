@@ -82,9 +82,15 @@ export interface ProviderPickerProps {
   /**
    * Starts the sign-in the user finishes on another device. Offered beside the row's usual sign-in,
    * never instead of it: this is the way out for a computer whose browser cannot complete the
-   * hand-off, and only for a provider whose descriptor says `codeSignIn`.
+   * hand-off, and only for a provider in `codeSignInProviders`.
    */
   onSignInWithCodeProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /**
+   * The providers the computer that runs them can sign in with a code. A host decides this by its
+   * capabilities, so an older host never shows a button that it refuses. Without it, the providers
+   * whose descriptor says `codeSignIn`.
+   */
+  codeSignInProviders?: readonly AgentProviderId[] | undefined;
   /**
    * The dialog element a row's actions menu portals into. Without it the menu lands beside the
    * dialog in `body`, where a modal makes it inert and out of reach.
@@ -368,9 +374,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 if (updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded") return;
                 const action = providerRuntimeAction(state(), connecting(), runtimeStatus());
                 // A remote host has no browser sign-in, so its caller passes no onConnectProvider:
-                // show only the Connect, Reconnect or Restart that the key dialog can answer.
+                // show only the Connect, Reconnect or Restart that the key dialog or a code sign-in
+                // can answer.
                 if (action !== "connect" && action !== "reconnect" && action !== "restart") return action;
                 if (props.onConnectProvider) return action;
+                if (action !== "restart" && codeSignInOffered()) return action;
                 return option().id === "opencode" &&
                   (action === "reconnect" || connectOptional()) &&
                   props.onSignInProvider
@@ -386,7 +394,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                */
               const codeSignInOffered = () =>
                 Boolean(props.onSignInWithCodeProvider) &&
-                agentProviderDescriptor(option().id).codeSignIn &&
+                (props.codeSignInProviders?.includes(option().id) ?? agentProviderDescriptor(option().id).codeSignIn) &&
                 (runtimeStatus()?.phase ?? "ready") === "ready";
               /**
                * Every row with a runtime on the computer offers Update in the same place, so the user
@@ -489,6 +497,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                 props.onSignInProvider
                               ) {
                                 void props.onSignInProvider(option().id);
+                              } else if (!props.onConnectProvider && codeSignInOffered()) {
+                                void props.onSignInWithCodeProvider?.(option().id);
                               } else {
                                 void props.onConnectProvider?.(option().id);
                               }

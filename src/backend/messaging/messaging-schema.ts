@@ -1,4 +1,4 @@
-// Shared by migration v24 and the separate new-database schema. IF NOT EXISTS throughout, because
+// Shared by migration v25 and the separate new-database schema. IF NOT EXISTS throughout, because
 // this text is both the migration and the tail of the latest schema.
 //
 // `platform` has no CHECK on purpose: the next platform must not need a table rebuild, which is

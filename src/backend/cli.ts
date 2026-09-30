@@ -43,7 +43,19 @@ export interface AntigravityCliInfo {
   source?: "system" | "managed";
 }
 
-export type AgentCliInfo = CodexCliInfo | ClaudeCliInfo | GrokCliInfo | OpencodeCliInfo | AntigravityCliInfo;
+export interface CursorCliInfo {
+  executable: string;
+  version: string;
+  source?: "system" | "managed";
+}
+
+export type AgentCliInfo =
+  | CodexCliInfo
+  | ClaudeCliInfo
+  | GrokCliInfo
+  | OpencodeCliInfo
+  | AntigravityCliInfo
+  | CursorCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -272,6 +284,62 @@ export function parseAntigravityVersion(manifest: string): string {
   return version;
 }
 
+/** The file beside `bin/` that names the version of a Cursor install. */
+export const CURSOR_MANIFEST = "cursor-package.json";
+
+/**
+ * The Cursor CLI is `cursor-agent` on `PATH`. The `cursor` command is the Cursor editor, not this
+ * CLI, so it is never used. There is no minimum version, as for OpenCode: a user who already has
+ * the CLI keeps it.
+ */
+export async function resolveCursorCli(
+  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+): Promise<CursorCliInfo> {
+  const candidates = await cliCandidates("cursor", input.systemCandidates, input.bundledExecutable ?? null);
+  let found = false;
+  for (const candidate of candidates) {
+    if (!(await isExecutable(candidate.executable))) continue;
+    found = true;
+    try {
+      const version = parseCursorVersion(await readCliVersion(candidate.executable));
+      return { executable: candidate.executable, version, source: candidate.source };
+    } catch {
+      /* Try the remaining installed candidates. */
+    }
+  }
+  throw new CodexCliError(
+    found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
+    found ? "invalid" : "missing",
+  );
+}
+
+/**
+ * Cursor prints its build as a date and a commit, such as `2026.09.28-64d2043`. The newer form that
+ * its launcher accepts adds the time: `2026.09.28-10-15-00-64d2043`.
+ */
+function parseCursorVersion(output: string): string {
+  const version = output.trim();
+  if (!/^\d{4}\.\d{2}\.\d{2}(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40}$/u.test(version)) {
+    throw new CodexCliError(sourceText("error.provider.cursorVersionUnreadable"), "invalid");
+  }
+  return version;
+}
+
+/** The version in the manifest that a managed Cursor install writes beside `bin/`. */
+export function parseCursorManifestVersion(manifest: string): string {
+  let version: unknown = null;
+  try {
+    const value = JSON.parse(manifest);
+    if (isDynamicRecord(value)) version = value.version;
+  } catch {
+    /* Reported below. */
+  }
+  if (typeof version !== "string") {
+    throw new CodexCliError(sourceText("error.provider.cursorVersionUnreadable"), "invalid");
+  }
+  return parseCursorVersion(version);
+}
+
 export function bundledOpencodeExecutable(
   platform = process.platform,
   architecture = process.arch,
@@ -367,6 +435,11 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
+/** The command name of a provider's CLI on `PATH`. */
+function cliCommandName(provider: AgentProviderId): string {
+  return provider === "cursor" ? "cursor-agent" : provider;
+}
+
 /** An explicit path remains under the user's control, including during managed updates. */
 export function configuredCliPath(provider: AgentProviderId): string | null {
   return process.env[`OPENBOT_${provider.toUpperCase()}_PATH`]?.trim() || null;
@@ -393,10 +466,11 @@ async function cliCandidates(
  * nothing else. A command the user typed, as for a custom agent, is resolved by
  * `resolveAgentCommand` in `acp-agent-command.ts`, which never gives it to a shell.
  */
-async function collectCandidates(command: AgentProviderId, configuredPath: string | undefined): Promise<string[]> {
+async function collectCandidates(provider: AgentProviderId, configuredPath: string | undefined): Promise<string[]> {
   const candidates: string[] = [];
   const override = configuredPath?.trim();
   if (override) return [override];
+  const command = cliCommandName(provider);
 
   if (process.platform === "win32") {
     try {
@@ -413,7 +487,7 @@ async function collectCandidates(command: AgentProviderId, configuredPath: strin
     } catch {
       // Known Windows install locations are checked next.
     }
-    candidates.push(...windowsFallbackPaths(command));
+    candidates.push(...windowsFallbackPaths(provider));
   } else {
     try {
       const path = commandPathFromShellOutput(await runInLoginShell(`command -v ${command}`));
@@ -421,17 +495,18 @@ async function collectCandidates(command: AgentProviderId, configuredPath: strin
     } catch {
       // Packaged apps often start with a restricted PATH; known locations are checked next.
     }
-    candidates.push(...posixFallbackPaths(command));
+    candidates.push(...posixFallbackPaths(provider));
   }
 
   return [...new Set(candidates)];
 }
 
 export function windowsFallbackPaths(
-  command: AgentProviderId,
+  provider: AgentProviderId,
   userHome = homedir(),
   environment: NodeJS.ProcessEnv = process.env,
 ): string[] {
+  const command = cliCommandName(provider);
   const paths: string[] = [];
   const appData = environment.APPDATA?.trim();
   const localAppData = environment.LOCALAPPDATA?.trim();
@@ -441,6 +516,10 @@ export function windowsFallbackPaths(
   }
   if (command === "claude" && localAppData) {
     paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "claude.exe"));
+  }
+  // Cursor's installer puts the launcher in a folder of its own and adds that folder to `PATH`.
+  if (command === "cursor-agent" && localAppData) {
+    paths.push(win32.join(localAppData, "cursor-agent", "cursor-agent.cmd"));
   }
   if (command === "grok") {
     paths.push(win32.join(userHome, ".grok", "bin", "grok.exe"));
@@ -550,7 +629,8 @@ export function runInLoginShell(script: string, shell = loginShellCommand()): Pr
   });
 }
 
-export function posixFallbackPaths(command: AgentProviderId, userHome = homedir()): string[] {
+export function posixFallbackPaths(provider: AgentProviderId, userHome = homedir()): string[] {
+  const command = cliCommandName(provider);
   const paths = [posix.join(userHome, ".local", "bin", command)];
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
   if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));

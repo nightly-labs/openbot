@@ -5,6 +5,8 @@ export const messages = {
   "error.backend.browserViewRemoteOnly": "Une vue de navigateur en direct est réservée à un hôte distant.",
   "error.backend.browserViewUnsupported": "Cet hôte distant ne prend pas en charge la vue de navigateur en direct.",
   "error.backend.browserViewLimit": "Trop de vues de navigateur sont ouvertes sur cet hôte.",
+  "error.backend.browserViewEnded": "La vue en direct de cette page est terminée.",
+  "error.backend.browserViewFailed": "La vue en direct de cette page a échoué.",
   "error.backend.windowTemporarilyUnavailable": "La fenêtre OpenBot est temporairement indisponible.",
   "error.backend.windowUnavailable": "La fenêtre OpenBot est indisponible.",
   "error.backend.sunshineApiHttp": "L’API Sunshine a échoué avec HTTP {status}.",
@@ -186,6 +188,8 @@ export const messages = {
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
   "error.backend.browserUrlTooLong": "L’URL du navigateur est trop longue.",
   "error.backend.browserTabLimit": "Le navigateur peut avoir jusqu’à {limit} onglets ouverts.",
+  "error.backend.browserLowMemory":
+    "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
   "error.backend.popupSecureInput":
     "Les fenêtres contextuelles sont bloquées pendant une saisie sécurisée. Terminez ou annulez la saisie sécurisée, puis réessayez depuis la page.",

@@ -23,6 +23,7 @@ export class GrokAgentClient extends AcpAgentClient {
     mcpToolRuntimes?: McpToolRuntimeSource,
     mcpAuthorization?: McpAuthorizationSource,
     confinement?: ProcessConfinement,
+    agentEnvironment?: () => Readonly<Record<string, string>>,
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
@@ -40,6 +41,7 @@ export class GrokAgentClient extends AcpAgentClient {
         "stdio",
       ],
       env: { GROK_OAUTH2_REFERRER: "openbot" },
+      ...(agentEnvironment ? { extraEnv: () => ({ ...agentEnvironment() }) } : {}),
       signInMessage: sourceText("error.provider.grokSignIn"),
       authenticate,
       readAccount: async (connection) => grokAccount(await connection.extMethod("_x.ai/auth/info", {})),

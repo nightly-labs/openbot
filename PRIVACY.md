@@ -220,7 +220,9 @@ France). The sandbox holds the server's workspaces, conversations, attachments, 
 team data, the same as your own computer would. The server stops 15 to 20 minutes after its last use and
 starts again when you connect, or a few minutes before its next scheduled routine run. When boat stops the sandbox, boat keeps a snapshot of its disk until
 the server starts again. Deleting the server
-deletes the sandbox.
+deletes the sandbox. A hosted server updates itself: it downloads the newest release from GitHub
+Releases, as an installed build does, installs the Ubuntu packages that the release needs from the
+Ubuntu package servers, and starts it at its next start.
 
 For each hosted server, the account service stores the owner, name, size and the size of a pending
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
@@ -304,10 +306,12 @@ the mail client shows images. The image address is the same in every message and
 recipient.
 
 Cloudflare processes account and configuration API requests. It does not carry Team API, file,
-message, command, Remote Desktop media, or Remote Desktop input traffic. For an agent's Slack app, it
-exchanges the Slack sign-in and serves the install page; see [Slack connections](#slack-connections). Cloudflare and the email
-provider can keep their own security, delivery, and network logs under their own policies. These
-provider logs are outside the OpenBot application database and its daily maintenance task.
+message, command, Remote Desktop media, or Remote Desktop input traffic. It forwards sealed iPhone
+Live Activity updates that it cannot read; see [iPhone Live Activity](#iphone-live-activity). For an
+agent's Slack app, it exchanges the Slack sign-in and serves the install page; see
+[Slack connections](#slack-connections). Cloudflare and the email provider can keep their own
+security, delivery, and network logs under their own policies. These provider logs are outside the
+OpenBot application database and its daily maintenance task.
 
 Paid server plans use Stripe. You enter card and billing details on Stripe's pages, not in OpenBot.
 Stripe sends the account service the subscription state, the plan, its price, the period, and the
@@ -345,6 +349,14 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   system's secret storage in the same way as provider API keys. One record per server address holds
   the client registration and the access and refresh tokens. Removing the server in settings deletes
   its record. These values are redacted from logs, exports and diagnostics.
+- The GitHub connection (Server settings > Connectors) is kept in
+  `~/Library/Application Support/OpenBot/openbot-github-connector-v1.json`, encrypted by the operating
+  system's secret storage. It holds the GitHub access and refresh tokens, the account name, ID and
+  avatar address, and the port and secret of the local GitHub MCP server.
+  While the connection is on, `provider-state/github` in the same folder holds the access token and
+  the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
+  agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
+  it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
   provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
   origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
@@ -371,8 +383,8 @@ inbound port. The one thing Signal passes to a host is the Slack events of an ag
 transit; see [Slack connections](#slack-connections).
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
-browser client at `/app`. A provider API key, a custom endpoint key or header, and a new server logo
-then travel from that computer or browser to the host over the same encrypted team connection. The
+browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
+provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
 No response returns a key, and neither computer writes request bodies to its logs.
 
@@ -389,12 +401,25 @@ Network traffic can also occur when:
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
   the grant the browser returns, and to renew the token. Nothing about the user's agents,
   conversations or files is sent in those requests;
+- the user connects GitHub in Server settings. OpenBot asks `github.com` for a sign-in code and a
+  token, renews the token, and reads the account name and the repositories of the OpenBot GitHub App
+  from `api.github.com`. The GitHub page in Server settings loads the account picture from the
+  address that GitHub gives, on GitHub's image host. Agents then reach the
+  GitHub MCP server at `api.githubcopilot.com` and GitHub itself through `gh` and `git`, with that
+  token. So that GitHub shows the OpenBot app as the author of an agent's work, OpenBot sends that
+  token to the central account service (`api.openbot.run`) about once an hour, and when you open the
+  repository list. The service uses it
+  only to ask GitHub which repositories you can push to, and gets back short-lived installation
+  tokens for those repositories. It does not store or log either token, and it gets no chats, files
+  or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
+  the right token to each call;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
   OpenCode, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
-  `dl.google.com` (for the download size) for Gemini, and it reads a list of blocked versions from
-  `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
+  `dl.google.com` (for the download size) for Gemini, and the same registry and
+  `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
+  versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - a user opens an explicitly labeled external support or setup link;
 - an agent is connected to Slack. See [Slack connections](#slack-connections).
@@ -549,6 +574,19 @@ server keeps its login and session files in `~/.gemini`, or in `$GEMINI_HOME`. O
 read, copy, or upload these files. Google's terms apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
+### Cursor
+
+OpenBot downloads the Cursor CLI from `downloads.cursor.com` when you select Download on the Cursor
+row. Each provider update check also asks `downloads.cursor.com` for the size of the newest
+download, also when you do not use Cursor. OpenBot starts the CLI as a local process. Prompts,
+attachments, and tool results go to that process, and the CLI sends them to Cursor. Sign in opens
+Cursor's sign-in page in your browser, or the CLI uses `CURSOR_API_KEY` from the environment that
+started OpenBot. OpenBot gives that key only to the local CLI, in its environment, and does
+not store it. The CLI keeps its login and session files
+in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
+upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
+on this computer: OpenBot does not show them to team members.
+
 ### Local model servers
 
 When Settings shows the AI providers tab, and once on the onboarding provider step, OpenBot looks
@@ -608,6 +646,41 @@ local application storage. This lets it recover the held draft after restart. Ne
 releases the host hold merely because the editor closes or disconnects. The host also preserves
 attachment drafts released by edit cancellation or message deletion until they are sent or
 discarded. This lets a disconnected desktop recover its saved composer backup after host restart.
+
+## iPhone Live Activity
+
+The iPhone app can show the state of the agents on the Lock Screen and in the Dynamic Island. While
+the app runs, the phone makes this view itself from the data that it receives over the encrypted
+host connection.
+
+When iOS stops the app in the background, the active host updates the view through Apple Push
+Notification service (APNs). For this, the phone gives that host, over the encrypted host
+connection, the push token of the Live Activity, a 32-byte secret for that host, its interface
+language, and the file names of the agent pictures that it saved on the phone. The phone makes each
+host secret from one random phone secret, so one host cannot seal an update or sign a button for
+another host. The phone keeps its secret in its secure storage and makes a new one when the user
+signs out. The host keeps these values in
+memory only, for the session that gave them. It forgets them when the phone removes them, when the
+session ends, when the member is removed or disabled, when Apple refuses the token, after 12 hours,
+and when the host stops.
+
+Each update contains the text that the view shows: agent names, the current task, the last reply,
+a question and its options, or a command that waits for approval. The host seals the update with
+keys made from the secret (an HMAC-SHA256 keystream and an HMAC-SHA256 tag) and sends it to the
+OpenBot account service, which sends it to Apple. The account service and Apple receive only the
+push token, the sealed bytes, the time, the priority, and the time when the content becomes out of
+date. They cannot read the content. The widget on the phone opens it and shows nothing with a
+wrong tag. The account service stores nothing from these requests and does not log them. It makes
+the Apple request itself and adds no text, so a host cannot use it to send an ordinary
+notification. Apple can keep its own delivery logs under its own policy.
+
+The buttons in the view open the app. A button that changes host state, such as Approve or an
+answer, has a signature made with a key that only the phone and the host have, so another app
+cannot start the action with an `openbot://` link. The app shows the command again before it
+approves it.
+
+Settings > General > Live Activities turns this off. The phone then removes its token from the
+host.
 
 ## Optional macOS Host Manager
 

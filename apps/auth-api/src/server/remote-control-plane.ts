@@ -1138,7 +1138,7 @@ export class RemoteControlPlane {
   }
 
   async issueHostTicket(hostId: string, machineToken: string) {
-    const host = await this.#authenticateHost(hostId, machineToken);
+    const host = await this.authenticateHost(hostId, machineToken);
     return this.#signer.issue({
       sessionId: `host-${hostId}`,
       hostId,
@@ -1162,13 +1162,20 @@ export class RemoteControlPlane {
     if (!IDENTIFIER_PATTERN.test(connectionId)) {
       throw new RemoteControlPlaneError(400, "invalid_remote_request", "The messaging connection is invalid.");
     }
-    await this.#authenticateHost(hostId, machineToken);
+    await this.authenticateHost(hostId, machineToken);
     return this.#slackRouteSigner.issue({ hostId, connectionId, now: this.#now() });
   }
 
-  async #authenticateHost(hostId: string, machineToken: string): Promise<RemoteHostRow> {
+  /** Checks the credential that a host received when it registered. */
+  async authenticateHost(hostId: string, machineToken: string): Promise<RemoteHostRow> {
     const host = await this.#host(hostId);
-    if (!host?.machine_token_hash || host.machine_token_hash !== (await sha256(machineToken))) {
+    const expected = host?.machine_token_hash ?? "";
+    const provided = await sha256(machineToken);
+    let difference = expected.length ^ provided.length;
+    for (let index = 0; index < provided.length; index += 1) {
+      difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
+    }
+    if (!host || !expected || difference !== 0) {
       throw new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
     }
     return host;

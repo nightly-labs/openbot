@@ -350,6 +350,7 @@ describe.sequential("AgentService: queue", () => {
         { id: "grok", state: "not-installed", version: null },
         { id: "opencode", state: "not-installed", version: null },
         { id: "antigravity", state: "not-installed", version: null },
+        { id: "cursor", state: "not-installed", version: null },
         { id: "acp", state: "not-installed", version: null },
       ],
     });
@@ -440,6 +441,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
           { id: "antigravity", state: "not-installed" },
+          { id: "cursor", state: "not-installed" },
           { id: "acp", state: "not-installed" },
         ],
       });
@@ -453,6 +455,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
           { id: "antigravity", state: "not-installed" },
+          { id: "cursor", state: "not-installed" },
           { id: "acp", state: "not-installed" },
         ],
       });
@@ -1917,6 +1920,53 @@ describe.sequential("AgentService: queue", () => {
     expect(
       service.listAgents().filter((agent) => agent.name === "Unknown model" || agent.name === "Unsupported effort"),
     ).toEqual([]);
+  });
+
+  it("gives a team that an agent creates the caller's model unless the request names one", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      hostedSites: null,
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", model: "gpt-5.6-terra", reasoningEffort: "high" });
+    await service.sendMessage({ agentId: "chief", text: "Create a research team." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+
+    const create = (name: string, fields: Record<string, string> = {}) =>
+      callOpenBotTool(client, threadId, "create_agent", { name, description: "", initialMessage: "Start.", ...fields });
+    for (const name of ["Scout", "Analyst"]) expect((await create(name)).error).toBeUndefined();
+    expect((await create("Writer", { model: "gpt-5.6-luna" })).error).toBeUndefined();
+    expect((await create("Editor", { reasoningEffort: "low" })).error).toBeUndefined();
+
+    const restored = stores(root).store;
+    await restored.initialize();
+    const team = restored
+      .list()
+      .filter((agent) => agent.id !== "chief")
+      .map(({ name, provider, model, reasoningEffort }) => ({ name, provider, model, reasoningEffort }));
+    restored.database.close();
+    expect(team).toEqual(
+      expect.arrayContaining([
+        { name: "Scout", provider: "codex", model: "gpt-5.6-terra", reasoningEffort: "high" },
+        { name: "Analyst", provider: "codex", model: "gpt-5.6-terra", reasoningEffort: "high" },
+        { name: "Writer", provider: "codex", model: "gpt-5.6-luna", reasoningEffort: "medium" },
+        { name: "Editor", provider: "codex", model: "gpt-5.6-terra", reasoningEffort: "low" },
+      ]),
+    );
+    expect(team).toHaveLength(4);
   });
 
   it("changes another agent's model with a record of the caller, and writes nothing for an unlisted model", async () => {

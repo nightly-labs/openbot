@@ -21,6 +21,8 @@ import { createSimpleContext } from "../../simple-context";
  *   arrives for *any* server and so may have to switch before it can act. The
  *   whole action is republished rather than a fragment of it, so the scope that
  *   lands runs the identical handler with its own domains.
+ * - `previousServerId` is the server a switch left, so the provider step of a
+ *   new server can go back to it.
  *
  * Deliberately dependency-free, so it can be mounted anywhere above the scope.
  */
@@ -38,6 +40,7 @@ const ServerSwitch = createSimpleContext({
     const [browserVisibilitySuspended, setBrowserVisibilitySuspended] = createSignal(false);
     const [pendingAgentSelection, setPendingAgentSelection] = createSignal<string | null>(null);
     const [pendingIslandAction, setPendingIslandAction] = createSignal<ServerScopedIslandAction | null>(null);
+    const [previousServerId, setPreviousServerId] = createSignal<string | null>(null);
     return {
       browserVisibilitySuspended,
       setBrowserVisibilitySuspended,
@@ -45,6 +48,8 @@ const ServerSwitch = createSimpleContext({
       setPendingAgentSelection,
       pendingIslandAction,
       setPendingIslandAction,
+      previousServerId,
+      setPreviousServerId,
     };
   },
 });

@@ -6,7 +6,7 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
-import { mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
+import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { McpHandoffLog } from "../mcp-handoff-log";
@@ -43,11 +43,22 @@ export interface McpGatewayHooks {
   refreshAllAgentRuntimes(): void;
 }
 
+/**
+ * The built-in GitHub connection, as the gateway reads it. The main process owns the sign-in; the
+ * gateway sees the entry while the connection is active, and a fresh bearer at each hand-off.
+ */
+export interface GitHubConnectorSource {
+  mcpServer(): McpServerConfig | null;
+  /** The bearer for `mcpServer()`: the secret of the loopback GitHub MCP server, or the user token. */
+  mcpAuthorization(): Promise<string | null>;
+}
+
 export interface McpGatewayOptions {
   servers: McpServerStore;
   /** The main process's knowledge of this machine: the tool runtimes and the http sign-ins. */
   credentials: ProviderClientContext;
   computerUseMcpServer: () => McpServerConfig | null;
+  githubConnector?: GitHubConnectorSource | null;
   /** The agent service logger, so a drop report keeps the `agent-service` prefix it always had. */
   logger: Logger;
   hooks: McpGatewayHooks;
@@ -63,6 +74,7 @@ export interface McpGatewayOptions {
 export class McpGateway {
   readonly #servers: McpServerStore;
   readonly #computerUseMcpServer: () => McpServerConfig | null;
+  readonly #githubConnector: GitHubConnectorSource | null;
   /**
    * What OpenBot downloaded for the MCP servers, read at each use. It travels with the credentials
    * because both are the main process's knowledge of this machine, and because the clients already
@@ -93,6 +105,7 @@ export class McpGateway {
     const { credentials } = options;
     this.#servers = options.servers;
     this.#computerUseMcpServer = options.computerUseMcpServer;
+    this.#githubConnector = options.githubConnector ?? null;
     this.#toolRuntimes = () => credentials.mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
     this.#oauth = credentials.mcpOAuth ?? null;
     this.#logger = options.logger;
@@ -110,7 +123,11 @@ export class McpGateway {
 
   /** The bearer token for one configuration, asked at every hand-off and never written to a row. */
   async authorization(config: McpServerConfig): Promise<string | null> {
-    const token = (await this.#oauth?.accessToken(config.url)) ?? null;
+    // The built-in GitHub entry spends the GitHub connection, not an MCP sign-in of its own.
+    const token =
+      config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
+        ? ((await this.#githubConnector?.mcpAuthorization()) ?? null)
+        : ((await this.#oauth?.accessToken(config.url)) ?? null);
     // The one place a minted token is known before it leaves this process. The row never holds
     // it, so this is what lets `redact` keep it out of a provider's own report of a failure.
     if (token) this.#handoff.recordSecret(token);
@@ -227,11 +244,19 @@ export class McpGateway {
    * The Computer Use entry is appended here rather than stored, because it exists only while the
    * driver daemon runs and the user never configured it. This one line is what gives Codex, Claude
    * and the ACP providers the same tools: all three read this function.
+   *
+   * The GitHub connection's entry is appended the same way, unless an enabled row already has its
+   * name: a server the user added keeps working as they set it up, and two entries with one name
+   * would collide in every provider's configuration.
    */
   enabled(): McpServerConfig[] {
-    const computerUse = this.#computerUseMcpServer();
     const configured = this.#servers.listEnabled();
-    return this.#handoff.record(computerUse ? [...configured, computerUse] : configured);
+    const builtIn: McpServerConfig[] = [];
+    const computerUse = this.#computerUseMcpServer();
+    if (computerUse) builtIn.push(computerUse);
+    const github = this.#githubConnector?.mcpServer() ?? null;
+    if (github && !configured.some((config) => config.name === github.name)) builtIn.push(github);
+    return this.#handoff.record([...configured, ...builtIn]);
   }
 
   /**

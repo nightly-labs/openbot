@@ -227,7 +227,13 @@ describe("TeamApiServer conversations", () => {
       description: "Builds practical itineraries.",
       title: "",
     });
-    expect(createAgent).toHaveBeenCalledWith(createInput);
+    // The first message of the new agent is the member's, as a message they send is.
+    expect(createAgent).toHaveBeenCalledWith(
+      createInput,
+      undefined,
+      undefined,
+      expect.objectContaining({ name: "owner" }),
+    );
     await expect(jsonRequest(base, "/v1/agents", { token: token })).resolves.toEqual(localAgents);
     await expect(
       jsonRequest(base, "/v1/agents/chief/usage", {
@@ -382,12 +388,11 @@ describe("TeamApiServer conversations", () => {
         replyToMessageId: null,
       },
     });
-    expect(sendMessage).toHaveBeenCalledWith({
-      agentId: "chief",
-      text: taggedMessage,
-      attachmentDraftIds: [],
-      replyToMessageId: null,
-    });
+    // The host names the member it authenticated; the request body cannot name a sender.
+    expect(sendMessage).toHaveBeenCalledWith(
+      { agentId: "chief", text: taggedMessage, attachmentDraftIds: [], replyToMessageId: null },
+      { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+    );
     await expect(
       jsonRequest(base, "/v1/agents/chief/conversation/read", {
         token: token,

@@ -52,10 +52,12 @@ local access on the other side of it.
 
 ## Voice prompts or remote desktop are missing on Linux
 
-Neither is available in the Linux build. The Whisper transcription binary and the Sunshine remote
-desktop runtime are built for macOS and Windows only, so the microphone control is not drawn and
-remote desktop reports itself as unavailable. Everything else works as it does on the other
-platforms.
+The Linux build has no Whisper transcription binary, so the microphone control is not drawn.
+
+Remote desktop on Linux needs the x64 AppImage and an X11 session. Sunshine captures the X11 screen
+and sends mouse and keyboard input through the XTest extension. Under Wayland, or with no `DISPLAY`,
+remote desktop reports that it needs an X11 session. Log in with an Xorg session, or start OpenBot
+under `xvfb-run` on a server. The arm64 AppImage does not include the runtime.
 
 ## Computer Use is unavailable
 
@@ -87,6 +89,34 @@ grant both **Screen & System Audio Recording** and **Accessibility**, then press
 development build asks for the grants as **Electron**, not as OpenBot, because the development binary
 is the responsible process. For the same reason a development grant does not carry over to an
 installed release, and each build must be granted once.
+
+## Computer Use is slow
+
+A Computer Use step has two parts: the driver does the action, and then the model reads the result
+and chooses the next action. While the driver works, the activity line in the chat shows **Using an
+app on this computer…**. While the model works, it shows **Deciding the next step in the app…**.
+When the agent writes its own progress note, the line shows that note instead. When the line stays
+the same for 5 seconds, the time since it changed shows next to the text.
+
+A driver call usually takes a few seconds or less. To see the time of each call, start OpenBot from
+a terminal. Each driver call that takes 5 seconds or more shows in its output as `Computer Use
+driver answered`, with the tool name and the milliseconds. A call that gets no answer before the
+agent closes the connection shows as `Computer Use driver did not answer`. Set
+`OPENBOT_LOG_LEVEL=debug` to show every call. The log does not contain what the agent typed.
+
+Most of the time in a slow step is the model. Its time depends on the model and on the reasoning
+effort in the agent settings: a high effort can use tens of seconds before each action. For
+mechanical GUI tasks, select a lower effort or a faster model. Name the application and the action
+in your request, for example "In Safari, open https://example.com", so the agent does not look for
+the target first.
+
+A step also gets slower as the conversation gets longer. The model reads the full conversation
+before each action, and each window read stays in it. When the conversation fills the model's
+context, the provider compacts it: it writes a summary, which can take minutes, and the chat
+shows no action in that time. A new conversation for a new GUI task does not have this cost, and the
+agent keeps its workspace. With OpenCode, OpenBot adds a JSON copy of each driver result
+to the result text, because OpenCode shows the model only the text. The copy leaves out the element
+list, because the tree in the text already names each element by its index.
 
 ## A chat is missing after an update
 

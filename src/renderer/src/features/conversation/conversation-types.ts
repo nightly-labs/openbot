@@ -122,6 +122,11 @@ export interface ConversationProps {
   server: ServerSummary | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
+  /**
+   * Is the stamped sender of a message the reader? Only another person's message draws a face and a
+   * name; a message with no sender is the reader's own, as every message was before senders.
+   */
+  isOwnSender: (senderId: string) => boolean;
   browserEnabled?: boolean;
   remoteDesktopEnabled?: boolean;
   remoteDesktopSessionActive: boolean;

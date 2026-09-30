@@ -13,11 +13,13 @@ import { readBinary, readJson, stringField } from "./request-helpers";
 /**
  * Agents imported from a Grok Bot export sent from a joined server. Any member can import, as any
  * member can create an agent; the token is the member's own. The response codec of `agent-import-v1`
- * leaves out the avatars of the preview. Frozen by `agent-import-v1`.
+ * leaves out the avatars of the preview. Frozen by `agent-import-v1`. `newAgentHidden` says that a
+ * new agent would start on a provider that the caller does not see.
  */
 export async function routeAgentImport(
   context: TeamApiRequestContext,
   agentImport: TeamApiAgentImport | undefined,
+  newAgentHidden: () => boolean,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const route = method === "POST" ? url.pathname : null;
@@ -45,6 +47,7 @@ export async function routeAgentImport(
   }
   // `readJson` has already run the body through the agent-import wire codec.
   const body = await readJson(request);
+  if (newAgentHidden()) throw new HttpError(400, sourceText("error.team.newAgentProviderLocalOnly"));
   let input: ReturnType<typeof parseApplyAgentImportInput>;
   try {
     input = parseApplyAgentImportInput(body);

@@ -3,7 +3,7 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
@@ -93,6 +93,15 @@
         {
           "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
           "speechRecognitionPermission": "Allow OpenBot to turn your speech into message text."
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "run.openbot.mobile.ExpoWidgetsTarget",
+          "groupIdentifier": "group.run.openbot.mobile",
+          "enablePushNotifications": true,
+          "frequentUpdates": true
         }
       ]
     ],

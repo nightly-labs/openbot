@@ -10,9 +10,11 @@ import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
+import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
 import { MESSAGING_CODECS } from "./messaging-v1";
 import { PROVIDERS_ADMIN_CODECS } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CODECS } from "./providers-v2";
+import { PROVIDERS_SIGN_IN_V3_CODECS } from "./providers-v3";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 
@@ -26,11 +28,13 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_UPDATE_CODECS,
   ...PROVIDERS_ADMIN_CODECS,
   ...PROVIDERS_RUNTIMES_V2_CODECS,
+  ...PROVIDERS_SIGN_IN_V3_CODECS,
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
   ...AGENT_IMPORT_CODECS,
   ...AGENT_PUBLISH_CODECS,
+  ...LIVE_ACTIVITY_PUSH_CODECS,
   ...MESSAGING_CODECS,
 ]);
 

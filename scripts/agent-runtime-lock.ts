@@ -91,6 +91,23 @@ const antigravityArtifactSchema = z.object({
   platformDirectory: z.enum(["macos", "linux", "windows"]),
 });
 
+/**
+ * Cursor ships the CLI as one archive per target, with one `dist-package` folder: a Node.js runtime,
+ * the bundled JavaScript, and a launcher script. `files` names the hash of the files that start the
+ * CLI: the launchers, the runtime and the entry script. The archive hash covers the other files, such
+ * as the script chunks and native modules, at download only, as the Codex lock does for its package.
+ */
+const cursorArtifactSchema = z.object({
+  platformDirectory: z.enum(["darwin", "linux", "windows"]),
+  architecture: z.enum(["arm64", "x64"]),
+  asset: z.enum(["agent-cli-package.tar.gz", "agent-cli-package.zip"]),
+  assetSha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["cursor-agent", "cursor-agent.cmd"]),
+  files: z.record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u), sha256Schema),
+});
+
 const agentRuntimeLockSchema = z.object({
   schemaVersion: z.literal(1),
   codex: z.object({
@@ -199,6 +216,25 @@ const agentRuntimeLockSchema = z.object({
       "linux-x64": antigravityArtifactSchema,
       "linux-arm64": antigravityArtifactSchema,
       "win32-x64": antigravityArtifactSchema,
+    }),
+  }),
+  /**
+   * The Cursor CLI, which signs in with a Cursor plan. It is proprietary, so OpenBot downloads it on
+   * the user's computer and does not ship it in a release. The terms are at `licenseUrl`. A version is
+   * a date and a commit, which is also the folder of the download.
+   */
+  cursor: z.object({
+    registry: z.literal("https://raw.githubusercontent.com/agentclientprotocol/registry/main/cursor/agent.json"),
+    distribution: z.literal("https://downloads.cursor.com/lab"),
+    version: z.string().regex(/^\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7,40}$/u),
+    license: z.literal("Proprietary"),
+    licenseUrl: z.literal("https://cursor.com/terms-of-service"),
+    artifacts: z.object({
+      "darwin-arm64": cursorArtifactSchema,
+      "darwin-x64": cursorArtifactSchema,
+      "linux-x64": cursorArtifactSchema,
+      "linux-arm64": cursorArtifactSchema,
+      "win32-x64": cursorArtifactSchema,
     }),
   }),
 });

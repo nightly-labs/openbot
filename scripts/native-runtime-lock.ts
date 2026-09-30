@@ -44,7 +44,7 @@ const sourceRuntimeSchema = z.object({
   submodules: z.record(z.string().min(1), commitSchema),
 });
 
-const REMOTE_DESKTOP_TARGETS = ["darwin-arm64", "darwin-x64", "win32-x64"] as const;
+const REMOTE_DESKTOP_TARGETS = ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"] as const;
 
 const nativeRuntimeLockSchema = z.object({
   schemaVersion: z.literal(1),
@@ -68,6 +68,7 @@ const nativeRuntimeLockSchema = z.object({
       "darwin-arm64": z.array(z.string().min(1)).min(1),
       "darwin-x64": z.array(z.string().min(1)).min(1),
       "win32-x64": z.array(z.string().min(1)).min(1),
+      "linux-x64": z.array(z.string().min(1)).min(1),
     }),
   }),
 });

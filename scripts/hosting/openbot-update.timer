@@ -1,0 +1,12 @@
+# A hosted server runs only while it is in use, so the first check comes soon after each start. The
+# delay counts from the start of the timer: boat resumes a server on a machine that booted before.
+[Unit]
+Description=Check for an OpenBot update
+
+[Timer]
+OnActiveSec=5min
+OnUnitActiveSec=6h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

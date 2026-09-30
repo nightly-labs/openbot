@@ -68,11 +68,11 @@ import {
   ServerSettingsOverlay,
   SharedAgentInstallOverlay,
 } from "../../WorkspaceOverlayViews";
+import type { CreationPreference } from "../agents/agent-creation-model";
 import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
-import { isOwnChannelAuthor } from "../channels/channel-timeline";
 import { ChannelsControllerProvider } from "../channels/channels-context";
 import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
@@ -80,11 +80,14 @@ import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { FilesPort } from "../files/files-port";
+import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
+import { ServerOnboarding } from "../onboarding/ServerOnboarding";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { watchHostUpdate } from "../servers/host-update-toast";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import { remoteAdminServer } from "../servers/server-capabilities";
+import { isReaderAuthor } from "../team/reader-identity";
 import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import type { UsagePort } from "../usage/usage-port";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -759,6 +762,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const firstAgent = () => workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported();
   /** An open channel still takes the pane, as a channel closes the desktop form. */
   const agentFormOpen = () => creating() || (firstAgent() && !channelOpen());
+  /**
+   * The provider that a server's provider step chose, by server. In memory only, as on desktop: the
+   * saved setup choice is of the desktop computer, not of the server.
+   */
+  const [serverSetupChoices, setServerSetupChoices] = createSignal<Record<string, CreationPreference>>({});
+  const serverSetupChoice = () => {
+    const id = server()?.id;
+    return id ? (serverSetupChoices()[id] ?? null) : null;
+  };
+  /**
+   * A server with no agents shows the provider step before the first-agent form, for an account that
+   * can sign its host in. OpenBot includes no AI subscription, so an agent made first could not
+   * answer. A member and an older host open the form as before.
+   */
+  const serverOnboarding = () =>
+    agentFormOpen() && firstAgent() && serverSetupChoice() === null ? providerSettings() : undefined;
   // The host reports the new agent before the create call returns. Hold the form open until the
   // save is done, so the new-agent avatar still changes after it.
   createEffect(firstAgent, (first) => {
@@ -989,10 +1008,21 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       await select(agent.id);
     });
   }
+  /** The host a switch left, so the provider step of a new server can go back to it. */
+  const [previousHostId, setPreviousHostId] = createSignal<string | null>(null);
   function selectServer(id: string) {
     const host = workspace.state.hosts.find((item) => item.hostId === id);
-    if (host) void workspace.connect(host);
+    if (!host) return;
+    const current = workspace.state.host?.hostId;
+    if (current && current !== id) setPreviousHostId(current);
+    void workspace.connect(host);
   }
+  /** The server the provider step goes back to: the one open before, else any other on the rail. */
+  const returnHostId = () => {
+    const current = workspace.state.host?.hostId;
+    const others = workspace.state.hosts.filter((item) => item.hostId !== current);
+    return others.find((item) => item.hostId === previousHostId())?.hostId ?? others[0]?.hostId;
+  };
   function startCreate() {
     setMobilePane("conversation");
     channels.close();
@@ -1357,11 +1387,36 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </>
           }
         >
-          <Show when={agentFormOpen()}>
+          <Show when={serverOnboarding()}>
+            {(settings) => (
+              <ServerOnboarding
+                serverName={server()?.name ?? ""}
+                setup={hostSetupProviderProps(settings())}
+                onContinue={(provider, model) => {
+                  const id = server()?.id;
+                  if (id)
+                    setServerSetupChoices((current) => ({
+                      ...current,
+                      [id]: { preferredProvider: provider, preferredModel: model },
+                    }));
+                }}
+                onClose={
+                  returnHostId()
+                    ? () => {
+                        const id = returnHostId();
+                        if (id) selectServer(id);
+                      }
+                    : undefined
+                }
+              />
+            )}
+          </Show>
+          <Show when={agentFormOpen() && !serverOnboarding()}>
             <WebAgentSettings
               runtime={workspace.runtime}
               capabilities={workspace.state.capabilities}
               first={firstAgent()}
+              preference={serverSetupChoice()}
               customProviders={providerSettings()?.customProviders}
               // A new form starts empty, with the avatar that the first-agent row showed.
               initialDraft={{ ...createFirstAgentDraft(), ...untrack(agentAvatar) }}
@@ -1377,7 +1432,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           <Show when={!agentFormOpen() && channelOpen()}>
             <ChannelConversation
               isOwnMessage={(authorId) =>
-                isOwnChannelAuthor(authorId, {
+                isReaderAuthor(authorId, {
                   memberId: workspace.state.memberId,
                   accountUserId: props.accountId,
                   onOwnComputer: false,
@@ -1513,6 +1568,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               server={server()}
               presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
               currentUserEmail={props.accountEmail ?? ""}
+              isOwnSender={(senderId) =>
+                isReaderAuthor(senderId, {
+                  memberId: workspace.state.memberId,
+                  accountUserId: props.accountId,
+                  onOwnComputer: false,
+                })
+              }
               browserEnabled={browserEnabled()}
               remoteDesktopEnabled={false}
               remoteDesktopSessionActive={false}

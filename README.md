@@ -6,7 +6,7 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, and Gemini through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, and [Cursor CLI](https://cursor.com/cli) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +19,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, or Gemini sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, or Cursor sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -32,7 +32,7 @@ messaging in one desktop app.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
-Grok connects to xAI, Gemini connects to Google,
+Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -71,7 +71,8 @@ On the first start from an AppImage, OpenBot writes `~/.local/share/applications
 and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
 a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
-Voice prompts and remote desktop are not available on Linux.
+Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
+such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
@@ -121,6 +122,14 @@ that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself
 `bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
 `bin/`. When that path is set, OpenBot uses only it. Gemini agents stay on this computer: team
 members do not see them.
+
+Cursor uses a Cursor plan or a Cursor API key. OpenBot downloads and pins the Cursor CLI
+(`cursor-agent`) when you select Download on the Cursor row in More providers, and starts it with
+`cursor-agent acp`. Sign in opens Cursor's sign-in page in your browser. You can also set
+`CURSOR_API_KEY` in the environment used to launch OpenBot. If you installed `cursor-agent`
+yourself, OpenBot uses it until a download exists. OpenBot never uses the `cursor` command, which
+starts the Cursor editor. Set `OPENBOT_CURSOR_PATH` to select an executable yourself. Cursor
+agents stay on this computer: team members do not see them.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -242,6 +251,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
 | `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
+| `bun run dev:apns-key -- <AuthKey_ID.p8> [KEY_ID]` | Save an Apple Push Notification service key in `apps/auth-api/.env.dev`, so the local Auth API sends iPhone Live Activity updates. The local server forwards them to Apple over HTTP/2. Restart `bun run dev` after it. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
 | `bun run api:images` | Draw the article artwork into `apps/auth-api/content-art/` after you add an article or change a title. Commit the result; the site build fails until it matches. Needs Electron and a GPU, so run it on your own machine. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
@@ -292,6 +302,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run package:linux` | Build an unpacked local Linux x64 application on Linux. |
 | `bun run package:linux:arm64` | Build an unpacked local Linux arm64 application on arm64 Linux. |
 | `bun run package:linux:verify` | Build and verify the Linux x64 application on Linux. Run it under `xvfb-run -a` without a display. |
+| `bun scripts/create-github-app.ts [--org <org>]` | Create the OpenBot GitHub App from `scripts/github-app/manifest.json` with the manifest flow. Prints the Client ID for `src/main/github-connector-config.ts` and writes the app secrets to `~/.config/openbot/github-app-<slug>.json` (mode 0600). Enable Device Flow in the app settings after the run. |
 | `bun run release:preflight` | Verify version, Git state, and GitHub release secrets before tagging. |
 | `bun run dist:mac` | Build unsigned local DMG and ZIP update artifacts for this Mac. |
 | `bun run dist:win` | Build an unsigned Windows x64 NSIS installer on Windows. |
@@ -440,6 +451,8 @@ video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts m
 - `~/.grok` — login and session history managed exclusively by Grok CLI.
 - `~/.gemini` (or `$GEMINI_HOME`) — login and session history managed exclusively by the
   Antigravity ACP server that Gemini uses.
+- `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
+  process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

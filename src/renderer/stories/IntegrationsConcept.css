@@ -1,0 +1,574 @@
+/* Concept only: Concepts/Integrations. Tokens from @openbot/brand; no literal colours. */
+
+.ic-canvas {
+  min-height: 100vh;
+  padding: var(--openbot-space-8);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.ic-canvas[data-width="narrow"] {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.ic-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: var(--openbot-space-6);
+  align-items: start;
+}
+
+.ic-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ hub */
+
+.ic-hub,
+.ic-detail {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+/* First-run hero: the landing grid and accent glow, with the brand marks on one line. */
+.ic-hero {
+  position: relative;
+  display: flex;
+  gap: var(--openbot-space-4);
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: var(--openbot-space-4);
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-lg);
+  background:
+    radial-gradient(45% 140% at 80% 50%, var(--openbot-accent-strong), var(--openbot-transparent) 70%),
+    radial-gradient(
+      50% 120% at 100% 0%,
+      color-mix(in srgb, var(--openbot-file-pink) 22%, var(--openbot-transparent)),
+      var(--openbot-transparent) 70%
+    ),
+    radial-gradient(
+      60% 160% at 0% 100%,
+      color-mix(in srgb, var(--openbot-onboarding-desktop-indigo) 20%, var(--openbot-transparent)),
+      var(--openbot-transparent) 70%
+    ),
+    var(--openbot-bg-surface);
+  box-shadow: inset 0 1px 0 var(--openbot-glass-highlight);
+}
+
+.ic-hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, var(--openbot-hero-grid-line) 1px, var(--openbot-transparent) 1px),
+    linear-gradient(var(--openbot-hero-grid-line) 1px, var(--openbot-transparent) 1px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(45% 120% at 80% 50%, var(--openbot-mask-solid) 20%, var(--openbot-transparent) 100%);
+}
+
+.ic-hero-copy {
+  position: relative;
+  display: grid;
+  gap: var(--openbot-space-1);
+  max-width: 320px;
+}
+
+.ic-hero-art {
+  position: relative;
+  display: flex;
+  flex: none;
+  gap: var(--openbot-space-3);
+  align-items: center;
+}
+
+.ic-hero-link {
+  position: absolute;
+  inset-inline: 16px;
+  top: 50%;
+  height: 1.5px;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--openbot-file-blue) 60%, var(--openbot-transparent)) 0 3px,
+    var(--openbot-transparent) 3px 8px
+  );
+  background-size: 8px 100%;
+  animation: ic-hero-flow 0.8s linear infinite;
+}
+
+@keyframes ic-hero-flow {
+  to {
+    background-position: 8px 0;
+  }
+}
+
+.ic-hero-node {
+  position: relative;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-glass-surface);
+  box-shadow:
+    inset 0 1px 0 var(--openbot-glass-highlight),
+    0 6px 16px var(--openbot-glass-shadow);
+  color: var(--openbot-text-primary);
+  backdrop-filter: blur(8px);
+}
+
+.ic-hero-node > svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The hero clips its glow, so the close button sits on a frame and straddles the corner. */
+.ic-hero-frame {
+  position: relative;
+  margin-top: var(--openbot-space-3);
+}
+
+.ic-hero-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 4px 12px var(--openbot-glass-shadow);
+  color: var(--openbot-text-secondary);
+  transform: translate(35%, -35%);
+}
+
+.ic-hero-close:hover:not(:disabled):not([data-disabled]) {
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+  border-color: var(--openbot-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ic-hero-link {
+    animation: none;
+  }
+}
+
+.ic-agent-face {
+  display: inline-block;
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+.ic-agent-face[data-size="sm"] {
+  width: 24px;
+  height: 24px;
+}
+
+.ic-agent-face > *,
+.ic-slack-avatar > * {
+  width: 100%;
+  height: 100%;
+}
+
+/* ------------------------------------------------ wizard */
+
+.ic-wizard-figure {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+}
+
+.ic-waiting-line {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.ic-waiting-line .ui-text {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+}
+
+.ic-checklist {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  font-size: var(--openbot-text-sm);
+}
+
+.ic-checklist li {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.ic-checklist li[data-state="done"] {
+  color: var(--openbot-text-secondary);
+}
+
+.ic-checklist li[data-state="done"] svg {
+  color: var(--openbot-success);
+}
+
+.ic-check-dot {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.ic-form {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.ic-form .ui-text[data-tone="success"] {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+}
+
+.ic-agent-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--openbot-space-2);
+}
+
+.ic-agent-option {
+  display: grid;
+  gap: var(--openbot-space-1);
+  justify-items: center;
+  padding: var(--openbot-space-3) var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ic-agent-option:hover:not(:disabled) {
+  background: var(--openbot-bg-control-hover);
+}
+
+.ic-agent-option[aria-pressed="true"] {
+  border-color: var(--openbot-accent);
+  box-shadow: inset 0 0 0 1px var(--openbot-accent);
+}
+
+.ic-agent-option:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ic-agent-option:focus-visible,
+.ic-segment-option:focus-visible {
+  outline: 2px solid var(--openbot-focus-ring);
+  outline-offset: 2px;
+}
+
+.ic-segment {
+  display: flex;
+  padding: var(--openbot-space-0-5);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+}
+
+.ic-segment-option {
+  flex: 1;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  cursor: pointer;
+}
+
+.ic-segment-option[aria-pressed="true"] {
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+  box-shadow: var(--openbot-shadow-ring);
+}
+
+/* ------------------------------------------------ slack preview */
+
+.ic-slack-preview {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.ic-slack-channel {
+  display: flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-secondary);
+}
+
+.ic-slack-message {
+  display: flex;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+}
+
+.ic-slack-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+}
+
+.ic-slack-body {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+}
+
+.ic-slack-meta {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.ic-slack-app {
+  padding: 0 var(--openbot-space-1);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+/* ------------------------------------------------ bot table */
+
+.ic-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.ic-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ic-table th,
+.ic-table td {
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ic-table thead th {
+  color: var(--openbot-data-table-header-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+}
+
+.ic-table tbody tr {
+  border-top: 1px solid var(--openbot-data-table-border);
+}
+
+.ic-table tbody th {
+  font-weight: inherit;
+}
+
+.ic-agent-cell {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  white-space: nowrap;
+}
+
+.ic-status-cell {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  justify-items: start;
+}
+
+.ic-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+  align-items: center;
+}
+
+.ic-table-action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ agent settings */
+
+.ic-agent-settings {
+  display: grid;
+  gap: var(--openbot-space-6);
+  max-width: 640px;
+}
+
+.ic-agent-settings-head {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+}
+
+.ic-agent-settings-head .ic-agent-face {
+  width: 48px;
+  height: 48px;
+}
+
+.ic-agent-settings .ui-item-title {
+  display: inline-flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.ic-agent-picker,
+.ic-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ic-fieldset {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.ic-legend {
+  margin-bottom: var(--openbot-space-2);
+  padding: 0;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.ic-cell-stack {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  justify-items: start;
+}
+
+/* ------------------------------------------------ hub rows */
+
+.ic-face-stack {
+  display: inline-flex;
+  gap: var(--openbot-space-0-5);
+  align-items: center;
+}
+
+.ic-face-more {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--openbot-space-1);
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The whole row opens the integration, as on Marketplace cards. Buttons in the row stay on top. */
+.ic-hub-row {
+  position: relative;
+  border-radius: var(--openbot-radius-md);
+  transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.ic-hub-row:has(> .ic-hub-row-hitarea:hover) {
+  background: var(--openbot-hover);
+}
+
+.ic-hub-row-hitarea {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: var(--openbot-transparent);
+  cursor: pointer;
+  transition: none;
+}
+
+.ic-hub-row-hitarea:hover:not(:disabled):not([data-disabled]) {
+  background: var(--openbot-transparent);
+}
+
+.ic-hub-row-hitarea:focus-visible {
+  outline: 2px solid var(--openbot-accent-strong);
+  outline-offset: -2px;
+}
+
+.ic-hub-actions .ui-button {
+  position: relative;
+  z-index: 2;
+}
+
+.ic-hub-row-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  margin: 0 var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+}
+
+.ic-hub-title {
+  display: inline-flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.ic-hub-summary[data-status="attention"] {
+  color: var(--openbot-warning-text);
+}
+
+.ic-hub-actions {
+  gap: var(--openbot-space-3);
+}
+
+.ic-hub-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.ic-hub-chip {
+  gap: var(--openbot-space-1-5);
+  padding-left: var(--openbot-space-1);
+}
+
+.ic-hub-chip > .ic-hub-chip-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ic-hub-chip > .ic-hub-chip-plus {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  margin-left: var(--openbot-space-0-5);
+  color: var(--openbot-text-muted);
+}

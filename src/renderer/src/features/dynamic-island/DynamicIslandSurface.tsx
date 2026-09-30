@@ -1,4 +1,9 @@
-import type { DynamicIslandAction, DynamicIslandPreference, DynamicIslandPresentation } from "@openbot/contracts/ipc";
+import type {
+  AppVariant,
+  DynamicIslandAction,
+  DynamicIslandPreference,
+  DynamicIslandPresentation,
+} from "@openbot/contracts/ipc";
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } from "@openbot/contracts/ipc";
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
@@ -13,6 +18,7 @@ export function DynamicIslandSurface() {
   const { t } = useText();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
+  const variant = readAppVariant(query.get("variant"));
   // The main process names a notch only on a MacBook that has one. Without it, the island draws its
   // own gap, which follows the width setting.
   const queryNotchWidth = query.get("notch-width");
@@ -184,6 +190,7 @@ export function DynamicIslandSurface() {
             presentation={presentation()}
             state={viewState()}
             displayMode={displayMode}
+            variant={variant}
             notchSize={displayMode === "notch" ? notchSize() : undefined}
             widthPercent={preference().widthPercent}
             heightPercent={preference().heightPercent}
@@ -196,6 +203,10 @@ export function DynamicIslandSurface() {
       </Show>
     </main>
   );
+}
+
+function readAppVariant(value: string | null): AppVariant {
+  return value === "dev" || value === "preview" ? value : "production";
 }
 
 function readPositivePixelValue(value: string | null, fallback: number): number {

@@ -258,26 +258,7 @@ export function createHostRequestActions({
         input,
       );
     },
-    loadAgentAvatar: async (agentId, avatarUrl, serverId) => {
-      const version = new URL(avatarUrl).searchParams.get("v");
-      if (!version) throw new Error("The agent avatar has no version.");
-      return request(
-        "GET",
-        `${TEAM_API_ROUTES.agent.avatar(agentId)}?${new URLSearchParams({ v: version })}`,
-        (value) => {
-          if (
-            !isDynamicRecord(value) ||
-            !isString(value.mimeType) ||
-            !isAvatarMimeType(value.mimeType) ||
-            !isString(value.base64)
-          )
-            throw new Error("The host returned an invalid avatar.");
-          return `data:${value.mimeType};base64,${value.base64}`;
-        },
-        undefined,
-        serverId,
-      );
-    },
+    loadAgentAvatar: (agentId, avatarUrl, serverId) => requestAgentAvatar(request, agentId, avatarUrl, serverId),
     duplicateAgent: async (agentId) => {
       await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
         operationId: Crypto.randomUUID(),
@@ -352,4 +333,31 @@ export function createHostRequestActions({
       return result;
     },
   };
+}
+
+/** The agent photo as a data URL. The Live Activity reads it too, outside the workspace value. */
+export function requestAgentAvatar(
+  request: WorkspaceRequest,
+  agentId: string,
+  avatarUrl: string,
+  serverId: string,
+): Promise<string> {
+  const version = new URL(avatarUrl).searchParams.get("v");
+  if (!version) return Promise.reject(new Error("The agent avatar has no version."));
+  return request(
+    "GET",
+    `${TEAM_API_ROUTES.agent.avatar(agentId)}?${new URLSearchParams({ v: version })}`,
+    (value) => {
+      if (
+        !isDynamicRecord(value) ||
+        !isString(value.mimeType) ||
+        !isAvatarMimeType(value.mimeType) ||
+        !isString(value.base64)
+      )
+        throw new Error("The host returned an invalid avatar.");
+      return `data:${value.mimeType};base64,${value.base64}`;
+    },
+    undefined,
+    serverId,
+  );
 }

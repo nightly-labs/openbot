@@ -11,7 +11,7 @@ import {
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin } from "./request-helpers";
+import { readJson, requireAdmin, requireVisibleBodyAgent } from "./request-helpers";
 
 /** The bounds `messaging-v1` froze. The host cuts to them, so a reply never fails closed on the client. */
 const WIRE_NAME = 256;
@@ -28,6 +28,7 @@ const WIRE_MESSAGES = 200;
 export async function routeMessaging(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
@@ -36,6 +37,7 @@ export async function routeMessaging(
     throw new HttpError(400, sourceText("error.messaging.unsupported"));
   requireAdmin(member);
   const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
     switch (url.pathname) {
       case MESSAGING_ROUTES.overview:

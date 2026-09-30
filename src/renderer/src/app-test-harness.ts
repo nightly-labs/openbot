@@ -10,6 +10,7 @@ import {
   type CentralAuthState,
   type ComputerUseState,
   type ConversationPage,
+  DISCONNECTED_GITHUB_CONNECTOR,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
   type DynamicIslandAction,
@@ -96,6 +97,23 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     auth: { kind: "unknown" },
     providers: [
       { id: "antigravity", state: "sign-in-required", connectionState: "connecting", version: "1.2.1", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  cursor: {
+    phase: "blocked",
+    cliVersion: "2026.09.28-64d2043",
+    auth: { kind: "unknown" },
+    providers: [
+      {
+        id: "cursor",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "2026.09.28-64d2043",
+        message: null,
+      },
     ],
     capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
     message: null,
@@ -570,6 +588,10 @@ export function installOpenbotStub(): void {
       listInstalled: vi.fn().mockResolvedValue([]),
     }),
     hostedSites: stubGroup(IPC_ENDPOINTS.hostedSites, "hostedSites", {}),
+    githubConnector: stubGroup(IPC_ENDPOINTS.githubConnector, "githubConnector", {
+      status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
+      repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
+    }),
     billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
     hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
       list: vi.fn().mockResolvedValue({ available: false, servers: [] }),

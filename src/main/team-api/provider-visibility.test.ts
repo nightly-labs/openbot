@@ -46,4 +46,26 @@ describe("provider visibility", () => {
     expect(hiddenAgentView(payload, new Set(), 4)).toEqual({ agents: [], providers: [], auth: { kind: "unknown" } });
     expect(hiddenAgentView(payload, new Set(), 5)).toEqual(payload);
   });
+
+  it("keeps Cursor on this computer for every protocol, and keeps an endpoint saved as cursor", () => {
+    const payload = {
+      agents: [{ id: "agent-cursor", provider: "cursor", model: "auto" }],
+      providers: [{ id: "cursor", state: "ready" }],
+      customProviders: [{ id: "cursor", name: "An endpoint saved before the provider existed" }],
+      cliVersion: "2026.09.28-64d2043",
+      auth: { kind: "cursor", email: null },
+      message: "Sign in to Cursor.",
+    };
+    const hidden = {
+      agents: [],
+      providers: [],
+      customProviders: [{ id: "cursor", name: "An endpoint saved before the provider existed" }],
+      cliVersion: null,
+      auth: { kind: "unknown" },
+      message: null,
+    };
+    expect(legacyProviderView(payload, new Set())).toEqual(hidden);
+    expect(hiddenAgentView(payload, new Set(), 4)).toEqual(hidden);
+    expect(hiddenAgentView(payload, new Set(), 5)).toEqual(hidden);
+  });
 });

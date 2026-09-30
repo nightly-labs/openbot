@@ -1035,6 +1035,7 @@ const args: Parameters<typeof Conversation>[0] = {
   server: STORY_SERVERS[0],
   presence: STORY_PRESENCE,
   currentUserEmail: "person@example.com",
+  isOwnSender: (senderId) => senderId === "member-self",
   remoteDesktopSessionActive: Boolean(STORY_REMOTE_DESKTOP_SESSION),
   remoteDesktopVisible: false,
   prompt: undefined,
@@ -1188,6 +1189,58 @@ export const ScrollToLatest: Story = {
     messages: unreadStoryMessages,
     unreadCount: 0,
     firstUnreadMessageId: null,
+  },
+};
+
+/** One agent chat on a team: two other people write, their runs group, and a reply quotes one. */
+export const SeveralPeople: Story = {
+  name: "Several people",
+  args: {
+    messages: [
+      {
+        id: "people-own",
+        author: "you",
+        body: "Can we ship the launch notes today?",
+        time: "10:00",
+        createdAt: "2026-08-20T10:00:00.000Z",
+        senderMember: { id: "member-self", name: "Norbert" },
+      },
+      {
+        id: "people-alice-1",
+        author: "you",
+        body: "I still need the pricing section.",
+        time: "10:01",
+        createdAt: "2026-08-20T10:01:00.000Z",
+        senderMember: { id: "member-alice", name: "Alice Chen" },
+      },
+      {
+        id: "people-alice-2",
+        author: "you",
+        body: "Also the screenshots.",
+        time: "10:01",
+        createdAt: "2026-08-20T10:01:30.000Z",
+        senderMember: { id: "member-alice", name: "Alice Chen" },
+      },
+      {
+        id: "people-left",
+        author: "you",
+        body: "A person who left the team keeps the name the host stored.",
+        time: "10:02",
+        createdAt: "2026-08-20T10:02:00.000Z",
+        senderMember: {
+          id: "member-former",
+          name: "Maximiliana Konstantinopoulou-Wolfeschlegelsteinhausenberger",
+        },
+      },
+      {
+        id: "people-agent",
+        author: "agent",
+        body: "I will draft the pricing section and add the screenshots.",
+        time: "10:03",
+        createdAt: "2026-08-20T10:03:00.000Z",
+        replyToMessageId: "people-alice-1",
+      },
+    ],
   },
 };
 

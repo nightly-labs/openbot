@@ -26,6 +26,16 @@ export const Playful: IndicatorStory = {
   },
 };
 
+/** A step that has run for a while shows its time, so a working agent does not look stalled. */
+export const LongStep: IndicatorStory = {
+  args: {
+    agent: STORY_AGENTS[0],
+    label: "Working on it…",
+    detail: "Deciding the next step in the app…",
+    since: Date.now() - 42_000,
+  },
+};
+
 // The desktop app icon, scaled down and inlined so the story needs no network.
 // It stands in for an agent’s uploaded avatar: the circular crop and the rings
 // flying around it are what this story is for.

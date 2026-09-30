@@ -29,6 +29,7 @@ export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";
 export * from "./ipc-endpoints";
+export * from "./ipc-github-connector";
 export * from "./ipc-host-analytics";
 export * from "./ipc-host-update";
 export * from "./ipc-hosted-sites";

@@ -63,6 +63,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
   "error.team.agentImportUnsupported": "この接続ではエージェントをインポートできません。",
+  "error.team.liveActivityUnsupported": "このホストはスマートフォンのライブアクティビティを更新できません。",
   "error.team.agentUpdateTargetRequired": "更新するエージェントを指定してください。",
   "error.team.queueEditUnsupported": "このクライアントはキューの編集に対応していません。",
   "error.team.skillsUnsupported": "この接続ではスキルを利用できません。",
@@ -80,6 +81,8 @@ export const messages = {
   "error.team.logoNotFound": "サーバーのロゴが見つかりません。",
   "error.team.updateRequired": "更新が必要です。",
   "error.team.defaultProviderRequiresV4": "ホストのデフォルトのプロバイダーには Team API v4 が必要です。",
+  "error.team.newAgentProviderLocalOnly":
+    "新しいエージェントは、ホストでしか使えないプロバイダーで始まります。ホストのデフォルトのプロバイダーを変更してください。",
   "error.team.hostAnalyticsUnsupported": "このクライアントはホストの分析に対応していません。",
   "error.team.profileGenerationUnsupported": "このクライアントはプロフィールの生成に対応していません。",
   "error.team.searchQueryRequired": "有効な検索クエリが必要です。",

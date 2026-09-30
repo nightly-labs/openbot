@@ -4,7 +4,7 @@ import { parseInstallSkill, parseSetEnabledSkill, parseUninstallSkill } from "..
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin, stringField } from "./request-helpers";
+import { readJson, requireAdmin, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
 /**
  * The skills of one agent on this computer, managed from a joined server. The host downloads a
@@ -13,6 +13,7 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 export async function routeSkillsAdmin(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const path = method === "POST" ? url.pathname : "";
@@ -27,6 +28,7 @@ export async function routeSkillsAdmin(
   requireAdmin(member);
   // `readJson` has already run the body through the skills-admin wire codec.
   const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
     if (list) return json(200, await skills.listInstalled(stringField(body, "agentId")));
     if (install) return json(200, await skills.install(parseInstallSkill(body)));

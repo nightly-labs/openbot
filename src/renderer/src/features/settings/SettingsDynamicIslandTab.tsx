@@ -1,4 +1,5 @@
 import {
+  type AppVariant,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
@@ -10,6 +11,8 @@ import { useI18n } from "../../i18n-context";
 
 export interface SettingsDynamicIslandTabProps {
   value: GeneralSettingsValue;
+  /** The previews draw the logo in the color of this build, as the real island does. */
+  variant: AppVariant;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   /** Saves several fields as one change, so a reset writes the preference once. */
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
@@ -94,6 +97,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
                   state="compact"
                   displayMode="notch"
                   notchSize={{ width: 192, height: 32 }}
+                  variant={props.variant}
                   widthPercent={widthPercent()}
                   heightPercent={heightPercent()}
                   onStateChange={() => undefined}
@@ -110,6 +114,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
                   presentation={IDLE_DYNAMIC_ISLAND_PRESENTATION}
                   state="compact"
                   displayMode="island"
+                  variant={props.variant}
                   widthPercent={widthPercent()}
                   heightPercent={heightPercent()}
                   onStateChange={() => undefined}

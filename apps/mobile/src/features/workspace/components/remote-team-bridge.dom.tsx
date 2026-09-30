@@ -27,6 +27,13 @@ export default function RemoteTeamBridge({ commands, active, onCommandResult, ..
     peer.setActive(active);
   }, [active, peer]);
 
+  // The WebView has no network details, but it sends `online` when the phone gets a network again.
+  useEffect(() => {
+    const restore = () => peer.networkRestored();
+    window.addEventListener("online", restore);
+    return () => window.removeEventListener("online", restore);
+  }, [peer]);
+
   useEffect(() => {
     const currentIds = new Set(commands.map((command) => command.id));
     for (const id of processedCommandIds.current) {

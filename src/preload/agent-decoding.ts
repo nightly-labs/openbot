@@ -29,7 +29,7 @@ import {
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export const decodeRoutine = guardedDecoder(isRoutine, "routine response");
 export const decodeRoutines = guardedListDecoder(isRoutine, "routine list response");
@@ -57,19 +57,24 @@ export function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
 export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginStart {
   if (!isDynamicRecord(value)) throw new Error("Invalid code login response.");
   if (value.kind === "connected") return { kind: "connected" };
+  if (!isHttpsUrl(value.verificationUrl) || !isNumber(value.expiresAt)) {
+    throw new Error("Invalid code login response.");
+  }
+  if (value.kind === "paste") {
+    return { kind: "paste", verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
+  }
   if (
     value.kind !== "code" ||
     !isString(value.userCode) ||
-    !isString(value.verificationUrl) ||
-    !isNumber(value.expiresAt)
+    (value.verificationUrlComplete !== undefined && !isHttpsUrl(value.verificationUrlComplete))
   ) {
     throw new Error("Invalid code login response.");
   }
-  if (new URL(value.verificationUrl).protocol !== "https:") throw new Error("Invalid code login response.");
   return {
     kind: "code",
     userCode: value.userCode,
     verificationUrl: value.verificationUrl,
+    ...(value.verificationUrlComplete === undefined ? {} : { verificationUrlComplete: value.verificationUrlComplete }),
     expiresAt: value.expiresAt,
   };
 }

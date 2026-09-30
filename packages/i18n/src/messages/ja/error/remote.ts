@@ -15,9 +15,10 @@ export const messages = {
   "error.remote.controlSessionEnded": "リモート操作のセッションが終了しました。",
   "error.remote.testPanelFailed": "ホストがテストパネルを開けませんでした。",
   "error.remote.sessionCapacity": "ホストにはすでに 4 つの有効なセッションがあります。",
-  "error.remote.linuxUnsupported": "Linux ではリモートデスクトップのホストに対応していません。",
+  "error.remote.linuxNeedsX11":
+    "Linux のリモートデスクトップには X11 セッションが必要です。Wayland には対応していません。",
   "error.remote.runtimeMissing":
-    "Sunshine と Moonlight Web のランタイムがないか、このホストでは対応していません。Mac または Windows x64 のホストに OpenBot のフルリリースをインストールしてから、OpenBot を再起動してください。",
+    "Sunshine と Moonlight Web のランタイムがないか、このホストでは対応していません。Mac、Windows x64 または Linux x64 のホストに OpenBot のフルリリースをインストールしてから、OpenBot を再起動してください。",
   "error.remote.testActive": "リモートデスクトップのテストを実行中です。終了してから再試行してください。",
   "error.remote.screenRecordingDenied":
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",

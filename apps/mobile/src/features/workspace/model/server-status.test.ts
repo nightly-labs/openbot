@@ -21,7 +21,10 @@ const server: MobileServer = {
   role: "owner",
 };
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("mobile server availability", () => {
   it("keeps the protocol error visible when suspending RTC rejects an in-flight workspace load", async () => {
@@ -59,6 +62,8 @@ describe("mobile server availability", () => {
 
   it("shows retry, protocol error, and recovery states from the live connection controller", async () => {
     vi.useFakeTimers();
+    // No retry jitter, so the first wait is exactly `REMOTE_RETRY_INTERVAL_MS`.
+    vi.spyOn(Math, "random").mockReturnValue(0);
     let current: MobileServer = { ...server, state: "unknown", initialConnectionPending: true };
     let connection = Promise.withResolvers<void>();
     const controller = createRemoteConnectionRecovery(

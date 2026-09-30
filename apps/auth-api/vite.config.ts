@@ -4,12 +4,18 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
 import { defineConfig, type Plugin } from "vite";
 import { contentImages } from "./content-images";
+import { DEVELOPMENT_APNS_PATH, developmentApnsProxy } from "./dev-apns-proxy";
 import { developmentNetworkRequestAllowed } from "./dev-network-access";
 import { rendererPreviewAlias, rendererWebAlias } from "./renderer-preview-alias";
 import { readLocalRuntimeVars } from "./src/server/runtime-env";
 
 export default defineConfig(({ command }) => {
+  const port = readApiPort(process.env.OPENBOT_API_PORT);
   const localRuntimeVars = command === "serve" ? readLocalRuntimeVars(process.env) : {};
+  // The local Worker cannot reach Apple over HTTP/2, so it sends Live Activity updates to this server.
+  if (localRuntimeVars.APNS_PRIVATE_KEY) {
+    localRuntimeVars.APNS_ORIGIN = `http://127.0.0.1:${port}${DEVELOPMENT_APNS_PATH}`;
+  }
   return {
     resolve: {
       dedupe: ["solid-js", "@solidjs/web", "@solidjs/signals"],
@@ -27,12 +33,13 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: readApiHost(process.env.OPENBOT_API_HOST),
-      port: readApiPort(process.env.OPENBOT_API_PORT),
+      port,
       strictPort: true,
       allowedHosts: [".openbot.localhost"],
     },
     plugins: [
       developmentLanGuard(),
+      developmentApnsProxy(),
       cloudflare({
         viteEnvironment: { name: "ssr" },
         config(config) {

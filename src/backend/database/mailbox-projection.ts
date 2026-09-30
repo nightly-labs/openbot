@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
@@ -66,6 +67,9 @@ export interface MailboxProjectionState {
   reactions: MailboxProjectionReaction[];
 }
 
+/** The queue-state row that holds the idempotency keys. */
+const MAILBOX_METADATA_ROW = "__mailbox__";
+
 export interface MailboxProjectionOptions {
   core: DatabaseCore;
 }
@@ -76,8 +80,10 @@ export interface MailboxProjectionOptions {
  *
  * Owns `projection_mailbox_messages`, `projection_deliveries`, `projection_queue_state`,
  * `projection_attachments`, `projection_reactions` and `file_deletion_outbox`. Unlike every other
- * projection here, mailbox state is stored whole: each write replaces the tables and compacts the
- * `mailbox` aggregate down to its newest event, so the log never accumulates superseded snapshots.
+ * projection here, each write receives the whole mailbox state. It deletes the rows that the state
+ * no longer has and writes only the rows that are new or changed, because finished deliveries stay
+ * as chat history and a full rewrite grew with them. Each write compacts the `mailbox` aggregate down
+ * to its newest event, and that event records only counts, not the state.
  * The class never imports the facade.
  */
 export class MailboxProjection {
@@ -101,7 +107,8 @@ export class MailboxProjection {
           aggregateType: "mailbox",
           aggregateId: "mailbox",
           eventType,
-          payload: state,
+          // The rows hold the state. A copy of all of it here made each write grow with the history.
+          payload: { messages: state.messages.length, deliveries: state.deliveries.length },
         },
       ],
       (db, sequences) => {
@@ -112,24 +119,60 @@ export class MailboxProjection {
         ).run(sequence);
         deleteOrphanReceipts(db);
         const value = state;
-        db.exec("DELETE FROM projection_deliveries");
-        db.exec("DELETE FROM projection_mailbox_messages");
-        db.exec("DELETE FROM projection_queue_state");
-        db.exec("DELETE FROM projection_reactions");
-        db.exec("DELETE FROM projection_attachments WHERE owner_kind IN ('mailbox-message', 'draft', 'generated')");
-        const messageInsert = db.prepare(`
+        const attachments = mailboxAttachmentRows(value);
+        // Deliveries go before their messages, as in the full rewrite this replaced, so no row
+        // depends on the cascade of the foreign key.
+        deleteRowsNotIn(
+          db,
+          "projection_deliveries",
+          ["delivery_id"],
+          new Set(value.deliveries.map((delivery) => rowKey([String(delivery.id)]))),
+        );
+        deleteRowsNotIn(
+          db,
+          "projection_mailbox_messages",
+          ["message_id"],
+          new Set(value.messages.map((message) => rowKey([String(message.id)]))),
+        );
+        deleteRowsNotIn(
+          db,
+          "projection_queue_state",
+          ["agent_id"],
+          new Set([MAILBOX_METADATA_ROW, ...value.pausedAgentIds].map((agentId) => rowKey([agentId]))),
+        );
+        deleteRowsNotIn(
+          db,
+          "projection_reactions",
+          ["agent_id", "message_id", "actor_kind", "actor_agent_id"],
+          new Set(value.reactions.map((reaction) => rowKey(reactionKey(reaction)))),
+        );
+        deleteRowsNotIn(
+          db,
+          "projection_attachments",
+          ["attachment_id"],
+          new Set(attachments.map((attachment) => rowKey([attachment[0]]))),
+          "owner_kind IN ('mailbox-message', 'draft', 'generated')",
+        );
+
+        // Each upsert below writes a row only when its content changed. An unchanged row keeps the
+        // sequence of the write that last changed it.
+        const messageUpsert = db.prepare(`
           INSERT INTO projection_mailbox_messages
             (message_id, sender_kind, sender_agent_id, text, reply_to_message_id, created_at, message_json, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        const attachmentInsert = db.prepare(`
-          INSERT INTO projection_attachments
-            (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(message_id) DO UPDATE SET
+            sender_kind = excluded.sender_kind,
+            sender_agent_id = excluded.sender_agent_id,
+            text = excluded.text,
+            reply_to_message_id = excluded.reply_to_message_id,
+            created_at = excluded.created_at,
+            message_json = excluded.message_json,
+            last_event_sequence = excluded.last_event_sequence
+          WHERE projection_mailbox_messages.message_json IS NOT excluded.message_json
         `);
         for (const message of value.messages) {
           const sender = message.sender;
-          messageInsert.run(
+          messageUpsert.run(
             String(message.id),
             sender.kind,
             sender.agentId ?? null,
@@ -139,26 +182,24 @@ export class MailboxProjection {
             JSON.stringify(message),
             sequence,
           );
-          for (const attachment of message.attachments) {
-            attachmentInsert.run(
-              String(attachment.id),
-              "mailbox-message",
-              String(message.id),
-              String(attachment.name),
-              String(attachment.path),
-              JSON.stringify(attachment),
-              String(message.createdAt),
-              sequence,
-            );
-          }
         }
-        const deliveryInsert = db.prepare(`
+        const deliveryUpsert = db.prepare(`
           INSERT INTO projection_deliveries
             (delivery_id, message_id, recipient_agent_id, status, turn_id, error, created_at, delivery_json, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(delivery_id) DO UPDATE SET
+            message_id = excluded.message_id,
+            recipient_agent_id = excluded.recipient_agent_id,
+            status = excluded.status,
+            turn_id = excluded.turn_id,
+            error = excluded.error,
+            created_at = excluded.created_at,
+            delivery_json = excluded.delivery_json,
+            last_event_sequence = excluded.last_event_sequence
+          WHERE projection_deliveries.delivery_json IS NOT excluded.delivery_json
         `);
         for (const delivery of value.deliveries) {
-          deliveryInsert.run(
+          deliveryUpsert.run(
             String(delivery.id),
             String(delivery.messageId),
             String(delivery.recipientAgentId),
@@ -170,52 +211,53 @@ export class MailboxProjection {
             sequence,
           );
         }
-        const queueInsert = db.prepare(`
+        const queueUpsert = db.prepare(`
           INSERT INTO projection_queue_state
             (agent_id, paused, metadata_json, last_event_sequence) VALUES (?, ?, ?, ?)
+          ON CONFLICT(agent_id) DO UPDATE SET
+            paused = excluded.paused,
+            metadata_json = excluded.metadata_json,
+            last_event_sequence = excluded.last_event_sequence
+          WHERE projection_queue_state.paused IS NOT excluded.paused
+            OR projection_queue_state.metadata_json IS NOT excluded.metadata_json
         `);
-        queueInsert.run("__mailbox__", 0, JSON.stringify({ idempotency: value.idempotency }), sequence);
-        for (const agentId of value.pausedAgentIds) queueInsert.run(agentId, 1, "{}", sequence);
-        const reactionInsert = db.prepare(`
+        queueUpsert.run(MAILBOX_METADATA_ROW, 0, JSON.stringify({ idempotency: value.idempotency }), sequence);
+        for (const agentId of value.pausedAgentIds) queueUpsert.run(agentId, 1, "{}", sequence);
+        const reactionUpsert = db.prepare(`
           INSERT INTO projection_reactions
-            (agent_id, message_id, emoji, actor_kind, actor_agent_id, updated_at, last_event_sequence)
+            (agent_id, message_id, actor_kind, actor_agent_id, emoji, updated_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(agent_id, message_id, actor_kind, actor_agent_id) DO UPDATE SET
+            emoji = excluded.emoji,
+            updated_at = excluded.updated_at,
+            last_event_sequence = excluded.last_event_sequence
+          WHERE projection_reactions.emoji IS NOT excluded.emoji
+            OR projection_reactions.updated_at IS NOT excluded.updated_at
         `);
         for (const reaction of value.reactions) {
-          reactionInsert.run(
-            String(reaction.agentId),
-            String(reaction.messageId),
-            String(reaction.emoji),
-            reaction.actor.kind === "agent" ? "agent" : reaction.actor.kind,
-            reaction.actor.kind === "agent" ? reaction.actor.agentId : "",
-            String(reaction.updatedAt),
-            sequence,
-          );
+          reactionUpsert.run(...reactionKey(reaction), String(reaction.emoji), String(reaction.updatedAt), sequence);
         }
-        for (const draft of value.drafts) {
-          attachmentInsert.run(
-            String(draft.id),
-            "draft",
-            String(draft.id),
-            String(draft.name),
-            String(draft.path),
-            JSON.stringify(draft),
-            String(draft.createdAt),
-            sequence,
-          );
-        }
-        for (const attachment of value.generatedAttachments) {
-          attachmentInsert.run(
-            String(attachment.id),
-            "generated",
-            String(attachment.id),
-            String(attachment.name),
-            String(attachment.path),
-            JSON.stringify(attachment),
-            new Date().toISOString(),
-            sequence,
-          );
-        }
+        // `created_at` is not compared: a generated attachment has no time of its own, so the write
+        // that first stores it sets the time.
+        const attachmentUpsert = db.prepare(`
+          INSERT INTO projection_attachments
+            (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(attachment_id) DO UPDATE SET
+            owner_kind = excluded.owner_kind,
+            owner_id = excluded.owner_id,
+            name = excluded.name,
+            path = excluded.path,
+            metadata_json = excluded.metadata_json,
+            created_at = excluded.created_at,
+            last_event_sequence = excluded.last_event_sequence
+          WHERE projection_attachments.owner_kind IS NOT excluded.owner_kind
+            OR projection_attachments.owner_id IS NOT excluded.owner_id
+            OR projection_attachments.name IS NOT excluded.name
+            OR projection_attachments.path IS NOT excluded.path
+            OR projection_attachments.metadata_json IS NOT excluded.metadata_json
+        `);
+        for (const attachment of attachments) attachmentUpsert.run(...attachment, sequence);
         const outboxInsert = db.prepare(`
           INSERT OR IGNORE INTO file_deletion_outbox
             (id, path, reason, created_at, attempts, last_error)
@@ -254,7 +296,7 @@ export class MailboxProjection {
   readMailboxState(): unknown | null {
     const db = this.#core.connection;
     const marker = databaseRow(
-      db.prepare("SELECT metadata_json FROM projection_queue_state WHERE agent_id = '__mailbox__'").get(),
+      db.prepare("SELECT metadata_json FROM projection_queue_state WHERE agent_id = ?").get(MAILBOX_METADATA_ROW),
     );
     if (!marker) return null;
     const metadata = parseMailboxMetadata(requiredStringColumn(marker, "metadata_json"));
@@ -297,6 +339,87 @@ export class MailboxProjection {
       idempotency: metadata.idempotency ?? {},
       reactions,
     };
+  }
+}
+
+type AttachmentRow = [
+  attachmentId: string,
+  ownerKind: "mailbox-message" | "draft" | "generated",
+  ownerId: string,
+  name: string,
+  path: string,
+  metadataJson: string,
+  createdAt: string,
+];
+
+function mailboxAttachmentRows(state: MailboxProjectionState): AttachmentRow[] {
+  const rows: AttachmentRow[] = [];
+  for (const message of state.messages) {
+    for (const attachment of message.attachments) {
+      rows.push([
+        String(attachment.id),
+        "mailbox-message",
+        String(message.id),
+        String(attachment.name),
+        String(attachment.path),
+        JSON.stringify(attachment),
+        String(message.createdAt),
+      ]);
+    }
+  }
+  for (const draft of state.drafts) {
+    rows.push([
+      String(draft.id),
+      "draft",
+      String(draft.id),
+      String(draft.name),
+      String(draft.path),
+      JSON.stringify(draft),
+      String(draft.createdAt),
+    ]);
+  }
+  for (const attachment of state.generatedAttachments) {
+    rows.push([
+      String(attachment.id),
+      "generated",
+      String(attachment.id),
+      String(attachment.name),
+      String(attachment.path),
+      JSON.stringify(attachment),
+      new Date().toISOString(),
+    ]);
+  }
+  return rows;
+}
+
+function reactionKey(
+  reaction: MailboxProjectionReaction,
+): [agentId: string, messageId: string, actorKind: string, actorAgentId: string] {
+  return [
+    String(reaction.agentId),
+    String(reaction.messageId),
+    reaction.actor.kind === "agent" ? "agent" : reaction.actor.kind,
+    reaction.actor.kind === "agent" ? reaction.actor.agentId : "",
+  ];
+}
+
+function rowKey(values: readonly string[]): string {
+  return JSON.stringify(values);
+}
+
+/** Deletes each row whose key is not in `kept`. Reading the keys writes nothing. */
+function deleteRowsNotIn(
+  db: DatabaseSync,
+  table: string,
+  keyColumns: readonly string[],
+  kept: ReadonlySet<string>,
+  where = "1",
+): void {
+  const remove = db.prepare(`DELETE FROM ${table} WHERE ${keyColumns.map((column) => `${column} = ?`).join(" AND ")}`);
+  const rows = databaseRows(db.prepare(`SELECT ${keyColumns.join(", ")} FROM ${table} WHERE ${where}`).all());
+  for (const row of rows) {
+    const key = keyColumns.map((column) => requiredStringColumn(row, column));
+    if (!kept.has(rowKey(key))) remove.run(...key);
   }
 }
 

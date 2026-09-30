@@ -10,10 +10,12 @@
 import type { IncomingMessage } from "node:http";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
   type ConversationWithReadState,
   type CreateAgentInput,
+  conversationMessageSender,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAgentModel,
   isAgentProvider,
@@ -142,8 +144,23 @@ export function firstHeaderValue(value: string | string[] | undefined): string |
   return first?.trim();
 }
 
+/** The member who made this request, as the sender the host stamps on the message they write. */
+export function memberSender(member: TeamMemberSummary): ConversationMessageSender | undefined {
+  return conversationMessageSender(member.id, member.name?.trim() || member.email || member.username);
+}
+
 export function requireAdmin(member: TeamMemberSummary): void {
   if (member.role === "member") throw new HttpError(403, sourceText("error.team.adminRequired"));
+}
+
+/**
+ * The router checks the agent ID in the path and the query. A module that reads it from the body
+ * checks it here: an agent hidden from the caller answers as a missing agent does.
+ */
+export function requireVisibleBodyAgent(body: DynamicRecord, hiddenAgentIds: ReadonlySet<string>): void {
+  if (isString(body.agentId) && hiddenAgentIds.has(body.agentId)) {
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  }
 }
 
 export function parseBrowserBounds(value: unknown): {
@@ -394,16 +411,37 @@ function requiredCreateText(value: unknown, field: string, maximum: number): str
   return value;
 }
 
+/**
+ * Reads a body of up to `limit` bytes into one array. With a `Content-Length`, the chunks go
+ * directly into that array, so the body is in memory one time. Without it, the chunks are kept
+ * until the end and then copied one time.
+ */
 export async function readBinary(request: IncomingMessage, limit: number): Promise<Uint8Array> {
+  const tooLarge = () => new HttpError(413, "Attachment exceeds the 100 MB limit.");
+  const header = request.headers["content-length"];
+  const declared = header !== undefined && /^\d+$/u.test(header) ? Number(header) : null;
+  // Node ends the body at `Content-Length`, so a larger declared body always fails the limit.
+  if (declared !== null && declared > limit) throw tooLarge();
+  const target = declared === null ? null : new Uint8Array(declared);
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    if (size + bytes.length > limit) throw tooLarge();
+    if (!target) chunks.push(bytes);
+    else if (size + bytes.length > target.length)
+      throw new Error("The request body is longer than its Content-Length.");
+    else target.set(bytes, size);
     size += bytes.length;
-    if (size > limit) throw new HttpError(413, "Attachment exceeds the 100 MB limit.");
-    chunks.push(bytes);
   }
-  return new Uint8Array(Buffer.concat(chunks));
+  if (target) return size === target.length ? target : target.slice(0, size);
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return body;
 }
 
 export function pageAnchor(url: URL): ConversationPageAnchor {

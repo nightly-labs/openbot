@@ -215,7 +215,10 @@ export function MessageBody(props: {
   animate?: boolean;
   message: AgentMessage;
   referencedMessage?: AgentMessage;
-  /** Who wrote the quoted message. A chat with several authors has to name the one it quotes. */
+  /**
+   * Who wrote the quoted message. A chat with several authors has to name the one it quotes, and
+   * an agent chat names another person the reader quotes. Absent, the quote says "You" or "Agent".
+   */
   referencedAuthorName?: string;
   agents: AgentProfile[];
   skills?: InstalledSkill[];
@@ -347,9 +350,8 @@ export function MessageBody(props: {
         {(referenced) => (
           <div class="message-reply-context">
             <span>
-              {referenced().author === "you"
-                ? t("chat.message.you")
-                : (props.referencedAuthorName ?? t("chat.message.agentFallback"))}
+              {props.referencedAuthorName ??
+                (referenced().author === "you" ? t("chat.message.you") : t("chat.message.agentFallback"))}
             </span>
             <p>
               <RichMessageText

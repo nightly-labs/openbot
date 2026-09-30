@@ -18,11 +18,16 @@
 // copy of its `structuredContent`, because some providers show the model only the text and the
 // driver's text is a summary with nothing in it to act on. `cua-driver-structured-text.ts` says
 // what the copy holds. Every other answer, and every other byte of a changed one, passes unchanged.
+//
+// It also times each tool call, from the request line to the end of its answer line, and logs the
+// tool name and the milliseconds. That is the driver's share of a slow Computer Use step; the rest
+// of the step is the model, which the tap cannot see.
 
 import { chmod } from "node:fs/promises";
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { Transform, type TransformCallback } from "node:stream";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { rewriteCallAnswer } from "./cua-driver-structured-text";
 
 /**
@@ -43,6 +48,14 @@ const MAX_REQUEST_LINE_BYTES = 1_048_576;
  */
 const MAX_ANSWER_LINE_BYTES = 33_554_432;
 const NEWLINE = 0x0a;
+
+/**
+ * A tool call that takes at least this long is logged at `info`, so the default log shows it.
+ * Faster calls are logged at `debug` only, because a Computer Use turn makes many of them.
+ */
+const SLOW_CALL_MS = 5_000;
+
+const defaultLogger = createOpenBotLogger("cua-driver-tap");
 
 /**
  * Where an agent last asked the daemon to act.
@@ -81,13 +94,16 @@ export interface ObservedPointer {
 
 /** What one request line says: whether it is a tool call, and at most two answers about where the agent works. */
 export interface ObservedRequest {
-  /** Whether the line is a tool call, whose answer gets the text copy of its structured result. */
-  call: boolean;
+  /**
+   * The tool a call names, or `null` when the line is no tool call. A call's answer gets the text
+   * copy of its structured result, and the tap logs how long that answer took.
+   */
+  tool: string | null;
   action: ObservedAction | null;
   pointer: ObservedPointer | null;
 }
 
-const NOTHING: ObservedRequest = { call: false, action: null, pointer: null };
+const NOTHING: ObservedRequest = { tool: null, action: null, pointer: null };
 
 /**
  * The tools that aim the pointer at a point on the desktop.
@@ -117,7 +133,7 @@ export function readRequest(line: string, at: number): ObservedRequest {
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { call: true, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  return { tool, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -149,6 +165,12 @@ export interface ActionTapAddresses {
   tap: string;
 }
 
+/** A tool call the daemon has not answered yet: its tool, and when the request passed through. */
+interface PendingCall {
+  tool: string;
+  at: number;
+}
+
 /**
  * The daemon's answers, one line at a time, with the text copy added to each tool call's answer.
  *
@@ -159,15 +181,33 @@ export interface ActionTapAddresses {
  * The stream's own back pressure holds the daemon while the agent reads slower than it writes.
  */
 class CallAnswerLines extends Transform {
-  /** One entry per request not yet answered: whether it was a tool call. */
-  readonly #expected: boolean[] = [];
+  /** One entry per request not yet answered: its tool call, or `null` when it is no call. */
+  readonly #expected: Array<PendingCall | null> = [];
   /** How the current line is handled, or `null` before its first byte. */
   #line: "pass" | "hold" | null = null;
+  /** The request the current line answers, or `null` when it answers no tool call. */
+  #answering: PendingCall | null = null;
   #held: Buffer[] = [];
   #heldBytes = 0;
+  readonly #answered: (tool: string, ms: number) => void;
+  readonly #now: () => number;
 
-  expect(call: boolean): void {
-    this.#expected.push(call);
+  constructor(answered: (tool: string, ms: number) => void, now: () => number) {
+    super();
+    this.#answered = answered;
+    this.#now = now;
+  }
+
+  expect(request: PendingCall | null): void {
+    this.#expected.push(request);
+  }
+
+  /** The tool calls still waiting for their answer, oldest first. Each is returned only once. */
+  takeUnanswered(): PendingCall[] {
+    const calls = [this.#answering, ...this.#expected].filter((call): call is PendingCall => call !== null);
+    this.#answering = null;
+    this.#expected.length = 0;
+    return calls;
   }
 
   override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
@@ -175,7 +215,10 @@ class CallAnswerLines extends Transform {
     while (start < chunk.length) {
       // An answer that arrives with no request to match reads as not a call. The copy also checks
       // the structure of the answer, so a line out of step is at worst left unchanged.
-      this.#line ??= this.#expected.shift() ? "hold" : "pass";
+      if (this.#line === null) {
+        this.#answering = this.#expected.shift() ?? null;
+        this.#line = this.#answering ? "hold" : "pass";
+      }
       const newline = chunk.indexOf(NEWLINE, start);
       const end = newline < 0 ? chunk.length : newline + 1;
       const piece = chunk.subarray(start, end);
@@ -192,6 +235,9 @@ class CallAnswerLines extends Transform {
       }
       if (newline >= 0) {
         if (this.#line === "hold") this.#release(true);
+        const answering = this.#answering;
+        if (answering) this.#answered(answering.tool, this.#now() - answering.at);
+        this.#answering = null;
         this.#line = null;
       }
     }
@@ -229,9 +275,11 @@ export class CuaDriverActionTap {
   #pointer: ObservedPointer | null = null;
   #address: string | null = null;
   #now: () => number;
+  #logger: Logger;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, logger: Logger = defaultLogger) {
     this.#now = now;
+    this.#logger = logger;
   }
 
   /** The address to hand the providers, or `null` while nothing listens. */
@@ -302,8 +350,10 @@ export class CuaDriverActionTap {
     const daemon = connect(upstream);
     this.#sockets.add(client);
     this.#sockets.add(daemon);
-    const answers = new CallAnswerLines();
+    const answers = new CallAnswerLines((tool, ms) => this.#logAnswered(tool, ms), this.#now);
     const end = () => {
+      // A call that hangs in the driver ends here, when the agent gives up and closes the connection.
+      for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
       this.#sockets.delete(client);
       this.#sockets.delete(daemon);
       client.destroy();
@@ -332,10 +382,11 @@ export class CuaDriverActionTap {
         pending = pending.slice(newline + 1);
         // Told before the daemon can answer, because this runs in the same turn as the write above.
         if (skipping) {
-          answers.expect(false);
+          answers.expect(null);
         } else {
-          const { call, action, pointer } = readRequest(line, this.#now());
-          answers.expect(call);
+          const at = this.#now();
+          const { tool, action, pointer } = readRequest(line, at);
+          answers.expect(tool === null ? null : { tool, at });
           if (action) this.#action = action;
           if (pointer) this.#pointer = pointer;
         }
@@ -347,5 +398,15 @@ export class CuaDriverActionTap {
         skipping = true;
       }
     });
+  }
+
+  /** The tool name and the time only: the arguments are the user's work and are never logged. */
+  #logAnswered(tool: string, ms: number): void {
+    const log = ms >= SLOW_CALL_MS ? this.#logger.info : this.#logger.debug;
+    log("Computer Use driver answered", { tool, ms });
+  }
+
+  #logUnanswered(tool: string, ms: number): void {
+    this.#logger.info("Computer Use driver did not answer", { tool, ms });
   }
 }

@@ -9,6 +9,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -56,13 +57,14 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
+import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
   type ServerConnectionHandle,
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
-import { createHostRequestActions } from "@/features/workspace/context/host-request-actions";
+import { createHostRequestActions, requestAgentAvatar } from "@/features/workspace/context/host-request-actions";
 import { reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import {
   canToggleAgentPin,
@@ -206,6 +208,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? NO_IDS;
   const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? NO_IDS;
   const readWrites = useRef(new Map<string, Promise<void>>());
+  /** Applies host read state. The Live Activity also shows the message counts. */
+  const applyConversationReads = useCallback(
+    (reads: Record<string, { unreadCount: number }>) => {
+      liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
+      liveState.update("unreadCounts", (current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries(reads).map(([agentId, read]) => [agentId, read.unreadCount])),
+      }));
+    },
+    [liveState],
+  );
 
   const installHosts = useCallback(
     (hosts: RemoteTeamHost[]) => {
@@ -323,6 +336,28 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [],
   );
+  const loadAgentAvatar = useCallback(
+    (agentId: string, avatarUrl: string, serverId: string) => requestAgentAvatar(request, agentId, avatarUrl, serverId),
+    [request],
+  );
+  const postLiveActivityAction = useCallback(
+    (serverId: string, path: string, body: TeamProtocolV2Json) => request("POST", path, ignoreResponse, body, serverId),
+    [request],
+  );
+  const supportsLiveActivityPush = useCallback(
+    (serverId: string) => serverCapabilities.current.get(serverId)?.includes(LIVE_ACTIVITY_PUSH_CAPABILITY) === true,
+    [],
+  );
+  const applyLiveActivityEvent = useLiveActivity({
+    servers,
+    activeServerId,
+    agents,
+    liveState,
+    foreground,
+    post: postLiveActivityAction,
+    loadAgentAvatar,
+    supportsPush: supportsLiveActivityPush,
+  });
   /** The shared Team API requests, sent to one server. */
   const teamApi = useCallback(
     (serverId?: string, onUploadProgress?: (fraction: number) => void): TeamApiRequest =>
@@ -438,7 +473,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await readRefresh.refresh(
         serverId,
         () => client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
-        (reads) => liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads)),
+        applyConversationReads,
         () => context.isCurrent() && !removedServers.current.has(serverId),
       );
       if (!context.isCurrent()) return;
@@ -463,7 +498,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       context.stage = "connection";
     },
-    [liveState, replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore, applySidebarLayout],
+    [
+      replaceServerAgents,
+      preferenceStore,
+      readRefresh,
+      conversationStore,
+      channelStore,
+      applySidebarLayout,
+      applyConversationReads,
+    ],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -575,16 +618,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await readRefresh.refresh(
         serverId,
         () => request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
-        (reads) => liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads)),
+        applyConversationReads,
         () => !removedServers.current.has(serverId),
       );
     },
-    [liveState, request, readRefresh],
+    [request, readRefresh, applyConversationReads],
   );
 
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      applyLiveActivityEvent(serverId, event);
       if (event.type === "runtime-snapshot") {
         liveState.update("browserRequests", (current) => {
           const next = replaceEqualDeep(
@@ -703,9 +747,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const readState = event.page.readState;
         if (readState) {
           readRefresh.invalidate(serverId);
-          liveState.update("unreadAgentIds", (current) =>
-            mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }),
-          );
+          applyConversationReads({ [event.page.agentId]: readState });
         } else void refreshConversationReads(serverId).catch(() => undefined);
         if (conversationStore.get(event.page.agentId)) conversationStore.applyPage(event.page);
       } else if (event.type === "conversation-invalidated" || event.type === "turn-completed") {
@@ -723,6 +765,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [
       liveState,
+      applyLiveActivityEvent,
       channelStore,
       applySidebarLayout,
       loadConversation,
@@ -734,6 +777,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       session.apiUrl,
       session.user.id,
       sessionScope,
+      applyConversationReads,
     ],
   );
 
@@ -776,7 +820,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
           if (generation === loadGeneration.current && isCurrentRead()) {
             readRefresh.invalidate(activeServerId);
-            liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
+            applyConversationReads(reads);
           }
         })
         .catch(() => {
@@ -792,7 +836,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
       });
     },
-    [liveState, request, refreshConversationReads, loadConversation, activeServerId, readRefresh, conversationStore],
+    [
+      liveState,
+      request,
+      refreshConversationReads,
+      loadConversation,
+      activeServerId,
+      readRefresh,
+      conversationStore,
+      applyConversationReads,
+    ],
   );
 
   const updatePreferences = useCallback(

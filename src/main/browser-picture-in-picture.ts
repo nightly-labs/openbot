@@ -109,6 +109,8 @@ export class BrowserPictureInPicture {
       positionControls();
     });
     window.on("closed", () => {
+      // A child view's contents outlive its window. A window that the system closes skips `#close`.
+      if (!controlsView.webContents.isDestroyed()) controlsView.webContents.close();
       if (this.#window !== window) return;
       this.#stopHoverTracking();
       this.#window = null;
@@ -123,6 +125,8 @@ export class BrowserPictureInPicture {
     await (developmentUrl
       ? window.loadURL(new URL("browser-pip.html", `${developmentUrl}/`).toString())
       : window.loadURL("openbot-app://app/browser-pip.html"));
+    // The system can close the window during the load, and the `closed` handler closes the controls.
+    if (controlsView.webContents.isDestroyed()) return bounds;
     await (developmentUrl
       ? controlsView.webContents.loadURL(new URL("browser-pip-controls.html", `${developmentUrl}/`).toString())
       : controlsView.webContents.loadURL("openbot-app://app/browser-pip-controls.html"));

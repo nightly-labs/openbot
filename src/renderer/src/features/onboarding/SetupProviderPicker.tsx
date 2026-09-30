@@ -5,6 +5,7 @@ import {
   type AgentStatus,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  isLocalOnlyProvider,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
@@ -26,6 +27,11 @@ import { fallbackProviderState } from "./onboarding-provider-state";
 /** The providers of this computer, and the actions on them, as both setup screens take them. */
 export interface SetupProviderProps {
   agentStatus: AgentStatus;
+  /**
+   * The providers are those of a joined server's host. A provider that stays on its computer, such
+   * as Cursor, then has a row only when the host's status lists it, as in Settings.
+   */
+  hostProviders?: boolean | undefined;
   refreshingProviders?: boolean | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /** The newer runtime main offers per provider; the row's actions menu offers it as in Settings. */
@@ -92,6 +98,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Included with OpenBot": "onboarding.provider.included",
   "Free models, no account needed": "onboarding.provider.freeModels",
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
+  "Cursor plan or API key": "onboarding.provider.cursorPlan",
 };
 
 /**
@@ -112,7 +119,7 @@ export function savedCustomModel(
   return (customProviders ?? []).some((endpoint) => model.startsWith(`${endpoint.id}/`)) ? model : null;
 }
 
-type SetupProviders = ReturnType<typeof createSetupProviders>;
+export type SetupProviders = ReturnType<typeof createSetupProviders>;
 
 /**
  * The provider step of setup: its rows, its choice, the actions on a row, and the errors those
@@ -154,7 +161,12 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
   let focusRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    SETUP_PROVIDERS.map((provider) => {
+    SETUP_PROVIDERS.filter(
+      (provider) =>
+        !props.hostProviders ||
+        !isLocalOnlyProvider(provider.id) ||
+        props.agentStatus.providers?.some((candidate) => candidate.id === provider.id) === true,
+    ).map((provider) => {
       const status = props.agentStatus.providers?.find((candidate) => candidate.id === provider.id);
       const runtime = props.providerRuntimeStatuses?.[provider.id];
       const descriptionKey = PROVIDER_DESCRIPTION_KEYS[provider.description];
@@ -551,6 +563,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           source().onSignInProvider || source().providerKeys ? props.providers.signInProvider : undefined
         }
         onSignInWithCodeProvider={source().codeLogin?.start}
+        codeSignInProviders={source().codeLogin?.providers()}
         onUpdateProvider={source().onUpdateProvider}
         menuMount={props.menuMount}
         onRefreshProviders={
@@ -637,6 +650,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
             state={api().state()}
             onOpenVerificationUrl={api().openVerificationUrl}
             onCancel={api().cancel}
+            onSubmitCode={api().submit}
           />
         )}
       </Show>

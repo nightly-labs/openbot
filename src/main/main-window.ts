@@ -12,13 +12,14 @@
 import { join } from "node:path";
 import {
   type AgentEvent,
+  type AppVariant,
   type ComputerUseHighlightPlacement,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
+import { app, BrowserWindow, clipboard, type Display, Menu, type Point, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import {
@@ -456,13 +457,18 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   return window;
 }
 
+/** The entry for the helper windows. It does not load `App`, so each window uses less memory. */
+function helperRendererUrl(developmentUrl: string | undefined): URL {
+  return developmentUrl ? new URL("helper.html", `${developmentUrl}/`) : new URL("openbot-app://app/helper.html");
+}
+
 export function loadComputerUsePermissionHelpRenderer(
   window: BrowserWindow,
   permission: MacPermissionId,
   sunshine = false,
 ): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "computer-use-permission-help");
   url.searchParams.set("permission", permission);
   if (sunshine) url.searchParams.set("application", "sunshine");
@@ -471,7 +477,7 @@ export function loadComputerUsePermissionHelpRenderer(
 
 export function loadComputerUseHighlightRenderer(window: BrowserWindow): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "computer-use-highlight");
   return window.loadURL(url.toString());
 }
@@ -487,6 +493,23 @@ export function computerUseDisplays(): HighlightDisplay[] {
   return screen.getAllDisplays().map((display) => ({ id: display.id, bounds: display.bounds }));
 }
 
+/**
+ * One rectangle the driver reports, in the units the displays above are measured in.
+ *
+ * On Windows the driver is Per-Monitor V2 DPI aware and reports physical pixels, while Electron
+ * places every window in DIP. At 125% scaling a maximized window would otherwise be drawn a
+ * quarter larger than the display, with its right and bottom edges past the overlay. macOS reports
+ * points, which are what Electron uses there. Electron has `screenToDipRect` on Windows only.
+ */
+export function computerUseDesktopRect(rect: Rectangle): Rectangle {
+  return process.platform === "win32" ? screen.screenToDipRect(null, rect) : rect;
+}
+
+/** One point the driver was asked for, in the same units as `computerUseDesktopRect`. */
+export function computerUseDesktopPoint(point: Point): Point {
+  return process.platform === "win32" ? screen.screenToDipPoint(point) : point;
+}
+
 /** Where the overlay draws the rim. Sent on every placement, and read by that surface only. */
 export function sendComputerUseHighlightPlacement(
   window: BrowserWindow,
@@ -499,12 +522,13 @@ export function showMainWindow(window: BrowserWindow): void {
   presentMainWindow(window, process.platform, () => app.show());
 }
 
-export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display): Promise<void> {
+export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
   const displayMode = display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "dynamic-island");
   url.searchParams.set("display", displayMode);
+  url.searchParams.set("variant", variant);
   const notch = dynamicIslandNotchSizeForDisplay(display);
   if (notch) {
     url.searchParams.set("notch-width", String(notch.width));

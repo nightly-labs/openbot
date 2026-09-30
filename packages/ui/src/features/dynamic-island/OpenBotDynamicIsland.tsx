@@ -1,5 +1,6 @@
 import { AppLogo } from "@openbot/brand";
 import type {
+  AppVariant,
   DynamicIslandAction,
   DynamicIslandAgentIdentity,
   DynamicIslandApprovalItem,
@@ -68,6 +69,8 @@ export interface OpenBotDynamicIslandProps {
   state: DynamicIslandViewState;
   displayMode?: "notch" | "island";
   notchSize?: DynamicIslandNotchSize;
+  /** The build that draws the island. Its logo color tells a dev or preview build from a release. */
+  variant?: AppVariant;
   /** The user-chosen compact width, as a percent of the default. The physical notch never shrinks. */
   widthPercent?: number;
   /** The user-chosen compact height, as a percent of the default. */
@@ -582,10 +585,14 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
             presentation={visiblePresentation()}
             outgoingPresentation={outgoingPresentation()}
             renderOutgoing={(presentation) => (
-              <CompactLeading presentation={presentation} displayMode={props.displayMode} />
+              <CompactLeading presentation={presentation} displayMode={props.displayMode} variant={props.variant} />
             )}
           >
-            <CompactLeading presentation={visiblePresentation()} displayMode={props.displayMode} />
+            <CompactLeading
+              presentation={visiblePresentation()}
+              displayMode={props.displayMode}
+              variant={props.variant}
+            />
           </IslandModeSwap>
         }
         compactTrailing={
@@ -667,6 +674,7 @@ function IslandModeSwap(props: IslandModeSwapProps): JSX.Element {
 function CompactLeading(props: {
   presentation: DynamicIslandPresentation;
   displayMode?: "notch" | "island";
+  variant?: AppVariant;
 }): JSX.Element {
   const statusAgent = () => compactStatusAgent(props.presentation);
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
@@ -675,7 +683,7 @@ function CompactLeading(props: {
       <Switch
         fallback={
           <span class="dynamic-island-surface-leading-anchor" data-island-spatial-anchor="center">
-            <AppLogo variant="production" animation="blink" class="dynamic-island-surface-logo" />
+            <AppLogo variant={props.variant ?? "production"} animation="blink" class="dynamic-island-surface-logo" />
           </span>
         }
       >

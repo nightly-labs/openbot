@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { latestReadableMessage, projectChatMessages, withFailureReasons } from "../model/chat-messages";
@@ -36,10 +37,15 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
     [agents, agent.serverId],
   );
   const mentionAgents = useMemo(() => serverAgents.filter((item) => item.id !== agent.id), [serverAgents, agent.id]);
-  const projected = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
+  const memberId = servers.find((item) => item.id === agent.serverId)?.membershipId ?? null;
+  const accountUserId = useMobileSession().session?.user.id ?? null;
+  const projected = useMemo(
+    () => projectChatMessages(conversation?.messages ?? [], memberId, accountUserId),
+    [conversation?.messages, memberId, accountUserId],
+  );
   const references = useMemo(
-    () => projectChatMessages(Object.values(conversation?.references ?? {})),
-    [conversation?.references],
+    () => projectChatMessages(Object.values(conversation?.references ?? {}), memberId, accountUserId),
+    [conversation?.references, memberId, accountUserId],
   );
   const activity = useAgentActivity(agent.id);
   const online = servers.find((item) => item.id === agent.serverId)?.state === "online";

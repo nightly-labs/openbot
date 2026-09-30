@@ -16,6 +16,5 @@ export interface AcpAgentPreset {
 export const ACP_AGENT_PRESETS: readonly AcpAgentPreset[] = [
   { id: "goose", name: "Goose", command: "goose", args: ["acp"] },
   { id: "qwen", name: "Qwen Code", command: "qwen", args: ["--acp"] },
-  { id: "cursor", name: "Cursor", command: "cursor-agent", args: ["acp"] },
   { id: "copilot", name: "GitHub Copilot", command: "copilot", args: ["--acp"] },
 ];

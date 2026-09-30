@@ -118,6 +118,9 @@ export function useChatMotion(
   const responseOpacity = useSharedValue(1);
   const revealed = useSharedValue(false);
   const [atLatest, setAtLatest] = useState(false);
+  // The opening position is not the user's choice. Until the user drags the
+  // list, the whole chat counts as seen, wherever the list lands.
+  const [userScrolled, setUserScrolled] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
   const pending = useRef<{ baseline: string | null; first: boolean } | null>(null);
@@ -320,11 +323,17 @@ export function useChatMotion(
     [position],
   );
 
+  const lowestY = useRef(0);
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.set(event.nativeEvent.contentOffset.y);
+      const y = event.nativeEvent.contentOffset.y;
+      scrollY.set(y);
+      if (!revealed.get()) return;
+      // A status-bar tap or an assistive scroll moves the list up without a drag.
+      lowestY.current = Math.max(lowestY.current, y);
+      if (y < lowestY.current - 24) setUserScrolled(true);
     },
-    [scrollY],
+    [revealed, scrollY],
   );
   const updateAtLatest = useCallback((visible: boolean) => {
     setAtLatest(visible);
@@ -373,6 +382,7 @@ export function useChatMotion(
     setResponseVisible(true);
   }
   function onScrollBeginDrag() {
+    setUserScrolled(true);
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
     pendingRequiredInput.current = null;
@@ -404,6 +414,7 @@ export function useChatMotion(
     ref,
     setScrollRef,
     atLatest,
+    userScrolled,
     historyVisible,
     responseVisible,
     composerHeight,

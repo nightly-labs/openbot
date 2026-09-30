@@ -132,6 +132,12 @@ export const messages = defineMessages("error.provider", {
   "error.provider.connectBeforeProfile": "Connect the selected provider before generating a profile.",
   "error.provider.cliNotReady": "{provider} CLI is not ready or signed in.",
   "error.provider.noCodeSignIn": "{provider} cannot be signed in with a code.",
+  "error.provider.codeLoginNoLink": "The provider did not show a sign-in link. Try again.",
+  "error.provider.codeLoginNotWaiting": "No sign-in is waiting for a code. Start the sign-in again.",
+  "error.provider.codeLoginBadCode": "Paste the code that the sign-in page shows.",
+  "error.provider.codeLoginRefused": "The provider did not accept the code. Start the sign-in again.",
+  "error.provider.codeLoginUnsupported":
+    "This server cannot sign in with a pasted code. Sign in on the server computer, in its browser.",
   "error.provider.cliBusyRetry": "The {provider} CLI is working on a turn. Wait for it to finish, then try again.",
   "error.provider.cliSigningIn": "The {provider} CLI is signing in. Finish or cancel sign-in, then update.",
   "error.provider.cliBusyUpdate": "The {provider} CLI is working on a turn. Wait for it to finish, then update.",
@@ -141,6 +147,14 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
+  "error.provider.opencodeRateLimited":
+    "The model provider refused the request because of its rate limit. Wait a few minutes or choose another model, then try again.\n{detail}",
+  "error.provider.opencodeBilling":
+    "The model provider refused the request because of the account's billing. Waiting does not fix this. Add a payment method or funds in the provider account, or choose another model.\n{detail}",
+  "error.provider.opencodeProviderFailed":
+    "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
+  "error.provider.opencodeNetwork":
+    "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -157,10 +171,20 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
+  "error.provider.cursorChecksum": "Cursor runtime checksum mismatch.",
+  "error.provider.cursorReleaseShape": "The Cursor release has an unexpected shape.",
+  "error.provider.cursorMissing": "Cursor is not downloaded. Download it in OpenBot to continue.",
+  "error.provider.cursorNotStarted": "The Cursor agent was found, but its version cannot be read.",
+  "error.provider.cursorVersionUnreadable": "Unable to read the Cursor agent version.",
+  "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
+  "error.provider.foreignReasoning":
+    "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
+  "error.provider.messageTooLarge": "OpenBot stopped {provider} because it sent a message larger than {limit} MB.",
   "error.provider.customAgentIdInvalid":
     "An agent ID must be lowercase letters, digits or `-`, and cannot be the ID of a built-in provider.",
   "error.provider.customAgentEnvInvalid":

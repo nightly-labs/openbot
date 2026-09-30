@@ -38,6 +38,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.included": "Included with OpenBot",
   "onboarding.provider.freeModels": "Free models, no account needed",
   "onboarding.provider.googlePlan": "Google AI Pro or Ultra plan",
+  "onboarding.provider.cursorPlan": "Cursor plan or API key",
   "onboarding.provider.tryFree": "Try it free",
   "onboarding.provider.noSignIn": "No sign-in needed",
   "onboarding.provider.more": "More providers",
@@ -85,4 +86,10 @@ export const messages = defineMessages("onboarding", {
   "onboarding.action.connect": "Connect",
   "onboarding.action.open": "Open OpenBot",
   "onboarding.action.next": "Next",
+  "onboarding.server.title": "Set up {server}",
+  "onboarding.server.description":
+    "OpenBot does not include an AI subscription. Connect your own provider to this server before you make an agent.",
+  "onboarding.server.label": "Choose the AI provider of this server",
+  "onboarding.server.hint": "The sign-in stays on the server. You can change the provider of each agent later.",
+  "onboarding.server.continue": "Continue",
 });

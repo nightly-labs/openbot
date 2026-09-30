@@ -3,7 +3,7 @@
 [Unit]
 Description=OpenBot hosted server
 Wants=network-online.target
-After=network-online.target
+After=network-online.target display-manager.service
 
 [Service]
 Type=simple
@@ -15,6 +15,14 @@ ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
 Restart=always
 RestartSec=10
 TimeoutStopSec=60
+# Memory guards. The machine is small, and this unit holds OpenBot, its browser tabs and every agent
+# process. The OOM killer of the unit acts before the kernel's own, so the desktop, sshd and the boat
+# agent keep running. systemd sets -500 as root, before it changes the user; main then gives each
+# process it starts 500, so the OOM killer picks an agent process before main. One killed agent does
+# not stop the unit: the default policy "stop" would stop OpenBot too.
+MemoryMax=90%
+OOMScoreAdjust=-500
+OOMPolicy=continue
 
 [Install]
 WantedBy=multi-user.target

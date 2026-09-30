@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentStore } from "../agent-store";
-import { ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
+import { CONVERSATION_SNAPSHOT_IDLE_MS, ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
 
 let root: string;
 let store: AgentStore;
@@ -139,6 +139,39 @@ describe("conversation transactions", () => {
     expect(runtime.snapshot(AGENT_ID)).toEqual(before);
     expect(store.list().find((candidate) => candidate.id === AGENT_ID)?.threadId).toBeNull();
     expect(threadRowCount()).toBe(threadRowsBefore);
+  });
+
+  it("rebuilds an evicted snapshot equal to SQLite, and keeps a snapshot that SQLite does not hold", () => {
+    runtime.withConversationTransaction(AGENT_ID, ({ threadId, snapshot }) => {
+      const message = systemMessage("persisted");
+      snapshot.messages.push(message);
+      snapshot.revision = store.database.appendConversationMessage({
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: snapshot.activeTurnId,
+        message,
+        eventType: "test.persisted-append",
+      });
+      return { result: undefined, snapshot };
+    });
+    const original = structuredClone(runtime.snapshot(AGENT_ID));
+    const idle = Date.now() + 2 * CONVERSATION_SNAPSHOT_IDLE_MS;
+
+    runtime.evictIdleSnapshots(idle);
+
+    expect(runtime.loadedSnapshot(AGENT_ID)).toBeUndefined();
+    // When no caller holds the evicted object any more, `snapshot` rebuilds it with this read.
+    expect(store.database.readConversation(AGENT_ID, original?.threadId ?? null)).toEqual(original);
+    expect(runtime.snapshot(AGENT_ID)).toEqual(original);
+
+    // Streamed text before its flush is in memory only: evicting it would lose that text.
+    runtime.snapshot(AGENT_ID)?.messages.push(systemMessage("not flushed"));
+    runtime.evictIdleSnapshots(idle);
+
+    expect(runtime.loadedSnapshot(AGENT_ID)?.messages.map((message) => message.text)).toEqual([
+      "persisted",
+      "not flushed",
+    ]);
   });
 
   it("ignores a late provider snapshot after an execution thread is forgotten", () => {

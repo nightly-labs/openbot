@@ -19,14 +19,19 @@
     "./team-admin-requests": "./src/team-admin-requests.ts",
     "./team-messaging-requests": "./src/team-messaging-requests.ts",
     "./marketplace-catalog": "./src/marketplace-catalog.ts",
-    "./hosted-server-wake": "./src/hosted-server-wake.ts"
+    "./hosted-server-wake": "./src/hosted-server-wake.ts",
+    "./agent-message-text": "./src/agent-message-text.ts",
+    "./dynamic-island-coordinator": "./src/dynamic-island-coordinator.ts",
+    "./dynamic-island-presentation": "./src/dynamic-island-presentation.ts",
+    "./live-activity-props": "./src/live-activity-props.ts",
+    "./live-activity-seal": "./src/live-activity-seal.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@noble/ed25519": "3.1.0",
-    "@noble/hashes": "2.3.0",
+    "@noble/hashes": "catalog:",
     "@openbot/contracts": "workspace:*",
     "@openbot/i18n": "workspace:*"
   },

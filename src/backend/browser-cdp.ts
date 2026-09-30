@@ -9,7 +9,15 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
-import { buttonMask, dispatchMouseClick, dispatchShortcut, dispatchTextKey, modifierMask } from "./browser-cdp-input";
+import {
+  buttonMask,
+  dispatchMouseClick,
+  dispatchShortcut,
+  dispatchTextKey,
+  modifierMask,
+  namedKey,
+  SHIFT_MODIFIER,
+} from "./browser-cdp-input";
 import {
   boundSerializedSnapshot,
   collectBoundedSnapshot,
@@ -1089,10 +1097,21 @@ export class BrowserCdpEngine {
   async dispatchViewportInput(input: BrowserViewportInput): Promise<void> {
     await this.#lease(async (send) => {
       if (input.type === "key") {
+        if (input.action === "char") {
+          await send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
+          return;
+        }
+        // A client sends a character event only for a printable key, so Enter's `\r` is added here.
+        // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
+        const { text, ...keyCodes } = namedKey(input.key);
+        const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
         await send("Input.dispatchKeyEvent", {
-          type: input.action === "char" ? "char" : input.action === "down" ? "rawKeyDown" : "keyUp",
+          type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
           modifiers: input.modifiers,
-          ...(input.action === "char" ? { text: input.text } : { key: input.key, code: input.code }),
+          key: input.key,
+          code: input.code,
+          ...keyCodes,
+          ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
         });
         return;
       }

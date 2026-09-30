@@ -41,8 +41,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
@@ -406,6 +407,10 @@ const MessageRow = memo(function MessageRow({
   );
   const waiting = awaitingFirstWord(message, shared);
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
+  // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
+  // as on desktop, so it does not read as the reader's own.
+  const memberColor =
+    message.kind === "message" && message.sender ? getBloubAvatarColor(message.sender.id, null) : undefined;
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
@@ -490,6 +495,11 @@ const MessageRow = memo(function MessageRow({
         }
         style={[{ borderCurve: "circular" }, isFirstUser ? firstMessageStyle : undefined]}
       >
+        {memberColor && message.sender ? (
+          <Typography.Paragraph type="body-xs" className="shrink px-1" numberOfLines={1} style={{ color: memberColor }}>
+            {message.sender.name.trim() || t("mobile.chat.speaker.memberFallback")}
+          </Typography.Paragraph>
+        ) : null}
         {message.speaker && message.author !== "user" ? (
           <View className="flex-row items-center gap-1 px-1">
             {message.speaker.kind === "agent" ? (
@@ -501,9 +511,10 @@ const MessageRow = memo(function MessageRow({
                 size={20}
               />
             ) : null}
-            <Typography.Paragraph type="body-xs" className="text-muted">
-              {message.speaker.name}
-              {message.superseded ? " · Superseded" : ""}
+            <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
+              {message.superseded
+                ? t("mobile.chat.speaker.superseded", { name: message.speaker.name })
+                : message.speaker.name}
             </Typography.Paragraph>
           </View>
         ) : null}
@@ -543,19 +554,23 @@ const MessageRow = memo(function MessageRow({
             collapsed={waiting}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
                 : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
-              message.author === "user" ? userBubbleStyle : undefined,
+              message.author === "user"
+                ? memberColor
+                  ? { backgroundColor: `${memberColor}38` }
+                  : userBubbleStyle
+                : undefined,
             ]}
           >
             <ChatMarkdown
               agents={agents}
               body={message.body}
               selectable={message.author === "user"}
-              color={message.author === "user" && userBubbleStyle ? userForeground : foreground}
+              color={message.author === "user" && userBubbleStyle && !memberColor ? userForeground : foreground}
               playback={playback}
               animationEnabled={shared.animationActive && arrivals.has(message.id)}
             />

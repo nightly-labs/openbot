@@ -136,7 +136,14 @@ EMAIL_FROM=hello@openbot.run
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
 `REMOTE_TICKET_PUBLIC_JWKS`, `REMOTE_AUTH_WEBHOOK_SECRET`, and `SITE_REPORT_HASH_SECRET` to
-`wrangler secret put` through standard input. It then builds and deploys the Worker.
+`wrangler secret put` through standard input, and `GITHUB_APP_PRIVATE_KEY` when it is set. It then
+builds and deploys the Worker.
+
+`GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
+PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
+Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
+agent's work. With no key, the desktop acts as the signed-in user. In GitHub Actions the secret is
+`OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
 
@@ -209,3 +216,22 @@ Set the private JWK, public JWKS, active key ID, Signal URL, and webhook secret 
 the encrypted environment. The private and public keys must use ES256. The Signal
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
+
+### Live Activity relay
+
+`POST /v2/remote/hosts/:hostId/live-activity` forwards a sealed iPhone Live Activity update from a
+host to Apple Push Notification service. The host seals the content for the phone, so the Worker
+cannot read it. The Worker checks the host credential and `LIVE_ACTIVITY_RATE_LIMITER`, makes the
+APNs payload itself with no alert text, and stores and logs nothing.
+
+The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
+the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the
+encrypted environment and to the `cloudflare-production` GitHub environment. `APNS_TEAM_ID` and
+`APNS_TOPIC` are in `wrangler.jsonc`.
+
+For local development, run `bun run dev:apns-key -- ~/Downloads/AuthKey_<KEY_ID>.p8`. It saves the
+key in `.env.dev`. The local Worker runtime cannot open HTTP/2, which APNs requires, so `vite dev`
+sets `APNS_ORIGIN` and forwards the Worker's request to Apple from Node
+(`dev-apns-proxy.ts`). The Worker still checks the host and the limit, makes the payload and signs
+the token. Only a loopback caller can use the forwarder, and the Worker accepts only a loopback
+`APNS_ORIGIN`.

@@ -426,6 +426,7 @@ export function SettingsModal(props: SettingsModalProps) {
             customAgents={props.customAgents}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
+            codeSignInProviders={props.codeLogin?.providers()}
           />
           <Show when={props.detectionSettings}>
             {(value) => (
@@ -442,6 +443,7 @@ export function SettingsModal(props: SettingsModalProps) {
           <Tabs.Content value="dynamic-island" class="settings-modal-tab-panel" data-tab="dynamic-island">
             <SettingsDynamicIslandTab
               value={props.value}
+              variant={props.appInfo?.variant ?? "production"}
               onUpdateSetting={updateSetting}
               onUpdateSettings={updateSettings}
             />

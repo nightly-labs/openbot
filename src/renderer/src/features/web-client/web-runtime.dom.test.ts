@@ -10,6 +10,7 @@ const peer = {
   cancelUpload: vi.fn(),
   setTyping: vi.fn(),
   setActive: vi.fn(),
+  networkRestored: vi.fn(),
 };
 const host = {
   hostId: "host",

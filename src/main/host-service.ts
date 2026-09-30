@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
 import { createInviteUrl } from "@openbot/contracts/invite-links";
@@ -5,6 +6,7 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   ConfigureHostInput,
+  ConversationMessageSender,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -36,7 +38,8 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import { conversationMessageSender, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -45,6 +48,7 @@ import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import { LiveActivityPushService } from "./live-activity-push";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
@@ -120,6 +124,8 @@ interface HostServiceOptions {
     devicePublicKey?: string | null;
   }) => Promise<unknown>;
   issueRemoteHostTicket?: (hostId: string) => Promise<{ ticket: string; signalUrl: string; expiresAt: number }>;
+  /** Sends one sealed Live Activity update through the account service. `gone` means Apple refused the token. */
+  sendLiveActivityPush?: (hostId: string, push: LiveActivityRelayPush) => Promise<"sent" | "gone">;
   verifyRemoteSessionTicket?: (ticket: string) => Promise<VerifiedRemoteSessionTicket>;
   endRemoteSession?: (sessionId: string) => Promise<void>;
   remoteControlPlaneUrl?: string;
@@ -162,6 +168,7 @@ export class HostService extends EventEmitter<HostEvents> {
   readonly #remoteScreen: RemoteScreenGateway;
   readonly #browserView: BrowserViewGateway;
   readonly #webrtcGateway: TeamWebRtcHostGateway | null;
+  readonly #liveActivityPush: LiveActivityPushService | undefined;
   #status: HostStatus;
   #runtimeGeneration = 0;
   #startOperation: Promise<HostStatus> | null = null;
@@ -223,6 +230,23 @@ export class HostService extends EventEmitter<HostEvents> {
       browser: options.browser,
       authenticate: (token) => options.store.authenticate(token),
     });
+    const sendLiveActivityPush = options.sendLiveActivityPush;
+    this.#liveActivityPush = sendLiveActivityPush
+      ? new LiveActivityPushService({
+          agents: options.agents,
+          send: (push) => {
+            const hostId = options.store.getIdentity()?.serverId;
+            if (!hostId) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
+            return sendLiveActivityPush(hostId, push);
+          },
+          randomBytes: (size) => new Uint8Array(randomBytes(size)),
+          memberActive: (memberId) => {
+            const member = options.store.getMember(memberId);
+            return member !== null && !member.disabled;
+          },
+          logger,
+        })
+      : undefined;
     this.#api = new TeamApiServer({
       appVersion: options.appVersion,
       store: options.store,
@@ -248,6 +272,7 @@ export class HostService extends EventEmitter<HostEvents> {
       onDirectTyping: (event) => this.emit("directTyping", event),
       createInvite: (input) => this.createInvite(input),
       onSessionRevoked: (sessionId) => this.#revokeWebRtcSession(sessionId),
+      liveActivityPush: this.#liveActivityPush,
     });
     this.#webrtcGateway = options.teamWebRtcBridge
       ? new TeamWebRtcHostGateway({
@@ -267,6 +292,7 @@ export class HostService extends EventEmitter<HostEvents> {
             });
           },
           closeSession: async (sessionId) => {
+            this.#liveActivityPush?.remove(sessionId);
             await this.#remoteScreen.revokeTeamSession(sessionId);
             await this.#browserView.revokeTeamSession(sessionId);
           },
@@ -921,6 +947,7 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   async #revokeWebRtcSession(sessionId: string): Promise<void> {
+    this.#liveActivityPush?.remove(sessionId);
     await Promise.all([this.#options.endRemoteSession?.(sessionId), this.#webrtcGateway?.revokeSession(sessionId)]);
   }
 
@@ -1051,6 +1078,8 @@ export class HostService extends EventEmitter<HostEvents> {
 
   async #stopRuntime(): Promise<void> {
     this.#webRtcOnline = false;
+    // The phones register again when they connect to the next runtime.
+    this.#liveActivityPush?.dispose();
     try {
       await this.#webrtcGateway?.stop();
     } finally {
@@ -1086,6 +1115,21 @@ export class HostService extends EventEmitter<HostEvents> {
       return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
     }
     return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
+  }
+
+  /**
+   * The host user as the sender of an agent message. Signed out there is none: a message with no
+   * sender is the reader's own, and the signed-out id would name this person as someone else to the
+   * members of a team they host later.
+   */
+  conversationSender(): ConversationMessageSender | undefined {
+    let user: CentralAuthUser;
+    try {
+      user = this.#options.getSignedInUser();
+    } catch {
+      return undefined;
+    }
+    return conversationMessageSender(this.#currentAgentReaderId(), user.name?.trim() || user.email);
   }
 
   #currentAgentReaderId(): string {

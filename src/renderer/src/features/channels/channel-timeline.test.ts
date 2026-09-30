@@ -2,8 +2,9 @@ import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import { assert, describe, expect, it } from "vitest";
+import { isReaderAuthor } from "../team/reader-identity";
 import { mergeChannelPage } from "./channel-page-merge";
-import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
+import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 
 const now = new Date(2026, 8, 9, 14, 0);
 const options = { now, locale: "en-US" };
@@ -357,24 +358,24 @@ describe("channelTimelineEntries", () => {
   });
 });
 
-describe("isOwnChannelAuthor", () => {
+describe("isReaderAuthor", () => {
   const host = { memberId: "member-9", accountUserId: "user-1", onOwnComputer: true };
 
   it("keeps a message the host wrote before signing in their own", () => {
-    expect(isOwnChannelAuthor("local", host)).toBe(true);
-    expect(isOwnChannelAuthor("local", { memberId: null, accountUserId: null, onOwnComputer: true })).toBe(true);
+    expect(isReaderAuthor("local", host)).toBe(true);
+    expect(isReaderAuthor("local", { memberId: null, accountUserId: null, onOwnComputer: true })).toBe(true);
   });
 
   it("reads the signed-out author as the host, not as the reader, on a server they joined", () => {
     // The reader here is a member of another person's server. That person wrote the message.
-    expect(isOwnChannelAuthor("local", { ...host, onOwnComputer: false })).toBe(false);
+    expect(isReaderAuthor("local", { ...host, onOwnComputer: false })).toBe(false);
   });
 
   it("answers for the reader's own member and account ids", () => {
-    expect(isOwnChannelAuthor("member-9", host)).toBe(true);
-    expect(isOwnChannelAuthor("local-user:user-1", host)).toBe(true);
-    expect(isOwnChannelAuthor("member-2", host)).toBe(false);
-    expect(isOwnChannelAuthor("local-user:user-2", host)).toBe(false);
+    expect(isReaderAuthor("member-9", host)).toBe(true);
+    expect(isReaderAuthor("local-user:user-1", host)).toBe(true);
+    expect(isReaderAuthor("member-2", host)).toBe(false);
+    expect(isReaderAuthor("local-user:user-2", host)).toBe(false);
   });
 });
 

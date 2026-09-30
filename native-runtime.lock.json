@@ -293,7 +293,7 @@
     }
   },
   "remoteDesktop": {
-    "recipeVersion": 13,
+    "recipeVersion": 14,
     "sunshine": {
       "sourceMode": "upstream-with-patch",
       "repository": "https://github.com/LizardByte/Sunshine.git",
@@ -309,7 +309,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "bbb7a990994f948a2dc51c3b7ff35be4752a0f2890f082af0311fc423ef1f003"
+        "sha256": "db586815acf867522687b268318d081076ad5192569b745057a3b705d2e79e04"
       },
       "overrides": [],
       "submodules": {
@@ -359,28 +359,33 @@
     "targets": {
       "darwin-arm64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
       "darwin-x64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
-      "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"]
+      "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"],
+      "linux-x64": ["sunshine", "web-server", "streamer"]
     },
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "8ad0a2a068eac7ecbf3dd64d547aa276be493411e2306aaefce3601b869ec51c"
+        "sha256": "f0d71114add31970a72134b36723534ae5349839b927903d6c3685dd19449c97"
       },
       "darwin-x64": {
         "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "207b93603b864d330e4eacda77856dbf2e54ca70e830078d5842fd32406bfa1a"
+        "sha256": "605bc2121520d21710d767b3027caf84c176a093997695446b9f827f17cc908f"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "605047147429fa50a8330b7f550ebac08960c1925efbf743c6b5187b6ed341ea"
+        "sha256": "ba225e8967d861a8412606640693e22dd7705120177d758ec93d747cd9549682"
+      },
+      "linux-x64": {
+        "asset": "remote-desktop-runtime-linux-x64.tar.gz",
+        "sha256": "3d1325700b25296fb02db95c61888a6af59f54d8c84d069a3baa2a6b2567e42d"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-29cff66db32af6debc1ff179dd754e953c6fb750b5155e17015cd7e54e66eb78",
-      "inputDigest": "29cff66db32af6debc1ff179dd754e953c6fb750b5155e17015cd7e54e66eb78",
+      "tag": "remote-desktop-runtime-f4354fbf4cb43ae955fe388107834fd80c5f97fa17c7fc04e4c2b4f329475816",
+      "inputDigest": "f4354fbf4cb43ae955fe388107834fd80c5f97fa17c7fc04e4c2b4f329475816",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "e400f94731c16f02d163cf30a0735a9b0a9181f966f78ffff9409254c6e9ec65"
+      "manifestSha256": "189d91a6d5d1912f3123ff770b468335397ad53ddbb93c88d28cf63209149b22"
     }
   },
   "bun": {
@@ -499,6 +504,86 @@
         "harness": "localharness_external.exe",
         "harnessSha256": "d9283bd0505014ca44f0e02259b78209c13b2426c9780bd43b7779f8eafe438f",
         "platformDirectory": "windows"
+      }
+    }
+  },
+  "cursor": {
+    "registry": "https://raw.githubusercontent.com/agentclientprotocol/registry/main/cursor/agent.json",
+    "distribution": "https://downloads.cursor.com/lab",
+    "version": "2026.09.28-64d2043",
+    "license": "Proprietary",
+    "licenseUrl": "https://cursor.com/terms-of-service",
+    "artifacts": {
+      "darwin-arm64": {
+        "platformDirectory": "darwin",
+        "architecture": "arm64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "c0d7e9cd2e62438610b886d3439907dc1f98c2923b07b3a41416cc919aaf53c7",
+        "downloadBytes": 176795016,
+        "installedBytes": 620000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "ebd2d552c7bebde593dd0390530963ad28de56bccde6ce387cdbe55fb0b6fb8e",
+          "index.js": "0d0c83f5478c3dcd806cb9697123cee3f548005fbcd3acafe31f102d659f5a7b"
+        }
+      },
+      "darwin-x64": {
+        "platformDirectory": "darwin",
+        "architecture": "x64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "3efe0dff2f3d92a1e8139e33fef182801556b57ed50a6afd7bac19c4fad09549",
+        "downloadBytes": 184187482,
+        "installedBytes": 640000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "b80c6bc98d39051e6af607805845cd497387bbe882b6c173b4b581465cd1e8d6",
+          "index.js": "d7e18a70be158b836cf23873f16f01217f2c1ca4b5f84ce530f81acb30f418ea"
+        }
+      },
+      "linux-x64": {
+        "platformDirectory": "linux",
+        "architecture": "x64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "6e4cd936a4866b8a77c50ff51a564460d715772fabc477a01aa0f0455d9559f0",
+        "downloadBytes": 182618248,
+        "installedBytes": 590000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "e0e46d3a1c0667117303412647cafcbcefb1be7612493015ec8fd6b7440162a4",
+          "index.js": "45d9b1df85d0165cb2e690f96fa5fbe4b59e8a71ddd22176a301ba7e5b18a0b9"
+        }
+      },
+      "linux-arm64": {
+        "platformDirectory": "linux",
+        "architecture": "arm64",
+        "asset": "agent-cli-package.tar.gz",
+        "assetSha256": "c737599b27d3d8d6743c72b487204e335f3a8ea2fdbaf18302ee207a646ffd8d",
+        "downloadBytes": 180564349,
+        "installedBytes": 580000000,
+        "executable": "cursor-agent",
+        "files": {
+          "cursor-agent": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+          "node": "47befb5f57df96771ce343d6293349ecf4d46c91110b626423ec3a49d2fee7c1",
+          "index.js": "b85bd012fa887d3d8cfee87fb3593849ab3137d7708cd2a0cbf7cbd39dc9dace"
+        }
+      },
+      "win32-x64": {
+        "platformDirectory": "windows",
+        "architecture": "x64",
+        "asset": "agent-cli-package.zip",
+        "assetSha256": "2d7abd33929520e2169d7392360e71a7b137144077d1574818960fe0949ec52a",
+        "downloadBytes": 77143980,
+        "installedBytes": 260000000,
+        "executable": "cursor-agent.cmd",
+        "files": {
+          "cursor-agent.cmd": "299eaddf3327768e7fcd64f29ad01747c740f7e316931575fb3cee617c92ccfc",
+          "cursor-agent.ps1": "11169ef90694ac10c60e685761b25be5848f92d44cfe5ee6a89010ed5735eff7",
+          "node.exe": "56dbd529d1eaa0f59c8f015ea604fe3d505a77ef9592fc4aed8030dc79f1bc14",
+          "index.js": "9e3d6101a208743cb0c35236ece75acdcd268f329e912ade9901c9eabd52468c"
+        }
       }
     }
   }

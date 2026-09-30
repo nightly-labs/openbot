@@ -52,6 +52,11 @@ export const messages = {
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",
   "mobile.settings.feedback.retry": "触覚フィードバックの設定をもう一度保存",
+  "mobile.settings.liveActivities.title": "ライブアクティビティ",
+  "mobile.settings.liveActivities.footer":
+    "OpenBot の実行中、エージェントの作業、メッセージ、質問、承認をロック画面と Dynamic Island に表示します。",
+  "mobile.settings.liveActivities.toggle": "エージェントのアクティビティを表示",
+  "mobile.settings.liveActivities.retry": "ライブアクティビティの設定をもう一度保存",
   "mobile.settings.privacy.title": "プライバシー",
   "mobile.settings.privacy.footer":
     "このスマートフォンの機能の使用状況と接続結果を共有します。メッセージの内容とファイルは送信されません。",

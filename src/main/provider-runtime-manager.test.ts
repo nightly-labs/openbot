@@ -915,8 +915,9 @@ describe("ProviderRuntimeManager", () => {
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
 
     for (const runtime of [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES]) {
-      // Google names the Gemini server after its build, not after the provider.
-      const executable = runtime === "antigravity" ? "agy_acp_server.par" : runtime;
+      // Google names the Gemini server after its build, and Cursor names its command `cursor-agent`.
+      const executable =
+        runtime === "antigravity" ? "agy_acp_server.par" : runtime === "cursor" ? "cursor-agent" : runtime;
       expect(manager.executablePath(runtime)).toBe(
         join(root, runtime, "darwin-arm64", lock[runtime].version, "bin", executable),
       );
@@ -1016,6 +1017,37 @@ describe("ProviderRuntimeManager", () => {
     const refused = antigravityManager(otherRoot, extra.lock, extra.archive);
     await refused.initialize();
     await expect(refused.downloadAndWait("antigravity")).rejects.toThrow("The Gemini archive has an unexpected file.");
+    await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
+  });
+
+  /*
+   * Cursor ships its Windows CLI as a zip of one folder with subfolders, and OpenBot unpacks it
+   * itself. Every entry must stay in that folder, so a name with `..` is refused before any write.
+   */
+  it("stages Cursor's Windows folder, and refuses an entry outside it", async () => {
+    const root = await temporaryRoot();
+    const fixture = cursorWindowsFixture();
+    const manager = cursorWindowsManager(root, fixture.lock, fixture.archive);
+    await manager.initialize();
+
+    await manager.downloadAndWait("cursor");
+
+    const version = fixture.lock.cursor.version;
+    expect(manager.getStatus().providers.cursor).toMatchObject({ phase: "ready", version });
+    const installed = join(root, "cursor", "win32-x64", version);
+    expect(await readFile(join(installed, "bin", "cursor-agent.cmd"), "utf8")).toBe(fixture.launcherText);
+    expect(await readFile(join(installed, "bin", "node_modules", "pkg", "index.js"), "utf8")).toBe("module");
+    expect(JSON.parse(await readFile(join(installed, "cursor-package.json"), "utf8"))).toMatchObject({
+      layoutVersion: 1,
+      version,
+      executable: "bin/cursor-agent.cmd",
+    });
+
+    const otherRoot = await temporaryRoot();
+    const escaping = cursorWindowsFixture([["dist-package/../../outside", "x"]]);
+    const refused = cursorWindowsManager(otherRoot, escaping.lock, escaping.archive);
+    await refused.initialize();
+    await expect(refused.downloadAndWait("cursor")).rejects.toThrow("The Cursor archive has an unexpected file.");
     await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
   });
 
@@ -1184,6 +1216,37 @@ function antigravityManager(
     root,
     platform: "darwin",
     architecture: "arm64",
+    lock,
+    fetchImpl: async () => chunkedResponse(archive, 4_096),
+  });
+}
+
+/** A served Cursor Windows zip with the lock rewritten to match it. `extra` adds entries to refuse. */
+function cursorWindowsFixture(extra: [string, string][] = []) {
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  const artifact = lock.cursor.artifacts["win32-x64"];
+  const launcherText = "@echo off\r\nnode.exe index.js %*\r\n";
+  const archive = zipArchive([
+    ["dist-package/cursor-agent.cmd", launcherText],
+    ["dist-package/node_modules/pkg/index.js", "module"],
+    ...extra,
+  ]);
+  artifact.assetSha256 = digest(archive);
+  artifact.files = { "cursor-agent.cmd": digest(new TextEncoder().encode(launcherText)) };
+  artifact.downloadBytes = archive.byteLength;
+  artifact.installedBytes = archive.byteLength + 1_024;
+  return { archive, launcherText, lock };
+}
+
+function cursorWindowsManager(
+  root: string,
+  lock: ReturnType<typeof parseAgentRuntimeLock>,
+  archive: Uint8Array,
+): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    platform: "win32",
+    architecture: "x64",
     lock,
     fetchImpl: async () => chunkedResponse(archive, 4_096),
   });

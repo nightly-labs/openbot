@@ -1,8 +1,10 @@
+import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
+import type { DynamicIslandText } from "@openbot/team-client/dynamic-island-presentation";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, flush, onSettled, untrack } from "solid-js";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
-import { DynamicIslandCoordinator } from "./dynamic-island-coordinator";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
 /**
@@ -32,7 +34,7 @@ const DynamicIsland = createSimpleContext({
   init: () => {
     const platform = usePlatform();
     const { servers, activeServerId } = useServers();
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(islandText);
     const connectedServers = new Set(["local"]);
     let presentationScheduled = false;
 
@@ -108,3 +110,22 @@ const DynamicIsland = createSimpleContext({
 
 export const DynamicIslandProvider = DynamicIsland.provider;
 export const useDynamicIsland = DynamicIsland.use;
+
+/** The island text in the current interface language, read for each presentation. */
+function islandText(): DynamicIslandText {
+  const { t, errorMessage } = currentText();
+  return {
+    taskWorking: t("island.task.working"),
+    questionHeader: t("island.question.defaultHeader"),
+    questionText: t("island.question.defaultText"),
+    optionFallback: (number) => t("island.question.optionFallback", { number }),
+    takeoverTitle: t("island.takeover.title"),
+    takeoverDetail: t("island.takeover.detail"),
+    failureTitle: t("island.failure.title"),
+    failureDetail: t("island.failure.detail"),
+    approvalCommand: t("island.approval.title.command"),
+    approvalFileChange: t("island.approval.title.fileChange"),
+    approvalPermissions: t("island.approval.title.permissions"),
+    errorMessage,
+  };
+}

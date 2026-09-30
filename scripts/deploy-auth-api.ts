@@ -27,6 +27,8 @@ async function main(): Promise<void> {
   await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
   // An unset value keeps the value that the Worker has: a new template is set for each release.
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
+  // Without the key, agents act on GitHub as the signed-in user and not as the OpenBot GitHub App.
+  await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
   if (cloudflareEnvironment === "test") {
     await putTestAllowList();
     // The key is in the encrypted .env.shared. Each developer who can decrypt it can create servers.
@@ -34,6 +36,8 @@ async function main(): Promise<void> {
   }
   // Only production sends account events, so a test Worker does not add events to the production project.
   if (!cloudflareEnvironment) await putOptionalSecretSet("OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET");
+  // The Live Activity relay stays off until the Apple key is in the environment.
+  await putOptionalSecretSet("APNS_PRIVATE_KEY", "APNS_KEY_ID");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
     label: "Remote D1 migrations",
   });

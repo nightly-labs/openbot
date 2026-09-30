@@ -132,8 +132,17 @@ Moonlight client uses a random pairing name and approves only its matching loopb
 Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
 that sends the configured pairing name instead of the upstream hard-coded name.
 The published runtime uses a new recipe/input digest; no existing release assets are replaced.
-The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
-on Linux.
+The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: the Linux runtime is built
+with the tray off, and OpenBot gives Sunshine no file capabilities.
+
+### Linux runtime (recipe 14)
+
+The `linux-x64` target builds on Ubuntu 24.04 with GCC 14, X11 capture and software encoding only
+(CUDA, DRM, KWin, VAAPI, Vulkan, Wayland, portal and tray are off). The OpenBot patch adds an XTest
+input backend, because Xvfb does not read uinput devices. It also links libcap when DRM is off and
+adds a `vaMapBuffer2` shim, because the prebuilt FFmpeg needs libva 2.21 and Ubuntu 24.04 has 2.20.
+The runtime uses the system libraries of Ubuntu 24.04; the hosted server template installs them.
+Linux arm64 builds only for local development and has no release artifact.
 
 ## Pin the Gemini server
 
@@ -142,6 +151,16 @@ the version from the ACP registry entry `antigravity-acp`, and for each target t
 SHA-256 and size, and the SHA-256 of `agy_acp_server` and `localharness_external` in it. Download
 each zip from the registry `archive` URL, hash the zip and the two files, and set `installedBytes`
 above the extracted size. Do not commit the zip: Google's license does not allow redistribution.
+
+## Pin the Cursor CLI
+
+`native-runtime.lock.json` pins the Cursor CLI by hand. Read the ACP registry entry `cursor`: its
+`version` is the date, and each `archive` URL has the build, a date and a commit such as
+`2026.09.28-64d2043`. Set `version` to the build. For each target, download
+`downloads.cursor.com/lab/<build>/<os>/<arch>/agent-cli-package.tar.gz` (`.zip` on Windows), and
+set the archive SHA-256 and size, `installedBytes` above the extracted size, and the SHA-256 of
+each file in `files`. The paths in `files` are relative to `dist-package/`. Do not commit the
+archives: Cursor's terms do not allow redistribution.
 
 ## Pin the OpenCode CLI
 

@@ -8,6 +8,8 @@ describe("resolveLocale", () => {
     expect(resolveLocale("system", "fr")).toBe("fr");
     expect(resolveLocale("system", "ja-JP")).toBe("ja");
     expect(resolveLocale("system", "ja")).toBe("ja");
+    expect(resolveLocale("system", "tr-TR")).toBe("tr");
+    expect(resolveLocale("system", "tr")).toBe("tr");
   });
 
   it("falls back to English for a language no catalog covers", () => {
@@ -17,6 +19,7 @@ describe("resolveLocale", () => {
   it("lets an explicit choice override the computer", () => {
     expect(resolveLocale("fr", "ja-JP")).toBe("fr");
     expect(resolveLocale("ja", "en-US")).toBe("ja");
+    expect(resolveLocale("tr", "en-US")).toBe("tr");
     expect(resolveLocale("en", "ja-JP")).toBe("en");
   });
 });
@@ -25,6 +28,7 @@ describe("translateFor", () => {
   it("returns the translation for the locale", () => {
     expect(translateFor("fr")("menu.stopAllAgents")).toBe("Arrêter tous les agents");
     expect(translateFor("ja")("menu.stopAllAgents")).toBe("すべてのエージェントを停止");
+    expect(translateFor("tr")("menu.stopAllAgents")).toBe("Tüm ajanları durdur");
     expect(translateFor("en")("menu.stopAllAgents")).toBe("Stop all agents");
   });
 
@@ -109,5 +113,14 @@ describe("plural forms without Intl.PluralRules", () => {
       sourceLocale: "en",
     });
     expect(japanese("replies", { count: 1 })).toBe("1 件の返信");
+
+    const turkish = createTranslate({
+      source,
+      translation: { replies: { one: "{count} yanıt", other: "{count} yanıt" } },
+      locale: "tr",
+      sourceLocale: "en",
+    });
+    expect(turkish("replies", { count: 1 })).toBe("1 yanıt");
+    expect(turkish("replies", { count: 2 })).toBe("2 yanıt");
   });
 });

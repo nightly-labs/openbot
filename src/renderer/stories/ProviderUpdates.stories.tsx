@@ -12,13 +12,14 @@ import {
   showProviderUpdateToast,
 } from "../src/features/provider-updates/provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity"] as const;
+const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor"] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
   claude: "Claude",
   grok: "Grok",
   opencode: "OpenCode",
   antigravity: "Gemini",
+  cursor: "Cursor",
 };
 const INSTALLED: Record<ManagedProviderId, string> = {
   codex: "0.149.1",
@@ -26,6 +27,7 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   grok: "1.0.5",
   opencode: "1.18.30",
   antigravity: "1.2.1",
+  cursor: "2026.09.28-64d2043",
 };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
@@ -35,6 +37,7 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   grok: null,
   opencode: null,
   antigravity: null,
+  cursor: null,
 };
 
 /** Fast enough to finish in a couple of seconds, slow enough to read. */
@@ -49,6 +52,7 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     grok: { phase: "ready", progress: 100, message: null, version: INSTALLED.grok },
     opencode: { phase: "ready", progress: 100, message: null, version: INSTALLED.opencode },
     antigravity: { phase: "ready", progress: 100, message: null, version: INSTALLED.antigravity },
+    cursor: { phase: "ready", progress: 100, message: null, version: INSTALLED.cursor },
   };
 }
 

@@ -292,6 +292,7 @@ describe("OnboardingFlow", () => {
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const [agentStatus, setAgentStatus] = createSignal(initialAgentStatus);
@@ -374,6 +375,7 @@ describe("OnboardingFlow", () => {
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const onDownloadProvider = vi.fn();
@@ -459,6 +461,7 @@ describe("OnboardingFlow", () => {
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "ready", progress: 100, message: null, version: "1.18.27" },
     };
     const onConnectProvider = vi.fn();
@@ -519,6 +522,7 @@ describe("OnboardingFlow", () => {
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     });
     const view = render(() => (
@@ -584,6 +588,7 @@ describe("OnboardingFlow", () => {
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const view = render(() => (
@@ -615,8 +620,10 @@ describe("OnboardingFlow", () => {
     const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
     const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
     const codeLogin = {
+      providers: () => ["codex" as const],
       provider,
       state,
+      submit: vi.fn(),
       start: vi.fn((id: AgentProviderId) => {
         setProvider(id);
         setState({
