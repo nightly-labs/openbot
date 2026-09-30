@@ -306,12 +306,12 @@ export interface HubRow {
   logo: JSX.Element;
   status: IntegrationStatus;
   summary: string;
-  agents?: ConceptAgent[];
+  agents?: ConceptAgent[] | undefined;
   /** Shown in place of the agent faces, for example "All agents". */
-  scope?: string;
+  scope?: string | undefined;
   /** A button in place of the chevron, when the row needs a step first. Unavailable rows show neither
    * and do not open. */
-  action?: string;
+  action?: string | undefined;
   onAction?: () => void;
 }
 
