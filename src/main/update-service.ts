@@ -98,10 +98,10 @@ export interface UpdateDiagnosticEvent {
   errorCode: UpdateFailureCode | null;
 }
 
-// One manifest request every four minutes, because the loop stops by itself: checkForUpdates()
-// returns early in "downloading", "ready" and "installing", so a poll this frequent costs nothing
-// more than a small GET while the app sits idle, and a user who leaves OpenBot open picks up a
-// release within minutes instead of hours.
+// One manifest request every four minutes: a small GET while the app sits idle, and a user who
+// leaves OpenBot open picks up a release within minutes instead of hours. The loop skips the request
+// while a download or an install runs, and keeps checking while a downloaded update waits for its
+// restart, because releases ship often enough to supersede it before the user restarts.
 const DEFAULT_CHECK_INTERVAL = 4 * 60 * 1_000;
 const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
@@ -342,7 +342,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
   async #check(joinOutstandingRequest: boolean): Promise<UpdateStatus> {
     if (this.#managedByHost || !this.#options.enabled || this.#teardownCommitted) return this.getStatus();
-    if (["checking", "downloading", "ready", "installing"].includes(this.#status.phase)) {
+    if (this.#status.phase === "ready") return this.#checkSupersedingRelease();
+    if (["checking", "downloading", "installing"].includes(this.#status.phase)) {
+      // A download ends in "ready" or in a failure, and neither schedules a check, so the periodic
+      // loop has to outlive it here.
+      if (this.#status.phase === "downloading" && !joinOutstandingRequest) {
+        this.#scheduleCheck(this.#options.checkIntervalMs);
+      }
       return this.getStatus();
     }
     // electron-updater returns the outstanding promise when a check is already running, so issuing
@@ -391,6 +397,50 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     // downloadUpdate() moves into "downloading" before its first await, so the caller and the
     // renderer see the download start rather than a stale "available".
     if (this.#autoDownload && this.#status.phase === "available") void this.downloadUpdate();
+    return this.getStatus();
+  }
+
+  /**
+   * Installing a downloaded update that a newer release has superseded restarts into a version that
+   * is already out of date, and the next launch offers another update: one restart per release
+   * (issue #1192). This check runs without leaving "ready", so the restart action stays available,
+   * and replaces the download only when the feed names a different release. A failed check keeps
+   * the download, which is still a valid update.
+   */
+  async #checkSupersedingRelease(): Promise<UpdateStatus> {
+    // Scheduled before the request, because a request that never settles must not end the loop.
+    this.#scheduleCheck(this.#options.checkIntervalMs);
+    if (this.#checkRequest) return this.getStatus();
+    const downloaded = this.#downloadedVersion;
+    let result: UpdateCheckOutcome | null;
+    try {
+      result = await this.#issueCheck();
+    } catch {
+      return this.getStatus();
+    }
+    // The user can start the install, or a host can take over, while the request is out.
+    if (
+      this.#status.phase !== "ready" ||
+      this.#downloadedVersion !== downloaded ||
+      this.#installStarted ||
+      this.#managedByHost ||
+      this.#teardownCommitted ||
+      !result?.isUpdateAvailable ||
+      result.updateInfo.version === downloaded
+    ) {
+      return this.getStatus();
+    }
+    this.#cancellationToken = result.cancellationToken ?? null;
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: "available",
+      availableVersion: result.updateInfo.version,
+      progress: null,
+      message: null,
+      errorCode: null,
+      checkedAt: new Date().toISOString(),
+    });
+    if (this.#autoDownload) void this.downloadUpdate();
     return this.getStatus();
   }
 
