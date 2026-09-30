@@ -113,51 +113,25 @@ function searchPattern(query: string): RegExp | null {
 /**
  * The text lowercased for the locale, as the query is. The whole text is lowercased at once, so a
  * context rule such as the Greek final sigma applies across text nodes. Lowercasing can change the
- * length, such as `İ` outside Turkish. Then each character that changes length is lowercased alone,
- * each run between them is lowercased as a whole, and each unit keeps its source offsets.
+ * length, such as `İ` outside Turkish. Then each unit keeps the source offsets of its character.
  */
 function lowercase(source: string): LowercaseText {
   const whole = source.toLocaleLowerCase();
   if (whole.length === source.length) return { text: whole };
+  const characters = Array.from(source, (character) => ({ character, lower: character.toLocaleLowerCase() }));
   const starts: number[] = [];
   const ends: number[] = [];
-  let text = "";
-  const append = (value: string, at: number, length: number) => {
-    const lower = value.toLocaleLowerCase();
-    for (let unit = 0; unit < lower.length; unit += 1) {
-      starts.push(at);
-      ends.push(at + length);
-    }
-    text += lower;
-  };
-  let runStart = 0;
-  const flush = (end: number) => {
-    const run = source.slice(runStart, end);
-    const lower = run.toLocaleLowerCase();
-    if (lower.length === run.length) {
-      for (let unit = 0; unit < run.length; unit += 1) {
-        starts.push(runStart + unit);
-        ends.push(runStart + unit + 1);
-      }
-      text += lower;
-    } else {
-      let at = runStart;
-      for (const character of run) {
-        append(character, at, character.length);
-        at += character.length;
-      }
-    }
-  };
   let offset = 0;
-  for (const character of source) {
-    if (character.toLocaleLowerCase().length !== character.length) {
-      flush(offset);
-      append(character, offset, character.length);
-      runStart = offset + character.length;
+  for (const { character, lower } of characters) {
+    for (let unit = 0; unit < lower.length; unit += 1) {
+      starts.push(offset);
+      ends.push(offset + character.length);
     }
     offset += character.length;
   }
-  flush(source.length);
+  // A Turkish or Lithuanian context rule can change the length of a character sequence. Then the
+  // lengths do not add up, and each character is lowercased alone.
+  const text = starts.length === whole.length ? whole : characters.map(({ lower }) => lower).join("");
   return { text, starts, ends };
 }
 
