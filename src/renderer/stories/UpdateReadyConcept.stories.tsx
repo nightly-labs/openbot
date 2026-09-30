@@ -129,13 +129,15 @@ function logoAnimation(state: ScreenState): AppLogoAnimation {
 interface UpdateScreenProps {
   labelledBy: string;
   state: ScreenState;
+  /** Changes when a panel swaps its buttons in one state, so focus moves as for a new state. */
+  focusKey?: string;
   children: JSX.Element;
   onDismiss?: () => void;
 }
 
 /**
- * The full-screen shell. It is a modal dialog, so focus stays inside and Escape returns to the app
- * whenever no restart runs. The app stays usable behind it: nothing here blocks without an exit.
+ * The full-screen shell, a modal dialog. The caller makes the content behind it inert, so focus
+ * stays inside. Escape returns to the app whenever no restart runs, so no state blocks the user.
  */
 function UpdateScreen(props: UpdateScreenProps) {
   let root: HTMLElement | undefined;
@@ -144,7 +146,7 @@ function UpdateScreen(props: UpdateScreenProps) {
   // action. Without it, focus falls to the body and Escape no longer reaches the dialog. Focus that
   // is still inside, such as on a changelog link while the download ends, stays where it is.
   createEffect(
-    () => props.state,
+    () => `${props.state}:${props.focusKey ?? ""}`,
     () => {
       const active = document.activeElement;
       if (root && active && active !== root && root.contains(active)) return;
@@ -433,7 +435,12 @@ function SafeRestartConcept(props: ConceptProps) {
   }
 
   return (
-    <UpdateScreen labelledBy="update-safe-title" state={state()} onDismiss={props.onDismiss}>
+    <UpdateScreen
+      labelledBy="update-safe-title"
+      state={state()}
+      focusKey={waiting() ? "waiting" : "choosing"}
+      onDismiss={props.onDismiss}
+    >
       <RestartAnnouncement state={state()} />
       <div class="update-ready__stage update-ready__stage--wide">
         <Show
@@ -482,7 +489,7 @@ function SafeRestartConcept(props: ConceptProps) {
               <div class="update-safe__waiting">
                 <Spinner size="sm" />
                 <span>Waiting for 2 agents. You can keep working.</span>
-                <Button variant="ghost" size="sm" onClick={() => setWaiting(false)}>
+                <Button variant="ghost" size="sm" data-autofocus onClick={() => setWaiting(false)}>
                   Cancel
                 </Button>
               </div>
@@ -690,10 +697,10 @@ function UpdateReadyStory(args: UpdateReadyStoryArgs) {
 
   return (
     <div class="update-ready-playground">
-      <Button variant="outline" onClick={show}>
+      <Button variant="outline" inert={open()} onClick={show}>
         Show update
       </Button>
-      <Show when={open() && run()} keyed>
+      <Show when={open() && `${run()}:${args.initial}`} keyed>
         <ConceptView {...args} onDismiss={() => setOpen(false)} />
       </Show>
     </div>
