@@ -176,6 +176,7 @@ function JoinServer(props: AccountProps) {
 function AddServer() {
   const { servers, addServerOpen, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select } = useServerActions();
+  const { openAppSettings } = useSettings();
 
   return (
     <AddServerOverlay
@@ -192,6 +193,7 @@ function AddServer() {
         setAddServerOpen(false);
         setJoinServerOpen(true);
       }}
+      onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
 }
@@ -339,6 +341,7 @@ function AppSettings(props: AccountProps) {
   const {
     appSettingsOpen,
     setAppSettingsOpen,
+    appSettingsTab,
     generalSettings,
     updateGeneralSettings,
     appSettingsRestoreTarget,
@@ -447,6 +450,7 @@ function AppSettings(props: AccountProps) {
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
+        openTab={appSettingsTab()}
       />
     </Loading>
   );

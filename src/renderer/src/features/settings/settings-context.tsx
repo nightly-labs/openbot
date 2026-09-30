@@ -9,6 +9,7 @@ import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import type { SettingsTab } from "./SettingsModal";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
@@ -51,6 +52,8 @@ const Settings = createSimpleContext({
      */
     const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
+    /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
+    const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -257,9 +260,10 @@ const Settings = createSimpleContext({
     }
 
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
-    function openAppSettings(trigger?: HTMLElement | null): void {
+    function openAppSettings(trigger?: HTMLElement | null, tab?: SettingsTab): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       appSettingsRestoreTarget = target;
+      setAppSettingsTab(tab);
       setAppSettingsOpen(true);
     }
 
@@ -365,6 +369,7 @@ const Settings = createSimpleContext({
       appSettingsOpen,
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
+      appSettingsTab,
       openAppSettings,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,

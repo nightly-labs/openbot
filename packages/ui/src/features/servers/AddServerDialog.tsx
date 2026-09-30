@@ -1,6 +1,7 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
+  AlertActions,
   AlertContent,
   AlertDescription,
   AlertIcon,
@@ -12,6 +13,7 @@ import {
   IconButton,
   OctagonX,
   Text,
+  TriangleAlert,
   X,
 } from "@openbot/ui";
 import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
@@ -69,6 +71,13 @@ interface AddServerDialogProps {
    * it, the dialog does not show the "Contact us" footer.
    */
   onContactUs?: (() => void) | undefined;
+  /**
+   * The maximum number of servers of the account, when the account has that many. The dialog then
+   * disables the plans and tells the user to delete a server first.
+   */
+  serverLimit?: number | null | undefined;
+  /** Opens the list of the account's hosted servers. Without it, the limit notice has no button. */
+  onManageServers?: (() => void) | undefined;
   /** Opens the invite dialog in place of this one. Without it, the dialog does not show the link. */
   onJoinWithInvite?: (() => void) | undefined;
   /** The consumer names the server, so the user does not have to. The logo uses the ID as its seed, as the rail does. */
@@ -296,12 +305,36 @@ export function AddServerDialog(props: AddServerDialogProps) {
                       />
                     </div>
 
+                    <Show when={props.serverLimit ?? null}>
+                      {(limit) => (
+                        <Alert class="join-server-alert add-server-limit" tone="warning" role="alert">
+                          <AlertIcon>
+                            <TriangleAlert />
+                          </AlertIcon>
+                          <AlertContent>
+                            <AlertTitle>{t("server.add.limit.title")}</AlertTitle>
+                            <AlertDescription>{t("server.add.limit.description", { count: limit() })}</AlertDescription>
+                          </AlertContent>
+                          <Show when={props.onManageServers}>
+                            {(onManageServers) => (
+                              <AlertActions>
+                                <Button size="sm" onClick={() => requestClose(onManageServers())}>
+                                  {t("server.add.limit.manage")}
+                                </Button>
+                              </AlertActions>
+                            )}
+                          </Show>
+                        </Alert>
+                      )}
+                    </Show>
+
                     <HostedServerPlans
                       plans={props.plans}
                       billing={billing()}
                       currency={currency()}
                       recommended={props.recommendedPlan}
                       pendingPlan={pendingPlan()}
+                      disabled={props.serverLimit != null}
                       onChoose={(plan) => void create(plan)}
                     />
 
@@ -334,7 +367,8 @@ export function AddServerDialog(props: AddServerDialogProps) {
                       )}
                     </Show>
 
-                    <Show when={createError()}>
+                    {/* The limit notice above explains a create that failed at the limit. */}
+                    <Show when={props.serverLimit == null && createError()}>
                       {(message) => (
                         <Alert class="join-server-alert" tone="danger" role="alert">
                           <AlertIcon>

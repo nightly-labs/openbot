@@ -252,7 +252,11 @@ export class HostedServerService {
       )
       .bind(user.id)
       .all<HostedServerRow>();
-    return { available: this.isAvailableFor(user), servers: rows.results.map(summary) };
+    return {
+      available: this.isAvailableFor(user),
+      servers: rows.results.map(summary),
+      maxServers: MAX_SERVERS_PER_ACCOUNT,
+    };
   }
 
   /**
@@ -279,6 +283,22 @@ export class HostedServerService {
       .bind(user.id, idempotencyKey)
       .first<HostedServerRow>();
     if (previous) return this.#checkout(previous, user, billing, returnTo);
+    const unpaid = await this.#database
+      .prepare(
+        `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE owner_user_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+           AND NOT EXISTS(
+             SELECT 1 FROM billing_subscriptions s
+             WHERE s.server_id = hosted_servers.server_id AND s.status IN ${OPEN_STATUSES_SQL}
+           )
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .bind(user.id)
+      .first<HostedServerRow>();
+    if (unpaid) {
+      const choice = { plan: input.plan, interval: input.interval, currency: input.currency };
+      return this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo);
+    }
     const count = await this.#database
       .prepare("SELECT COUNT(*) AS count FROM hosted_servers WHERE owner_user_id = ? AND desired_state != 'deleted'")
       .bind(user.id)
@@ -749,6 +769,48 @@ export class HostedServerService {
       throw new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
     }
     return { server: summary(await this.#requireRow(row.server_id)), checkoutUrl: session.url };
+  }
+
+  /**
+   * Gives the account's unpaid server the plan of a new create, so an account has at most one server
+   * that waits for its first payment. A cancelled or abandoned Checkout page then adds no server, also
+   * when the client lost its Idempotency-Key. The old page closes first: when the user paid on it, the
+   * server keeps its plan and the create returns it with no page.
+   */
+  async #reuseUnpaid(
+    row: HostedServerRow,
+    choice: { plan: BillingPlanId; interval: BillingInterval; currency: BillingCurrency },
+    idempotencyKey: string,
+    user: AuthUser,
+    billing: HostedServerBilling,
+    returnTo: CheckoutReturn,
+  ): Promise<HostedServerCheckout> {
+    const previous = row.checkout_session_id;
+    if (previous && (await billing.closeCheckout(previous)) === "paid") {
+      return { server: summary(await this.#requireRow(row.server_id)), checkoutUrl: null };
+    }
+    const updated = await this.#database
+      .prepare(
+        `UPDATE hosted_servers SET plan = ?, size = ?, billing_interval = ?, currency = ?, idempotency_key = ?,
+           checkout_session_id = NULL, updated_at = ?
+         WHERE server_id = ? AND checkout_session_id IS ? AND observed_state = 'awaiting_payment'
+           AND desired_state = 'running'`,
+      )
+      .bind(
+        choice.plan,
+        HOSTED_PLAN_SIZE[choice.plan],
+        choice.interval,
+        choice.currency,
+        idempotencyKey,
+        this.#now(),
+        row.server_id,
+        previous,
+      )
+      .run();
+    // A second request changed the server first.
+    if (updated.meta.changes !== 1)
+      throw new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
+    return this.#checkout(await this.#requireRow(row.server_id), user, billing, returnTo);
   }
 
   /**

@@ -1,5 +1,5 @@
 import type { BillingInterval } from "@openbot/contracts/billing";
-import type { HostedServerSummary } from "@openbot/contracts/hosted-servers";
+import type { HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type {
@@ -43,12 +43,18 @@ interface AddServerOverlayProps {
   onOpenServer: (serverId: string) => void;
   onContactUs?: (() => void) | undefined;
   onJoinWithInvite?: (() => void) | undefined;
+  /** Opens the list of the account's hosted servers, so that the user can delete one at the limit. */
+  onManageServers?: (() => void) | undefined;
 }
 
 interface AddServerState {
   plans: HostedServerPlan[] | null;
   /** The number of hosted servers of the account, for the name of the next one. */
   serverCount: number;
+  /** The servers that block a new one. The account server replaces an unpaid server at the limit. */
+  paidCount: number;
+  /** Null when the account server does not send it. */
+  maxServers: number | null;
   server: HostedServerSummary | null;
   paid: boolean;
 }
@@ -92,7 +98,14 @@ function AddServerSession(
     onPendingResume: (resume: AddServerResume | null) => void;
   },
 ) {
-  const [state, setState] = createStore<AddServerState>({ plans: null, serverCount: 0, server: null, paid: false });
+  const [state, setState] = createStore<AddServerState>({
+    plans: null,
+    serverCount: 0,
+    paidCount: 0,
+    maxServers: null,
+    server: null,
+    paid: false,
+  });
   const requestIds = untrack(() => props.requestIds);
   const resume = untrack(() => props.resume) ?? null;
   /** A read can take longer than the poll interval. The next tick then skips, so reads do not overlap. */
@@ -119,6 +132,8 @@ function AddServerSession(
       setState((draft) => {
         draft.plans = hostedServerPlansFromCatalog(catalog);
         draft.serverCount = list.servers.length;
+        draft.paidCount = paidCount(list);
+        draft.maxServers = list.maxServers;
         draft.server = resumed ?? null;
         draft.paid = resume?.paid ?? false;
       });
@@ -181,6 +196,23 @@ function AddServerSession(
     }
   }
 
+  const serverLimit = (): number | null =>
+    state.maxServers !== null && state.paidCount >= state.maxServers ? state.maxServers : null;
+
+  /**
+   * Reads the server count again after a create failed. When the account reached its limit in
+   * another window, the dialog then shows the limit and not the error text of the account server.
+   */
+  async function refreshCount(): Promise<void> {
+    const list = await props.calls.list().catch(() => null);
+    if (!list) return;
+    setState((draft) => {
+      draft.serverCount = list.servers.length;
+      draft.paidCount = paidCount(list);
+      draft.maxServers = list.maxServers;
+    });
+  }
+
   function nextName(): string {
     const text = currentText();
     return state.serverCount === 0
@@ -194,13 +226,18 @@ function AddServerSession(
     const choice = `${input.plan}:${interval}:${currency}`;
     const key = requestIds.get(choice) ?? { requestId: crypto.randomUUID(), serverId: null };
     requestIds.set(choice, key);
-    const server = await props.calls.create({
-      name: nextName(),
-      plan: input.plan,
-      interval,
-      currency,
-      requestId: key.requestId,
-    });
+    const server = await props.calls
+      .create({
+        name: nextName(),
+        plan: input.plan,
+        interval,
+        currency,
+        requestId: key.requestId,
+      })
+      .catch(async (error: unknown) => {
+        await refreshCount();
+        throw error;
+      });
     key.serverId = server.serverId;
     setState((draft) => {
       draft.server = server;
@@ -241,6 +278,8 @@ function AddServerSession(
             plans={plans()}
             recommendedPlan="standard"
             setupStatus={setupStatus()}
+            serverLimit={serverLimit()}
+            onManageServers={props.onManageServers}
             resume={state.server ? { serverId: state.server.serverId, name: state.server.name } : undefined}
             onClose={props.onClose}
             onContactUs={props.onContactUs}
@@ -274,4 +313,8 @@ function newestInSetup(
     if (!newest || server.createdAt > newest.createdAt) newest = server;
   }
   return newest;
+}
+
+function paidCount(list: HostedServerList): number {
+  return list.servers.filter((server) => server.state !== "awaiting_payment").length;
 }

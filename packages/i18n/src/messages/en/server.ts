@@ -58,6 +58,14 @@ export const messages = defineMessages("server", {
   "server.add.custom.action": "Contact us",
   "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
+  "server.add.limit.title": "This account has the maximum number of servers",
+  "server.add.limit.description": {
+    one: "An account can have {count} paid server. To add a server, delete one first.",
+    other: "An account can have {count} paid servers. To add a server, delete one first.",
+  },
+  // Opens the list of the account's hosted servers, where the user can delete one.
+  "server.add.limit.manage": "Manage servers",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",

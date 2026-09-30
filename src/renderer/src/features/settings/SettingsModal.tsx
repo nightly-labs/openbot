@@ -136,6 +136,8 @@ export interface SettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   /** The tab shown when the modal is created. Read once; the user moves between tabs after that. */
   initialTab?: SettingsTab;
+  /** The tab shown each time the modal opens. Without it, the modal shows the tab that was open last. */
+  openTab?: SettingsTab | undefined;
 }
 
 export type SettingsTab =
@@ -254,6 +256,12 @@ function trackHostedSiteDelete(): (result: HostedSiteDeleteResult) => void {
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>(untrack(() => props.initialTab) ?? "general");
+  createEffect(
+    () => (props.open ? props.openTab : undefined),
+    (tab) => {
+      if (tab) setActiveTab(tab);
+    },
+  );
   let modalElement: HTMLElement | undefined;
   const providerKeyState = createProviderKeyState(props);
 

@@ -1243,6 +1243,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   setAddServer(null);
                   setJoinOpen(true);
                 }}
+                onManageServers={() => setBillingOpen(true)}
               />
               <JoinServerOverlay
                 open={joinOpen()}

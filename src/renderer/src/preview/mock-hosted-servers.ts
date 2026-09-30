@@ -10,6 +10,8 @@ import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 const CREATED_AT = "2026-09-20T09:30:00.000Z";
 /** How long each mock step takes (payment, then start), so the list shows the transition states. */
 const MOCK_STEP_MS = 4_000;
+/** The account server's `MAX_SERVERS_PER_ACCOUNT`. */
+const MOCK_MAX_SERVERS = 3;
 
 /** The monthly amounts in minor units, as `scripts/stripe-bootstrap.ts` sets them. A year costs 20% less. */
 const MONTHLY_PRICES = {
@@ -90,12 +92,20 @@ export function createMockHostedServers(): HostedServersDesktopApi {
           ? { ...server, state: next, updatedAt: now }
           : server;
       });
-      return structuredClone({ available: true, servers });
+      return structuredClone({ available: true, servers, maxServers: MOCK_MAX_SERVERS });
     },
     plans: async () => structuredClone(MOCK_HOSTED_SERVER_CATALOG),
     create: async (input) => {
       const earlier = servers.find((entry) => entry.serverId === requests.get(input.requestId));
       if (earlier) return structuredClone(earlier);
+      // The account server gives the new plan to the server that waits for its first payment.
+      const unpaid = servers.find((entry) => entry.state === "awaiting_payment");
+      if (unpaid) {
+        requests.set(input.requestId, unpaid.serverId);
+        const { plan, interval, currency } = input;
+        return update(unpaid.serverId, { plan, interval, currency, size: HOSTED_PLAN_SIZE[plan] });
+      }
+      if (servers.length >= MOCK_MAX_SERVERS) throw new Error("This account has the maximum number of servers.");
       const now = new Date().toISOString();
       const server: HostedServerSummary = {
         serverId: crypto.randomUUID(),

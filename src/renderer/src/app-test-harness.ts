@@ -577,7 +577,7 @@ export function installOpenbotStub(): void {
     }),
     billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
     hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
-      list: vi.fn().mockResolvedValue({ available: false, servers: [] }),
+      list: vi.fn().mockResolvedValue({ available: false, servers: [], maxServers: null }),
     }),
     marketplaceAgents: stubGroup(IPC_ENDPOINTS.marketplaceAgents, "marketplaceAgents", {}),
     agentTemplates: stubGroup(IPC_ENDPOINTS.agentTemplates, "agentTemplates", {

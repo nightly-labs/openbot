@@ -198,6 +198,8 @@ interface HostedServerPlansProps {
   recommended?: HostedServerPlanId | undefined;
   /** The plan whose button shows the loading state. All buttons are disabled while it is set. */
   pendingPlan?: HostedServerPlanId | null | undefined;
+  /** Disables all buttons, such as when the account has the maximum number of servers. */
+  disabled?: boolean | undefined;
 }
 
 /** A plan price: "zł 90" in place of "PLN 90", so that the old and the new price fit in a column. */
@@ -300,7 +302,7 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                 fullWidth
                 loading={props.pendingPlan === plan.id}
                 loadingLabel={t("settings.hostedServers.creating")}
-                disabled={props.pendingPlan != null}
+                disabled={props.disabled || props.pendingPlan != null}
                 onClick={() => props.onChoose(plan.id)}
               >
                 {t("server.add.choosePlan", { plan: t(PLAN_TEXT[plan.id].name) })}
