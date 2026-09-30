@@ -93,8 +93,9 @@ const antigravityArtifactSchema = z.object({
 
 /**
  * Cursor ships the CLI as one archive per target, with one `dist-package` folder: a Node.js runtime,
- * the bundled JavaScript, and a launcher script. `files` names the hash of each file that decides what
- * runs: the launchers, the runtime and the entry script.
+ * the bundled JavaScript, and a launcher script. `files` names the hash of the files that start the
+ * CLI: the launchers, the runtime and the entry script. The archive hash covers the other files, such
+ * as the script chunks and native modules, at download only, as the Codex lock does for its package.
  */
 const cursorArtifactSchema = z.object({
   platformDirectory: z.enum(["darwin", "linux", "windows"]),

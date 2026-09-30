@@ -26,6 +26,11 @@ export interface ProviderStatePaths {
    * not confined. A confined agent that wrote them would reach outside at the next start of one.
    */
   readonly protected: readonly string[];
+  /**
+   * Folders in `writable` that hold a folder for each project, and the file names in there, at any
+   * depth, that trust a project or approve its MCP servers for the processes that are not confined.
+   */
+  readonly protectedInProjects?: { readonly folders: readonly string[]; readonly names: readonly string[] };
 }
 
 export interface SpawnTarget {
@@ -104,8 +109,9 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
  * folder of its own:
  * `cursorConfinedEnv`. The user's settings files, and the folders that hold extensions, plugins,
  * skills, agents, commands and rules, load code or settings in the editor and in every other CLI
- * process, so they stay read-only. The sessions stay in the shared data folder, so a thread
- * continues when the agent changes between Workspace only and Full access.
+ * process, so they stay read-only. So do the trust and MCP approval files of each project in
+ * `projects`. The sessions stay in the shared data folder, so a thread continues when the agent
+ * changes between Workspace only and Full access.
  */
 export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const xdgConfig = env.XDG_CONFIG_HOME?.trim();
@@ -132,6 +138,10 @@ export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
   return {
     writable: unique([cursorConfinedConfig(home), dataHome, fixedHome, CURSOR_CONFINED_CACHE]),
     protected: unique([userConfig, dataHome, fixedHome].flatMap((root) => settings.map((name) => join(root, name)))),
+    protectedInProjects: {
+      folders: unique([dataHome, fixedHome].map((root) => join(root, "projects"))),
+      names: [".workspace-trusted", "mcp-approvals.json"],
+    },
   };
 }
 
@@ -206,7 +216,12 @@ export function confineSpawnTarget(
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
     return {
       command: SANDBOX_EXEC,
-      args: ["-p", seatbeltProfile(writable, protectedPaths), target.command, ...target.args],
+      args: [
+        "-p",
+        seatbeltProfile(writable, protectedPaths, state.protectedInProjects),
+        target.command,
+        ...target.args,
+      ],
       windowsVerbatimArguments: false,
     };
   }
@@ -224,11 +239,23 @@ function unavailable(tool: string): string {
  * in a Seatbelt profile the last rule that matches wins. Everything else stays open, as the Access
  * setting says: reads, the network and process starts.
  */
-function seatbeltProfile(writable: readonly string[], protectedPaths: readonly string[]): string {
+function seatbeltProfile(
+  writable: readonly string[],
+  protectedPaths: readonly string[],
+  inProjects: ProviderStatePaths["protectedInProjects"],
+): string {
   const allowed = unique(writable.flatMap(realPaths)).map((path) => `(subpath ${sbplString(path)})`);
-  const denied = unique(protectedPaths.flatMap(realPaths)).map(
-    (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
-  );
+  const names = inProjects?.names.map(regexText).join("|");
+  const denied = [
+    ...unique(protectedPaths.flatMap(realPaths)).map(
+      (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
+    ),
+    ...(names
+      ? unique(inProjects?.folders.flatMap(realPaths) ?? []).map(
+          (folder) => `(regex ${sbplString(`^${regexText(folder)}/(.+/)?(${names})(/|$)`)})`,
+        )
+      : []),
+  ];
   return [
     "(version 1)",
     "(allow default)",
@@ -256,6 +283,10 @@ function resolveExisting(path: string): string {
     const parent = dirname(path);
     return parent === path ? path : join(resolveExisting(parent), basename(path));
   }
+}
+
+function regexText(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function sbplString(value: string): string {

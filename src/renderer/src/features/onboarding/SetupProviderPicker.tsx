@@ -5,6 +5,7 @@ import {
   type AgentStatus,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  isLocalOnlyProvider,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
@@ -26,6 +27,11 @@ import { fallbackProviderState } from "./onboarding-provider-state";
 /** The providers of this computer, and the actions on them, as both setup screens take them. */
 export interface SetupProviderProps {
   agentStatus: AgentStatus;
+  /**
+   * The providers are those of a joined server's host. A provider that stays on its computer, such
+   * as Cursor, then has a row only when the host's status lists it, as in Settings.
+   */
+  hostProviders?: boolean | undefined;
   refreshingProviders?: boolean | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /** The newer runtime main offers per provider; the row's actions menu offers it as in Settings. */
@@ -155,7 +161,12 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
   let focusRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    SETUP_PROVIDERS.map((provider) => {
+    SETUP_PROVIDERS.filter(
+      (provider) =>
+        !props.hostProviders ||
+        !isLocalOnlyProvider(provider.id) ||
+        props.agentStatus.providers?.some((candidate) => candidate.id === provider.id) === true,
+    ).map((provider) => {
       const status = props.agentStatus.providers?.find((candidate) => candidate.id === provider.id);
       const runtime = props.providerRuntimeStatuses?.[provider.id];
       const descriptionKey = PROVIDER_DESCRIPTION_KEYS[provider.description];

@@ -153,6 +153,16 @@ export function requireAdmin(member: TeamMemberSummary): void {
   if (member.role === "member") throw new HttpError(403, sourceText("error.team.adminRequired"));
 }
 
+/**
+ * The router checks the agent ID in the path and the query. A module that reads it from the body
+ * checks it here: an agent hidden from the caller answers as a missing agent does.
+ */
+export function requireVisibleBodyAgent(body: DynamicRecord, hiddenAgentIds: ReadonlySet<string>): void {
+  if (isString(body.agentId) && hiddenAgentIds.has(body.agentId)) {
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  }
+}
+
 export function parseBrowserBounds(value: unknown): {
   x: number;
   y: number;

@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { cliSpawnTarget } from "./cli";
+import { stopProcessTree } from "./windows-process-tree";
 
 /** The messages this client sends: two requests, and a refusal for each request the server makes. */
 type AcpMessage =
@@ -44,7 +45,7 @@ export function startAcpAuthentication(options: {
       settled = true;
       clearTimeout(timer);
       child.stdin.end();
-      if (child.exitCode === null) child.kill("SIGTERM");
+      stopProcessTree(child);
       if (error) reject(error);
       else resolve();
     };

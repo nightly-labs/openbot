@@ -86,6 +86,8 @@ export const messages = {
   "error.team.logoNotFound": "Logo du serveur introuvable.",
   "error.team.updateRequired": "Mise à jour requise.",
   "error.team.defaultProviderRequiresV4": "Le fournisseur par défaut de l’hôte nécessite Team API v4.",
+  "error.team.newAgentProviderLocalOnly":
+    "Un nouvel agent démarrerait sur un fournisseur que seul l’hôte peut utiliser. Changez le fournisseur par défaut de l’hôte.",
   "error.team.hostAnalyticsUnsupported": "Les statistiques de l’hôte ne sont pas prises en charge par ce client.",
   "error.team.profileGenerationUnsupported": "La génération de profil n’est pas prise en charge par ce client.",
   "error.team.searchQueryRequired": "Une requête de recherche valide est requise.",

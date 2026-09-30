@@ -367,6 +367,39 @@ describe("TeamApiServer agents", () => {
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
+  it("does not create an agent that would start on a provider only the host can use", async () => {
+    const createAgent = vi.fn();
+    const newAgentProvider = vi.fn(() => "cursor" as const);
+    const { start, signIn } = await createTeamApiFixture("local-only-new-agent", { configure: true });
+    const { base } = await start({ appVersion: "1.0.0", agents: createAgents({ createAgent, newAgentProvider }) });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      [TEAM_PROTOCOL_VERSION_HEADER]: "5",
+      [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      [TEAM_CAPABILITIES_HEADER]: "opencode,local-providers,agent-create-model",
+      "Content-Type": "application/json",
+    };
+    // A model ID alone, or no model at all, is a Cursor agent when the host resolves it so.
+    for (const choice of [{ model: "composer-2" }, {}]) {
+      const create = await fetch(`${base}/v1/agents`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: "Explorer",
+          description: "",
+          initialMessage: "Hello.",
+          avatarSeed: "mobile:newagentseed",
+          avatarHue: null,
+          ...choice,
+        }),
+      });
+      expect(create.status).toBe(400);
+    }
+    expect(newAgentProvider).toHaveBeenCalledWith(expect.objectContaining({ model: "composer-2" }));
+    expect(createAgent).not.toHaveBeenCalled();
+  });
+
   it("keeps agent access on the computer that runs the agent", async () => {
     const fixture = opencodeFixture[0];
     if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");

@@ -97,7 +97,7 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(existsSync(join(workspace, ".claude"))).toBe(false);
   });
 
-  it("gives Cursor a config folder of its own, and denies the user's Cursor settings", () => {
+  it("gives Cursor a config folder of its own, and denies the user's Cursor settings and project trust", () => {
     const cursor = cursorStatePaths({}, root);
     const config = cursorConfinedEnv(root).CURSOR_CONFIG_DIR ?? "";
     expect(confinedWrite(join(config, "cli-config.json"), cursor)).toBe(true);
@@ -106,6 +106,9 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(confinedWrite(join(root, ".cursor", "cli-config.json"), cursor)).toBe(false);
     expect(confinedWrite(join(root, ".cursor", "hooks.json"), cursor)).toBe(false);
     expect(confinedWrite(join(root, ".cursor", "rules", "a.mdc"), cursor)).toBe(false);
+    // A trusted project with approved MCP servers would start them in the user's own CLI.
+    expect(confinedWrite(join(root, ".cursor", "projects", "a", ".workspace-trusted"), cursor)).toBe(false);
+    expect(confinedWrite(join(root, ".cursor", "projects", "a", "mcp-approvals.json"), cursor)).toBe(false);
     expect(confinedWrite(join(workspace, ".cursor", "mcp.json"), cursor)).toBe(false);
   });
 });

@@ -74,9 +74,20 @@ function project(
   )
     return null;
   if (key === "auth" && isPeerHiddenProvider(value.kind, protocol)) return { kind: "unknown" };
+  // An agent status names the version and the message of the provider that its `auth` names.
+  const hiddenStatusProvider =
+    "cliVersion" in value &&
+    typeof value.auth === "object" &&
+    value.auth !== null &&
+    !Array.isArray(value.auth) &&
+    isPeerHiddenProvider(value.auth.kind, protocol);
   const result: TeamProtocolV1JsonObject = {};
   for (const [field, child] of Object.entries(value)) {
     if ((key === "agentAssignments" || key === "agents") && hiddenIds.has(field)) continue;
+    if (hiddenStatusProvider && (field === "cliVersion" || field === "message")) {
+      result[field] = null;
+      continue;
+    }
     const visible =
       field === "typingAgentId" && typeof child === "string" && hiddenIds.has(child)
         ? null

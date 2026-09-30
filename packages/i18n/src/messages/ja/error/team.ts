@@ -81,6 +81,8 @@ export const messages = {
   "error.team.logoNotFound": "サーバーのロゴが見つかりません。",
   "error.team.updateRequired": "更新が必要です。",
   "error.team.defaultProviderRequiresV4": "ホストのデフォルトのプロバイダーには Team API v4 が必要です。",
+  "error.team.newAgentProviderLocalOnly":
+    "新しいエージェントは、ホストでしか使えないプロバイダーで始まります。ホストのデフォルトのプロバイダーを変更してください。",
   "error.team.hostAnalyticsUnsupported": "このクライアントはホストの分析に対応していません。",
   "error.team.profileGenerationUnsupported": "このクライアントはプロフィールの生成に対応していません。",
   "error.team.searchQueryRequired": "有効な検索クエリが必要です。",

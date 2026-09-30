@@ -59,6 +59,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
       events.off(event, listener);
     },
     preferredProvider: () => "codex",
+    newAgentProvider: () => "codex",
     getStatus: unimplemented,
     getAnalytics: unimplemented,
     getHostAnalytics: unimplemented,

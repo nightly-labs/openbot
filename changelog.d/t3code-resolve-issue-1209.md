@@ -4,4 +4,4 @@
 
 ### Removed
 
-- The Cursor preset for custom ACP agents. Use the Cursor provider. A custom agent that you saved with the preset continues to work.
+- The Cursor preset for custom ACP agents. Use the Cursor provider. A custom agent that you saved with the preset continues to work. If its ID is `cursor`, you cannot edit it: to change it, remove it and add it again with another ID.

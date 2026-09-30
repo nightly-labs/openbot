@@ -46,6 +46,7 @@ import {
 } from "./../provider-drivers";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
+import { stopProcessTree } from "../windows-process-tree";
 import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
 import { type CliCodeLogin, startCliCodeLogin } from "./cli-code-login";
@@ -1170,7 +1171,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#cliLogins.clear();
     this.#providerConnectionCommands.clear();
     for (const login of cliLogins) {
-      if (login.child.exitCode === null) login.child.kill("SIGTERM");
+      stopProcessTree(login.child);
     }
     const clients = [
       ...this.#clients.values(),
@@ -1592,7 +1593,7 @@ export class ProviderRuntime implements ProviderPort {
   async #failCliLogin(provider: AgentProvider, pending: PendingCliLogin, error: unknown): Promise<void> {
     if (this.#cliLogins.get(provider) !== pending) return;
     this.#cliLogins.delete(provider);
-    if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
+    stopProcessTree(pending.child);
     this.#setProviderConnectionFailure(provider, error, pending.cli.version);
   }
 
@@ -1600,7 +1601,7 @@ export class ProviderRuntime implements ProviderPort {
     const pending = this.#cliLogins.get(provider);
     if (!pending) return;
     this.#cliLogins.delete(provider);
-    if (pending.child.exitCode === null) pending.child.kill("SIGTERM");
+    stopProcessTree(pending.child);
     await pending.task?.catch(() => undefined);
     if (message) this.#setProviderConnectionFailure(provider, new Error(message), pending.cli.version);
     else this.#clearProviderConnectionState(provider);

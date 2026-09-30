@@ -10,6 +10,7 @@ import type { SetupProviderProps } from "./SetupProviderPicker";
  */
 export function hostSetupProviderProps(settings: HostProviderSettings): SetupProviderProps {
   return {
+    hostProviders: true,
     get agentStatus() {
       return settings.agentStatus;
     },

@@ -9,7 +9,7 @@ import { requireString } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin } from "./request-helpers";
+import { readJson, requireAdmin, requireVisibleBodyAgent } from "./request-helpers";
 
 /**
  * One agent of this computer published as a link-only template from a joined server, updated or
@@ -19,6 +19,7 @@ import { readJson, requireAdmin } from "./request-helpers";
 export async function routeAgentPublish(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const route = method === "POST" ? routeName(url.pathname) : null;
@@ -28,6 +29,7 @@ export async function routeAgentPublish(
     throw new HttpError(400, sourceText("error.team.agentPublishUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
     if (route === "preview") return json(200, previewBody(await agentTemplates.preview(agentId(body))));
     if (route === "publish") return json(200, publicationBody(await agentTemplates.publish(publishInput(body))));

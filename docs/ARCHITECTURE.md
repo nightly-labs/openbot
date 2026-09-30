@@ -1287,12 +1287,16 @@ Sign in is an ACP `authenticate` call with `cursor_login`, in a separate process
 `CURSOR_CONFIG_DIR=~/.cursor/openbot-confined` (`cursorConfinedEnv`): the CLI writes
 `cli-config.json` when a session starts and fails when it cannot, and that file also holds the
 user's permissions. `cursorStatePaths` lets it write `~/.cursor` and protects the user's settings,
-hooks, rules, MCP and permission files there and in the CLI config folder. Migration 24 adds
+hooks, rules, MCP and permission files there and in the CLI config folder, and the
+`.workspace-trusted` and `mcp-approvals.json` files in each folder in `projects`. Migration 24 adds
 `cursor` to `projection_provider_sessions`.
 
 No Team API protocol knows `cursor`. The host hides Cursor agents, models, status, and sign-in
-state from every peer, and the `providers-v1` and `providers-v2` routes omit it. A custom endpoint
-saved with the id `cursor` before the provider existed stays visible.
+state from every peer, and the `providers-v1` and `providers-v2` routes omit it. A route that reads
+an agent ID from the body answers 404 for a hidden agent (`requireVisibleBodyAgent`). A peer cannot
+create an agent, or add one from a template, the marketplace or an import, when the host would start
+it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id `cursor` before the
+provider existed stays visible.
 
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
@@ -1466,8 +1470,8 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini |
-| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor |
+| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode, Cursor |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
 | `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
@@ -1484,7 +1488,7 @@ does not make links. `.openbot/skills-lock.json` in the workspace records the fi
 `.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
 marker.
 
-`src/main/skill-folder-discovery.ts` lists all other skills in the four workspace folders as
+`src/main/skill-folder-discovery.ts` lists all other skills in the five workspace folders as
 `workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
 they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
 skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a

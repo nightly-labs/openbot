@@ -5,7 +5,7 @@ import { AgentNotFoundError } from "../agent-admin-settings";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin, stringField } from "./request-helpers";
+import { readJson, requireAdmin, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
 /**
  * Access and auto-approve of one agent, changed from a joined server. Both decide what the agent
@@ -15,6 +15,7 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 export async function routeAgentAdmin(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const read = method === "POST" && url.pathname === AGENT_ADMIN_ROUTES.settings;
@@ -26,6 +27,7 @@ export async function routeAgentAdmin(
   requireAdmin(member);
   // `readJson` has already run the body through the agent-admin wire codec.
   const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
     if (read) return json(200, settings.read(stringField(body, "agentId")));
     let input: ReturnType<typeof parseUpdateAgentAdminSettingsInput>;

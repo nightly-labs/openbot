@@ -474,7 +474,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const versions = entries
       .filter((entry) => entry.isDirectory() && isVersion(entry.name))
       .map((entry) => entry.name)
-      .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+      // Of two builds that the release does not order, the pinned one comes first.
+      .sort((a, b) => compareReleases(b, a) || Number(b === pinned.version) - Number(a === pinned.version));
     for (const version of versions) {
       const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
       const installRoot = join(targetRoot, version);
@@ -526,7 +527,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const versions = entries
       .filter((entry) => entry.isDirectory() && olderVersion(entry.name, spec.version))
       .map((entry) => entry.name)
-      .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+      .sort((a, b) => compareReleases(b, a));
     for (const version of versions) {
       const executable = await stat(join(targetRoot, version, "bin", spec.executableName)).catch(() => null);
       if (!executable?.isFile()) continue;
@@ -1253,14 +1254,23 @@ async function digestMatches(path: string, digest: ArchiveDigest): Promise<boole
   return hash.digest("hex") === digest.hex;
 }
 
-/** A release number such as `1.2.3`, or a Cursor build such as `2026.09.28-64d2043`. */
+/**
+ * A release number such as `1.2.3`, or a Cursor build such as `2026.09.28-64d2043`, which can also
+ * have the time before the commit: `2026.09.28-10-15-00-64d2043`.
+ */
 function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+(?:-[0-9a-f]{7,40})?$/u.test(value);
+  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
 }
 
-/** A commit orders nothing, so two Cursor builds of the same date are neither older nor newer. */
+/**
+ * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
+ * no time, are neither older nor newer.
+ */
 function olderVersion(installed: string, target: string): boolean {
-  if (!isVersion(installed) || !isVersion(target)) return false;
-  const release = (version: string) => version.split("-")[0] ?? version;
-  return release(installed).localeCompare(release(target), "en", { numeric: true }) < 0;
+  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
+}
+
+function compareReleases(a: string, b: string): number {
+  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
+  return release(a).localeCompare(release(b), "en", { numeric: true });
 }

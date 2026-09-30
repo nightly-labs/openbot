@@ -44,9 +44,12 @@ const BLOCKED_VERSIONS_URL =
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 const VERSION = /^\d+\.\d+\.\d+$/u;
-/** Cursor's registry version is the date; the download folder adds the commit. */
+/**
+ * Cursor's registry version is the date; the download folder adds the commit, and in the newer form
+ * that Cursor's launcher accepts, the time before it.
+ */
 const CURSOR_DATE = /^\d{4}\.\d{2}\.\d{2}$/u;
-const CURSOR_BUILD = /^\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7,40}$/u;
+const CURSOR_BUILD = /^\d{4}\.\d{2}\.\d{2}(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40}$/u;
 const HEADERS = { "User-Agent": "OpenBot-runtime-installer" };
 
 export type BlockedVersions = ReadonlyMap<ManagedProviderId, ReadonlySet<string>>;

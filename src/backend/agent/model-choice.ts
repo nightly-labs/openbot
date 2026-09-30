@@ -42,7 +42,10 @@ export function startingModel(
  * or `null` when the request names neither. A named model must be listed for the named provider;
  * a lone provider takes its default when listed, else whatever it lists first.
  */
-export function creationModel(input: CreateAgentInput, models: AgentModelOption[]): ModelChoice | null {
+export function creationModel(
+  input: Pick<CreateAgentInput, "provider" | "model">,
+  models: AgentModelOption[],
+): ModelChoice | null {
   const { provider, model: requestedId } = input;
   if (provider === undefined && requestedId === undefined) return null;
   if (requestedId !== undefined) {

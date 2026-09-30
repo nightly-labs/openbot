@@ -81,6 +81,8 @@ export const messages = defineMessages("error.team", {
   "error.team.logoNotFound": "Server logo not found.",
   "error.team.updateRequired": "Update required.",
   "error.team.defaultProviderRequiresV4": "The host's default provider requires Team API v4.",
+  "error.team.newAgentProviderLocalOnly":
+    "A new agent would start on a provider that only the host can use. Change the host's default provider.",
   "error.team.hostAnalyticsUnsupported": "Host analytics is not supported by this client.",
   "error.team.profileGenerationUnsupported": "Profile generation is not supported by this client.",
   "error.team.searchQueryRequired": "A valid search query is required.",

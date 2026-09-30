@@ -1131,6 +1131,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.preferredProvider();
   }
 
+  /**
+   * The provider that `createAgent` or `createAgentProfile` puts a new agent on: the one of the model
+   * or provider that `input` names, else the starting choice. `null` when nothing lists a model, and
+   * the record keeps the built-in default.
+   */
+  newAgentProvider(input: Pick<CreateAgentInput, "provider" | "model"> = {}): AgentProvider | null {
+    return (creationModel(input, this.#endpoints.available()) ?? this.#startingChoice())?.provider ?? null;
+  }
+
   /** The provider and model setup or Settings recorded. */
   #preference(): ProviderPreference {
     return { provider: this.#providers.preferredProvider(), model: this.#providers.preferredModel() };
