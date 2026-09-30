@@ -5,7 +5,6 @@ import {
   type SignalServerMessage,
   SLACK_DELIVERY_RESPONSE_BYTES_LIMIT,
 } from "@openbot/contracts/signal-protocol/messages";
-import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import WebSocket from "ws";
 import type {
@@ -27,14 +26,15 @@ export interface SlackIngressOptions {
   hostId(): string | null;
   signedIn(): boolean;
   issueTicket(hostId: string): Promise<{ ticket: string; signalUrl: string }>;
-  issueRequestUrl(hostId: string, connectionId: string): Promise<string>;
+  /** The Slack route ticket: the workspaces that the account service links to this host. */
+  issueSlackRoute(hostId: string): Promise<string>;
 }
 
 /**
  * Owns this host's `ingress` socket to Signal, which brings the Events API requests of the Slack
- * apps that OpenBot manages. It needs no WebRTC, so it lives here in main rather than in the hidden
- * peer window. It is open while a managed connection holds it, and it reconnects with a new ticket
- * after every close. It never logs a frame: a delivery carries Slack message text.
+ * workspaces linked to this host. It needs no WebRTC, so it lives here in main rather than in the
+ * hidden peer window. It is open while a connection holds it, and it reconnects with a new ticket and
+ * route ticket after every close. It never logs a frame: a delivery carries Slack message text.
  */
 export class SlackIngress implements MessagingIngress {
   readonly #options: SlackIngressOptions;
@@ -77,13 +77,10 @@ export class SlackIngress implements MessagingIngress {
     this.#handler = handler;
   }
 
-  requestUrl(connectionId: string): Promise<string> {
-    const hostId = this.#options.hostId();
-    if (!hostId || !this.#options.signedIn()) throw new Error(sourceText("error.messaging.relayUnavailable"));
-    return this.#options.issueRequestUrl(hostId, connectionId);
-  }
-
-  /** A socket can be dead without knowing it after the computer sleeps, or the account or name changed. */
+  /**
+   * A socket can be dead without knowing it after the computer sleeps, or the account, the name or
+   * the linked workspaces changed.
+   */
   reconnect(): void {
     if (this.#holders === 0) return;
     this.#close();
@@ -104,8 +101,12 @@ export class SlackIngress implements MessagingIngress {
     if (!hostId) return this.#wait("no_host");
     this.#setState("connecting");
     let bootstrap: { ticket: string; signalUrl: string };
+    let slackRoute: string;
     try {
-      bootstrap = await this.#options.issueTicket(hostId);
+      [bootstrap, slackRoute] = await Promise.all([
+        this.#options.issueTicket(hostId),
+        this.#options.issueSlackRoute(hostId),
+      ]);
     } catch {
       if (generation === this.#generation) this.#wait("unavailable");
       return;
@@ -119,6 +120,7 @@ export class SlackIngress implements MessagingIngress {
         version: SIGNAL_PROTOCOL_VERSION,
         peer: "ingress",
         token: bootstrap.ticket,
+        slackRoute,
       };
       socket.send(JSON.stringify(hello));
     });
@@ -160,10 +162,8 @@ export class SlackIngress implements MessagingIngress {
     let answer: IngressAnswer = { status: 503 };
     if (handler) {
       try {
-        answer = await handler(message.connectionId, {
+        answer = await handler(message.teamId, {
           kind: message.kind,
-          timestamp: message.timestamp,
-          signature: message.signature,
           retryNum: message.retryNum,
           body: Buffer.from(message.bodyBase64, "base64"),
         });

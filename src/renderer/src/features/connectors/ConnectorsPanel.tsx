@@ -6,8 +6,8 @@ import { GitHubMark, type IntegrationStatus, SlackMark } from "@openbot/ui/featu
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
 import {
   SlackIntegrationPanel,
+  slackAnsweringAgents,
   slackIntegrationState,
-  slackMembers,
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -57,10 +57,10 @@ export function ConnectorsPanel(props: {
   };
   const slackRow = (slack: SlackConnectorController): IntegrationsHubRow => {
     const connections = slack.overview()?.connections ?? [];
-    const workspaces = slack.overview()?.workspaces ?? [];
-    const state = slackIntegrationState(connections, workspaces);
-    const members = slackMembers(connections);
-    const workspace = workspaces[0]?.name;
+    const state = slackIntegrationState(connections);
+    const [connection] = connections;
+    const members = connection ? slackAnsweringAgents(connection, props.agents) : [];
+    const workspace = connection?.workspaceName;
     return {
       id: "slack",
       name: t("connector.slack.title"),
@@ -75,7 +75,7 @@ export function ConnectorsPanel(props: {
             : members.length > 0
               ? t("connector.slack.summaryAgents", { workspace, count: members.length })
               : t("connector.slack.summaryNoAgents", { workspace }),
-      agents: props.agents.filter((agent) => members.some((member) => member.agentId === agent.id)),
+      agents: members,
       onOpen: () => setView("slack"),
     };
   };
@@ -122,15 +122,12 @@ export function ConnectorsPanel(props: {
                 <SlackIntegrationPanel
                   agents={props.agents}
                   connections={overview().connections}
-                  workspaces={overview().workspaces}
                   busy={slack().busy()}
                   onConnectWorkspace={slack().connectWorkspace}
                   onDisconnectWorkspace={slack().disconnectWorkspace}
-                  onCreateApp={slack().createApp}
-                  onOpenInstall={slack().openInstall}
                   onReconnect={slack().reconnect}
                   onSetEnabled={slack().setEnabled}
-                  onRemove={slack().remove}
+                  onSetRouting={slack().setRouting}
                 />
               )}
             </Show>

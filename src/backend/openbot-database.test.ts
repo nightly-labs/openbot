@@ -1298,6 +1298,7 @@ describe("OpenBotDatabase", () => {
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
         DROP TABLE projection_messaging_threads;
+        DROP TABLE projection_messaging_agents;
         DROP TABLE projection_messaging_connections;
         DELETE FROM schema_migrations WHERE version = 25;
       `);
@@ -1331,10 +1332,13 @@ describe("OpenBotDatabase", () => {
       connection
         .prepare(
           `INSERT INTO projection_messaging_connections
-             (connection_id, agent_id, platform, enabled, created_at, updated_at)
-           VALUES ('connection-1', ?, 'slack', 1, ?, ?)`,
+             (connection_id, platform, workspace_id, workspace_name, enabled, router_agent_id, created_at, updated_at)
+           VALUES ('connection-1', 'slack', 'T1', 'Acme', 1, ?, ?, ?)`,
         )
         .run(agent.id, now, now);
+      connection
+        .prepare("INSERT INTO projection_messaging_agents (connection_id, agent_id) VALUES ('connection-1', ?)")
+        .run(agent.id);
       const link = (linkId: string, threadId: string) =>
         connection
           .prepare(

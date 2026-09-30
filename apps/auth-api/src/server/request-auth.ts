@@ -28,7 +28,7 @@ import {
   verifyRemoteServiceSignature,
 } from "./remote-control-plane";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
-import { SlackManagerError, SlackManagerService } from "./slack-manager";
+import { SlackAppError, SlackAppService } from "./slack-app";
 import { requireWorkerBindings, type TeamInviteEmailDelivery } from "./types";
 
 export function requestAuthService(): AuthService {
@@ -271,12 +271,12 @@ export function remoteControlPlaneErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requestSlackManager(): SlackManagerService {
-  return new SlackManagerService(requireWorkerBindings(env));
+export function requestSlackApp(): SlackAppService {
+  return new SlackAppService(requireWorkerBindings(env));
 }
 
-export function slackManagerErrorResponse(error: unknown): Response {
-  if (error instanceof SlackManagerError) return apiError(error.status, error.code, error.message);
+export function slackAppErrorResponse(error: unknown): Response {
+  if (error instanceof SlackAppError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
 }
 

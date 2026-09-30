@@ -1,19 +1,20 @@
-// The OpenBot Slack manager app's OAuth. A workspace member lets it create and change Slack apps, so
-// the desktop can give each agent its own app. The Worker exchanges the code because the client
-// secret lives here, seals the resulting token to the host's key, and keeps nothing: no table, no
-// log. The sealed grant goes back to the desktop in the URL fragment of `/slack/connect`.
+// The OpenBot Slack app's OAuth install. One app serves every workspace: a workspace member installs
+// it once, and the workspace is linked to one OpenBot host, which answers all of its messages. The
+// Worker exchanges the code because the client secret lives here, records only which host answers
+// the workspace, and seals the bot token to the host's key. It keeps no token. The sealed grant goes
+// back to the desktop in the URL fragment of `/slack/connect`.
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { isRawP256PublicKey, sealSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { hmacSha256 } from "./crypto";
 import type { AuthUser, WorkerBindings } from "./types";
 
-// Only what `apps.manifest.*` needs. The manager app asks for no bot scope.
-const MANAGER_USER_SCOPES = ["app_configurations:read", "app_configurations:write"];
 const STATE_TTL_MS = 10 * 60_000;
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+const SLACK_ID_PATTERN = /^[A-Z0-9]{1,32}$/u;
 
-export class SlackManagerError extends Error {
+export class SlackAppError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
@@ -26,13 +27,17 @@ export class SlackManagerError extends Error {
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface StatePayload {
+  // The account and the host that asked.
   u: string;
+  h: string;
+  // The host's nonce and one-use public key.
   n: string;
   k: string;
   e: number;
 }
 
-export class SlackManagerService {
+export class SlackAppService {
+  readonly #database: D1Database;
   readonly #clientId: string;
   readonly #clientSecret: string;
   readonly #stateSecret: string;
@@ -40,15 +45,16 @@ export class SlackManagerService {
   readonly #now: () => number;
 
   constructor(
-    bindings: Pick<WorkerBindings, "SLACK_MANAGER_CLIENT_ID" | "SLACK_MANAGER_CLIENT_SECRET" | "SLACK_STATE_SECRET">,
+    bindings: Pick<WorkerBindings, "DB" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_STATE_SECRET">,
     options: { fetch?: Fetch; now?: () => number } = {},
   ) {
-    const clientId = bindings.SLACK_MANAGER_CLIENT_ID?.trim();
-    const clientSecret = bindings.SLACK_MANAGER_CLIENT_SECRET?.trim();
+    const clientId = bindings.SLACK_CLIENT_ID?.trim();
+    const clientSecret = bindings.SLACK_CLIENT_SECRET?.trim();
     const stateSecret = bindings.SLACK_STATE_SECRET?.trim();
     if (!clientId || !clientSecret || !stateSecret || new TextEncoder().encode(stateSecret).byteLength < 32) {
-      throw new SlackManagerError(503, "slack_not_configured", "The Slack manager app is not configured.");
+      throw new SlackAppError(503, "slack_not_configured", "The OpenBot Slack app is not configured.");
     }
+    this.#database = bindings.DB;
     this.#clientId = clientId;
     this.#clientSecret = clientSecret;
     this.#stateSecret = stateSecret;
@@ -56,32 +62,42 @@ export class SlackManagerService {
     this.#now = options.now ?? Date.now;
   }
 
-  /** The Slack consent URL for one sign-in of one host. */
+  /** The Slack install URL for one connect of one host that the account owns. */
   async authorizeUrl(
     user: AuthUser,
-    input: { hostNonce: string; hostPublicKey: string; redirectUri: string },
+    input: { hostId: string; hostNonce: string; hostPublicKey: string; redirectUri: string },
   ): Promise<string> {
     if (!NONCE_PATTERN.test(input.hostNonce) || !isRawP256PublicKey(input.hostPublicKey)) {
-      throw new SlackManagerError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
+      throw new SlackAppError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
+    }
+    const host = await this.#database
+      .prepare("SELECT owner_user_id FROM remote_hosts WHERE host_id = ? LIMIT 1")
+      .bind(input.hostId)
+      .first<{ owner_user_id: string }>();
+    if (host?.owner_user_id !== user.id) {
+      throw new SlackAppError(403, "forbidden", "Only the owner of this server can connect Slack.");
     }
     const state = await this.#signState({
       u: user.id,
+      h: input.hostId,
       n: input.hostNonce,
       k: input.hostPublicKey,
       e: this.#now() + STATE_TTL_MS,
     });
     const url = new URL("https://slack.com/oauth/v2/authorize");
     url.searchParams.set("client_id", this.#clientId);
-    url.searchParams.set("scope", "");
-    url.searchParams.set("user_scope", MANAGER_USER_SCOPES.join(","));
+    url.searchParams.set("scope", SLACK_BOT_SCOPES.join(","));
     url.searchParams.set("redirect_uri", input.redirectUri);
     url.searchParams.set("state", state);
     return url.toString();
   }
 
   /**
-   * Exchanges the code and seals the token to the host key in `state`. Returns what the desktop
-   * needs: the nonce, to find its sign-in, and the sealed grant.
+   * Exchanges the code, links the workspace to the host in `state`, and seals the bot token to the
+   * host key. Returns what the desktop needs: the nonce, to find its connect, and the sealed grant.
+   *
+   * A workspace answers to one host. The account that connected it can move it to another of its
+   * hosts; another account gets `slack_workspace_taken` until the first host disconnects.
    */
   async complete(input: {
     code: string;
@@ -100,29 +116,49 @@ export class SlackManagerService {
     });
     const body = await response.json().catch(() => null);
     if (!isDynamicRecord(body) || body.ok !== true) {
-      throw new SlackManagerError(502, "slack_exchange_failed", "Slack did not accept the sign-in.");
+      throw new SlackAppError(502, "slack_exchange_failed", "Slack did not accept the install.");
     }
     if (body.is_enterprise_install === true) {
-      throw new SlackManagerError(400, "slack_enterprise_install", "Connect one workspace, not a whole organization.");
+      throw new SlackAppError(400, "slack_enterprise_install", "Connect one workspace, not a whole organization.");
     }
-    const user = body.authed_user;
     const team = body.team;
     if (
-      !isDynamicRecord(user) ||
-      !isString(user.access_token) ||
-      !isString(user.id) ||
+      body.token_type !== "bot" ||
+      !isString(body.access_token) ||
+      !isString(body.bot_user_id) ||
+      !isString(body.app_id) ||
       !isDynamicRecord(team) ||
-      !isString(team.id)
+      !isString(team.id) ||
+      !SLACK_ID_PATTERN.test(team.id)
     ) {
-      throw new SlackManagerError(502, "slack_exchange_failed", "Slack did not accept the sign-in.");
+      throw new SlackAppError(502, "slack_exchange_failed", "Slack did not accept the install.");
+    }
+    // One statement, so two connects at once cannot both win. Another account's row stays as it is.
+    const linked = await this.#database
+      .prepare(
+        `INSERT INTO slack_workspace_routes (team_id, host_id, account_id, app_id, bot_user_id, connected_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(team_id) DO UPDATE SET host_id = excluded.host_id, app_id = excluded.app_id,
+           bot_user_id = excluded.bot_user_id, connected_at = excluded.connected_at
+         WHERE slack_workspace_routes.account_id = excluded.account_id`,
+      )
+      .bind(team.id, state.h, state.u, body.app_id, body.bot_user_id, this.#now())
+      .run();
+    if (linked.meta.changes === 0) {
+      throw new SlackAppError(
+        409,
+        "slack_workspace_taken",
+        "Another OpenBot server answers this Slack workspace. Disconnect it there first.",
+      );
     }
     return {
       nonce: state.n,
       grant: await sealSlackWorkspaceGrant(state.k, state.n, {
-        accessToken: user.access_token,
+        botToken: body.access_token,
+        botUserId: body.bot_user_id,
+        appId: body.app_id,
         workspaceId: team.id,
         workspaceName: isString(team.name) ? team.name : team.id,
-        userId: user.id,
       }),
     };
   }
@@ -155,6 +191,7 @@ export class SlackManagerService {
     if (
       !isDynamicRecord(payload) ||
       !isString(payload.u) ||
+      !isString(payload.h) ||
       !isString(payload.n) ||
       !isString(payload.k) ||
       typeof payload.e !== "number" ||
@@ -162,12 +199,12 @@ export class SlackManagerService {
     ) {
       throw invalidState();
     }
-    return { u: payload.u, n: payload.n, k: payload.k, e: payload.e };
+    return { u: payload.u, h: payload.h, n: payload.n, k: payload.k, e: payload.e };
   }
 }
 
-function invalidState(): SlackManagerError {
-  return new SlackManagerError(400, "slack_state_invalid", "The Slack sign-in expired. Start it again.");
+function invalidState(): SlackAppError {
+  return new SlackAppError(400, "slack_state_invalid", "The Slack sign-in expired. Start it again.");
 }
 
 function toBase64Url(value: Uint8Array): string {

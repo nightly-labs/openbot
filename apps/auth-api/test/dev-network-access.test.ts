@@ -41,7 +41,7 @@ describe("development Auth API LAN access", () => {
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/agent-templates/template-id/card")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/register")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/host-1/slack-route")).toBe(false);
-    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/slack/manager/authorize")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/slack/authorize")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/host-1/logo/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/sessions/session-1/other")).toBe(false);
   });

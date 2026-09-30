@@ -36,7 +36,6 @@ import {
   isTeamCurrentCapability,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
-  MESSAGING_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
@@ -114,7 +113,6 @@ import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { routeMcpServers } from "./team-api/route-mcp";
-import { routeMessaging } from "./team-api/route-messaging";
 import { routeProviders } from "./team-api/route-providers";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeSharedTables } from "./team-api/route-shared-tables";
@@ -634,7 +632,6 @@ export class TeamApiServer {
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
-      if ((await routeMessaging(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
@@ -1254,7 +1251,6 @@ export class TeamApiServer {
         if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
-        if (capability === MESSAGING_CAPABILITY) return this.#options.admin?.messaging !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
         if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
         return true;

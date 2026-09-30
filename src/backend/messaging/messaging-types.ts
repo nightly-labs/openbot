@@ -1,9 +1,9 @@
 // The seam between the platform-agnostic messaging core and one chat platform. A platform is one
-// `MessagingDriver`: an adapter for its API and a transport for its inbound events. A Slack app,
-// which OpenBot creates for the agent, uses the Events API: Slack posts to Signal, and Signal passes
-// each request to this host over the `MessagingIngress` socket, which the host opens. A Discord
-// driver would use the Gateway and a Telegram driver long polling (`getUpdates`). No transport needs
-// a public endpoint on the host.
+// `MessagingDriver`: an adapter for its API and a transport for its inbound events. The OpenBot
+// Slack app uses the Events API: Slack posts to Signal, Signal checks Slack's signature, and passes
+// each request of a workspace linked to this host over the `MessagingIngress` socket, which the host
+// opens. A Discord driver would use the Gateway and a Telegram driver long polling (`getUpdates`).
+// No transport needs a public endpoint on the host.
 
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
 import type { MessagingAnswerFile } from "./messaging-threads";
@@ -22,7 +22,7 @@ export interface InboundFile {
   url: string;
 }
 
-/** One message that addresses the agent, in the same shape for every platform. */
+/** One message that addresses OpenBot, in the same shape for every platform. */
 export interface InboundMessage {
   /** Stable for one message across redeliveries. */
   dedupKey: string;
@@ -32,7 +32,7 @@ export interface InboundMessage {
   target: MessageTarget;
   platformMessageId: string;
   isDirect: boolean;
-  /** True for a reply that does not name the agent: it counts only in a conversation it already has. */
+  /** True for a reply that does not name OpenBot: it counts only in a conversation that already has an agent. */
   requiresLink: boolean;
   authorId: string;
   text: string;
@@ -113,18 +113,12 @@ export interface MessagingAdapter {
   authorName(userId: string): Promise<string>;
   placeName(platformChannelId: string): Promise<string>;
   mention(userId: string): string;
-  /** Joins every public place the platform lets the agent join without an invitation. */
-  joinPublicPlaces?(): Promise<void>;
-  /** Joins one public place, such as a channel that was just created. */
-  joinPlace?(platformChannelId: string): Promise<void>;
 }
 
 export interface TransportSink {
   state(state: MessagingConnectionState, detail?: { retryAt?: string }): void;
   message(message: InboundMessage): void;
   action(action: InboundAction): void;
-  /** A public place was created that the agent can join. */
-  placeCreated?(platformChannelId: string): void;
 }
 
 export interface MessagingTransport {
@@ -136,13 +130,13 @@ export interface MessagingTransport {
   deliver?(delivery: IngressDelivery): Promise<IngressAnswer>;
 }
 
-/** One HTTP request that a platform sent to this host's request URL, as Signal passed it on. */
+/**
+ * One HTTP request that a platform sent to its request URL, as Signal passed it on. Signal has
+ * already checked the platform's signature.
+ */
 export interface IngressDelivery {
   kind: "events" | "interactivity";
-  timestamp: string;
-  signature: string;
   retryNum: number | null;
-  /** The exact bytes the platform signed. */
   body: Uint8Array;
 }
 
@@ -156,7 +150,8 @@ export interface IngressAnswer {
 /** `unavailable` has a reason the user can act on: sign in, name this computer, or wait for Signal. */
 export type IngressState = "online" | "connecting" | "signed_out" | "no_host" | "unavailable";
 
-export type IngressHandler = (connectionId: string, delivery: IngressDelivery) => Promise<IngressAnswer>;
+/** Handles one request for a workspace, by the platform's workspace id. */
+export type IngressHandler = (workspaceId: string, delivery: IngressDelivery) => Promise<IngressAnswer>;
 
 /**
  * The relay that brings a platform's HTTP requests to this host: Signal's `ingress` socket, which
@@ -169,10 +164,11 @@ export interface MessagingIngress {
   onState(listener: (state: IngressState) => void): () => void;
   /** Sets the one handler of the requests the relay receives, or removes it. */
   handle(handler: IngressHandler | null): void;
-  /** Opens the socket again, such as after the computer wakes. */
+  /**
+   * Opens the socket again, such as after the computer wakes, or after a workspace was connected or
+   * disconnected: Signal learns the workspaces of this host when the socket connects.
+   */
   reconnect(): void;
-  /** The public request URL that routes to this host, for one connection. */
-  requestUrl(connectionId: string): Promise<string>;
 }
 
 export interface MessagingDriverOptions {

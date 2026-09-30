@@ -1,4 +1,4 @@
-import type { AgentEvent, ConversationMessage, MessagingThread, MessagingThreadSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, ConversationMessage } from "@openbot/contracts/ipc";
 import { CONVERSATION_PLAN_ITEM_TYPE, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
@@ -120,20 +120,23 @@ export class MessagingThreads {
       isDirect: input.isDirect,
       title: input.title.slice(0, MESSAGING_LIMITS.name),
     });
+    // The link decides the agent: a conversation that already has one keeps it, even when another
+    // message routed it elsewhere at the same time.
+    const agentId = link.agentId;
     // Only external messages count: a teammate's answer to a request from here is the agent's own work.
     const pending = this.store
-      .links(input.agentId)
+      .links(agentId)
       .flatMap((candidate) => this.#mailbox.unresolvedMessagingDeliveries(candidate.linkId))
       .filter((context) => context.delivery.sender.kind === "user");
     const byAuthor = pending.filter(
       (context) => this.#mailbox.messagingOrigin(context.delivery.id)?.authorId === input.origin.authorId,
     );
     if (pending.length >= AGENT_QUEUE_LIMIT || byAuthor.length >= AUTHOR_QUEUE_LIMIT) return { status: "busy", link };
-    const waiting = this.#hooks.busy(input.agentId);
+    const waiting = this.#hooks.busy(agentId);
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "user" },
       messaging: { ...input.origin, linkId: link.linkId },
-      recipientAgentIds: [input.agentId],
+      recipientAgentIds: [agentId],
       text: input.text || "(The message has no text.)",
       sourcePaths: input.sourcePaths,
       idempotencyKey: input.idempotencyKey,
@@ -141,7 +144,7 @@ export class MessagingThreads {
     const deliveryId = receipt.deliveries[0]?.id;
     if (!deliveryId) throw new Error(sourceText("error.agent.queuedMessageCreateFailed"));
     this.store.touch(link.linkId);
-    this.#hooks.schedule(input.agentId);
+    this.#hooks.schedule(agentId);
     return { status: "queued", link, deliveryId, waiting };
   }
 
@@ -294,34 +297,7 @@ export class MessagingThreads {
     return stopped;
   }
 
-  list(agentId: string): MessagingThreadSummary[] {
-    return this.store.links(agentId).map((link) => ({
-      linkId: link.linkId,
-      title: link.title,
-      isDirect: link.isDirect,
-      updatedAt: link.updatedAt,
-    }));
-  }
-
-  read(agentId: string, linkId: string): MessagingThread {
-    const link = this.store.link(linkId);
-    if (!link || link.agentId !== agentId) throw new Error(sourceText("error.messaging.threadNotFound"));
-    const authors = this.#mailbox.messagingAuthors(linkId);
-    const messages = this.#database
-      .readConversation(agentId, link.threadId)
-      .messages.filter((message) => message.author === "user" || isAnswer(message))
-      .slice(-MESSAGING_LIMITS.threadMessages)
-      .map((message) => ({
-        id: message.id,
-        role: message.author === "user" ? ("external" as const) : ("agent" as const),
-        authorName: message.author === "user" ? (authors.get(message.id) ?? null) : null,
-        text: message.text.slice(0, MESSAGING_LIMITS.messageText),
-        createdAt: message.createdAt,
-      }));
-    return { linkId, title: link.title, messages };
-  }
-
-  /** Removes the agent's links, execution threads and connections. The mailbox leaves separately. */
+  /** Removes the agent's links and execution threads, and takes it out of every connection. The mailbox leaves separately. */
   async deleteForAgent(agentId: string): Promise<void> {
     for (const threadId of this.store.threadIdsForAgent(agentId)) await this.#hooks.forgetThread(threadId);
     this.store.deleteForAgent(agentId);

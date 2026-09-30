@@ -8,18 +8,16 @@ export const SLACK_ACTION_IDS = {
   stop: "openbot_stop",
 } as const;
 
-/** The conversation key of a direct message: one execution thread per direct message channel. */
-export const SLACK_DIRECT_THREAD_KEY = "direct";
-
 /**
- * One Events API payload as a message for the agent, or null when it does not address the agent.
+ * One Events API payload as a message for OpenBot, or null when it does not address OpenBot.
  *
  * - `app_mention` in a channel starts or continues the thread it is in.
- * - A direct message always addresses the agent.
- * - A reply in a thread without a mention counts only in a thread the agent already answers
+ * - A direct message always addresses OpenBot. OpenBot answers in a thread under it, so each
+ *   top-level direct message is its own conversation, and the router picks its agent.
+ * - A reply in a thread without a mention counts only in a thread that an agent already answers
  *   (`requiresLink`). A reply with a mention also arrives as `app_mention`, and both have the same
  *   dedup key, so it runs once.
- * - Messages of bots, of the agent itself, edits, deletions and joins are ignored.
+ * - Messages of bots, of OpenBot itself, edits, deletions and joins are ignored.
  */
 export function slackInboundMessage(payload: unknown, workspaceId: string, botUserId: string): InboundMessage | null {
   if (!isDynamicRecord(payload) || payload.team_id !== workspaceId) return null;
@@ -51,14 +49,16 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
     };
   }
   if (event.type !== "message") return null;
-  if (event.channel_type === "im")
+  if (event.channel_type === "im") {
+    const threadKey = threadTs ?? ts;
     return {
       ...base,
-      threadKey: SLACK_DIRECT_THREAD_KEY,
-      target: { platformChannelId: channel, replyThreadId: threadTs },
+      threadKey,
+      target: { platformChannelId: channel, replyThreadId: threadKey },
       isDirect: true,
       requiresLink: false,
     };
+  }
   if (!threadTs || threadTs === ts) return null;
   return {
     ...base,
@@ -69,7 +69,7 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
   };
 }
 
-/** One `block_actions` payload as a button press on an agent message, or null. */
+/** One `block_actions` payload as a button press on an OpenBot message, or null. */
 export function slackInboundAction(payload: unknown, workspaceId: string): InboundAction | null {
   if (!isDynamicRecord(payload) || payload.type !== "block_actions") return null;
   const team = payload.team;
@@ -117,7 +117,7 @@ function inboundFiles(value: unknown): InboundFile[] {
 }
 
 /**
- * Slack's markup as plain text: the agent's own mention goes, other mentions stay as ids, a
+ * Slack's markup as plain text: OpenBot's own mention goes, other mentions stay as ids, a
  * channel link keeps its name, a link keeps its label and address, and the three escaped
  * characters come back.
  */

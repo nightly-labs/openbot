@@ -39,6 +39,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
   "error.backend.sunshineNotReadyReason": "Sunshine did not become ready. {reason}",
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
+  "error.backend.routerModelUnavailable": "The model of the Slack router agent is unavailable.",
   "error.backend.sharedDataUnavailable": "Shared data is unavailable.",
   "error.backend.shuttingDown": "OpenBot is shutting down.",
   "error.backend.channelUnconfirmedStart":

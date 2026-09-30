@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { createHmac, generateKeyPairSync } from "node:crypto";
 import { exportJWK, SignJWT } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { createRemoteApiApp, signalClientIp } from "../src/app";
@@ -43,7 +43,7 @@ describe("signed account notifications", () => {
     });
     const signal = new SignalService(new RemoteTokenService(config), 8);
     const changed = vi.spyOn(signal, "profileChanged");
-    const app = createRemoteApiApp(config, signal, new RemoteTokenService(config));
+    const app = createRemoteApiApp(config, signal);
     const body = '{ "type": "account-profile-changed", "userId": "user-1" }';
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = signServiceRequest(body, timestamp, config.authWebhookSecret);
@@ -76,7 +76,7 @@ describe("signed account notifications", () => {
     });
     const signal = new SignalService(new RemoteTokenService(config), 8);
     const changed = vi.spyOn(signal, "serversChanged");
-    const app = createRemoteApiApp(config, signal, new RemoteTokenService(config));
+    const app = createRemoteApiApp(config, signal);
     const body = '{ "type": "account-servers-changed", "userId": "user-1" }';
     const timestamp = String(Math.floor(Date.now() / 1000));
     const response = await app.handle(
@@ -96,87 +96,156 @@ describe("signed account notifications", () => {
 });
 
 // Slack posts to Signal from the internet, so each refusal here is a security check: nothing reaches
-// a host unless Signal's own key signed the route token, and a host gets only the exact bytes Slack
-// signed.
+// a host unless Slack signed it with the app's signing secret, and a host receives only the
+// workspaces that a route ticket from the account service links to it.
 describe("Slack request route", () => {
-  it("passes a Slack request to the host's ingress socket and returns the host's answer", async () => {
-    const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-    const jwk = await exportJWK(publicKey);
-    jwk.kid = "slack-route-1";
-    jwk.alg = "ES256";
-    const config = readRemoteApiConfig({
-      REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [jwk] }),
-      REMOTE_TLS_DISABLED: "true",
-      REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
-      REMOTE_SESSION_SECRET: "s".repeat(32),
-      REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
-      TURN_SHARED_SECRET: "t".repeat(32),
-      TURN_HOST: "localhost",
-    });
-    const signal = new SignalService(hostTickets(), 8);
-    const app = createRemoteApiApp(config, signal, new RemoteTokenService(config));
-    const route = (claims: Record<string, string>, audience = "openbot-slack-route") =>
-      new SignJWT(claims)
-        .setProtectedHeader({ alg: "ES256", kid: "slack-route-1" })
-        .setAudience(audience)
-        .setIssuedAt()
-        .sign(privateKey);
-    const token = await route({ hid: "host-1", cid: "messaging-1" });
-    const body = '{"type":"url_verification","challenge":"abc"}';
-    const post = (path: string, init: { body?: string; headers?: Record<string, string> } = {}) =>
-      app.handle(
-        new Request(`http://localhost/v1/slack/events/${path}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Slack-Request-Timestamp": String(Math.floor(Date.now() / 1_000)),
-            "X-Slack-Signature": `v0=${"a".repeat(64)}`,
-            ...init.headers,
-          },
-          body: init.body ?? body,
-        }),
-      );
+  const signingSecret = "8f742231b10e8888abcd99yyyzzz85a5";
 
-    expect((await post(token)).status).toBe(503);
-    expect((await post(await route({ hid: "host-1", cid: "messaging-1" }, "openbot-remote"))).status).toBe(404);
-    expect((await post("not-a-token")).status).toBe(404);
-    expect((await post(token, { headers: { "X-Slack-Request-Timestamp": "1" } })).status).toBe(401);
-    expect((await post(token, { headers: { "X-Slack-Signature": "v1=abc" } })).status).toBe(401);
-    expect((await post(token, { headers: { "Content-Type": "text/plain" } })).status).toBe(415);
-    expect((await post(token, { body: "x".repeat(64 * 1024 + 1) })).status).toBe(413);
+  it("checks Slack's signature and passes the request to the workspace's host", async () => {
+    const { app, signal, route } = await slackRoute(signingSecret);
+    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev1","event":{"type":"app_mention"}}';
+
+    // Nothing unsigned passes, and a challenge is answered with no host.
+    expect((await post(app, body, { signature: `v0=${"a".repeat(64)}` })).status).toBe(401);
+    expect((await post(app, body, { timestamp: "1" })).status).toBe(401);
+    expect((await post(app, body.replace("T1", "T2"), { signedBody: body })).status).toBe(401);
+    expect((await post(app, body, { contentType: "text/plain" })).status).toBe(415);
+    expect((await post(app, "x".repeat(64 * 1024 + 1))).status).toBe(413);
+    expect((await post(app, '{"type":"event_callback"}')).status).toBe(400);
+    const challenge = await post(app, '{"type":"url_verification","challenge":"abc"}');
+    expect(challenge.status).toBe(200);
+    expect(await challenge.text()).toBe("abc");
+    expect((await post(app, body)).status).toBe(503);
+
+    // An ingress socket needs a route ticket for its own host, and it is not expired.
+    const refused = async (slackRoute: string | undefined) => {
+      const socket = testSocket(crypto.randomUUID());
+      signal.connect(socket);
+      await signal.receive(
+        socket,
+        JSON.stringify({ type: "hello", version: 1, peer: "ingress", token: "t", slackRoute }),
+      );
+      return socket.messages.at(-1) ?? "";
+    };
+    expect(await refused(undefined)).toContain('"code":"authentication_required"');
+    expect(await refused(await route({ hid: "host-2", teams: ["T1"] }))).toContain('"code":"authentication_required"');
+    expect(await refused(await route({ hid: "host-1", teams: ["T1"] }, -60))).toContain(
+      '"code":"authentication_required"',
+    );
 
     const ingress = testSocket("ingress");
     signal.connect(ingress);
-    await signal.receive(ingress, JSON.stringify({ type: "hello", version: 1, peer: "ingress", token: "host-ticket" }));
+    await signal.receive(
+      ingress,
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "ingress",
+        token: "host-ticket",
+        slackRoute: await route({ hid: "host-1", teams: ["T1"] }),
+      }),
+    );
+    expect(ingress.messages.at(-1)).toContain('"type":"ready"');
     ingress.messages.length = 0;
 
-    const pending = post(token);
+    // A workspace that the ticket does not name still has no host.
+    expect((await post(app, body.replace("T1", "T9"))).status).toBe(503);
+
+    const pending = post(app, body);
     await vi.waitFor(() => expect(ingress.messages).toHaveLength(1));
     const delivery = JSON.parse(ingress.messages[0] ?? "{}");
-    expect(delivery).toMatchObject({ type: "slack-delivery", connectionId: "messaging-1", kind: "events" });
+    expect(delivery).toMatchObject({ type: "slack-delivery", teamId: "T1", kind: "events" });
     expect(Buffer.from(delivery.bodyBase64, "base64").toString()).toBe(body);
 
-    // Another socket of the same host cannot answer a request that Signal did not send it.
+    // Another socket cannot answer a request that Signal did not send it.
     const other = testSocket("other");
     signal.connect(other);
-    await signal.receive(other, JSON.stringify({ type: "hello", version: 1, peer: "ingress", token: "host-ticket" }));
-    const answer = {
-      type: "slack-delivery-result",
-      version: 1,
-      requestId: delivery.requestId,
-      status: 200,
-      contentType: "text/plain",
-      body: "abc",
-    };
+    await signal.receive(
+      other,
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "ingress",
+        token: "host-ticket",
+        slackRoute: await route({ hid: "host-1", teams: [] }),
+      }),
+    );
+    const answer = { type: "slack-delivery-result", version: 1, requestId: delivery.requestId, status: 200 };
     await signal.receive(other, JSON.stringify(answer));
     expect(other.messages.at(-1)).toContain('"code":"permission_denied"');
 
     await signal.receive(ingress, JSON.stringify(answer));
-    const response = await pending;
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe("abc");
+    expect((await pending).status).toBe(200);
+
+    // A button press carries the workspace inside the form's `payload`.
+    const press = `payload=${encodeURIComponent('{"type":"block_actions","team":{"id":"T1"}}')}`;
+    const pressed = post(app, press, { contentType: "application/x-www-form-urlencoded" });
+    await vi.waitFor(() => expect(ingress.messages).toHaveLength(2));
+    expect(JSON.parse(ingress.messages[1] ?? "{}")).toMatchObject({ teamId: "T1", kind: "interactivity" });
+    signal.disconnect(ingress);
+    expect((await pressed).status).toBe(503);
   });
+
+  it("answers 503 when the signing secret is not configured", async () => {
+    const { app } = await slackRoute(null);
+    expect((await post(app, '{"type":"url_verification","challenge":"abc"}')).status).toBe(503);
+  });
+
+  function post(
+    app: ReturnType<typeof createRemoteApiApp>,
+    body: string,
+    options: { contentType?: string; timestamp?: string; signature?: string; signedBody?: string } = {},
+  ) {
+    const timestamp = options.timestamp ?? String(Math.floor(Date.now() / 1_000));
+    const signature =
+      options.signature ??
+      `v0=${createHmac("sha256", signingSecret)
+        .update(`v0:${timestamp}:${options.signedBody ?? body}`)
+        .digest("hex")}`;
+    return app.handle(
+      new Request("http://localhost/v1/slack/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": options.contentType ?? "application/json",
+          "X-Slack-Request-Timestamp": timestamp,
+          "X-Slack-Signature": signature,
+        },
+        body,
+      }),
+    );
+  }
 });
+
+async function slackRoute(signingSecret: string | null) {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const jwk = await exportJWK(publicKey);
+  jwk.kid = "slack-route-1";
+  jwk.alg = "ES256";
+  const config = readRemoteApiConfig({
+    REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [jwk] }),
+    REMOTE_TLS_DISABLED: "true",
+    REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
+    REMOTE_SESSION_SECRET: "s".repeat(32),
+    REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
+    TURN_SHARED_SECRET: "t".repeat(32),
+    TURN_HOST: "localhost",
+    ...(signingSecret ? { SLACK_SIGNING_SECRET: signingSecret } : {}),
+  });
+  const routes = new RemoteTokenService(config);
+  const signal = new SignalService(
+    { ...hostTickets(), verifySlackRoute: (token, hostId) => routes.verifySlackRoute(token, hostId) },
+    8,
+  );
+  const now = Math.floor(Date.now() / 1_000);
+  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600) =>
+    new SignJWT(claims)
+      .setProtectedHeader({ alg: "ES256", kid: "slack-route-1" })
+      .setAudience("openbot-slack-route")
+      .setIssuedAt(now - 120)
+      .setExpirationTime(now + lifetimeSeconds)
+      .sign(privateKey);
+  return { app: createRemoteApiApp(config, signal), signal, route };
+}
 
 interface TestSocket {
   id: string;

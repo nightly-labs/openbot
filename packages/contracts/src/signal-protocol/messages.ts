@@ -3,8 +3,9 @@
 // Signal (`remote/api`) relays SDP and ICE between a host and its clients and hands out resume
 // tokens and TURN credentials. Team chats, files and commands never pass through it - those travel
 // on the WebRTC data channels it helped negotiate, and their protocol is `../team-protocol` instead.
-// The one exception is Slack: a managed Slack app posts its events to Signal, and Signal passes
-// each request body to the host's `ingress` socket in transit, without storing or logging it.
+// The one exception is Slack: the OpenBot Slack app posts every workspace's events to Signal.
+// Signal checks the Slack signature, reads only the workspace ID, and passes the request body to
+// the `ingress` socket of the host that the workspace is linked to, without storing or logging it.
 //
 // Three parties speak this and none of them ships together: the service
 // (`remote/api/src/signal-service.ts`), the shared client that mobile and the future web client run
@@ -117,6 +118,9 @@ export type SignalClientMessage =
       // A remote ticket on the first connect, a resume token on every reconnect after it.
       token: string;
       multiplex?: boolean;
+      // `ingress` only: the Slack route ticket (`./slack-route.ts`) that names the Slack workspaces
+      // whose requests this socket receives.
+      slackRoute?: string;
     }
   // An `ingress` socket's answer to one `slack-delivery`. Signal returns it to Slack as the HTTP
   // response, so `body` is only the `url_verification` challenge or an interactivity reply.
@@ -160,17 +164,15 @@ export type SignalServerMessage =
   // service it does not ship with, and a code a newer Signal has added is still a code it has to
   // surface. The service narrows its own emissions where it builds the frame.
   | { type: "error"; version: SignalProtocolVersion; code: string; message: string; connectionId?: string }
-  // One Slack request for a messaging connection of this host, sent only to an `ingress` socket.
-  // The body is base64 so the host checks Slack's signature over the exact bytes Slack signed.
-  // Signal does not check that signature: only the host has the app's signing secret.
+  // One Slack request for a workspace linked to this host, sent only to an `ingress` socket. Signal
+  // has already checked Slack's signature with the app's signing secret, which no host has. The body
+  // is base64 because Slack sends button presses as a form.
   | {
       type: "slack-delivery";
       version: SignalProtocolVersion;
       requestId: string;
-      connectionId: string;
+      teamId: string;
       kind: SlackDeliveryKind;
-      timestamp: string;
-      signature: string;
       retryNum: number | null;
       retryReason: string | null;
       bodyBase64: string;

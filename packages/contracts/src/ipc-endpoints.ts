@@ -195,17 +195,7 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
-import type {
-  CreateSlackAppInput,
-  MessagingAgentInput,
-  MessagingOverview,
-  MessagingThread,
-  ReadMessagingThreadInput,
-  SetMessagingEnabledInput,
-  SetSlackIconInput,
-  SlackOverview,
-  SlackWorkspaceInput,
-} from "./ipc-messaging";
+import type { SetSlackEnabledInput, SetSlackRoutingInput, SlackOverview, SlackWorkspaceInput } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   DetectedModelServer,
@@ -561,24 +551,16 @@ export const IPC_ENDPOINTS = {
       "provider-admin:delete-custom-provider",
     ),
   },
-  // The Slack connection of one agent, on the computer that runs it. These take the server, so a
-  // remote admin reaches the host. A token only travels towards the host; no result carries one.
+  // The Slack workspaces where this computer's agents answer. Only the host's own desktop can use
+  // these: a connect opens a Slack page in this computer's browser, and the page returns to this
+  // computer's `openbot://` link. A token only travels towards the host; no result carries one.
   messaging: {
-    getOverview: scopedRequest<MessagingAgentInput, MessagingOverview, "required">()("messaging:get-overview"),
-    reconnect: scopedRequest<MessagingAgentInput, MessagingOverview, "required">()("messaging:reconnect"),
-    setEnabled: scopedRequest<SetMessagingEnabledInput, MessagingOverview, "required">()("messaging:set-enabled"),
-    disconnect: scopedRequest<MessagingAgentInput, MessagingOverview, "required">()("messaging:disconnect"),
-    readThread: scopedRequest<ReadMessagingThreadInput, MessagingThread, "required">()("messaging:read-thread"),
-    // Managed Slack apps. Only the host's own desktop can start these: each one opens a Slack page
-    // in this computer's browser, and the page returns to this computer's `openbot://` link.
     getSlackOverview: request<undefined, SlackOverview>()("messaging:get-slack-overview"),
     connectSlackWorkspace: request<undefined, void>()("messaging:connect-slack-workspace"),
-    disconnectSlackWorkspace: scopedRequest<SlackWorkspaceInput, void, "required">()(
-      "messaging:disconnect-slack-workspace",
-    ),
-    createSlackApp: scopedRequest<CreateSlackAppInput, MessagingOverview, "required">()("messaging:create-slack-app"),
-    openSlackInstall: scopedRequest<MessagingAgentInput, void, "required">()("messaging:open-slack-install"),
-    setSlackIcon: scopedRequest<SetSlackIconInput, void, "required">()("messaging:set-slack-icon"),
+    disconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:disconnect-slack-workspace"),
+    reconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:reconnect-slack-workspace"),
+    setSlackEnabled: request<SetSlackEnabledInput, void>()("messaging:set-slack-enabled"),
+    setSlackRouting: request<SetSlackRoutingInput, void>()("messaging:set-slack-routing"),
   },
   // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The

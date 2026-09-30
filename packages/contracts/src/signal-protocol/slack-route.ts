@@ -1,23 +1,31 @@
-// The Slack route token: the ES256 JWT in a managed Slack app's request URL,
-// `https://signal.openbot.run/v1/slack/events/<token>`.
+// The Slack route: how a Slack request finds the host that answers it.
 //
-// `apps/auth-api` mints it for a host that proves its machine token, and the Signal service
-// (`remote/api/src/tokens.ts`) verifies it to find the host that owns a Slack request. It is signed
-// with its own key, not the ticket key, so the ticket key can rotate without breaking the request
-// URL of every Slack app. It has no expiry, because Slack keeps the URL until the app changes.
+// The OpenBot Slack app has one request URL for every workspace that installs it,
+// `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature, reads the workspace
+// ID (`team_id`) from the body, and passes the request to the `ingress` socket that holds a route
+// ticket for that workspace.
 //
-// The token only routes. It grants nothing: the host refuses any request that Slack did not sign
-// with the app's signing secret, which never leaves the host.
+// The route ticket is an ES256 JWT that `apps/auth-api` mints for a host that proves its machine
+// token. It names only the workspaces that the account service links to that host, so a host cannot
+// claim another host's workspace. It is signed with its own key, not the ticket key, and it expires:
+// the host asks for a new one each time its `ingress` socket connects.
 
 export const SLACK_ROUTE_AUDIENCE = "openbot-slack-route";
 
-export const SLACK_ROUTE_PATH_PREFIX = "/v1/slack/events/";
+export const SLACK_EVENTS_PATH = "/v1/slack/events";
+
+// How long a route ticket stays valid. Signal checks it only when an `ingress` socket connects.
+export const SLACK_ROUTE_TTL_SECONDS = 24 * 60 * 60;
+
+// The most workspaces one host can link.
+export const SLACK_ROUTE_TEAMS_LIMIT = 32;
 
 export interface SlackRouteClaims {
   aud: typeof SLACK_ROUTE_AUDIENCE;
   // The remote host that receives the requests.
   hid: string;
-  // The host's messaging connection, which names the agent's Slack app on that host.
-  cid: string;
+  // The Slack workspace IDs linked to that host.
+  teams: string[];
   iat: number;
+  exp: number;
 }

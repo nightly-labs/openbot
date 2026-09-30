@@ -2,7 +2,7 @@
 
 This directory holds our own control plane for WebRTC connections. The Remote API relays SDP and ICE.
 Team files, chats, commands and video never pass through the Remote API or Cloudflare. The one exception
-is an agent's Slack app: see [Slack requests](#slack-requests).
+is the OpenBot Slack app: see [Slack requests](#slack-requests).
 
 ## Flow
 
@@ -31,15 +31,19 @@ validation window.
 
 ## Slack requests
 
-A Slack app that OpenBot creates for an agent has the request URL
-`https://signal.openbot.run/v1/slack/events/<route token>`. The route token is an ES256 JWT with the
-audience `openbot-slack-route`, signed by the Worker with `SLACK_ROUTE_PRIVATE_JWK` (key id
-`SLACK_ROUTE_KEY_ID`). Its public key must be in the ticket JWKS that Signal loads
-(`REMOTE_TICKET_PUBLIC_JWKS` on the Worker, or `REMOTE_TICKET_PUBLIC_KEYS` here). It names the host and
-the messaging connection. Signal checks the token, then passes the exact request body to that host's
-`ingress` socket and returns the host's answer, or 503 when the host does not answer in 2.5 seconds.
-Slack then sends the request again. Signal does not store, log, or check the body; only the host has the
-app's signing secret. Nginx does not log the `/v1/slack/` path, because it holds the route token.
+The OpenBot Slack app sends the events and button presses of every workspace to one request URL,
+`https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's signing
+secret (`SLACK_SIGNING_SECRET`), answers Slack's `url_verification` challenge, and reads only the
+workspace ID. Then it passes the exact request body to the `ingress` socket of the host that the
+workspace is linked to, and returns the host's answer, or 503 when no host holds the workspace or the
+host does not answer in 2.5 seconds. Slack then sends the request again.
+
+An `ingress` socket names its workspaces with a Slack route ticket: an ES256 JWT with the audience
+`openbot-slack-route`, signed by the Worker with `SLACK_ROUTE_PRIVATE_JWK` (key id
+`SLACK_ROUTE_KEY_ID`) for the workspaces that the account service links to that host. Its public key
+must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the Worker, or
+`REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
+`SLACK_SIGNING_SECRET`, the Slack route answers 503.
 
 ## Production requirements
 

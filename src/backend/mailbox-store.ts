@@ -290,15 +290,6 @@ export class MailboxStore {
     return structuredClone(request.messagingReturn);
   }
 
-  /** The external author of each message of one messaging link, by message id. */
-  messagingAuthors(linkId: string): Map<string, string> {
-    return new Map(
-      this.#state.messages.flatMap((message) =>
-        message.messaging?.linkId === linkId ? [[message.id, message.messaging.authorName] as const] : [],
-      ),
-    );
-  }
-
   /** The deliveries of one messaging link that have not ended, oldest first. */
   unresolvedMessagingDeliveries(linkId: string): DeliveryContext[] {
     const messageIds = new Set(

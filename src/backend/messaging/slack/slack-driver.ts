@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { sourceText } from "@openbot/i18n/source";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import type {
@@ -14,17 +15,14 @@ import type {
   MessagingIngress,
   StatusReaction,
 } from "../messaging-types";
-import { plainText, SLACK_ACTION_IDS, SLACK_DIRECT_THREAD_KEY } from "./slack-events";
+import { plainText, SLACK_ACTION_IDS } from "./slack-events";
 import { SlackEventsTransport } from "./slack-events-transport";
-import { SLACK_BOT_SCOPES } from "./slack-manifest";
 import { slackChunks, slackMrkdwn } from "./slack-render";
 import { SlackApiError, SlackWebApi } from "./slack-web-api";
 
-const SIGNING_SECRET = /^[0-9a-f]{32,64}$/;
 /** Slack's own limit for one uploaded file is 1 GB; the host holds its uploads to this. */
 const UPLOAD_BYTES = 100 * 1024 * 1024;
 const HISTORY_LIMIT = 100;
-const CHANNEL_PAGE_LIMIT = 200;
 
 const REACTIONS: Record<StatusReaction, string> = {
   received: "eyes",
@@ -165,23 +163,15 @@ export class SlackAdapter implements MessagingAdapter {
     afterId: string | null,
     beforeId: string,
   ): Promise<ContextEntry[]> {
-    const response =
-      threadKey === SLACK_DIRECT_THREAD_KEY
-        ? await this.#api.call("conversations.history", {
-            channel: platformChannelId,
-            latest: beforeId,
-            oldest: afterId ?? undefined,
-            inclusive: false,
-            limit: HISTORY_LIMIT,
-          })
-        : await this.#api.call("conversations.replies", {
-            channel: platformChannelId,
-            ts: threadKey,
-            latest: beforeId,
-            oldest: afterId ?? undefined,
-            inclusive: false,
-            limit: HISTORY_LIMIT,
-          });
+    // Every conversation is a thread, in a direct message too.
+    const response = await this.#api.call("conversations.replies", {
+      channel: platformChannelId,
+      ts: threadKey,
+      latest: beforeId,
+      oldest: afterId ?? undefined,
+      inclusive: false,
+      limit: HISTORY_LIMIT,
+    });
     const messages = Array.isArray(response.messages) ? response.messages.filter(isDynamicRecord) : [];
     const entries: ContextEntry[] = [];
     for (const message of messages) {
@@ -242,33 +232,6 @@ export class SlackAdapter implements MessagingAdapter {
    * `#statusText` turns the marker back into a mention after the escape. The answer of an agent never
    * goes through it, so an answer cannot mention anyone.
    */
-  /** Every public channel of the workspace that the bot is not in yet. Archived ones are left out. */
-  async joinPublicPlaces(): Promise<void> {
-    let cursor: string | undefined;
-    do {
-      const page = await this.#api.call("conversations.list", {
-        types: "public_channel",
-        exclude_archived: true,
-        limit: CHANNEL_PAGE_LIMIT,
-        cursor,
-      });
-      const channels = Array.isArray(page.channels) ? page.channels.filter(isDynamicRecord) : [];
-      for (const channel of channels)
-        if (isString(channel.id) && channel.is_member !== true) await this.joinPlace(channel.id);
-      const next = isDynamicRecord(page.response_metadata) ? page.response_metadata.next_cursor : undefined;
-      cursor = isString(next) && next ? next : undefined;
-    } while (cursor);
-  }
-
-  async joinPlace(platformChannelId: string): Promise<void> {
-    try {
-      await this.#api.call("conversations.join", { channel: platformChannelId });
-    } catch (error) {
-      // A channel that was archived, or that the workspace keeps apps out of, stays without the agent.
-      if (!(error instanceof SlackApiError)) throw error;
-    }
-  }
-
   mention(userId: string): string {
     return /^[A-Z0-9]+$/.test(userId) ? `\uE000@${userId}\uE000` : userId;
   }
@@ -313,25 +276,20 @@ export class SlackAdapter implements MessagingAdapter {
 export interface SlackDriverOptions {
   /** Only tests change this. */
   origin?: string;
-  /** The relay that brings the app's events. Without it, no Slack app connects. */
+  /** The relay that brings the workspace's events. Without it, no workspace connects. */
   ingress?: MessagingIngress;
 }
 
-/** Each Slack app is one that OpenBot created, and it gets its events through the ingress relay. */
+/** Each workspace installed the OpenBot app, and its events come through the ingress relay. */
 export function slackDriver(options: SlackDriverOptions = {}): MessagingDriver {
   return {
     platform: "slack",
     createAdapter(credentials, driverOptions) {
       return new SlackAdapter(credentials.botToken ?? "", { ...driverOptions, origin: options.origin });
     },
-    createTransport(credentials, identity) {
-      if (!options.ingress || !SIGNING_SECRET.test(credentials.signingSecret ?? ""))
-        throw new Error(sourceText("error.messaging.unsupported"));
-      return new SlackEventsTransport({
-        signingSecret: credentials.signingSecret ?? "",
-        identity,
-        ingress: options.ingress,
-      });
+    createTransport(_credentials, identity) {
+      if (!options.ingress) throw new Error(sourceText("error.messaging.unsupported"));
+      return new SlackEventsTransport({ identity, ingress: options.ingress });
     },
   };
 }

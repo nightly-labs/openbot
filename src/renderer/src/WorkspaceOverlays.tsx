@@ -243,7 +243,7 @@ function ServerSettings() {
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
-  const slack = createSlackConnector(() => serverSettingsTarget()?.id ?? "");
+  const slack = createSlackConnector();
   // The overlay mounts with the app. A first read that failed then must not hide GitHub for good.
   createEffect(serverSettingsOpen, (open) => {
     if (open) github.reload();

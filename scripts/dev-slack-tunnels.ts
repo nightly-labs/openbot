@@ -1,34 +1,25 @@
-// `bun run dev:slack`: the dev stack, reachable by Slack. Slack posts an agent app's events to
-// Signal and sends the browser back after an install, and it accepts only public HTTPS addresses. So
-// this opens a `cloudflared` quick tunnel to Signal and one to the dev app's own sign-in listener
-// (`src/main/slack-dev-callback-server.ts`), and gives the stack the tunnel addresses. The install
-// then reaches the dev app directly, not an installed OpenBot that owns `openbot://`. The tunnels
-// live as long as this process.
+// `bun run dev:slack`: the dev stack, reachable by Slack. Slack posts the events of every workspace
+// that installed the OpenBot app to Signal, and it accepts only a public HTTPS address. So this opens
+// a `cloudflared` quick tunnel to the local Signal and gives it the development Slack app's signing
+// secret. The tunnel lives as long as this process. Set the development app's request URL (event
+// subscriptions and interactivity) to the printed address; it changes at each start.
 //
-// `.env.slack-dev` in the worktree root holds the Slack values. Git ignores it. Until Slack enrolls
-// the OpenBot manager app, an App Configuration Token stands in for the workspace's manager token:
+// `.env.slack-dev` in the worktree root holds the Slack value. Git ignores it:
 //
-//   OPENBOT_DEV_SLACK_CONFIG_TOKEN='xoxe.xoxp-…'   (12 hours; api.slack.com/apps)
-//   OPENBOT_DEV_SLACK_WORKSPACE_ID='T…'
-//   OPENBOT_DEV_SLACK_WORKSPACE_NAME='…'
+//   OPENBOT_DEV_SLACK_SIGNING_SECRET='…'   (the development app, api.slack.com/apps > Basic Information)
 //
-// The route token key is `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID` in
-// `apps/auth-api/.env.dev`. In development it can be a copy of the ticket key.
+// The install needs an account API that Slack can send the browser back to over HTTPS: use the test
+// Worker (`bun run deploy:test`) with the development app's `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET`.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { join } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 
 const logger = createOpenBotLogger("dev-slack");
 
 const SLACK_FILE = ".env.slack-dev";
-const SLACK_KEYS = [
-  "OPENBOT_DEV_SLACK_CONFIG_TOKEN",
-  "OPENBOT_DEV_SLACK_WORKSPACE_ID",
-  "OPENBOT_DEV_SLACK_WORKSPACE_NAME",
-] as const;
+const SLACK_KEYS = ["OPENBOT_DEV_SLACK_SIGNING_SECRET"] as const;
 const TUNNEL_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 const TUNNEL_TIMEOUT_MS = 45_000;
 
@@ -57,22 +48,19 @@ export function readSlackDevelopmentValues(text: string, environment: NodeJS.Pro
 }
 
 /**
- * Opens the two tunnels and points every service of the stack at them. Returns the function that
- * closes them. Stops the start when a tunnel or a Slack value is missing: a stack that Slack cannot
- * reach would look like a bug in the app.
+ * Opens the tunnel to Signal and points every service of the stack at it. Returns the function that
+ * closes it. Stops the start when the tunnel or the signing secret is missing: a stack that Slack
+ * cannot reach would look like a bug in the app.
  */
 export async function attachSlackTunnels(specs: TunnelledSpec[], projectRoot: string): Promise<() => void> {
   const file = join(projectRoot, SLACK_FILE);
   const values = readSlackDevelopmentValues(existsSync(file) ? readFileSync(file, "utf8") : "", process.env);
-  if (!values.OPENBOT_DEV_SLACK_CONFIG_TOKEN || !values.OPENBOT_DEV_SLACK_WORKSPACE_ID) {
-    throw new Error(
-      `--slack needs OPENBOT_DEV_SLACK_CONFIG_TOKEN and OPENBOT_DEV_SLACK_WORKSPACE_ID in ${SLACK_FILE} or the shell.`,
-    );
+  if (!values.OPENBOT_DEV_SLACK_SIGNING_SECRET) {
+    throw new Error(`--slack needs OPENBOT_DEV_SLACK_SIGNING_SECRET in ${SLACK_FILE} or the shell.`);
   }
   const signalPort = specs.find((spec) => spec.name === "remote")?.env.REMOTE_SIGNAL_PORT;
   if (!signalPort || !specs.some((spec) => spec.name === "app"))
     throw new Error("--slack needs Signal and the app: use the app or all target.");
-  const callbackPort = String(await freePort());
 
   const tunnels: ChildProcess[] = [];
   const close = () => {
@@ -80,36 +68,18 @@ export async function attachSlackTunnels(specs: TunnelledSpec[], projectRoot: st
   };
   process.once("exit", close);
   try {
-    const [signalUrl, callbackUrl] = await Promise.all([
-      openTunnel(signalPort, tunnels),
-      openTunnel(callbackPort, tunnels),
-    ]);
+    const signalUrl = await openTunnel(signalPort, tunnels);
     const tunnelled = {
-      ...values,
       REMOTE_SIGNAL_URL: `${signalUrl.replace("https://", "wss://")}/v1/signal`,
-      OPENBOT_DEV_SLACK_CALLBACK_PORT: callbackPort,
-      OPENBOT_DEV_SLACK_REDIRECT_URL: `${callbackUrl}/slack-install`,
+      SLACK_SIGNING_SECRET: values.OPENBOT_DEV_SLACK_SIGNING_SECRET,
     };
     for (const spec of specs) Object.assign(spec.env, tunnelled);
-    logger.info(`Slack reaches Signal at ${signalUrl} and the dev app's sign-in listener at ${callbackUrl}.`);
+    logger.info(`Set the development Slack app's request URL to ${signalUrl}/v1/slack/events.`);
     return close;
   } catch (error) {
     close();
     throw error;
   }
-}
-
-/** A loopback port that nothing listens on now. The dev app binds it when it starts. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address ? address.port : 0;
-      server.close(() => (port ? resolve(port) : reject(new Error("No free port for the Slack sign-in listener."))));
-    });
-  });
 }
 
 function openTunnel(port: string, tunnels: ChildProcess[]): Promise<string> {

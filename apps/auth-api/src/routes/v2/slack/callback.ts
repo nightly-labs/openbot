@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { requestSlackManager } from "../../../../server/request-auth";
-import { SlackManagerError } from "../../../../server/slack-manager";
+import { requestSlackApp } from "../../../server/request-auth";
+import { SlackAppError } from "../../../server/slack-app";
 
-// Slack returns here after the manager app's consent. The sealed grant goes to `/slack/connect` in
+// Slack returns here after the OpenBot app's install. The sealed grant goes to `/slack/connect` in
 // the URL fragment, which the browser does not send to any server, and that page opens OpenBot.
-export const Route = createFileRoute("/v2/slack/manager/callback")({
+export const Route = createFileRoute("/v2/slack/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -17,15 +17,15 @@ export const Route = createFileRoute("/v2/slack/manager/callback")({
           return redirect(target);
         }
         try {
-          const result = await requestSlackManager().complete({
+          const result = await requestSlackApp().complete({
             code,
             state,
-            redirectUri: new URL("/v2/slack/manager/callback", url).toString(),
+            redirectUri: new URL("/v2/slack/callback", url).toString(),
           });
           target.hash = new URLSearchParams({ nonce: result.nonce, grant: result.grant }).toString();
         } catch (error) {
           target.hash = new URLSearchParams({
-            error: error instanceof SlackManagerError ? error.code : "slack_exchange_failed",
+            error: error instanceof SlackAppError ? error.code : "slack_exchange_failed",
           }).toString();
         }
         return redirect(target);

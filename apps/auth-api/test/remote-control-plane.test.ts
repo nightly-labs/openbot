@@ -15,9 +15,9 @@ import {
 } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
-/** The account server reads the plan of a host for its member limit. */
+/** The account server reads the plan of a host for its member limit, and its Slack workspaces. */
 function applyPlanMigrations(database: DatabaseSync): void {
-  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql"]) {
+  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql", "0024_slack_workspace_routes.sql"]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
 }
@@ -574,13 +574,25 @@ describe("RemoteControlPlane", () => {
     await expect(controlPlane.issueHostTicket("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
       code: "host_unauthorized",
     });
-    // A Slack request URL routes Slack messages to a host, so only that host's credential gets one.
+    // A Slack route ticket routes a workspace's messages to a host, so only that host's credential
+    // gets one, and it names only the workspaces linked to that host.
+    await expect(controlPlane.issueSlackRoute("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
+      code: "host_unauthorized",
+    });
+    database
+      .prepare(
+        `INSERT INTO slack_workspace_routes(team_id, host_id, account_id, app_id, bot_user_id, connected_at)
+         VALUES ('T1', 'host-1', 'owner', 'A1', 'U1', 1)`,
+      )
+      .run();
+    const route = await controlPlane.issueSlackRoute("host-1", registration.machineToken);
+    expect(route.teams).toEqual(["T1"]);
+    expect(decodeJwt(route.ticket)).toMatchObject({ aud: "openbot-slack-route", hid: "host-1", teams: ["T1"] });
     await expect(
-      controlPlane.issueSlackRoute("host-1", firstRegistration.machineToken, "messaging-1"),
+      controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1"),
     ).rejects.toMatchObject({ code: "host_unauthorized" });
-    expect(
-      decodeJwt(await controlPlane.issueSlackRoute("host-1", registration.machineToken, "messaging-1")),
-    ).toMatchObject({ aud: "openbot-slack-route", hid: "host-1", cid: "messaging-1" });
+    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
+    expect((await controlPlane.issueSlackRoute("host-1", registration.machineToken)).teams).toEqual([]);
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

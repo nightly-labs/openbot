@@ -2,7 +2,11 @@ import { memberLimitForPlan } from "@openbot/contracts/billing";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
-import { SLACK_ROUTE_AUDIENCE, SLACK_ROUTE_PATH_PREFIX } from "@openbot/contracts/signal-protocol/slack-route";
+import {
+  SLACK_ROUTE_AUDIENCE,
+  SLACK_ROUTE_TEAMS_LIMIT,
+  SLACK_ROUTE_TTL_SECONDS,
+} from "@openbot/contracts/signal-protocol/slack-route";
 import {
   REMOTE_TICKET_AUDIENCE,
   REMOTE_TICKET_PROTOCOL_VERSION,
@@ -16,7 +20,6 @@ import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const TICKET_TTL_SECONDS = 180;
-const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
@@ -178,8 +181,8 @@ export class RemoteTicketSigner {
 }
 
 /**
- * Signs the route token in a managed Slack app's request URL. It uses its own key, which the public
- * JWKS also lists, so the ticket key can rotate without breaking the URL of every Slack app.
+ * Signs the Slack route ticket that names the workspaces linked to a host. It uses its own key,
+ * which the public JWKS also lists, so each key can rotate on its own.
  */
 export class SlackRouteSigner {
   readonly #keyId: string;
@@ -192,23 +195,16 @@ export class SlackRouteSigner {
     this.#privateJwk = parseJwk(config.privateJwk);
   }
 
-  async issue(input: { hostId: string; connectionId: string; now: number }): Promise<string> {
+  async issue(input: { hostId: string; teams: string[]; now: number }): Promise<string> {
     this.#key ??= await importJWK(this.#privateJwk, "ES256");
-    return new SignJWT({ hid: input.hostId, cid: input.connectionId })
+    const issuedAt = Math.floor(input.now / 1_000);
+    return new SignJWT({ hid: input.hostId, teams: input.teams })
       .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
-      .setIssuedAt(Math.floor(input.now / 1_000))
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + SLACK_ROUTE_TTL_SECONDS)
       .setAudience(SLACK_ROUTE_AUDIENCE)
       .sign(this.#key);
   }
-}
-
-/** The public request URL for a route token, on the host that serves `signalUrl`. */
-export function slackRequestUrl(signalUrl: string, routeToken: string): string {
-  const url = new URL(signalUrl);
-  url.protocol = url.protocol === "ws:" ? "http:" : "https:";
-  url.pathname = `${SLACK_ROUTE_PATH_PREFIX}${routeToken}`;
-  url.search = "";
-  return url.toString();
 }
 
 /** One signer for each key: the JWKS parse and the key import are too costly for every request. */
@@ -1152,18 +1148,29 @@ export class RemoteControlPlane {
   }
 
   /**
-   * A route token for one messaging connection of this host. Every token that this returns stays
-   * valid, so the host keeps the one in its Slack app's manifest and asks again only to repair it.
+   * The route ticket that the host's Signal `ingress` socket presents: the Slack workspaces linked to
+   * this host, signed. The host asks for a new one each time the socket connects.
    */
-  async issueSlackRoute(hostId: string, machineToken: string, connectionId: string): Promise<string> {
+  async issueSlackRoute(hostId: string, machineToken: string): Promise<{ ticket: string; teams: string[] }> {
     if (!this.#slackRouteSigner) {
       throw new RemoteControlPlaneError(503, "slack_not_configured", "Slack routing is not configured.");
     }
-    if (!IDENTIFIER_PATTERN.test(connectionId)) {
-      throw new RemoteControlPlaneError(400, "invalid_remote_request", "The messaging connection is invalid.");
-    }
     await this.authenticateHost(hostId, machineToken);
-    return this.#slackRouteSigner.issue({ hostId, connectionId, now: this.#now() });
+    const rows = await this.#database
+      .prepare("SELECT team_id FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?")
+      .bind(hostId, SLACK_ROUTE_TEAMS_LIMIT)
+      .all<{ team_id: string }>();
+    const teams = rows.results.map((row) => row.team_id);
+    return { ticket: await this.#slackRouteSigner.issue({ hostId, teams, now: this.#now() }), teams };
+  }
+
+  /** Unlinks a Slack workspace from this host, after the host disconnected it or Slack uninstalled it. */
+  async disconnectSlackWorkspace(hostId: string, machineToken: string, teamId: string): Promise<void> {
+    await this.authenticateHost(hostId, machineToken);
+    await this.#database
+      .prepare("DELETE FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
+      .bind(teamId, hostId)
+      .run();
   }
 
   /** Checks the credential that a host received when it registered. */

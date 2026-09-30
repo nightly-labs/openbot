@@ -17,7 +17,6 @@
     "./browser-view": "./src/browser-view.ts",
     "./team-api-requests": "./src/team-api-requests.ts",
     "./team-admin-requests": "./src/team-admin-requests.ts",
-    "./team-messaging-requests": "./src/team-messaging-requests.ts",
     "./marketplace-catalog": "./src/marketplace-catalog.ts",
     "./hosted-server-wake": "./src/hosted-server-wake.ts",
     "./agent-message-text": "./src/agent-message-text.ts",

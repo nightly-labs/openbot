@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { SLACK_ROUTE_AUDIENCE } from "@openbot/contracts/signal-protocol/slack-route";
+import { SLACK_ROUTE_AUDIENCE, SLACK_ROUTE_TEAMS_LIMIT } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   createLocalJWKSet,
   createRemoteJWKSet,
@@ -28,7 +28,6 @@ const RESUME_AUDIENCE = "openbot-remote-resume";
 export const RESUME_TTL_SECONDS = 10 * 60;
 const MAXIMUM_STALE_RESUME_SECONDS = 24 * 60 * 60;
 const MAXIMUM_TRUSTED_RESUME_TOKENS = 100_000;
-const MAXIMUM_CACHED_SLACK_ROUTES = 1_000;
 const jwksSchema = z.object({ keys: z.array(z.object({ kty: z.string() }).loose()).min(1) });
 const remoteTicketClaimsSchema = z.object({
   aud: z.literal(REMOTE_TICKET_AUDIENCE),
@@ -51,19 +50,13 @@ const identifierSchema = z
   .min(1)
   .max(128)
   .regex(/^[A-Za-z0-9_-]+$/u);
-const slackRouteClaimsSchema = z.object({ hid: identifierSchema, cid: identifierSchema });
+const slackRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  teams: z.array(identifierSchema).max(SLACK_ROUTE_TEAMS_LIMIT),
+});
+const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
-/** The host and messaging connection that a Slack request URL names. */
-export interface SlackRoute {
-  hostId: string;
-  connectionId: string;
-}
-
-export interface SlackRouteVerifier {
-  verifySlackRoute(token: string): Promise<SlackRoute>;
-}
-
-export class RemoteTokenService implements SlackRouteVerifier {
+export class RemoteTokenService {
   readonly #ticketKey: JWTVerifyGetKey;
   readonly #remoteTicketKey: RemoteJWKSet | null;
   readonly #sessionSecret: Uint8Array;
@@ -76,8 +69,6 @@ export class RemoteTokenService implements SlackRouteVerifier {
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
   >();
-  // Slack sends every event of an app to the same URL, so one ES256 check per token is enough.
-  readonly #slackRoutes = new Map<string, SlackRoute>();
 
   constructor(
     config: Pick<
@@ -124,24 +115,19 @@ export class RemoteTokenService implements SlackRouteVerifier {
   }
 
   /**
-   * Reads the host and connection from a Slack request URL. The token has no expiry: it only
-   * routes, and the host checks Slack's signature on every request it gets.
+   * The Slack workspaces that a route ticket links to `hostId`. Throws for a ticket that is expired,
+   * signed with another key, or minted for another host.
    */
-  async verifySlackRoute(token: string): Promise<SlackRoute> {
-    const cached = this.#slackRoutes.get(token);
-    if (cached) return cached;
+  async verifySlackRoute(token: string, hostId: string, now = new Date()): Promise<string[]> {
     const { payload } = await jwtVerify(token, this.#ticketKey, {
       audience: SLACK_ROUTE_AUDIENCE,
       algorithms: ["ES256"],
+      requiredClaims: ["exp"],
+      currentDate: now,
     });
     const claims = slackRouteClaimsSchema.parse(payload);
-    const route = { hostId: claims.hid, connectionId: claims.cid };
-    if (this.#slackRoutes.size >= MAXIMUM_CACHED_SLACK_ROUTES) {
-      const oldest = this.#slackRoutes.keys().next().value;
-      if (oldest) this.#slackRoutes.delete(oldest);
-    }
-    this.#slackRoutes.set(token, route);
-    return route;
+    if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
+    return claims.teams;
   }
 
   validateClaims(claims: RemoteTicketClaims): Promise<boolean> {
@@ -263,6 +249,25 @@ export class RemoteTokenService implements SlackRouteVerifier {
       },
     ];
   }
+}
+
+/**
+ * Slack's request signature: `v0=` and the hex HMAC-SHA256 of `v0:<timestamp>:<body>` with the app's
+ * signing secret, for a timestamp at most five minutes old.
+ */
+export function verifySlackSignature(
+  body: Uint8Array,
+  timestamp: string,
+  signature: string,
+  secret: string,
+  now = Date.now(),
+): boolean {
+  if (!/^[0-9]{1,12}$/u.test(timestamp)) return false;
+  if (Math.abs(now / 1_000 - Number(timestamp)) > SLACK_SIGNATURE_TOLERANCE_SECONDS) return false;
+  const expected = `v0=${createHmac("sha256", secret).update(`v0:${timestamp}:`).update(body).digest("hex")}`;
+  const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export function verifyWebhookSignature(

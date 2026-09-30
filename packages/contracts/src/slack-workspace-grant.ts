@@ -1,7 +1,7 @@
-// The hand-off of a Slack manager token from the account Worker to one desktop host.
+// The hand-off of the OpenBot Slack app's bot token from the account Worker to one desktop host.
 //
-// The OpenBot Slack manager app's client secret lives only on the Worker (`apps/auth-api`), so the
-// Worker exchanges the OAuth code. It must not keep the token, and the browser that carries the
+// The OpenBot Slack app's client secret lives only on the Worker (`apps/auth-api`), so the Worker
+// exchanges the OAuth code. It must not keep the token, and the browser that carries the
 // result back to `openbot://` must not be able to read it. So the host makes a P-256 key pair for
 // one sign-in and sends only the public key. The Worker seals the grant to it with ECDH, HKDF and
 // AES-GCM, and only the host that holds the private key can open it. The host's nonce is the
@@ -11,17 +11,18 @@
 
 import { isDynamicRecord, isString } from "./runtime-values";
 
-export const SLACK_WORKSPACE_GRANT_VERSION = 1;
+export const SLACK_WORKSPACE_GRANT_VERSION = 2;
 
-const HKDF_INFO = "openbot-slack-workspace-grant-v1";
+const HKDF_INFO = "openbot-slack-workspace-grant-v2";
 const RAW_P256_PUBLIC_KEY_BYTES = 65;
 
-/** What the manager app's OAuth gives the host: a user token that can create and change apps. */
+/** What the OpenBot app's OAuth install gives the host: the bot token for one workspace. */
 export interface SlackWorkspaceGrant {
-  accessToken: string;
+  botToken: string;
+  botUserId: string;
+  appId: string;
   workspaceId: string;
   workspaceName: string;
-  userId: string;
 }
 
 export function isRawP256PublicKey(value: string): boolean {
@@ -108,18 +109,20 @@ export async function openSlackWorkspaceGrant(
   const grant = JSON.parse(new TextDecoder().decode(plaintext));
   if (
     !isDynamicRecord(grant) ||
-    !isString(grant.accessToken) ||
+    !isString(grant.botToken) ||
+    !isString(grant.botUserId) ||
+    !isString(grant.appId) ||
     !isString(grant.workspaceId) ||
-    !isString(grant.workspaceName) ||
-    !isString(grant.userId)
+    !isString(grant.workspaceName)
   ) {
     throw new Error("The Slack workspace grant is invalid.");
   }
   return {
-    accessToken: grant.accessToken,
+    botToken: grant.botToken,
+    botUserId: grant.botUserId,
+    appId: grant.appId,
     workspaceId: grant.workspaceId,
     workspaceName: grant.workspaceName,
-    userId: grant.userId,
   };
 }
 

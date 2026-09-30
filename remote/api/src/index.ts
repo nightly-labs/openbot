@@ -35,7 +35,7 @@ const tlsPaths =
     ? { certificate: config.tlsCertificatePath, privateKey: config.tlsPrivateKeyPath }
     : undefined;
 
-const app = createRemoteApiApp(config, signal, tokens);
+const app = createRemoteApiApp(config, signal);
 const listen = () =>
   app.listen({
     hostname: config.host,

@@ -1,14 +1,22 @@
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
+import { SLACK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/slack-route";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import type { SignalService, SignalSocket, SlackDeliveryResponse } from "./signal-service";
-import { type SlackRouteVerifier, verifyWebhookSignature } from "./tokens";
+import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
 
-const SLACK_SIGNATURE_PATTERN = /^v0=[0-9a-f]{64}$/u;
-const SLACK_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
+const SLACK_TEAM_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
+
+const slackRequestSchema = z.object({
+  type: z.string().optional(),
+  challenge: z.string().max(1_024).optional(),
+  team_id: z.string().optional(),
+  team: z.object({ id: z.string() }).nullish(),
+  authorizations: z.array(z.object({ team_id: z.string() })).optional(),
+});
 
 const authEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("account-profile-changed"), userId: z.string().min(1) }),
@@ -25,7 +33,7 @@ const authEventSchema = z.discriminatedUnion("type", [
   }),
 ]) satisfies z.ZodType<RemoteAuthEvent>;
 
-export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalService, routes: SlackRouteVerifier) {
+export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalService) {
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live" }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
@@ -48,46 +56,43 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })
-    // A managed Slack app's request URL, for events and button presses. Signal checks only what it
-    // can check cheaply, finds the host from the route token, and passes the exact body to that
-    // host's ingress socket. The host checks Slack's signature. Nothing here logs the path, which
-    // holds the route token, or the body.
+    // The OpenBot Slack app's one request URL, for the events and button presses of every
+    // workspace. Signal checks Slack's signature, reads only the workspace ID, and passes the exact
+    // body to the ingress socket of the host that the workspace is linked to. Nothing here stores or
+    // logs the body.
     .post(
-      "/v1/slack/events/:route",
-      async ({ request, params, server }) => {
+      SLACK_EVENTS_PATH,
+      async ({ request, server }) => {
+        if (!config.slackSigningSecret) return slackResponse({ status: 503 });
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) {
           return slackResponse({ status: 413 });
         }
         const kind = slackDeliveryKind(request.headers.get("content-type"));
         if (!kind) return slackResponse({ status: 415 });
+        const body = new Uint8Array(await request.arrayBuffer());
+        if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
         const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
         const signature = request.headers.get("x-slack-signature") ?? "";
-        if (!freshSlackTimestamp(timestamp) || !SLACK_SIGNATURE_PATTERN.test(signature)) {
-          return slackResponse({ status: 401 });
-        }
-        let route: Awaited<ReturnType<SlackRouteVerifier["verifySlackRoute"]>>;
-        try {
-          route = await routes.verifySlackRoute(params.route);
-        } catch {
+        if (!verifySlackSignature(body, timestamp, signature, config.slackSigningSecret)) {
           const address = signalClientIp(
             server?.requestIP(request)?.address,
             request.headers.get("x-forwarded-for"),
             config.trustProxy,
           );
-          return slackResponse({ status: signal.acceptSlackRequest(`address:${address}`) ? 404 : 429 });
+          return slackResponse({ status: signal.acceptSlackRequest(`address:${address}`) ? 401 : 429 });
         }
-        if (!signal.acceptSlackRequest(`route:${route.connectionId}`)) return slackResponse({ status: 429 });
-        const body = new Uint8Array(await request.arrayBuffer());
-        if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
+        const slack = slackRequest(kind, body);
+        if (!slack) return slackResponse({ status: 400 });
+        if ("challenge" in slack) {
+          return slackResponse({ status: 200, contentType: "text/plain", body: slack.challenge });
+        }
+        if (!signal.acceptSlackRequest(`team:${slack.teamId}`)) return slackResponse({ status: 429 });
         const retryNum = Number(request.headers.get("x-slack-retry-num") ?? "");
         const retryReason = request.headers.get("x-slack-retry-reason");
         return slackResponse(
-          await signal.deliverSlack(route.hostId, {
-            connectionId: route.connectionId,
+          await signal.deliverSlack(slack.teamId, {
             kind,
-            timestamp,
-            signature,
             retryNum: Number.isInteger(retryNum) && retryNum >= 0 && retryNum < 100 ? retryNum : null,
             retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
             body,
@@ -162,13 +167,29 @@ function slackDeliveryKind(contentType: string | null): SlackDeliveryKind | null
   return null;
 }
 
-// A cheap filter only. The host checks the timestamp again, with the signature that covers it.
-function freshSlackTimestamp(timestamp: string, nowSeconds = Math.floor(Date.now() / 1_000)): boolean {
-  if (!/^[0-9]{1,12}$/u.test(timestamp)) return false;
-  return Math.abs(nowSeconds - Number(timestamp)) <= SLACK_TIMESTAMP_TOLERANCE_SECONDS;
+/**
+ * The only parts of a signed Slack request that Signal reads: the `url_verification` challenge, which
+ * Signal answers itself, or the workspace ID that picks the host. Events carry it as `team_id`, and
+ * button presses as `payload.team.id`.
+ */
+function slackRequest(kind: SlackDeliveryKind, body: Uint8Array): { challenge: string } | { teamId: string } | null {
+  let value: unknown;
+  try {
+    const text = new TextDecoder().decode(body);
+    value = kind === "events" ? JSON.parse(text) : JSON.parse(new URLSearchParams(text).get("payload") ?? "null");
+  } catch {
+    return null;
+  }
+  const parsed = slackRequestSchema.safeParse(value);
+  if (!parsed.success) return null;
+  if (kind === "events" && parsed.data.type === "url_verification" && parsed.data.challenge) {
+    return { challenge: parsed.data.challenge };
+  }
+  const teamId = parsed.data.team_id ?? parsed.data.team?.id ?? parsed.data.authorizations?.[0]?.team_id;
+  return teamId && SLACK_TEAM_PATTERN.test(teamId) ? { teamId } : null;
 }
 
-function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 429 | 401 | 404 }): Response {
+function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 429 | 401 | 400 | 503 }): Response {
   const headers: Record<string, string> = { "Cache-Control": "no-store" };
   if ("contentType" in response && response.contentType && response.body !== undefined) {
     headers["Content-Type"] = response.contentType;

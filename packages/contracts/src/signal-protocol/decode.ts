@@ -93,10 +93,8 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
         type: kind,
         version,
         requestId: identifier(value.requestId),
-        connectionId: identifier(value.connectionId),
+        teamId: identifier(value.teamId),
         kind: deliveryKind(value.kind),
-        timestamp: identifier(value.timestamp),
-        signature: identifier(value.signature),
         retryNum: value.retryNum === null ? null : retryNumber(value.retryNum),
         retryReason: value.retryReason === null ? null : identifier(value.retryReason),
         bodyBase64: deliveryBody(value.bodyBase64),
@@ -165,7 +163,7 @@ function deliveryKind(value: unknown): SlackDeliveryKind {
   return value;
 }
 
-// Base64 of at most the body limit. The host decodes it and checks Slack's signature over it.
+// Base64 of at most the body limit.
 function deliveryBody(value: unknown): string {
   const candidate = text(value);
   if (

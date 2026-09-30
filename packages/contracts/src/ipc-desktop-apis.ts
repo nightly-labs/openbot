@@ -113,10 +113,7 @@ export type ProviderAdminDesktopApi = GroupApi<IpcEndpoints["providerAdmin"]>;
  */
 export type HostAdminDesktopApi = GroupApi<IpcEndpoints["hostAdmin"]>;
 
-/**
- * The Slack connection of one agent on one server's host. A remote host answers only an owner or
- * admin, and only when it advertises `messaging-v1`.
- */
+/** The Slack workspaces where this computer's agents answer. */
 export type MessagingDesktopApi = GroupApi<IpcEndpoints["messaging"]>;
 
 /**

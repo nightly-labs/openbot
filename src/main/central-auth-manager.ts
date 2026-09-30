@@ -338,18 +338,32 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     );
   }
 
-  /** The request URL of one managed Slack app, which routes its events to this host through Signal. */
-  issueSlackRequestUrl(hostId: string, connectionId: string): Promise<string> {
+  /**
+   * The Slack route ticket of this host: the workspaces that the account service links to it, which
+   * Signal routes to its `ingress` socket.
+   */
+  issueSlackRoute(hostId: string): Promise<string> {
     const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
     if (!machineToken) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
     return this.#request(
       `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-route`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+      (value) => requiredString(decodeRecord(value, "Slack route"), "ticket"),
+    );
+  }
+
+  /** Unlinks a Slack workspace from this host, so Signal stops routing its events here. */
+  async unlinkSlackWorkspace(hostId: string, teamId: string): Promise<void> {
+    const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+    if (!machineToken) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
+    await this.#request(
+      `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-disconnect`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ machineToken, connectionId }),
+        body: JSON.stringify({ machineToken, teamId }),
       },
-      (value) => requiredString(decodeRecord(value, "Slack request URL"), "requestUrl"),
+      () => undefined,
     );
   }
 

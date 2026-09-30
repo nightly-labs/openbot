@@ -3,23 +3,22 @@ import { createSignal, onSettled, Show } from "solid-js";
 import { Button } from "../ui/button";
 
 /**
- * The page that returns a Slack sign-in to the desktop app. Slack redirects here after an agent's
- * app is installed (`?code&state`), and the manager app's callback redirects here with a sealed
- * grant in the fragment. The page only builds the `openbot://` link: the code is useless without
- * the app's client secret on the host, and only the host can open the grant.
+ * The page that returns a Slack install to the desktop app. The install callback redirects here with
+ * a sealed grant, or an error code, in the fragment. The page only builds the `openbot://` link:
+ * only the host can open the grant.
  */
 export function SlackConnectPage() {
   const [openUrl, setOpenUrl] = createSignal("");
-  const [failed, setFailed] = createSignal(false);
+  const [failure, setFailure] = createSignal<string | null>(null);
 
   onSettled(() => {
     const page = new URL(window.location.href);
     const fragment = new URLSearchParams(page.hash.slice(1));
-    const target = slackDeepLink(page.searchParams, fragment);
-    // The code and the grant are no use to anyone who reads the address bar later.
+    const target = slackDeepLink(fragment);
+    // The grant is no use to anyone who reads the address bar later.
     window.history.replaceState(null, "", page.pathname);
     if (!target) {
-      setFailed(true);
+      setFailure(fragment.get("error") ?? "slack_failed");
       return;
     }
     setOpenUrl(target);
@@ -37,9 +36,13 @@ export function SlackConnectPage() {
         <p class="join-card-eyebrow">Slack</p>
         <h1 id="slack-connect-title">Return to OpenBot</h1>
         <Show
-          when={!failed()}
+          when={!failure()}
           fallback={
-            <p class="join-card-error">Slack did not finish the connection. Go back to OpenBot and start again.</p>
+            <p class="join-card-error">
+              {failure() === "slack_workspace_taken"
+                ? "Another OpenBot server already answers this Slack workspace. Disconnect it on that server, then try again."
+                : "Slack did not finish the connection. Go back to OpenBot and start again."}
+            </p>
           }
         >
           <p class="join-card-copy">OpenBot finishes the Slack connection on your computer.</p>
@@ -58,12 +61,8 @@ export function SlackConnectPage() {
   );
 }
 
-function slackDeepLink(query: URLSearchParams, fragment: URLSearchParams): string | null {
+function slackDeepLink(fragment: URLSearchParams): string | null {
   const nonce = fragment.get("nonce");
   const grant = fragment.get("grant");
-  if (nonce && grant) return `openbot://slack-workspace?${new URLSearchParams({ nonce, grant })}`;
-  const code = query.get("code");
-  const state = query.get("state");
-  if (code && state) return `openbot://slack-install?${new URLSearchParams({ code, state })}`;
-  return null;
+  return nonce && grant ? `openbot://slack-workspace?${new URLSearchParams({ nonce, grant })}` : null;
 }

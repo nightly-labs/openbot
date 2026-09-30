@@ -6,14 +6,12 @@ import type {
   AgentApproval,
   AgentEvent,
   AgentSummary,
-  CreateSlackAppInput,
   MessagingConnection,
   MessagingConnectionState,
   MessagingCredentialState,
-  MessagingOverview,
   MessagingPlatform,
-  MessagingThread,
   RespondToApprovalInput,
+  SetSlackRoutingInput,
   SlackOverview,
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES } from "@openbot/contracts/ipc";
@@ -21,6 +19,7 @@ import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-v
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { MessagingOrigin } from "../mailbox-store";
+import { parseRouteDecision, routePrompt } from "./messaging-router";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
 import type { MessagingActivity, MessagingThreads } from "./messaging-threads";
 import {
@@ -36,14 +35,12 @@ import {
   type MessagingIngress,
   type MessagingTransport,
 } from "./messaging-types";
-import { SlackManagedApps, type SlackManagerPort } from "./slack/slack-managed-apps";
+import { type SlackAppPort, SlackConnect } from "./slack/slack-connect";
+import { SlackWebApi } from "./slack/slack-web-api";
 
 const logger = createOpenBotLogger("messaging");
 
-/**
- * The tokens of each connection, kept by the main process in encrypted storage. A key is a
- * connection id, or `slack-workspace:<id>` for the manager token of a Slack workspace.
- */
+/** The tokens of each connection, kept by the main process in encrypted storage, by connection id. */
 export interface MessagingCredentials {
   keys(): string[];
   status(connectionId: string): MessagingCredentialState;
@@ -58,6 +55,8 @@ export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Promise<void>;
   onEvent(listener: (event: AgentEvent) => void): () => void;
+  /** One text completion of the agent's own model, with no tools: the router's decision. */
+  generate(agentId: string, prompt: string): Promise<string>;
 }
 
 export interface MessagingServiceOptions {
@@ -67,9 +66,9 @@ export interface MessagingServiceOptions {
   drivers: readonly MessagingDriver[];
   /** A private folder for files that arrive, until the mailbox has copied them. */
   downloadsRoot: string;
-  /** The Signal relay of the Slack apps. Without it and `slackManager`, no Slack app can connect. */
+  /** The Signal relay of the OpenBot Slack app. Without it and `slackApp`, no workspace can connect. */
   ingress?: MessagingIngress;
-  slackManager?: SlackManagerPort;
+  slackApp?: SlackAppPort;
   /** Only tests change this. */
   slackOrigin?: string;
 }
@@ -112,10 +111,11 @@ const RECENT_MESSAGES = 2_000;
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
 
 /**
- * Owns the live connections to chat platforms: it starts and stops each one's transport, turns
- * inbound messages into agent work through `MessagingThreads`, posts status and answers back, and
- * relays approvals and stop requests. It never stores a token: `MessagingCredentials` does. It is
- * platform-agnostic; everything a platform does goes through its `MessagingDriver`.
+ * Owns the live connections to chat platform workspaces: it starts and stops each one's transport,
+ * picks the agent of each new conversation with the router agent, turns inbound messages into agent
+ * work through `MessagingThreads`, posts status and answers back as OpenBot, and relays approvals
+ * and stop requests. It never stores a token: `MessagingCredentials` does. It is platform-agnostic;
+ * everything a platform does goes through its `MessagingDriver`.
  */
 export class MessagingService {
   readonly #threads: MessagingThreads;
@@ -134,7 +134,8 @@ export class MessagingService {
   readonly #recent = new Set<string>();
   readonly #unsubscribe: Array<() => void> = [];
   readonly #ingress: MessagingIngress | null;
-  readonly #managed: SlackManagedApps | null;
+  readonly #connect: SlackConnect | null;
+  readonly #slackOrigin: string | undefined;
   #started = false;
 
   constructor(options: MessagingServiceOptions) {
@@ -144,20 +145,8 @@ export class MessagingService {
     this.#drivers = new Map(options.drivers.map((driver) => [driver.platform, driver]));
     this.#downloadsRoot = options.downloadsRoot;
     this.#ingress = options.ingress ?? null;
-    this.#managed =
-      options.ingress && options.slackManager
-        ? new SlackManagedApps({
-            store: options.threads.store,
-            credentials: options.credentials,
-            ingress: options.ingress,
-            manager: options.slackManager,
-            connections: {
-              restart: (connectionId) => this.#restart(connectionId),
-              stop: (connectionId) => this.#stopConnection(connectionId),
-            },
-            origin: options.slackOrigin,
-          })
-        : null;
+    this.#connect = options.ingress && options.slackApp ? new SlackConnect(options.slackApp) : null;
+    this.#slackOrigin = options.slackOrigin;
   }
 
   async start(): Promise<void> {
@@ -168,24 +157,10 @@ export class MessagingService {
       this.#agents.onEvent((event) => this.#agentEvent(event)),
     );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
-    this.#ingress?.handle((connectionId, delivery) => this.deliverSlack(connectionId, delivery));
+    this.#ingress?.handle((workspaceId, delivery) => this.deliverSlack(workspaceId, delivery));
     const records = this.#threads.store.connections();
-    await this.#credentials.retain(this.#retainedKeys());
-    const agents = new Set(this.#agents.listAgents().map((agent) => agent.id));
-    await Promise.all(
-      records
-        .filter((record) => record.enabled && agents.has(record.agentId))
-        .map((record) => this.#startConnection(record)),
-    );
-  }
-
-  /**
-   * Moves each Slack app to this host's current request URL and install address. The main process
-   * calls it once the host's identity is loaded, because the account service issues the URL for a
-   * named host only.
-   */
-  async syncSlackApps(): Promise<void> {
-    await this.#managed?.sync(this.#agentMap(), true);
+    await this.#credentials.retain(new Set(records.map((record) => record.connectionId)));
+    await Promise.all(records.filter((record) => record.enabled).map((record) => this.#startConnection(record)));
   }
 
   async stop(): Promise<void> {
@@ -207,134 +182,103 @@ export class MessagingService {
     return [...this.#live.values()].some((live) => LIVE_STATES.has(live.state));
   }
 
-  overview(agentId: string): MessagingOverview {
-    this.#requireAgent(agentId);
-    const record = this.#threads.store.connectionFor(agentId, "slack");
-    return {
-      connection: record ? this.#summary(record) : null,
-      threads: this.#threads.list(agentId),
-      slackWorkspaces: this.#managed?.workspaces() ?? [],
-    };
-  }
-
-  /** Every agent's Slack connection, for Server settings > Connectors. A deleted agent's row is left out. */
+  /** The Slack workspaces of this computer, for Server settings > Connectors. A disconnected one is left out. */
   slackOverview(): SlackOverview {
-    const agents = this.#agentMap();
     return {
       connections: this.#threads.store
         .connections()
-        .filter((record) => record.platform === "slack" && agents.has(record.agentId))
+        .filter((record) => record.platform === "slack" && this.#credentials.status(record.connectionId) !== "missing")
         .map((record) => this.#summary(record)),
-      workspaces: this.#managed?.workspaces() ?? [],
     };
   }
 
-  readThread(agentId: string, linkId: string): MessagingThread {
-    this.#requireAgent(agentId);
-    return this.#threads.read(agentId, linkId);
-  }
-
-  async reconnect(agentId: string): Promise<MessagingOverview> {
-    const record = this.#requireConnection(agentId);
+  async reconnect(workspaceId: string): Promise<void> {
+    const record = this.#requireConnection(workspaceId);
     await this.#stopConnection(record.connectionId);
     this.#threads.store.updateConnection(record.connectionId, { enabled: true, lastErrorCode: null });
     const updated = this.#threads.store.connection(record.connectionId);
     if (updated) await this.#startConnection(updated);
-    return this.overview(agentId);
+    this.#ingress?.reconnect();
   }
 
-  async setEnabled(agentId: string, enabled: boolean): Promise<MessagingOverview> {
-    const record = this.#requireConnection(agentId);
+  async setEnabled(workspaceId: string, enabled: boolean): Promise<void> {
+    const record = this.#requireConnection(workspaceId);
     await this.#stopConnection(record.connectionId);
     this.#threads.store.updateConnection(record.connectionId, { enabled, lastErrorCode: null });
     const updated = this.#threads.store.connection(record.connectionId);
     if (enabled && updated) await this.#startConnection(updated);
-    return this.overview(agentId);
+  }
+
+  /** Which agent routes the workspace's new conversations, and which agents can answer them. */
+  setRouting(input: SetSlackRoutingInput): void {
+    const record = this.#requireConnection(input.workspaceId);
+    if (input.routerAgentId) this.#requireAgent(input.routerAgentId);
+    for (const agentId of input.agentIds) this.#requireAgent(agentId);
+    this.#threads.store.updateConnection(record.connectionId, { routerAgentId: input.routerAgentId });
+    this.#threads.store.setAnsweringAgents(record.connectionId, input.agentIds);
+  }
+
+  /** Opens the OpenBot Slack app's install in the browser. A deep link to `completeSlackWorkspace` ends it. */
+  async connectSlackWorkspace(): Promise<void> {
+    await this.#requireConnect().start();
   }
 
   /**
-   * Removes the tokens, stops the connection and deletes the agent's Slack app, which nothing else
-   * can use. The conversations stay, for reading and for a later connect.
+   * Saves the bot token of a workspace that installed the OpenBot app, and starts its connection. A
+   * workspace connected before keeps its conversations. False for a link that this run did not start.
    */
-  async disconnect(agentId: string): Promise<MessagingOverview> {
-    const record = this.#requireConnection(agentId);
+  async completeSlackWorkspace(nonce: string, grant: string): Promise<boolean> {
+    const opened = await this.#requireConnect().complete(nonce, grant);
+    if (!opened) return false;
+    const record = this.#threads.store.ensureConnection("slack", opened.workspaceId, opened.workspaceName);
     await this.#stopConnection(record.connectionId);
-    // The connection ends either way. When Slack keeps the app, the person is told, so they can
-    // delete it in Slack: nothing on this computer can reach it after this.
-    const appKept = await this.#managed
-      ?.deleteApp(record.connectionId)
-      .then(() => false)
-      .catch((error) => {
-        this.#warn(error);
-        return true;
-      });
-    await this.#credentials.clear(record.connectionId);
+    await this.#credentials.set(record.connectionId, {
+      botToken: opened.botToken,
+      botUserId: opened.botUserId,
+      appId: opened.appId,
+      workspaceId: opened.workspaceId,
+    });
     this.#threads.store.updateConnection(record.connectionId, {
-      enabled: false,
-      workspaceId: null,
-      workspaceName: null,
-      botUserId: null,
-      appId: null,
+      enabled: true,
+      workspaceName: opened.workspaceName,
+      botUserId: opened.botUserId,
+      appId: opened.appId,
       lastErrorCode: null,
     });
-    if (appKept) throw new Error(sourceText("error.messaging.slackAppNotDeleted"));
-    return this.overview(agentId);
-  }
-
-  // Managed Slack apps.
-
-  /** Opens the OpenBot manager app's consent in the browser. A deep link to `completeSlackWorkspace` ends it. */
-  async connectSlackWorkspace(): Promise<void> {
-    await this.#requireManaged().startWorkspace();
-  }
-
-  /** False for a link that this run did not start. */
-  completeSlackWorkspace(nonce: string, grant: string): Promise<boolean> {
-    return this.#requireManaged().completeWorkspace(nonce, grant);
-  }
-
-  async disconnectSlackWorkspace(workspaceId: string): Promise<void> {
-    await this.#requireManaged().disconnectWorkspace(workspaceId);
-  }
-
-  /** Creates the agent's own Slack app in the workspace and opens its install page. */
-  async createSlackApp(input: CreateSlackAppInput): Promise<MessagingOverview> {
-    const managed = this.#requireManaged();
-    const agent = this.#requireAgent(input.agentId);
-    const record = this.#threads.store.ensureConnection(input.agentId, "slack");
-    await managed.createApp(record.connectionId, agent, input.workspaceId);
-    return this.overview(input.agentId);
-  }
-
-  /** The app's addresses are brought up to date first: Slack refuses an install to an address it does not list. */
-  async openSlackInstall(agentId: string): Promise<void> {
-    const managed = this.#requireManaged();
-    const record = this.#requireConnection(agentId);
-    await managed.sync(this.#agentMap(), true);
-    await managed.openInstall(record.connectionId);
-  }
-
-  /** Sets the agent's avatar as the icon of its Slack app. An icon Slack already has is not sent again. */
-  async setSlackIcon(agentId: string, png: Uint8Array): Promise<void> {
-    await this.#requireManaged().setIcon(this.#requireConnection(agentId).connectionId, png);
-  }
-
-  /** False for a link that this run did not start. */
-  completeSlackInstall(state: string, code: string): Promise<boolean> {
-    return this.#requireManaged().completeInstall(state, code);
+    const updated = this.#threads.store.connection(record.connectionId);
+    if (updated) await this.#startConnection(updated);
+    // Signal learns the workspaces of this host when the socket connects.
+    this.#ingress?.reconnect();
+    return true;
   }
 
   /**
-   * One request that Slack sent to a managed app's request URL. A paused connection answers 200, so
-   * Slack does not send it again, and does nothing. An unknown one answers 404.
+   * Stops the workspace's connection, asks Slack to revoke the bot token, removes it, and unlinks the
+   * workspace from this host. The conversations stay, for a later connect.
    */
-  async deliverSlack(connectionId: string, delivery: IngressDelivery): Promise<IngressAnswer> {
-    const check = this.#managed?.answerUrlCheck(connectionId, delivery);
-    if (check) return check;
-    const record = this.#threads.store.connection(connectionId);
+  async disconnectSlackWorkspace(workspaceId: string): Promise<void> {
+    const record = this.#requireConnection(workspaceId);
+    await this.#stopConnection(record.connectionId);
+    const botToken = this.#credentials.get(record.connectionId)?.botToken;
+    if (botToken)
+      await new SlackWebApi({ token: botToken, origin: this.#slackOrigin })
+        .call("auth.revoke")
+        .catch((error) => this.#warn(error));
+    await this.#credentials.clear(record.connectionId);
+    this.#threads.store.updateConnection(record.connectionId, { enabled: false, lastErrorCode: null });
+    await this.#connect?.unlink(workspaceId).catch((error) => this.#warn(error));
+    this.#ingress?.reconnect();
+  }
+
+  /**
+   * One request that Slack sent for a workspace, which Signal has checked. A paused connection answers
+   * 200, so Slack does not send it again, and does nothing. An unknown workspace answers 404.
+   */
+  async deliverSlack(workspaceId: string, delivery: IngressDelivery): Promise<IngressAnswer> {
+    const record = this.#threads.store.connectionForWorkspace("slack", workspaceId);
     if (!record) return { status: 404 };
     if (!record.enabled) return { status: 200 };
-    const transport = this.#live.get(connectionId)?.transport;
+    const transport = this.#live.get(record.connectionId)?.transport;
     if (!transport?.deliver) return { status: 503 };
     return transport.deliver(delivery);
   }
@@ -344,8 +288,7 @@ export class MessagingService {
   async #startConnection(record: MessagingConnectionRecord): Promise<void> {
     const credentials = this.#credentials.get(record.connectionId);
     const driver = this.#drivers.get(record.platform);
-    // A managed app that is not installed yet has no bot token: it waits for `completeSlackInstall`.
-    if (!credentials || !driver || !credentials.botToken) return;
+    if (!credentials?.botToken || !driver) return;
     const live: LiveConnection = {
       record,
       adapter: driver.createAdapter(credentials, {
@@ -376,7 +319,6 @@ export class MessagingService {
     if (this.#live.get(record.connectionId) !== live) return;
     const identity = live.identity;
     this.#threads.store.updateConnection(record.connectionId, {
-      workspaceId: identity.workspaceId,
       workspaceName: identity.workspaceName,
       botUserId: identity.botUserId,
       appId: identity.appId,
@@ -391,12 +333,7 @@ export class MessagingService {
       },
       message: (message) => void this.#receive(live, message).catch((error) => this.#warn(error)),
       action: (action) => void this.#action(live, action).catch((error) => this.#warn(error)),
-      placeCreated: (platformChannelId) =>
-        void live.adapter.joinPlace?.(platformChannelId).catch((error) => this.#warn(error)),
     });
-    // So people can mention the agent in any public channel without inviting it first. Channels
-    // made while the host was off are joined here too.
-    void live.adapter.joinPublicPlaces?.().catch((error) => this.#warn(error));
   }
 
   async #restart(connectionId: string): Promise<void> {
@@ -416,6 +353,8 @@ export class MessagingService {
     if (FATAL_STATES.has(state)) {
       this.#threads.store.updateConnection(live.record.connectionId, { lastErrorCode: state });
       logger.warn("A messaging connection stopped.", { platform: live.record.platform, state });
+      // The workspace uninstalled OpenBot or revoked its token: Signal stops routing it here.
+      void this.#connect?.unlink(live.record.workspaceId).catch((error) => this.#warn(error));
     }
   }
 
@@ -426,13 +365,11 @@ export class MessagingService {
     const stored = isOneOf(MESSAGING_CONNECTION_STATES, record.lastErrorCode) ? record.lastErrorCode : null;
     const state: MessagingConnectionState = !record.enabled
       ? "paused"
-      : credentials === "unreadable"
+      : credentials === "unreadable" || (values && !values.botToken)
         ? "secret_storage_unavailable"
-        : values && !values.botToken
-          ? "awaiting_install"
-          : (live?.state ?? stored ?? "connecting");
+        : (live?.state ?? stored ?? "connecting");
     return {
-      agentId: record.agentId,
+      workspaceId: record.workspaceId,
       platform: record.platform,
       enabled: record.enabled,
       state,
@@ -441,14 +378,15 @@ export class MessagingService {
       missingScopes: live?.identity?.missingScopes ?? [],
       retryAt: state === "rate_limited" ? (live?.retryAt ?? null) : null,
       credentials,
+      routerAgentId: record.routerAgentId,
+      agentIds: this.#threads.store.answeringAgents(record.connectionId),
     };
   }
 
   // Inbound.
 
   async #receive(live: LiveConnection, message: InboundMessage): Promise<void> {
-    const agent = this.#agents.listAgents().find((candidate) => candidate.id === live.record.agentId);
-    if (!agent || !live.identity) return;
+    if (!live.identity) return;
     // Before any await: a redelivered event can arrive while the first copy is still downloading its
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
@@ -470,6 +408,14 @@ export class MessagingService {
     const { adapter } = live;
     const authorName = await adapter.authorName(message.authorId);
     const place = message.isDirect ? null : await adapter.placeName(message.platformChannelId);
+    const agentId = existing
+      ? existing.agentId
+      : await this.#route(live, message, place ?? "direct message").catch(async (error) => {
+          this.#warn(error);
+          await adapter.post(message.target, { text: sourceText("status.messaging.routeFailed") });
+          return null;
+        });
+    if (!agentId) return;
     const staging = join(this.#downloadsRoot, randomUUID());
     try {
       const { paths, skipped } = await this.#download(adapter, message, staging);
@@ -478,7 +424,7 @@ export class MessagingService {
         : message.text;
       const result = await this.#threads.receive({
         connectionId: live.record.connectionId,
-        agentId: agent.id,
+        agentId,
         platformChannelId: message.platformChannelId,
         threadKey: message.threadKey,
         isDirect: message.isDirect,
@@ -491,7 +437,7 @@ export class MessagingService {
       if (result.status === "duplicate") return;
       const key = `${result.link.linkId}:${message.platformMessageId}`;
       if (result.status === "busy") {
-        await adapter.post(message.target, { text: sourceText("status.messaging.busy", { name: agent.name }) });
+        await adapter.post(message.target, { text: sourceText("status.messaging.busy") });
         await adapter.react(message.target, message.platformMessageId, "failed", true).catch(() => undefined);
         return;
       }
@@ -501,9 +447,7 @@ export class MessagingService {
       if (result.waiting)
         this.#serial(result.link.linkId, async () => {
           if (this.#posts.has(key) || !this.#targets.has(key)) return;
-          const messageId = await adapter.post(message.target, {
-            text: sourceText("status.messaging.queued", { name: agent.name }),
-          });
+          const messageId = await adapter.post(message.target, { text: sourceText("status.messaging.queued") });
           this.#posts.set(key, {
             connectionId: live.record.connectionId,
             target: message.target,
@@ -514,6 +458,34 @@ export class MessagingService {
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * The agent that answers a new conversation. With one agent that can answer, no model is asked.
+   * Otherwise the router agent's model picks one, or asks the person a question, which is posted in
+   * the thread and starts nothing. Null when no agent answers.
+   */
+  async #route(live: LiveConnection, message: InboundMessage, place: string): Promise<string | null> {
+    const agents = this.#agents.listAgents();
+    const allowed = new Set(this.#threads.store.answeringAgents(live.record.connectionId));
+    const candidates = allowed.size ? agents.filter((agent) => allowed.has(agent.id)) : agents;
+    const [only, ...others] = candidates;
+    if (!only) {
+      await live.adapter.post(message.target, { text: sourceText("status.messaging.noAgent") });
+      return null;
+    }
+    if (others.length === 0) return only.id;
+    // The model takes seconds. The person sees that OpenBot has the message.
+    await live.adapter.react(message.target, message.platformMessageId, "received", true).catch(() => undefined);
+    const router = agents.find((agent) => agent.id === live.record.routerAgentId) ?? only;
+    const decision = parseRouteDecision(
+      await this.#agents.generate(router.id, routePrompt({ agents: candidates, place, text: message.text })),
+      candidates,
+    );
+    if ("agentId" in decision) return decision.agentId;
+    await live.adapter.post(message.target, { text: decision.question });
+    await live.adapter.react(message.target, message.platformMessageId, "received", false).catch(() => undefined);
+    return null;
   }
 
   /** Downloads the files of a message into `staging`, within the attachment limits. */
@@ -569,7 +541,6 @@ export class MessagingService {
     const live = this.#live.get(activity.link.connectionId);
     if (!live || !activity.origin) return;
     const { adapter } = live;
-    const agentName = this.#agentName(activity.link.agentId);
     const key = `${activity.link.linkId}:${activity.origin.platformMessageId}`;
     const target = this.#targets.get(key) ?? linkTarget(activity.link);
     const post = this.#posts.get(key);
@@ -613,11 +584,11 @@ export class MessagingService {
     }
     if (activity.status === "failed") {
       // The provider's error can hold local paths or MCP values, so Slack gets a fixed sentence.
-      await this.#say(adapter, target, placeholder, sourceText("status.messaging.failed", { name: agentName }));
+      await this.#say(adapter, target, placeholder, sourceText("status.messaging.failed"));
       return;
     }
     if (activity.answer) await adapter.postAnswer(target, activity.answer, placeholder);
-    else await this.#say(adapter, target, placeholder, sourceText("status.messaging.noAnswer", { name: agentName }));
+    else await this.#say(adapter, target, placeholder, sourceText("status.messaging.noAnswer"));
     if (activity.files.length) {
       const skipped = await adapter.upload(target, activity.files);
       if (skipped.length)
@@ -641,12 +612,7 @@ export class MessagingService {
     if (event.type === "approval") void this.#approval(event.approval).catch((error) => this.#warn(error));
     else if (event.type === "agent-input-resolved" && event.kind === "approval")
       void this.#approvalResolved(event.requestId).catch((error) => this.#warn(error));
-    else if (event.type === "prompt")
-      void this.#question(event.threadId, event.agentId).catch((error) => this.#warn(error));
-    else if (event.type === "agents-changed")
-      void this.#forgetDeletedAgents(event.agents)
-        .then(() => this.#managed?.sync(new Map(event.agents.map((agent) => [agent.id, agent]))))
-        .catch((error) => this.#warn(error));
+    else if (event.type === "prompt") void this.#question(event.threadId).catch((error) => this.#warn(error));
   }
 
   async #approval(approval: AgentApproval): Promise<void> {
@@ -666,7 +632,7 @@ export class MessagingService {
       .replace(MENTION_MARKERS, "")
       .slice(0, APPROVAL_TEXT_LIMIT);
     const text = [
-      sourceText("status.messaging.approvalTitle", { name: this.#agentName(link.agentId) }),
+      sourceText("status.messaging.approvalTitle"),
       `**${kind}**`,
       detail ? `\`\`\`\n${detail}\n\`\`\`` : "",
     ]
@@ -713,13 +679,11 @@ export class MessagingService {
     });
   }
 
-  async #question(threadId: string, agentId: string): Promise<void> {
+  async #question(threadId: string): Promise<void> {
     const link = this.#threads.store.linkForThread(threadId);
     const live = link ? this.#live.get(link.connectionId) : undefined;
     if (!link || !live) return;
-    await live.adapter.post(linkTarget(link), {
-      text: sourceText("status.messaging.questionOnHost", { name: this.#agentName(agentId) }),
-    });
+    await live.adapter.post(linkTarget(link), { text: sourceText("status.messaging.questionOnHost") });
   }
 
   async #action(live: LiveConnection, action: InboundAction): Promise<void> {
@@ -771,42 +735,6 @@ export class MessagingService {
     });
   }
 
-  /**
-   * A deleted agent's links are already gone with it. This stops its socket, deletes a Slack app
-   * that OpenBot managed for it, and removes its tokens.
-   */
-  async #forgetDeletedAgents(agents: readonly AgentSummary[]): Promise<void> {
-    const ids = new Set(agents.map((agent) => agent.id));
-    for (const [connectionId, live] of this.#live) {
-      if (ids.has(live.record.agentId)) continue;
-      await this.#stopConnection(connectionId);
-    }
-    // The rows of a deleted agent's connections are gone with it, installed or not. Their saved
-    // credentials name each app, so the apps are deleted before the credentials are.
-    const retained = this.#retainedKeys();
-    for (const key of this.#credentials.keys()) {
-      if (!retained.has(key)) await this.#managed?.deleteApp(key).catch((error) => this.#warn(error));
-    }
-    await this.#credentials.retain(retained);
-  }
-
-  /** The credential keys that still belong to something: each connection, and each Slack workspace. */
-  #retainedKeys(): Set<string> {
-    return new Set([
-      ...this.#threads.store.connections().map((record) => record.connectionId),
-      ...(this.#managed?.workspaceKeys() ?? []),
-    ]);
-  }
-
-  #agentMap(): Map<string, AgentSummary> {
-    return new Map(this.#agents.listAgents().map((agent) => [agent.id, agent]));
-  }
-
-  #requireManaged(): SlackManagedApps {
-    if (!this.#managed) throw new Error(sourceText("error.messaging.unsupported"));
-    return this.#managed;
-  }
-
   // Helpers.
 
   /**
@@ -829,15 +757,15 @@ export class MessagingService {
     return agent;
   }
 
-  #requireConnection(agentId: string): MessagingConnectionRecord {
-    this.#requireAgent(agentId);
-    const record = this.#threads.store.connectionFor(agentId, "slack");
+  #requireConnection(workspaceId: string): MessagingConnectionRecord {
+    const record = this.#threads.store.connectionForWorkspace("slack", workspaceId);
     if (!record) throw new Error(sourceText("error.messaging.notConnected"));
     return record;
   }
 
-  #agentName(agentId: string): string {
-    return this.#agents.listAgents().find((agent) => agent.id === agentId)?.name ?? "The agent";
+  #requireConnect(): SlackConnect {
+    if (!this.#connect) throw new Error(sourceText("error.messaging.unsupported"));
+    return this.#connect;
   }
 
   #warn(error: unknown): void {
@@ -851,9 +779,9 @@ export class MessagingService {
   }
 }
 
-/** Where to answer when the message that started the work is not known: the thread, or the DM. */
+/** Where to answer when the message that started the work is not known: the conversation's thread. */
 function linkTarget(link: MessagingLink): MessageTarget {
-  return { platformChannelId: link.platformChannelId, replyThreadId: link.isDirect ? null : link.threadKey };
+  return { platformChannelId: link.platformChannelId, replyThreadId: link.threadKey };
 }
 
 function token(): string {

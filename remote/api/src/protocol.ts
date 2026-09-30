@@ -57,6 +57,7 @@ const signalClientMessageSchema = z.discriminatedUnion("type", [
     peer: z.enum(["host", "client", "ingress"]),
     token: z.string().min(1).max(8_192),
     multiplex: z.boolean().optional(),
+    slackRoute: z.string().min(1).max(8_192).optional(),
   }),
   z.object({
     type: z.enum(["offer", "answer"]),

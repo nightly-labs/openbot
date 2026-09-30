@@ -9,10 +9,9 @@
  * The invite parser runs first. It owns the host `join`, it is the shipped behaviour, and asking it
  * first is what stops a later kind ever claiming one of its links.
  *
- * Three kinds never reach a renderer. `mcp-auth` carries an OAuth grant for an MCP server,
- * `slack-install` the OAuth code of an agent's Slack app, and `slack-workspace` the sealed manager
- * token of a Slack workspace. Each is a secret, so `src/main/index.ts` hands it to the sign-in that is
- * waiting for it and sends nothing on. They are classified here anyway, because the four entry
+ * Two kinds never reach a renderer. `mcp-auth` carries an OAuth grant for an MCP server, and
+ * `slack-workspace` the sealed bot token of a Slack workspace that installed the OpenBot app. Each is
+ * a secret, so `src/main/index.ts` hands it to the sign-in that is waiting for it and sends nothing on. They are classified here anyway, because the four entry
  * points must keep asking one question.
  *
  * Anything this module does not recognise is `null`, which every caller drops without a message.
@@ -29,7 +28,6 @@ export type DeepLink =
   | { kind: "plugin"; slug: string }
   | { kind: "agent-template"; id: string }
   | { kind: "mcp-auth"; state: string; code: string }
-  | { kind: "slack-install"; state: string; code: string }
   | { kind: "slack-workspace"; nonce: string; grant: string };
 
 /**
@@ -43,7 +41,6 @@ export type DeepLink =
 export const MCP_OAUTH_REDIRECT_URL = "openbot://mcp-auth";
 
 const MCP_OAUTH_HOST = "mcp-auth";
-const SLACK_INSTALL_HOST = "slack-install";
 const SLACK_WORKSPACE_HOST = "slack-workspace";
 
 export function parseDeepLink(value: string, options: InviteLinkOptions = {}): DeepLink | null {
@@ -70,10 +67,9 @@ export function parseDeepLink(value: string, options: InviteLinkOptions = {}): D
 }
 
 /**
- * The return legs of the Slack sign-ins, from the page at `/slack/connect`:
- * `openbot://slack-install?code=…&state=…` and `openbot://slack-workspace?nonce=…&grant=…`. As with
- * `mcp-auth`, the waiting sign-in checks `state` or `nonce`, so a link this run did not start does
- * nothing.
+ * The return leg of the Slack install, from the page at `/slack/connect`:
+ * `openbot://slack-workspace?nonce=…&grant=…`. As with `mcp-auth`, the waiting sign-in checks
+ * `nonce`, so a link this run did not start does nothing.
  */
 function parseSlackUrl(value: string): DeepLink | null {
   let url: URL;
@@ -83,11 +79,6 @@ function parseSlackUrl(value: string): DeepLink | null {
     return null;
   }
   if (url.protocol !== "openbot:") return null;
-  if (url.hostname === SLACK_INSTALL_HOST) {
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-    return code && state ? { kind: "slack-install", state, code } : null;
-  }
   if (url.hostname === SLACK_WORKSPACE_HOST) {
     const nonce = url.searchParams.get("nonce");
     const grant = url.searchParams.get("grant");
