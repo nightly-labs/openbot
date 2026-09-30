@@ -10,6 +10,9 @@ interface TextSegment {
   node: Text;
   start: number;
   end: number;
+  /** Node offsets of each lowercased unit, when lowercasing changed the length. */
+  starts?: number[];
+  ends?: number[];
 }
 
 function highlightRegistry(): HighlightRegistry | undefined {
@@ -42,9 +45,52 @@ export function renderChatSearchHighlights(matches: ChatSearchMatch[], currentIn
 
 const HIDDEN_TEXT = '[aria-hidden="true"], .sr-only, .message-actions';
 
-/** Elements that start a new rendered line. A code block renders each line as its own span. */
-const LINE_CONTAINER =
-  "address, article, aside, blockquote, dd, details, div, dl, dt, figcaption, figure, footer, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, td, th, tr, ul, .message-code-line";
+/** Elements that start a new rendered line. */
+const LINE_CONTAINER_TAGS = new Set([
+  "ADDRESS",
+  "ARTICLE",
+  "ASIDE",
+  "BLOCKQUOTE",
+  "DD",
+  "DETAILS",
+  "DIV",
+  "DL",
+  "DT",
+  "FIGCAPTION",
+  "FIGURE",
+  "FOOTER",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "HEADER",
+  "HR",
+  "LI",
+  "MAIN",
+  "NAV",
+  "OL",
+  "P",
+  "PRE",
+  "SECTION",
+  "SUMMARY",
+  "TABLE",
+  "TD",
+  "TH",
+  "TR",
+  "UL",
+]);
+
+/** A code block renders each line as its own span, with no newline between them. */
+const CODE_LINE_CLASS = "message-code-line";
+
+function lineContainer(text: Text, message: HTMLElement): Element {
+  for (let element = text.parentElement; element && element !== message; element = element.parentElement) {
+    if (LINE_CONTAINER_TAGS.has(element.tagName) || element.classList.contains(CODE_LINE_CLASS)) return element;
+  }
+  return message;
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -56,8 +102,41 @@ function escapeRegExp(value: string): string {
  * line boundary.
  */
 function searchPattern(query: string): RegExp | null {
-  const terms = query.trim().split(/\s+/u).filter(Boolean).map(escapeRegExp);
-  return terms.length > 0 ? new RegExp(terms.join("\\s+"), "giu") : null;
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean).map(escapeRegExp);
+  return terms.length > 0 ? new RegExp(terms.join("\\s+"), "gu") : null;
+}
+
+/**
+ * Text lowercased for the locale, as the query is. Lowercasing can change the length, such as `İ`
+ * outside Turkish, so a segment that changes length keeps the node offsets of each lowercased unit.
+ */
+function lowercased(data: string): Pick<TextSegment, "starts" | "ends"> & { text: string } {
+  const text = data.toLocaleLowerCase();
+  if (text.length === data.length) return { text };
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let offset = 0;
+  let folded = "";
+  for (const character of data) {
+    const lower = character.toLocaleLowerCase();
+    for (let unit = 0; unit < lower.length; unit += 1) {
+      starts.push(offset);
+      ends.push(offset + character.length);
+    }
+    folded += lower;
+    offset += character.length;
+  }
+  return { text: folded, starts, ends };
+}
+
+function startOffset(segment: TextSegment, index: number): number {
+  const local = index - segment.start;
+  return segment.starts?.[local] ?? local;
+}
+
+function endOffset(segment: TextSegment, index: number): number {
+  const local = index - segment.start;
+  return segment.ends?.[local - 1] ?? local;
 }
 
 export function findChatSearchMatches(root: HTMLElement, query: string): ChatSearchMatch[] {
@@ -66,19 +145,16 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
 
   const matches: ChatSearchMatch[] = [];
   for (const message of root.querySelectorAll<HTMLElement>("[data-chat-search-message]")) {
+    if (message.closest(HIDDEN_TEXT)) continue;
     const segments: TextSegment[] = [];
     let text = "";
     const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode(node) {
         if (node instanceof Element) {
-          return node.tagName === "BR" && !node.closest(HIDDEN_TEXT)
-            ? NodeFilter.FILTER_ACCEPT
-            : NodeFilter.FILTER_SKIP;
+          if (node.matches(HIDDEN_TEXT)) return NodeFilter.FILTER_REJECT;
+          return node.tagName === "BR" ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }
-        if (!(node instanceof Text) || !node.data) return NodeFilter.FILTER_REJECT;
-        const parent = node.parentElement;
-        if (!parent || parent.closest(HIDDEN_TEXT)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
+        return node instanceof Text && node.data ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       },
     });
 
@@ -87,36 +163,38 @@ export function findChatSearchMatches(root: HTMLElement, query: string): ChatSea
     let node = walker.nextNode();
     while (node) {
       if (node instanceof Text) {
-        const container = node.parentElement?.closest(LINE_CONTAINER) ?? message;
+        const container = lineContainer(node, message);
         // The space belongs to no segment, so a match across it still maps to the text on both sides.
         if (segments.length > 0 && (lineBreak || container !== line)) text += " ";
         lineBreak = false;
         line = container;
+        const { text: lower, starts, ends } = lowercased(node.data);
         const start = text.length;
-        text += node.data;
-        segments.push({ node, start, end: text.length });
+        text += lower;
+        segments.push({ node, start, end: text.length, starts, ends });
       } else {
         lineBreak = true;
       }
       node = walker.nextNode();
     }
 
-    // Matches come in order, so each segment lookup continues from the previous match.
-    let segmentIndex = 0;
+    // Matches come in order, so each lookup continues from the segment of the previous match. A
+    // match starts and ends on a query character, never on an added space, so both ends are in a
+    // segment.
+    let index = 0;
     for (const found of text.matchAll(pattern)) {
       const matchStart = found.index;
       const matchEnd = matchStart + found[0].length;
-      while ((segments[segmentIndex]?.end ?? matchStart + 1) <= matchStart) segmentIndex += 1;
-      const startSegment = segments[segmentIndex];
-      let endIndex = segmentIndex;
-      while ((segments[endIndex]?.end ?? matchEnd) < matchEnd) endIndex += 1;
+      while ((segments[index]?.end ?? Number.POSITIVE_INFINITY) <= matchStart) index += 1;
+      let endIndex = index;
+      while ((segments[endIndex]?.end ?? Number.POSITIVE_INFINITY) < matchEnd) endIndex += 1;
+      const startSegment = segments[index];
       const endSegment = segments[endIndex];
-      if (startSegment && endSegment) {
-        const range = document.createRange();
-        range.setStart(startSegment.node, matchStart - startSegment.start);
-        range.setEnd(endSegment.node, matchEnd - endSegment.start);
-        matches.push({ range, message });
-      }
+      if (!startSegment || !endSegment) break;
+      const range = document.createRange();
+      range.setStart(startSegment.node, startOffset(startSegment, matchStart));
+      range.setEnd(endSegment.node, endOffset(endSegment, matchEnd));
+      matches.push({ range, message });
     }
   }
   return matches;
