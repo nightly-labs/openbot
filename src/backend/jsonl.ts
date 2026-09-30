@@ -15,7 +15,7 @@ const NEWLINE = 0x0a;
  * The limit is six times the largest line that we measured. It also stops a CLI that writes with no
  * newline before main uses a large part of a 4 GB hosted server.
  */
-export const PROVIDER_LINE_LIMIT_BYTES = 128 * MIB;
+const PROVIDER_LINE_LIMIT_BYTES = 128 * MIB;
 
 /**
  * A provider CLI wrote a line longer than `PROVIDER_LINE_LIMIT_BYTES`. The stream cannot continue
