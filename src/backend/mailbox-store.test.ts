@@ -1416,7 +1416,7 @@ describe("MailboxStore", () => {
         sender: { kind: "agent", agentId: "planner" },
         recipientAgentIds: [recipient],
         text,
-        idempotencyKey,
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
       });
     const finished = required((await send("chief", "Finished work")).deliveries[0]).id;
     await mailbox.markStarting(finished);
