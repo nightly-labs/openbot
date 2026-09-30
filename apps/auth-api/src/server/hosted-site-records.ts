@@ -20,6 +20,8 @@ import {
 export interface SiteRow {
   id: string;
   user_id: string;
+  /** Null for an unlinked site, and for every row that the Worker before `0024` wrote. */
+  server_id: string | null;
   hostname: string;
   title: string;
   description: string;
@@ -158,7 +160,8 @@ export function parseStoredSiteSummary(value: string): HostedSiteSummary {
     !isNumber(parsed.fileCount) ||
     !isNumber(parsed.size) ||
     (parsed.expiresAt !== null && !isString(parsed.expiresAt)) ||
-    !isString(parsed.updatedAt)
+    !isString(parsed.updatedAt) ||
+    (parsed.serverId !== undefined && parsed.serverId !== null && !isString(parsed.serverId))
   ) {
     throw new Error("The stored site receipt is invalid.");
   }
@@ -174,6 +177,8 @@ export function parseStoredSiteSummary(value: string): HostedSiteSummary {
     size: parsed.size,
     expiresAt: parsed.expiresAt,
     updatedAt: parsed.updatedAt,
+    // A receipt from before sites belonged to servers has no server.
+    serverId: isString(parsed.serverId) ? parsed.serverId : null,
   };
 }
 
@@ -198,6 +203,7 @@ export function mapSite(
     size: row.total_bytes,
     expiresAt: row.expires_at === null ? null : new Date(row.expires_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+    serverId: row.server_id ?? null,
   };
 }
 

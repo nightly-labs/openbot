@@ -1098,6 +1098,26 @@ renderer hides those controls from a member. The wire carries no absolute paths,
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
 
+### Hosted sites per server
+
+A hosted site belongs to the server that published it (`hosted_sites.server_id`, D1 `0024`). The user
+stays the accountable owner, for abuse reports, blocks and account deletion. The desktop sends
+`OpenBot-Host-Id` and `OpenBot-Host-Token` (the machine token of `/v2/remote/hosts/register`) on each
+`/v1/sites` request when it is a registered server. The Worker checks the hash and that the host owner
+is the request user; a wrong token is refused with 401, never counted as unlinked. The active-site
+limit comes from the server's plan (`siteLimitForPlan`: none 1, Starter 3, Standard 10, Pro 50). A
+request with no server headers creates only into the account's unlinked bucket (limit 1,
+`server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
+the released meaning of `/v1/sites`. Replace and delete in a server scope refuse a site of another
+bucket with 409 `site_other_server`. A downgrade deletes nothing: a server above its limit cannot
+create a site, but it can replace one, and the extra sites end at their expiry.
+
+`hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
+optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and
+`POST /v1/hosted-sites/delete` for an owner or admin, with the frozen codec in
+`team-protocol/hosted-sites-v1.ts`. The host answers with its own account and credential. Sites are
+managed in Server settings > Sites, on the desktop and in the browser.
+
 ### Leaving a server
 
 Leaving a joined server has the same effect as an admin removal: the membership and every session of

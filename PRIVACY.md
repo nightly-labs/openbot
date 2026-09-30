@@ -11,10 +11,13 @@ account Worker. The browser keeps chat pages, drafts, search results, and file p
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
 their browser. The host must stay online. An owner or admin can manage members and invitations from
 the browser; these requests go to the account Worker, as they do from the desktop app. A signed-in
-user can also change the display name and avatar, disconnect account sessions, and list and delete
-the account's hosted sites from the browser; these requests and the avatar image go to the same
-account Worker as from the desktop app. Host settings,
-such as MCP servers, travel through the encrypted host connection.
+user can also change the display name and avatar and disconnect account sessions from the browser;
+these requests and the avatar image go to the same account Worker as from the desktop app. Host
+settings, such as MCP servers and the server's hosted sites, travel through the encrypted host
+connection. A hosted site belongs to the server that published it. When the computer that runs
+OpenBot is a registered server, its site requests to the account Worker also send that server's id and
+machine token. The account Worker already holds both, and uses them only to find the server and its
+plan's site limit.
 A Grok Bot export that a member imports into a joined server, from the desktop app or the browser, goes
 to the computer that runs that server through the same encrypted host connection, not through the
 account Worker. The host keeps the file only until the import ends, is cancelled, or expires.

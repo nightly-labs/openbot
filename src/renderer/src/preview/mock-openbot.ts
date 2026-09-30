@@ -538,7 +538,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {
-      list: async () => clone(hostedSites),
+      // The preview server is on the Starter plan.
+      list: async () => ({
+        sites: clone(hostedSites),
+        limit: 3,
+        used: hostedSites.filter((site) => site.status === "active").length,
+      }),
       chooseDirectory: async () => "/mock/OpenBot/Sites/launch-notes",
       publish: async (input) => {
         const hostname = `${input.title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}.openbot.site`;
@@ -554,6 +559,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           size: 786_432,
           expiresAt: null,
           updatedAt: new Date().toISOString(),
+          serverId: "host-preview",
         };
         hostedSites = [site, ...hostedSites];
         return clone(site);

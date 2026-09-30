@@ -92,8 +92,6 @@ export const messages = defineMessages("settings", {
   "settings.tab.dynamicIsland.description": "Choose when the island shows and how large it is.",
   "settings.tab.updates.title": "Updates",
   "settings.tab.updates.description": "Keep OpenBot current on this computer.",
-  "settings.tab.hostedSites.title": "Hosted sites",
-  "settings.tab.hostedSites.description": "View and manage static sites published by your agents.",
   "settings.tab.billing.title": "Billing",
   "settings.tab.billing.description": "Server plans, payment method and invoices.",
   "settings.tab.hostedServers.title": "Hosted servers",
@@ -236,15 +234,16 @@ export const messages = defineMessages("settings", {
   "settings.updates.allowRemote.description":
     "Owners and admins of this server can download an update and restart OpenBot on this computer.",
   // The Hosted sites tab.
-  "settings.hostedSites.title": "Your sites",
+  "settings.hostedSites.title": "Published sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",
-  "settings.hostedSites.usage": "{used} of 10 sites",
+  "settings.hostedSites.usage": "{used} of {limit} sites",
   "settings.hostedSites.expiryNote":
     "Sites expire 30 days after publication. Ask an agent to publish or update a site.",
-  "settings.hostedSites.empty": "You do not have a hosted site yet. Ask an agent to publish one.",
+  "settings.hostedSites.empty": "This server does not have a hosted site yet. Ask an agent to publish one.",
   "settings.hostedSites.expires": "Expires {date}",
   "settings.hostedSites.expiryUnavailable": "Expiry unavailable",
   "settings.hostedSites.blocked": "Blocked",
+  "settings.hostedSites.unlinked": "Not linked to a server",
   "settings.hostedSites.openLabel": "Open {hostname}",
   "settings.hostedSites.deleteLabel": "Delete {hostname}",
   "settings.hostedSites.deleteTitle": "Delete {hostname}?",

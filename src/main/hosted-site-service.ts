@@ -4,13 +4,17 @@ import { lstat, open, readdir, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import {
   checkHostedSitePath,
+  HOSTED_SITE_HOST_ID_HEADER,
+  HOSTED_SITE_HOST_TOKEN_HEADER,
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UPLOAD_LIMITS,
   type HostedSitePathProblem,
+  parseHostedSiteList,
   parseHostedSiteSummary,
 } from "@openbot/contracts/hosted-sites";
 import type {
   HostedSiteFramework,
+  HostedSiteList,
   HostedSiteSummary,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
@@ -57,14 +61,36 @@ export interface HostedSiteAuthClient {
   requestAuthorized<T>(path: string, init: RequestInit, decoder: (value: unknown) => T, timeoutMs?: number): Promise<T>;
 }
 
+/** The registered server of this computer and its machine token. The token is a secret: never log it. */
+export interface HostedSiteServerCredential {
+  hostId: string;
+  machineToken: string;
+}
+
+const UNLINKED_SCOPE = "?scope=unlinked";
+
+/**
+ * The sites of this computer's server. A computer that is a registered server proves it with its machine
+ * token, and its new sites count against the server's plan. Without a credential, the account's unlinked
+ * bucket holds the sites. The list shows both, because the unlinked sites belong to this computer's account.
+ */
 export class HostedSiteDesktopService {
   readonly #pendingUploads = new Map<string, PendingUpload>();
 
-  constructor(private readonly auth: HostedSiteAuthClient) {}
+  constructor(
+    private readonly auth: HostedSiteAuthClient,
+    private readonly serverCredential: () => HostedSiteServerCredential | null = () => null,
+  ) {}
 
-  async list(): Promise<HostedSiteSummary[]> {
-    const result = await this.auth.requestAuthorized("/v1/sites/", { method: "GET" }, decodeSiteList);
-    return result.sites;
+  async list(): Promise<HostedSiteList> {
+    const credential = this.serverCredential();
+    const unlinked = this.auth.requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteList);
+    if (!credential) return unlinked;
+    const [server, account] = await Promise.all([
+      this.auth.requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList),
+      unlinked,
+    ]);
+    return { sites: [...server.sites, ...account.sites], limit: server.limit, used: server.used };
   }
 
   publish(input: PublishHostedSiteInput, allowedRoots?: readonly string[]): Promise<HostedSiteSummary> {
@@ -75,10 +101,27 @@ export class HostedSiteDesktopService {
     return this.upload(input, input.siteId, allowedRoots);
   }
 
+  /** Deletes a site of this server, or an unlinked site of this account. */
   async delete(siteId: string): Promise<void> {
+    const path = `/v1/sites/${encodeURIComponent(siteId)}`;
+    const key = operationKey("delete");
+    const credential = this.serverCredential();
+    if (credential) {
+      try {
+        await this.auth.requestAuthorized(
+          path,
+          { method: "DELETE", headers: { "Idempotency-Key": key, ...serverHeaders(credential) } },
+          decodeDeleteResult,
+        );
+        return;
+      } catch (error) {
+        // An unlinked site is not the server's. The Worker refuses it before it claims the key.
+        if (!(error instanceof Error && "code" in error && error.code === "site_other_server")) throw error;
+      }
+    }
     await this.auth.requestAuthorized(
-      `/v1/sites/${encodeURIComponent(siteId)}`,
-      { method: "DELETE", headers: { "Idempotency-Key": operationKey("delete") } },
+      `${path}${UNLINKED_SCOPE}`,
+      { method: "DELETE", headers: { "Idempotency-Key": key } },
       decodeDeleteResult,
     );
   }
@@ -127,7 +170,11 @@ export class HostedSiteDesktopService {
           "/v1/sites/",
           {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Idempotency-Key": pending.uploadKey },
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": pending.uploadKey,
+              ...serverHeaders(this.serverCredential()),
+            },
             body: JSON.stringify({
               title: input.title,
               description: input.description,
@@ -304,9 +351,15 @@ async function collectFiles(root: string): Promise<PreparedFile[]> {
   return files;
 }
 
-function decodeSiteList(value: unknown): { sites: HostedSiteSummary[] } {
-  if (!isDynamicRecord(value) || !Array.isArray(value.sites)) throw new Error("The site list response is invalid.");
-  return { sites: value.sites.map(decodeSite) };
+function decodeSiteList(value: unknown): HostedSiteList {
+  const list = parseHostedSiteList(value);
+  if (!list) throw new Error("The site list response is invalid.");
+  return list;
+}
+
+function serverHeaders(credential: HostedSiteServerCredential | null): Record<string, string> {
+  if (!credential) return {};
+  return { [HOSTED_SITE_HOST_ID_HEADER]: credential.hostId, [HOSTED_SITE_HOST_TOKEN_HEADER]: credential.machineToken };
 }
 
 function decodeSite(value: unknown): HostedSiteSummary {

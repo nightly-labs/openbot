@@ -31,6 +31,13 @@ import {
   sourceIpHash,
   uploadRequestHash,
 } from "./hosted-site-records";
+import { type HostedSiteScope, hostedSiteLimit, scopeServerId } from "./hosted-site-server";
+
+export interface HostedSiteList {
+  sites: HostedSiteSummary[];
+  limit: number;
+  used: number;
+}
 
 export interface HostedSiteUploadSession {
   uploadId: string;
@@ -52,25 +59,35 @@ export class HostedSiteService {
     private readonly localSiteOrigin?: string,
   ) {}
 
-  async list(userId: string): Promise<HostedSiteSummary[]> {
+  /** The sites of the scope, with the limit and slot count of the server that new sites go to. */
+  async list(scope: HostedSiteScope): Promise<HostedSiteList> {
     const now = this.now();
+    const serverId = scopeServerId(scope);
+    const serverFilter = scope.kind === "account" ? "" : "AND s.server_id IS ?";
+    const binds: unknown[] = scope.kind === "account" ? [scope.userId, now] : [scope.userId, now, serverId];
     const rows = await this.database
       .prepare(
         `SELECT s.*, COALESCE(d.file_count, 0) AS file_count, COALESCE(d.total_bytes, 0) AS total_bytes
          FROM hosted_sites s LEFT JOIN site_deployments d ON d.id = s.current_deployment_id
-         WHERE s.user_id = ? AND s.status IN ('active', 'blocked') AND s.expires_at > ?
+         WHERE s.user_id = ? AND s.status IN ('active', 'blocked') AND s.expires_at > ? ${serverFilter}
          ORDER BY s.updated_at DESC`,
       )
-      .bind(userId, now)
+      .bind(...binds)
       .all<SiteRow & { file_count: number; total_bytes: number }>();
-    return rows.results.map((row) => mapSite(row, this.localSiteOrigin));
+    const [limit, used] = await Promise.all([
+      hostedSiteLimit(this.database, serverId, now),
+      this.activeSiteSlotCount(scope.userId, serverId, null, now),
+    ]);
+    return { sites: rows.results.map((row) => mapSite(row, this.localSiteOrigin)), limit, used };
   }
 
   async createUpload(
-    userId: string,
+    scope: HostedSiteScope,
     request: HostedSiteUploadRequest,
     idempotencyKey: string,
   ): Promise<HostedSiteUploadSession> {
+    const userId = scope.userId;
+    const serverId = scopeServerId(scope);
     const requestHash = await uploadRequestHash(request);
     const prior = await this.deploymentByIdempotency(userId, idempotencyKey);
     if (prior) return this.uploadSessionForRequest(prior, requestHash);
@@ -91,6 +108,7 @@ export class HostedSiteService {
     const totalBytes = request.files.reduce((sum, file) => sum + file.size, 0);
     if (request.siteId) {
       const site = await this.requireOwnedSite(userId, request.siteId);
+      requireSiteInBucket(site, serverId);
       if (!site.expires_at || site.expires_at <= now) throw inactiveSiteError("expired");
       const spaFallback = request.spaFallback ?? site.spa_fallback === 1;
       let insert: D1Result<unknown>;
@@ -151,17 +169,19 @@ export class HostedSiteService {
     }
 
     await this.enforceCreationRate(userId, now);
+    const siteLimit = await hostedSiteLimit(this.database, serverId, now);
     const siteId = crypto.randomUUID();
     const hostname = await this.uniqueHostname(`${request.title} ${request.description}`);
     const statements = [
       this.database
         .prepare(
           `INSERT INTO hosted_sites(
-             id, user_id, hostname, title, description, framework, spa_fallback, status, created_at, updated_at
+             id, user_id, server_id, hostname, title, description, framework, spa_fallback, status,
+             created_at, updated_at
            )
-           SELECT ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?
            WHERE (SELECT COUNT(*) FROM hosted_sites
-                  WHERE user_id = ? AND status IN ('uploading', 'active', 'blocked')
+                  WHERE user_id = ? AND server_id IS ? AND status IN ('uploading', 'active', 'blocked')
                     AND (expires_at IS NULL OR expires_at > ?)) < ?
              AND (SELECT COUNT(*) FROM site_deployments
                   WHERE user_id = ? AND status = 'uploading' AND upload_expires_at > ?) < ?
@@ -171,6 +191,7 @@ export class HostedSiteService {
         .bind(
           siteId,
           userId,
+          serverId,
           hostname,
           request.title,
           request.description,
@@ -179,8 +200,9 @@ export class HostedSiteService {
           now,
           now,
           userId,
+          serverId,
           now,
-          HOSTED_SITE_LIMITS.activeSites,
+          siteLimit,
           userId,
           now,
           HOSTED_SITE_LIMITS.concurrentUploads,
@@ -259,11 +281,7 @@ export class HostedSiteService {
         throw new HostedSiteInputError(429, "upload_session_limit", "Finish or wait for an existing upload first.");
       }
       await this.enforceCreationRate(userId, now);
-      throw new HostedSiteInputError(
-        409,
-        "site_limit",
-        `This account already has ${HOSTED_SITE_LIMITS.activeSites} active sites.`,
-      );
+      throw siteLimitError(serverId, siteLimit);
     }
     return this.uploadSession(await this.requireDeployment(userId, deploymentId));
   }
@@ -472,8 +490,10 @@ export class HostedSiteService {
     );
   }
 
-  async delete(userId: string, siteId: string, idempotencyKey: string): Promise<void> {
+  async delete(scope: HostedSiteScope, siteId: string, idempotencyKey: string): Promise<void> {
+    const userId = scope.userId;
     const site = await this.requireOwnedSite(userId, siteId, true);
+    if (scope.kind !== "account") requireSiteInBucket(site, scopeServerId(scope));
     if (site.status === "deleted" && (await this.completedDeletion(userId, site.id))) return;
     return this.runClaimedOperation(
       userId,
@@ -778,6 +798,8 @@ export class HostedSiteService {
     now: number,
   ): Promise<HostedSiteSummary> {
     const previousDeployment = deployment.base_deployment_id;
+    // The site keeps the server it was created for, so the activation counts against that server's plan.
+    const siteLimit = await hostedSiteLimit(this.database, site.server_id, now);
     const results = await this.database.batch([
       this.database
         .prepare(
@@ -787,10 +809,13 @@ export class HostedSiteService {
            WHERE id = ? AND user_id = ? AND status IN ('uploading', 'active')
              AND (status = 'uploading' OR expires_at > ?)
              AND (
-               SELECT COUNT(*) FROM hosted_sites
-               WHERE user_id = ? AND id != ? AND status IN ('uploading', 'active', 'blocked')
-                 AND (expires_at IS NULL OR expires_at > ?)
-             ) < ?
+               -- An active site already holds its slot, so a replacement is allowed after a downgrade.
+               status = 'active' OR (
+                 SELECT COUNT(*) FROM hosted_sites
+                 WHERE user_id = ? AND server_id IS ? AND id != ? AND status IN ('uploading', 'active', 'blocked')
+                   AND (expires_at IS NULL OR expires_at > ?)
+               ) < ?
+             )
              AND current_deployment_id IS ?
              AND EXISTS (SELECT 1 FROM site_deployments WHERE id = ? AND status = 'activating')`,
         )
@@ -806,9 +831,10 @@ export class HostedSiteService {
           userId,
           now,
           userId,
+          site.server_id,
           site.id,
           now,
-          HOSTED_SITE_LIMITS.activeSites,
+          siteLimit,
           previousDeployment,
           deployment.id,
         ),
@@ -877,12 +903,11 @@ export class HostedSiteService {
         if (currentSite.status === "active" && (!currentSite.expires_at || currentSite.expires_at <= now)) {
           throw inactiveSiteError("expired");
         }
-        if ((await this.activeSiteSlotCount(userId, site.id, now)) >= HOSTED_SITE_LIMITS.activeSites) {
-          throw new HostedSiteInputError(
-            409,
-            "site_limit",
-            `This account already has ${HOSTED_SITE_LIMITS.activeSites} active sites.`,
-          );
+        if (
+          currentSite.status === "uploading" &&
+          (await this.activeSiteSlotCount(userId, site.server_id, site.id, now)) >= siteLimit
+        ) {
+          throw siteLimitError(site.server_id, siteLimit);
         }
         throw new HostedSiteInputError(409, "activation_superseded", "A newer site deployment is active.");
       }
@@ -985,14 +1010,20 @@ export class HostedSiteService {
     return this.database.prepare("SELECT * FROM hosted_sites WHERE id = ?").bind(siteId).first<SiteRow>();
   }
 
-  private async activeSiteSlotCount(userId: string, excludeSiteId: string, now: number): Promise<number> {
+  /** The sites that hold a slot of one server, or of the unlinked bucket when `serverId` is null. */
+  private async activeSiteSlotCount(
+    userId: string,
+    serverId: string | null,
+    excludeSiteId: string | null,
+    now: number,
+  ): Promise<number> {
     const row = await this.database
       .prepare(
         `SELECT COUNT(*) AS count FROM hosted_sites
-         WHERE user_id = ? AND id != ? AND status IN ('uploading', 'active', 'blocked')
+         WHERE user_id = ? AND server_id IS ? AND id IS NOT ? AND status IN ('uploading', 'active', 'blocked')
            AND (expires_at IS NULL OR expires_at > ?)`,
       )
-      .bind(userId, excludeSiteId, now)
+      .bind(userId, serverId, excludeSiteId, now)
       .first<{ count: number }>();
     return row?.count ?? 0;
   }
@@ -1369,4 +1400,15 @@ export class HostedSiteService {
     if (prior) return this.uploadSessionForRequest(prior, requestHash);
     throw error;
   }
+}
+
+/** A request changes only the sites of its own server, or unlinked sites when it proved no server. */
+function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
+  if ((site.server_id ?? null) === serverId) return;
+  throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");
+}
+
+function siteLimitError(serverId: string | null, limit: number): HostedSiteInputError {
+  const owner = serverId === null ? "This account has no server, and it" : "This server";
+  return new HostedSiteInputError(409, "site_limit", `${owner} already has ${limit} active sites, its limit.`);
 }

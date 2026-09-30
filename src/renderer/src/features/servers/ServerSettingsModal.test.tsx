@@ -1,4 +1,6 @@
 import type {
+  HostedSiteSummary,
+  HostedSitesDesktopApi,
   HostStatus,
   McpServerConfig,
   ProviderRuntimeStatus,
@@ -453,6 +455,56 @@ describe("ServerSettingsModal", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Clear Cached server files" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
     await waitFor(() => expect(clear).toHaveBeenCalledWith({ category: "caches" }, "remote-1"));
+  });
+
+  it("lists a server's sites with its plan limit, and deletes only for an owner or admin", async () => {
+    const site: HostedSiteSummary = {
+      id: "site-to-delete",
+      hostname: "temporary-project-site-23456789ab.openbot.site",
+      url: "https://temporary-project-site-23456789ab.openbot.site",
+      title: "Temporary project site",
+      description: "Verify deletion and list refresh.",
+      framework: "vanilla",
+      status: "active",
+      fileCount: 1,
+      size: 256,
+      expiresAt: "2026-09-30T12:00:00.000Z",
+      updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: "remote-1",
+    };
+    const unlinked: HostedSiteSummary = { ...site, id: "site-unlinked", hostname: "old.openbot.site", serverId: null };
+    const api = {
+      list: vi
+        .fn<HostedSitesDesktopApi["list"]>()
+        .mockResolvedValueOnce({ sites: [site, unlinked], limit: 3, used: 2 })
+        .mockResolvedValueOnce({ sites: [site, unlinked], limit: 3, used: 2 })
+        .mockResolvedValue({ sites: [unlinked], limit: 3, used: 1 }),
+      delete: vi.fn<HostedSitesDesktopApi["delete"]>(async () => undefined),
+    };
+    const track = vi.fn();
+    const hostedSites = { api, onOpenSite: vi.fn(), trackDelete: () => track };
+
+    const { unmount } = render(() => (
+      <ServerSettingsModal {...props({ server: { ...remoteServer, role: "member" }, hostedSites })} />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    expect(await screen.findByText(site.hostname)).toBeInTheDocument();
+    expect(api.list).toHaveBeenCalledWith("remote-1");
+    expect(screen.getByText("2 of 3 sites")).toBeInTheDocument();
+    expect(screen.getByText("Not linked to a server")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Delete ${site.hostname}` })).not.toBeInTheDocument();
+    unmount();
+
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostedSites })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    await fireEvent.click(await screen.findByRole("button", { name: `Delete ${site.hostname}` }));
+    const confirmation = await screen.findByRole("alertdialog", { name: `Delete ${site.hostname}?` });
+    expect(confirmation).toHaveAccessibleDescription("This address will immediately return 410 Gone.");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith({ siteId: site.id }, "remote-1"));
+    await waitFor(() => expect(screen.queryByText(site.hostname)).not.toBeInTheDocument());
+    expect(screen.getByText("1 of 3 sites")).toBeInTheDocument();
+    expect(track).toHaveBeenCalledWith("succeeded");
   });
 
   // MCP servers belong to this machine and are started by the agents on it, so they are manageable

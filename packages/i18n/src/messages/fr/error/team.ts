@@ -81,6 +81,7 @@ export const messages = {
   "error.team.browserSessionNotFound": "Session de vue du navigateur introuvable.",
   "error.team.mcpUnsupported": "Les serveurs MCP ne sont pas pris en charge par cette connexion.",
   "error.team.storageUnsupported": "Le stockage n’est pas pris en charge par cette connexion.",
+  "error.team.hostedSitesUnsupported": "Les sites ne sont pas pris en charge par cette connexion.",
   "error.team.markUnreadUnsupported": "Ce client ne permet pas de marquer des conversations comme non lues.",
   "error.team.inviteServiceUnavailable": "Le service d’invitation n’est pas disponible.",
   "error.team.logoNotFound": "Logo du serveur introuvable.",

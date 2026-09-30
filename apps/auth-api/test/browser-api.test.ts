@@ -501,7 +501,10 @@ describe("browser account boundary", () => {
     }
     function withSites() {
       const services = setup();
-      const hostedSites = { list: vi.fn().mockResolvedValue([]), delete: vi.fn().mockResolvedValue(undefined) };
+      const hostedSites = {
+        list: vi.fn().mockResolvedValue({ sites: [], limit: 1, used: 0 }),
+        delete: vi.fn().mockResolvedValue(undefined),
+      };
       services.hostedSites = () => hostedSites;
       return { services, hostedSites };
     }
@@ -522,12 +525,12 @@ describe("browser account boundary", () => {
     it("acts on the sites of the browser cookie's account", async () => {
       const { services, hostedSites } = withSites();
       const listed = await handleBrowserApi(request("v1/sites", { cookie }), services);
-      expect(await listed.json()).toEqual({ sites: [], limit: 10 });
-      expect(hostedSites.list).toHaveBeenCalledWith(user.id);
+      expect(await listed.json()).toEqual({ sites: [], limit: 1, used: 0 });
+      expect(hostedSites.list).toHaveBeenCalledWith({ kind: "account", userId: user.id });
 
       const deleted = await handleBrowserApi(deleteSite(), services);
       expect(await deleted.json()).toEqual({ deleted: true });
-      expect(hostedSites.delete).toHaveBeenCalledWith(user.id, "site-one", idempotencyKey);
+      expect(hostedSites.delete).toHaveBeenCalledWith({ kind: "account", userId: user.id }, "site-one", idempotencyKey);
     });
     it("returns a hosted-site refusal with its own status", async () => {
       const { services, hostedSites } = withSites();

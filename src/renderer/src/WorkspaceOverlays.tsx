@@ -1,7 +1,9 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, Loading, Show } from "solid-js";
+import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
@@ -308,6 +310,17 @@ function ServerSettings() {
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
           storage={storageOptions(server())}
+          // This computer, or a remote host with `hosted-sites-v1`. Every member lists; the host deletes
+          // only for an owner or admin.
+          hostedSites={
+            serverSupportsCapability(server(), "hosted-sites-v1")
+              ? {
+                  api: appPort().hostedSites,
+                  onOpenSite: (url) => void appPort().openUrl(url),
+                  trackDelete: trackHostedSiteDelete,
+                }
+              : undefined
+          }
           hostUpdate={{}}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
@@ -325,6 +338,18 @@ function ServerSettings() {
       )}
     </Show>
   );
+}
+
+/** The account that starts a deletion gets its result event, as the scope is taken at the start. */
+function trackHostedSiteDelete(): (result: HostedSiteDeleteResult) => void {
+  const analytics = desktopAnalytics.scope();
+  return (result) =>
+    analytics.track("hosted_site_action", {
+      action: "delete",
+      entry_point: "settings",
+      result,
+      ...(result === "failed" ? { failure_code: "delete_failed" } : {}),
+    });
 }
 
 /**
@@ -439,7 +464,6 @@ function AppSettings(props: AccountProps) {
         providerKeys={providerDownloads() ? providerKeys() : undefined}
         providerHostName={providerAdminServerId() === undefined ? undefined : activeServer()?.name}
         codeLogin={providerDownloads() ? codeLogin : undefined}
-        hostedSitesApi={appPort().hostedSites}
         billingApi={appPort().billing}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {

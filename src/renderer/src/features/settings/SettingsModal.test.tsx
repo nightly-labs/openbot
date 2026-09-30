@@ -7,7 +7,6 @@ import type {
   CentralAuthUser,
   CustomProviderRestart,
   DesktopPlatform,
-  HostedSitesDesktopApi,
   MobileConnectedDevice,
   SaveCustomProviderInput,
   UpdateStatus,
@@ -18,7 +17,6 @@ import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-sett
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
@@ -505,161 +503,6 @@ describe("SettingsModal", () => {
     );
     await fireEvent.click(await screen.findByRole("button", { name: "Remove profile photo" }));
     await waitFor(() => expect(onUpdateAccountAvatar).toHaveBeenLastCalledWith(null));
-  });
-
-  it("lists an agent-published site with only Open and Delete actions", async () => {
-    const site = {
-      id: "site-1",
-      hostname: "interactive-budget-planner-students-23456789ab.openbot.site",
-      url: "https://interactive-budget-planner-students-23456789ab.openbot.site",
-      title: "Student budget planner",
-      description: "Plan a student budget.",
-      framework: "vanilla" as const,
-      status: "active" as const,
-      fileCount: 3,
-      size: 1_024,
-      expiresAt: "2026-09-30T12:00:00.000Z",
-      updatedAt: "2026-08-31T12:00:00.000Z",
-    };
-    const hostedSitesApi: HostedSitesDesktopApi = {
-      list: vi.fn(async () => [site]),
-      chooseDirectory: vi.fn(async () => "/tmp/student-budget-site"),
-      publish: vi.fn(async () => site),
-      replace: vi.fn(async () => site),
-      delete: vi.fn(async () => undefined),
-    };
-    const openUrl = vi.fn(async () => undefined);
-    vi.stubGlobal("openbot", { ...logoColorPort(), openUrl });
-    render(() => (
-      <SettingsModal
-        open
-        onOpenChange={() => undefined}
-        value={DEFAULT_GENERAL_SETTINGS}
-        onValueChange={() => undefined}
-        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
-        updateStatus={idleUpdateStatus}
-        onUpdateAction={vi.fn(async () => undefined)}
-        account={account}
-        onUpdateAccountName={vi.fn(async () => undefined)}
-        onUpdateAccountAvatar={vi.fn(async () => undefined)}
-        hostedSitesApi={hostedSitesApi}
-      />
-    ));
-
-    await fireEvent.click(screen.getByRole("tab", { name: "Hosted sites" }));
-    expect(await screen.findByText(site.hostname)).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: site.hostname }));
-    await fireEvent.click(screen.getByRole("button", { name: `Open ${site.hostname}` }));
-
-    expect(openUrl).toHaveBeenNthCalledWith(1, site.url);
-    expect(openUrl).toHaveBeenNthCalledWith(2, site.url);
-    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Replace" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: `Copy ${site.hostname} URL` })).not.toBeInTheDocument();
-    expect(hostedSitesApi.chooseDirectory).not.toHaveBeenCalled();
-    expect(hostedSitesApi.publish).not.toHaveBeenCalled();
-    expect(hostedSitesApi.replace).not.toHaveBeenCalled();
-  });
-
-  it("confirms a hosted-site deletion and reloads the list", async () => {
-    const site = {
-      id: "site-to-delete",
-      hostname: "temporary-project-site-23456789ab.openbot.site",
-      url: "https://temporary-project-site-23456789ab.openbot.site",
-      title: "Temporary project site",
-      description: "Verify deletion and list refresh.",
-      framework: "vanilla" as const,
-      status: "active" as const,
-      fileCount: 1,
-      size: 256,
-      expiresAt: "2026-09-30T12:00:00.000Z",
-      updatedAt: "2026-08-31T12:00:00.000Z",
-    };
-    const analyticsTrack = vi.fn<DesktopAnalyticsScope["track"]>();
-    const analyticsScope = { track: analyticsTrack } satisfies DesktopAnalyticsScope;
-    vi.spyOn(desktopAnalytics, "scope").mockReturnValue(analyticsScope);
-    const hostedSitesApi: HostedSitesDesktopApi = {
-      list: vi.fn().mockResolvedValueOnce([site]).mockResolvedValue([]),
-      chooseDirectory: vi.fn(async () => "/tmp/queued-site"),
-      publish: vi.fn(async () => site),
-      replace: vi.fn(async () => site),
-      delete: vi.fn(async () => undefined),
-    };
-    render(() => (
-      <SettingsModal
-        open
-        onOpenChange={() => undefined}
-        value={DEFAULT_GENERAL_SETTINGS}
-        onValueChange={() => undefined}
-        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
-        updateStatus={idleUpdateStatus}
-        onUpdateAction={vi.fn(async () => undefined)}
-        account={account}
-        onUpdateAccountName={vi.fn(async () => undefined)}
-        onUpdateAccountAvatar={vi.fn(async () => undefined)}
-        hostedSitesApi={hostedSitesApi}
-      />
-    ));
-
-    await fireEvent.click(screen.getByRole("tab", { name: "Hosted sites" }));
-    expect(await screen.findByText(site.hostname)).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: `Delete ${site.hostname}` }));
-
-    const confirmation = await screen.findByRole("alertdialog", { name: `Delete ${site.hostname}?` });
-    expect(confirmation).toHaveAccessibleDescription("This address will immediately return 410 Gone.");
-    expect(hostedSitesApi.delete).not.toHaveBeenCalled();
-    await fireEvent.click(within(confirmation).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(hostedSitesApi.delete).toHaveBeenCalledWith({ siteId: site.id }));
-    await waitFor(() => expect(hostedSitesApi.list).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText(site.hostname)).not.toBeInTheDocument());
-    expect(analyticsTrack).toHaveBeenCalledWith("hosted_site_action", {
-      action: "delete",
-      entry_point: "settings",
-      result: "succeeded",
-    });
-  });
-
-  it("shows a blocked hosted site and disables Open", async () => {
-    const site = {
-      id: "blocked-site",
-      hostname: "blocked-project-site-23456789ab.openbot.site",
-      url: "https://blocked-project-site-23456789ab.openbot.site",
-      title: "Blocked project site",
-      description: "A blocked hosted site.",
-      framework: "vanilla" as const,
-      status: "blocked" as const,
-      fileCount: 1,
-      size: 256,
-      expiresAt: "2026-09-30T12:00:00.000Z",
-      updatedAt: "2026-08-31T12:00:00.000Z",
-    };
-    const hostedSitesApi: HostedSitesDesktopApi = {
-      list: vi.fn(async () => [site]),
-      chooseDirectory: vi.fn(async () => null),
-      publish: vi.fn(async () => site),
-      replace: vi.fn(async () => site),
-      delete: vi.fn(async () => undefined),
-    };
-    render(() => (
-      <SettingsModal
-        open
-        onOpenChange={() => undefined}
-        value={DEFAULT_GENERAL_SETTINGS}
-        onValueChange={() => undefined}
-        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
-        updateStatus={idleUpdateStatus}
-        onUpdateAction={vi.fn(async () => undefined)}
-        account={account}
-        onUpdateAccountName={vi.fn(async () => undefined)}
-        onUpdateAccountAvatar={vi.fn(async () => undefined)}
-        hostedSitesApi={hostedSitesApi}
-      />
-    ));
-
-    await fireEvent.click(screen.getByRole("tab", { name: "Hosted sites" }));
-    expect(await screen.findByText("Blocked")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: `Open ${site.hostname}` })).toBeDisabled();
   });
 
   it("confirms a new mobile connection before collapsing the QR code", async () => {

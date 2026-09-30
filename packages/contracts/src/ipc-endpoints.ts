@@ -174,6 +174,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
   DeleteHostedSiteInput,
+  HostedSiteList,
   HostedSiteSummary,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
@@ -584,11 +585,12 @@ export const IPC_ENDPOINTS = {
     changed: event<GitHubConnectorStatus>()("github-connector:changed"),
   },
   hostedSites: {
-    list: request<undefined, HostedSiteSummary[]>()("hosted-sites:list"),
+    // The sites of one server. A joined server answers through `hosted-sites-v1`.
+    list: scopedQuery<HostedSiteList, "required">()("hosted-sites:list"),
     chooseDirectory: request<undefined, string | null>()("hosted-sites:choose-directory"),
     publish: request<PublishHostedSiteInput, HostedSiteSummary>()("hosted-sites:publish"),
     replace: request<ReplaceHostedSiteInput, HostedSiteSummary>()("hosted-sites:replace"),
-    delete: request<DeleteHostedSiteInput, void>()("hosted-sites:delete"),
+    delete: scopedRequest<DeleteHostedSiteInput, void, "required">()("hosted-sites:delete"),
   },
   // The account's Stripe subscription. The main process gets the Checkout or Portal URL from the
   // account server and opens it in the browser, so the renderer never sends a URL.

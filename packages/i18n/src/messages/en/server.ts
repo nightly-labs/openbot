@@ -161,6 +161,8 @@ export const messages = defineMessages("server", {
   "server.settings.mcpDescription": "Connect MCP servers and choose which ones this server’s agents can use.",
   "server.settings.storageTitle": "Storage",
   "server.settings.storageDescription": "See what OpenBot keeps on this server’s disk, and free space.",
+  "server.settings.hostedSitesTitle": "Sites",
+  "server.settings.hostedSitesDescription": "The static sites that agents on this server published to openbot.site.",
   "server.settings.importTitle": "Import",
   "server.settings.importDescription": "Move your agents from Grok Bot to this server.",
   "server.settings.connectorsTitle": "Connectors",

@@ -48,7 +48,8 @@ mock. The separate web preview implements the browser runtime with that same moc
   `v1/me/billing/portal`), and hosted servers (`v2/hosting/servers` list and create with
   `{name, plan, interval, currency}`, `v2/hosting/plans`, `v2/hosting/servers/:id` delete, and
   `v2/hosting/servers/:id/wake` and `/checkout`), and the account's hosted site list/delete
-  (`v1/sites`). It is not a general account or host proxy.
+  (`v1/sites`), which the web client no longer calls: sites are in Server settings > Sites, through
+  the host's `hosted-sites-v1`. It is not a general account or host proxy.
   Every write needs the same origin and `X-OpenBot-Browser: 1`; all send JSON except the avatar
   upload, which sends the image bytes. A site delete also needs an `Idempotency-Key`. A host logo is
   given to a member of that host, for its current `logoKey` only.
@@ -56,7 +57,7 @@ mock. The separate web preview implements the browser runtime with that same moc
   Account settings, Settings (the connected host's settings), Marketplace, Send feedback, Message,
   and Sign out. Profile opens the desktop Settings > Profile content in the right panel of the agent
   on screen; it is not available in a channel. Account settings opens a dialog with the desktop
-  Profile and Hosted sites tabs, and Preferences: the interface language and the completion sound.
+  Profile tab, and Preferences: the interface language and the completion sound.
   This browser keeps both preferences, also before sign-in (`web-language-preference.ts`,
   `completion-sound.ts`). A browser session is listed as Desktop, and it can disconnect any other
   session of the account, as the desktop app can. Providers & permissions and app updates stay

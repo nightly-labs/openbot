@@ -14,7 +14,7 @@ import {
   parseHostedServerList,
   parseHostedServerSummary,
 } from "@openbot/contracts/hosted-servers";
-import { parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
+import { parseHostedSiteList, parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
   type AnalyticsPreference,
@@ -38,6 +38,7 @@ import {
   type ExportResult,
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
+  type HostedSiteList,
   type HostedSiteSummary,
   isAgentModel,
   isAgentProvider,
@@ -294,9 +295,10 @@ export function decodeHostedSite(value: unknown): HostedSiteSummary {
   return site;
 }
 
-export function decodeHostedSites(value: unknown): HostedSiteSummary[] {
-  if (!Array.isArray(value)) throw new Error("Invalid hosted site list response.");
-  return value.map(decodeHostedSite);
+export function decodeHostedSiteList(value: unknown): HostedSiteList {
+  const list = parseHostedSiteList(value);
+  if (!list) throw new Error("Invalid hosted site list response.");
+  return list;
 }
 
 export function decodeGitHubConnectorStatus(value: unknown): GitHubConnectorStatus {

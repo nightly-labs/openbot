@@ -81,7 +81,7 @@ import {
   decodeHostedServerCatalog,
   decodeHostedServerList,
   decodeHostedSite,
-  decodeHostedSites,
+  decodeHostedSiteList,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
@@ -533,7 +533,7 @@ const openbotApi: OpenBotDesktopApi = {
     setEnabled: decodeInstalledSkill,
   }),
   hostedSites: bridgeGroup(IPC_ENDPOINTS.hostedSites, {
-    list: decodeHostedSites,
+    list: decodeHostedSiteList,
     chooseDirectory: decodeNullablePath,
     publish: decodeHostedSite,
     replace: decodeHostedSite,

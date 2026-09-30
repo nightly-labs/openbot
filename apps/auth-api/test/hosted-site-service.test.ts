@@ -1,9 +1,12 @@
-import { readFileSync } from "node:fs";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { createHash } from "node:crypto";
+import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { HOSTED_SITE_HOST_ID_HEADER, HOSTED_SITE_HOST_TOKEN_HEADER } from "@openbot/contracts/hosted-sites";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
 import { HOSTED_SITE_LIMITS, type HostedSiteUploadRequest } from "../src/server/hosted-site-contract";
+import { type HostedSiteScope, resolveHostedSiteScope } from "../src/server/hosted-site-server";
 import { HostedSiteService } from "../src/server/hosted-site-service";
+import { migratedDatabase } from "./sqlite-d1";
 
 const databases: DatabaseSync[] = [];
 const HTML = "<h1>Hosted</h1>";
@@ -16,8 +19,8 @@ afterEach(() => {
 describe("hosted site control plane", () => {
   it("keeps publication idempotent, enforces ownership, and replaces atomically", async () => {
     const fixture = serviceFixture();
-    const firstUpload = await fixture.service.createUpload("alice", uploadRequest(), "publish-1");
-    const repeated = await fixture.service.createUpload("alice", uploadRequest(), "publish-1");
+    const firstUpload = await fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1");
+    const repeated = await fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1");
     expect(repeated.uploadId).toBe(firstUpload.uploadId);
 
     await uploadIndex(fixture.service, "alice", firstUpload.uploadId);
@@ -25,12 +28,12 @@ describe("hosted site control plane", () => {
     const firstDeployment = firstUpload.uploadId;
 
     await expect(
-      fixture.service.createUpload("bob", uploadRequest({ siteId: first.id }), "replace-by-bob"),
+      fixture.service.createUpload(server("bob"), uploadRequest({ siteId: first.id }), "replace-by-bob"),
     ).rejects.toMatchObject({ code: "site_not_found" });
 
     fixture.setNow(NOW + 24 * 60 * 60_000);
     const replacement = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: first.id, title: "Updated hosted budget planner" }),
       "replace-1",
     );
@@ -50,7 +53,7 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const first = await publish(fixture.service, "alice", "receipt-first-publish", "shared-activation-key");
     const replacement = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: first.id, title: "Replacement with reused activation key" }),
       "receipt-replacement-publish",
     );
@@ -65,9 +68,9 @@ describe("hosted site control plane", () => {
       .first<{ status: string }>();
     expect(replacementDeployment?.status).toBe("uploading");
 
-    const second = await fixture.service.createUpload("alice", uploadRequest(), "receipt-second-publish");
-    await fixture.service.delete("alice", first.id, "shared-delete-key");
-    await expect(fixture.service.delete("alice", second.site.id, "shared-delete-key")).rejects.toMatchObject({
+    const second = await fixture.service.createUpload(server("alice"), uploadRequest(), "receipt-second-publish");
+    await fixture.service.delete(server("alice"), first.id, "shared-delete-key");
+    await expect(fixture.service.delete(server("alice"), second.site.id, "shared-delete-key")).rejects.toMatchObject({
       code: "idempotency_conflict",
     });
     const secondSite = await fixture.database
@@ -80,12 +83,12 @@ describe("hosted site control plane", () => {
   it("claims an operation key before concurrent activation and deletion", async () => {
     const activationFixture = serviceFixture();
     const firstUpload = await activationFixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ title: "First concurrent activation" }),
       "concurrent-operation-first-upload",
     );
     const secondUpload = await activationFixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ title: "Second concurrent activation" }),
       "concurrent-operation-second-upload",
     );
@@ -128,11 +131,11 @@ describe("hosted site control plane", () => {
       "concurrent-delete-second-activation",
     );
     const deletionPause = deletionFixture.database.pauseNextBatchContaining("SET status = 'deleted'");
-    const firstDeletion = deletionFixture.service.delete("alice", firstSite.id, "concurrent-delete-key");
+    const firstDeletion = deletionFixture.service.delete(server("alice"), firstSite.id, "concurrent-delete-key");
     await deletionPause.started;
     try {
       await expect(
-        deletionFixture.service.delete("alice", secondSite.id, "concurrent-delete-key"),
+        deletionFixture.service.delete(server("alice"), secondSite.id, "concurrent-delete-key"),
       ).rejects.toMatchObject({ code: "idempotency_conflict" });
     } finally {
       deletionPause.resume();
@@ -150,7 +153,7 @@ describe("hosted site control plane", () => {
     const site = await publish(fixture.service, "alice", "rate-publish-0", "rate-activate-0");
     for (let index = 1; index < 20; index += 1) {
       const replacement = await fixture.service.createUpload(
-        "alice",
+        server("alice"),
         uploadRequest({ siteId: site.id, title: `Rate limited replacement ${index}` }),
         `rate-publish-${index}`,
       );
@@ -158,7 +161,7 @@ describe("hosted site control plane", () => {
       await fixture.service.activate("alice", replacement.uploadId, `rate-activate-${index}`);
     }
     const limited = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: site.id, title: "Rate limited replacement twenty one" }),
       "rate-publish-20",
     );
@@ -186,7 +189,7 @@ describe("hosted site control plane", () => {
       .bind(site.id)
       .first<{ current_deployment_id: string }>();
     const replacement = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: site.id, title: "Replacement after route failure" }),
       "retry-replace",
     );
@@ -212,7 +215,7 @@ describe("hosted site control plane", () => {
 
   it("keeps the active objects when two requests finalize the same authorized upload", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "concurrent-same-upload");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-same-upload");
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const pause = fixture.database.pauseNextBatchContaining("UPDATE hosted_sites SET status = 'active'");
     const firstActivation = fixture.service.activate("alice", upload.uploadId, "concurrent-activate-first");
@@ -232,7 +235,7 @@ describe("hosted site control plane", () => {
   it("rejects missing or false content lengths before an oversized body reaches R2", async () => {
     const fixture = serviceFixture();
     const upload = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ files: [{ path: "index.html", size: 0, mimeType: "text/html" }] }),
       "oversized-upload",
     );
@@ -259,7 +262,7 @@ describe("hosted site control plane", () => {
 
   it("does not activate while a file upload can still mutate the asset", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "active-file-upload");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "active-file-upload");
     const asset = `sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`;
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await fixture.bucket.delete(asset);
@@ -282,8 +285,8 @@ describe("hosted site control plane", () => {
   it("caps simultaneous file uploads for an account", async () => {
     const fixture = serviceFixture();
     const [first, second] = await Promise.all([
-      fixture.service.createUpload("alice", uploadRequest(), "concurrent-file-limit-first"),
-      fixture.service.createUpload("alice", uploadRequest(), "concurrent-file-limit-second"),
+      fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-first"),
+      fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-second"),
     ]);
     const firstPause = fixture.bucket.pauseNextPutContaining(
       `sites/${first.site.id}/deployments/${first.uploadId}/index.html`,
@@ -305,7 +308,7 @@ describe("hosted site control plane", () => {
 
   it("does not consume retry claims for an already completed file", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "completed-file-retry");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "completed-file-retry");
 
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await uploadIndex(fixture.service, "alice", upload.uploadId);
@@ -321,7 +324,7 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const content = "x".repeat(HOSTED_SITE_LIMITS.fileBytes);
     const upload = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ files: [{ path: "index.html", size: content.length, mimeType: "text/html" }] }),
       "upload-byte-limit",
     );
@@ -371,7 +374,7 @@ describe("hosted site control plane", () => {
       .bind(site.id)
       .first<{ current_deployment_id: string }>();
     const replacement = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: site.id, title: "Cleanup route replacement" }),
       "cleanup-route-replace",
     );
@@ -393,10 +396,10 @@ describe("hosted site control plane", () => {
 
   it("deletes a deployment activated after deletion reads its site snapshot", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "delete-activation-race");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "delete-activation-race");
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const pause = fixture.database.pauseNextBatchContaining("SET status = 'deleted'");
-    const deletion = fixture.service.delete("alice", upload.site.id, "delete-after-activation");
+    const deletion = fixture.service.delete(server("alice"), upload.site.id, "delete-after-activation");
     await pause.started;
     await fixture.service.activate("alice", upload.uploadId, "activate-before-delete-batch");
     pause.resume();
@@ -416,7 +419,7 @@ describe("hosted site control plane", () => {
     const pause = fixture.database.pauseNextBatchContaining("UPDATE hosted_sites SET status = ?");
     const blocking = fixture.service.setBlocked(site.id, true);
     await pause.started;
-    await fixture.service.delete("alice", site.id, "delete-during-block");
+    await fixture.service.delete(server("alice"), site.id, "delete-during-block");
     pause.resume();
 
     await expect(blocking).rejects.toMatchObject({ code: "site_deleted" });
@@ -433,7 +436,7 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const results = await Promise.allSettled(
       ["one", "two", "three"].map((key) =>
-        fixture.service.createUpload("alice", uploadRequest({ title: `${key} hosted static project` }), key),
+        fixture.service.createUpload(server("alice"), uploadRequest({ title: `${key} hosted static project` }), key),
       ),
     );
 
@@ -445,9 +448,9 @@ describe("hosted site control plane", () => {
   it("returns one upload session for concurrent requests with the same idempotency key", async () => {
     const fixture = serviceFixture();
     const pause = fixture.database.pauseNextBatchContaining("INSERT INTO hosted_sites");
-    const firstRequest = fixture.service.createUpload("alice", uploadRequest(), "same-upload-key");
+    const firstRequest = fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key");
     await pause.started;
-    const secondSession = await fixture.service.createUpload("alice", uploadRequest(), "same-upload-key");
+    const secondSession = await fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key");
     pause.resume();
     const firstSession = await firstRequest;
 
@@ -462,10 +465,10 @@ describe("hosted site control plane", () => {
 
   it("rejects an upload idempotency key reused for another payload or target", async () => {
     const payloadFixture = serviceFixture();
-    await payloadFixture.service.createUpload("alice", uploadRequest(), "upload-request-key");
+    await payloadFixture.service.createUpload(server("alice"), uploadRequest(), "upload-request-key");
     await expect(
       payloadFixture.service.createUpload(
-        "alice",
+        server("alice"),
         uploadRequest({ title: "A different hosted site request" }),
         "upload-request-key",
       ),
@@ -475,16 +478,20 @@ describe("hosted site control plane", () => {
     const firstSite = await publish(targetFixture.service, "alice", "target-first-upload", "target-first-activate");
     const secondSite = await publish(targetFixture.service, "alice", "target-second-upload", "target-second-activate");
     await targetFixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: firstSite.id }),
       "replacement-request-key",
     );
     await expect(
-      targetFixture.service.createUpload("alice", uploadRequest({ siteId: secondSite.id }), "replacement-request-key"),
+      targetFixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: secondSite.id }),
+        "replacement-request-key",
+      ),
     ).rejects.toMatchObject({ code: "idempotency_conflict" });
   });
 
-  it("uses one atomic slot check for the ten-site limit", async () => {
+  it("uses one atomic slot check for the ten-site limit of a standard server", async () => {
     const fixture = serviceFixture();
     for (let index = 0; index < 10; index += 1) {
       await publish(fixture.service, "alice", `publish-${index}`, `activate-${index}`, {
@@ -493,7 +500,7 @@ describe("hosted site control plane", () => {
     }
 
     await expect(
-      fixture.service.createUpload("alice", uploadRequest({ title: "Eleventh hosted planner" }), "publish-11"),
+      fixture.service.createUpload(server("alice"), uploadRequest({ title: "Eleventh hosted planner" }), "publish-11"),
     ).rejects.toMatchObject({ code: "site_limit" });
   });
 
@@ -501,13 +508,13 @@ describe("hosted site control plane", () => {
     const deletedFixture = serviceFixture();
     const deletedSite = await publish(deletedFixture.service, "alice", "publish-delete", "activate-delete");
     const pendingDelete = await deletedFixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: deletedSite.id }),
       "replace-before-delete",
     );
     await uploadIndex(deletedFixture.service, "alice", pendingDelete.uploadId);
 
-    await deletedFixture.service.delete("alice", deletedSite.id, "delete-site-once");
+    await deletedFixture.service.delete(server("alice"), deletedSite.id, "delete-site-once");
     await expect(
       deletedFixture.service.activate("alice", pendingDelete.uploadId, "activate-after-delete"),
     ).rejects.toMatchObject({ code: "site_deleted" });
@@ -517,7 +524,7 @@ describe("hosted site control plane", () => {
     const expiredSite = await publish(expiredFixture.service, "alice", "publish-expiry", "activate-expiry");
     expiredFixture.setNow(NOW + 30 * 24 * 60 * 60_000 - 5 * 60_000);
     const pendingExpiry = await expiredFixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: expiredSite.id }),
       "replace-before-expiry",
     );
@@ -535,10 +542,10 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const expired = await publish(fixture.service, "alice", "list-expiry-upload", "list-expiry-activation");
     const deleted = await publish(fixture.service, "alice", "list-delete-upload", "list-delete-activation");
-    await fixture.service.delete("alice", deleted.id, "list-delete-site");
+    await fixture.service.delete(server("alice"), deleted.id, "list-delete-site");
     fixture.setNow(NOW + 30 * 24 * 60 * 60_000 + 1);
 
-    await expect(fixture.service.list("alice")).resolves.toEqual([]);
+    await expect(fixture.service.list(server("alice"))).resolves.toMatchObject({ sites: [], used: 0 });
     const stored = await fixture.database
       .prepare("SELECT status FROM hosted_sites WHERE id = ?")
       .bind(expired.id)
@@ -551,12 +558,12 @@ describe("hosted site control plane", () => {
     const site = await publish(fixture.service, "alice", "publish-race", "activate-race");
     const [first, second] = await Promise.all([
       fixture.service.createUpload(
-        "alice",
+        server("alice"),
         uploadRequest({ siteId: site.id, title: "First replacement site" }),
         "replace-a",
       ),
       fixture.service.createUpload(
-        "alice",
+        server("alice"),
         uploadRequest({ siteId: site.id, title: "Second replacement site" }),
         "replace-b",
       ),
@@ -697,7 +704,7 @@ describe("hosted site control plane", () => {
 
   it("keeps a live initial activation and abandons it only after its upload expires", async () => {
     const liveFixture = serviceFixture();
-    const live = await liveFixture.service.createUpload("alice", uploadRequest(), "live-initial-upload");
+    const live = await liveFixture.service.createUpload(server("alice"), uploadRequest(), "live-initial-upload");
     await uploadIndex(liveFixture.service, "alice", live.uploadId);
     await liveFixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
@@ -712,7 +719,7 @@ describe("hosted site control plane", () => {
     );
 
     const staleFixture = serviceFixture();
-    const stale = await staleFixture.service.createUpload("alice", uploadRequest(), "stale-initial-upload");
+    const stale = await staleFixture.service.createUpload(server("alice"), uploadRequest(), "stale-initial-upload");
     await uploadIndex(staleFixture.service, "alice", stale.uploadId);
     await staleFixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
@@ -735,7 +742,7 @@ describe("hosted site control plane", () => {
 
   it("rejects a stuck activation after the upload session expires", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "stuck-upload");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "stuck-upload");
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await fixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
@@ -759,7 +766,7 @@ describe("hosted site control plane", () => {
     const expiring = await publish(fixture.service, "alice", "publish-expiring", "activate-expiring");
     fixture.setNow(NOW + 30 * 24 * 60 * 60_000 - 5 * 60_000);
     const replacement = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: expiring.id }),
       "replace-expiring",
     );
@@ -786,17 +793,17 @@ describe("hosted site control plane", () => {
 
   it("deletes every uploaded object when an unfinished site is deleted", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload("alice", uploadRequest(), "unfinished-upload");
+    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "unfinished-upload");
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const assetKey = `sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`;
     expect(fixture.bucket.keys()).toContain(assetKey);
 
-    await fixture.service.delete("alice", upload.site.id, "delete-unfinished");
+    await fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished");
 
     expect(fixture.bucket.keys()).not.toContain(assetKey);
     expect(await fixture.bucket.route(upload.site.hostname)).toMatchObject({ status: "deleted" });
 
-    await fixture.service.delete("alice", upload.site.id, "delete-unfinished-again");
+    await fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished-again");
     const auditRows = await fixture.database
       .prepare("SELECT COUNT(*) AS count FROM site_audit_log WHERE site_id = ? AND operation = 'delete'")
       .bind(upload.site.id)
@@ -819,7 +826,7 @@ describe("hosted site control plane", () => {
     const asset = `sites/${site.id}/deployments/${deployment?.current_deployment_id}/index.html`;
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
 
-    await expect(fixture.service.delete("alice", site.id, "failed-delete-key")).rejects.toThrow(
+    await expect(fixture.service.delete(server("alice"), site.id, "failed-delete-key")).rejects.toThrow(
       "Injected R2 put failure",
     );
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "active" });
@@ -864,15 +871,19 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     for (let index = 0; index < 20; index += 1) {
       const upload = await fixture.service.createUpload(
-        "alice",
+        server("alice"),
         uploadRequest({ title: `Disposable hosted project ${index}` }),
         `churn-${index}`,
       );
-      await fixture.service.delete("alice", upload.site.id, `delete-churn-${index}`);
+      await fixture.service.delete(server("alice"), upload.site.id, `delete-churn-${index}`);
     }
 
     await expect(
-      fixture.service.createUpload("alice", uploadRequest({ title: "One more disposable project" }), "churn-21"),
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ title: "One more disposable project" }),
+        "churn-21",
+      ),
     ).rejects.toMatchObject({ code: "site_creation_rate_limit" });
   });
 
@@ -880,7 +891,7 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "publish-spa", "activate-spa", { spaFallback: true });
     const preserved = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: site.id, spaFallback: null }),
       "replace-spa-preserved",
     );
@@ -889,7 +900,7 @@ describe("hosted site control plane", () => {
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ spaFallback: true });
 
     const disabled = await fixture.service.createUpload(
-      "alice",
+      server("alice"),
       uploadRequest({ siteId: site.id, spaFallback: false }),
       "replace-spa-disabled",
     );
@@ -899,23 +910,140 @@ describe("hosted site control plane", () => {
   });
 });
 
+describe("hosted sites per server", () => {
+  it("counts sites against their server's plan, and keeps sites over the limit after a downgrade", async () => {
+    const fixture = serviceFixture();
+    subscribe(fixture.sqlite, "bob-server", "bob", "starter");
+    const bob = server("bob");
+    const sites = [];
+    for (let index = 0; index < 3; index += 1) {
+      sites.push(
+        await publish(fixture.service, bob, `starter-${index}`, `starter-activate-${index}`, {
+          title: `Starter hosted planner ${index}`,
+        }),
+      );
+    }
+    await expect(
+      fixture.service.createUpload(bob, uploadRequest({ title: "Fourth starter planner" }), "starter-3"),
+    ).rejects.toMatchObject({ status: 409, code: "site_limit" });
+
+    // The unlinked bucket has its own single slot, and an account request creates into it.
+    await publish(fixture.service, { kind: "unlinked", userId: "bob" }, "unlinked-1", "unlinked-activate-1");
+    await expect(
+      fixture.service.createUpload({ kind: "account", userId: "bob" }, uploadRequest(), "unlinked-2"),
+    ).rejects.toMatchObject({ code: "site_limit" });
+
+    subscribe(fixture.sqlite, "bob-server", "bob", "starter", "canceled");
+    const downgraded = await fixture.service.list(bob);
+    expect(downgraded).toMatchObject({ limit: 1, used: 3 });
+    expect(downgraded.sites).toHaveLength(3);
+    await expect(
+      fixture.service.createUpload(bob, uploadRequest({ title: "Planner after downgrade" }), "downgraded-create"),
+    ).rejects.toMatchObject({ code: "site_limit" });
+    const replacement = await fixture.service.createUpload(
+      bob,
+      uploadRequest({ siteId: sites[0]?.id ?? null }),
+      "downgraded-replace",
+    );
+    await uploadIndex(fixture.service, "bob", replacement.uploadId);
+    await expect(
+      fixture.service.activate("bob", replacement.uploadId, "downgraded-replace-activate"),
+    ).resolves.toMatchObject({ id: sites[0]?.id, status: "active" });
+  });
+
+  it("keeps each server to its own sites, and lets an account request manage every site", async () => {
+    const fixture = serviceFixture();
+    const aliceServer = await publish(fixture.service, "alice", "server-upload", "server-activate");
+    const unlinkedScope: HostedSiteScope = { kind: "unlinked", userId: "alice" };
+    const unlinked = await publish(fixture.service, unlinkedScope, "unlinked-upload", "unlinked-activate");
+    const laptop: HostedSiteScope = { kind: "server", userId: "alice", serverId: "alice-laptop" };
+
+    await expect(
+      fixture.service.createUpload(laptop, uploadRequest({ siteId: aliceServer.id }), "cross-replace"),
+    ).rejects.toMatchObject({ status: 409, code: "site_other_server" });
+    await expect(
+      fixture.service.createUpload(unlinkedScope, uploadRequest({ siteId: aliceServer.id }), "unlinked-replace"),
+    ).rejects.toMatchObject({ code: "site_other_server" });
+    await expect(fixture.service.delete(laptop, aliceServer.id, "cross-delete")).rejects.toMatchObject({
+      code: "site_other_server",
+    });
+    await expect(fixture.service.delete(server("alice"), unlinked.id, "unlinked-delete")).rejects.toMatchObject({
+      code: "site_other_server",
+    });
+
+    const ids = async (scope: HostedSiteScope) => (await fixture.service.list(scope)).sites.map((site) => site.id);
+    expect(await ids(laptop)).toEqual([]);
+    expect(await ids(server("alice"))).toEqual([aliceServer.id]);
+    expect(await ids(unlinkedScope)).toEqual([unlinked.id]);
+    const account: HostedSiteScope = { kind: "account", userId: "alice" };
+    expect((await ids(account)).sort()).toEqual([aliceServer.id, unlinked.id].sort());
+
+    await fixture.service.delete(account, aliceServer.id, "account-delete");
+    expect(await ids(server("alice"))).toEqual([]);
+  });
+
+  it("accepts a server only with its machine token and its owner's account", async () => {
+    const fixture = serviceFixture();
+    const request = (headers: Record<string, string>, query = "") =>
+      new Request(`https://openbot.run/v1/sites/${query}`, { headers });
+    const credential = (hostId: string, token: string) => ({
+      [HOSTED_SITE_HOST_ID_HEADER]: hostId,
+      [HOSTED_SITE_HOST_TOKEN_HEADER]: token,
+    });
+
+    await expect(
+      resolveHostedSiteScope(fixture.database, "alice", request(credential("alice-server", "alice-token"))),
+    ).resolves.toEqual(server("alice"));
+    for (const headers of [
+      credential("alice-server", "bob-token"),
+      credential("bob-server", "bob-token"),
+      credential("unknown-server", "alice-token"),
+      { [HOSTED_SITE_HOST_ID_HEADER]: "alice-server" },
+    ]) {
+      // A bad credential never falls back to the unlinked bucket, even with `?scope=unlinked`.
+      await expect(
+        resolveHostedSiteScope(fixture.database, "alice", request(headers, "?scope=unlinked")),
+      ).rejects.toMatchObject({ status: 401, code: "host_unauthorized" });
+    }
+    await expect(resolveHostedSiteScope(fixture.database, "alice", request({}))).resolves.toEqual({
+      kind: "account",
+      userId: "alice",
+    });
+    await expect(resolveHostedSiteScope(fixture.database, "alice", request({}, "?scope=unlinked"))).resolves.toEqual({
+      kind: "unlinked",
+      userId: "alice",
+    });
+  });
+});
+
 function serviceFixture(): {
   service: HostedSiteService;
+  sqlite: DatabaseSync;
   database: FakeD1Database;
   bucket: FakeR2Bucket;
   now: () => number;
   setNow: (value: number) => void;
 } {
-  const sqlite = new DatabaseSync(":memory:");
+  const sqlite = migratedDatabase();
   databases.push(sqlite);
-  sqlite.exec("PRAGMA foreign_keys = ON; CREATE TABLE users(id TEXT PRIMARY KEY);");
-  sqlite.exec(migration("0016_hosted_sites.sql"));
-  sqlite.prepare("INSERT INTO users(id) VALUES (?), (?)").run("alice", "bob");
+  const user = sqlite.prepare(
+    "INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)",
+  );
+  for (const id of ["alice", "bob"]) user.run(id, `email:${id}@example.com`, `${id}@example.com`);
+  // Each user owns one server. Alice's server has the standard plan (10 sites); Bob's has no plan (1 site).
+  const host = sqlite.prepare(
+    `INSERT INTO remote_hosts(host_id, owner_user_id, name, machine_token_hash, created_at, updated_at)
+     VALUES (?, ?, 'Desktop', ?, 1, 1)`,
+  );
+  host.run("alice-server", "alice", createHash("sha256").update("alice-token").digest("base64url"));
+  host.run("bob-server", "bob", createHash("sha256").update("bob-token").digest("base64url"));
+  subscribe(sqlite, "alice-server", "alice", "standard");
   const database = new FakeD1Database(sqlite);
   const bucket = new FakeR2Bucket();
   let currentTime = NOW;
   return {
     service: new HostedSiteService(database, bucket, () => currentTime, "test-report-hash-secret-with-32-bytes"),
+    sqlite,
     database,
     bucket,
     now: () => currentTime,
@@ -925,16 +1053,34 @@ function serviceFixture(): {
   };
 }
 
+function server(userId: string): HostedSiteScope {
+  return { kind: "server", userId, serverId: `${userId}-server` };
+}
+
+function subscribe(sqlite: DatabaseSync, serverId: string, userId: string, plan: string, status = "active"): void {
+  sqlite
+    .prepare(
+      `INSERT INTO billing_subscriptions(
+         stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval, currency, status,
+         current_period_end, updated_at
+       ) VALUES (?, ?, 'cus_1', ?, ?, 'month', 'eur', ?, NULL, ?)
+       ON CONFLICT(stripe_subscription_id) DO UPDATE SET plan = excluded.plan, status = excluded.status,
+         updated_at = excluded.updated_at`,
+    )
+    .run(`sub_${serverId}`, userId, serverId, plan, status, Date.now());
+}
+
 async function publish(
   service: HostedSiteService,
-  userId: string,
+  scope: HostedSiteScope | string,
   publishKey: string,
   activateKey: string,
   changes: Partial<HostedSiteUploadRequest> = {},
 ) {
-  const session = await service.createUpload(userId, uploadRequest(changes), publishKey);
-  await uploadIndex(service, userId, session.uploadId);
-  return service.activate(userId, session.uploadId, activateKey);
+  const siteScope = typeof scope === "string" ? server(scope) : scope;
+  const session = await service.createUpload(siteScope, uploadRequest(changes), publishKey);
+  await uploadIndex(service, siteScope.userId, session.uploadId);
+  return service.activate(siteScope.userId, session.uploadId, activateKey);
 }
 
 function uploadRequest(changes: Partial<HostedSiteUploadRequest> = {}): HostedSiteUploadRequest {
@@ -960,10 +1106,6 @@ async function uploadIndex(service: HostedSiteService, userId: string, uploadId:
       body: HTML,
     }),
   );
-}
-
-function migration(name: string): string {
-  return readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8");
 }
 
 class FakeD1Database implements D1Database {
