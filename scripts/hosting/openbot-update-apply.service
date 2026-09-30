@@ -1,0 +1,15 @@
+# boat stop and resume work like a reboot. This moves a staged release into place before OpenBot
+# starts, so an update never stops work in progress. OpenBot does not require this unit, so it starts
+# after a failure too. The next boot does the update again.
+[Unit]
+Description=Apply a staged OpenBot update
+Before=openbot.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/OpenBot/hosted/openbot-hosted-update apply
+# At most 4 minutes of restore wait, then the copy.
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

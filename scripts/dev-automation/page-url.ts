@@ -13,7 +13,7 @@ function isLoopbackHost(hostname: string): boolean {
 // a target too, and such a path carries its secret as a plain segment
 // (`/callback/<code>`) where no redaction rule would recognize it. Aiming at
 // one of those pages uses its target id, so nothing needs the path.
-const APP_ROUTES = new Set(["/", "/index.html"]);
+const APP_ROUTES = new Set(["/", "/index.html", "/helper.html"]);
 
 // A page title or a full URL can carry an OAuth code, a signed download URL or
 // the contents of a visited site, and log redaction recognizes none of those

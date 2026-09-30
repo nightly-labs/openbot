@@ -20,6 +20,12 @@ export const DYNAMIC_ISLAND_SIZE_LIMITS = {
   heightPercent: { min: 75, max: 125, step: 5 },
 } as const;
 
+/**
+ * The largest unread or remaining count that a presentation can carry. A sender clamps to it: a
+ * larger count is not valid, so main rejects the whole presentation.
+ */
+export const DYNAMIC_ISLAND_MAX_COUNT = 10_000;
+
 /** The compact height where a display has no notch to match. */
 export const DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT = 32;
 
@@ -235,7 +241,7 @@ function isPositiveFiniteNumber(value: unknown): value is number {
 }
 
 function isSafeCount(value: unknown): value is number {
-  return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= 10_000;
+  return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= DYNAMIC_ISLAND_MAX_COUNT;
 }
 
 function isShortString(value: unknown, length: number): value is string {

@@ -68,6 +68,11 @@ const SANDBOX_NAME_MAX_LENGTH = 120;
 /** A server that reports no activity this long stops. The next use starts it again. */
 const IDLE_STOP_AFTER_MS = 15 * 60_000;
 /**
+ * A server in use reports each 5 minutes (`src/main/hosted-server-activity.ts`). A resize stops the
+ * server, so it waits until the server sent no report for this long.
+ */
+const RESIZE_AFTER_NO_USE_MS = 7 * 60_000;
+/**
  * boat stops a sandbox this long after its create or resume, so a server that the Worker loses stops.
  * A boat trial refuses more than 2 hours. Activity extends the time when less than an hour is left.
  */
@@ -678,14 +683,15 @@ export class HostedServerService {
       .bind(now - STUCK_AFTER_MS, TICK_BATCH_SIZE)
       .all<HostedServerRow>();
     result.reconciled = await run(stuck.results, (row) => this.#refresh(row));
-    // The Stripe webhook starts a resize at once. This catches a server that was busy then, or a failed stop.
+    // The Stripe webhook starts a resize when the server is not in use. This catches a server that was in
+    // use or busy then, or a failed stop.
     const resizing = await this.#database
       .prepare(
         `SELECT ${ROW_COLUMNS} FROM hosted_servers
          WHERE desired_state = 'running' AND observed_state = 'running' AND pending_size IS NOT NULL
-           AND provider_sandbox_id IS NOT NULL AND updated_at <= ? LIMIT ?`,
+           AND provider_sandbox_id IS NOT NULL AND updated_at <= ? AND COALESCE(last_active_at, 0) <= ? LIMIT ?`,
       )
-      .bind(now - STUCK_AFTER_MS, TICK_BATCH_SIZE)
+      .bind(now - STUCK_AFTER_MS, now - RESIZE_AFTER_NO_USE_MS, TICK_BATCH_SIZE)
       .all<HostedServerRow>();
     result.resized = await run(resizing.results, (row) => this.#resize(row));
     const deleting = await this.#database
@@ -767,26 +773,40 @@ export class HostedServerService {
   /**
    * Moves a running server to the machine of its new plan. boat changes the size only on a resume, so
    * the server stops first: boat saves the disk, and the restart after the stop (`#observe`) resumes
-   * the sandbox on the new machine. The server is offline for this time.
+   * the sandbox on the new machine. The server is offline for this time, so a server in use keeps its
+   * machine until its use stops, or until its idle stop, after which the next wake uses the new machine.
    */
   async #resize(row: HostedServerRow): Promise<void> {
     const boat = this.#boat;
     if (!boat || !row.provider_sandbox_id || !row.pending_size) return;
-    if (row.desired_state !== "running" || row.observed_state !== "running") return;
+    // Claimed before the stop: the cron reads its rows first, and activity that comes in after that keeps
+    // the server running.
+    const now = this.#now();
+    const claimed = await this.#database
+      .prepare(
+        `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
+         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
+           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ?`,
+      )
+      .bind(now, row.server_id, now - RESIZE_AFTER_NO_USE_MS)
+      .run();
+    if (claimed.meta.changes !== 1) return;
     try {
       await boat.stopSandbox(row.provider_sandbox_id);
     } catch (error) {
       // 409: the sandbox cannot stop in its current state. The cron tries again.
-      if (error instanceof BoatApiError && error.status === 409) return;
+      if (error instanceof BoatApiError && error.status === 409) {
+        await this.#database
+          .prepare(
+            `UPDATE hosted_servers SET observed_state = 'running', updated_at = ?
+             WHERE server_id = ? AND observed_state = 'stopping'`,
+          )
+          .bind(this.#now(), row.server_id)
+          .run();
+        return;
+      }
       throw error;
     }
-    await this.#database
-      .prepare(
-        `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
-         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'`,
-      )
-      .bind(this.#now(), row.server_id)
-      .run();
   }
 
   /** Makes the server match its plan. `getServerEntitlement` is the only place that decides the plan. */

@@ -111,7 +111,7 @@ export class MailboxSync {
     if (routinesChanged) this.#routines.stateChanged(agentId);
     const affectedAgents = new Set([agentId, ...this.#mailbox.senderAgentIdsForRecipient(agentId)]);
     for (const affectedAgentId of affectedAgents) {
-      const snapshot = this.#conversation.snapshot(affectedAgentId);
+      const snapshot = this.#conversation.snapshotToUpdate(affectedAgentId);
       if (!snapshot) continue;
       const previousSignature = conversationContentSignature(snapshot);
       this.syncMailboxMessages(snapshot);
@@ -125,7 +125,7 @@ export class MailboxSync {
     queueMicrotask(() => {
       try {
         this.emitQueue(agentId);
-        const snapshot = this.#conversation.snapshot(agentId);
+        const snapshot = this.#conversation.snapshotToUpdate(agentId);
         if (snapshot) this.#conversation.emitConversation(snapshot);
       } catch (error) {
         this.#hooks.emitError("delivery_reconciliation_pending", error, agentId);

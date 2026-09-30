@@ -121,7 +121,7 @@ export class QueueControls {
           input.editId,
           sender,
         );
-        const snapshot = this.#conversation.snapshot(agentId);
+        const snapshot = this.#conversation.snapshotToUpdate(agentId);
         if (snapshot) {
           this.#mailboxSync.syncMailboxMessages(snapshot);
           this.#conversation.emitConversation(snapshot, "queue.message-updated");
@@ -146,7 +146,7 @@ export class QueueControls {
       undefined,
       sender,
     );
-    const snapshot = this.#conversation.snapshot(input.agentId);
+    const snapshot = this.#conversation.snapshotToUpdate(input.agentId);
     if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(input.agentId);
     if (snapshot) this.#conversation.emitConversation(snapshot, "queue.message-updated");

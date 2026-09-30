@@ -1,0 +1,36 @@
+# The Ubuntu 24.04 packages of a hosted server. provision.sh installs them in the template, and
+# openbot-hosted-update installs the list of a new release before that release starts.
+# The server: AppArmor, D-Bus, the keyring and a virtual display.
+apparmor
+ca-certificates
+curl
+dbus
+dbus-x11
+gnome-keyring
+libsecret-1-0
+openssl
+x11-utils
+xauth
+xvfb
+# Electron.
+libasound2t64
+libgbm1
+libgtk-3-0t64
+libnss3
+libxss1
+# The remote desktop runtime.
+libcap2
+libcurl4t64
+libevdev2
+libglib2.0-0t64
+libminiupnpc17
+libpulse0
+libssl3t64
+libva2
+libx11-6
+libxcb-shm0
+libxcb-xfixes0
+libxcb1
+libxfixes3
+libxrandr2
+libxtst6

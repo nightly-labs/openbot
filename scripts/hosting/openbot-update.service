@@ -1,0 +1,14 @@
+# Downloads and unpacks a newer OpenBot release next to the running one. openbot-update.timer starts
+# it; openbot-update-apply.service moves the release into place at the next start of the server.
+[Unit]
+Description=Stage an OpenBot update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/OpenBot/hosted/openbot-hosted-update stage
+Nice=19
+IOSchedulingClass=idle
+CPUWeight=idle
+TimeoutStartSec=30min

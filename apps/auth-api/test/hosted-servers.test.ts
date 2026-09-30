@@ -632,12 +632,16 @@ describe("hosted servers", () => {
     const server = await createPaidServer(context);
     const calls = (path: string) => context.boatCalls.filter((call) => call.path === `/sandboxes/bx_1/${path}`);
 
-    // The upgrade comes while the sandbox starts. The cron stops it when it runs.
+    // The upgrade comes while the sandbox starts. A resize stops the server, so the cron waits until the
+    // server has no use: a start counts as use.
     await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "pro");
     expect(context.state(server.serverId)).toMatchObject({ size: "small", pending_size: "large" });
     await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
     expect(calls("stop")).toHaveLength(0);
     context.clock.now += 3 * MINUTE;
+    await expect(context.service.tick()).resolves.toMatchObject({ resized: 0, failed: 0 });
+    expect(calls("stop")).toHaveLength(0);
+    context.clock.now += 4 * MINUTE;
     await expect(context.service.tick()).resolves.toMatchObject({ resized: 1, failed: 0 });
     expect(calls("stop")).toHaveLength(1);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "stopping" });
@@ -654,6 +658,9 @@ describe("hosted servers", () => {
     context.refusals.shrink = true;
     context.clock.now += MINUTE;
     await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "starter");
+    expect(calls("stop")).toHaveLength(1);
+    context.clock.now += 7 * MINUTE;
     await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "starter");
     expect(calls("stop")).toHaveLength(2);
     context.clock.now += MINUTE;
