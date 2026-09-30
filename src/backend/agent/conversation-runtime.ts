@@ -11,6 +11,14 @@ interface TransactionScope {
   readonly commit: (() => void)[];
 }
 
+/**
+ * The idle chats that main keeps in memory. A chat of 2,000 messages takes about 1 MB, and marking a
+ * chat read loads it, so the cache grew with each chat that the user opened. A chat with a running
+ * turn always stays. A chat that goes is read again from the database when it is next needed, the
+ * same as a chat that was not opened since the app started.
+ */
+const IDLE_SNAPSHOT_LIMIT = 16;
+
 /** Only the caller that opened the transaction holds a scope, so a nested call finds the owner's. */
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
@@ -129,7 +137,20 @@ export class ConversationRuntime {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
       this.#executionSnapshots.set(snapshot.threadId, snapshot);
-    else this.#snapshots.set(agentId, snapshot);
+    else this.#remember(agentId, snapshot);
+  }
+
+  /** Makes this chat the most recently used, then drops the least recently used idle chats. */
+  #remember(agentId: string, snapshot: ConversationSnapshot): void {
+    this.#snapshots.delete(agentId);
+    this.#snapshots.set(agentId, snapshot);
+    let excess = this.#snapshots.size - IDLE_SNAPSHOT_LIMIT;
+    for (const [id, cached] of this.#snapshots) {
+      if (excess <= 0) return;
+      if (id === agentId || cached.activeTurnId) continue;
+      this.#snapshots.delete(id);
+      excess -= 1;
+    }
   }
 
   dropSnapshot(agentId: string): void {
@@ -173,10 +194,10 @@ export class ConversationRuntime {
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
       const publicThreadId = agent?.threadId ?? threadId;
       snapshot = this.#store.database.readConversation(agentId, publicThreadId);
-      this.#snapshots.set(agentId, snapshot);
     } else if (threadId && !snapshot.threadId) {
       snapshot.threadId = threadId;
     }
+    this.#remember(agentId, snapshot);
     return snapshot;
   }
 
@@ -346,7 +367,7 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
-        this.#snapshots.set(agentId, published);
+        this.#remember(agentId, published);
         this.publishConversation(published);
       },
     );
