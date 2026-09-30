@@ -519,6 +519,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       // attempt as failed, or a retry has taken over, this attempt must not go on to restart the
       // app behind a UI that says it did not happen.
       if (this.#installGeneration !== generation) return;
+      // A quiet check can still be out. electron-updater emits its error before the call settles, so
+      // waiting here keeps that error on the side of the handover that the error handler ignores.
+      await this.#checkRequest?.catch(() => null);
+      if (this.#installGeneration !== generation) return;
       this.#installHandedOver = true;
       this.#updater.quitAndInstall(false, true);
       // The handover is where a restart is most likely to stall, and shutdown preparation may have
