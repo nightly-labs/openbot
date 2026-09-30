@@ -384,10 +384,10 @@ are only on a hosted server; the desktop app does not change.
 
 The unit (`openbot.service`):
 
-- `MemoryMax=90%`: the OOM killer of the unit acts before the kernel's own, so the desktop, sshd and
-  the boat agent keep running. The limit counts memory only, not swap. The boat image has a 2 GB
-  swap file, so a process that grows first fills the swap, and then the kernel's own OOM killer acts.
-  It also picks the process with the highest value, as below.
+- `MemoryMax=90%`: the unit can use at most 90% of the memory, so 10% stays for the desktop, sshd
+  and the boat agent. The limit counts memory only, not swap. The boat image has a 2 GB swap file,
+  so a process that grows first fills the swap, and then the kernel's own OOM killer acts, not the
+  one of the unit. It also picks the process with the highest value, as below.
 - `OOMScoreAdjust=-500` for main. Every 5 s, main gives each process that it starts an
   `oom_score_adj` of 500. So the OOM killer picks a provider CLI, an MCP server or an agent tool
   before main. The processes of the Electron binary do not change: Chromium sets the values of its
