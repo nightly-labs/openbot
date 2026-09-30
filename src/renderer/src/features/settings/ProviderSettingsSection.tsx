@@ -37,7 +37,7 @@ import { useI18n } from "../../i18n-context";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { createSettingsGeneralStore, type SettingsGeneralStore } from "./stores/general-store";
 
-export interface ProviderSettingsSectionProps {
+interface ProviderSettingsSectionProps {
   store: SettingsGeneralStore;
   /** The dialog element the Select popovers portal into, captured when the section was created. */
   selectMount: HTMLElement | undefined;
@@ -70,7 +70,7 @@ export interface ProviderSettingsSectionProps {
 }
 
 /** The provider list of the computer the agents run on, with its custom endpoint dialogs. */
-export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
+function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const i18n = useI18n();
   const customProviders = () => props.customProviders ?? [];
   /**
