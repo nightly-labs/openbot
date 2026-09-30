@@ -118,6 +118,7 @@ export function ServerConnection({
       active={active}
       directory={directory}
       onMembershipChanged={onMembershipChanged}
+      onNetworkRestored={() => controller.current?.networkRestored()}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (update.hostId !== hostId) return;

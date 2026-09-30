@@ -77,6 +77,7 @@ function createTab(
           cancelUpload: vi.fn(async () => undefined),
           setTyping: vi.fn(),
           setActive: vi.fn(),
+          networkRestored: vi.fn(),
         };
         peers.push(peer);
         return peer;

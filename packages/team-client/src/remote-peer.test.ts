@@ -455,27 +455,40 @@ describe("browser remote peer recovery", () => {
   it("discards a silent peer after the required compatibility read times out", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const response = deferred();
-    const requested = deferred();
+    let requested = deferred();
+    let silent = true;
     const network = await setupNetwork({
-      beforeResponse: () => {
+      beforeResponse: async () => {
+        if (!silent) return;
         requested.resolve();
-        return response.promise;
+        await response.promise;
       },
     });
+    const compatibility = (id: string) =>
+      network.runtime.execute({ id, type: "request", method: "GET", path: "/v1/compatibility", body: {} });
     await network.connect();
-    const reading = network.runtime.execute({
-      id: "resume-check",
-      type: "request",
-      method: "GET",
-      path: "/v1/compatibility",
-      body: {},
-    });
+    // The first read on a new peer can wait for a slow relay path, such as TURN over TLS.
+    const first = compatibility("first-check");
+    await requested.promise;
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(network.updates.at(-1)).toMatchObject({ state: "offline" });
+    await expect(first).resolves.toMatchObject({ ok: false, error: "The desktop request timed out." });
+    silent = false;
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    await expect(
+      network.runtime.execute({ id: "answered", type: "request", method: "GET", path: "/v1/agents", body: {} }),
+    ).resolves.toMatchObject({ ok: true });
+    silent = true;
+    requested = deferred();
+    const resumed = compatibility("resume-check");
     await requested.promise;
     await vi.advanceTimersByTimeAsync(3_000);
     expect(network.updates.at(-1)).toMatchObject({ state: "offline" });
-    await expect(reading).resolves.toMatchObject({ ok: false, error: "The desktop request timed out." });
+    await expect(resumed).resolves.toMatchObject({ ok: false, error: "The desktop request timed out." });
     await expect(network.connect()).resolves.toMatchObject({ ok: true });
-    expect(network.bootstraps()).toBe(2);
+    expect(network.bootstraps()).toBe(3);
     response.resolve();
     await network.runtime.dispose();
   });
@@ -534,7 +547,8 @@ describe("browser remote peer recovery", () => {
       } else await initial;
       const closed =
         mode === "disconnect" ? network.runtime.execute({ id: "disconnect", type: "disconnect" }) : Promise.resolve();
-      if (mode === "reconnect") network.connection().drop("failed");
+      // An authenticated peer on a failed path can still restart ICE; a closed one cannot.
+      if (mode === "reconnect") network.connection().drop("closed");
       const reconnecting = network.connect();
       await vi.advanceTimersByTimeAsync(0);
       cleanup.resolve();
@@ -602,7 +616,7 @@ describe("browser remote peer recovery", () => {
       const network = await setupNetwork();
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       network.connection().drop(state);
-      if (state === "disconnected") await vi.advanceTimersByTimeAsync(5_000);
+      if (state !== "closed") await vi.advanceTimersByTimeAsync(15_000);
       expect(network.updates.at(-1)?.state).toBe("offline");
       await expect(network.connect()).resolves.toMatchObject({ ok: true });
       expect(network.connections).toHaveLength(2);
@@ -634,6 +648,56 @@ describe("browser remote peer recovery", () => {
       bootstraps: 1,
       state: "online",
     });
+    await network.runtime.dispose();
+  });
+
+  it("restarts ICE on a failed path and renews a half-open Signal socket without a new session", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const network = await setupNetwork();
+    await network.connect();
+    network.socket().halfOpen = true;
+    network.connection().drop("failed");
+    await vi.advanceTimersByTimeAsync(0);
+    expect({ restarts: network.connection().iceRestarts, sockets: network.sockets.length }).toEqual({
+      restarts: 1,
+      sockets: 1,
+    });
+    await vi.advanceTimersByTimeAsync(8_000);
+    // The new socket's `ready` restarts ICE again, and this time the answer arrives.
+    expect({ restarts: network.connection().iceRestarts, sockets: network.sockets.length }).toEqual({
+      restarts: 2,
+      sockets: 2,
+    });
+    network.connection().drop("connected");
+    await vi.advanceTimersByTimeAsync(15_000);
+    const result = await network.runtime.execute({
+      id: "after-ice-restart",
+      type: "request",
+      method: "GET",
+      path: "/v1/agents",
+      body: {},
+    });
+    expect({ result, bootstraps: network.bootstraps(), connections: network.connections.length }).toEqual({
+      result: { commandId: "after-ice-restart", ok: true, status: 200, body: [] },
+      bootstraps: 1,
+      connections: 1,
+    });
+    expect(network.updates.some((update) => update.state === "offline")).toBe(false);
+    await network.runtime.dispose();
+  });
+
+  it("renews Signal and tells the consumer when the network comes back", async () => {
+    const onNetworkRestored = vi.fn(async () => {});
+    const network = await setupNetwork({ onNetworkRestored });
+    await network.connect();
+    network.socket().halfOpen = true;
+    network.runtime.networkRestored();
+    await vi.waitFor(() => expect(network.connection().iceRestarts).toBe(1));
+    expect({ sockets: network.sockets.length, bootstraps: network.bootstraps() }).toEqual({
+      sockets: 2,
+      bootstraps: 1,
+    });
+    expect(onNetworkRestored).toHaveBeenCalledOnce();
     await network.runtime.dispose();
   });
 
@@ -700,7 +764,7 @@ describe("browser remote peer recovery", () => {
     network.connection().connectionState = "disconnected";
     network.runtime.setActive(true);
     const reconnect = network.connect();
-    await vi.advanceTimersByTimeAsync(4_999);
+    await vi.advanceTimersByTimeAsync(14_999);
     expect(endSession).not.toHaveBeenCalled();
     network.connection().drop("connected");
     await expect(reconnect).resolves.toMatchObject({ ok: true });
@@ -719,7 +783,7 @@ describe("browser remote peer recovery", () => {
     expect(endSession).not.toHaveBeenCalled();
     network.runtime.setActive(true);
     const reconnect = network.connect();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     await expect(reconnect).resolves.toMatchObject({ ok: false });
     // Each recovery attempt would otherwise create and end a session on the account Worker.
     expect(endSession).not.toHaveBeenCalled();
@@ -750,7 +814,7 @@ describe("browser remote peer recovery", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     network.runtime.setActive(true);
     const reconnect = network.connect();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     await expect(reconnect).resolves.toMatchObject({ ok: false });
     accountUnavailable = true;
     await expect(network.connect()).resolves.toMatchObject({ ok: false });
@@ -918,6 +982,7 @@ async function setupNetwork(
     onTeamEvent?: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
     onAccountProfileChanged?: () => Promise<void>;
     onAccountServersChanged?: () => Promise<void>;
+    onNetworkRestored?: () => Promise<void>;
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
@@ -951,6 +1016,7 @@ async function setupNetwork(
   class TestSocket {
     static OPEN = 1;
     readyState = 1;
+    halfOpen = false;
     onopen: (() => void) | null = null;
     onclose: (() => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
@@ -962,6 +1028,7 @@ async function setupNetwork(
       this.onmessage?.({ data: JSON.stringify(value) });
     }
     send(data: string) {
+      if (this.halfOpen) return;
       const message = JSON.parse(data);
       if (message.type === "hello")
         queueMicrotask(() =>
@@ -1086,6 +1153,8 @@ async function setupNetwork(
     }
     async setRemoteDescription(value: RTCSessionDescriptionInit) {
       this.remoteDescription = value;
+      // An ICE restart answer does not bring the path back by itself; a test calls `drop("connected")`.
+      if (this.connectionState !== "new") return;
       this.connectionState = "connected";
       this.onconnectionstatechange?.();
       for (const channel of this.channels.values()) {
@@ -1094,7 +1163,10 @@ async function setupNetwork(
       }
     }
     setConfiguration() {}
-    restartIce() {}
+    iceRestarts = 0;
+    restartIce() {
+      this.iceRestarts += 1;
+    }
     drop(state: string) {
       this.connectionState = state;
       this.onconnectionstatechange?.();
@@ -1126,6 +1198,7 @@ async function setupNetwork(
       },
       onAccountProfileChanged: options.onAccountProfileChanged,
       onAccountServersChanged: options.onAccountServersChanged,
+      onNetworkRestored: options.onNetworkRestored,
       onHostStreamData: options.onHostStreamData,
       onTeamEvent: options.onTeamEvent ?? (async () => {}),
       onConnectionUpdate: async (update) => {

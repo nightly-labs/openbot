@@ -1,5 +1,5 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRemoteConnectionRecovery,
   createRemoteReadRefresh,
@@ -9,7 +9,14 @@ import {
   resyncRemoteConversations,
 } from "./remote-recovery";
 
-afterEach(() => vi.useRealTimers());
+// No jitter, so each wait has an exact length.
+beforeEach(() => {
+  vi.spyOn(Math, "random").mockReturnValue(0);
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("remote connection recovery", () => {
   it("keeps foreground checks and explicit data refreshes online", async () => {
@@ -48,7 +55,7 @@ describe("remote connection recovery", () => {
       recovery.setActive(false);
       recovery.setActive(true);
     }
-    await vi.advanceTimersByTimeAsync(9_999);
+    await vi.advanceTimersByTimeAsync(1_999);
     expect(load).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(1);
     expect(load).toHaveBeenCalledTimes(4);
@@ -71,7 +78,7 @@ describe("remote connection recovery", () => {
       fail(new Error("Desktop offline"));
       await vi.advanceTimersByTimeAsync(0);
       recovery.setActive(true);
-      await vi.advanceTimersByTimeAsync(9_999);
+      await vi.advanceTimersByTimeAsync(1_999);
       expect(load).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
       expect(load).toHaveBeenCalledTimes(2);
@@ -227,7 +234,7 @@ describe("remote connection recovery", () => {
     const current = ["other-server", "unread"];
     expect(mergeRemoteUnreadIds(current, { unread: { unreadCount: 2 }, read: { unreadCount: 0 } })).toBe(current);
   });
-  it("shows five attempts ten seconds apart, then a two-minute cooldown before restarting at one", async () => {
+  it("shows five attempts with doubling waits, then a two-minute cooldown before restarting at one", async () => {
     vi.useFakeTimers();
     let desktopOnline = false;
     let connected = false;
@@ -251,12 +258,15 @@ describe("remote connection recovery", () => {
     recovery.setActive(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(attempts).toBe(1);
-    expect(messages.at(-1)).toBe("Connection attempt failed. Retrying in 10s.");
-    await vi.advanceTimersByTimeAsync(9_999);
+    expect(messages.at(-1)).toBe("Connection attempt failed. Retrying in 2s.");
+    await vi.advanceTimersByTimeAsync(1_999);
     expect(attempts).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
     expect(attempts).toBe(2);
-    await vi.advanceTimersByTimeAsync(30_000);
+    expect(messages.at(-1)).toBe("Connection attempt failed. Retrying in 4s.");
+    await vi.advanceTimersByTimeAsync(4_000 + 8_000 + 15_999);
+    expect(attempts).toBe(4);
+    await vi.advanceTimersByTimeAsync(1);
     expect(attempts).toBe(5);
     expect(connecting).toEqual([
       "Reconnecting 1/5",
@@ -295,7 +305,7 @@ describe("remote connection recovery", () => {
     recovery.dispose();
   });
 
-  // Ten seconds apart, five times, then every two minutes, for as long as the app is open -- all of
+  // Five attempts with doubling waits, then every two minutes, for as long as the app is open -- all of
   // it asking a service that would answer with the same unreadable frame.
   it("stops retrying a failure a retry cannot fix, and tries once when the app comes back", async () => {
     vi.useFakeTimers();
@@ -323,6 +333,33 @@ describe("remote connection recovery", () => {
     recovery.setActive(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(attempts).toBe(2);
+    recovery.dispose();
+  });
+
+  it("retries at once from attempt one when the network comes back", async () => {
+    vi.useFakeTimers();
+    let networkUp = false;
+    const connecting: string[] = [];
+    let phase = "";
+    const recovery = createRemoteConnectionRecovery(
+      async () => {
+        if (!networkUp) throw new Error("Offline");
+      },
+      () => {},
+      (status) => {
+        phase = status.phase;
+        const message = remoteRecoveryMessage(status);
+        if (status.phase === "connecting" && message) connecting.push(message);
+      },
+    );
+    recovery.setActive(true);
+    await vi.advanceTimersByTimeAsync(2_000 + 4_000 + 8_000);
+    expect(connecting.at(-1)).toBe("Reconnecting 4/5");
+    networkUp = true;
+    recovery.networkRestored();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(connecting.at(-1)).toBe("Reconnecting 1/5");
+    expect(phase).toBe("online");
     recovery.dispose();
   });
 

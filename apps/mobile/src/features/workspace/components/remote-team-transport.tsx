@@ -38,6 +38,8 @@ interface RemoteTeamTransportProps {
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
   /** Signal says this account's server list changed on another device. */
   onMembershipChanged?: () => Promise<void>;
+  /** The phone got a network again. */
+  onNetworkRestored?: () => void;
   onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
 }
 
@@ -48,7 +50,7 @@ type RemoteTeamCommandInput =
 
 export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(
   function RemoteTeamTransport(
-    { active: foreground, directory, onConnectionUpdate, onMembershipChanged, onTeamEvent },
+    { active: foreground, directory, onConnectionUpdate, onMembershipChanged, onNetworkRestored, onTeamEvent },
     ref,
   ) {
     const { refreshProfile } = useMobileSession();
@@ -146,6 +148,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         onAccountProfileChanged={refreshProfile}
         onAccountServersChanged={onMembershipChanged}
         onConnectionUpdate={async (update) => onConnectionUpdate(update)}
+        onNetworkRestored={async () => onNetworkRestored?.()}
         onTeamEvent={async (hostId, event) => onTeamEvent(hostId, event)}
       />
     );
