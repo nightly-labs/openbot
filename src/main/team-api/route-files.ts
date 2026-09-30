@@ -28,7 +28,8 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { pathIdentifier, readBinary } from "./request-helpers";
 
 // Each upload holds its body, up to 100 MB, until the attachment is on disk. Two at a time keep that
-// below 200 MB on a 4 GB hosted server. A third upload waits for a slot; it does not fail.
+// below 200 MB on a 4 GB hosted server. A third upload waits for a slot. Node's request timeout
+// (300 s) still counts while it waits, so a very slow pair of uploads can make it fail with 408.
 const ATTACHMENT_UPLOAD_SLOTS = 2;
 
 class UploadSlots {
@@ -178,13 +179,15 @@ async function sendFile(
   }
   const stream = file.createReadStream({ start: 0, end: size - 1 });
   try {
-    await pipeline(stream, response);
+    await pipeline(stream, response, { end: false });
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ERR_STREAM_PREMATURE_CLOSE") return "handled";
     throw error;
   }
   // A file that became shorter after `stat` cannot fill its `Content-Length`. Closing the socket
-  // makes the client see an incomplete download, not wait for bytes that never come.
+  // makes the client see an incomplete download, not wait for bytes that never come. The response is
+  // not ended yet: after `end`, Node detaches the socket and `destroy` has no effect.
   if (stream.bytesRead !== size) response.destroy();
+  else response.end();
   return "handled";
 }
