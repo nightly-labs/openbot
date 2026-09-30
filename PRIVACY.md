@@ -422,41 +422,44 @@ Network traffic can also occur when:
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - a user opens an explicitly labeled external support or setup link;
-- an agent is connected to Slack. See [Slack connections](#slack-connections).
+- a Slack workspace is connected. See [Slack connections](#slack-connections).
 
 ## Slack connections
 
-An agent that the user connects to Slack gets its own Slack app, which OpenBot creates in the user's
-workspace. A workspace member first lets the OpenBot Slack manager app create apps in the workspace.
-The account service exchanges that sign-in with Slack, because the manager app's secret lives there,
-and gives the resulting token to the computer encrypted to a key that only that computer has. The
-account service keeps no Slack token. The computer then creates the agent's app and keeps its
-secrets. Slack sends the app's events, which contain the Slack messages that address the agent, to
-OpenBot's Signal service (`signal.openbot.run`). Signal passes each request to the computer over its
-Signal connection, in transit only: it does not store, log, or read the message, and it cannot check
-Slack's signature, which only the computer can. The browser that returns from Slack's install page
-carries a one-use install code through `openbot.run`; the code is useless without the app's secret
-on the computer. The agent's answers go from the computer to the Slack Web API directly.
+A workspace member installs the OpenBot Slack app in their workspace from OpenBot on their computer.
+The account service exchanges that install with Slack, because the app's secret lives there. It
+records which OpenBot computer answers the workspace: the Slack workspace ID, the computer, the
+OpenBot account that connected it, and the Slack app and bot user IDs. It keeps no Slack token and no
+message. It gives the bot token to the computer encrypted to a key that only that computer has.
 
-- **Stored on the host.** The app's bot token, signing secret and client secret, and the manager
-  token of the connected workspace, are encrypted by the operating system's secret storage, like provider API keys, and redacted from
-  logs, exports and diagnostics.
-  The database holds the workspace name and ids of the Slack app, and one row per Slack thread or
-  direct message the agent answers. The messages of that thread are kept as a conversation of the
-  agent, with the Slack display name of each author, and files people send are kept with the
-  agent's attachments. Disconnect removes the tokens and keeps the conversations; deleting the agent
-  removes both.
-- **Read from Slack.** The messages that mention the agent, the replies in a thread it answers, its
-  direct messages, the files in them, the display names of their authors, the names of the channels,
-  and up to 30 earlier messages of a thread as context for the agent. The agent's app joins every
-  public channel of the workspace, and Slack sends it every message of each channel it is in. These
-  pass through Signal to the computer, which keeps only the messages that address the agent.
-- **Sent to Slack.** The agent's avatar as the icon of its app, the agent's answers and the files it attaches, short status posts ("Working on
-  it…"), reactions, and approval requests with the command, folder and reason the provider gave,
-  redacted. A failed request posts a fixed sentence, never the provider's error.
+Slack sends the workspace's events, which contain the Slack messages in the channels OpenBot is in
+and its direct messages, to OpenBot's Signal service (`signal.openbot.run`). Signal checks Slack's
+signature and reads only the workspace ID, to find the computer. It passes each request to that
+computer over its Signal connection, in transit only: it does not store or log the message. The
+answers go from the computer to the Slack Web API directly.
+
+- **Stored on the host.** The bot token is encrypted by the operating system's secret storage, like
+  provider API keys, and redacted from logs, exports and diagnostics. The database holds the
+  workspace name and IDs, the router agent and the agents that can answer, and one row per Slack
+  thread that an agent answers. The messages of that thread are kept as a conversation of that
+  agent, with the Slack display name of each author, and files people send are kept with the agent's
+  attachments. Disconnect revokes and removes the token and keeps the conversations; deleting an
+  agent removes its conversations.
+- **Read from Slack.** The messages that mention OpenBot, the replies in a thread an agent answers,
+  its direct messages, the files in them, the display names of their authors, the names of the
+  channels, and earlier messages of a thread as context. Slack sends every message of each channel
+  that OpenBot is in; the computer keeps only the messages that address OpenBot or continue a
+  conversation.
+- **Given to the router agent's model.** For a new conversation, the text of the message, the channel
+  name, and the name, title and description of each agent that can answer, so that the model picks
+  one. This goes to that agent's provider like any other prompt.
+- **Sent to Slack.** The agents' answers and the files they attach, short status posts ("Working on
+  it…"), the router's questions, reactions, and approval requests with the command, folder and
+  reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
+  error.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
-agent work. The agent runs on the host with the access the user gave it. A hosted server stays awake
+agents work. The agents run on the host with the access the user gave them. A hosted server stays awake
 while a Slack connection is live.
 
 Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that

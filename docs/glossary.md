@@ -26,11 +26,12 @@ table, IPC channel or product string, or when a term in the code disagrees with 
   for each OpenBot computer (`GitHubConnectorService`, `github-connector:*`,
   `GITHUB_CONNECTOR_MCP_SERVER_ID`). A user-added MCP server or a marketplace plugin is not a
   connector.
-- **messaging connection**: one agent's link to an external chat platform, today Slack
-  (`projection_messaging_connections`, `MessagingConnection`, `messaging:*`, `messaging-v1`). A
-  **messaging thread** is one external conversation (a Slack thread or direct message) that the
-  agent answers in its own execution thread (`projection_messaging_threads`, `MessagingLink`). A
-  Slack channel is a `platformChannelId`, never a **channel**.
+- **messaging connection**: one workspace of an external chat platform, today a Slack workspace that
+  installed the OpenBot app, where this computer's agents answer (`projection_messaging_connections`,
+  `MessagingConnection`, `messaging:*`). Its **router agent** picks the agent that answers each new
+  conversation. A **messaging thread** is one external conversation (a Slack thread) that one agent
+  answers in its own execution thread (`projection_messaging_threads`, `MessagingLink`). A Slack
+  channel is a `platformChannelId`, never a **channel**.
 - **server**: a joined team server (`ServerSummary`, `servers:*`), the local Team API host
   (`HostStatus`, `host:*`, `src/main/team-api-server.ts`), the account API (`apps/auth-api`,
   `auth:*`), or an MCP server (`createSdkMcpServer`).
