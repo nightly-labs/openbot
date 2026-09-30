@@ -1,0 +1,296 @@
+/* The shared integration layout: see IntegrationLayout.tsx. */
+
+.integration-logo-tile {
+  --integration-tile: 36px;
+  display: inline-grid;
+  flex: none;
+  width: var(--integration-tile);
+  height: var(--integration-tile);
+  place-items: center;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+}
+
+.integration-logo-tile[data-size="lg"] {
+  --integration-tile: 48px;
+  border-radius: var(--openbot-radius-lg);
+}
+
+.integration-logo-tile > svg {
+  width: 55%;
+  height: 55%;
+}
+
+.integration-status {
+  gap: var(--openbot-space-1);
+}
+
+.integration-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: currentColor;
+}
+
+.integration-status[data-status="unavailable"] .integration-status-dot {
+  background: var(--openbot-transparent);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+/* ------------------------------------------------ page header */
+
+.integration-detail-header {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+}
+
+.integration-detail-copy {
+  display: grid;
+  flex: 1;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+}
+
+.integration-detail-title {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.integration-detail-actions {
+  display: flex;
+  flex: none;
+  gap: var(--openbot-space-2);
+}
+
+/* ------------------------------------------------ connect dialog */
+
+.integration-wizard {
+  display: grid;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-6);
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-sheet);
+  box-shadow: var(--openbot-shadow-dialog);
+}
+
+.integration-wizard-head {
+  display: grid;
+  gap: var(--openbot-space-2);
+  justify-items: center;
+  text-align: center;
+}
+
+.integration-wizard-logos {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  margin-bottom: var(--openbot-space-2);
+}
+
+.integration-wizard-app {
+  width: 36px;
+  height: 36px;
+}
+
+/* Dots flow from OpenBot to the other app while the flow runs. */
+.integration-wizard-link {
+  width: 40px;
+  height: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background:
+    radial-gradient(circle, var(--openbot-accent) 0 1px, var(--openbot-transparent) 1.5px) 0 50% / 8px 2px repeat-x;
+  animation: integration-wizard-flow 0.6s linear infinite;
+}
+
+@keyframes integration-wizard-flow {
+  to {
+    background-position-x: 8px;
+  }
+}
+
+.integration-wizard-logos[data-link="connected"] .integration-wizard-link {
+  background: var(--openbot-success);
+  animation: none;
+}
+
+.integration-wizard-logos[data-link="broken"] .integration-wizard-link {
+  background:
+    radial-gradient(circle, var(--openbot-border-strong) 0 1px, var(--openbot-transparent) 1.5px) 0 50% / 8px 2px
+    repeat-x;
+  animation: none;
+}
+
+/* The other app breathes while OpenBot waits for it. */
+.integration-wizard-target {
+  display: inline-grid;
+  border-radius: var(--openbot-radius-md);
+}
+
+.integration-wizard-logos[data-link="connecting"] .integration-wizard-target {
+  animation: integration-wizard-pulse 1.8s var(--openbot-ease-out) infinite;
+}
+
+.integration-wizard-logos[data-link="connected"] .integration-wizard-target {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--openbot-success) 30%, var(--openbot-transparent));
+}
+
+@keyframes integration-wizard-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--openbot-accent) 45%, var(--openbot-transparent));
+  }
+  100% {
+    box-shadow: 0 0 0 8px var(--openbot-transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integration-wizard-link,
+  .integration-wizard-logos[data-link="connecting"] .integration-wizard-target {
+    animation: none;
+  }
+}
+
+.integration-wizard-body {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.integration-wizard-foot {
+  display: flex;
+  gap: var(--openbot-space-2);
+  justify-content: flex-end;
+}
+
+/* CopyButton draws its icon at full size; match the 14px icons of the other footer buttons. */
+.integration-wizard-foot .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* Above the settings window the flow opens from. */
+.integration-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-dialog) + 1);
+  background: var(--openbot-dialog-overlay);
+}
+
+.integration-wizard-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: calc(var(--openbot-layer-dialog) + 1);
+  width: min(440px, calc(100vw - var(--openbot-space-6) * 2));
+  max-height: calc(100dvh - var(--openbot-space-6) * 2);
+  overflow-y: auto;
+  outline: 0;
+  transform: translate(-50%, -50%);
+}
+
+.integration-wizard-dialog h2 {
+  margin: 0;
+}
+
+.integration-dialog-close {
+  position: absolute;
+  top: var(--openbot-space-3);
+  right: var(--openbot-space-3);
+}
+
+/* ------------------------------------------------ stepper */
+
+.integration-stepper {
+  display: flex;
+  align-items: center;
+  margin: 0 0 var(--openbot-space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.integration-step {
+  display: flex;
+  align-items: center;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The line to a step: quiet until the flow reaches that step, then it fills from the left. */
+.integration-step + .integration-step::before {
+  display: block;
+  width: 24px;
+  height: 2px;
+  margin-inline: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background:
+    linear-gradient(to right, var(--openbot-success), var(--openbot-accent)) no-repeat,
+    var(--openbot-border-strong);
+  background-size:
+    0% 100%,
+    auto;
+  content: "";
+}
+
+.integration-step + .integration-step[data-state="current"]::before {
+  background-size:
+    100% 100%,
+    auto;
+  animation: integration-step-fill 0.4s var(--openbot-ease-out);
+}
+
+.integration-step + .integration-step[data-state="done"]::before {
+  background:
+    linear-gradient(var(--openbot-success), var(--openbot-success)) no-repeat,
+    var(--openbot-border-strong);
+  background-size:
+    100% 100%,
+    auto;
+  animation: integration-step-fill 0.4s var(--openbot-ease-out);
+}
+
+@keyframes integration-step-fill {
+  from {
+    background-size:
+      0% 100%,
+      auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integration-step + .integration-step[data-state="current"]::before,
+  .integration-step + .integration-step[data-state="done"]::before {
+    animation: none;
+  }
+}
+
+.integration-step-index {
+  display: inline-grid;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+  line-height: 1;
+}
+
+.integration-step[data-state="current"] {
+  color: var(--openbot-text-primary);
+}
+
+.integration-step[data-state="current"] .integration-step-index {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+.integration-step[data-state="done"] .integration-step-index {
+  border-color: var(--openbot-success);
+  color: var(--openbot-success);
+}

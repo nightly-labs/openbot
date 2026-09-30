@@ -36,6 +36,7 @@
 @import "./features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
+@import "@openbot/ui/features/settings/integration-layout.css";
 @import "@openbot/ui/features/settings/github-connector.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "./features/computer-use/computer-use.css";
