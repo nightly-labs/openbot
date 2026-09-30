@@ -203,6 +203,7 @@ import type {
   ReadMessagingThreadInput,
   SetMessagingEnabledInput,
   SetSlackIconInput,
+  SlackOverview,
   SlackWorkspaceInput,
 } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
@@ -570,7 +571,8 @@ export const IPC_ENDPOINTS = {
     readThread: scopedRequest<ReadMessagingThreadInput, MessagingThread, "required">()("messaging:read-thread"),
     // Managed Slack apps. Only the host's own desktop can start these: each one opens a Slack page
     // in this computer's browser, and the page returns to this computer's `openbot://` link.
-    connectSlackWorkspace: scopedRequest<MessagingAgentInput, void, "required">()("messaging:connect-slack-workspace"),
+    getSlackOverview: request<undefined, SlackOverview>()("messaging:get-slack-overview"),
+    connectSlackWorkspace: request<undefined, void>()("messaging:connect-slack-workspace"),
     disconnectSlackWorkspace: scopedRequest<SlackWorkspaceInput, void, "required">()(
       "messaging:disconnect-slack-workspace",
     ),

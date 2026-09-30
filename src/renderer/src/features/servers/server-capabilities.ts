@@ -37,8 +37,7 @@ export function serverSupportsCapability(
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "context-reset-v1" ||
-      capability === "agent-import-v1" ||
-      capability === "messaging-v1") &&
+      capability === "agent-import-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

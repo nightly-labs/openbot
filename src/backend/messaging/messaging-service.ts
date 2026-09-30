@@ -14,6 +14,7 @@ import type {
   MessagingPlatform,
   MessagingThread,
   RespondToApprovalInput,
+  SlackOverview,
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -213,6 +214,18 @@ export class MessagingService {
       connection: record ? this.#summary(record) : null,
       threads: this.#threads.list(agentId),
       slackWorkspaces: this.#managed?.workspaces() ?? [],
+    };
+  }
+
+  /** Every agent's Slack connection, for Server settings > Connectors. A deleted agent's row is left out. */
+  slackOverview(): SlackOverview {
+    const agents = this.#agentMap();
+    return {
+      connections: this.#threads.store
+        .connections()
+        .filter((record) => record.platform === "slack" && agents.has(record.agentId))
+        .map((record) => this.#summary(record)),
+      workspaces: this.#managed?.workspaces() ?? [],
     };
   }
 

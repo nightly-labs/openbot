@@ -1,4 +1,4 @@
-import type { MarketplaceSkillDetail, MessagingConnection } from "@openbot/contracts/ipc";
+import type { MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import SharedAgentSettingsPanel, {
@@ -11,8 +11,6 @@ import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../componen
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
-import { AgentSlackSettings, MESSAGING_STATE_LABEL } from "../messaging/AgentSlackSettings";
-import type { MessagingPort } from "../messaging/messaging-port";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
@@ -49,16 +47,9 @@ interface AgentSettingsPanelProps
   onAddFromMarketplace?: (agentId: string) => void;
   /** The Files row. Left out for a remote server without `storage-v1`. */
   files?: AgentFilesOptions;
-  /** The Slack row. Left out where the viewer cannot manage the host, or the host has no `messaging-v1`. */
-  messaging?: MessagingPort;
 }
 
 export type { AgentSkillsMode };
-
-/** The Slack row shows the state of a connection that has tokens, and nothing otherwise. */
-function noSlackState(): MessagingConnection["state"] | null {
-  return null;
-}
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t } = useText();
@@ -68,7 +59,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     memories: { count: 0, open: false },
     routines: { count: 0, open: false },
     files: { open: false },
-    slack: { open: false, state: noSlackState() },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
@@ -97,21 +87,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.memories.open = false;
         state.routines.open = false;
         state.files.open = false;
-        state.slack.open = false;
-        state.slack.state = null;
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
-      const messaging = untrack(() => props.messaging);
-      if (messaging)
-        void messaging.api
-          .getOverview({ agentId }, messaging.serverId)
-          .then((overview) => {
-            setDraft((state) => {
-              state.slack.state = overview.connection?.credentials === "saved" ? overview.connection.state : null;
-            });
-          })
-          .catch(() => undefined);
       if (untrack(() => !props.remoteClient || props.tablesVisible !== false)) {
         void tableCalls()
           .listTables()
@@ -217,11 +195,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
-      detailOpen={draft.routines.open || draft.files.open || draft.slack.open}
+      detailOpen={draft.routines.open || draft.files.open}
       links={
-        <Show
-          when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.messaging}
-        >
+        <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false}>
           <SettingsLinkGroup>
             <Show when={!props.remoteClient && props.onOpenUsage}>
               <SettingsLinkRow
@@ -273,17 +249,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               />
             </Show>
-            <Show when={props.messaging}>
-              <SettingsLinkRow
-                label={t("agentSettings.links.slack")}
-                value={draft.slack.state ? t(MESSAGING_STATE_LABEL[draft.slack.state]) : undefined}
-                onClick={() =>
-                  setDraft((state) => {
-                    state.slack.open = true;
-                  })
-                }
-              />
-            </Show>
             <Show when={!props.remoteClient}>
               <SettingsLinkRow
                 label={t("agentSettings.links.routines")}
@@ -308,26 +273,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             onBack={() =>
               setDraft((state) => {
                 state.files.open = false;
-              })
-            }
-            onClose={props.onClose}
-          />
-        )}
-      </Show>
-      <Show when={draft.slack.open && props.messaging}>
-        {(messaging) => (
-          <AgentSlackSettings
-            port={messaging()}
-            agentId={props.agent.id}
-            agentName={props.agent.name}
-            onStateChange={(connection) =>
-              setDraft((state) => {
-                state.slack.state = connection?.credentials === "saved" ? connection.state : null;
-              })
-            }
-            onBack={() =>
-              setDraft((state) => {
-                state.slack.open = false;
               })
             }
             onClose={props.onClose}

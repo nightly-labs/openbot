@@ -101,6 +101,11 @@ export function createMockMessaging(agentName: (agentId: string) => string | und
         throw new Error(sourceText("error.messaging.threadNotFound"));
       return clone(thread);
     },
+    getSlackOverview: async () =>
+      clone({
+        connections: [...connections.values()].filter((connection) => agentName(connection.agentId)),
+        workspaces: [...workspaces.values()],
+      }),
     connectSlackWorkspace: async () => {
       workspaces.set(PREVIEW_WORKSPACE.workspaceId, PREVIEW_WORKSPACE);
     },

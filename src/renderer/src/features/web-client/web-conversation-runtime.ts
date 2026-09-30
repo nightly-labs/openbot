@@ -13,7 +13,6 @@ import {
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
 import { listInstalledSkills, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import { teamMessagingRequests } from "@openbot/team-client/team-messaging-requests";
 import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
@@ -52,7 +51,6 @@ function webHostAdmin(
       publish: (input) => publishAgentTemplate(request(), input),
       unpublish: (agentId) => unpublishAgentTemplate(request(), agentId),
     },
-    messaging: teamMessagingRequests(() => request()),
   };
 }
 

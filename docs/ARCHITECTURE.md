@@ -1513,9 +1513,12 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   button value is a random token that exists only in memory.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart. Events that arrive while no socket is open are lost.
+- **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents lists
+  every agent with its Slack app (`messaging.getSlackOverview`) and adds, pauses and removes them.
+  A remote server shows no Slack page, because Slack returns to the host's own browser.
 - **Hosted servers and remote admins.** The optional `messaging-v1` capability lets an owner or
-  admin of a joined server connect an agent from the desktop app or the browser client. A live
-  connection counts as use, so a hosted server does not idle out.
+  admin of a joined server read and manage an agent's connection over the Team API; no screen uses
+  it yet. A live connection counts as use, so a hosted server does not idle out.
 
 ## Skill folders and MCP configuration
 

@@ -41,6 +41,7 @@ export const MESSAGING_LIMITS = {
   threadMessages: 200,
   messageText: 20_000,
   workspaces: 50,
+  connections: 1_000,
 } as const;
 
 export interface MessagingConnection {
@@ -76,6 +77,12 @@ export interface MessagingOverview {
   threads: MessagingThreadSummary[];
   /** The workspaces connected on this host. Empty on a host that cannot create managed apps. */
   slackWorkspaces: SlackWorkspace[];
+}
+
+/** Every agent's Slack connection on this computer, and the connected workspaces. */
+export interface SlackOverview {
+  connections: MessagingConnection[];
+  workspaces: SlackWorkspace[];
 }
 
 export interface MessagingThreadMessage {
@@ -171,6 +178,18 @@ export function isMessagingOverview(value: unknown): value is MessagingOverview 
     Array.isArray(value.slackWorkspaces) &&
     value.slackWorkspaces.length <= MESSAGING_LIMITS.workspaces &&
     value.slackWorkspaces.every(isSlackWorkspace)
+  );
+}
+
+export function isSlackOverview(value: unknown): value is SlackOverview {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.connections) &&
+    value.connections.length <= MESSAGING_LIMITS.connections &&
+    value.connections.every(isMessagingConnection) &&
+    Array.isArray(value.workspaces) &&
+    value.workspaces.length <= MESSAGING_LIMITS.workspaces &&
+    value.workspaces.every(isSlackWorkspace)
   );
 }
 

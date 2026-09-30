@@ -86,7 +86,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.links.files": "Files",
   "agentSettings.links.routines": "Routines",
   "agentSettings.links.routinesCount": { one: "{count} configured", other: "{count} configured" },
-  "agentSettings.links.slack": "Slack",
   "agentSettings.runtime.workspaceNote":
     "Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders. Reads and network stay available.",
   "agentSettings.runtime.workspaceEnforcedCommand":

@@ -21,6 +21,7 @@ export function teamMessagingRequests(request: (serverId?: string) => TeamApiReq
     readThread: async ({ agentId, linkId }, serverId) =>
       request(serverId)("POST", MESSAGING_ROUTES.thread, decodeMessagingThread, { agentId, linkId }),
     // A managed Slack app opens Slack in the host's own browser, so no route creates one.
+    getSlackOverview: hostOnly,
     connectSlackWorkspace: hostOnly,
     disconnectSlackWorkspace: hostOnly,
     createSlackApp: hostOnly,

@@ -5,7 +5,6 @@ import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../componen
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
-import { desktopMessagingPort, type MessagingPort } from "../messaging/messaging-port";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
@@ -21,7 +20,6 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 import { Portal } from "@solidjs/web";
 import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 import { conversationPort } from "./conversation-port";
-import type { ConversationRuntime } from "./conversation-runtime";
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLButtonElement) => void }) {
@@ -84,19 +82,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
         (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
       ),
     );
-  /**
-   * Agent settings > Slack: this computer, or a joined server that an owner or admin manages and that
-   * serves `messaging-v1`. The web client reaches the host with its own admin calls.
-   */
-  const agentMessaging = (
-    server: ServerSummary | undefined,
-    runtime: ConversationRuntime | undefined,
-  ): MessagingPort | undefined => {
-    if (!serverCanAdminister(server, "messaging-v1")) return undefined;
-    if (!runtime) return desktopMessagingPort(server.id, server.kind === "local");
-    const api = runtime.admin?.messaging;
-    return api ? { api, serverId: server.id, managedApps: false } : undefined;
-  };
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
     // The web client shows host files in Server settings > Storage; its agent settings have no Files.
@@ -348,7 +333,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
               files={agentFiles(props.server, agent().id)}
-              messaging={agentMessaging(props.server, props.runtime)}
             />
           </Loading>
         )}

@@ -9,7 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
-import type { IpcGroupHandlers } from "./define-ipc-group";
+import { handler, type IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseCreateSlackAppInput,
   parseMessagingAgentInput,
@@ -33,6 +33,7 @@ interface MessagingIpcDependencies {
     | "setEnabled"
     | "disconnect"
     | "readThread"
+    | "slackOverview"
     | "connectSlackWorkspace"
     | "disconnectSlackWorkspace"
     | "createSlackApp"
@@ -78,10 +79,9 @@ export function messagingIpcHandlers({
         local: ({ agentId, linkId }) => messaging.readThread(agentId, linkId),
         remote: (input, serverId) => remote(serverId, MESSAGING_ROUTES.thread, input, decodeMessagingThread),
       }),
-      connectSlackWorkspace: scopedHandler(parseMessagingAgentInput, {
-        local: () => messaging.connectSlackWorkspace(),
-        remote: hostOnly,
-      }),
+      // The workspaces and the Slack apps are this computer's: these two have no server to name.
+      getSlackOverview: handler(() => messaging.slackOverview()),
+      connectSlackWorkspace: handler(() => messaging.connectSlackWorkspace()),
       disconnectSlackWorkspace: scopedHandler(parseSlackWorkspaceInput, {
         local: ({ workspaceId }) => messaging.disconnectSlackWorkspace(workspaceId),
         remote: hostOnly,

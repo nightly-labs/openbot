@@ -14,20 +14,20 @@ design is in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), and the u
 
 1. The user is signed in to OpenBot, and the computer has a name in **Server settings**. Most users
    already have both.
-2. **Agent settings → Slack → Connect Slack.** The browser opens Slack's consent page for the
+2. **Server settings → Connectors → Slack → Connect Slack.** The browser opens Slack's consent page for the
    **OpenBot** manager app. The user selects the workspace in the top-right corner and clicks
    **Allow**.
 3. Slack returns to `openbot.run`. The page there opens the installed OpenBot app, and the screen
-   shows "Connected to <workspace>".
+   shows the workspace in the Workspace section.
 
 ## For each agent
 
-1. **Add to Slack.** OpenBot creates a Slack app named after the agent, with its description, and
-   opens Slack's install page.
+1. **Add agent**, then **Create in Slack.** OpenBot creates a Slack app named after the agent, with
+   its description, and opens Slack's install page.
 2. The user clicks **Allow**. The page opens OpenBot again, and the state becomes **Connected**. The
    icon becomes the agent's avatar within a few seconds.
 3. If the workspace requires an admin to approve new apps, the state stays **Waiting for install**
-   until an admin approves. Then the user clicks **Install in Slack** again.
+   until an admin approves. Then the user clicks **Continue** on the agent's row.
 
 ## What people see in Slack
 
@@ -45,8 +45,8 @@ design is in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), and the u
   connection and stores nothing. Answers go from the host straight to Slack.
 - The app's URL does not change, so after a restart events arrive again with nothing to reinstall.
   Events sent while the app is closed are retried for about 6 minutes, then lost.
-- Renaming the agent renames the app. A new avatar reaches Slack the next time **Agent settings →
-  Slack** is opened. **Disconnect**, or deleting the agent, deletes the app.
+- Renaming the agent renames the app. A new avatar reaches Slack the next time the Slack page
+  shows after OpenBot starts. **Remove**, or deleting the agent, deletes the app.
 
 ## How it differs from a local test
 

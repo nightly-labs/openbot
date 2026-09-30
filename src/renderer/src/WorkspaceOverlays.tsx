@@ -6,6 +6,7 @@ import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { createGitHubConnector } from "./features/connectors/github-connector";
+import { createSlackConnector } from "./features/connectors/slack-connector";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
@@ -207,6 +208,7 @@ function ServerSettings() {
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
+  const { agentList } = useAgents();
   const github = createGitHubConnector();
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -241,6 +243,7 @@ function ServerSettings() {
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
+  const slack = createSlackConnector(() => serverSettingsTarget()?.id ?? "");
   // The overlay mounts with the app. A first read that failed then must not hide GitHub for good.
   createEffect(serverSettingsOpen, (open) => {
     if (open) github.reload();
@@ -319,6 +322,10 @@ function ServerSettings() {
           }
           // The GitHub connection belongs to this computer, and a build with no GitHub App has none.
           githubConnector={server().kind === "local" && github.status().available ? github : undefined}
+          // Each agent's Slack app is made on the computer that runs the agent: Slack opens this
+          // computer's browser and returns to its `openbot://` link.
+          slackConnector={server().kind === "local" ? slack : undefined}
+          connectorAgents={agentList()}
         />
       )}
     </Show>

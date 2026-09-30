@@ -1,0 +1,246 @@
+/* Server settings > Connectors > Slack. */
+
+.slack-integration {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+.slack-integration-note {
+  margin-top: var(--openbot-space-2);
+}
+
+/* ------------------------------------------------ agent table */
+
+.slack-integration-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.slack-integration-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.slack-integration-table th,
+.slack-integration-table td {
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.slack-integration-table thead th {
+  color: var(--openbot-data-table-header-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+}
+
+.slack-integration-table tbody tr {
+  border-top: 1px solid var(--openbot-data-table-border);
+}
+
+.slack-integration-table tbody th {
+  font-weight: inherit;
+}
+
+.slack-integration-agent {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  white-space: nowrap;
+}
+
+.slack-integration-stack {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  justify-items: start;
+}
+
+.slack-integration-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.slack-integration-row-actions {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+}
+
+/* ------------------------------------------------ remove dialog */
+
+.slack-effects {
+  display: grid;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.slack-effects li {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-2);
+}
+
+.slack-effects li + li {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.slack-effect-icon {
+  display: inline-grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+}
+
+.slack-effect-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.slack-effects li[data-tone="danger"] .slack-effect-icon {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.slack-effects li[data-tone="success"] .slack-effect-icon {
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success);
+}
+
+/* ------------------------------------------------ add dialog */
+
+.slack-agent-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.slack-agent-option {
+  display: grid;
+  gap: var(--openbot-space-1);
+  justify-items: center;
+  min-width: 0;
+  height: auto;
+  padding: var(--openbot-space-3) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-lg);
+  text-align: center;
+}
+
+.slack-agent-option > .ui-text {
+  max-width: 100%;
+}
+
+.slack-agent-option[aria-pressed="true"] {
+  border-color: var(--openbot-accent);
+  box-shadow: inset 0 0 0 1px var(--openbot-accent);
+}
+
+.slack-preview {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.slack-preview-channel {
+  display: flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-secondary);
+}
+
+.slack-preview-message {
+  display: flex;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+}
+
+.slack-preview-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+}
+
+.slack-preview-avatar > * {
+  width: 100%;
+  height: 100%;
+}
+
+.slack-preview-body {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+}
+
+.slack-preview-meta {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.slack-preview-app {
+  padding: 0 var(--openbot-space-1);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.slack-checklist {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  font-size: var(--openbot-text-sm);
+}
+
+.slack-checklist li {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.slack-checklist li[data-state="done"] {
+  color: var(--openbot-text-secondary);
+}
+
+.slack-checklist li[data-state="done"] svg {
+  color: var(--openbot-success);
+}
+
+.slack-checklist-dot {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.slack-waiting {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: center;
+}
