@@ -100,6 +100,10 @@ export function StartupSplash(props: StartupSplashProps) {
       aria-busy={exiting() ? "false" : "true"}
       style={SPLASH_EYE_LENGTH_STYLE}
       onAnimationEnd={handleAnimationEnd}
+      // Reduce motion turned on during the draw cancels it: the eyes are then shown in full.
+      onAnimationCancel={(event) => {
+        if (event.animationName === INTRO_ANIMATION) setIntroDone(true);
+      }}
     >
       <AppLogo variant={props.variant} class="startup-splash-logo" />
     </main>
