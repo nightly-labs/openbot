@@ -411,6 +411,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  releaseIdleThreads(): void {
+    this.#threads.releaseIdle();
+  }
+
   /**
    * Closes one session and keeps the agent process for the other threads. The bridge session goes
    * first, because it is this app's own child; the agent is then told to drop the session, which is

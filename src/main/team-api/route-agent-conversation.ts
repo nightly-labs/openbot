@@ -15,6 +15,7 @@ import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./re
 import {
   conversationForCapabilities,
   markerExclusionsForCapabilities,
+  memberSender,
   nullableString,
   pageAnchor,
   pageLimit,
@@ -82,12 +83,15 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     return json(
       202,
-      await agents.sendMessage({
-        agentId,
-        text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-        attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-        replyToMessageId: nullableString(body, "replyToMessageId"),
-      }),
+      await agents.sendMessage(
+        {
+          agentId,
+          text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+          attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+          replyToMessageId: nullableString(body, "replyToMessageId"),
+        },
+        memberSender(member),
+      ),
     );
   }
 

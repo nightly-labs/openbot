@@ -26,6 +26,7 @@ has its own Stripe plan. Its machine comes from the plan
 | Server bootstrap | `src/main/hosted-server-bootstrap.ts` | On the first start, redeems the claim, signs in, and publishes the host. |
 | Start retry | `src/main/hosted-server-start-retry.ts` | Publishes the host again after a failed start. |
 | Activity report | `src/main/hosted-server-activity.ts` | Tells the Worker that the server is in use, and when its next routine runs. |
+| Memory guard | `src/main/hosted-server-memory.ts`, `src/backend/agent/memory-hold.ts`, `turn-slots.ts` | Reads the memory of the server, holds new turns when it is low, and limits the turns that run at the same time. See [Memory](#memory). |
 | Billing link | `apps/auth-api/src/server/hosted-billing.ts`, `billing-service.ts` | Opens Stripe Checkout for a new server. Tells the hosting service when a subscription changes. |
 | Desktop and web clients | `AddServerOverlay`, `SettingsHostedServersTab`, `hosted-server-service.ts`, `web-hosted-servers.ts`, `web-hosted-server-wake.ts` | Pick a plan, pay, list, start, renew and delete. The web app shows the list in Billing. Start a stopped server when a connection fails. |
 | Mobile client | `mobile-workspace-context.tsx` | Starts the selected stopped server when a connection fails. |
@@ -375,6 +376,44 @@ each claim, so a VM that has no working session cannot sign in after the change;
 A start that cannot reach the account server does not use the claim. The start retry signs in
 again with backoff (30 s to 10 min) and then publishes the host.
 
+## Memory
+
+One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
+each thread, and one set of MCP servers for each ACP session. A Starter server has 4 GB. The guards
+are only on a hosted server; the desktop app does not change.
+
+The unit (`openbot.service`):
+
+- `MemoryMax=90%`: the OOM killer of the unit acts before the kernel's own, so the desktop, sshd and
+  the boat agent keep running.
+- `OOMScoreAdjust=-500` for main. Every 5 s, main gives each process that it starts, other than the
+  Electron processes, an `oom_score_adj` of 500. So the OOM killer picks a provider CLI, an MCP server
+  or an agent tool before main.
+- `OOMPolicy=continue`: one killed agent process does not stop the unit.
+- `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
+
+The app (`HostedServerMemory`) reads the memory every 5 s. The free memory is the smaller of
+`MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
+plus `inactive_file` from `memory.stat`: the kernel takes that file cache back before the OOM killer
+acts). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
+do not all pass the check before their processes grow. A start that fails counts nothing.
+
+| Level | When | What happens |
+| --- | --- | --- |
+| `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
+| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. |
+| `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. |
+
+When the level is `ok` again, each held message starts. If a file cannot be read, the level stays
+`ok` and main logs one warning.
+
+Only a fixed number of turns run at the same time, from the memory of the server: 4 up to 5 GiB,
+8 up to 10 GiB, and 16 above. A turn that starts, runs, or compacts the context uses a slot. When
+the slots are full, the messages wait in the queue: a message from a person starts first, then
+routine runs and teammate messages, and the oldest first in each group. No turn waits for a slot
+that another turn holds, because a message to a teammate ends the turn that sends it. A queued
+message counts as use, so the server does not stop while messages wait.
+
 ## Tested on boat
 
 The `boat` scenario of `scripts/stripe-flows-e2e.ts` (see `apps/auth-api/README.md`) passed on
@@ -426,5 +465,7 @@ These were not tested on boat. Test them before a user gets access:
 - that boat frees the key of a refused create, so a retry of a setup that failed works;
 - the menu path of the Stripe failed-payment setting in [Production](#production), and whether test
   mode and live mode keep separate values;
+- the [memory guards](#memory): that boat VMs use cgroup v2 with the memory controller, that
+  their kernel has zram, and that the OOM killer of the unit kills an agent process and not main;
 - whether boat stops a sandbox that runs for weeks. The Worker restarts it, but work in progress
   at that time stops.

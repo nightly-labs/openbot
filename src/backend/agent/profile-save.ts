@@ -1,6 +1,7 @@
 import { rm } from "node:fs/promises";
 import type {
   AgentSummary,
+  ConversationMessageSender,
   SaveAgentProfileInput,
   SaveAgentProfileResult,
   SidebarLayoutSnapshot,
@@ -14,6 +15,7 @@ interface ProfileSaveHooks {
   create(
     input: SaveAgentProfileInput,
     configure: (agent: AgentSummary) => Promise<AgentSummary>,
+    sender: ConversationMessageSender | undefined,
   ): Promise<AgentSummary>;
   changed(agent: AgentSummary): void;
   delete(agent: AgentSummary): Promise<void>;
@@ -33,11 +35,13 @@ export class ProfileSave {
     private readonly hooks: ProfileSaveHooks,
   ) {}
 
+  /** `sender` is the person who writes the first message of a new agent. */
   save(
     input: SaveAgentProfileInput,
     sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "withProfileAssignment">,
+    sender?: ConversationMessageSender,
   ): Promise<SaveAgentProfileResult> {
-    const operation = this.#queue.then(() => this.#save(input, sidebar));
+    const operation = this.#queue.then(() => this.#save(input, sidebar, sender));
     this.#queue = operation.then(
       () => undefined,
       () => undefined,
@@ -48,6 +52,7 @@ export class ProfileSave {
   async #save(
     input: SaveAgentProfileInput,
     sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "withProfileAssignment">,
+    sender: ConversationMessageSender | undefined,
   ): Promise<SaveAgentProfileResult> {
     const commandId = `agent-profile:${input.operationId}`;
     const receipt = this.store.database.commandResult(commandId);
@@ -75,11 +80,15 @@ export class ProfileSave {
           layout = await assign(previous.id);
           agent = this.store.commitReviewedProfile(previous.id, input.draft, commandId, layout).agent;
         } else {
-          agent = await this.hooks.create(input, async (candidate) => {
-            created = candidate;
-            this.#pendingAgents.add(candidate.id);
-            return configure(candidate);
-          });
+          agent = await this.hooks.create(
+            input,
+            async (candidate) => {
+              created = candidate;
+              this.#pendingAgents.add(candidate.id);
+              return configure(candidate);
+            },
+            sender,
+          );
           agent = this.store.commitReviewedProfile(agent.id, input.draft, commandId, layout).agent;
         }
         const result = { agent, layout };

@@ -21,12 +21,13 @@ import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 /**
  * Who wrote a message, as much as a row needs to draw it.
  *
- * `you` is the only kind that stands on the right, and the only kind that draws neither a face nor
- * a name: a chat does not tell the reader who they are. Everything else is an author with an
+ * `you` draws neither a face nor a name: a chat does not tell the reader who they are. `member` is
+ * another person in an agent chat. People stand on the right and agents on the left, so a member
+ * row stands with the reader's own and adds a name, and a bubble in that person's colour. Everything else is an author with an
  * identity, whether it is an agent of this chat or a member of a channel.
  */
 export interface ChatMessageAuthor {
-  kind: "you" | "agent";
+  kind: "you" | "agent" | "member";
   name: string;
   /** Missing for an author the agent list no longer holds, and for the reader's own messages. */
   agent?: AgentProfile;
@@ -38,11 +39,12 @@ export interface ChatMessageRowProps {
   message: AgentMessage;
   author: ChatMessageAuthor;
   /**
-   * Whether the face stands beside the bubble and the name above it. The agent chat never shows them - one
-   * chat has one agent, and its name is in the header - and a channel shows them once for a run of
-   * messages by one author.
+   * Whether the face stands beside the bubble and the name above it. The agent chat never shows a
+   * face - one chat has one agent, and its name is in the header - but names another person once
+   * for a run of their messages. A channel shows both once for a run of messages by one author.
+   * `false` keeps an empty gutter where the face stands; leave it out when the row has no face.
    */
-  showAuthor?: boolean;
+  showAuthor?: boolean | undefined;
   showTime?: boolean;
   animate?: boolean;
   agents: AgentProfile[];
@@ -82,6 +84,8 @@ export interface ChatMessageRowProps {
 export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const { t } = useText();
   const own = () => props.author.kind === "you";
+  const member = () => props.author.kind === "member";
+  const person = () => own() || member();
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
   // own head colour, read through the same helper the action markers use, so a name matches the
@@ -94,23 +98,23 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   return (
     <Message
       role="article"
-      align={own() ? "end" : "start"}
+      align={person() ? "end" : "start"}
       aria-label={t("chat.row.label", { name: props.author.name })}
-      data-author={own() ? "user" : "assistant"}
+      data-author={person() ? "user" : "assistant"}
       data-chat-search-message={props["data-chat-search-message"]}
       style={authorStyle()}
       class={[
         "message-entry",
         {
           "message-entry-animated": props.animate === true,
-          "message-entry-user": own(),
-          "message-entry-agent": !own(),
-          "message-entry-with-author": props.showAuthor === true && !own(),
+          "message-entry-user": person(),
+          "message-entry-agent": !person(),
+          "message-entry-with-author": props.showAuthor === true && !person(),
         },
         props.class,
       ]}
     >
-      <Show when={props.showAuthor && !own()}>
+      <Show when={props.showAuthor && !person()}>
         <MessageAvatar class="message-author-avatar">
           <Show when={props.author.agent} fallback={<AgentAvatar seed={seed()} />}>
             {(agent) => (
@@ -126,7 +130,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
           </Show>
         </MessageAvatar>
       </Show>
-      <Show when={props.showAuthor === false && !own()}>
+      <Show when={props.showAuthor === false && !person()}>
         <div class="message-author-gutter" aria-hidden="true" />
       </Show>
       <MessageContent>
@@ -158,9 +162,10 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
         </Show>
         <div class="message-shell">
           <Bubble
-            align={own() ? "end" : "start"}
+            class={member() ? "message-bubble-member" : undefined}
+            align={person() ? "end" : "start"}
             variant={conversationBubbleVariant(props.message)}
-            data-author={own() ? "user" : "assistant"}
+            data-author={person() ? "user" : "assistant"}
             data-streaming={props.message.streaming === true ? "" : undefined}
           >
             <BubbleContent>
@@ -185,7 +190,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
             <Show when={(props.reactions?.length ?? 0) > 0}>
               <BubbleReactions
                 class="message-reaction-anchor"
-                align={own() ? "start" : "end"}
+                align={person() ? "start" : "end"}
                 overflowCount={props.reactionOverflowCount}
                 role="group"
                 aria-label={t("chat.row.reactions", {

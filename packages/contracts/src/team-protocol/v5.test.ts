@@ -144,4 +144,55 @@ describe("Team protocol v5", () => {
     const malformed = { agentId: "chief", deliveries: [{ ...answer, expectsReply: "false" }] };
     expect(() => encodeTeamProtocolV5CurrentHttpResponse("GET", queuePath, 200, malformed)).toThrow("reply mark");
   });
+
+  it("names the member who wrote a user message; v4 drops the name, and a malformed one fails closed", () => {
+    const pagePath = "/v1/agents/chief/conversation-page";
+    const message = (id: string, senderMember?: { id: string; name: string }) => ({
+      id,
+      author: "user" as const,
+      text: `Message ${id}`,
+      createdAt: "2026-09-28T10:00:00.000Z",
+      status: "completed" as const,
+      ...(senderMember ? { senderMember } : {}),
+    });
+    const page = {
+      agentId: "chief",
+      threadId: "thread-1",
+      activeTurnId: null,
+      revision: 1,
+      messages: [message("ada-1", { id: "member-ada", name: "Ada" }), message("legacy-1")],
+      references: { "grace-0": message("grace-0", { id: "member-grace", name: "Grace" }) },
+      pageInfo: { hasOlder: false, olderCursor: null },
+    };
+    const wire = JSON.parse(encodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, page));
+    expect(decodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, wire)).toEqual(page);
+    const overWebRtc = encodeTeamProtocolV5WebRtcHttpResponse("GET", pagePath, 200, page);
+    expect(decodeTeamProtocolV5WebRtcHttpResponse("GET", pagePath, 200, overWebRtc)).toEqual(page);
+
+    const snapshot = {
+      agentId: "chief",
+      threadId: "thread-1",
+      activeTurnId: null,
+      revision: 1,
+      messages: page.messages,
+    };
+    const eventWire = JSON.parse(encodeTeamProtocolV5BaseCurrentEvent({ type: "conversation", snapshot }) ?? "null");
+    expect(decodeTeamProtocolV5CurrentEvent(createTeamProtocolV5Event(1, eventWire))).toEqual({
+      status: "known",
+      event: { type: "conversation", snapshot },
+    });
+
+    // A client on protocol 4 reads every user message as its own, as it always did.
+    const v4 = decodeTeamProtocolV4CurrentHttpResponse("GET", pagePath, 200, wire);
+    expect(JSON.stringify(v4)).not.toContain("senderMember");
+
+    const malformed = { ...page, messages: [{ ...message("bad-1"), senderMember: { id: "member-ada", name: 7 } }] };
+    expect(() => encodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, malformed)).toThrow(
+      "Invalid conversation sender.",
+    );
+    const malformedWire = { ...wire, messages: [{ ...wire.messages[0], senderMember: { id: "", name: "Ada" } }] };
+    expect(() => decodeTeamProtocolV5CurrentHttpResponse("GET", pagePath, 200, malformedWire)).toThrow(
+      "Invalid conversation sender.",
+    );
+  });
 });

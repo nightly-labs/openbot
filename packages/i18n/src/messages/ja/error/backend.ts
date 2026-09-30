@@ -181,6 +181,8 @@ export const messages = {
   "error.backend.browserUrlRequired": "ブラウザーの URL が必要です。",
   "error.backend.browserUrlTooLong": "ブラウザーの URL が長すぎます。",
   "error.backend.browserTabLimit": "ブラウザーで開けるタブは {limit} 個までです。",
+  "error.backend.browserLowMemory":
+    "このサーバーはメモリが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
   "error.backend.popupSecureInput":
     "セキュア入力中はポップアップがブロックされます。セキュア入力を完了またはキャンセルしてから、ページからもう一度お試しください。",

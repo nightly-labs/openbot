@@ -1,4 +1,5 @@
 import type {
+  ConversationMessageSender,
   QueueSnapshot,
   ReorderQueueInput,
   SteerQueuedMessageInput,
@@ -74,7 +75,7 @@ export class QueueControls {
     if (sender?.kind === "agent") this.#drain.scheduleDrain(sender.agentId);
   }
 
-  async edit(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
+  async edit(agentId: string, input: QueueEditRequest, sender?: ConversationMessageSender): Promise<QueueSnapshot> {
     const finished = this.#mailbox.finishedQueueEditAction(agentId, input.deliveryId, input.editId);
     if (finished) {
       if (input.action === "begin" || input.action === "retain-attachments")
@@ -118,6 +119,7 @@ export class QueueControls {
           input.keepAttachmentIds,
           input.attachmentDraftIds,
           input.editId,
+          sender,
         );
         const snapshot = this.#conversation.snapshot(agentId);
         if (snapshot) {
@@ -132,7 +134,7 @@ export class QueueControls {
     return this.#mailbox.listQueue(agentId);
   }
 
-  async update(input: UpdateQueuedMessageInput): Promise<void> {
+  async update(input: UpdateQueuedMessageInput, sender?: ConversationMessageSender): Promise<void> {
     if (this.#hooks.channelAssignment(input.deliveryId))
       throw new Error(sourceText("error.backend.useChannelTaskControls"));
     await this.#mailbox.updateQueuedMessage(
@@ -141,6 +143,8 @@ export class QueueControls {
       input.text,
       input.keepAttachmentIds,
       input.attachmentDraftIds,
+      undefined,
+      sender,
     );
     const snapshot = this.#conversation.snapshot(input.agentId);
     if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);

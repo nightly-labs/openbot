@@ -73,7 +73,6 @@ import { claimErrorToast, readableAgentError } from "../agents/agent-error-text"
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
-import { isOwnChannelAuthor } from "../channels/channel-timeline";
 import { ChannelsControllerProvider } from "../channels/channels-context";
 import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
@@ -88,6 +87,7 @@ import { watchHostUpdate } from "../servers/host-update-toast";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import { remoteAdminServer } from "../servers/server-capabilities";
+import { isReaderAuthor } from "../team/reader-identity";
 import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import type { UsagePort } from "../usage/usage-port";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -1432,7 +1432,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           <Show when={!agentFormOpen() && channelOpen()}>
             <ChannelConversation
               isOwnMessage={(authorId) =>
-                isOwnChannelAuthor(authorId, {
+                isReaderAuthor(authorId, {
                   memberId: workspace.state.memberId,
                   accountUserId: props.accountId,
                   onOwnComputer: false,
@@ -1568,6 +1568,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               server={server()}
               presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
               currentUserEmail={props.accountEmail ?? ""}
+              isOwnSender={(senderId) =>
+                isReaderAuthor(senderId, {
+                  memberId: workspace.state.memberId,
+                  accountUserId: props.accountId,
+                  onOwnComputer: false,
+                })
+              }
               browserEnabled={browserEnabled()}
               remoteDesktopEnabled={false}
               remoteDesktopSessionActive={false}

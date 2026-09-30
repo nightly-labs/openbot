@@ -175,6 +175,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserUrlRequired": "A browser URL is required.",
   "error.backend.browserUrlTooLong": "The browser URL is too long.",
   "error.backend.browserTabLimit": "The browser can have up to {limit} open tabs.",
+  "error.backend.browserLowMemory":
+    "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
   "error.backend.popupSecureInput":
     "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page.",

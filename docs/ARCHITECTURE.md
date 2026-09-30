@@ -1707,7 +1707,9 @@ and observed state. A server reports each minute while it is in use, and the Wor
 extends. When boat stops a server in use, the Worker resumes it, and clients ask the Worker to
 start a stopped server when a connection fails. No message
 waits in the Worker while a server is stopped; the client keeps it and connects again. The Worker's boat key cannot read files or run commands in a
-sandbox. See [hosted servers](hosted-servers.md) for the flow, the configuration and the template.
+sandbox. On a hosted server only, main reads the memory of the machine, and the backend holds new
+turns while it is low and limits the turns that run at the same time. See
+[hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
 
 ## Shared UI package
 

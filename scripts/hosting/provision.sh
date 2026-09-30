@@ -31,6 +31,17 @@ source "$SOURCE/openbot-hosted-update"
 exec 9>"$LOCK"
 flock 9
 install_packages "$SOURCE/packages.txt"
+# Compressed swap in memory: it uses no disk and no snapshot space, and it gives a small server time
+# before the OOM killer acts. A kernel with no zram module, or an image with no package for it, gets
+# none.
+if modprobe zram 2>/dev/null && apt-get -o DPkg::Lock::Timeout=600 update &&
+  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends systemd-zram-generator; then
+  printf '[zram0]\nzram-size = ram / 2\n' >/etc/systemd/zram-generator.conf
+  chmod 0644 /etc/systemd/zram-generator.conf
+else
+  echo "zram is not available. The server has no compressed swap."
+fi
+apt-get clean
 install -d -m 0755 "$INSTALL" "$INSTALL/hosted"
 recover
 work=$(mktemp -d "$SCRATCH/openbot-update.XXXXXX")

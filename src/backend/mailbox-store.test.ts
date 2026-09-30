@@ -218,6 +218,26 @@ describe("MailboxStore", () => {
     expect(restored.nextQueued("chief")).toBeNull();
   });
 
+  it("makes the member who saves a queued edit its sender", async () => {
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      senderMember: { id: "member-ada", name: "Ada" },
+      recipientAgentIds: ["chief"],
+      text: "Ada wrote this",
+    });
+    const id = required(receipt.deliveries[0]).id;
+    await store.updateQueuedMessage("chief", id, "Bob wrote this", [], [], undefined, {
+      id: "member-bob",
+      name: "Bob",
+    });
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.conversationMessages("chief")[0]).toMatchObject({
+      text: "Bob wrote this",
+      senderMember: { id: "member-bob", name: "Bob" },
+    });
+  });
+
   it("keeps finished edit outcomes across many later edits per delivery", async () => {
     const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
     const id = required(receipt.deliveries[0]).id;

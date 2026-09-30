@@ -248,6 +248,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.rejectAll("Claude session stopped.");
   }
 
+  releaseIdleThreads(): void {
+    this.#threads.releaseIdle();
+  }
+
   /**
    * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
    * of that thread, so the close is what ends those child processes. The caller releases an idle

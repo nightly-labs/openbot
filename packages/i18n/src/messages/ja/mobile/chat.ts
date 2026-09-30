@@ -174,6 +174,8 @@ export const messages = {
   "mobile.chat.exchange.messaged": "メッセージ送信先",
   "mobile.chat.exchange.messageFrom": "メッセージ送信元",
   "mobile.chat.exchange.assignedTo": "割り当て先",
+  "mobile.chat.speaker.superseded": "{name} · 置き換え済み",
+  "mobile.chat.speaker.memberFallback": "チームメンバー",
   "mobile.chat.exchange.continuingWith": "引き継ぎ先",
   "mobile.chat.exchange.unavailableAgent": "利用できないエージェント",
   "mobile.chat.exchange.unknownAgent": "不明なエージェント",

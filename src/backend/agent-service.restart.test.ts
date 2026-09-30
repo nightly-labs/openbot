@@ -464,6 +464,34 @@ describe.sequential("AgentService: restart", () => {
     expect((await store.database.readConversation("chief", before.threadId)).revision).toBe(before.revision);
   });
 
+  it("keeps the member who wrote a message after a restart", async () => {
+    const { store, mailbox } = stores(root);
+    const createService = () =>
+      createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: (provider) => new FakeAgentClient(provider),
+      });
+    service = createService();
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "From Ada" }, { id: "member-ada", name: "Ada" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+    await service.sendMessage({ agentId: "chief", text: "From nobody" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+    await service.stop();
+
+    service = createService();
+    await service.initialize();
+    const userMessages = (await service.readConversation("chief")).messages.filter(
+      (message) => message.author === "user",
+    );
+    expect(userMessages.map((message) => [message.text, message.senderMember])).toEqual([
+      ["From Ada", { id: "member-ada", name: "Ada" }],
+      ["From nobody", undefined],
+    ]);
+  });
+
   it("unarchives a stored Codex thread and resumes the queued delivery", async () => {
     process.env.OPENBOT_FAKE_ARCHIVED_THREAD = "1";
     const { store, mailbox } = stores(root);

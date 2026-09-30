@@ -10,10 +10,12 @@
 import type { IncomingMessage } from "node:http";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type ConversationMessageSender,
   type ConversationPageAnchor,
   type ConversationSnapshot,
   type ConversationWithReadState,
   type CreateAgentInput,
+  conversationMessageSender,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAgentModel,
   isAgentProvider,
@@ -140,6 +142,11 @@ export function publicHttpBaseUrl(request: IncomingMessage): string {
 export function firstHeaderValue(value: string | string[] | undefined): string | undefined {
   const first = Array.isArray(value) ? value[0] : value?.split(",", 1)[0];
   return first?.trim();
+}
+
+/** The member who made this request, as the sender the host stamps on the message they write. */
+export function memberSender(member: TeamMemberSummary): ConversationMessageSender | undefined {
+  return conversationMessageSender(member.id, member.name?.trim() || member.email || member.username);
 }
 
 export function requireAdmin(member: TeamMemberSummary): void {

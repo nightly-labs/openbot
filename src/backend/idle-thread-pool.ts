@@ -171,12 +171,24 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return this.#threads.get(thread.id) === thread && !thread.activeTurn && !this.#startingTurns.has(thread.id);
   }
 
-  /** An armed release timer marks a thread that is idle and can be opened again. */
+  /**
+   * Closes each idle thread that can open again, before its timeout, to free its processes when the
+   * machine is low on memory. Its next turn opens it again from its session.
+   */
+  releaseIdle(): void {
+    this.#releaseIdleOver(0);
+  }
+
   #releaseOverLimit(): void {
+    this.#releaseIdleOver(this.#options.idleLimit);
+  }
+
+  /** An armed release timer marks a thread that is idle and can be opened again. */
+  #releaseIdleOver(limit: number): void {
     const idle = [...this.#threads.values()]
       .filter((thread) => thread.idleRelease !== null && thread.idleSince > 0 && this.#isIdle(thread))
       .sort((left, right) => left.idleSince - right.idleSince);
-    for (const thread of idle.slice(0, Math.max(0, idle.length - this.#options.idleLimit))) {
+    for (const thread of idle.slice(0, Math.max(0, idle.length - limit))) {
       this.#release(thread);
     }
   }

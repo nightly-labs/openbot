@@ -195,6 +195,7 @@ export class TurnLifecycle {
     this.#runningTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
+    this.#itemTurns.clear();
   }
 
   /**
@@ -439,6 +440,8 @@ export class TurnLifecycle {
       message.status = normalizeCompletionStatus(status);
       markIncompleteImageGeneration(message, message.status);
     }
+    // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
+    for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
     const failure = refused
       ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
       : reportedError;

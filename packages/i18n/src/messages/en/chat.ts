@@ -159,6 +159,7 @@ export const messages = defineMessages("chat", {
   "chat.image.lightbox.strip": "Images in this message",
   "chat.message.you": "You",
   "chat.message.agentFallback": "Agent",
+  "chat.message.memberFallback": "Team member",
   "chat.message.attachment": "Attachment",
   "chat.actions.userLabel": "User message actions",
   "chat.actions.label": "{name} message actions",

@@ -186,6 +186,8 @@ export const messages = {
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
   "error.backend.browserUrlTooLong": "L’URL du navigateur est trop longue.",
   "error.backend.browserTabLimit": "Le navigateur peut avoir jusqu’à {limit} onglets ouverts.",
+  "error.backend.browserLowMemory":
+    "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
   "error.backend.popupSecureInput":
     "Les fenêtres contextuelles sont bloquées pendant une saisie sécurisée. Terminez ou annulez la saisie sécurisée, puis réessayez depuis la page.",

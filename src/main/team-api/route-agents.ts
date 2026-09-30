@@ -36,6 +36,7 @@ import {
   approvalDecision,
   browserTakeoverDecision,
   markerExclusionsForCapabilities,
+  memberSender,
   pageLimit,
   pathIdentifier,
   promptAnswers,
@@ -115,7 +116,7 @@ export async function routeAgents(
         await agents.generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections),
       );
     }
-    return json(200, await agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout));
+    return json(200, await agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout, memberSender(member)));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.messages.search) {
     const query = url.searchParams.get("q") ?? "";
@@ -163,7 +164,7 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input.provider);
-    return json(201, await agents.createAgent(input));
+    return json(201, await agents.createAgent(input, undefined, undefined, memberSender(member)));
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
