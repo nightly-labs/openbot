@@ -330,6 +330,8 @@ function ConnectDialog(props: GitHubConnectorPanelProps & { open: boolean; onRet
   const step = () => connectStep(props.status, props.busy);
   const link = (): WizardLink => (step() === "connected" ? "connected" : step() === "failed" ? "broken" : "connecting");
   const noRepositories = () => props.repositories?.total === 0;
+  /** While the sign-in runs, closing the dialog cancels it. */
+  const running = () => step() === "waiting" || step() === "code";
   const title = () => {
     switch (step()) {
       case "waiting":
@@ -358,7 +360,8 @@ function ConnectDialog(props: GitHubConnectorPanelProps & { open: boolean; onRet
   return (
     <WizardDialog
       open={props.open}
-      closeLabel={t("connector.github.cancelConnecting")}
+      closeLabel={running() ? t("connector.github.cancelConnecting") : t("connector.github.close")}
+      dismissible={!running()}
       onClose={props.onClose}
       logo={<GitHubMark />}
       link={link()}
@@ -453,11 +456,31 @@ function ConnectDialog(props: GitHubConnectorPanelProps & { open: boolean; onRet
             <GitHubAvatar login={props.status.login ?? ""} avatarUrl={props.status.avatarUrl} />
             <div>
               <Text variant="label">@{props.status.login ?? ""}</Text>
-              <Text variant="caption" tone="muted">
-                <Show when={props.repositories} fallback={t("connector.github.repositoriesLoading")}>
-                  {(list) => t("connector.github.connectedSummary", { count: list().total })}
-                </Show>
-              </Text>
+              <Show
+                when={props.repositories}
+                fallback={
+                  <Show
+                    when={props.repositoriesError}
+                    fallback={
+                      <Text variant="caption" tone="muted">
+                        {t("connector.github.repositoriesLoading")}
+                      </Text>
+                    }
+                  >
+                    {(message) => (
+                      <Text variant="caption" tone="danger" role="alert">
+                        {message()}
+                      </Text>
+                    )}
+                  </Show>
+                }
+              >
+                {(list) => (
+                  <Text variant="caption" tone="muted">
+                    {t("connector.github.connectedSummary", { count: list().total })}
+                  </Text>
+                )}
+              </Show>
             </div>
           </div>
         </Match>

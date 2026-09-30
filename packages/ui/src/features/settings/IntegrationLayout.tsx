@@ -184,8 +184,13 @@ export function WizardContent(props: WizardProps & { heading: JSX.Element }) {
   );
 }
 
-/** A connect dialog over the settings window. */
-export function WizardDialog(props: WizardProps & { open: boolean; closeLabel: string; onClose: () => void }) {
+/**
+ * A connect dialog over the settings window. With `dismissible` false, a click outside does not close
+ * it: the user may come back from the browser while a flow runs, and that click must not stop the flow.
+ */
+export function WizardDialog(
+  props: WizardProps & { open: boolean; closeLabel: string; dismissible?: boolean; onClose: () => void },
+) {
   return (
     <Dialog.Root
       open={props.open}
@@ -195,9 +200,16 @@ export function WizardDialog(props: WizardProps & { open: boolean; closeLabel: s
     >
       <Dialog.Portal>
         <Dialog.Overlay class="integration-dialog-backdrop" />
-        <Dialog.Content class="integration-wizard integration-wizard-dialog" as="section">
+        <Dialog.Content
+          class="integration-wizard integration-wizard-dialog"
+          as="section"
+          onInteractOutside={(event) => {
+            if (props.dismissible === false) event.preventDefault();
+          }}
+        >
           <WizardContent
             {...props}
+            description={<Dialog.Description as="span">{props.description}</Dialog.Description>}
             heading={
               <Dialog.Title as="h2" class="ui-heading" data-size="md" data-tone="primary">
                 {props.title}

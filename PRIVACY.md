@@ -401,7 +401,8 @@ Network traffic can also occur when:
   conversations or files is sent in those requests;
 - the user connects GitHub in Server settings. OpenBot asks `github.com` for a sign-in code and a
   token, renews the token, and reads the account name and the repositories of the OpenBot GitHub App
-  from `api.github.com`. Agents then reach the
+  from `api.github.com`. The GitHub page in Server settings loads the account picture from the
+  address that GitHub gives, on GitHub's image host. Agents then reach the
   GitHub MCP server at `api.githubcopilot.com` and GitHub itself through `gh` and `git`, with that
   token. So that GitHub shows the OpenBot app as the author of an agent's work, OpenBot sends that
   token to the central account service (`api.openbot.run`) about once an hour, and when you open the
