@@ -7,14 +7,35 @@ import { dirname, join, resolve } from "node:path";
 import { type BundledLibrary, bundledLibraryLicenses, bundleMacDynamicLibraries } from "./mac-runtime-dylibs";
 import { createRemoteDesktopSourceManifest, loadNativeRuntimeLock } from "./native-runtime-lock";
 
-const platform = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : null;
-if (!platform) throw new Error("The remote desktop runtime supports macOS and Windows only.");
+const platform =
+  process.platform === "darwin" || process.platform === "win32" || process.platform === "linux"
+    ? process.platform
+    : null;
+if (!platform) throw new Error("The remote desktop runtime supports macOS, Windows and Linux only.");
 const architecture = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
 if (!architecture || (platform === "win32" && architecture !== "x64")) {
   throw new Error(`Unsupported remote desktop target: ${process.platform}-${process.arch}.`);
 }
 const tarExecutable =
   process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
+
+/**
+ * The Linux build captures an X11 display, such as the Xvfb display of a hosted server, and encodes
+ * in software. The other capture and encoder paths need a GPU, a Wayland compositor or elevated
+ * capabilities, and each would add libraries that such a computer does not have. With no tray, the
+ * binary also loads no GTK modules.
+ */
+const LINUX_SUNSHINE_OPTIONS = [
+  "-DSUNSHINE_ENABLE_CUDA=OFF",
+  "-DSUNSHINE_ENABLE_DRM=OFF",
+  "-DSUNSHINE_ENABLE_KWIN=OFF",
+  "-DSUNSHINE_ENABLE_PORTAL=OFF",
+  "-DSUNSHINE_ENABLE_TRAY=OFF",
+  "-DSUNSHINE_ENABLE_VAAPI=OFF",
+  "-DSUNSHINE_ENABLE_VULKAN=OFF",
+  "-DSUNSHINE_ENABLE_WAYLAND=OFF",
+  "-DSUNSHINE_ENABLE_X11=ON",
+];
 
 const lock = await loadNativeRuntimeLock();
 const outputRoot = resolve("build/remote-desktop-runtime", platform, architecture);
@@ -191,7 +212,7 @@ async function preparePinnedCheckout(
   }
 }
 
-function requiredSunshineSubmodules(targetPlatform: "darwin" | "win32"): string[] {
+function requiredSunshineSubmodules(targetPlatform: "darwin" | "win32" | "linux"): string[] {
   const common = [
     "third-party/Simple-Web-Server",
     "third-party/build-deps",
@@ -204,9 +225,9 @@ function requiredSunshineSubmodules(targetPlatform: "darwin" | "win32"): string[
     "third-party/nv-codec-headers",
     "third-party/tray",
   ];
-  return targetPlatform === "darwin"
-    ? [...common, "third-party/TPCircularBuffer"]
-    : [...common, "third-party/ViGEmClient", "third-party/glad", "third-party/nvapi"];
+  if (targetPlatform === "darwin") return [...common, "third-party/TPCircularBuffer"];
+  if (targetPlatform === "linux") return [...common, "third-party/glad", "third-party/inputtino"];
+  return [...common, "third-party/ViGEmClient", "third-party/glad", "third-party/nvapi"];
 }
 
 function buildSunshine(source: string, version: string, commit: string): void {
@@ -233,6 +254,7 @@ function buildSunshine(source: string, version: string, commit: string): void {
       "-DBUILD_TESTS=ON",
       "-DOPENBOT_SECURITY_TESTS=ON",
       "-DBUILD_WERROR=OFF",
+      ...(platform === "linux" ? LINUX_SUNSHINE_OPTIONS : []),
     ],
     { env: buildEnvironment, stdio: "inherit" },
   );

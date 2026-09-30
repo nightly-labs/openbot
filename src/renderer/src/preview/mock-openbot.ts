@@ -99,6 +99,7 @@ import { createMockAuth, type MockAuthOptions } from "./mock-auth";
 import { createMockBilling } from "./mock-billing";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels } from "./mock-channels";
+import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
@@ -573,6 +574,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         hostedSites = hostedSites.filter((site) => site.id !== siteId);
       },
     },
+    githubConnector: createMockGitHubConnector(),
     billing: createMockBilling(),
     hostedServers: createMockHostedServers(),
     customProviders: {
@@ -673,7 +675,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
-      startCodeLogin: (provider) => api.startProviderCodeLogin(provider),
+      // A host signs Claude in with a code its page shows, which the user pastes back.
+      startCodeLogin: async (provider) =>
+        provider === "claude"
+          ? {
+              kind: "paste",
+              verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+              expiresAt: Date.now() + 10 * 60_000,
+            }
+          : api.startProviderCodeLogin(provider),
+      // As with the code above, the preview has no provider to finish the sign-in.
+      submitCodeLogin: async () => clone(agentStatus),
       cancelCodeLogin: (provider) => api.cancelProviderCodeLogin(provider),
       getApiKeyState: (provider) => api.getProviderApiKeyState(provider),
       setApiKey: (input) => api.setProviderApiKey(input),

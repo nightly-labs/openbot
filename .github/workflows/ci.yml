@@ -397,6 +397,8 @@ jobs:
           BOAT_WEBHOOK_SECRET: ${{ secrets.BOAT_WEBHOOK_SECRET }}
           OPENPANEL_CLIENT_ID: ${{ secrets.OPENPANEL_CLIENT_ID }}
           OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
+          # GitHub refuses an Actions secret name that starts with GITHUB_. The Worker name is GITHUB_APP_PRIVATE_KEY.
+          OPENBOT_GITHUB_APP_PRIVATE_KEY: ${{ secrets.OPENBOT_GITHUB_APP_PRIVATE_KEY }}
           HOSTED_SERVER_TEMPLATE: ${{ vars.HOSTED_SERVER_TEMPLATE }}
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
@@ -439,6 +441,8 @@ jobs:
               if (present.length !== names.length) throw new Error(`Set ${names.join(" and ")} together.`);
               for (const name of names) optional[name] = process.env[name].trim();
             }
+            const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
+            if (githubAppKey) optional.GITHUB_APP_PRIVATE_KEY = githubAppKey;
             const stripeKey = optional.STRIPE_SECRET_KEY;
             if (stripeKey && !stripeKey.startsWith("sk_live_") && !stripeKey.startsWith("rk_live_")) {
               throw new Error("STRIPE_SECRET_KEY is not a live key.");

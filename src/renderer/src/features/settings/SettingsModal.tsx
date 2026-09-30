@@ -427,6 +427,7 @@ export function SettingsModal(props: SettingsModalProps) {
             customAgents={props.customAgents}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
+            codeSignInProviders={props.codeLogin?.providers()}
           />
           <Show when={props.detectionSettings}>
             {(value) => (

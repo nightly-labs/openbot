@@ -48,6 +48,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
+import { type CliCodeLogin, startCliCodeLogin } from "./cli-code-login";
 import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -89,6 +90,11 @@ export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
  */
 export const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+/**
+ * The providers whose shared process reads the agent environment only when it starts. Claude reads
+ * it at each session start, and Codex with each thread's config.
+ */
+const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = ["grok", "opencode", "antigravity", "acp"];
 
 /**
  * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
@@ -99,11 +105,13 @@ function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
 }
 
-/** A sign-in that is a CLI process the user completes in a browser the CLI opened. */
+/** A sign-in that is a CLI process the user completes in a browser the CLI opened, or on another device. */
 interface PendingCliLogin {
   child: ChildProcess;
   cli: AgentCliInfo;
   task: Promise<void> | null;
+  /** A code sign-in: what the CLI printed for the user, and the prompt a pasted code goes to. */
+  code?: Pick<CliCodeLogin, "prompt" | "submit">;
 }
 
 export type AgentClientFactory = (
@@ -274,9 +282,16 @@ export class ProviderRuntime implements ProviderPort {
   readonly #released = new Set<AgentProvider>();
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
+  /** Providers that a turn kept on the old agent environment. The idle check restarts each after its turn. */
+  readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
+  /**
+   * Providers whose last usage read returned no limit, such as custom ACP agents. The dock polls
+   * every five minutes, so starting a released one to ask again would keep its process running.
+   */
+  readonly #usageUnreported = new Set<AgentProvider>();
   #idleCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
@@ -421,6 +436,9 @@ export class ProviderRuntime implements ProviderPort {
   async #releaseIdleProviders(): Promise<void> {
     if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
     if (this.#customAgentsReloadPending && !this.#hooks.isProviderBusy("acp")) void this.reloadCustomAgents();
+    for (const provider of this.#environmentReloadPending) {
+      if (!this.#hooks.isProviderBusy(provider)) void this.#reloadAgentEnvironment(provider);
+    }
     const now = Date.now();
     for (const [provider, client] of this.#clients) {
       if (
@@ -457,6 +475,12 @@ export class ProviderRuntime implements ProviderPort {
       logger.info("Stopped an idle Workspace only provider process.", { provider: confined.client.provider, agentId });
       await this.#stopConfined(agentId, confined);
     }
+  }
+
+  /** Closes the idle threads of each client and each Workspace only process, when memory is low. */
+  releaseIdleThreads(): void {
+    for (const client of this.#clients.values()) client.releaseIdleThreads?.();
+    for (const confined of this.#confined.values()) confined.client.releaseIdleThreads?.();
   }
 
   listModels(): AgentModelOption[] {
@@ -515,6 +539,7 @@ export class ProviderRuntime implements ProviderPort {
                 this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
                 return;
               }
+              if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return;
               if (!this.#clients.has(provider)) await this.ensureProvider(provider);
               const client = this.#clients.get(provider);
               if (!client) return;
@@ -527,7 +552,11 @@ export class ProviderRuntime implements ProviderPort {
               );
             }
             const limit = usage.limits[0];
-            if (!limit || (!limit.primary && !limit.secondary)) return;
+            if (!limit || (!limit.primary && !limit.secondary)) {
+              this.#usageUnreported.add(provider);
+              return;
+            }
+            this.#usageUnreported.delete(provider);
             collected.set(provider, { ...limit, id: provider });
             this.#lastUsage.set(provider, { ...limit, id: provider });
             this.#emit({
@@ -683,22 +712,64 @@ export class ProviderRuntime implements ProviderPort {
    * account, and the one in use keeps working until the new sign-in finishes.
    */
   async startProviderCodeLogin(provider: AgentProvider): Promise<ProviderCodeLoginStart> {
-    if (!agentProviderDescriptor(provider).codeSignIn) {
+    const codeSignIn = requireProviderDriver(provider).codeSignIn;
+    if (!codeSignIn) {
       throw new Error(sourceText("error.provider.noCodeSignIn", { provider: providerLabel(provider) }));
     }
     const start = this.#providerStarts.get(provider);
     if (start) await start;
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#codexLogin.cancel(null);
-      return this.#codexLogin.startDevice();
+      if (codeSignIn.kind === "codex-device") {
+        await this.#codexLogin.cancel(null);
+        return this.#codexLogin.startDevice();
+      }
+      await this.#cancelCliLogin(provider, null);
+      const { command, flow } = codeSignIn;
+      await this.#startCliLogin(provider, (cli) =>
+        startCliCodeLogin({
+          flow,
+          executable: cli.executable,
+          argv: command.argv,
+          env: command.env(cli),
+          timeoutMs: command.timeoutMs,
+        }),
+      );
+      const pending = this.#cliLogins.get(provider);
+      if (!pending?.code) throw new Error(sourceText("error.provider.codeLoginNoLink"));
+      const expiresAt = Date.now() + command.timeoutMs;
+      // A CLI that exits or prints no link rejects here; its `done` then records the failure.
+      const prompt = await pending.code.prompt;
+      return prompt.flow === "paste"
+        ? { kind: "paste", verificationUrl: prompt.verificationUrl, expiresAt }
+        : {
+            kind: "code",
+            userCode: prompt.userCode,
+            verificationUrl: prompt.verificationUrl,
+            ...(prompt.verificationUrlComplete ? { verificationUrlComplete: prompt.verificationUrlComplete } : {}),
+            expiresAt,
+          };
     });
+  }
+
+  /**
+   * Types the code the provider's page showed into the CLI that is waiting for it. The code is a
+   * credential: it goes to the CLI's stdin and nowhere else. How the sign-in ends arrives as the
+   * provider's status.
+   */
+  submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {
+    const pending = this.#cliLogins.get(provider);
+    if (!pending?.code) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    pending.code.submit(code);
+    return this.status();
   }
 
   /** Abandons a code sign-in. The provider is told, so the code cannot be used after this returns. */
   async cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
-    if (!agentProviderDescriptor(provider).codeSignIn) return this.status();
+    const codeSignIn = requireProviderDriver(provider).codeSignIn;
+    if (!codeSignIn) return this.status();
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#codexLogin.cancel(null);
+      if (codeSignIn.kind === "codex-device") await this.#codexLogin.cancel(null);
+      else await this.#cancelCliLogin(provider, null);
       return this.status();
     });
   }
@@ -745,6 +816,31 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy("opencode") ? "skipped-busy" : "restarted";
     }
     return "restarted";
+  }
+
+  /**
+   * Restarts each running process that read the agent environment when it started, so the next
+   * turn gets the new one. The rules of `reloadOpenCodeConfig` apply, and a restart that a turn
+   * delays is applied by the idle check after the turn stops. A Workspace only process is replaced
+   * at its next turn, because its key names the activation.
+   */
+  async reloadAgentEnvironment(): Promise<void> {
+    await Promise.all(SPAWN_ENVIRONMENT_PROVIDERS.map((provider) => this.#reloadAgentEnvironment(provider)));
+  }
+
+  async #reloadAgentEnvironment(provider: AgentProvider): Promise<void> {
+    this.#environmentReloadPending.delete(provider);
+    if (!this.#clients.has(provider)) return;
+    if (this.#hooks.isProviderBusy(provider)) {
+      this.#environmentReloadPending.add(provider);
+      return;
+    }
+    try {
+      await this.#runProviderConnectionCommand(provider, () => this.#reprobeProvider(provider));
+    } catch {
+      // `#reprobeProvider` has already reported the failure on the provider's status.
+      if (this.#hooks.isProviderBusy(provider)) this.#environmentReloadPending.add(provider);
+    }
   }
 
   /**
@@ -1447,15 +1543,22 @@ export class ProviderRuntime implements ProviderPort {
 
   async #startCliLogin(
     provider: AgentProvider,
-    start: (cli: AgentCliInfo) => { child: ChildProcess; done: Promise<void> },
+    start: (
+      cli: AgentCliInfo,
+    ) => { child: ChildProcess; done: Promise<void> } & Partial<Pick<CliCodeLogin, "prompt" | "submit">>,
   ): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
 
     try {
       cli = await this.#resolveProviderCli(provider);
-      const { child, done } = start(cli);
-      const pending: PendingCliLogin = { child, cli, task: null };
+      const { child, done, prompt, submit } = start(cli);
+      const pending: PendingCliLogin = {
+        child,
+        cli,
+        task: null,
+        ...(prompt && submit ? { code: { prompt, submit } } : {}),
+      };
       this.#cliLogins.set(provider, pending);
       recordRestartActivity();
       pending.task = done

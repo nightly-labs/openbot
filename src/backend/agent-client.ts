@@ -17,6 +17,12 @@ export interface AgentClient {
    * user turned off. Optional, because a client that keeps no per-thread state has nothing to close.
    */
   releaseThread?(externalThreadId: string): Promise<void>;
+  /**
+   * Closes each thread that has no turn and can open again from its session, to free its processes
+   * and MCP servers when the machine is low on memory. Optional, because a client that runs all its
+   * threads in one process frees nothing this way.
+   */
+  releaseIdleThreads?(): void;
   request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
   notify(method: string, params?: unknown): void;
   respond(id: RequestId, result: unknown): void;

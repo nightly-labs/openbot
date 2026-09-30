@@ -1,5 +1,5 @@
 /**
- * The eleven service events the main process relays to the renderer. They live here rather than in
+ * The service events the main process relays to the renderer. They live here rather than in
  * the entry point because every one of them is the same three lines around a different channel, and
  * because they are the part of the entry point most likely to be edited by two agents at once.
  *
@@ -143,6 +143,12 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
 
+  function forwardGitHubConnectorStatus(status: import("@openbot/contracts/ipc").GitHubConnectorStatus): void {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed()) return;
+    sendToRenderer(window, IPC_ENDPOINTS.githubConnector.changed, status);
+  }
+
   function forwardHostStatus(status: import("@openbot/contracts/ipc").HostStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
@@ -204,6 +210,7 @@ export function createRendererForwarders({
     forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardProviderRuntimeStatus,
+    forwardGitHubConnectorStatus,
     forwardHostStatus,
     forwardRemoteDesktopSessions,
     forwardServers,

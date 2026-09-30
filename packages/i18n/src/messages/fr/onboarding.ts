@@ -89,4 +89,11 @@ export const messages = {
   "onboarding.action.connect": "Connecter",
   "onboarding.action.open": "Ouvrir OpenBot",
   "onboarding.action.next": "Suivant",
+  "onboarding.server.title": "Configurer {server}",
+  "onboarding.server.description":
+    "OpenBot n’inclut pas d’abonnement IA. Connectez votre propre fournisseur à ce serveur avant de créer un agent.",
+  "onboarding.server.label": "Choisissez le fournisseur IA de ce serveur",
+  "onboarding.server.hint":
+    "La connexion reste sur le serveur. Vous pourrez changer le fournisseur de chaque agent plus tard.",
+  "onboarding.server.continue": "Continuer",
 } as const satisfies PartialTranslation<typeof source>;

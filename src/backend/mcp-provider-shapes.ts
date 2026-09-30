@@ -60,7 +60,7 @@ export type McpAuthorizationSource = (config: McpServerConfig) => Promise<string
  * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
  * say so without probing anything.
  */
-type McpDropReason = "command_not_found" | "working_directory_unsupported" | "unusable";
+type McpDropReason = "command_not_found" | "working_directory_unsupported" | "name_conflict" | "unusable";
 
 /** One server a provider did not get, named so the user can be told which one and why. */
 export interface McpServerDrop {
@@ -91,6 +91,9 @@ export interface McpHandoff<T> {
 /** Said by both providers that cannot carry one, so the user reads the same sentence either way. */
 const WORKING_DIRECTORY_UNSUPPORTED = "This provider cannot start a server in a working directory.";
 
+/** Said when two names differ only in characters the provider replaces. */
+const NAME_CONFLICT = "Another MCP server has the same name for this provider.";
+
 /**
  * A configuration with its stdio command, directory and `PATH` resolved, or why it cannot start.
  *
@@ -116,7 +119,7 @@ export type UsableMcpServer =
       authorization?: undefined;
       error: string;
       /** Machine-readable beside the sentence, so a reporter never has to match on the wording. */
-      reason: Exclude<McpDropReason, "working_directory_unsupported">;
+      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict">;
     };
 
 /** The failed arm, for the readers that have already narrowed to it. */
@@ -539,6 +542,11 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * **http travels as `url` with `http_headers`.** Both were confirmed against the pinned Codex
  * app-server: an entry with an invalid credential is listed as failed with the server's own 401,
  * which is the handshake reaching the server rather than the shape being dropped.
+ *
+ * **Names travel as `codexMcpServerName`.** Codex does not start a server whose name does not match
+ * `^[a-zA-Z0-9_-]+$`, and it tells no one. A server the user named "Home Assistant" passed its test
+ * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
+ * reported as a drop.
  */
 export type CodexMcpServer =
   | { command: string; args: string[]; env: Record<string, string> }
@@ -568,12 +576,22 @@ export interface CodexDisabledMcpServer {
   enabled: false;
 }
 
+/** A server name in the form Codex accepts. Claude makes the same change by itself. */
+function codexMcpServerName(name: string): string {
+  return name.replace(/[^A-Za-z0-9_-]/gu, "_");
+}
+
 export function codexMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<Record<string, CodexMcpServer>> {
   const record: Record<string, CodexMcpServer> = {};
   const dropped: McpServerDrop[] = [];
   for (const server of servers) {
     if (server.error !== undefined) {
       dropped.push(unusableDrop(server));
+      continue;
+    }
+    const name = codexMcpServerName(server.config.name);
+    if (Object.hasOwn(record, name)) {
+      dropped.push({ name: server.config.name, reason: "name_conflict", detail: NAME_CONFLICT });
       continue;
     }
     if (server.config.transport === "stdio") {
@@ -585,13 +603,13 @@ export function codexMcpServers(servers: readonly UsableMcpServer[]): McpHandoff
         });
         continue;
       }
-      record[server.config.name] = {
+      record[name] = {
         command: server.command,
         args: [...server.config.args],
         env: mcpLaunchEnvironment(server),
       };
     } else {
-      record[server.config.name] = {
+      record[name] = {
         url: server.config.url,
         http_headers: mcpHandoffHeaders(server),
       };

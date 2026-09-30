@@ -110,7 +110,7 @@ describe("CentralAuthManager", () => {
   it("accepts a private-LAN Signal URL for local Mobile Connect development", async () => {
     const root = await createRoot();
     const storagePath = join(root, "session.bin");
-    await writeFile(storagePath, "session-secret");
+    await writeFile(storagePath, Buffer.from("session-secret").toString("base64"));
     const serverId = "00000000-0000-4000-8000-000000000000";
     let signalUrl = "ws://192.168.1.143:3101/v1/signal";
     const manager = new CentralAuthManager({

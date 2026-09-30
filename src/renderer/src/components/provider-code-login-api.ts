@@ -15,11 +15,15 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 
 export interface ProviderCodeLoginApi {
+  /** The providers that the computer that runs them can sign in with a code. */
+  providers: () => readonly AgentProviderId[];
   /** The provider whose dialog is open, or null while none is. */
   provider: () => AgentProviderId | null;
   state: () => ProviderCodeLoginState;
   /** Asks the provider for a code and opens the dialog on it. */
   start: (provider: AgentProviderId) => void;
+  /** Sends the code the page of a `paste` sign-in showed. */
+  submit: (code: string) => void;
   /** Gives up: the code stops working and the dialog closes. */
   cancel: () => void;
   /** Opens the verification page here, for the user who is on this computer after all. */

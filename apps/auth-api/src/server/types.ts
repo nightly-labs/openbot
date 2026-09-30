@@ -10,6 +10,7 @@ export interface WorkerBindings {
   MARKETPLACE_MUTATION_RATE_LIMITER: RateLimit;
   MARKETPLACE_UPLOAD_RATE_LIMITER: RateLimit;
   SITE_REPORT_RATE_LIMITER: RateLimit;
+  GITHUB_TOKEN_RATE_LIMITER: RateLimit;
   /** Checked by the Live Activity relay only, so a Worker without it keeps its other routes. */
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
@@ -47,6 +48,10 @@ export interface WorkerBindings {
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;
+  /** The public Client ID of the OpenBot GitHub App. */
+  GITHUB_APP_CLIENT_ID?: string;
+  /** The private key of the OpenBot GitHub App as a PKCS #8 PEM. Without it, no installation token is issued. */
+  GITHUB_APP_PRIVATE_KEY?: string;
   /** The Apple Push Notification service key (`.p8`, PEM text). The Live Activity relay is off without it. */
   APNS_PRIVATE_KEY?: string;
   APNS_KEY_ID?: string;
@@ -67,6 +72,7 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
   const marketplaceMutationRateLimiter = value.MARKETPLACE_MUTATION_RATE_LIMITER;
   const marketplaceUploadRateLimiter = value.MARKETPLACE_UPLOAD_RATE_LIMITER;
   const siteReportRateLimiter = value.SITE_REPORT_RATE_LIMITER;
+  const githubTokenRateLimiter = value.GITHUB_TOKEN_RATE_LIMITER;
   if (
     !isDynamicRecord(database) ||
     !isFunction(database.prepare) ||
@@ -89,7 +95,9 @@ function isWorkerBindings(value: unknown): value is WorkerBindings {
     !isDynamicRecord(marketplaceUploadRateLimiter) ||
     !isFunction(marketplaceUploadRateLimiter.limit) ||
     !isDynamicRecord(siteReportRateLimiter) ||
-    !isFunction(siteReportRateLimiter.limit)
+    !isFunction(siteReportRateLimiter.limit) ||
+    !isDynamicRecord(githubTokenRateLimiter) ||
+    !isFunction(githubTokenRateLimiter.limit)
   ) {
     return false;
   }

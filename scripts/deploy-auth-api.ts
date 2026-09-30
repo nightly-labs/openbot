@@ -27,6 +27,8 @@ async function main(): Promise<void> {
   await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
   // An unset value keeps the value that the Worker has: a new template is set for each release.
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
+  // Without the key, agents act on GitHub as the signed-in user and not as the OpenBot GitHub App.
+  await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
   if (cloudflareEnvironment === "test") {
     await putTestAllowList();
     // The key is in the encrypted .env.shared. Each developer who can decrypt it can create servers.

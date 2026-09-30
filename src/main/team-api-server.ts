@@ -38,6 +38,7 @@ import {
   MCP_SERVERS_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
+  PROVIDERS_SIGN_IN_V3_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -649,6 +650,12 @@ export class TeamApiServer {
       const message = expected ? error.message : sourceText("error.team.requestFailed");
       const code = error instanceof RemoteScreenError ? error.code : undefined;
       if (!expected) (this.#options.logger ?? logger).error("Team API request failed:", toLogValue(error));
+      // A streamed file can fail after its head is on the wire. A second head is not possible, so
+      // the socket closes and the client sees an incomplete download.
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
       return this.#json(response, status, { error: message, ...(code ? { code } : {}) });
     }
   }
@@ -1223,6 +1230,7 @@ export class TeamApiServer {
         if (capability === AGENT_PUBLISH_CAPABILITY) return this.#options.admin?.agentTemplates !== undefined;
         if (capability === PROVIDERS_ADMIN_CAPABILITY || capability === PROVIDERS_RUNTIMES_V2_CAPABILITY)
           return this.#options.admin?.providers !== undefined;
+        if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;

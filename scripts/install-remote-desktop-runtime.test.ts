@@ -182,6 +182,12 @@ async function createFixture() {
         sbomAsset: "remote-desktop-runtime-win32-x64.spdx.json",
         sbomSha256: "e".repeat(64),
       },
+      "linux-x64": {
+        asset: "remote-desktop-runtime-linux-x64.tar.gz",
+        sha256: "b".repeat(64),
+        sbomAsset: "remote-desktop-runtime-linux-x64.spdx.json",
+        sbomSha256: "9".repeat(64),
+      },
     },
   });
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);

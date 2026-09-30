@@ -3,6 +3,7 @@ import { connect, createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { CuaDriverActionTap, readRequest } from "./cua-driver-action-tap";
 import { STRUCTURED_TEXT_LABEL } from "./cua-driver-structured-text";
@@ -70,6 +71,7 @@ describe("CuaDriverActionTap", () => {
   async function taps(
     now: () => number = () => 1_000,
     answer: string | ((request: string) => string) = '{"ok":true}\n',
+    logger?: Logger,
   ) {
     // The short system temporary directory, because a Unix socket path has a hard length limit and
     // the test's own working directory is deep.
@@ -80,7 +82,7 @@ describe("CuaDriverActionTap", () => {
     const daemon = fakeDaemon(upstream, answer);
     await daemon.listen();
     cleanUp.push(daemon.close);
-    const tap = new CuaDriverActionTap(now);
+    const tap = new CuaDriverActionTap(now, logger);
     await tap.listen({ upstream, tap: address });
     cleanUp.push(() => tap.close());
     const client = connect(address);
@@ -107,6 +109,25 @@ describe("CuaDriverActionTap", () => {
     await nextChunk(client);
 
     expect(tap.lastAction(60_000)).toEqual({ tool: "click", pid: 22, windowId: 7, at: 1_000 });
+  });
+
+  it("logs how long a call took with the tool name, and never what the agent typed", async () => {
+    const lines: string[] = [];
+    const times = [1_000, 7_500];
+    const { client } = await taps(
+      () => times.shift() ?? 7_500,
+      '{"ok":true}\n',
+      createOpenBotLogger("tap", (line) => lines.push(line), "debug"),
+    );
+
+    client.write('{"method":"call","name":"type_text","args":{"pid":41,"text":"hunter2-secret"}}\n');
+    await nextChunk(client);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("INFO");
+    expect(lines[0]).toContain('"tool":"type_text"');
+    expect(lines[0]).toContain('"ms":6500');
+    expect(lines[0]).not.toContain("hunter2-secret");
   });
 
   it("reads a request that arrives in pieces, which a long argument does", async () => {
@@ -199,7 +220,8 @@ describe("CuaDriverActionTap", () => {
       snapshot_id: "s0000002a",
       tree_markdown: '- [0] AXButton "Send"',
       window_id: 7,
-      element_tokens: { "0": "s0000002a:0" },
+      element_address:
+        "To act on an element, send this pid, window_id and snapshot_id with the element_index that the tree in the result text shows.",
     });
   });
 });

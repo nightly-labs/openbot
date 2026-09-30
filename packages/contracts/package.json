@@ -69,6 +69,7 @@
     "./team-protocol/live-activity-push-v1": "./src/team-protocol/live-activity-push-v1.ts",
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",
+    "./team-protocol/providers-v3": "./src/team-protocol/providers-v3.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",

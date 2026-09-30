@@ -8,7 +8,7 @@ import { runtimeTarget } from "./remote-desktop-runtime-release";
 
 const logger = createOpenBotLogger("verify-remote-desktop-runtime");
 
-const platform = process.argv.includes("--windows") ? "win32" : "darwin";
+const platform = process.argv.includes("--windows") ? "win32" : process.argv.includes("--linux") ? "linux" : "darwin";
 const architecture = platform === "win32" ? "x64" : process.arch;
 const distributionRoot = resolve("build/remote-desktop-runtime");
 const root = resolve("build/remote-desktop-runtime", platform, architecture);

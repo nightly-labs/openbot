@@ -8,7 +8,7 @@ import {
 } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
-import { resolveCreationModel } from "../agents/agent-creation-model";
+import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { createAgentInitialMessage } from "../agents/agent-initial-message";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
@@ -17,6 +17,8 @@ export function WebAgentSettings(props: {
   capabilities: string[];
   /** The host has no agents yet: the form shows the first-agent copy and cannot be cancelled. */
   first: boolean;
+  /** The provider that the server's provider step chose, for the model the draft starts on. */
+  preference?: CreationPreference | null | undefined;
   /** The host's endpoints, so the picker lists their models on its Custom tab. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The draft the form starts from. */
@@ -85,8 +87,9 @@ export function WebAgentSettings(props: {
             (model) => model.provider === draft.draft.provider && model.id === draft.draft.model,
           );
           if (draft.modelTouched && selected) return;
-          // As in the desktop app. The web client does not know the host's saved setup choice.
-          const resolved = resolveCreationModel(null, models);
+          // As in the desktop app. The web client does not know the host's saved setup choice, so
+          // only the server's provider step names a provider.
+          const resolved = resolveCreationModel(props.preference ?? null, models);
           if (resolved) {
             draft.draft.provider = resolved.provider;
             draft.draft.model = resolved.model;

@@ -109,6 +109,7 @@ async function releaseLockValue() {
         "darwin-arm64": { asset: "remote-desktop-runtime-darwin-arm64.tar.gz", sha256: "b".repeat(64) },
         "darwin-x64": { asset: "remote-desktop-runtime-darwin-x64.tar.gz", sha256: "d".repeat(64) },
         "win32-x64": { asset: "remote-desktop-runtime-win32-x64.tar.gz", sha256: "c".repeat(64) },
+        "linux-x64": { asset: "remote-desktop-runtime-linux-x64.tar.gz", sha256: "e".repeat(64) },
       },
     },
   };

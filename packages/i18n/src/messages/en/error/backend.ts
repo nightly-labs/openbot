@@ -5,6 +5,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",
   "error.backend.browserViewLimit": "Too many browser views are open on this host.",
+  "error.backend.browserViewEnded": "The live view of this page ended.",
+  "error.backend.browserViewFailed": "The live view of this page failed.",
   "error.backend.windowTemporarilyUnavailable": "The OpenBot window is temporarily unavailable.",
   "error.backend.windowUnavailable": "The OpenBot window is unavailable.",
   "error.backend.sunshineApiHttp": "Sunshine API failed with HTTP {status}.",
@@ -175,6 +177,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserUrlRequired": "A browser URL is required.",
   "error.backend.browserUrlTooLong": "The browser URL is too long.",
   "error.backend.browserTabLimit": "The browser can have up to {limit} open tabs.",
+  "error.backend.browserLowMemory":
+    "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
   "error.backend.popupSecureInput":
     "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page.",

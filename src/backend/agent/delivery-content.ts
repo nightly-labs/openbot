@@ -9,13 +9,15 @@ export function responseAttachmentMessageId(threadId: string, turnId: string, ca
   return `agent-attachments:${digest}`;
 }
 
+/** A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history. */
 export function conversationContentSignature(snapshot: ConversationSnapshot): string {
-  return JSON.stringify({
+  const content = JSON.stringify({
     agentId: snapshot.agentId,
     threadId: snapshot.threadId,
     activeTurnId: snapshot.activeTurnId,
     messages: snapshot.messages,
   });
+  return createHash("sha256").update(content).digest("base64");
 }
 
 export function routineStatusForDelivery(status: QueueDeliveryStatus) {

@@ -86,6 +86,16 @@ type ProviderSignIn =
   | { kind: "acp-authenticate"; methodId: string; argv: readonly string[]; timeoutMs: number };
 
 /**
+ * A sign-in the user finishes on another device, for a host with no browser the user can see.
+ * `codex-device` is the Codex app-server device code. `cli` spawns the provider's CLI and reads its
+ * link: `device` prints a code the user confirms, `paste` waits for the code the provider's page
+ * shows, which the user copies back.
+ */
+type ProviderCodeSignIn =
+  | { kind: "codex-device" }
+  | { kind: "cli"; flow: "device" | "paste"; command: ProviderCliCommand };
+
+/**
  * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
  * argument. OpenBot starts it the same way.
  */
@@ -142,6 +152,12 @@ export interface ProviderClientContext {
    */
   readonly providerStateDirectory?: string;
   /**
+   * Variables an agent's tools run with, beyond the user's own environment: today the paths that
+   * point `gh` and `git` at the built-in GitHub connection. Paths only, never a secret, because a
+   * provider process can outlive the token. Read at each spawn; empty while nothing is connected.
+   */
+  readonly agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
+  /**
    * The saved custom agents with their environment values, read when an agent's process starts.
    * Only the `acp` driver reads it. Optional for the same reason as `reportMcpDrops`: without it no
    * custom agent is saved.
@@ -164,6 +180,8 @@ export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = {
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
+  /** Absent for a provider that has no sign-in on another device. */
+  codeSignIn?: ProviderCodeSignIn;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
   createClient(
     cli: AgentCliInfo,
@@ -185,6 +203,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "codex",
     signIn: { kind: "browser" },
+    codeSignIn: { kind: "codex-device" },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs) => new CodexAppServerClient(cli.executable, requestTimeoutMs),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
@@ -204,6 +223,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
+    // With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only.
+    codeSignIn: {
+      kind: "cli",
+      flow: "paste",
+      command: {
+        argv: ["auth", "login", "--claudeai"],
+        env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+    },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
       new ClaudeAgentClient(
@@ -216,6 +245,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.mcpToolRuntimes,
         context.mcpAuthorization,
         context.providerStateDirectory,
+        context.agentEnvironment,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -226,6 +256,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       kind: "cli-command",
       command: {
         argv: ["--no-auto-update", "login"],
+        env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+    },
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: ["--no-auto-update", "login", "--device-auth"],
         env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
@@ -241,6 +280,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.mcpToolRuntimes,
         context.mcpAuthorization,
         confinement,
+        context.agentEnvironment,
       ),
     createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
@@ -263,6 +303,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
         extraEnv: () => ({
+          ...context.agentEnvironment?.(),
           ...opencodeEnv(cli, context),
           ...openCodeConfigEnv({}, context.customProviders),
           ...(confinement ? OPENCODE_CONFINED_ENV : {}),
@@ -309,6 +350,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement
           ? { confine: (target) => confineSpawnTarget(target, confinement, antigravityStatePaths()) }
           : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
         signInMessage: sourceText("error.provider.antigravitySignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
@@ -380,6 +422,14 @@ function customAgentChild(
     ...(profileGeneration
       ? {}
       : {
+          // A variable the user saved on this agent wins over the GitHub connection's. The
+          // `GIT_CONFIG_*` entries count on from the user's own, so they always apply.
+          extraEnv: () =>
+            Object.fromEntries(
+              Object.entries(context.agentEnvironment?.({ ...process.env, ...env }) ?? {}).filter(
+                ([name]) => name.startsWith("GIT_CONFIG_") || !(name in env),
+              ),
+            ),
           mcpServers: context.mcpServers,
           reportMcpDrops: context.reportMcpDrops,
           mcpToolRuntimes: context.mcpToolRuntimes,

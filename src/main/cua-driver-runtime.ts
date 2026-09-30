@@ -46,6 +46,8 @@ const MAX_SOCKET_PATH_LENGTH: Readonly<Partial<Record<NodeJS.Platform, number>>>
 };
 const READY_TIMEOUT_MS = 20_000;
 const READY_POLL_MS = 200;
+/** How long a daemon left by a previous run gets to release its socket. The driver's own `stop` waits as long. */
+const ORPHAN_STOP_TIMEOUT_MS = 2_000;
 const PERMISSION_TIMEOUT_MS = 10_000;
 
 /**
@@ -63,6 +65,14 @@ const PERMISSION_TIMEOUT_MS = 10_000;
  * The driver reads this variable as the exact string `1`.
  */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
+/**
+ * Makes the daemon stop when its standard input closes.
+ *
+ * The kernel closes that pipe when this process ends for any reason, a crash or an out-of-memory
+ * kill included, so the daemon cannot outlive OpenBot. Only the daemon gets it: the proxy reads its
+ * standard input as JSON-RPC. The driver reads it only together with `CUA_DRIVER_EMBEDDED`.
+ */
+const PARENT_LIVENESS_ENV = "CUA_DRIVER_PARENT_LIVENESS_STDIN";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
 
@@ -87,7 +97,7 @@ const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly Ma
 export interface SpawnDriverOptions {
   cwd: string;
   env: NodeJS.ProcessEnv;
-  stdio: ["ignore", "pipe", "pipe"];
+  stdio: ["pipe", "pipe", "pipe"];
   windowsHide: boolean;
 }
 
@@ -312,7 +322,7 @@ export class CuaDriverRuntime {
    * The tap forwards every request unchanged, so the agent gets the same tools either way - and a
    * tap that failed to listen costs the rim its answer, never the agent its tools. What it does
    * cost is the JSON copy the tap adds to each tool answer, which a provider that shows the model
-   * only the result text needs to read window ids and element tokens.
+   * only the result text needs to read window ids and snapshot ids.
    */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();
@@ -526,8 +536,9 @@ export class CuaDriverRuntime {
       // creates, which is why what is already there is inspected below rather than trusted.
       await mkdir(endpoint.directory, { recursive: true, mode: 0o700 });
       await assertPrivateDirectory(endpoint.directory);
-      await this.#removeSocket();
     }
+    await this.#stopOrphanedDaemon(socketPath);
+    await this.#removeSocket();
     this.#command = await this.#linkCommandAlias(executable);
     // OpenBot owns the cursor on every display, including displays connected after startup.
     const child = this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
@@ -535,11 +546,13 @@ export class CuaDriverRuntime {
       env: {
         ...process.env,
         [EMBEDDED_ENV]: "1",
+        [PARENT_LIVENESS_ENV]: "1",
         ...CUA_DRIVER_VENDOR_CALLS_OFF,
         [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
         ...waylandEnvironment(this.#options.platform),
       },
-      stdio: ["ignore", "pipe", "pipe"],
+      // Nothing is written to standard input. It stays open only so that it closes when OpenBot ends.
+      stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
     this.#child = child;
@@ -600,6 +613,25 @@ export class CuaDriverRuntime {
     } catch (error) {
       this.#options.onDiagnostic?.(`OpenBot: the Computer Use tap could not listen. ${describe(error)}\n`);
     }
+  }
+
+  /**
+   * Stops a daemon that a previous run left on this profile's endpoint.
+   *
+   * Before the daemon watched its standard input, a run that crashed or was killed left it running.
+   * Removing its socket file then hid it from every client while it kept its memory. The endpoint
+   * belongs to this profile, and the single-instance lock keeps a second OpenBot off the profile, so
+   * a daemon that answers here serves no other run.
+   */
+  async #stopOrphanedDaemon(socketPath: string): Promise<void> {
+    if (!(await accepts(socketPath, `${JSON.stringify({ method: "shutdown" })}\n`))) return;
+    this.#options.onDiagnostic?.("OpenBot: stopping a Computer Use driver that a previous run left running.\n");
+    const deadline = Date.now() + ORPHAN_STOP_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS / 4));
+      if (!(await accepts(socketPath))) return;
+    }
+    this.#options.onDiagnostic?.("OpenBot: the Computer Use driver left by a previous run did not stop.\n");
   }
 
   async #removeSocket(): Promise<void> {
@@ -751,6 +783,34 @@ async function assertPrivateDirectory(directory: string): Promise<void> {
   if ((stats.mode & 0o077) !== 0) {
     throw new Error(sourceText("error.computerUse.socketDirectoryShared", { path: directory }));
   }
+}
+
+/**
+ * Whether something accepts on `path`. `message` is sent to it, and then the connection closes.
+ *
+ * A connect that does not finish in time counts as refused, so a daemon that hangs cannot hold the
+ * start past the deadline of its caller.
+ */
+function accepts(path: string, message = ""): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect(path);
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve(false);
+    }, READY_POLL_MS);
+    socket.once("connect", () => {
+      clearTimeout(timer);
+      resolve(true);
+      // The reply is not read. The message is in the daemon's buffer once it is written.
+      socket.end(message, () => socket.destroy());
+    });
+    // An error after the connection is up also ends up here, and changes nothing.
+    socket.on("error", () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(false);
+    });
+  });
 }
 
 /**

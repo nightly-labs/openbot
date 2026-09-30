@@ -132,8 +132,17 @@ Moonlight client uses a random pairing name and approves only its matching loopb
 Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
 that sends the configured pairing name instead of the upstream hard-coded name.
 The published runtime uses a new recipe/input digest; no existing release assets are replaced.
-The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
-on Linux.
+The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: the Linux runtime is built
+with the tray off, and OpenBot gives Sunshine no file capabilities.
+
+### Linux runtime (recipe 14)
+
+The `linux-x64` target builds on Ubuntu 24.04 with GCC 14, X11 capture and software encoding only
+(CUDA, DRM, KWin, VAAPI, Vulkan, Wayland, portal and tray are off). The OpenBot patch adds an XTest
+input backend, because Xvfb does not read uinput devices. It also links libcap when DRM is off and
+adds a `vaMapBuffer2` shim, because the prebuilt FFmpeg needs libva 2.21 and Ubuntu 24.04 has 2.20.
+The runtime uses the system libraries of Ubuntu 24.04; the hosted server template installs them.
+Linux arm64 builds only for local development and has no release artifact.
 
 ## Pin the Gemini server
 

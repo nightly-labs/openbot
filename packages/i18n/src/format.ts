@@ -3,6 +3,7 @@ import { createTranslate } from "./message";
 import { messages as en } from "./messages/en/format";
 import { messages as fr } from "./messages/fr/format";
 import { messages as ja } from "./messages/ja/format";
+import { messages as tr } from "./messages/tr/format";
 
 /**
  * Numbers, dates, lists and sizes in the interface language.
@@ -29,7 +30,7 @@ export interface AppFormat {
   fileSize: (bytes: number) => string;
 }
 
-const catalogs = { en, fr, ja } as const;
+const catalogs = { en, fr, ja, tr } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 

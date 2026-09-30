@@ -50,6 +50,8 @@ export type RemoteScreenGatewayCreateRuntime = (
 
 interface RemoteScreenGatewayOptions {
   platform: "darwin" | "win32" | "linux";
+  // Read for a Linux host only. Defaults to the environment of this process.
+  sessionEnvironment?: Readonly<Record<string, string | undefined>>;
   unattended: boolean;
   runtimePaths: RemoteDesktopRuntimePaths | null;
   runtimeStateDirectory: string;
@@ -123,6 +125,7 @@ export class RemoteScreenGateway {
   // nothing would be left to ask by the time the host owner looks.
   #screenRecordingDenied = false;
   #activeStreamStart: { sessionId: string; timeout: ReturnType<typeof setTimeout> } | null = null;
+  #linuxWithoutX11: boolean;
 
   constructor(options: RemoteScreenGatewayOptions) {
     this.#options = {
@@ -131,6 +134,7 @@ export class RemoteScreenGateway {
       audit: options.audit ?? (() => undefined),
       now: options.now ?? Date.now,
     };
+    this.#linuxWithoutX11 = options.platform === "linux" && !isX11Session(options.sessionEnvironment ?? process.env);
     const displays = this.#options.getDisplays?.() ?? [];
     this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
   }
@@ -150,7 +154,7 @@ export class RemoteScreenGateway {
    * a runtime a live session owns is asked rather than replaced.
    */
   async recheckScreenRecording(): Promise<boolean> {
-    if (this.#options.platform === "linux" || !this.#options.runtimePaths) return this.#screenRecordingDenied;
+    if (this.#linuxWithoutX11 || !this.#options.runtimePaths) return this.#screenRecordingDenied;
     await this.#ensureRuntime();
     const denied = Boolean(this.#runtime?.screenCaptureDenied?.());
     this.#reportScreenRecordingDenied(denied);
@@ -272,7 +276,7 @@ export class RemoteScreenGateway {
   capabilities(): RemoteDesktopCapabilities {
     const displays = this.#availableDisplays();
     return {
-      ready: this.#options.platform !== "linux" && Boolean(this.#options.runtimePaths),
+      ready: !this.#linuxWithoutX11 && Boolean(this.#options.runtimePaths),
       platform: this.#options.platform,
       unattended: this.#options.unattended,
       runtime: "sunshine-moonlight",
@@ -376,8 +380,8 @@ export class RemoteScreenGateway {
     if (this.#sessions.size >= REMOTE_DESKTOP_MAX_SESSIONS) {
       throw new RemoteScreenError(429, "session_capacity_reached", sourceText("error.remote.sessionCapacity"));
     }
-    if (this.#options.platform === "linux") {
-      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.linuxUnsupported"));
+    if (this.#linuxWithoutX11) {
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.linuxNeedsX11"));
     }
     if (!this.#options.runtimePaths) {
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing"));
@@ -758,7 +762,7 @@ export class RemoteScreenGateway {
     if (this.#runtimeStopping) await this.#runtimeStopping;
     if (this.#runtimeState) return this.#runtimeState;
     const paths = this.#options.runtimePaths;
-    if (!paths || this.#options.platform === "linux") throw new Error(sourceText("error.remote.runtimeUnavailable"));
+    if (!paths || this.#linuxWithoutX11) throw new Error(sourceText("error.remote.runtimeUnavailable"));
     this.#runtime ??= this.#options.createRuntime({
       paths,
       stateDirectory: this.#options.runtimeStateDirectory,
@@ -870,6 +874,12 @@ export class RemoteScreenError extends Error {
   ) {
     super(message);
   }
+}
+
+// Sunshine captures and sends input through X11 only. Under Wayland, X11 reaches only the windows
+// of XWayland clients, so the stream would show an empty screen.
+function isX11Session(environment: Readonly<Record<string, string | undefined>>): boolean {
+  return Boolean(environment.DISPLAY) && !environment.WAYLAND_DISPLAY && environment.XDG_SESSION_TYPE !== "wayland";
 }
 
 function sendViewer(

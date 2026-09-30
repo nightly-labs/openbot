@@ -47,6 +47,7 @@ import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agen
 import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
+import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
 import { Route as V1MeProfileRouteImport } from './routes/v1/me/profile'
 import { Route as V1MobileAuthDevicesRouteImport } from './routes/v1/mobile-auth/devices'
@@ -308,6 +309,12 @@ const V1AvatarsUserIdRoute = V1AvatarsUserIdRouteImport.update({
   path: '/v1/avatars/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1GithubInstallationTokensRoute =
+  V1GithubInstallationTokensRouteImport.update({
+    id: '/v1/github/installation-tokens',
+    path: '/v1/github/installation-tokens',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MeAvatarRoute = V1MeAvatarRouteImport.update({
   id: '/avatar',
   path: '/avatar',
@@ -710,6 +717,7 @@ export interface FileRoutesByFullPath {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
@@ -817,6 +825,7 @@ export interface FileRoutesByTo {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
@@ -925,6 +934,7 @@ export interface FileRoutesById {
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/profile': typeof V1MeProfileRoute
   '/v1/mobile-auth/devices': typeof V1MobileAuthDevicesRouteWithChildren
@@ -1034,6 +1044,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/github/installation-tokens'
     | '/v1/me/avatar'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
@@ -1141,6 +1152,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/github/installation-tokens'
     | '/v1/me/avatar'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
@@ -1248,6 +1260,7 @@ export interface FileRouteTypes {
     | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/github/installation-tokens'
     | '/v1/me/avatar'
     | '/v1/me/profile'
     | '/v1/mobile-auth/devices'
@@ -1356,6 +1369,7 @@ export interface RootRouteChildren {
   V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
+  V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
   V1MobileAuthRedeemRoute: typeof V1MobileAuthRedeemRoute
   V1MobileAuthSessionRoute: typeof V1MobileAuthSessionRoute
@@ -1676,6 +1690,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/avatars/$userId'
       fullPath: '/v1/avatars/$userId'
       preLoaderRoute: typeof V1AvatarsUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/github/installation-tokens': {
+      id: '/v1/github/installation-tokens'
+      path: '/v1/github/installation-tokens'
+      fullPath: '/v1/github/installation-tokens'
+      preLoaderRoute: typeof V1GithubInstallationTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/me/avatar': {
@@ -2315,6 +2336,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
+  V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
   V1MobileAuthRedeemRoute: V1MobileAuthRedeemRoute,
   V1MobileAuthSessionRoute: V1MobileAuthSessionRoute,

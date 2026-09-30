@@ -11,6 +11,14 @@ interface TransactionScope {
   readonly commit: (() => void)[];
 }
 
+/**
+ * The chats that main keeps in memory only because something read them. A chat of 2,000 messages
+ * takes about 1 MB, and marking a chat read loads it, so the cache grew with each chat that the user
+ * opened. A chat that goes is read again from the database when it is next needed, the same as a
+ * chat that was not opened since the app started.
+ */
+const READ_SNAPSHOT_LIMIT = 16;
+
 /** Only the caller that opened the transaction holds a scope, so a nested call finds the owner's. */
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
@@ -81,6 +89,17 @@ export function withDatabaseTransaction<T>(
   return result;
 }
 
+/**
+ * How long an agent's snapshot stays in memory after its last use. The sweep runs at the same
+ * interval, so an idle snapshot leaves memory between one and two periods after its last use.
+ */
+export const CONVERSATION_SNAPSHOT_IDLE_MS = 10 * 60_000;
+
+interface EvictedSnapshot {
+  threadId: string;
+  snapshot: WeakRef<ConversationSnapshot>;
+}
+
 export interface ConversationTransaction {
   threadId: string;
   snapshot: ConversationSnapshot;
@@ -108,6 +127,23 @@ export class ConversationRuntime {
    */
   readonly #listAgents: () => AgentSummary[];
   readonly #snapshots = new Map<string, ConversationSnapshot>();
+  readonly #snapshotUsedAt = new Map<string, number>();
+  /**
+   * An idle snapshot leaves `snapshots` but stays here while a caller still holds it, for example
+   * across an `await`. The next read then gets that same object, not a second copy: a stale copy
+   * that `persistConversation` writes later deletes the messages the other copy added. When no
+   * caller holds it, the next read rebuilds it from SQLite, which held the same content at eviction.
+   */
+  readonly #evictedSnapshots = new Map<string, EvictedSnapshot>();
+  #evictionTimer: NodeJS.Timeout | null = null;
+  /**
+   * The cached chats that `setSnapshot` stored and that no turn code took since, oldest first. Only
+   * these can go. `ensureSnapshot` gives its object to code that can change it across an `await`
+   * before it saves it, so a copy read again from the database could lose that change.
+   */
+  readonly #readSnapshots = new Set<string>();
+  /** The chats that the limit dropped. `snapshotToUpdate` reads them again, so they still get updates. */
+  readonly #droppedSnapshots = new Set<string>();
   readonly #conversationSignatures = new Map<string, string>();
   readonly #threadToAgent = new Map<string, string>();
   readonly #loadedThreads = new Map<string, AgentClient>();
@@ -121,19 +157,112 @@ export class ConversationRuntime {
     this.#listAgents = listAgents;
   }
 
+  /** The agent's snapshot when it is loaded. An evicted snapshot comes back, so eviction is not visible. */
   snapshot(agentId: string): ConversationSnapshot | undefined {
+    const live = this.#snapshots.get(agentId);
+    if (live) {
+      this.#snapshotUsedAt.set(agentId, Date.now());
+      return live;
+    }
+    const evicted = this.#evictedSnapshots.get(agentId);
+    if (!evicted) return undefined;
+    const snapshot = evicted.snapshot.deref() ?? this.#store.database.readConversation(agentId, evicted.threadId);
+    this.#keepSnapshot(agentId, snapshot);
+    return snapshot;
+  }
+
+  /**
+   * The snapshot in memory now, with no SQLite read and no change to its idle time. It is for a
+   * reader of every agent that falls back to SQLite itself: `snapshot` would load all of them again.
+   */
+  loadedSnapshot(agentId: string): ConversationSnapshot | undefined {
     return this.#snapshots.get(agentId);
+  }
+
+  /**
+   * The chat that a change must publish: the cached one, an idle one that `snapshot` brings back, or
+   * one that the limit dropped, read again from the database. A chat that main never loaded stays
+   * unloaded.
+   */
+  snapshotToUpdate(agentId: string): ConversationSnapshot | undefined {
+    const cached = this.snapshot(agentId);
+    if (cached || !this.#droppedSnapshots.has(agentId)) return cached;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const snapshot = this.#store.database.readConversation(agentId, agent?.threadId ?? null);
+    this.#keepSnapshot(agentId, snapshot);
+    this.#rememberRead(agentId);
+    return snapshot;
   }
 
   setSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     if (snapshot.threadId && snapshot.threadId !== this.#store.list().find((agent) => agent.id === agentId)?.threadId)
       this.#executionSnapshots.set(snapshot.threadId, snapshot);
-    else this.#snapshots.set(agentId, snapshot);
+    else {
+      this.#keepSnapshot(agentId, snapshot);
+      this.#rememberRead(agentId);
+    }
   }
 
-  dropSnapshot(agentId: string): void {
-    this.#snapshots.delete(agentId);
+  #keepSnapshot(agentId: string, snapshot: ConversationSnapshot): void {
+    this.#evictedSnapshots.delete(agentId);
+    this.#snapshots.set(agentId, snapshot);
+    this.#snapshotUsedAt.set(agentId, Date.now());
+    this.#evictionTimer ??= setInterval(() => {
+      try {
+        this.evictIdleSnapshots();
+      } catch {
+        // A failed sweep changes nothing, and after `stop` the database is closed. The next
+        // snapshot that is kept starts the timer again.
+        this.dispose();
+      }
+    }, CONVERSATION_SNAPSHOT_IDLE_MS);
+    this.#evictionTimer.unref?.();
+  }
+
+  /**
+   * Removes from memory each agent snapshot that is idle and that SQLite can rebuild with the same
+   * content. A snapshot stays when it has no thread, has a turn that runs, or is different from
+   * SQLite: streamed text before its flush, and mailbox messages that a read merged, are in memory
+   * only. `revision` is not compared: a rebuilt snapshot takes the thread's last event sequence from
+   * SQLite, as after a restart.
+   */
+  evictIdleSnapshots(now = Date.now()): void {
+    // A read inside a transaction sees rows that a ROLLBACK can still discard.
+    if (this.#store.database.connection.isTransaction) return;
+    for (const [agentId, snapshot] of this.#snapshots) {
+      if ((this.#snapshotUsedAt.get(agentId) ?? 0) > now - CONVERSATION_SNAPSHOT_IDLE_MS) continue;
+      // A snapshot that must stay is read again only after one more idle period.
+      this.#snapshotUsedAt.set(agentId, now);
+      if (!snapshot.threadId || snapshot.activeTurnId) continue;
+      const persisted = this.#store.database.readConversation(agentId, snapshot.threadId);
+      if (conversationContentSignature(persisted) !== conversationContentSignature(snapshot)) continue;
+      this.#snapshots.delete(agentId);
+      this.#snapshotUsedAt.delete(agentId);
+      this.#readSnapshots.delete(agentId);
+      this.#evictedSnapshots.set(agentId, { threadId: snapshot.threadId, snapshot: new WeakRef(snapshot) });
+    }
+    if (this.#snapshots.size === 0) this.dispose();
+  }
+
+  dispose(): void {
+    if (this.#evictionTimer) clearInterval(this.#evictionTimer);
+    this.#evictionTimer = null;
+  }
+
+  /** Makes this chat the newest read chat, then drops the oldest read chats past the limit. */
+  #rememberRead(agentId: string): void {
+    this.#droppedSnapshots.delete(agentId);
+    this.#readSnapshots.delete(agentId);
+    this.#readSnapshots.add(agentId);
+    for (const id of this.#readSnapshots) {
+      if (this.#readSnapshots.size <= READ_SNAPSHOT_LIMIT) return;
+      if (this.#snapshots.get(id)?.activeTurnId) continue;
+      this.#readSnapshots.delete(id);
+      this.#snapshots.delete(id);
+      this.#snapshotUsedAt.delete(id);
+      this.#droppedSnapshots.add(id);
+    }
   }
 
   activeSnapshots(): IterableIterator<[string, ConversationSnapshot]> {
@@ -168,15 +297,17 @@ export class ConversationRuntime {
       if (execution.agentId !== agentId) throw new Error("Execution thread belongs to another agent.");
       return execution;
     }
-    let snapshot = this.#snapshots.get(agentId);
+    let snapshot = this.snapshot(agentId);
     if (!snapshot) {
       const agent = this.#store.list().find((candidate) => candidate.id === agentId);
       const publicThreadId = agent?.threadId ?? threadId;
       snapshot = this.#store.database.readConversation(agentId, publicThreadId);
-      this.#snapshots.set(agentId, snapshot);
+      this.#keepSnapshot(agentId, snapshot);
     } else if (threadId && !snapshot.threadId) {
       snapshot.threadId = threadId;
     }
+    this.#readSnapshots.delete(agentId);
+    this.#droppedSnapshots.delete(agentId);
     return snapshot;
   }
 
@@ -204,6 +335,10 @@ export class ConversationRuntime {
     },
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
+    // A caller that held an evicted snapshot across an `await` puts it back here, so that
+    // `workingSnapshot` sees a turn that the caller started on it.
+    if (this.#evictedSnapshots.get(snapshot.agentId)?.snapshot.deref() === snapshot)
+      this.#keepSnapshot(snapshot.agentId, snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
     if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) return;
@@ -211,12 +346,12 @@ export class ConversationRuntime {
       const persisted = this.#store.database.persistConversation(snapshot, eventType, detail);
       snapshot.revision = persisted.revision;
     }
-    this.publishConversation(snapshot);
+    this.publishConversation(snapshot, signature);
   }
 
-  publishConversation(snapshot: ConversationSnapshot): void {
+  publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
-    this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, conversationContentSignature(snapshot));
+    this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
   }
 
@@ -292,9 +427,17 @@ export class ConversationRuntime {
 
   forgetAgent(agentId: string): void {
     for (const [id, snapshot] of this.#executionSnapshots) {
-      if (snapshot.agentId === agentId) this.#executionSnapshots.delete(id);
+      if (snapshot.agentId !== agentId) continue;
+      this.#executionSnapshots.delete(id);
+      this.#conversationSignatures.delete(id);
     }
+    const threadId = (this.#snapshots.get(agentId) ?? this.#evictedSnapshots.get(agentId))?.threadId;
+    if (threadId) this.#conversationSignatures.delete(threadId);
     this.#snapshots.delete(agentId);
+    this.#snapshotUsedAt.delete(agentId);
+    this.#evictedSnapshots.delete(agentId);
+    this.#readSnapshots.delete(agentId);
+    this.#droppedSnapshots.delete(agentId);
     this.#conversationSignatures.delete(agentId);
   }
 
@@ -318,15 +461,20 @@ export class ConversationRuntime {
     // Throws before BEGIN IMMEDIATE: an error raised inside an open transaction would leave
     // isTransaction true for the next caller, on a database that has no backup.
     const previousAgent = this.requireKnownAgent(agentId);
-    const previousSnapshot = this.#snapshots.get(agentId);
+    // `snapshot` brings an evicted snapshot back before BEGIN, so a rollback restores its content.
+    const previousSnapshot = this.snapshot(agentId);
     const previousSnapshotState = previousSnapshot ? structuredClone(previousSnapshot) : undefined;
     const restorePreviousState = () => {
       onRollback?.();
       if (previousAgent.threadId === null) {
         this.#store.restoreThreadIdentity(agentId, previousAgent.threadId, previousAgent.updatedAt);
       }
-      if (previousSnapshotState) this.#snapshots.set(agentId, previousSnapshotState);
-      else this.#snapshots.delete(agentId);
+      if (previousSnapshotState) this.#keepSnapshot(agentId, previousSnapshotState);
+      else {
+        this.#snapshots.delete(agentId);
+        this.#snapshotUsedAt.delete(agentId);
+      }
+      this.#readSnapshots.delete(agentId);
     };
     let published: ConversationSnapshot | undefined;
     return withDatabaseTransaction(
@@ -342,7 +490,9 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
-        this.#snapshots.set(agentId, published);
+        this.#keepSnapshot(agentId, published);
+        this.#readSnapshots.delete(agentId);
+        this.#droppedSnapshots.delete(agentId);
         this.publishConversation(published);
       },
     );

@@ -63,6 +63,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     itemType: message.itemType,
     kind: message.questionPrompt ? "question" : actionMarker ? "action-marker" : plan ? "plan" : "text",
     senderAgentId: exchangeSenderId,
+    senderMember: message.author === "user" ? message.senderMember : undefined,
     replyToMessageId: message.replyToMessageId,
     attachments: message.attachments,
     imageGeneration: message.imageGeneration,
@@ -217,6 +218,8 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.itemType === right.itemType &&
     left.status === right.status &&
     left.senderAgentId === right.senderAgentId &&
+    left.senderMember?.id === right.senderMember?.id &&
+    left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
     left.reaction === right.reaction &&
     JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&

@@ -682,3 +682,15 @@
     display: none;
   }
 }
+
+/* The provider step of a joined server covers the window, over the rail and the sidebar. */
+.server-onboarding-screen {
+  position: fixed;
+}
+
+.server-onboarding-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  -webkit-app-region: no-drag;
+}

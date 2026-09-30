@@ -5,6 +5,8 @@ export const messages = {
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
   "error.backend.browserViewUnsupported": "このリモートホストはライブブラウザービューに対応していません。",
   "error.backend.browserViewLimit": "このホストで開いているブラウザービューが多すぎます。",
+  "error.backend.browserViewEnded": "このページのライブビューは終了しました。",
+  "error.backend.browserViewFailed": "このページのライブビューは失敗しました。",
   "error.backend.windowTemporarilyUnavailable": "OpenBot ウィンドウは一時的に使用できません。",
   "error.backend.windowUnavailable": "OpenBot ウィンドウを使用できません。",
   "error.backend.sunshineApiHttp": "Sunshine API が HTTP {status} で失敗しました。",
@@ -181,6 +183,8 @@ export const messages = {
   "error.backend.browserUrlRequired": "ブラウザーの URL が必要です。",
   "error.backend.browserUrlTooLong": "ブラウザーの URL が長すぎます。",
   "error.backend.browserTabLimit": "ブラウザーで開けるタブは {limit} 個までです。",
+  "error.backend.browserLowMemory":
+    "このサーバーはメモリが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
   "error.backend.popupSecureInput":
     "セキュア入力中はポップアップがブロックされます。セキュア入力を完了またはキャンセルしてから、ページからもう一度お試しください。",

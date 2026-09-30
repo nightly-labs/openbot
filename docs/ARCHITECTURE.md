@@ -237,6 +237,7 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
 | Restart | Restored from the browser's own state file. |
+| Idle 30 min (5 min when memory is low) | Stays open, but its page unloads. The next use loads the page again. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
 | Takeover held | No agent tool touches that tab, `close_tab` included. |
 
@@ -1152,6 +1153,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
+| `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 
@@ -1159,6 +1161,26 @@ These IPC groups take a required server id and route with `scopedHandler`. A key
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
 sign-in and folder import stay on the host.
+
+`providers-v1` signs in Codex only, with a device code. A host that serves `providers-v3` also signs
+in Grok (`grok login --device-auth`) and Claude (`claude auth login`), for a host with no visible
+browser, such as a hosted server. `src/backend/agent/cli-code-login.ts` reads the link, and for Grok
+the code, from the CLI output. The Claude CLI shows its paste prompt only on a terminal, so the host
+runs it under the util-linux `script`, and the admin sends back the code that the Claude page shows
+(`code-login/submit`). This flow runs only on a Linux host: the macOS `script` refuses a socket for
+stdin, and Windows has no `script`. So only a Linux host advertises `providers-v3`; a macOS or
+Windows host keeps `providers-v1`, and its clients offer the Codex code sign-in only. The CLI output and the pasted code are secrets; no log line or
+error quotes them. How a sign-in ends arrives in the host's agent status, as for Codex.
+`codeSignInProviders` in `server-capabilities.ts` picks the providers that the Providers list offers
+for a code sign-in, from the host's capabilities.
+
+When the account is an owner or admin of the active remote server, the server serves `providers-v1`,
+and the server has no agent, the workspace shows `ServerOnboarding` before the first-agent form, on
+desktop (`WorkspaceServerOnboarding`) and on the web (`WebWorkspace`). It shows the host's providers
+through `hostSetupProviderProps`, and Continue stays blocked until a provider is connected. The form
+then opens with that provider. The choice stays in memory for the server; it is not written to the
+setup file of this computer. A member, the local server, and a host without `providers-v1` open the
+form directly.
 
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until
@@ -1456,6 +1478,36 @@ and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The pan
 environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
 `safeStorage`.
 
+The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
+in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps
+the tokens in `openbot-github-connector-v1.json`, encrypted with `safeStorage`. While it is
+connected, `McpGateway.enabled()` adds the `openbot-github` server (`api.githubcopilot.com/mcp/`),
+and `authorization()` gives it a fresh bearer at each hand-off. An enabled server that the user added
+with the name `github` wins. For `gh` and `git`, the service writes the token to
+`<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
+`GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
+token. Codex gets these values through `shell_environment_policy.set` in the thread config.
+
+A user token makes GitHub show "user with OpenBotGit". To show `openbotgit[bot]`, the desktop sends
+the user token to `POST /v1/github/installation-tokens` on the account Worker
+(`apps/auth-api/src/server/github-installation-tokens.ts`). The Worker holds the app's private key
+(`GITHUB_APP_PRIVATE_KEY`, PKCS #8) and signs an app JWT. It mints one installation token for each
+installation of this app, limited to the repositories where the user can push, maintain or
+administer, and stores nothing. With no key it answers 503, and the desktop keeps the user token.
+`src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
+- `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
+  `provider-state/github/repositories`, or else the user token.
+- MCP: `src/main/github-mcp-proxy.ts` is a loopback MCP server with a secret bearer. It forwards to
+  `api.githubcopilot.com/mcp/` with one upstream client for each token, because GitHub binds an MCP
+  session to its token. A tool call with `owner` and `repo` arguments uses that repository's bot
+  token. The port and the secret stay in the encrypted record, so a resumed Codex session keeps its
+  URL and header.
+- `gh` has one token for each host, so it acts as the user.
+
+A pull request that an agent opens with a bot token has `openbotgit[bot]` as its author, so the user
+who asked for it can approve it. A branch rule that needs one approval then passes with no second
+person.
+
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
@@ -1618,6 +1670,11 @@ Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishi
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
 
+On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
+`XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
+sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
+capability. Linux has no permission checks: an X11 session is ready.
+
 ## Secure browser authentication
 
 `openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
@@ -1651,7 +1708,9 @@ and observed state. A server reports each minute while it is in use, and the Wor
 extends. When boat stops a server in use, the Worker resumes it, and clients ask the Worker to
 start a stopped server when a connection fails. No message
 waits in the Worker while a server is stopped; the client keeps it and connects again. The Worker's boat key cannot read files or run commands in a
-sandbox. See [hosted servers](hosted-servers.md) for the flow, the configuration and the template.
+sandbox. On a hosted server only, main reads the memory of the machine, and the backend holds new
+turns while it is low and limits the turns that run at the same time. See
+[hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
 
 ## Shared UI package
 

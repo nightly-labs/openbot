@@ -271,7 +271,7 @@ export type RemoteRuntimeSpawn = (executable: string, args: string[], options: S
 interface SunshineMoonlightRuntimeOptions {
   paths: RemoteDesktopRuntimePaths;
   stateDirectory: string;
-  platform: "darwin" | "win32";
+  platform: "darwin" | "win32" | "linux";
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
   getIceServers: () => Promise<RemoteDesktopIceServer[]>;
@@ -529,6 +529,9 @@ export class SunshineMoonlightRuntime {
       `cert = ${join(this.#options.stateDirectory, "sunshine-cert.pem")}`,
       `log_path = ${join(this.#options.stateDirectory, "sunshine.log")}`,
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
+      // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
+      // probe the others.
+      ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
     ];
     await Promise.all([
       writeFile(join(this.#options.stateDirectory, "sunshine.conf"), `${values.join("\n")}\n`, { mode: 0o600 }),
@@ -765,17 +768,23 @@ export class SunshineMoonlightRuntime {
       sunshineDisplaysSchema,
     );
     const local = this.#options.getDisplays();
-    if (native.displays.length === 0) return structuredClone(local);
-    return native.displays.map((display, index) => {
+    // Sunshine also lists outputs that have no monitor: an X server with a dummy driver has 16, and
+    // only one is connected. Electron lists only connected monitors, so an output with no match is
+    // not a screen to show, and its size is unknown.
+    const displays = native.displays.flatMap((display, index) => {
       const metadata = local.find((candidate) => candidate.id === display.id) ?? local[index];
-      return {
-        id: display.id,
-        label: metadata?.label ?? display.name,
-        width: metadata?.width ?? 0,
-        height: metadata?.height ?? 0,
-        primary: metadata?.primary ?? index === 0,
-      };
+      if (!metadata) return [];
+      return [
+        {
+          id: display.id,
+          label: metadata.label,
+          width: metadata.width,
+          height: metadata.height,
+          primary: metadata.primary,
+        },
+      ];
     });
+    return displays.length === 0 ? structuredClone(local) : displays;
   }
 
   async #waitForPairingRequest(): Promise<string> {

@@ -287,6 +287,7 @@ export class ConversationQueries {
              AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+             AND json_extract(message.message_json, '$.routine') IS NULL
              ${CHANNEL_THREAD_EXCLUSION}
              ${filter}`,
         )
@@ -305,6 +306,7 @@ export class ConversationQueries {
              AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
              AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+             AND json_extract(message.message_json, '$.routine') IS NULL
              ${CHANNEL_THREAD_EXCLUSION}
              ${filter}
            ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC

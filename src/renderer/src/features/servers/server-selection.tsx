@@ -40,7 +40,7 @@ const ServerSelection = createSimpleContext({
     const { pendingInviteUrl, setPendingInviteUrl, saveSetup } = useSetup();
     const { setSkillsMarketplaceOpen } = useSettings();
     const { disconnectRemoteDesktopWorkspace } = useRemoteDesktop();
-    const { setBrowserVisibilitySuspended, setPendingAgentSelection } = useServerSwitch();
+    const { setBrowserVisibilitySuspended, setPendingAgentSelection, setPreviousServerId } = useServerSwitch();
     const { agentSetupOpen, creatingAgent } = useAgents();
     const { stopComposerTyping } = useConversationController();
     const { setDirectTyping } = useDirectMessages();
@@ -110,6 +110,7 @@ const ServerSelection = createSimpleContext({
           }
           throw error;
         }
+        if (switchingServers && previousServerId) setPreviousServerId(previousServerId);
         setServers(nextServers);
         return true;
       } finally {

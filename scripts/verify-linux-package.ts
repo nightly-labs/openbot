@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { constants, existsSync } from "node:fs";
 import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,6 +8,15 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const logger = createOpenBotLogger("verify-linux-package");
+
+/** The files that a hosted server installs from a release (`RELEASE_FILES` in scripts/hosting/openbot-hosted-update). */
+const HOSTED_SCRIPTS = ["openbot-hosted-server", "openbot-hosted-env", "openbot-hosted-update"];
+const HOSTED_UNITS = [
+  "openbot.service",
+  "openbot-update.service",
+  "openbot-update.timer",
+  "openbot-update-apply.service",
+];
 
 const FUSE_DISABLED = 48;
 const FUSE_ENABLED = 49;
@@ -43,6 +52,11 @@ await Promise.all([
   access(resolve(resourcesPath, "managed-skills")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
+  // A hosted server refuses an update to a release without all of its hosting files.
+  ...["packages.txt", "openbot-hosted.apparmor", ...HOSTED_UNITS].map((file) =>
+    access(resolve(resourcesPath, "hosting", file)),
+  ),
+  ...HOSTED_SCRIPTS.map((file) => access(resolve(resourcesPath, "hosting", file), constants.X_OK)),
   // Computer Use is the one native runtime the Linux build does ship.
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/cua-driver`)),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/wayland-helper/winrects@cua/extension.js`)),
@@ -54,11 +68,28 @@ await Promise.all(
   ),
 );
 
-// Voice and remote desktop are not built for Linux. These two assertions are the regression guard
-// for the platform split of `extraResources`: if either ever returns to the shared list, the Linux
-// build either fails outright on a missing source or ships a runtime it cannot use.
+// Voice is not built for Linux. This assertion is the regression guard for the platform split of
+// `extraResources`: if it ever returns to the shared list, the Linux build either fails outright
+// on a missing source or ships a runtime it cannot use.
 await assertAbsent(resolve(resourcesPath, "whisper"), "Voice transcription is not available on Linux");
-await assertAbsent(resolve(resourcesPath, "remote-desktop-runtime"), "Remote desktop is not available on Linux");
+// The remote desktop runtime is built for x64 only, and only for this platform.
+if (architecture === "x64") {
+  await Promise.all(
+    ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
+      access(resolve(resourcesPath, "remote-desktop-runtime/linux/x64", name)),
+    ),
+  );
+  await Promise.all(
+    ["darwin", "win32"].map((name) =>
+      assertAbsent(resolve(resourcesPath, "remote-desktop-runtime", name), "Only this platform's runtime ships"),
+    ),
+  );
+} else {
+  await assertAbsent(
+    resolve(resourcesPath, "remote-desktop-runtime"),
+    "Remote desktop is not available on Linux arm64",
+  );
+}
 
 // Providers and the tunnel are downloaded on demand, exactly as on macOS and Windows.
 await Promise.all(

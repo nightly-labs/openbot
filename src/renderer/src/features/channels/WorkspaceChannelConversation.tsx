@@ -5,9 +5,9 @@ import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useServers } from "../servers/servers-context";
+import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { ChannelConversation } from "./ChannelConversation";
-import { isOwnChannelAuthor } from "./channel-timeline";
 
 /** The desktop's open channel: the reader, the waiting requests and the browser tabs come from its contexts. */
 export function WorkspaceChannelConversation() {
@@ -27,7 +27,7 @@ export function WorkspaceChannelConversation() {
     <ChannelConversation
       isOwnMessage={(authorId) => {
         const auth = centralAuth();
-        return isOwnChannelAuthor(authorId, {
+        return isReaderAuthor(authorId, {
           memberId: currentTeamMember()?.id ?? null,
           accountUserId: auth.status === "signed_in" ? auth.user.id : null,
           onOwnComputer: activeServer()?.kind === "local",

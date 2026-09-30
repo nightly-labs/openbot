@@ -40,6 +40,15 @@ export const RESERVED_MCP_SERVER_NAMES = ["openbot", "openbot_browser"] as const
 export const COMPUTER_USE_MCP_SERVER_NAME = "computer_use";
 export const COMPUTER_USE_MCP_SERVER_ID = "openbot-computer-use";
 
+/**
+ * The id and address of the GitHub MCP server that the built-in GitHub connection hands to agents.
+ * The name is the one the GitHub plugin row uses, so a row the user added keeps its place: when an
+ * enabled row has this name, the built-in entry is not added.
+ */
+export const GITHUB_CONNECTOR_MCP_SERVER_ID = "openbot-github";
+export const GITHUB_CONNECTOR_MCP_SERVER_NAME = "github";
+export const GITHUB_CONNECTOR_MCP_SERVER_URL = "https://api.githubcopilot.com/mcp/";
+
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];

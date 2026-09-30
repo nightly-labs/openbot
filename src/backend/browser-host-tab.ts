@@ -54,6 +54,13 @@ export interface BrowserHostTab {
    * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
    */
   pendingRestore?: (() => Promise<void>) | undefined;
+  /**
+   * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
+   * preview frame stand in for the page until `pendingRestore` loads it again.
+   */
+  sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
+  /** When a person or an agent last used the tab. A preview request does not count as use. */
+  lastUsedAt: number;
   focusOnVisible: boolean;
   environment: BrowserEnvironment;
   engine: BrowserCdpEngine;
@@ -106,9 +113,13 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
   };
 }
 
-/** A restored tab that has not loaded yet shows a blank page; its host name stands in for its title. */
+/**
+ * A restored or sleeping tab that has not loaded yet shows a blank page; its last title, or else its
+ * host name, stands in for its title.
+ */
 function restoredTabTitle(tab: BrowserHostTab): string | null {
   if (!tab.pendingRestore) return null;
+  if (tab.sleeping?.title) return tab.sleeping.title;
   try {
     return new URL(tab.requestedUrl).hostname || null;
   } catch {

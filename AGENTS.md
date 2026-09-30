@@ -6,9 +6,6 @@ Use ASD-STE100 Simplified Technical English for all text you write: questions, u
 explanations, final answers, commit messages, PR descriptions, and review comments. Be as concise as
 possible. Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
 
-Do not add an agent or model as author or co-author. Do not add `Co-Authored-By:` trailers or
-"Generated with" lines to commits or PRs.
-
 When a step doesn't need the developer's input, keep going. Put status notes in the same message as
 your next action. Stop and ask only when you can't continue without the developer, or before
 anything destructive: deleting data, force-pushing, or changing anything outside this repository.
@@ -44,9 +41,8 @@ adding a module or moving ownership between workspaces.
 
 - Workspaces, conversations, attachments, browser data, and team data stay on the computer that
   runs OpenBot. Providers, visited pages, and plugins can use the network.
-- **No cloud dependency for core function.** The app works without an account.
-  Cloudflare holds accounts, avatars, host configuration,
-  memberships, invitations, and logical sessions; it does not hold chats, files, or commands.
+- Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
+  sessions; it does not hold chats, files, or commands.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.

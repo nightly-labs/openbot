@@ -44,6 +44,7 @@ export function testConversationProps(agentId: string): ConversationProps {
     server: undefined,
     presence: { serverId: null, members: [], updatedAt: "" },
     currentUserEmail: "",
+    isOwnSender: () => true,
     remoteDesktopSessionActive: false,
     remoteDesktopVisible: false,
     prompt: undefined,

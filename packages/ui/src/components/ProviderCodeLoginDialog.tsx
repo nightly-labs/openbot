@@ -22,7 +22,19 @@
  * be a second copy of it. That also makes every phase reachable in Storybook.
  */
 
-import { Button, CopyButton, Dialog, ExternalLink, IconButton, QrCode, Spinner, Text, X } from "@openbot/ui";
+import {
+  Button,
+  CopyButton,
+  Dialog,
+  ExternalLink,
+  Field,
+  IconButton,
+  Input,
+  QrCode,
+  Spinner,
+  Text,
+  X,
+} from "@openbot/ui";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../text";
 
@@ -47,6 +59,22 @@ export type ProviderCodeLoginState =
       /** Epoch milliseconds. The countdown, and the moment the code stops working. */
       expiresAt: number;
     }
+  /**
+   * The provider's page shows a code after the user signs in there, and the user pastes it back
+   * here (Claude on a host with no visible browser). The pasted code is a credential: it goes to the
+   * provider's CLI and is not kept.
+   */
+  | {
+      phase: "paste";
+      /** The provider's sign-in page. */
+      verificationUrl: string;
+      /** Epoch milliseconds. When the host stops waiting for the code. */
+      expiresAt: number;
+      /** The code is on its way to the provider. */
+      submitting?: boolean;
+      /** Why the last code did not go through, in the user's words. */
+      error?: string;
+    }
   /** The code was accepted on the other device; OpenBot is finishing the sign-in. */
   | { phase: "verifying" };
 
@@ -59,14 +87,26 @@ export interface ProviderCodeLoginDialogProps {
   onOpenVerificationUrl: (url: string) => void;
   /** Gives up: closes the dialog and abandons the code. */
   onCancel: () => void;
+  /** Sends the code a `paste` sign-in's page showed. */
+  onSubmitCode?: (code: string) => void;
 }
 
 export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
   const { t } = useText();
   const waiting = () => (props.state.phase === "waiting" ? props.state : null);
+  const pasting = () => (props.state.phase === "paste" ? props.state : null);
+  // The field keeps what the user pasted until the dialog closes, so a refused code can be fixed.
+  const [pastedCode, setPastedCode] = createSignal("");
+  // A new sign-in has a new page, and the code of the last one is no use to it.
+  createEffect(
+    () => pasting()?.verificationUrl,
+    () => {
+      setPastedCode("");
+    },
+  );
   // The clock only runs while a code is on screen, so an open dialog on any other phase does not
   // wake the view once a second for a label nothing shows.
-  const remaining = createCountdown(() => waiting()?.expiresAt ?? null);
+  const remaining = createCountdown(() => waiting()?.expiresAt ?? pasting()?.expiresAt ?? null);
 
   return (
     <Dialog.Root
@@ -158,6 +198,65 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                 )}
               </Show>
 
+              <Show when={pasting()}>
+                {(paste) => (
+                  <div class="provider-code-login-code">
+                    <QrCode
+                      value={paste().verificationUrl}
+                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
+                      size={160}
+                    />
+
+                    <ol class="provider-code-login-steps">
+                      <li>
+                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
+                        {/* The whole link carries a long sign-in state, so only its page is shown. */}
+                        <Button
+                          class="provider-code-login-url"
+                          type="button"
+                          variant="link"
+                          onClick={() => props.onOpenVerificationUrl(paste().verificationUrl)}
+                        >
+                          {shortUrl(paste().verificationUrl)}
+                          <ExternalLink aria-hidden="true" />
+                        </Button>
+                      </li>
+                      <li>
+                        <Text as="span">{t("provider.codeLogin.pasteStep", { name: props.providerName })}</Text>
+                      </li>
+                    </ol>
+
+                    <form
+                      class="provider-code-login-paste"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const code = pastedCode().trim();
+                        if (code && !paste().submitting) props.onSubmitCode?.(code);
+                      }}
+                    >
+                      <Field label={t("provider.codeLogin.pasteLabel")} error={paste().error}>
+                        <Input
+                          value={pastedCode()}
+                          autocomplete="off"
+                          spellcheck={false}
+                          disabled={paste().submitting}
+                          onValueChange={setPastedCode}
+                        />
+                      </Field>
+                      <Button type="submit" disabled={!pastedCode().trim() || paste().submitting}>
+                        {t("provider.codeLogin.pasteSubmit")}
+                      </Button>
+                    </form>
+
+                    <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
+                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
+                        {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
+                      </Show>
+                    </Text>
+                  </div>
+                )}
+              </Show>
+
               <Show when={props.state.phase === "verifying"}>
                 <div class="provider-code-login-pending" role="status">
                   <Spinner size="sm" />
@@ -208,6 +307,12 @@ function createCountdown(deadline: () => number | null) {
     const until = deadline();
     return until === null ? 0 : Math.max(0, Math.ceil((until - now()) / 1_000));
   });
+}
+
+/** The host and path of a link, without the query that carries its sign-in state. */
+function shortUrl(url: string): string {
+  const parsed = new URL(url);
+  return `${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}`;
 }
 
 function formatCountdown(seconds: number): string {

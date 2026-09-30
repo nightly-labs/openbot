@@ -56,6 +56,7 @@ import {
   type SetProviderApiKeyInput,
   type SharedTable,
   type StorageUsage,
+  type SubmitProviderCodeLoginInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
@@ -73,6 +74,7 @@ import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
+import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/providers-v3";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -270,12 +272,19 @@ export function clearStorage(request: TeamApiRequest, input: ClearStorageInput):
   return request("POST", STORAGE_ROUTES.clear, ignoreResponse, { ...input });
 }
 
+/**
+ * The sign-in routes of a host: `providers-v3` signs in Codex, Claude and Grok, and `providers-v1`
+ * Codex only. The caller picks by the host's capabilities.
+ */
+export type ProviderCodeLoginRoutes = typeof PROVIDERS_SIGN_IN_V3_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+
 /** The verification URL is https, or the reply is refused. */
 export function startProviderCodeLogin(
   request: TeamApiRequest,
   provider: AgentProviderId,
+  routes: ProviderCodeLoginRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Promise<ProviderCodeLoginStart> {
-  return request("POST", PROVIDERS_ADMIN_ROUTES.codeLoginStart, decodeProviderCodeLoginStart, { provider });
+  return request("POST", routes.codeLoginStart, decodeProviderCodeLoginStart, { provider });
 }
 
 /** A change, then the host's status, so the result is the `AgentStatus` a local change gives. */
@@ -284,8 +293,20 @@ async function providerChange(request: TeamApiRequest, path: string, body: TeamP
   return request("GET", TEAM_API_ROUTES.agents.status, decodeAgentStatus);
 }
 
-export function cancelProviderCodeLogin(request: TeamApiRequest, provider: AgentProviderId): Promise<AgentStatus> {
-  return providerChange(request, PROVIDERS_ADMIN_ROUTES.codeLoginCancel, { provider });
+/** `providers-v3` only. The code is a credential: it goes in the body, and no reply carries it. */
+export function submitProviderCodeLogin(
+  request: TeamApiRequest,
+  input: SubmitProviderCodeLoginInput,
+): Promise<AgentStatus> {
+  return providerChange(request, PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit, { ...input });
+}
+
+export function cancelProviderCodeLogin(
+  request: TeamApiRequest,
+  provider: AgentProviderId,
+  routes: ProviderCodeLoginRoutes = PROVIDERS_ADMIN_ROUTES,
+): Promise<AgentStatus> {
+  return providerChange(request, routes.codeLoginCancel, { provider });
 }
 
 /** Only the key's state comes back; no reply carries the key. */

@@ -1,0 +1,24 @@
+.github-connector-repositories {
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+/* A long list scrolls inside the card, so Disconnect stays near the top of the tab. */
+.github-connector-repository-list {
+  display: grid;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.github-connector-repository {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  /* The same height with and without the Private badge. */
+  min-height: 28px;
+}

@@ -902,15 +902,10 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     timeoutMs?: number,
   ): Promise<T> {
     if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
-    return this.#request(
-      path,
-      {
-        ...init,
-        headers: { ...init.headers, Authorization: `Bearer ${this.#sessionToken}` },
-      },
-      decoder,
-      timeoutMs,
-    );
+    // A spread drops the entries of a `Headers` object, such as the hosting developer key.
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${this.#sessionToken}`);
+    return this.#request(path, { ...init, headers }, decoder, timeoutMs);
   }
 
   #resolveUserAvatar(user: CentralAuthUser): CentralAuthUser {

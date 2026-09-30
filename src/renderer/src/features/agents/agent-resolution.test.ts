@@ -25,27 +25,26 @@ const options: AgentModelOption[] = [
 describe("resolveCreationModel", () => {
   it("keeps the saved provider and model while the catalog lists them", () => {
     expect(
-      resolveCreationModel(
-        { completed: true, preferredProvider: "opencode", preferredModel: "opencode/example-free" },
-        options,
-      ),
+      resolveCreationModel({ preferredProvider: "opencode", preferredModel: "opencode/example-free" }, options),
     ).toEqual({ provider: "opencode", model: "opencode/example-free" });
   });
 
   it("falls back to the saved provider default when the saved model is gone", () => {
-    expect(
-      resolveCreationModel({ completed: true, preferredProvider: "codex", preferredModel: "gpt-5.6-retired" }, options),
-    ).toEqual({ provider: "codex", model: "gpt-5.6-luna" });
+    expect(resolveCreationModel({ preferredProvider: "codex", preferredModel: "gpt-5.6-retired" }, options)).toEqual({
+      provider: "codex",
+      model: "gpt-5.6-luna",
+    });
   });
 
   it("moves to the first listed provider when the saved one lists nothing", () => {
-    expect(
-      resolveCreationModel({ completed: true, preferredProvider: "claude", preferredModel: null }, options),
-    ).toEqual({ provider: "codex", model: "gpt-5.6-luna" });
+    expect(resolveCreationModel({ preferredProvider: "claude", preferredModel: null }, options)).toEqual({
+      provider: "codex",
+      model: "gpt-5.6-luna",
+    });
   });
 
   it("returns null while the catalog is empty", () => {
-    expect(resolveCreationModel({ completed: true, preferredProvider: "codex", preferredModel: null }, [])).toBeNull();
+    expect(resolveCreationModel({ preferredProvider: "codex", preferredModel: null }, [])).toBeNull();
   });
 });
 

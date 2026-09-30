@@ -88,6 +88,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
   const [billingReturn, setBillingReturn] = createSignal(takeBillingReturn());
   const [hostingReturn, setHostingReturn] = createSignal(takeHostingReturn());
+  // The loading screen stays over the app until its exit ends.
+  const [loadingShown, setLoadingShown] = createSignal(true);
   let channel: BroadcastChannel | null = null;
   let disposed = false;
   let sessionGeneration = 0;
@@ -278,7 +280,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     >
       <div class="web-app">
         <Toaster />
-        <Show when={state.loaded} fallback={<AppLoadingScreen variant={variant} />}>
+        <Show when={state.loaded}>
           <Show
             keyed
             when={state.account?.id}
@@ -324,6 +326,9 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
               />
             )}
           </Show>
+        </Show>
+        <Show when={loadingShown()}>
+          <AppLoadingScreen ready={state.loaded} onExited={() => setLoadingShown(false)} />
         </Show>
       </div>
     </StaticI18nProvider>

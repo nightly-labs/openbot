@@ -179,6 +179,8 @@ export const messages = {
   "mobile.chat.exchange.messaged": "Message envoyé à",
   "mobile.chat.exchange.messageFrom": "Message de",
   "mobile.chat.exchange.assignedTo": "Attribué à",
+  "mobile.chat.speaker.superseded": "{name} · Remplacé",
+  "mobile.chat.speaker.memberFallback": "Membre de l’équipe",
   "mobile.chat.exchange.continuingWith": "Suite avec",
   "mobile.chat.exchange.unavailableAgent": "Agent non disponible",
   "mobile.chat.exchange.unknownAgent": "Agent inconnu",

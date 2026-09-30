@@ -48,6 +48,7 @@ import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
+import { githubConnectorIpcHandlers } from "./ipc/github-connector-handlers";
 import { hostAdminIpcHandlers } from "./ipc/host-admin-handlers";
 import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
@@ -251,6 +252,7 @@ const {
   forwardUpdatePreference,
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
+  forwardGitHubConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -407,6 +409,7 @@ function registerIpcHandlers({
   centralAuth,
   skills,
   hostedSites,
+  githubConnector,
   billing,
   hostedServers,
   customProviderChanges,
@@ -459,6 +462,7 @@ function registerIpcHandlers({
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow, translate: language.translate }),
+    ...githubConnectorIpcHandlers({ githubConnector }),
     ...billingIpcHandlers({ billing }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
@@ -822,6 +826,7 @@ if (!hasSingleInstanceLock) {
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
+      built.githubConnector.onChanged(forwardGitHubConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);

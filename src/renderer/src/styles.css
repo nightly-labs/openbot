@@ -13,7 +13,9 @@
 @import "@openbot/ui/features/sidebar/sidebar-mobile-app.css";
 @import "./styles/base.css";
 @import "@openbot/ui/features/account/auth.css";
+@import "@openbot/ui/features/account/app-loading-screen.css";
 @import "./features/onboarding/onboarding.css";
+@import "./features/startup/startup-splash.css";
 @import "@openbot/ui/features/agents/first-agent-setup.css";
 @import "./styles/app-shell.css";
 @import "./features/account/account-update-island.css";
@@ -34,6 +36,7 @@
 @import "./features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
+@import "@openbot/ui/features/settings/github-connector.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";

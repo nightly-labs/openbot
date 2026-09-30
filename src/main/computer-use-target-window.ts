@@ -37,9 +37,12 @@ export interface ComputerUseHighlightTarget {
  * How long after its last action a session still counts as holding the desktop.
  *
  * The daemon keeps a lease alive for five minutes after the last call, which is far longer than the
- * rim should outlive the work. The rim is a claim about now, so it follows the last action closely.
+ * rim should outlive the work. It must also outlast the model's thinking between two actions: a
+ * model step can take longer than fifteen seconds, and a rim that drops out between steps flickers
+ * through the whole turn. The rim goes down with the turn in any case, so this only
+ * limits how long an idle agent inside a running turn keeps it.
  */
-const LIVE_SESSION_IDLE_SECONDS = 15;
+const LIVE_SESSION_IDLE_SECONDS = 60;
 
 /**
  * How recently a session must have acted for a change of front window to count as the agent's.
@@ -82,7 +85,8 @@ export interface LiveSession {
  * that lease is left out by its name and by the kind a command line reports. The busiest of the
  * rest wins, because the rim follows the agent that acts, not the one that stopped a moment ago.
  */
-export function liveSession(payload: unknown): LiveSession | null {
+export function liveSession(payload: unknown, maxIdleSeconds = LIVE_SESSION_IDLE_SECONDS): LiveSession | null {
+  const limit = Math.min(maxIdleSeconds, LIVE_SESSION_IDLE_SECONDS);
   if (!isDynamicRecord(payload) || !Array.isArray(payload.sessions)) return null;
   let busiest: LiveSession | null = null;
   for (const entry of payload.sessions) {
@@ -91,7 +95,7 @@ export function liveSession(payload: unknown): LiveSession | null {
     if (entry.state !== "active") continue;
     const idle = entry.idle_seconds;
     const idleSeconds = typeof idle === "number" ? idle : 0;
-    if (idleSeconds > LIVE_SESSION_IDLE_SECONDS) continue;
+    if (idleSeconds > limit) continue;
     if (!busiest || idleSeconds < busiest.idleSeconds) busiest = { idleSeconds };
   }
   return busiest;
@@ -106,6 +110,11 @@ export interface TargetChoice {
   ownPid: number;
   /** The window the rim is on now, which the choice holds on to while it can. */
   previous: ComputerUseHighlightTarget | null;
+  /**
+   * One driver rectangle in the units the overlays draw in. Applied to every window before any
+   * size or overlap is measured, so the covered strips still meet edge to edge after it.
+   */
+  toDesktop?: (bounds: Rectangle) => Rectangle;
 }
 
 /**
@@ -126,9 +135,10 @@ export function chooseTarget({
   action,
   ownPid,
   previous,
+  toDesktop,
 }: TargetChoice): ComputerUseHighlightTarget | null {
   if (!session) return null;
-  const visible = visibleWindows(windows, ownPid);
+  const visible = visibleWindows(windows, ownPid, toDesktop);
   const candidates = workableWindows(visible);
   const acted = actedWindow(candidates, action);
   if (acted) return asTarget(acted, visible);
@@ -250,10 +260,15 @@ function frontWindow(candidates: readonly DriverWindow[]): DriverWindow | null {
  * Both of those are drawn over the desktop by this feature itself, so either one would otherwise
  * be taken for the window an agent works in.
  */
-function visibleWindows(payload: unknown, ownPid: number): DriverWindow[] {
-  return readWindows(payload).filter(
+function visibleWindows(
+  payload: unknown,
+  ownPid: number,
+  toDesktop?: (bounds: Rectangle) => Rectangle,
+): DriverWindow[] {
+  const visible = readWindows(payload).filter(
     (window) => window.pid !== ownPid && window.appName !== DRIVER_OVERLAY_APP && window.onScreen,
   );
+  return toDesktop ? visible.map((window) => ({ ...window, bounds: toDesktop(window.bounds) })) : visible;
 }
 
 /** Of those, the windows an agent could work in: on this Space and big enough to hold work. */

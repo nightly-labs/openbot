@@ -92,4 +92,10 @@ export const messages = {
   "onboarding.action.connect": "接続",
   "onboarding.action.open": "OpenBot を開く",
   "onboarding.action.next": "次へ",
+  "onboarding.server.title": "{server} をセットアップ",
+  "onboarding.server.description":
+    "OpenBot には AI のサブスクリプションが含まれていません。エージェントを作成する前に、このサーバーにご自身のプロバイダーを接続してください。",
+  "onboarding.server.label": "このサーバーの AI プロバイダーを選択",
+  "onboarding.server.hint": "サインイン情報はサーバーに保存されます。各エージェントのプロバイダーは後で変更できます。",
+  "onboarding.server.continue": "続行",
 } as const satisfies PartialTranslation<typeof source>;

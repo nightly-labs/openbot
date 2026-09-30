@@ -162,10 +162,18 @@ interface TeamApiHostIdentity {
 }
 
 interface TeamApiProviders {
-  service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
+  service: Pick<
+    AgentService,
+    "startProviderCodeLogin" | "submitProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential"
+  >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
   customProviders: PeerCustomProviderChanges;
+  /**
+   * Whether this host can run the Claude pasted-code sign-in. `providers-v3` promises it, so a host
+   * that cannot does not advertise `providers-v3`, and its clients keep the Codex-only `providers-v1`.
+   */
+  pasteSignIn: boolean;
 }
 
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;

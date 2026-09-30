@@ -79,6 +79,8 @@ export const messages = {
   "error.agent.computerUseLocalOnly": "Computer Use ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.workspaceOnlyMacOnly":
     "« Espace de travail uniquement » n’est disponible pour ce fournisseur que sur macOS. Choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.lowMemory":
+    "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre. Une offre plus grande donne plus de mémoire au serveur.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
 } as const satisfies PartialTranslation<typeof source>;

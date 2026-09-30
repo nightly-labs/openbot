@@ -2,7 +2,7 @@
 
 A hosted server is an OpenBot server that runs in a [boat](https://boat.dev) sandbox, so it works
 when the user's computer is off. Each server is one boat sandbox for one account. The sandbox runs
-the Linux build of OpenBot under Xvfb. The server runs while it is in use. After 15 minutes with no
+the Linux build of OpenBot on the boat desktop. The server runs while it is in use. After 15 minutes with no
 use, the Worker stops it and keeps its data. The next client starts it again, and the Worker cron
 starts it before its next routine run. A connected client counts as use for 1 hour after its last
 request or typing event (`CLIENT_USE_WINDOW_MS`). A desktop app that is open in the background keeps
@@ -26,6 +26,7 @@ has its own Stripe plan. Its machine comes from the plan
 | Server bootstrap | `src/main/hosted-server-bootstrap.ts` | On the first start, redeems the claim, signs in, and publishes the host. |
 | Start retry | `src/main/hosted-server-start-retry.ts` | Publishes the host again after a failed start. |
 | Activity report | `src/main/hosted-server-activity.ts` | Tells the Worker that the server is in use, and when its next routine runs. |
+| Memory guard | `src/main/hosted-server-memory.ts`, `src/backend/agent/memory-hold.ts`, `turn-slots.ts` | Reads the memory of the server, holds new turns when it is low, and limits the turns that run at the same time. See [Memory](#memory). |
 | Billing link | `apps/auth-api/src/server/hosted-billing.ts`, `billing-service.ts` | Opens Stripe Checkout for a new server. Tells the hosting service when a subscription changes. |
 | Desktop and web clients | `AddServerOverlay`, `SettingsHostedServersTab`, `hosted-server-service.ts`, `web-hosted-servers.ts`, `web-hosted-server-wake.ts` | Pick a plan, pay, list, start, renew and delete. The web app shows the list in Billing. Start a stopped server when a connection fails. |
 | Mobile client | `mobile-workspace-context.tsx` | Starts the selected stopped server when a connection fails. |
@@ -129,8 +130,9 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    shorter interval starts at the next period. The Worker copies the new plan, interval and currency
    to the server. boat changes the machine of a sandbox only on a resume (`type`), so the Worker
    stops a running server (boat saves the disk) and resumes it on the machine of the new plan. The
-   server is offline for this time. The cron does this for a server that was not running at the
-   plan change. When the data does not fit a smaller machine, boat refuses it
+   server is offline for this time, so the Worker waits until the server has no use: no activity
+   report for 7 minutes (a server in use reports each 5 minutes). A server that stops for no use,
+   or that was not running at the plan change, gets the new machine at its next resume. When the data does not fit a smaller machine, boat refuses it
    (`409 type_too_small`); the server then starts on its old machine, and the Worker does not try
    again until the next plan change.
 9. **Delete.** `DELETE /v2/hosting/servers/:id` with `{confirmName}`. The Worker first closes the
@@ -139,6 +141,16 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    Then it cancels the open plan now, with no refund. A Stripe failure stops the delete (502), so
    the user does not pay for a deleted server. Then it deletes the sandbox and its Remote host. The D1 row stays with `desired_state = 'deleted'`, so a sandbox is never
    left without a record.
+
+## Providers
+
+OpenBot ships no AI subscription, so a new server has no provider connected. When its owner or an
+admin opens a server with no agent, the app shows a provider step before the first-agent form. The
+sandbox browser is on Xvfb, where nobody can see it, so each sign-in finishes on the user's own device
+over `providers-v3`: Codex and Grok show a device code, and Claude shows a page whose code the user
+pastes back into the app. The Claude sign-in runs under `script` from util-linux (package
+`bsdutils`, in every Ubuntu and Debian image). See
+[Admin capabilities](ARCHITECTURE.md#admin-capabilities) for the routes.
 
 ## Members
 
@@ -221,8 +233,9 @@ servers, their webhooks and the cron continue.
    seconds.
 2. **Template.** Build it from the release AppImage with the production account service:
    `bun run hosting:template --version=<v> --appimage-url=<release AppImage URL>
-   --appimage-sha256=<hex> --auth-api-url=https://api.openbot.run`. Build a new template for each
-   release. A new template applies only to new servers.
+   --appimage-sha256=<hex> --auth-api-url=https://api.openbot.run`. A server updates itself to
+   each new release ([Updates](#updates)), so a new template only makes the first start of a new
+   server faster.
 3. **Webhooks and secrets.** Put the live Stripe key and the Worker boat key in the shell, so they
    are not in the history, and run the setup with `gh` signed in:
 
@@ -262,7 +275,7 @@ use, and the checks that repair a missed webhook run at most 5 minutes late.
 
 ## Build the server template
 
-The template is a boat named snapshot. Build one for each OpenBot release that servers use:
+The template is a boat named snapshot. Build one from a release; each server then updates itself:
 
 ```sh
 BOAT_TEMPLATE_API_KEY=... bun run hosting:template --version=0.9.0 \
@@ -274,20 +287,70 @@ BOAT_TEMPLATE_API_KEY=... bun run hosting:template --version=0.9.0 \
 named snapshot access. The script:
 
 1. creates a builder sandbox with `noEnv`;
-2. uploads `scripts/hosting/` and runs `provision.sh` with `sudo`. It installs Xvfb, D-Bus,
-   gnome-keyring and the Electron libraries, checks the AppImage SHA-256, unpacks the AppImage to
-   `/opt/OpenBot/app`, adds an AppArmor profile that lets Chromium make user namespaces, and
-   enables `openbot.service`;
+2. uploads `scripts/hosting/` and runs `provision.sh` with `sudo`. It installs the packages in
+   `packages.txt` (Xvfb, D-Bus, gnome-keyring, the Electron libraries and the remote desktop runtime
+   libraries), checks the AppImage SHA-256, unpacks the AppImage to `/opt/OpenBot/app`, adds an
+   AppArmor profile that lets Chromium make user namespaces, and enables `openbot.service` and the
+   [update](#updates) units;
 3. checks that OpenBot did not start and that no profile or claim exists;
 4. saves the builder as `openbot-server-<version>` and deletes the builder.
 
-The builder never starts OpenBot, so the template has no host identity and no session. A new
-template applies only to new servers. boat keeps at most 10 named snapshots for each account.
+The builder never starts OpenBot, so the template has no host identity and no session. boat keeps
+at most 10 named snapshots for each account.
+
+### Updates
+
+The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
+On a server, root runs `openbot-hosted-update`:
+
+1. `openbot-update.timer` runs `stage` 5 to 10 minutes after each start of the timer and then
+   about each 6 hours. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
+   latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
+   AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
+   all hosting files, installs the packages in the `packages.txt` of that release, and copies it
+   to `/opt/OpenBot/staged`.
+   `staged.ready` comes after the last file. OpenBot keeps running. The download and unpack use
+   idle CPU and disk priority.
+2. `openbot-update-apply.service` runs `apply` at boot, before `openbot.service`. boat stop and resume
+   work like a reboot, so the new release starts at the next wake of the server, not during use. It
+   copies `staged` to `app`, and then installs the scripts, AppArmor profile and units of the new
+   release. `.applying` and `staged` stay until all of this is complete, so after a stop or a
+   failure the next boot does it again, and `stage` does nothing until then. `openbot.service`
+   does not require `apply`, so it starts after a failure too: with the old release, or with a
+   partial copy after a failed copy, until the next boot.
+
+boat saves `/opt` by the paths that change, and it does not look into a directory that a rename
+moves. After the next stop, such a directory is empty or has its old files. So a release gets to
+`/opt` only as a copy of each file, never with `mv`. A file rename is safe. [Observed on a boat VM
+with a probe; not in boat documentation.]
+
+boat resumes a server on a machine that booted before, restores the disk lazily, and starts the
+units before the restore ends. `stage` waits until the restore ends (at most 4 minutes). `apply`
+waits only when it finds `staged.ready` or `.applying`, because OpenBot starts after it. When the
+restore does not show a staged release yet, the release applies at the next boot.
+[Not confirmed in boat documentation: the `active` and `hydration-done` files in
+`/var/lib/ascii-lazy` that mark the restore. Observed on a boat VM.] `apply` never removes a staged
+release that is not complete.
+
+A server only moves to a newer version: an older OpenBot cannot open a database that a newer one
+migrated. `stage` stops when it cannot read the installed version, and `provision.sh` stops when the
+installed version is newer. A staged release that is no longer the latest one, for example a
+withdrawn release, is removed at the next `stage` run. A server that starts before that run applies
+it. A release without all of its `resources/hosting` files cannot update a server.
+
+A server that has no updater, such as one made from a template before 0.26.0, needs one upgrade by
+hand. With a boat key that has command and file access: upload `scripts/hosting/` to
+`/tmp/openbot-upgrade`, run `sudo systemctl stop openbot.service`, run `sudo bash /tmp/openbot-upgrade/provision.sh user <AppImage URL> <SHA-256>
+https://api.openbot.run` as a detached command, and start the service again. The data in the home
+folder and in `/srv` stays.
 
 On a server, `openbot-hosted-server` starts a D-Bus session, unlocks a gnome-keyring with a
 random password for each server (so `safeStorage` can keep the account session), and runs OpenBot
-under `xvfb-run` with `--password-store=gnome-libsecret`. The keyring files are in
-`/srv/openbot-hosted/keyrings`:
+with `--password-store=gnome-libsecret`. OpenBot uses the boat desktop: the lightdm session of the
+sandbox user on `:0`, with openbox. So boat's desktop viewer and OpenBot remote desktop show the same
+screen, and a click moves the keyboard focus to another window. After a resume, the script waits up
+to 2 minutes for that session. With no session, OpenBot runs under `xvfb-run`. The keyring files are
+in `/srv/openbot-hosted/keyrings`:
 
 - not in `~/.local/share/keyrings`: the boat image has a locked `default` keyring there, and a
   snapshot restore resets that folder after the service starts;
@@ -312,6 +375,60 @@ each claim, so a VM that has no working session cannot sign in after the change;
 A start that cannot reach the account server does not use the claim. The start retry signs in
 again with backoff (30 s to 10 min) and then publishes the host.
 
+## Memory
+
+One systemd unit holds OpenBot, its browser tabs and every agent process: one `claude` process for
+each thread, and one set of MCP servers for each ACP session. A Starter server has 4 GB. The guards
+are only on a hosted server; the desktop app does not change.
+
+The unit (`openbot.service`):
+
+- `MemoryMax=90%`: the unit can use at most 90% of the memory, so 10% stays for the desktop, sshd
+  and the boat agent. The limit counts memory only, not swap. The boat image has a 2 GB swap file,
+  so a process that grows first fills the swap, and then the kernel's own OOM killer acts, not the
+  one of the unit. It also picks the process with the highest value, as below.
+- `OOMScoreAdjust=-500` for main. Every 5 s, main gives each process that it starts an
+  `oom_score_adj` of 500. So the OOM killer picks a provider CLI, an MCP server or an agent tool
+  before main. The processes of the Electron binary do not change: Chromium sets the values of its
+  renderers and GPU process, and its zygotes keep -500, because a new renderer starts from them.
+- `OOMPolicy=continue`: one killed agent process does not stop the unit.
+- `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
+  A Starter server then has 3.9 GB of memory and 3.9 GB of swap: the 2 GB file on disk and 1.9 GB of
+  zram. zram keeps its pages compressed in the same memory, about 3 to 1 for program memory, so it
+  gives about 1.3 GB more. The unit can use all of the swap (no `MemorySwapMax`). The swap holds
+  idle memory, such as hidden browser tabs. A swap limit, or a lower `MemoryMax`, gives the agents
+  less memory and does not protect main more: the memory test below shows the same victim in each
+  case.
+
+The app (`HostedServerMemory`) reads the memory every 5 s. The free memory is the smaller of
+`MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
+plus `inactive_file` from `memory.stat`: the kernel takes that file cache back before the OOM killer
+acts). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
+do not all pass the check before their processes grow. A start that fails counts nothing.
+
+| Level | When | What happens |
+| --- | --- | --- |
+| `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
+| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. |
+| `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. |
+
+When the level is `ok` again, each held message starts. If a file cannot be read, the level stays
+`ok` and main logs one warning.
+
+Only a fixed number of turns run at the same time, from the memory of the server: 4 up to 5 GiB,
+8 up to 10 GiB, and 16 above. A turn that starts, runs, or compacts the context uses a slot. When
+the slots are full, the messages wait in the queue: a message from a person starts first, then
+routine runs and teammate messages, and the oldest first in each group. No turn waits for a slot
+that another turn holds, because a message to a teammate ends the turn that sends it. A queued
+message counts as use, so the server does not stop while messages wait.
+
+An agent's browser tab that nobody uses for 30 minutes unloads its page and keeps a blank page, as a
+restored tab does. The tab stays in the list with its URL, title and last preview. The next use by the agent or
+a person loads the page again, without its history and page state. When memory is `low`, a tab
+unloads after 5 minutes. The active tab, a popup and its opener, and a tab with a
+takeover, a secret, a recording, a live view, staged uploads or sound do not unload. This also
+applies to the desktop app.
+
 ## Tested on boat
 
 The `boat` scenario of `scripts/stripe-flows-e2e.ts` (see `apps/auth-api/README.md`) passed on
@@ -335,6 +452,34 @@ and a resume with `type`) confirmed that boat changes the machine in place with 
 ID (2 vCPU/4 GB, then 4 vCPU/8 GB, then 2 vCPU/4 GB). Files in `/srv` and in the home folder stayed,
 and an enabled systemd unit started again after each resume. The stop took 25 to 31 s, and the
 sandbox was `idle` 3 to 6 s after the resume call.
+
+A memory test on 2026-09-30 (one `small` sandbox with `noEnv`, the scripts and the Linux AppImage of
+main, and a `HostedServerMemory` driver in a unit with the same limits as `openbot.service`)
+confirmed:
+
+- boat VMs use cgroup v2 with the memory controller, and the unit gets `memory.max` = 90% (3.4 GiB);
+- the kernel has zram. `provision.sh` adds `/dev/zram0` (1.9 GB, priority 100) in front of the
+  2 GB swap file of the image, and it is active again after a stop and a resume;
+- the level went `ok`, `low`, `critical` and back to `ok` while a child process grew by 64 MB/s;
+- the OOM killer killed the child (`oom_score_adj` 500), not the driver (-500). The unit stayed
+  active. The kill was the kernel's own (`global_oom`), after the child filled the swap, and not the
+  unit limit;
+- the app in hosted mode gives 500 to `cua-driver`, and keeps -500 for main.
+
+A swap test on 2026-09-30 (one `small` sandbox, systemd 255, the zram setup of `provision.sh`, and a
+child at 500 in a unit at -500 that takes 32 MB each 250 ms) compared unit limits:
+
+| `MemoryMax` | `MemorySwapMax` | Unit swap at the kill | OOM killer |
+| --- | --- | --- | --- |
+| 90% | none (the unit now) | 3.7 GiB | the kernel's |
+| 90% | 10% | 392 MiB | the kernel's |
+| 80% | 10% | 392 MiB | the kernel's |
+| 75% | 10% | 392 MiB | the unit's |
+
+In each case the killer took the child at 500, and the unit, its other process and sshd stayed.
+`MemorySwapMax` takes a percentage of all swap. The processes outside the unit use about 665 MB
+(17% of the memory), so above about 75% the machine is full before the unit is. The unit's own killer
+is not necessary, because the kernel's also picks the process with the highest value.
 
 A boat trial account refuses a sandbox with no auto-stop, or a TTL longer than 2 hours
 (`trial_auto_stop_required`), and the Worker shows it as `provider_billing`. The Worker sends a
@@ -363,5 +508,7 @@ These were not tested on boat. Test them before a user gets access:
 - that boat frees the key of a refused create, so a retry of a setup that failed works;
 - the menu path of the Stripe failed-payment setting in [Production](#production), and whether test
   mode and live mode keep separate values;
+- the [memory guards](#memory) with real agents: the held message, the turn slots and the release of
+  idle provider threads on a server with a signed-in account;
 - whether boat stops a sandbox that runs for weeks. The Worker restarts it, but work in progress
   at that time stops.

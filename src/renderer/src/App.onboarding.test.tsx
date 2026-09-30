@@ -1,11 +1,79 @@
-import type { AgentStatus } from "@openbot/contracts/ipc";
+import type { AgentStatus, ProviderRuntimeStatus, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
-import { emitAgentEvent, emitAuth, emitInvite, installOpenbotStub, trackAnalytics } from "./app-test-harness";
+import {
+  emitAgentEvent,
+  emitAuth,
+  emitInvite,
+  installOpenbotStub,
+  testServer,
+  trackAnalytics,
+} from "./app-test-harness";
 
 /** A model of a custom endpoint, which only the first-run flow can choose. */
 const CUSTOM_ENDPOINT_MODEL = "opencode/local-studio/qwen3-coder";
+
+/** A new server that this account owns: its host has every CLI and no sign-in. */
+function newOwnedServer(role: ServerSummary["role"]): AgentStatus {
+  const server: ServerSummary = {
+    ...testServer("remote-1", true),
+    role,
+    compatibility: {
+      localAppVersion: "0.0.0",
+      hostAppVersion: "0.0.0",
+      localProtocol: { minimum: 1, maximum: 4 },
+      hostProtocol: { minimum: 1, maximum: 4 },
+      negotiatedProtocol: 4,
+      capabilities: ["providers-v1", "providers-v3", "agent-create-model"],
+    },
+  };
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("local", false), server]);
+  vi.mocked(window.openbot.agent.listAgents).mockResolvedValue([]);
+  const hostStatus: AgentStatus = {
+    phase: "blocked",
+    cliVersion: null,
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "codex", state: "sign-in-required", version: "0.149.1", message: null },
+      { id: "claude", state: "sign-in-required", version: "2.1.263", message: null },
+      { id: "grok", state: "sign-in-required", version: "1.0.22", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  };
+  vi.mocked(window.openbot.agent.getStatus).mockResolvedValue(hostStatus);
+  const ready = (version: string): ProviderRuntimeStatus => ({ phase: "ready", progress: 100, message: null, version });
+  const none: ProviderRuntimeStatus = { phase: "not-downloaded", progress: null, message: null, version: null };
+  Object.assign(window.openbot.providerAdmin, {
+    getRuntimes: vi.fn().mockResolvedValue({
+      revision: 1,
+      providers: {
+        codex: ready("0.149.1"),
+        claude: ready("2.1.263"),
+        grok: ready("1.0.22"),
+        opencode: none,
+        antigravity: none,
+      },
+      toolRuntimes: { bun: none },
+    }),
+    listCustomProviders: vi.fn().mockResolvedValue([]),
+    getApiKeyState: vi.fn().mockResolvedValue({ provider: "opencode", hasKey: false }),
+    startCodeLogin: vi.fn().mockResolvedValue({
+      kind: "paste",
+      verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+      expiresAt: Date.now() + 600_000,
+    }),
+    submitCodeLogin: vi.fn().mockResolvedValue({
+      ...hostStatus,
+      providers: hostStatus.providers?.map((row) =>
+        row.id === "claude" ? { ...row, connectionState: "connecting" as const } : row,
+      ),
+    }),
+  });
+  return hostStatus;
+}
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -468,6 +536,59 @@ describe("OpenBot connected desktop shell", () => {
       }),
     );
     expect(await screen.findByRole("heading", { name: "New agent" })).toBeInTheDocument();
+  });
+
+  it("signs the host of a new owned server in to a provider before its first agent", async () => {
+    const hostStatus = newOwnedServer("owner");
+    render(() => <App />);
+
+    expect(await screen.findByRole("heading", { name: "Set up Studio Mac" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Create your first agent" })).not.toBeInTheDocument();
+    const providers = await screen.findByRole("radiogroup", { name: "Choose the AI provider of this server" });
+    await fireEvent.click(within(providers).getByRole("radio", { name: /Claude/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await waitFor(() => expect(window.openbot.providerAdmin.startCodeLogin).toHaveBeenCalledWith("claude", "remote-1"));
+
+    const dialog = await screen.findByRole("dialog");
+    await fireEvent.input(within(dialog).getByRole("textbox", { name: "Code from the page" }), {
+      target: { value: "pasted-code#state" },
+    });
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+    await waitFor(() =>
+      expect(window.openbot.providerAdmin.submitCodeLogin).toHaveBeenCalledWith(
+        { provider: "claude", code: "pasted-code#state" },
+        "remote-1",
+      ),
+    );
+    emitAgentEvent?.({
+      type: "status",
+      status: {
+        ...hostStatus,
+        phase: "ready",
+        providers: (hostStatus.providers ?? []).map((row) =>
+          row.id === "claude" ? { ...row, state: "available" as const, email: "ada@example.com" } : row,
+        ),
+      },
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Create your first agent" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.createAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "claude", model: expect.stringMatching(/^claude-/) }),
+      ),
+    );
+    expect(window.openbot.saveSetup).not.toHaveBeenCalled();
+  });
+
+  it("opens the first-agent form directly on a server where the account is a member", async () => {
+    newOwnedServer("member");
+    render(() => <App />);
+
+    expect(await screen.findByRole("heading", { name: "Create your first agent" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Set up Studio Mac" })).not.toBeInTheDocument();
   });
 
   it("blocks chat for signed-out users", async () => {

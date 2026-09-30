@@ -10,6 +10,7 @@ import {
   type CentralAuthState,
   type ComputerUseState,
   type ConversationPage,
+  DISCONNECTED_GITHUB_CONNECTOR,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
   type DynamicIslandAction,
@@ -570,6 +571,10 @@ export function installOpenbotStub(): void {
       listInstalled: vi.fn().mockResolvedValue([]),
     }),
     hostedSites: stubGroup(IPC_ENDPOINTS.hostedSites, "hostedSites", {}),
+    githubConnector: stubGroup(IPC_ENDPOINTS.githubConnector, "githubConnector", {
+      status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
+      repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
+    }),
     billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
     hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
       list: vi.fn().mockResolvedValue({ available: false, servers: [] }),

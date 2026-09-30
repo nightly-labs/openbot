@@ -155,6 +155,8 @@ export const messages = defineMessages("server", {
   "server.settings.storageDescription": "See what OpenBot keeps on this server’s disk, and free space.",
   "server.settings.importTitle": "Import",
   "server.settings.importDescription": "Move your agents from Grok Bot to this server.",
+  "server.settings.connectorsTitle": "Connectors",
+  "server.settings.connectorsDescription": "Connect accounts that every agent on this server can use.",
   "server.settings.nameTooShort": "Enter at least {limit} characters.",
   "server.settings.nameTooLong": "Use no more than {limit} characters.",
   "server.settings.actionFailedTitle": "Server action failed",

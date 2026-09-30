@@ -45,10 +45,18 @@ export class ChannelMemoryStore extends MemoryStore {
     return { ...memory, channelId };
   }
 
-  /** `channel_forget_memory` names the text, not an id: the model never sees a memory id. */
+  /**
+   * `channel_forget_memory` names the text, not an id: the model never sees a memory id. An exact,
+   * case-sensitive match wins first: `MemoryStore#save` does not merge entries that differ only by
+   * case, so two such entries can coexist, and forgetting one must not delete the other instead.
+   * Only when no exact match exists does this fall back to a case-insensitive match, since a model
+   * or user retypes the fact from memory rather than copying it verbatim.
+   */
   deleteByText(channelId: string, text: string): boolean {
     const target = text.trim();
-    const memory = this.list(channelId).find((entry) => entry.text === target);
+    const entries = this.list(channelId);
+    const exact = entries.find((entry) => entry.text === target);
+    const memory = exact ?? entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase());
     return memory ? this.delete(channelId, memory.id) : false;
   }
 }

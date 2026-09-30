@@ -19,6 +19,8 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // Japanese has one form for every count.
   ja: () => "other",
+  // CLDR: one is the integer 1.
+  tr: (count) => (count === 1 ? "one" : "other"),
 };
 
 const rulesByLocale = new Map<string, Intl.PluralRules>();

@@ -8,6 +8,7 @@ import type {
   AttachmentSummary,
   AvatarHue,
   ChannelRoutingConversationEvent,
+  ConversationMessageSender,
   ConversationPlan,
   ConversationQuestionPrompt,
   ConversationReaction,
@@ -128,6 +129,8 @@ export interface AgentMessage {
   kind?: MessageKind;
   status?: string;
   senderAgentId?: string;
+  /** The person who wrote a `you` message. Absent on the reader's own older messages. */
+  senderMember?: ConversationMessageSender;
   replyToMessageId?: string | null;
   attachments?: AttachmentSummary[];
   imageGeneration?: ImageGenerationInfo;

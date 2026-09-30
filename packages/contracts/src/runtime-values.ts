@@ -34,6 +34,16 @@ export function isDynamicRecord(value: unknown): value is DynamicRecord {
   return value !== null && isObjectValue(value) && !Array.isArray(value);
 }
 
+/** A string that parses as an `https:` URL. */
+export function isHttpsUrl(value: unknown): value is string {
+  if (!isString(value)) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function isOneOf<T extends string | number>(values: readonly T[], value: unknown): value is T {
   return values.some((candidate) => candidate === value);
 }

@@ -3,6 +3,12 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "Chargement d’OpenBot…",
+  "webClient.loadingLine.wake": "Réveil des agents…",
+  "webClient.loadingLine.coffee": "Café servi aux agents…",
+  "webClient.loadingLine.tokens": "On compte les jetons sur les doigts…",
+  "webClient.loadingLine.prompts": "On démêle les prompts…",
+  "webClient.loadingLine.sleepy": "On demande gentiment au dormeur…",
+  "webClient.loadingLine.almost": "Presque prêt. Probablement.",
   "webClient.login.failed": "La connexion a échoué.",
   "webClient.login.requestFailed": "La requête du compte a échoué.",
   "webClient.login.sessionFailed": "Impossible de vérifier cette session.",

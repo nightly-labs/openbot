@@ -63,7 +63,12 @@ describe("TeamApiServer agents", () => {
     expect(editQueuedMessage).not.toHaveBeenCalled();
     const accepted = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
     expect(accepted.status).toBe(200);
-    expect(editQueuedMessage).toHaveBeenCalledExactlyOnceWith("chief", input);
+    // The member who saves the edit becomes the sender of the new text.
+    expect(editQueuedMessage).toHaveBeenCalledExactlyOnceWith(
+      "chief",
+      input,
+      expect.objectContaining({ name: "owner" }),
+    );
     editQueuedMessage.mockRejectedValueOnce(new QueueEditRejectedError("Held by another device"));
     const rejected = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
     expect(rejected.status).toBe(409);
@@ -353,7 +358,12 @@ describe("TeamApiServer agents", () => {
       }),
     });
     expect(create.status).toBe(201);
-    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({ provider: "antigravity" }));
+    expect(createAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "antigravity" }),
+      undefined,
+      undefined,
+      expect.objectContaining({ id: expect.any(String) }),
+    );
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 

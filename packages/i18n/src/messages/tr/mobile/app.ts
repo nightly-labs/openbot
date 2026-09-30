@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/app";
+
+export const messages = {
+  "mobile.app.route.scanQrCode": "QR kodunu tara",
+  "mobile.app.route.actionsNeeded": "Gerekli işlemler",
+  "mobile.app.route.newChannel": "Yeni kanal",
+  "mobile.app.route.createAgent": "Ajan oluştur",
+  "mobile.app.route.addSharedAgent": "Paylaşılan bir ajan ekle",
+  "mobile.app.route.newSection": "Yeni bölüm",
+  "mobile.app.route.settings": "Ayarlar",
+  "mobile.app.route.profile": "Profil",
+  "mobile.app.route.general": "Genel",
+  "mobile.app.route.accountSessions": "Hesap oturumları",
+  "mobile.app.route.about": "Hakkında",
+  "mobile.app.route.hiddenChats": "Gizli sohbetler",
+  "mobile.app.route.deletedChannels": "Silinen kanallar",
+  "mobile.app.route.cropPhoto": "Taşı ve Ölçeklendir",
+  "mobile.app.route.queuedMessages": "Kuyruktaki mesajlar",
+  "mobile.app.route.messageOptions": "Mesaj seçenekleri",
+  "mobile.app.route.editMessage": "Mesajı düzenle",
+  "mobile.app.route.serverOptions": "Sunucu seçenekleri",
+  "mobile.app.route.members": "Üyeler",
+  "mobile.app.route.message": "Mesaj",
+  "mobile.app.messageActions.reply": "Yanıtla",
+  "mobile.app.messageActions.selectText": "Metni Seç",
+  "mobile.app.messageActions.copied": "Mesaj kopyalandı",
+  "mobile.app.messageActions.copy": "Mesajı kopyala",
+  "mobile.app.messageActions.text": "Mesaj metni",
+} as const satisfies PartialTranslation<typeof source>;

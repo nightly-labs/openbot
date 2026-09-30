@@ -25,6 +25,7 @@ export function WorkspaceAgentSetup() {
     cancelAgentSetup,
     modelOptions,
     agentStatus,
+    serverSetupChoice,
   } = useAgents();
   const { createAgent } = useAgentActions();
   const { setupState } = useSetup();
@@ -54,11 +55,17 @@ export function WorkspaceAgentSetup() {
   /**
    * The draft opens on the hard-coded default, which would bypass the saved setup choice and fail
    * outright after onboarding with a provider the default does not cover. Resolve it from the
-   * saved choice and the live catalog until the user picks a model themselves.
+   * saved choice and the live catalog until the user picks a model themselves. A joined server's
+   * provider step chose for that server, so its choice comes first.
    */
   const [modelTouched, setModelTouched] = createSignal(false);
   createEffect(
-    () => ({ touched: modelTouched(), setup: setupState(), options: modelOptions(), draft: agentSetupDraft() }),
+    () => ({
+      touched: modelTouched(),
+      setup: serverSetupChoice() ?? setupState(),
+      options: modelOptions(),
+      draft: agentSetupDraft(),
+    }),
     ({ touched, setup, options, draft }) => {
       if (touched) return;
       const resolved = resolveCreationModel(setup, options);

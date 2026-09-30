@@ -161,6 +161,24 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
   );
 }
 
+/**
+ * The person who wrote a user message, as the host saw them when it arrived. The host stamps it;
+ * the sender never names itself. `name` is the name at send time, for a member who has since left.
+ */
+export interface ConversationMessageSender {
+  id: string;
+  name: string;
+}
+
+export function isConversationMessageSender(value: unknown): value is ConversationMessageSender {
+  return isDynamicRecord(value) && isIdentifier(value.id) && isBoundedString(value.name, INPUT_LIMITS.accountName);
+}
+
+/** The sender the host stamps, with the name cut to the bound every reader checks. */
+export function conversationMessageSender(id: string, name: string): ConversationMessageSender | undefined {
+  return isIdentifier(id) ? { id, name: name.slice(0, INPUT_LIMITS.accountName) } : undefined;
+}
+
 export interface ConversationMessage {
   id: string;
   turnId?: string;
@@ -171,6 +189,8 @@ export interface ConversationMessage {
   itemType?: string;
   source?: "user" | "assistant" | "agent" | "system" | "routine";
   senderAgentId?: string;
+  /** Absent on a message from before senders were kept, and on one from an older host. */
+  senderMember?: ConversationMessageSender;
   replyToMessageId?: string | null;
   attachments?: AttachmentSummary[];
   imageGeneration?: ImageGenerationInfo;
@@ -208,6 +228,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
       value.source === "system" ||
       value.source === "routine") &&
     (value.senderAgentId === undefined || isIdentifier(value.senderAgentId)) &&
+    (value.senderMember === undefined || isConversationMessageSender(value.senderMember)) &&
     (value.replyToMessageId === undefined || value.replyToMessageId === null || isIdentifier(value.replyToMessageId)) &&
     (value.attachments === undefined ||
       (Array.isArray(value.attachments) &&

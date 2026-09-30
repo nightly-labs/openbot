@@ -10,6 +10,7 @@ import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "./live-activity-push-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
+import { PROVIDERS_SIGN_IN_V3_ROUTES } from "./providers-v3";
 import { SHARED_TABLES_ROUTES } from "./shared-tables-v1";
 import { SKILLS_ADMIN_ROUTES } from "./skills-admin-v1";
 
@@ -161,6 +162,37 @@ describe("providers-v1", () => {
       }),
     ).toThrow();
     expect(() => codec(PROVIDERS_ADMIN_ROUTES.customList).response(200, [{ id: "studio" }])).toThrow();
+  });
+});
+
+describe("providers-v3", () => {
+  const routes = PROVIDERS_SIGN_IN_V3_ROUTES;
+
+  it("carries a pasted code towards the host and never back", () => {
+    expect(codec(routes.codeLoginStart).request({ provider: "claude" })).toEqual({ provider: "claude" });
+    const paste = { kind: "paste", verificationUrl: "https://claude.com/cai/oauth/authorize?code=true", expiresAt: 1 };
+    expect(codec(routes.codeLoginStart).response(200, { ...paste, userCode: "extra" })).toEqual(paste);
+    const device = {
+      kind: "code",
+      userCode: "6Z9Q-HAAK",
+      verificationUrl: "https://accounts.x.ai/oauth2/device",
+      verificationUrlComplete: "https://accounts.x.ai/oauth2/device?user_code=6Z9Q-HAAK",
+      expiresAt: 1,
+    };
+    expect(codec(routes.codeLoginStart).response(200, device)).toEqual(device);
+    expect(codec(routes.codeLoginSubmit).request({ provider: "claude", code: "abc#state" })).toEqual({
+      provider: "claude",
+      code: "abc#state",
+    });
+    expect(codec(routes.codeLoginSubmit).response(200, { code: "abc#state" })).toEqual({});
+    expect(codec(routes.codeLoginCancel).request({ provider: "grok" })).toEqual({ provider: "grok" });
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(() => codec(routes.codeLoginStart).request({ provider: "opencode" })).toThrow();
+    expect(() => codec(routes.codeLoginStart).response(200, { kind: "paste", expiresAt: 1 })).toThrow();
+    expect(() => codec(routes.codeLoginSubmit).request({ provider: "claude", code: "x".repeat(2049) })).toThrow();
+    expect(() => codec(routes.codeLoginSubmit).request({ provider: "claude" })).toThrow();
   });
 });
 

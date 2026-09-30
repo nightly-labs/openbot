@@ -3,6 +3,12 @@ import type { messages as source } from "../en/webClient";
 
 export const messages = {
   "webClient.loading": "OpenBot を読み込んでいます…",
+  "webClient.loadingLine.wake": "エージェントを起こしています…",
+  "webClient.loadingLine.coffee": "エージェントにコーヒーを淹れています…",
+  "webClient.loadingLine.tokens": "トークンを指で数えています…",
+  "webClient.loadingLine.prompts": "プロンプトのもつれをほどいています…",
+  "webClient.loadingLine.sleepy": "寝ている子にやさしくお願いしています…",
+  "webClient.loadingLine.almost": "もうすぐです。たぶん。",
   "webClient.login.failed": "サインインに失敗しました。",
   "webClient.login.requestFailed": "アカウントのリクエストに失敗しました。",
   "webClient.login.sessionFailed": "このセッションを確認できませんでした。",

@@ -2,7 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
-import { JsonLineDecoder } from "./jsonl";
+import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -77,7 +77,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       try {
         for (const message of this.#decoder.push(chunk)) this.#handleMessage(message);
       } catch (error) {
-        this.#fail(new Error(`Codex protocol error: ${String(error)}`), child);
+        // Not wrapped: the screen translates this text only when no prefix is in front of it.
+        this.#fail(
+          error instanceof LineTooLongError ? error : new Error(`Codex protocol error: ${String(error)}`),
+          child,
+        );
       }
     });
 

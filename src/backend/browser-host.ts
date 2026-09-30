@@ -147,6 +147,15 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+/**
+ * An agent's tab that nobody used for this long unloads its page, and loads it again on its next use,
+ * so a long run does not keep in memory the page of each tab an agent left open. The tab keeps a
+ * blank page, as a restored tab does. When memory is low, the tab unloads after
+ * `LOW_MEMORY_TAB_SLEEP_MS`.
+ */
+const IDLE_TAB_SLEEP_MS = 30 * 60_000;
+const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
+const IDLE_TAB_SWEEP_MS = 60_000;
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -224,6 +233,9 @@ export class BrowserHost {
   readonly #takeoverTabIds = new Set<string>();
   #persistQueue: Promise<void> = Promise.resolve();
   #destroyPromise: Promise<void> | null = null;
+  /** Whether the machine is too low on memory for one more tab. Only a hosted server has a reading. */
+  readonly #memoryLow: () => boolean;
+  readonly #idleTabSweep: NodeJS.Timeout;
 
   constructor(
     window: BrowserWindow,
@@ -233,9 +245,11 @@ export class BrowserHost {
       recordingDurationMs?: number;
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
+      memoryLow?: () => boolean;
     } = {},
   ) {
     this.#window = window;
+    this.#memoryLow = options.memoryLow ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -254,6 +268,8 @@ export class BrowserHost {
       },
     );
     this.#configureSession();
+    this.#idleTabSweep = setInterval(() => this.#sleepIdleTabs(), IDLE_TAB_SWEEP_MS);
+    this.#idleTabSweep.unref();
   }
 
   /**
@@ -282,13 +298,7 @@ export class BrowserHost {
     this.#syncAttachedView();
     this.#emitChanged();
 
-    const restoreTab = async (tab: BrowserHostTab) => {
-      await tab.contents.loadURL("about:blank");
-      await tab.engine.setEnvironment(tab.environment);
-      await tab.engine.navigate(tab.requestedUrl);
-      tab.contents.navigationHistory.clear();
-    };
-    for (const tab of tabs) tab.pendingRestore = () => restoreTab(tab);
+    for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
     if (activeTab) this.#wake(activeTab);
     // A view that never navigated is a debugger target that never answers, which stops a CDP client
@@ -298,12 +308,84 @@ export class BrowserHost {
     }
   }
 
-  /** Starts the held-back first load of a restored tab, once, ahead of anything else queued on it. */
+  /**
+   * Starts the held-back load of a restored or sleeping tab, once, ahead of anything else queued on
+   * it.
+   */
   #wake(tab: BrowserHostTab): void {
     const pending = tab.pendingRestore;
     if (!pending) return;
     tab.pendingRestore = undefined;
+    tab.sleeping = undefined;
     tab.queue = tab.queue.then(pending).catch(() => undefined);
+  }
+
+  #sleepIdleTabs(): void {
+    const now = Date.now();
+    const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
+    for (const tab of this.#tabs.values()) {
+      if (tab.pendingRestore || !this.#maySleep(tab)) continue;
+      if (this.#tabInUse(tab)) tab.lastUsedAt = now;
+      else if (now - tab.lastUsedAt >= idleMs) this.#sleep(tab);
+    }
+  }
+
+  /**
+   * Only an agent's own tab sleeps. A popup and its opener keep a live link between their pages, and
+   * a reload breaks it, as it does staged uploads.
+   */
+  #maySleep(tab: BrowserHostTab): boolean {
+    return (
+      (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+      !tab.closing &&
+      !tab.contents.isDestroyed() &&
+      !tab.popup &&
+      !tab.hasSharedBrowsingContext &&
+      ![...this.#tabs.values()].some((child) => child.openerTabId === tab.id) &&
+      !tab.engine.hasUploadDocuments()
+    );
+  }
+
+  /** A reload loses what the page holds, so a tab that a person or a task still has open stays loaded. */
+  #tabInUse(tab: BrowserHostTab): boolean {
+    return (
+      this.#activeTabId === tab.id ||
+      // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
+      tab.pendingOperations > (tab.previewCapture ? 1 : 0) ||
+      tab.viewInvalidations.size > 0 ||
+      tab.recording ||
+      tab.secret !== undefined ||
+      tab.secretDocument === true ||
+      this.#takeoverTabIds.has(tab.id) ||
+      tab.contents.isCurrentlyAudible()
+    );
+  }
+
+  /**
+   * Unloads the page and keeps the tab: its id, owner, URL and settings stay, and the next use loads
+   * the page again through `#wake`. The page's own state, such as its history and unsent form
+   * input, is lost, as when a browser discards a background tab.
+   */
+  #sleep(tab: BrowserHostTab): void {
+    const saved = savedPreview(tab);
+    // Take the frame now, as the card shows it while the tab sleeps.
+    const preview = saved ? Promise.resolve(saved) : this.#previewCapture(tab).frame.catch(() => null);
+    const sleeping: NonNullable<BrowserHostTab["sleeping"]> = { title: tab.contents.getTitle(), preview: null };
+    let unloaded = false;
+    tab.sleeping = sleeping;
+    // A use while the frame is taken wakes the tab first, and its page is still there.
+    tab.pendingRestore = async () => {
+      if (unloaded) await loadSavedPage(tab);
+    };
+    tab.queue = tab.queue
+      .then(async () => {
+        sleeping.preview = await preview;
+        if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
+        unloaded = true;
+        await tab.contents.loadURL("about:blank");
+      })
+      .catch(() => undefined);
+    this.#emitChanged();
   }
 
   onChanged(listener: (...args: BrowserHostEvents["changed"]) => void): () => void {
@@ -382,6 +464,8 @@ export class BrowserHost {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       throw new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs }));
     }
+    // Each tab is its own renderer process.
+    if (this.#memoryLow()) throw new Error(sourceText("error.backend.browserLowMemory"));
     const normalizedUrl = normalizeBrowserUrl(url);
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerAgentId);
@@ -822,7 +906,11 @@ export class BrowserHost {
    * takes longer than `PREVIEW_STALE_AFTER_MS`, the card gets the last frame of the same page instead.
    */
   async capturePreview(tabId: string): Promise<BrowserPreview> {
-    const tab = this.#requireTab(tabId);
+    const tab = this.#tabs.get(tabId);
+    if (!tab) throw new Error(`Unknown browser tab: ${tabId}`);
+    // A preview card on screen does not keep a sleeping tab loaded.
+    if (tab.sleeping?.preview) return tab.sleeping.preview;
+    this.#wake(tab);
     if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
     const cached = savedPreview(tab);
     if (cached && tab.pendingOperations > 0) return cached;
@@ -851,7 +939,7 @@ export class BrowserHost {
   #previewCapture(tab: BrowserHostTab): BrowserPreviewPage & { frame: Promise<BrowserPreview> } {
     if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
     const page = currentPreviewPage(tab);
-    const frame = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
+    const frame = enqueueTabOperation(tab, async (_tab, keepQueueBlocked) => {
       const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
@@ -1226,6 +1314,7 @@ export class BrowserHost {
   }
 
   destroy(): Promise<void> {
+    clearInterval(this.#idleTabSweep);
     this.#destroyPromise ??= this.#destroyPersistentStorageAndViews();
     return this.#destroyPromise;
   }
@@ -1300,6 +1389,7 @@ export class BrowserHost {
       captureGeneration: 0,
       documents: 0,
       viewInvalidations: new Set(),
+      lastUsedAt: Date.now(),
     };
   }
 
@@ -1559,7 +1649,9 @@ export class BrowserHost {
             ? sourceText("error.backend.popupUnsupportedAddress")
             : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
               ? sourceText("error.backend.popupTabLimit")
-              : undefined;
+              : this.#memoryLow()
+                ? sourceText("error.backend.browserLowMemory")
+                : undefined;
       if (failure) {
         tab.popupFailure = { id: randomUUID(), message: failure };
         this.#emitChanged();
@@ -1800,6 +1892,7 @@ export class BrowserHost {
     const tab = this.#tabs.get(tabId);
     if (!tab) throw new Error(`Unknown browser tab: ${tabId}`);
     this.#wake(tab);
+    tab.lastUsedAt = Date.now();
     return tab;
   }
 
@@ -1947,6 +2040,14 @@ function currentPreviewPage(tab: BrowserHostTab): BrowserPreviewPage {
 function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolean {
   const current = currentPreviewPage(tab);
   return page.url === current.url && page.document === current.document && page.generation === current.generation;
+}
+
+/** Loads the saved URL of a tab that has not loaded its page, with its settings, and no history. */
+async function loadSavedPage(tab: BrowserHostTab): Promise<void> {
+  await tab.contents.loadURL("about:blank");
+  await tab.engine.setEnvironment(tab.environment);
+  await tab.engine.navigate(tab.requestedUrl);
+  tab.contents.navigationHistory.clear();
 }
 
 /** The saved preview frame, when it still shows the tab's current page. */

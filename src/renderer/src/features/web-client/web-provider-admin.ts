@@ -11,6 +11,10 @@ import {
   PROVIDERS_RUNTIMES_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v2";
 import {
+  PROVIDERS_SIGN_IN_V3_CAPABILITY,
+  PROVIDERS_SIGN_IN_V3_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v3";
+import {
   cancelProviderCodeLogin,
   cancelProviderRuntime,
   checkProviderRuntimeUpdates,
@@ -20,10 +24,12 @@ import {
   getProviderApiKeyState,
   getProviderRuntimes,
   listCustomProviders,
+  type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
   saveCustomProvider,
   setProviderApiKey,
   startProviderCodeLogin,
+  submitProviderCodeLogin,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
@@ -33,7 +39,7 @@ import { createCustomProvidersStore } from "../custom-providers/stores/custom-pr
 import { createProviderCodeLogin } from "../provider-updates/provider-code-login";
 import { createProviderRuntimeStore } from "../provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "../provider-updates/remote-provider-runtimes";
-import { remoteAdminServer, serverSupportsCapability } from "../servers/server-capabilities";
+import { codeSignInProviders, remoteAdminServer, serverSupportsCapability } from "../servers/server-capabilities";
 import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import { hostProviderKeyApi } from "../settings/provider-key-api";
 
@@ -64,10 +70,12 @@ export function openWebDestination(destination: ExternalDestination): Promise<vo
 function webProviderAdmin(
   request: (serverId?: string) => TeamApiRequest,
   runtimeRoutes: () => ProviderRuntimeRoutes,
+  signInRoutes: () => ProviderCodeLoginRoutes,
 ): ProviderAdminDesktopApi {
   return {
-    startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider),
-    cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider),
+    startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider, signInRoutes()),
+    submitCodeLogin: async (input, serverId) => submitProviderCodeLogin(request(serverId), input),
+    cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider, signInRoutes()),
     getApiKeyState: async (provider, serverId) => getProviderApiKeyState(request(serverId), provider),
     setApiKey: async (input, serverId) => setProviderApiKey(request(serverId), input),
     clearApiKey: async (provider, serverId) => clearProviderApiKey(request(serverId), provider),
@@ -97,10 +105,17 @@ export interface WebProviderSettingsOptions {
  */
 export function createWebProviderSettings(options: WebProviderSettingsOptions): () => HostProviderSettings | undefined {
   // `request` refuses a server other than the connected one, so the connected one decides the routes.
-  const admin = webProviderAdmin(options.request, () =>
-    serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
-      ? PROVIDERS_RUNTIMES_V2_ROUTES
-      : PROVIDERS_ADMIN_ROUTES,
+  const admin = webProviderAdmin(
+    options.request,
+    () =>
+      serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
+        ? PROVIDERS_RUNTIMES_V2_ROUTES
+        : PROVIDERS_ADMIN_ROUTES,
+    // `providers-v1` signs in Codex only; the picker offers no other provider on such a host.
+    () =>
+      serverSupportsCapability(options.server(), PROVIDERS_SIGN_IN_V3_CAPABILITY)
+        ? PROVIDERS_SIGN_IN_V3_ROUTES
+        : PROVIDERS_ADMIN_ROUTES,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -138,15 +153,17 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
       const id = serverId();
       return {
         start: (provider: AgentProviderId) => admin.startCodeLogin(provider, id ?? ""),
+        submit: (provider: AgentProviderId, code: string) => admin.submitCodeLogin({ provider, code }, id ?? ""),
         cancel: (provider: AgentProviderId) => admin.cancelCodeLogin(provider, id ?? ""),
       };
     },
+    providers: () => codeSignInProviders(options.server()),
     openVerificationUrl: (url) => void window.open(url, "_blank", "noopener"),
   });
   // The host sends status events, but a browser that reconnects in the middle can miss the one that
   // ends the sign-in. The status is read again while the code is on screen.
   createEffect(
-    () => codeLogin.provider() !== null && codeLogin.state().phase === "waiting",
+    () => codeLogin.provider() !== null && codeLogin.state().phase !== "starting",
     (waiting) => {
       if (!waiting) return;
       const host = serverId();

@@ -53,6 +53,9 @@
     "HOSTED_SERVERS_ENABLED": "true",
     // Each account can buy a server in production. Put account IDs here to limit creates to them.
     "HOSTED_SERVERS_ALLOWED_USER_IDS": "*",
+    // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
+    // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
+    "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
     "APNS_TEAM_ID": "ZTRDTUL87R",
     "APNS_TOPIC": "run.openbot.mobile"
   },
@@ -101,6 +104,11 @@
       "name": "SITE_REPORT_RATE_LIMITER",
       "namespace_id": "2026083101",
       "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "GITHUB_TOKEN_RATE_LIMITER",
+      "namespace_id": "2026092911",
+      "simple": { "limit": 30, "period": 60 }
     },
     {
       "name": "LIVE_ACTIVITY_RATE_LIMITER",
@@ -176,6 +184,11 @@
           "simple": { "limit": 10, "period": 60 }
         },
         {
+          "name": "GITHUB_TOKEN_RATE_LIMITER",
+          "namespace_id": "2026092912",
+          "simple": { "limit": 30, "period": 60 }
+        },
+        {
           "name": "LIVE_ACTIVITY_RATE_LIMITER",
           "namespace_id": "2026092902",
           "simple": { "limit": 300, "period": 60 }
@@ -218,6 +231,7 @@
         "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
         "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
         "HOSTED_SERVERS_ENABLED": "true",
+        "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
         "APNS_TEAM_ID": "ZTRDTUL87R",
         "APNS_TOPIC": "run.openbot.mobile"
       },
@@ -263,6 +277,11 @@
           "name": "SITE_REPORT_RATE_LIMITER",
           "namespace_id": "2026083103",
           "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "GITHUB_TOKEN_RATE_LIMITER",
+          "namespace_id": "2026092913",
+          "simple": { "limit": 30, "period": 60 }
         },
         {
           "name": "LIVE_ACTIVITY_RATE_LIMITER",

@@ -136,7 +136,14 @@ EMAIL_FROM=hello@openbot.run
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
 `REMOTE_TICKET_PUBLIC_JWKS`, `REMOTE_AUTH_WEBHOOK_SECRET`, and `SITE_REPORT_HASH_SECRET` to
-`wrangler secret put` through standard input. It then builds and deploys the Worker.
+`wrangler secret put` through standard input, and `GITHUB_APP_PRIVATE_KEY` when it is set. It then
+builds and deploys the Worker.
+
+`GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
+PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
+Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
+agent's work. With no key, the desktop acts as the signed-in user. In GitHub Actions the secret is
+`OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
 
