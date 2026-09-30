@@ -645,15 +645,14 @@ export function GlobalSearch(props: GlobalSearchProps) {
         section("messages", matching(messageItems(), value), remote(messageSearch, ALL_SECTION_LIMIT)),
         section("files", matching(fileItems(), value), remote(fileSearch, ALL_SECTION_LIMIT)),
         section("routines", matching(routineItems(), value), preview),
+        // Actions and settings have no filter tab, so they show every match.
         section(
           "actions",
           actions.filter((result) => result.action.group === "actions"),
-          preview,
         ),
         section(
           "settings",
           actions.filter((result) => result.action.group === "settings"),
-          preview,
         ),
       ];
     }

@@ -507,6 +507,25 @@
     max-height: calc(100dvh - 124px);
   }
 
+  /* The filters go to their own row, so the input keeps the full width. */
+  .global-search-control {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .global-search-control .global-search-input {
+    height: 48px;
+  }
+
+  .global-search-filters {
+    min-width: 0;
+    flex-basis: 100%;
+    overflow-x: auto;
+    padding-block: var(--openbot-space-1) var(--openbot-space-2);
+    scrollbar-width: none;
+  }
+
   .global-search-footer,
   .global-search-result .global-search-result-enter {
     display: none;
