@@ -394,6 +394,12 @@ The unit (`openbot.service`):
   renderers and GPU process, and its zygotes keep -500, because a new renderer starts from them.
 - `OOMPolicy=continue`: one killed agent process does not stop the unit.
 - `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
+  A Starter server then has 3.9 GB of memory and 3.9 GB of swap: the 2 GB file on disk and 1.9 GB of
+  zram. zram keeps its pages compressed in the same memory, about 3 to 1 for program memory, so it
+  gives about 1.3 GB more. The unit can use all of the swap (no `MemorySwapMax`). The swap holds
+  idle memory, such as hidden browser tabs. A swap limit, or a lower `MemoryMax`, gives the agents
+  less memory and does not protect main more: the memory test below shows the same victim in each
+  case.
 
 The app (`HostedServerMemory`) reads the memory every 5 s. The free memory is the smaller of
 `MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
@@ -453,6 +459,21 @@ confirmed:
   active. The kill was the kernel's own (`global_oom`), after the child filled the swap, and not the
   unit limit;
 - the app in hosted mode gives 500 to `cua-driver`, and keeps -500 for main.
+
+A swap test on 2026-09-30 (one `small` sandbox, systemd 255, the zram setup of `provision.sh`, and a
+child at 500 in a unit at -500 that takes 32 MB each 250 ms) compared unit limits:
+
+| `MemoryMax` | `MemorySwapMax` | Unit swap at the kill | OOM killer |
+| --- | --- | --- | --- |
+| 90% | none (the unit now) | 3.7 GiB | the kernel's |
+| 90% | 10% | 392 MiB | the kernel's |
+| 80% | 10% | 392 MiB | the kernel's |
+| 75% | 10% | 392 MiB | the unit's |
+
+In each case the killer took the child at 500, and the unit, its other process and sshd stayed.
+`MemorySwapMax` takes a percentage of all swap. The processes outside the unit use about 665 MB
+(17% of the memory), so above about 75% the machine is full before the unit is. The unit's own killer
+is not necessary, because the kernel's also picks the process with the highest value.
 
 A boat trial account refuses a sandbox with no auto-stop, or a TTL longer than 2 hours
 (`trial_auto_stop_required`), and the Worker shows it as `provider_billing`. The Worker sends a
