@@ -10,7 +10,7 @@ import { type Accessor, createEffect, createSignal, onSettled, untrack } from "s
 import { prefersReducedMotion } from "../utils";
 
 /** One row: a key that is unique in the list, and a first guess of its height. It is measured when it renders. */
-export interface ListRow {
+interface ListRow {
   key: string;
   size: number;
 }
