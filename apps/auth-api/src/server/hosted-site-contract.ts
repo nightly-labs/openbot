@@ -1,6 +1,5 @@
 import {
   checkHostedSitePath,
-  HOSTED_SITE_ACTIVE_LIMIT,
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UPLOAD_LIMITS,
   type HostedSitePathProblem,
@@ -9,7 +8,6 @@ import type { HostedSiteFramework } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export const HOSTED_SITE_LIMITS = {
-  activeSites: HOSTED_SITE_ACTIVE_LIMIT,
   concurrentUploads: 2,
   concurrentFileUploads: 2,
   uploadAttemptMultiplier: 2,
@@ -45,7 +43,7 @@ const PATH_PROBLEM_MESSAGES = {
 
 export class HostedSiteInputError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409 | 413 | 429,
+    readonly status: 400 | 401 | 404 | 409 | 413 | 429,
     readonly code: string,
     message: string,
   ) {

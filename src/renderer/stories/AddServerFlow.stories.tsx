@@ -19,6 +19,8 @@ interface FlowProps {
   startOpen?: boolean;
   /** The fake setup stops with an error at the "Start OpenBot" step on the first try. */
   failFirstTry?: boolean;
+  /** The account has this many servers, the maximum, so the plans are disabled. */
+  serverLimit?: number;
 }
 
 /**
@@ -31,6 +33,7 @@ function AddServerFlow(props: FlowProps) {
   const [addOpen, setAddOpen] = createSignal(props.startOpen ?? false);
   const [contactNote, setContactNote] = createSignal(false);
   const [joinNote, setJoinNote] = createSignal(false);
+  const [manageNote, setManageNote] = createSignal(false);
   const [setupStatus, setSetupStatus] = createSignal<HostedServerSetupStatus | null>(null);
   const [pending, setPending] = createSignal({ id: "", name: "" });
   let attempts = 0;
@@ -90,6 +93,9 @@ function AddServerFlow(props: FlowProps) {
         <Show when={contactNote()}>
           <Text tone="muted">"Contact us" was clicked. The app opens an email to hello@openbot.run here.</Text>
         </Show>
+        <Show when={manageNote()}>
+          <Text tone="muted">"Manage servers" was clicked. The app opens the list of hosted servers here.</Text>
+        </Show>
         <Show when={joinNote()}>
           <Text tone="muted">"Join a server" was clicked. The app opens the invite dialog here.</Text>
         </Show>
@@ -100,6 +106,8 @@ function AddServerFlow(props: FlowProps) {
           plans={PLANS}
           recommendedPlan="standard"
           setupStatus={setupStatus()}
+          serverLimit={props.serverLimit}
+          onManageServers={() => setManageNote(true)}
           onClose={() => setAddOpen(false)}
           onContactUs={() => setContactNote(true)}
           onJoinWithInvite={() => {
@@ -174,6 +182,11 @@ export const DialogOpen: Story = {
 /** The first setup stops at "Start OpenBot". "Try again" then succeeds. */
 export const SetupFails: Story = {
   render: () => <AddServerFlow startOpen failFirstTry />,
+};
+
+/** The account has the maximum number of servers. "Manage servers" closes the dialog. */
+export const ServerLimit: Story = {
+  render: () => <AddServerFlow startOpen serverLimit={3} />,
 };
 
 /** A narrow window: the plan cards stack. */

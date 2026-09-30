@@ -1,16 +1,24 @@
 import type {
+  AgentProviderId,
+  AgentStatus,
+  CustomProviderRestart,
+  HostedSiteSummary,
+  HostedSitesDesktopApi,
   HostStatus,
   McpServerConfig,
   ProviderRuntimeStatus,
+  SaveCustomProviderInput,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { createMockOpenBot } from "../../preview/mock-openbot";
+import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
 
@@ -453,6 +461,56 @@ describe("ServerSettingsModal", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Clear Cached server files" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
     await waitFor(() => expect(clear).toHaveBeenCalledWith({ category: "caches" }, "remote-1"));
+  });
+
+  it("lists a server's sites with its plan limit, and deletes only for an owner or admin", async () => {
+    const site: HostedSiteSummary = {
+      id: "site-to-delete",
+      hostname: "temporary-project-site-23456789ab.openbot.site",
+      url: "https://temporary-project-site-23456789ab.openbot.site",
+      title: "Temporary project site",
+      description: "Verify deletion and list refresh.",
+      framework: "vanilla",
+      status: "active",
+      fileCount: 1,
+      size: 256,
+      expiresAt: "2026-09-30T12:00:00.000Z",
+      updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: "remote-1",
+    };
+    const unlinked: HostedSiteSummary = { ...site, id: "site-unlinked", hostname: "old.openbot.site", serverId: null };
+    const api = {
+      list: vi
+        .fn<HostedSitesDesktopApi["list"]>()
+        .mockResolvedValueOnce({ sites: [site, unlinked], limit: 3, used: 2 })
+        .mockResolvedValueOnce({ sites: [site, unlinked], limit: 3, used: 2 })
+        .mockResolvedValue({ sites: [unlinked], limit: 3, used: 1 }),
+      delete: vi.fn<HostedSitesDesktopApi["delete"]>(async () => undefined),
+    };
+    const track = vi.fn();
+    const hostedSites = { api, onOpenSite: vi.fn(), trackDelete: () => track };
+
+    const { unmount } = render(() => (
+      <ServerSettingsModal {...props({ server: { ...remoteServer, role: "member" }, hostedSites })} />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    expect(await screen.findByText(site.hostname)).toBeInTheDocument();
+    expect(api.list).toHaveBeenCalledWith("remote-1");
+    expect(screen.getByText("2 of 3 sites")).toBeInTheDocument();
+    expect(screen.getByText("Not linked to a server")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Delete ${site.hostname}` })).not.toBeInTheDocument();
+    unmount();
+
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostedSites })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Sites" }));
+    await fireEvent.click(await screen.findByRole("button", { name: `Delete ${site.hostname}` }));
+    const confirmation = await screen.findByRole("alertdialog", { name: `Delete ${site.hostname}?` });
+    expect(confirmation).toHaveAccessibleDescription("This address will immediately return 410 Gone.");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith({ siteId: site.id }, "remote-1"));
+    await waitFor(() => expect(screen.queryByText(site.hostname)).not.toBeInTheDocument());
+    expect(screen.getByText("1 of 3 sites")).toBeInTheDocument();
+    expect(track).toHaveBeenCalledWith("succeeded");
   });
 
   // MCP servers belong to this machine and are started by the agents on it, so they are manageable
@@ -1015,5 +1073,276 @@ describe("ServerSettingsModal", () => {
     expect(screen.getByRole("tab", { name: "Email" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Invite link" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Perma link" })).not.toBeInTheDocument();
+  });
+});
+
+/** Server settings opened on the Providers section of this computer. */
+function ProvidersSection(providers: HostProviderSettings) {
+  return <ServerSettingsModal {...props({ initialSection: "providers", providers })} />;
+}
+
+/**
+ * A custom endpoint runs inside OpenCode, so the AI providers section offers one only while that CLI
+ * can answer. Its own sign-in does not matter: the endpoint brings its own key.
+ */
+const openCodeReadyStatus: AgentStatus = {
+  phase: "ready",
+  cliVersion: "1.3.13",
+  auth: { kind: "chatgpt", email: "norbert@example.com" },
+  providers: [{ id: "opencode", state: "available", version: "1.3.13", message: null, cliSource: "system" }],
+  capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+  message: null,
+  fullAccess: true,
+};
+
+/** ChatGPT installed and signed out: the state both sign-in buttons are offered from. */
+const codexSignedOutStatus: AgentStatus = {
+  phase: "ready",
+  cliVersion: "0.55.0",
+  auth: { kind: "signed-out" },
+  providers: [{ id: "codex", state: "sign-in-required", version: "0.55.0", message: null, cliSource: "system" }],
+  capabilities: { chat: "unavailable", browser: "unavailable", computerUse: "unavailable" },
+  message: null,
+  fullAccess: true,
+};
+
+describe("ServerSettingsModal providers", () => {
+  it("offers an update for a CLI the user installed, which has no managed download", async () => {
+    const onUpdateProvider = vi.fn(async () => undefined);
+    const agentStatus: AgentStatus = {
+      phase: "ready",
+      cliVersion: "0.146.0",
+      auth: { kind: "chatgpt", email: "norbert@example.com" },
+      providers: [
+        { id: "codex", state: "available", version: "0.146.0", message: null, cliSource: "system" },
+        { id: "claude", state: "available", version: "2.1.246", message: null, cliSource: "managed" },
+        { id: "grok", state: "not-installed", version: null, message: null },
+      ],
+      capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+      message: null,
+      fullAccess: true,
+    };
+
+    render(() => (
+      <ProvidersSection
+        agentStatus={agentStatus}
+        providerRuntimeStatuses={{
+          codex: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: "0.153.4" },
+          claude: { phase: "ready", progress: null, message: null, version: "2.1.246", availableVersion: "2.1.263" },
+        }}
+        providerAvailableVersions={{ codex: "0.153.4", claude: "2.1.263" }}
+        onUpdateProvider={onUpdateProvider}
+      />
+    ));
+
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
+    fireEvent.pointerDown(moreActions, { button: 0 });
+    fireEvent.click(moreActions);
+    fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Update to 0.153.4" }), { button: 0 });
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("codex"));
+  });
+
+  // The endpoint the user typed carries an API key, so a failed save must not throw the form away:
+  // the previous version closed the dialog before the call and dropped the promise, which made a
+  // refused endpoint look like a saved one.
+  it("keeps the custom endpoint form open when the save fails, and closes it when the next one works", async () => {
+    const onAddCustomProvider = vi
+      .fn<(value: SaveCustomProviderInput) => Promise<CustomProviderRestart>>()
+      .mockRejectedValueOnce(new Error("Studio Local refused the API key."))
+      .mockResolvedValue("restarted");
+    render(() => (
+      <ProvidersSection
+        agentStatus={openCodeReadyStatus}
+        customProviders={[]}
+        onAddCustomProvider={onAddCustomProvider}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Add custom provider" }));
+    // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
+    await fireEvent.input(await screen.findByLabelText(/^Provider ID/u), { target: { value: "studio-local" } });
+    await fireEvent.input(screen.getByLabelText(/^Display name/u), { target: { value: "Studio Local" } });
+    await fireEvent.input(screen.getByLabelText(/^Base URL/u), { target: { value: "http://127.0.0.1:11434/v1" } });
+    await fireEvent.input(screen.getByLabelText("Model 1 ID"), { target: { value: "glm-5-air" } });
+    await fireEvent.input(screen.getByLabelText("Model 1 display name"), { target: { value: "GLM 5 Air" } });
+    await fireEvent.input(screen.getByLabelText("API key"), { target: { value: "sk-test-key" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(await screen.findByText("Studio Local refused the API key.")).toBeInTheDocument();
+    // Still open, still holding the endpoint: the user retries rather than types it again.
+    expect(screen.getByLabelText(/^Provider ID/u)).toHaveValue("studio-local");
+    await waitFor(() => expect(onAddCustomProvider).toHaveBeenCalledTimes(1));
+    expect(onAddCustomProvider).toHaveBeenCalledWith({
+      id: "studio-local",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      apiKey: "sk-test-key",
+      models: [{ id: "glm-5-air", name: "GLM 5 Air" }],
+      headers: [],
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(screen.queryByLabelText(/^Provider ID/u)).not.toBeInTheDocument());
+    expect(screen.getByRole("status")).toHaveTextContent("Saved. OpenBot is loading the models.");
+  });
+
+  // A removal discards the key and drops the models, and neither is undoable, so the callback must
+  // run only after the user answers the question.
+  it("removes a custom endpoint only after the confirmation is accepted", async () => {
+    const onDeleteCustomProvider = vi.fn<(id: string) => Promise<CustomProviderRestart>>(async () => "restarted");
+    render(() => (
+      <ProvidersSection
+        agentStatus={openCodeReadyStatus}
+        customProviders={[
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
+        ]}
+        onAddCustomProvider={vi.fn(async () => "restarted" as const)}
+        onDeleteCustomProvider={onDeleteCustomProvider}
+      />
+    ));
+
+    // The endpoints are listed in a dialog now, which the count on the Custom provider row opens.
+    await fireEvent.click(screen.getByRole("button", { name: "Manage 1 endpoint" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Delete Studio Local" }));
+    const declined = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    expect(declined).toHaveAccessibleDescription(
+      "Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model.",
+    );
+    await fireEvent.click(within(declined).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(onDeleteCustomProvider).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Delete Studio Local" }));
+    const accepted = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await fireEvent.click(within(accepted).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
+    // The outcome is read inside the dialog, which stays open: the section behind it is hidden.
+    expect(await screen.findByRole("status")).toHaveTextContent("Removed. OpenBot is loading the models.");
+  });
+
+  // The custom row is one of the AI providers, so it takes the check mark like its neighbours and
+  // the provider that serves it gives it up. Nothing stores the choice yet; this is the row's state.
+  it("gives the custom provider row the check mark, and takes it from the provider rows", async () => {
+    render(() => (
+      <ProvidersSection
+        agentStatus={openCodeReadyStatus}
+        customProviders={[
+          {
+            id: "studio-local",
+            name: "Studio Local",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            hasApiKey: true,
+            models: [],
+          },
+        ]}
+        onAddCustomProvider={vi.fn(async () => "restarted" as const)}
+      />
+    ));
+
+    const custom = await screen.findByRole("radio", { name: /Custom provider/ });
+    const openCode = screen.getByRole("radio", { name: /OpenCode/ });
+    await fireEvent.click(openCode);
+    expect(openCode).toBeChecked();
+
+    await fireEvent.click(custom);
+    expect(custom).toBeChecked();
+    expect(openCode).not.toBeChecked();
+
+    await fireEvent.click(openCode);
+    expect(custom).not.toBeChecked();
+  });
+
+  // The runtime badge reports the CLI, so the row carries a tier badge only while it adds
+  // anything: "Free" with no key, gone once the key is saved and the runtime "Connected" speaks
+  // for the row. The status is re-read after the key dialog closes, so a save lands on the row
+  // without reopening Settings.
+  it("badges the OpenCode row with the account tier, and refreshes it after the key dialog closes", async () => {
+    const providerKeys = {
+      // Modal open, key dialog open: no key yet. Key dialog close: the save landed.
+      getProviderApiKeyState: vi
+        .fn()
+        .mockResolvedValueOnce({ provider: "opencode" as const, status: "missing" as const })
+        .mockResolvedValueOnce({ provider: "opencode" as const, status: "missing" as const })
+        .mockResolvedValue({ provider: "opencode" as const, status: "saved" as const }),
+      setProviderApiKey: vi.fn(async () => undefined),
+      clearProviderApiKey: vi.fn(async () => undefined),
+      openExternal: vi.fn(async () => undefined),
+    };
+    const onConnectProvider = vi.fn(async () => undefined);
+    render(() => (
+      <ProvidersSection
+        agentStatus={openCodeReadyStatus}
+        providerKeys={providerKeys}
+        onConnectProvider={onConnectProvider}
+      />
+    ));
+
+    await screen.findByText("Free");
+    expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to OpenCode" }));
+    const input = await screen.findByLabelText("OpenCode Go key");
+    await waitFor(() => expect(input).toBeEnabled());
+    // The dialog reconnects without touching credentials. The row behind keeps its own
+    // "Connect OpenCode" button, so the name matches exactly.
+    fireEvent.click(screen.getByRole("button", { name: /^Reconnect$/ }));
+    await waitFor(() => expect(onConnectProvider).toHaveBeenCalledWith("opencode"));
+    fireEvent.input(input, { target: { value: "go-key-value" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+
+    await waitFor(() =>
+      expect(providerKeys.setProviderApiKey).toHaveBeenCalledWith({ provider: "opencode", key: "go-key-value" }),
+    );
+    // Modal open, key dialog open, key dialog close: the last read is the refresh the badge needs.
+    await waitFor(() => expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(3));
+    // getAllByText only waits for the first match, so the count itself is what waits here: the
+    // Free badge is gone, leaving the single runtime Connected.
+    await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
+    expect(screen.queryByText("Free")).toBeNull();
+  });
+
+  // The second way in, for the computer whose browser cannot finish the first one. What Settings
+  // owns is the entry point and the dialog; the phase itself comes from main.
+  it("opens the code sign-in from the ChatGPT row and shows the code to type", async () => {
+    const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
+    const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
+    const codeLogin = {
+      providers: () => ["codex" as const],
+      provider,
+      state,
+      submit: vi.fn(),
+      start: vi.fn((id: AgentProviderId) => {
+        setProvider(id);
+        setState({
+          phase: "waiting",
+          userCode: "KTQ4-B62MX",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          expiresAt: Date.now() + 600_000,
+        });
+      }),
+      cancel: vi.fn(() => setProvider(null)),
+      openVerificationUrl: vi.fn(),
+    };
+    render(() => <ProvidersSection agentStatus={codexSignedOutStatus} codeLogin={codeLogin} />);
+
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
+    fireEvent.pointerDown(moreActions, { button: 0 });
+    fireEvent.click(moreActions);
+    fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });
+
+    await waitFor(() => expect(codeLogin.start).toHaveBeenCalledWith("codex"));
+    expect(await screen.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close log in to ChatGPT" }));
+
+    await waitFor(() => expect(codeLogin.cancel).toHaveBeenCalledTimes(1));
   });
 });

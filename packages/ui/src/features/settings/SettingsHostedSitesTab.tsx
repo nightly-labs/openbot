@@ -19,6 +19,8 @@ import type { SettingsHostedSitesStore } from "./stores/hosted-sites-store";
 interface SettingsHostedSitesTabProps {
   store: SettingsHostedSitesStore;
   available: boolean;
+  /** An owner or admin of the server. A member sees the sites, without Delete. */
+  canDelete: boolean;
   onOpenSite: (url: string) => void;
 }
 
@@ -29,9 +31,13 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
     <SettingsSection title={t("settings.hostedSites.title")}>
       <Show when={props.available} fallback={<Text tone="muted">{t("settings.hostedSites.unavailable")}</Text>}>
         <div class="hosted-sites-overview">
-          <span class="settings-modal-row-title">
-            {t("settings.hostedSites.usage", { used: props.store.state.sites.length })}
-          </span>
+          <Show when={props.store.state.limit}>
+            {(limit) => (
+              <span class="settings-modal-row-title">
+                {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit() })}
+              </span>
+            )}
+          </Show>
           <Text tone="muted" variant="caption">
             {t("settings.hostedSites.expiryNote")}
           </Text>
@@ -69,6 +75,10 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                     >
                       <Badge tone="neutral">{t("settings.hostedSites.blocked")}</Badge>
                     </Show>
+                    {/* An upload with no proven server counts against the account's own site, not this server's plan. */}
+                    <Show when={site.serverId === null}>
+                      <Badge tone="neutral">{t("settings.hostedSites.unlinked")}</Badge>
+                    </Show>
                   </ItemContent>
                   <ItemActions class="hosted-sites-actions">
                     <Button
@@ -81,16 +91,18 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                       <ExternalLink size={14} aria-hidden="true" />
                       {t("common.open")}
                     </Button>
-                    <Button
-                      variant="destructive-ghost"
-                      size="sm"
-                      aria-label={t("settings.hostedSites.deleteLabel", { hostname: site.hostname })}
-                      disabled={props.store.state.busy}
-                      onClick={() => props.store.requestDelete(site)}
-                    >
-                      <Trash2 size={14} aria-hidden="true" />
-                      {t("common.delete")}
-                    </Button>
+                    <Show when={props.canDelete}>
+                      <Button
+                        variant="destructive-ghost"
+                        size="sm"
+                        aria-label={t("settings.hostedSites.deleteLabel", { hostname: site.hostname })}
+                        disabled={props.store.state.busy}
+                        onClick={() => props.store.requestDelete(site)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        {t("common.delete")}
+                      </Button>
+                    </Show>
                   </ItemActions>
                 </Item>
               )}

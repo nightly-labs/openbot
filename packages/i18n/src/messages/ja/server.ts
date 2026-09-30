@@ -108,6 +108,8 @@ export const messages = {
   "server.settings.storageTitle": "ストレージ",
   "server.settings.storageDescription":
     "OpenBot がこのサーバーのディスクに保存しているものを確認し、空き容量を増やします。",
+  "server.settings.hostedSitesTitle": "サイト",
+  "server.settings.hostedSitesDescription": "このサーバーのエージェントが openbot.site に公開した静的サイト。",
   "server.settings.importTitle": "インポート",
   "server.settings.importDescription": "Grok Bot からこのサーバーにエージェントを移動します。",
   "server.settings.nameTooShort": "{limit} 文字以上で入力してください。",
@@ -246,4 +248,6 @@ export const messages = {
   "server.desktop.startHint": "サーバーのヘッダーにあるモニターボタンからリモート操作を開始してください。",
   "server.settings.providersTitle": "プロバイダー",
   "server.settings.providersDescription": "このサーバーを実行するコンピューターの AI プロバイダーを管理します。",
+  "server.settings.providersSwitchNote": "AI プロバイダーを管理するには {name} に切り替えてください。",
+  "server.settings.providersSwitch": "このサーバーに切り替える",
 } as const satisfies PartialTranslation<typeof source>;

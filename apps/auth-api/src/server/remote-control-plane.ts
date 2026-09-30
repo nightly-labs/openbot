@@ -1083,6 +1083,10 @@ export class RemoteControlPlane {
         )
         .bind(now, hostId, ownerUserId),
       this.#authEpochEventStatement(hostId, now, ownerUserId),
+      // The sites stay public until they expire. The unlinked bucket keeps them in the owner's list, to delete.
+      this.#database
+        .prepare("UPDATE hosted_sites SET server_id = NULL WHERE server_id = ? AND user_id = ?")
+        .bind(hostId, ownerUserId),
       this.#database
         .prepare("DELETE FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?")
         .bind(hostId, ownerUserId),

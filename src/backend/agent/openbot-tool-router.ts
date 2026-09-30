@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { HOSTED_SITE_ACTIVE_LIMIT } from "@openbot/contracts/hosted-sites";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelOption,
@@ -426,7 +425,7 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "list_sites") {
-      return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: HOSTED_SITE_ACTIVE_LIMIT });
+      return openBotToolResult(await this.#hostedSites.listSites());
     }
 
     if (isHostedSiteMutationTool(params.tool)) throw new Error("Hosted site changes require user approval.");

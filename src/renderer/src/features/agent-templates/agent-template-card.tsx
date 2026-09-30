@@ -64,7 +64,7 @@ function themeColors(): ThemeColors {
     secondary: token("--openbot-text-secondary"),
     muted: token("--openbot-text-muted"),
     logo: token("--openbot-logo-production"),
-    logoEye: token("--openbot-logo-eye"),
+    logoEye: token("--openbot-logo-production-eye"),
   };
 }
 

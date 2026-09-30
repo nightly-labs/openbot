@@ -97,6 +97,11 @@ export interface HostedServerList {
   /** False when this account cannot create hosted servers, or when the account server has no billing. */
   available: boolean;
   servers: HostedServerSummary[];
+  /**
+   * The most servers that the account can have. Each server in `servers` counts, also one that waits
+   * for its first payment. Null from an account server that does not send it.
+   */
+  maxServers: number | null;
 }
 
 export interface HostedServerClaim {
@@ -160,7 +165,11 @@ export function parseHostedServerList(value: unknown): HostedServerList | null {
     const server = parseHostedServerSummary(entry);
     if (server) servers.push(server);
   }
-  return { available: value.available, servers };
+  const maxServers =
+    isNumber(value.maxServers) && Number.isSafeInteger(value.maxServers) && value.maxServers >= 0
+      ? value.maxServers
+      : null;
+  return { available: value.available, servers, maxServers };
 }
 
 /** Returns null for a value that is not a redeemed claim. */

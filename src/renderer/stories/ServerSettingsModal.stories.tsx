@@ -3,7 +3,13 @@ import { createSignal, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
-import { STORY_HOST_STATUS, STORY_INVITES, STORY_PRESENCE, STORY_SERVERS } from "../src/preview/fixtures";
+import {
+  STORY_HOST_STATUS,
+  STORY_HOSTED_SITES,
+  STORY_INVITES,
+  STORY_PRESENCE,
+  STORY_SERVERS,
+} from "../src/preview/fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
 const localServer = STORY_SERVERS.find((server) => server.kind === "local") ?? STORY_SERVERS[0];
@@ -152,6 +158,28 @@ export const RemoteMember: Story = {
     server: { ...remoteServer, role: "member" },
     hostStatus: null,
     invites: [],
+  },
+};
+
+/** A Starter server with one site of its own and one unlinked site from before it was registered. */
+export const Sites: Story = {
+  args: {
+    initialSection: "sites",
+    hostedSites: {
+      api: {
+        list: async () => ({ sites: STORY_HOSTED_SITES.map((site) => ({ ...site })), limit: 3, used: 2 }),
+        delete: fn(async () => undefined),
+      },
+      onOpenSite: fn(),
+    },
+  },
+};
+
+export const SitesForMember: Story = {
+  args: {
+    ...Sites.args,
+    server: { ...remoteServer, role: "member" },
+    hostStatus: null,
   },
 };
 

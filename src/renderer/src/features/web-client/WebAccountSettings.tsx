@@ -2,7 +2,6 @@ import type { AppLanguage } from "@openbot/contracts/app-language";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  Globe2,
   Item,
   ItemActions,
   ItemContent,
@@ -18,17 +17,14 @@ import {
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
-import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
-import { createSettingsHostedSitesStore } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import type { WebAccountCalls } from "./web-account";
-import { openWebLink } from "./web-attachments";
 
-const TABS = ["profile", "preferences", "hosted-sites"] as const;
+const TABS = ["profile", "preferences"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
 
 const TAB_ITEMS = {
@@ -41,11 +37,6 @@ const TAB_ITEMS = {
     titleKey: "webClient.settings.preferences.title",
     descriptionKey: "webClient.settings.preferences.description",
     icon: SlidersHorizontal,
-  },
-  "hosted-sites": {
-    titleKey: "settings.tab.hostedSites.title",
-    descriptionKey: "settings.tab.hostedSites.description",
-    icon: Globe2,
   },
 } as const satisfies Record<
   WebAccountSettingsTab,
@@ -63,7 +54,8 @@ export interface WebAccountSettingsProps {
 
 /**
  * The account's own settings in the web client, where Settings opens the settings of a host. Profile
- * and Hosted sites are the desktop tabs and stores; Preferences holds what this browser keeps.
+ * is the desktop tab and store; Preferences holds what this browser keeps. Sites are in the settings
+ * of their server.
  */
 export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const { t } = useText();
@@ -89,15 +81,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
       onRevokeAccountSession: (sessionId) => props.calls.revokeSession(sessionId),
     },
     () => activeTab() === "profile",
-  );
-  const hostedSites = createSettingsHostedSitesStore(
-    {
-      get open() {
-        return props.open;
-      },
-      hostedSitesApi: props.calls.hostedSites,
-    },
-    () => activeTab() === "hosted-sites",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
 
@@ -175,10 +158,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
               />
             </ItemGroup>
           </SettingsSection>
-        </Tabs.Content>
-
-        <Tabs.Content value="hosted-sites" class="settings-modal-tab-panel" data-tab="hosted-sites">
-          <SettingsHostedSitesTab store={hostedSites} available onOpenSite={(url) => void openWebLink(url)} />
         </Tabs.Content>
       </SettingsDialogShell>
     </Tabs.Root>

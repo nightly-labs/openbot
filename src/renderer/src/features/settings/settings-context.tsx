@@ -52,10 +52,8 @@ const Settings = createSimpleContext({
      */
     const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
-    const [appSettingsTabRequest, setAppSettingsTabRequest] = createSignal<{
-      tab: SettingsTab;
-      nonce: number;
-    } | null>(null);
+    /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
+    const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -261,14 +259,11 @@ const Settings = createSimpleContext({
       return agentAutoApprovalEnabled({ ...approvalAutomation(), turbo: generalSettings().turboMode }, agentId);
     }
 
-    /**
-     * Remembers what to focus when the dialog closes; the dialog itself restores it. A `tab` shows
-     * that tab; without one, the dialog opens on the tab it showed last.
-     */
+    /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
     function openAppSettings(trigger?: HTMLElement | null, tab?: SettingsTab): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       appSettingsRestoreTarget = target;
-      if (tab) setAppSettingsTabRequest({ tab, nonce: Date.now() });
+      setAppSettingsTab(tab);
       setAppSettingsOpen(true);
     }
 
@@ -374,8 +369,8 @@ const Settings = createSimpleContext({
       appSettingsOpen,
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
+      appSettingsTab,
       openAppSettings,
-      appSettingsTabRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

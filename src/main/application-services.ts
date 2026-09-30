@@ -109,6 +109,7 @@ import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-se
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
+import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   computerUseDesktopPoint,
@@ -173,6 +174,7 @@ const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
 const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
+const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
@@ -285,6 +287,7 @@ export interface ApplicationServices {
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
   language: LanguageService;
+  logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
@@ -461,7 +464,11 @@ export async function createApplicationServices({
   await managedSkills.syncAll(store.list());
   await skillCreator.syncAll(store.list());
   await dataSkill.syncAll(store.list());
-  const hostedSites = new HostedSiteDesktopService(centralAuth);
+  const hostedSites = new HostedSiteDesktopService(centralAuth, () => {
+    // Read at request time: the team store is created later, and the server can register after launch.
+    const hostId = teamStore.getIdentity()?.serverId;
+    return hostId ? centralAuth.hostSiteCredential(hostId) : null;
+  });
   const billing = new BillingDesktopService(centralAuth, (url) => shell.openExternal(url));
   const hostedServers = new HostedServerDesktopService(
     withHostingDeveloperKey(centralAuth, hostingDeveloperKey),
@@ -528,6 +535,8 @@ export async function createApplicationServices({
     systemLocale: app.getLocale(),
   });
   await language.load();
+  const logoColor = new LogoColorService({ path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE) });
+  await logoColor.load();
   const notificationPreference = new NotificationPreferenceStore(
     join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
   );
@@ -1051,6 +1060,8 @@ export async function createApplicationServices({
     mcpServers: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
+    // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.
+    hostedSites,
     // Present, so the host advertises `agent-import-v1`. Any member can import.
     agentImport,
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
@@ -1475,6 +1486,7 @@ export async function createApplicationServices({
     approvalAutomation,
     agentAdminSettings,
     language,
+    logoColor,
     notificationPreference,
     agentInitialization,
     hostUpdateCoordinator,

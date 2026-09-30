@@ -1,11 +1,12 @@
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
-// the app update, MCP servers, storage and providers.
+// the app update, MCP servers, storage, hosted sites and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
 // them through their own transport, so the path, body and decoding of each request are here once.
 // The host answers only an owner or admin; a member gets a refusal, which the transport rejects.
 
 import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
+import { parseHostedSiteList } from "@openbot/contracts/hosted-sites";
 import {
   type AddedAgent,
   type AgentAdminSettings,
@@ -34,6 +35,7 @@ import {
   decodeProviderRuntimeSnapshot,
   decodeStorageUsage,
   type GetStorageUsageInput,
+  type HostedSiteList,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   type InstallAgentTemplateInput,
@@ -71,6 +73,7 @@ import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contra
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
@@ -270,6 +273,21 @@ export function deleteStoredFile(request: TeamApiRequest, input: DeleteStoredFil
 
 export function clearStorage(request: TeamApiRequest, input: ClearStorageInput): Promise<void> {
   return request("POST", STORAGE_ROUTES.clear, ignoreResponse, { ...input });
+}
+
+function decodeHostedSiteList(value: unknown): HostedSiteList {
+  const list = parseHostedSiteList(value);
+  if (!list) throw new Error("The host returned an invalid site list.");
+  return list;
+}
+
+/** Any member can read the sites of the server. */
+export function listHostedSites(request: TeamApiRequest): Promise<HostedSiteList> {
+  return request("POST", HOSTED_SITES_ROUTES.list, decodeHostedSiteList, {});
+}
+
+export function deleteHostedSite(request: TeamApiRequest, siteId: string): Promise<void> {
+  return request("POST", HOSTED_SITES_ROUTES.remove, ignoreResponse, { siteId });
 }
 
 /**

@@ -26,6 +26,7 @@ export function serverSupportsCapability(
       capability === "browser-view" ||
       capability === "mcp-servers-v1" ||
       capability === "storage-v1" ||
+      capability === "hosted-sites-v1" ||
       capability === "agent-admin-v1" ||
       capability === "skills-admin-v1" ||
       capability === "shared-tables-v1" ||

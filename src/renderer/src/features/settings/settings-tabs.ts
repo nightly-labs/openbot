@@ -2,26 +2,22 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   CircleArrowDown,
   CreditCard,
-  Globe2,
   MousePointer2,
   PanelTop,
   Server,
   Settings,
   Smartphone,
-  Sparkles,
   UserRound,
 } from "@openbot/ui";
 
 export type SettingsTab =
   | "general"
-  | "providers"
   | "dynamic-island"
   | "computer-use"
   | "profile"
   | "billing"
   | "mobile-connect"
   | "updates"
-  | "hosted-sites"
   | "hosted-servers";
 
 /**
@@ -42,12 +38,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.general.title",
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
-  },
-  {
-    value: "providers",
-    titleKey: "settings.tab.providers.title",
-    descriptionKey: "settings.tab.providers.description",
-    icon: Sparkles,
   },
   {
     value: "dynamic-island",
@@ -84,12 +74,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.updates.title",
     descriptionKey: "settings.tab.updates.description",
     icon: CircleArrowDown,
-  },
-  {
-    value: "hosted-sites",
-    titleKey: "settings.tab.hostedSites.title",
-    descriptionKey: "settings.tab.hostedSites.description",
-    icon: Globe2,
   },
   {
     value: "hosted-servers",
