@@ -1,0 +1,15 @@
+{
+  "display_information": {
+    "name": "OpenBot (dev)",
+    "description": "Creates one Slack app for each of your OpenBot agents."
+  },
+  "oauth_config": {
+    "redirect_urls": ["https://openbot-auth-api-test.internal9671.workers.dev/v2/slack/manager/callback"],
+    "scopes": { "user": ["app_configurations:read", "app_configurations:write"] }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
