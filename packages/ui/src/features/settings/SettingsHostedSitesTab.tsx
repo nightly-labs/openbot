@@ -34,7 +34,7 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
           <Show when={props.store.state.limit}>
             {(limit) => (
               <span class="settings-modal-row-title">
-                {t("settings.hostedSites.usage", { used: props.store.state.used, limit: limit() })}
+                {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit() })}
               </span>
             )}
           </Show>

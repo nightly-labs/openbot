@@ -1410,5 +1410,6 @@ function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
 
 function siteLimitError(serverId: string | null, limit: number): HostedSiteInputError {
   const owner = serverId === null ? "This account has no server, and it" : "This server";
-  return new HostedSiteInputError(409, "site_limit", `${owner} already has ${limit} active sites, its limit.`);
+  const sites = limit === 1 ? "1 active site" : `${limit} active sites`;
+  return new HostedSiteInputError(409, "site_limit", `${owner} is at its limit of ${sites}.`);
 }

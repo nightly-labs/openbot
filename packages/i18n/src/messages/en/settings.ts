@@ -236,7 +236,7 @@ export const messages = defineMessages("settings", {
   // The Hosted sites tab.
   "settings.hostedSites.title": "Published sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",
-  "settings.hostedSites.usage": "{used} of {limit} sites",
+  "settings.hostedSites.usage": { one: "{used} of {count} site", other: "{used} of {count} sites" },
   "settings.hostedSites.expiryNote":
     "Sites expire 30 days after publication. Ask an agent to publish or update a site.",
   "settings.hostedSites.empty": "This server does not have a hosted site yet. Ask an agent to publish one.",

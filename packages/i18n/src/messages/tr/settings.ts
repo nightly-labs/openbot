@@ -224,7 +224,7 @@ export const messages = {
     "Bu sunucunun sahipleri ve yöneticileri bir güncelleme indirebilir ve bu bilgisayarda OpenBot'u yeniden başlatabilir.",
   "settings.hostedSites.title": "Yayınlanan siteler",
   "settings.hostedSites.unavailable": "Site barındırma kullanılamıyor.",
-  "settings.hostedSites.usage": "{limit} siteden {used} tanesi",
+  "settings.hostedSites.usage": { one: "{count} siteden {used} tanesi", other: "{count} siteden {used} tanesi" },
   "settings.hostedSites.expiryNote":
     "Sitelerin süresi yayınlandıktan 30 gün sonra dolar. Bir ajandan bir site yayınlamasını veya güncellemesini isteyin.",
   "settings.hostedSites.empty": "Bu sunucunun henüz barındırılan bir sitesi yok. Bir ajandan yayınlamasını isteyin.",

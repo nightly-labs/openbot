@@ -216,7 +216,7 @@ export const messages = {
   "settings.updates.actionFailed": "OpenBot をアップデートできませんでした。",
   "settings.hostedSites.title": "公開済みのサイト",
   "settings.hostedSites.unavailable": "サイトのホスティングは利用できません。",
-  "settings.hostedSites.usage": "{used} / {limit} サイト",
+  "settings.hostedSites.usage": { other: "{used} / {count} サイト" },
   "settings.hostedSites.expiryNote":
     "サイトは公開から 30 日後に期限切れになります。サイトの公開や更新はエージェントに依頼してください。",
   "settings.hostedSites.empty": "このサーバーには公開サイトがまだありません。エージェントに公開を依頼してください。",

@@ -227,7 +227,7 @@ export const messages = {
   "settings.updates.actionFailed": "Impossible de mettre à jour OpenBot.",
   "settings.hostedSites.title": "Sites publiés",
   "settings.hostedSites.unavailable": "L’hébergement de sites n’est pas disponible.",
-  "settings.hostedSites.usage": "{used} sites sur {limit}",
+  "settings.hostedSites.usage": { one: "{used} sur {count} site", other: "{used} sur {count} sites" },
   "settings.hostedSites.expiryNote":
     "Les sites expirent 30 jours après leur publication. Demandez à un agent de publier ou de mettre à jour un site.",
   "settings.hostedSites.empty": "Ce serveur n’a pas encore de site hébergé. Demandez à un agent d’en publier un.",
