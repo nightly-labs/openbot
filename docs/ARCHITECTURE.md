@@ -881,7 +881,9 @@ the existing agent service and validate arguments before changing state.
 read-only `openbot.list_models` returns the models of each provider that the model picker shows, with
 their reasoning efforts and the default model for a request that names only a provider. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
-it creates the agent. Without these fields, the new agent starts on the user's default.
+it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
+provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
+When the caller's provider no longer lists its model, the new agent starts on the user's default.
 Creation stays this small. The calling agent then configures the new agent, or any other local
 agent, with the same tools that act on itself. `openbot.read_agent` returns one agent's setup:
 profile, runtime, access, Computer Use, notifications, auto-approve, installed skills, routines,
