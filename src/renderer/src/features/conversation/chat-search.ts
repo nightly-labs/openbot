@@ -40,53 +40,83 @@ export function renderChatSearchHighlights(matches: ChatSearchMatch[], currentIn
   registry.set(CURRENT_HIGHLIGHT, active);
 }
 
+const HIDDEN_TEXT = '[aria-hidden="true"], .sr-only, .message-actions';
+
+/** Elements that start a new rendered line. A code block renders each line as its own span. */
+const LINE_CONTAINER =
+  "address, article, aside, blockquote, dd, details, div, dl, dt, figcaption, figure, footer, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, summary, table, td, th, tr, ul, .message-code-line";
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+/**
+ * The query as a pattern whose spaces match any run of whitespace, as the backend search does. A
+ * stored newline renders as `<br>` and carries no character, so the caller puts a space at each
+ * line boundary.
+ */
+function searchPattern(query: string): RegExp | null {
+  const terms = query.trim().split(/\s+/u).filter(Boolean).map(escapeRegExp);
+  return terms.length > 0 ? new RegExp(terms.join("\\s+"), "giu") : null;
+}
+
 export function findChatSearchMatches(root: HTMLElement, query: string): ChatSearchMatch[] {
-  const needle = query.trim().toLocaleLowerCase();
-  if (!needle) return [];
+  const pattern = searchPattern(query);
+  if (!pattern) return [];
 
   const matches: ChatSearchMatch[] = [];
   for (const message of root.querySelectorAll<HTMLElement>("[data-chat-search-message]")) {
     const segments: TextSegment[] = [];
     let text = "";
-    const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT, {
+    const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode(node) {
+        if (node instanceof Element) {
+          return node.tagName === "BR" && !node.closest(HIDDEN_TEXT)
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_SKIP;
+        }
         if (!(node instanceof Text) || !node.data) return NodeFilter.FILTER_REJECT;
         const parent = node.parentElement;
-        if (!parent || parent.closest('[aria-hidden="true"], .sr-only, .message-actions')) {
-          return NodeFilter.FILTER_REJECT;
-        }
+        if (!parent || parent.closest(HIDDEN_TEXT)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
 
+    let lineBreak = false;
+    let line: Element | null = null;
     let node = walker.nextNode();
     while (node) {
-      if (!(node instanceof Text)) {
-        node = walker.nextNode();
-        continue;
+      if (node instanceof Text) {
+        const container = node.parentElement?.closest(LINE_CONTAINER) ?? message;
+        // The space belongs to no segment, so a match across it still maps to the text on both sides.
+        if (segments.length > 0 && (lineBreak || container !== line)) text += " ";
+        lineBreak = false;
+        line = container;
+        const start = text.length;
+        text += node.data;
+        segments.push({ node, start, end: text.length });
+      } else {
+        lineBreak = true;
       }
-      const textNode = node;
-      const start = text.length;
-      text += textNode.data;
-      segments.push({ node: textNode, start, end: text.length });
       node = walker.nextNode();
     }
 
-    const searchableText = text.toLocaleLowerCase();
-    let offset = 0;
-    while (offset <= searchableText.length - needle.length) {
-      const matchStart = searchableText.indexOf(needle, offset);
-      if (matchStart === -1) break;
-      const matchEnd = matchStart + needle.length;
-      const startSegment = segments.find((segment) => matchStart >= segment.start && matchStart < segment.end);
-      const endSegment = segments.find((segment) => matchEnd > segment.start && matchEnd <= segment.end);
+    // Matches come in order, so each segment lookup continues from the previous match.
+    let segmentIndex = 0;
+    for (const found of text.matchAll(pattern)) {
+      const matchStart = found.index;
+      const matchEnd = matchStart + found[0].length;
+      while ((segments[segmentIndex]?.end ?? matchStart + 1) <= matchStart) segmentIndex += 1;
+      const startSegment = segments[segmentIndex];
+      let endIndex = segmentIndex;
+      while ((segments[endIndex]?.end ?? matchEnd) < matchEnd) endIndex += 1;
+      const endSegment = segments[endIndex];
       if (startSegment && endSegment) {
         const range = document.createRange();
         range.setStart(startSegment.node, matchStart - startSegment.start);
         range.setEnd(endSegment.node, matchEnd - endSegment.start);
         matches.push({ range, message });
       }
-      offset = matchEnd;
     }
   }
   return matches;

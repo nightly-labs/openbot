@@ -1252,10 +1252,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
       },
       searchConversationMessages: async (input) => {
-        const query = input.query.trim().toLocaleLowerCase();
+        const query = input.query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
         const results = agents.flatMap((agent) =>
           getSnapshot(agent.id)
-            .messages.filter((message) => message.text.toLocaleLowerCase().includes(query))
+            .messages.filter((message) => message.text.replace(/\s+/g, " ").toLocaleLowerCase().includes(query))
             .map((message) => ({ agentId: agent.id, message: clone(message) })),
         );
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };

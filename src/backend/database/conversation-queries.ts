@@ -12,7 +12,7 @@ import {
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { DatabaseCore } from "./database-core";
+import { COLLAPSE_WHITESPACE_FUNCTION, type DatabaseCore } from "./database-core";
 import {
   databaseRow,
   databaseRows,
@@ -273,6 +273,9 @@ export class ConversationQueries {
     const limit = pageLimit(requestedLimit);
     const offset = cursor ? decodeSearchCursor(cursor) : 0;
     const pattern = `%${escapeLike(normalized)}%`;
+    const storedText = "json_extract(message.message_json, '$.text')";
+    // Only a query with a space can match across a line break, so only that query pays for the call.
+    const searchedText = normalized.includes(" ") ? `${COLLAPSE_WHITESPACE_FUNCTION}(${storedText})` : storedText;
     const filter = agentId ? "AND thread.agent_id = ?" : "";
     const parameters = agentId ? [pattern, agentId] : [pattern];
     const countRow = databaseRow(
@@ -281,7 +284,7 @@ export class ConversationQueries {
           `SELECT COUNT(*) AS count
            FROM projection_thread_messages message
            JOIN projection_threads thread ON thread.thread_id = message.thread_id
-           WHERE LOWER(json_extract(message.message_json, '$.text')) LIKE ? ESCAPE '\\'
+           WHERE LOWER(${searchedText}) LIKE ? ESCAPE '\\'
              AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
              AND COALESCE(message.item_type, '') != 'commentary'
              AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -300,7 +303,7 @@ export class ConversationQueries {
           `SELECT thread.agent_id, message.message_json
            FROM projection_thread_messages message
            JOIN projection_threads thread ON thread.thread_id = message.thread_id
-           WHERE LOWER(json_extract(message.message_json, '$.text')) LIKE ? ESCAPE '\\'
+           WHERE LOWER(${searchedText}) LIKE ? ESCAPE '\\'
              AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
              AND COALESCE(message.item_type, '') != 'commentary'
              AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
