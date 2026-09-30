@@ -52,6 +52,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve("src/renderer/index.html"),
+          helper: resolve("src/renderer/helper.html"),
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),

@@ -457,13 +457,18 @@ export function createComputerUsePermissionHelpWindow(translate: AppTranslate): 
   return window;
 }
 
+/** The entry for the helper windows. It does not load `App`, so each window uses less memory. */
+function helperRendererUrl(developmentUrl: string | undefined): URL {
+  return developmentUrl ? new URL("helper.html", `${developmentUrl}/`) : new URL("openbot-app://app/helper.html");
+}
+
 export function loadComputerUsePermissionHelpRenderer(
   window: BrowserWindow,
   permission: MacPermissionId,
   sunshine = false,
 ): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "computer-use-permission-help");
   url.searchParams.set("permission", permission);
   if (sunshine) url.searchParams.set("application", "sunshine");
@@ -472,7 +477,7 @@ export function loadComputerUsePermissionHelpRenderer(
 
 export function loadComputerUseHighlightRenderer(window: BrowserWindow): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "computer-use-highlight");
   return window.loadURL(url.toString());
 }
@@ -520,7 +525,7 @@ export function showMainWindow(window: BrowserWindow): void {
 export function loadDynamicIslandRenderer(window: BrowserWindow, display: Display, variant: AppVariant): Promise<void> {
   const displayMode = display.internal ? "notch" : "island";
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  const url = helperRendererUrl(developmentUrl);
   url.searchParams.set("surface", "dynamic-island");
   url.searchParams.set("display", displayMode);
   url.searchParams.set("variant", variant);
