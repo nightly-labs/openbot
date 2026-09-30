@@ -45,7 +45,7 @@ export interface GlobalSearchChannel {
   id: string;
   name: string;
   /** The last message, as one line. */
-  detail?: string;
+  detail?: string | undefined;
 }
 
 export interface GlobalSearchFile {
@@ -71,7 +71,7 @@ export interface GlobalSearchAction {
   /** Actions do things; settings open a settings page. The two show as separate groups. */
   group: "actions" | "settings";
   icon: typeof Settings;
-  detail?: string;
+  detail?: string | undefined;
   /** More words that find the action, such as the English name in another language. */
   keywords?: string;
   run: () => void;
@@ -105,7 +105,7 @@ interface GlobalSearchSection {
 export interface GlobalSearchPage<T> {
   results: T[];
   /** All results, when the source counts them. */
-  total?: number;
+  total?: number | undefined;
   /** Gives the next page; null on the last page. */
   nextCursor: string | null;
 }
@@ -117,7 +117,7 @@ interface GlobalSearchProps {
   open: boolean;
   agents: AgentProfile[];
   /** Omit to hide the Channels filter, for a client or server without channels. */
-  channels?: GlobalSearchChannel[];
+  channels?: GlobalSearchChannel[] | undefined;
   /** Omit to hide the Routines filter. */
   routines?: GlobalSearchRoutine[];
   routinesLoading?: boolean;
@@ -126,7 +126,7 @@ interface GlobalSearchProps {
   /** Omit to hide the Messages filter. The Messages filter loads the next page as the user scrolls. */
   onSearchMessages?: PagedSearch<MessageHit>;
   /** Omit to hide the Files filter. An empty query lists the newest files. */
-  onSearchFiles?: PagedSearch<GlobalSearchFile>;
+  onSearchFiles?: PagedSearch<GlobalSearchFile> | undefined;
   onOpenChange: (open: boolean) => void;
   onSelectAgent: (agentId: string) => void;
   onSelectChannel?: (channelId: string) => void;
@@ -244,7 +244,7 @@ function matching<T extends GlobalSearchResult>(items: T[], query: string): T[] 
 function section(
   key: SectionKey,
   results: GlobalSearchResult[],
-  options: { limit?: number; total?: number; more?: boolean } = {},
+  options: { limit?: number | undefined; total?: number | undefined; more?: boolean } = {},
 ): GlobalSearchSection {
   return {
     key,
@@ -281,7 +281,7 @@ function createRemoteSearch<T>(
   request: () => { search: PagedSearch<T>; query: string } | null,
   key: (item: T) => string,
 ): RemoteSearch<T> {
-  type Loaded = { items: T[]; total?: number; cursor: string | null };
+  type Loaded = { items: T[]; total?: number | undefined; cursor: string | null };
   const empty: Loaded = { items: [], cursor: null };
   const [loaded, setLoaded] = createSignal<Loaded>(empty);
   const [pending, setPending] = createSignal(false);
@@ -445,7 +445,7 @@ function ResultIcon(props: { icon: typeof Settings }) {
 }
 
 /** A row with a name that matches the query and one line of detail. */
-function NamedRow(props: { name: string; detail?: string; time?: string; query: string }) {
+function NamedRow(props: { name: string; detail?: string | undefined; time?: string | undefined; query: string }) {
   return (
     <>
       <Combobox.ItemLabel class="global-search-result-title">

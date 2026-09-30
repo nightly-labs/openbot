@@ -27,7 +27,7 @@ interface VirtualListboxProps<Node extends ListNode> {
   /** Receives the function to give to `Combobox.Listbox` as `scrollToItem`. */
   registerScrollToItem: (scroll: (key: string) => void) => void;
   /** Runs when the view comes near the last row, to load the next page. */
-  onEndReached?: () => void;
+  onEndReached?: (() => void) | undefined;
 }
 
 const OVERSCAN = 8;
