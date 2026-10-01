@@ -37,46 +37,56 @@ Until the Marketplace approves the app, `conversations.replies` gives 1 request 
 messages. OpenBot reads the thread as context with a 5 second limit, so answers still work, with less
 context.
 
-## Steps you can do now
+## Rollout
 
-1. **Slack app settings** (`apps/slack-app/README.md`). For `A0C5H5C95NH` and `A0C5G5XGS83`:
-   - [ ] Copy the client ID, client secret and signing secret (steps 2 and 3).
-2. **Worker secrets** (`apps/auth-api`). Without them, the Slack routes return
-   `503 slack_not_configured`. Use the development app for test and the production app for
-   production.
+What the workflows do, checked on 2026-10-01:
 
-   | Name | Kind | Value |
-   | --- | --- | --- |
-   | `SLACK_CLIENT_ID` | variable | The app's client ID |
-   | `SLACK_CLIENT_SECRET` | secret | The app's client secret |
-   | `SLACK_STATE_SECRET` | secret | Random, 32 bytes or more |
-   | `SLACK_ROUTE_PRIVATE_JWK` | secret | New ES256 private JWK |
-   | `SLACK_ROUTE_KEY_ID` | variable | For example `openbot-slack-route-1` |
-   | `REMOTE_TICKET_PUBLIC_JWKS` | secret (update) | Add the route public JWK beside the ticket key |
+- **Worker.** CI job `deploy-production` (`.github/workflows/ci.yml`) runs on every push to `main`. It
+  applies the D1 migrations, then deploys with `--secrets-file`. The file holds only GitHub Actions
+  secrets of the `cloudflare-production` environment, and it has no Slack secret. Wrangler adds those
+  secrets to the existing ones and deletes none, so the Slack secrets that `bun run deploy`
+  (`scripts/deploy-auth-api.ts`, from the Dotenvx `.env.production`) uploads stay.
+- **But** `REMOTE_TICKET_PUBLIC_JWKS` is in that file. Each CI deploy writes the GitHub secret's value,
+  which was last changed on 2026-08-31 and does not have the Slack route key. Signal then refuses every
+  route ticket.
+- **Signal.** No workflow. `docs/remote-session-deployment.md` deploys it by hand over SSH. The release
+  links the server's own `/opt/openbot/remote/.env.production`; the archive leaves out `.env*`. The
+  `SLACK_SIGNING_SECRET` in this repository does not reach the server by itself.
+- **Desktop.** `release.yml` on a version tag.
 
-   Signal reads keys from `REMOTE_TICKET_JWKS_URL` (`api.openbot.run/.well-known/jwks.json`), which
-   serves `REMOTE_TICKET_PUBLIC_JWKS`, so the Worker update covers Signal too. Make the key pair:
+Live state on 2026-10-01: `api.openbot.run/.well-known/jwks.json` lists only `openbot-remote-1`.
+`/v2/slack/authorize`, `/v2/remote/slack-route/validate` and `signal.openbot.run/v1/slack/events`
+return 404.
 
-   ```sh
-   bun -e 'import { exportJWK, generateKeyPair } from "jose";
-   const { privateKey, publicKey } = await generateKeyPair("ES256", { extractable: true });
-   const kid = "openbot-slack-route-1";
-   console.log(JSON.stringify({ ...(await exportJWK(privateKey)), kid, alg: "ES256" }));
-   console.log(JSON.stringify({ ...(await exportJWK(publicKey)), kid, alg: "ES256", use: "sig" }));'
-   ```
+Do the steps in this order:
 
-   - [ ] Apply D1 migration `0025_slack_workspace_routes.sql` (the CI deploy does this first).
-   - [ ] Test: `bun run deploy:test`. Production: `bun run deploy`.
-3. **Signal** (`remote/`). Deploy it before any desktop release with Slack: an old Signal refuses the
-   new `ingress` hello.
-   - [ ] Set `SLACK_SIGNING_SECRET` in `remote/.env.production` (Dotenvx).
-   - [ ] Deploy Signal (`docs/remote-session-deployment.md`) and `remote/nginx/signal.openbot.run.conf`.
-4. **Manifests.** Applied on 2026-10-01 with `apps.manifest.update` (`slack manifest sync` needs an
-   installed app). After Signal serves `/v1/slack/events`:
-   - [ ] Verify the request URL in each app's **Event Subscriptions** and **Interactivity** pages.
-5. **Desktop.**
-   - [ ] Open a PR for `slack-messaging`. It changes the unreleased database migration 25.
-   - [ ] Merge after Signal is live. Run `release-upgrade-safety`, then release.
+1. **GitHub secret.** Set `REMOTE_TICKET_PUBLIC_JWKS` in the `cloudflare-production` environment to the
+   decrypted value from `apps/auth-api/.env.production`. It lists `openbot-remote-1` and
+   `openbot-slack-route-1`.
+2. **Merge** the `slack-messaging` PR. CI applies D1 migration `0025` and deploys the Worker.
+3. **Worker Slack secrets**, one time: `bun run api:deploy` from `main`. It uploads `SLACK_CLIENT_ID`,
+   `SLACK_CLIENT_SECRET`, `SLACK_STATE_SECRET`, `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID`.
+   Check:
+   - [ ] `jwks.json` lists `openbot-slack-route-1`.
+   - [ ] `POST /v2/slack/authorize` without a session gives 401, not 404 or 503.
+   - [ ] `POST /v2/remote/slack-route/validate` without a signature gives 401.
+4. **Signal**, after the Worker: Signal asks `/v2/remote/slack-route/validate` for 5 minutes after it
+   starts, so an older Worker makes every `ingress` hello fail.
+   - [ ] Add `SLACK_SIGNING_SECRET` (the production app's signing secret) to the server's
+         `/opt/openbot/remote/.env.production` with the server's Dotenvx key. Not checked: whether the
+         repository file and the server file use the same key pair.
+   - [ ] Deploy as `docs/remote-session-deployment.md` says, with `remote/nginx/signal.openbot.run.conf`.
+   - [ ] `POST https://signal.openbot.run/v1/slack/events` without a signature gives 401, not 404 or
+         503.
+5. **Slack app settings** for `A0C5H5C95NH`:
+   - [ ] Verify the request URL in **Event Subscriptions** and **Interactivity**.
+   - [ ] **Manage Distribution**: turn on distribution, unlisted, for the pilot.
+6. **Desktop.** Run `release-upgrade-safety`, then release. An old Signal refuses the new `ingress`
+   hello, so step 4 comes first.
+
+The test Worker (`bun run deploy:test`) reads `.env.shared`, then `.env.production`. `.env.shared` has
+no route key, so it takes the production route key and JWKS. This computer has no key for
+`.env.shared`.
 
 ## End-to-end test
 
@@ -113,8 +123,8 @@ Then the same with production, in the unlisted pilot.
 | Apps | `A0C5H5C95NH` (production), `A0C5G5XGS83` (development). OpenBot manifest and icons applied on 2026-10-01. Request URL not verified (Signal not deployed). Distribution off. |
 | Old apps | `A0C5K4J6AUW`, `A0C5QNZTWLC` in `openbot-dev` (`T0C5443H7CP`). Not used, not deleted. |
 | Code | Branch `slack-messaging`, not merged |
-| Worker secrets, Signal secret | Not set |
-| Signal with the Slack route | Not deployed |
+| Worker and Signal secrets | Encrypted in this repository. Not uploaded. GitHub `REMOTE_TICKET_PUBLIC_JWKS` has no route key. |
+| Worker and Signal with the Slack route | Not deployed (404 on 2026-10-01) |
 
 ## Sources
 

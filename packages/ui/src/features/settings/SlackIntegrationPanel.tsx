@@ -40,7 +40,6 @@ import {
   type IntegrationStatus,
   LogoTile,
   SlackMark,
-  StatusPill,
   Stepper,
   WizardDialog,
   type WizardLink,
@@ -96,26 +95,6 @@ function rowKind(connection: MessagingConnection): RowKind {
       return "attention";
   }
 }
-
-const ROW_STATUS = {
-  live: "connected",
-  setup: "idle",
-  paused: "idle",
-  attention: "attention",
-} as const satisfies Record<RowKind, IntegrationStatus>;
-
-const STATE_LABEL = {
-  connecting: "messaging.state.connecting",
-  connected: "messaging.state.connected",
-  reconnecting: "messaging.state.reconnecting",
-  paused: "messaging.state.paused",
-  invalid_token: "messaging.state.invalid_token",
-  missing_scope: "messaging.state.missing_scope",
-  rate_limited: "messaging.state.rate_limited",
-  secret_storage_unavailable: "messaging.state.secret_storage_unavailable",
-  error: "messaging.state.error",
-  relay_unavailable: "messaging.state.relay_unavailable",
-} as const satisfies Record<MessagingConnection["state"], AppTextKey>;
 
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   invalid_token: "messaging.help.invalid_token",
@@ -257,12 +236,6 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         )}
       </For>
 
-      <Show when={props.connections.length > 0}>
-        <Text class="slack-integration-note" variant="caption" tone="muted">
-          {t("connector.slack.warning")}
-        </Text>
-      </Show>
-
       <SlackConnectDialog
         open={dialogOpen()}
         connection={first()}
@@ -331,10 +304,7 @@ function WorkspaceRow(props: {
         </LogoTile>
       </ItemMedia>
       <ItemContent>
-        <ItemTitle>
-          {props.connection.workspaceName}
-          <StatusPill status={ROW_STATUS[kind()]} label={t(STATE_LABEL[props.connection.state])} />
-        </ItemTitle>
+        <ItemTitle>{props.connection.workspaceName}</ItemTitle>
         <ItemDescription>{note()}</ItemDescription>
       </ItemContent>
       <ItemActions>
@@ -342,9 +312,6 @@ function WorkspaceRow(props: {
           <Match when={kind() === "attention"}>{action(t("connector.slack.reconnect"), props.onReconnect)}</Match>
           <Match when={kind() === "paused"}>
             {action(t("connector.slack.resume"), () => props.onSetEnabled(true))}
-          </Match>
-          <Match when={kind() === "live" || kind() === "setup"}>
-            {action(t("connector.slack.pause"), () => props.onSetEnabled(false))}
           </Match>
         </Switch>
         <Button

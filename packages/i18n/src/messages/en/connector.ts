@@ -106,7 +106,6 @@ export const messages = defineMessages("connector", {
     "OpenBot does not have these permissions in Slack: {scopes}. Disconnect the workspace, then connect it again.",
   "connector.slack.retryAt": "Slack asked OpenBot to wait. It tries again at {time}.",
   "connector.slack.reconnect": "Reconnect",
-  "connector.slack.pause": "Pause",
   "connector.slack.resume": "Resume",
   // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}: {name}",
@@ -117,8 +116,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.orchestratorNoneDescription": "Add the Slack Orchestrator, or Slack gets no answer.",
   "connector.slack.inviteNote":
     "OpenBot joins every public channel by itself, and each new one. For a private channel, invite it: /invite @OpenBot.",
-  "connector.slack.warning":
-    "Anyone who can post in the Slack workspace can give these agents work. They run on this computer with the access you gave them, and a hosted server stays awake while Slack is connected.",
   // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.slack.stepWorkspace": "Workspace",
   "connector.slack.stepAgent": "Agent",
