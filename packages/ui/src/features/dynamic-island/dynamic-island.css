@@ -193,7 +193,7 @@
 /* The compact content blurs a little while it moves with the surface, as much as the move is large.
    The blur bridges the old and the new place, and a transition keeps it interruptible. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-ear-content {
-  filter: blur(calc(0.6px * var(--dynamic-island-compact-motion, 1)));
+  filter: blur(calc(0.4px * var(--dynamic-island-compact-motion, 1)));
 }
 
 .dynamic-island-hover-content {

@@ -94,6 +94,17 @@ const IDLE_GREETING_NAMES = {
   "🙌": "cheer",
   "✨": "sparkles",
 } as const satisfies Record<IdleGreetingEmoji, string>;
+/**
+ * The emoji on the back of a greeting's 3D card. The card turns to it as the greeting moves: the
+ * wave turns into heart hands, the smile spins into a grin, and the raised hands turn to clap.
+ * Heart hands, not a thumbs up or an OK hand: those two are rude in some places.
+ */
+const IDLE_GREETING_BACKS: Record<IdleGreetingEmoji, string | undefined> = {
+  "👋": "🫶",
+  "😊": "😄",
+  "🙌": "👏",
+  "✨": undefined,
+};
 const IDLE_GREETING_INTERVAL = 8_000;
 const QUESTION_SWAP_EXIT_DURATION = 200;
 const QUESTION_SWAP_ENTER_DURATION = 320;
@@ -836,6 +847,22 @@ function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
   );
 }
 
+/** A greeting as a card with a front and a back face, so its motion can turn it in 3D. */
+function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
+  return (
+    <span class="dynamic-island-surface-idle-greeting-card">
+      <span class="dynamic-island-surface-idle-greeting-face">{props.emoji}</span>
+      <Show when={IDLE_GREETING_BACKS[props.emoji]}>
+        {(back) => (
+          <span class="dynamic-island-surface-idle-greeting-face dynamic-island-surface-idle-greeting-face-back">
+            {back()}
+          </span>
+        )}
+      </Show>
+    </span>
+  );
+}
+
 function IdleGreetingEmoji(): JSX.Element {
   const [index, setIndex] = createSignal(0);
   const [activeSlot, setActiveSlot] = createSignal<0 | 1>(0);
@@ -874,14 +901,14 @@ function IdleGreetingEmoji(): JSX.Element {
         data-greeting={IDLE_GREETING_NAMES[firstEmoji()]}
         data-active={activeSlot() === 0 ? "true" : undefined}
       >
-        {firstEmoji()}
+        <IdleGreetingCard emoji={firstEmoji()} />
       </span>
       <span
         class="dynamic-island-surface-idle-greeting-layer"
         data-greeting={IDLE_GREETING_NAMES[secondEmoji()]}
         data-active={activeSlot() === 1 ? "true" : undefined}
       >
-        {secondEmoji()}
+        <IdleGreetingCard emoji={secondEmoji()} />
       </span>
     </span>
   );
