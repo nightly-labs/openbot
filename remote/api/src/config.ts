@@ -23,7 +23,7 @@ export interface RemoteApiConfig {
   slackSigningSecrets: SlackSigningSecret[];
 }
 
-export interface SlackSigningSecret {
+interface SlackSigningSecret {
   appId: string;
   secret: string;
 }
