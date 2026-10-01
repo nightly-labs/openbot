@@ -90,8 +90,9 @@ const COMPACT_RESIZE_SETTLE = 0.6;
 const COMPACT_RESIZE_FULL_MOTION_DISTANCE = 120;
 const COMPACT_RESIZE_LARGE_MOTION = 0.5;
 // After a large move, `data-compact-settled` marks the landing for this long, so the compact content
-// can play a short arrival. A small move, such as one slow slider step, gets none.
-const COMPACT_SETTLED_DURATION = 480;
+// can play a short arrival that is shorter than this. A small move, such as one slow slider step,
+// gets none.
+const COMPACT_SETTLED_DURATION = 700;
 const CONTENT_ENTER_DELAY = 90;
 const CONTENT_BLUR_OPEN_DURATION = 460;
 const CONTENT_BLUR_CLOSE_DURATION = 450;

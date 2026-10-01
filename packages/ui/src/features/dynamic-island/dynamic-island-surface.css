@@ -185,28 +185,50 @@ body:has(.dynamic-island-surface),
 }
 
 .dynamic-island-shell[data-compact-settled] .dynamic-island-surface-idle-greeting {
-  animation: dynamic-island-greeting-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: dynamic-island-greeting-pop 600ms var(--dynamic-island-greeting-pop-ease);
+}
+
+/* One damped spring (damping 0.5, response 0.4s, with a push), sampled, so the pop is one smooth
+   overshoot to about 1.06 and back, not a curve per keyframe. The tilt rides the same spring. */
+.dynamic-island-shell {
+  --dynamic-island-greeting-pop-ease: linear(
+    0,
+    0.571 4.2%,
+    1.01 8.3%,
+    1.306 12.5%,
+    1.467 16.7%,
+    1.517 20.8%,
+    1.485 25.0%,
+    1.403 29.2%,
+    1.297 33.3%,
+    1.188 37.5%,
+    1.09 41.7%,
+    1.013 45.8%,
+    0.96 50.0%,
+    0.928 54.2%,
+    0.916 58.3%,
+    0.919 62.5%,
+    0.931 66.7%,
+    0.947 70.8%,
+    0.965 75.0%,
+    0.982 79.2%,
+    0.995 83.3%,
+    1.005 87.5%,
+    1.011 91.7%,
+    1.013 95.8%,
+    1
+  );
 }
 
 @keyframes dynamic-island-greeting-pop {
-  0% {
+  from {
     opacity: 0.6;
     scale: 0.88;
-    rotate: 0deg;
+    rotate: -5deg;
   }
 
-  35% {
+  to {
     opacity: 1;
-    scale: 1.14;
-    rotate: -8deg;
-  }
-
-  70% {
-    scale: 0.98;
-    rotate: 5deg;
-  }
-
-  100% {
     scale: 1;
     rotate: 0deg;
   }
