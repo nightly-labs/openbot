@@ -50,7 +50,7 @@ export type InboundAction =
     }
   | { type: "stop"; token: string; actorId: string; target: MessageTarget; platformMessageId: string };
 
-export interface MessageButton {
+interface MessageButton {
   action: "accept" | "decline" | "stop";
   label: string;
   /** Opaque and single use. It maps to the request only in the host's memory. */

@@ -2,7 +2,7 @@ import { open, rm } from "node:fs/promises";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { MessagingConnectionError } from "../messaging-types";
 
-export const SLACK_API_ORIGIN = "https://slack.com";
+const SLACK_API_ORIGIN = "https://slack.com";
 
 /** Slack's error codes that mean the token no longer works. */
 const AUTH_ERRORS = new Set(["invalid_auth", "not_authed", "token_revoked", "token_expired", "account_inactive"]);

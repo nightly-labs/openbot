@@ -13,7 +13,7 @@ export interface MessagingAnswerFile {
   mimeType: string;
 }
 
-export type MessagingTurnStatus = "completed" | "failed" | "interrupted";
+type MessagingTurnStatus = "completed" | "failed" | "interrupted";
 
 /**
  * `followUp` marks a turn that a teammate's answer started, not an external message: its answer goes

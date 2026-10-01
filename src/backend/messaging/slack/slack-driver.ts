@@ -39,7 +39,7 @@ const BUTTON_ACTIONS = {
 } as const;
 
 /** The Slack Web API side of one connection. It never logs message text or a response body. */
-export class SlackAdapter implements MessagingAdapter {
+class SlackAdapter implements MessagingAdapter {
   readonly platform = "slack" as const;
   readonly #api: SlackWebApi;
   readonly #names = new Map<string, Promise<string>>();

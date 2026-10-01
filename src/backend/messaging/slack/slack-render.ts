@@ -1,5 +1,5 @@
 /** Slack cuts a message at 40,000 characters and folds long ones; this keeps each post readable. */
-export const SLACK_CHUNK_CHARACTERS = 3_900;
+const SLACK_CHUNK_CHARACTERS = 3_900;
 
 const FENCE = "```";
 

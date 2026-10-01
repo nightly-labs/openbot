@@ -115,3 +115,9 @@ export function isSlackOverview(value: unknown): value is SlackOverview {
     value.connections.every(isMessagingConnection)
   );
 }
+
+export function isAddSlackOrchestratorResult(value: unknown): value is AddSlackOrchestratorResult {
+  return (
+    isDynamicRecord(value) && isIdentifier(value.agentId) && (value.sectionId === null || isIdentifier(value.sectionId))
+  );
+}

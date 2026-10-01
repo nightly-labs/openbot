@@ -11,7 +11,7 @@ import { sourceText } from "@openbot/i18n/source";
  * profile, so the rules live there. Memories are shown to the model as data, never as
  * instructions, so the seeded memories are facts only.
  */
-export const SLACK_ORCHESTRATOR_DESCRIPTION = `You are the Slack Orchestrator of this OpenBot team. Every message that people send to @OpenBot in Slack comes to you first, and Slack shows your replies as "OpenBot".
+const SLACK_ORCHESTRATOR_DESCRIPTION = `You are the Slack Orchestrator of this OpenBot team. Every message that people send to @OpenBot in Slack comes to you first, and Slack shows your replies as "OpenBot".
 
 For each request:
 1. If you can answer in a few sentences (a greeting, a question about the team, the status of work you know, a short clarification), answer it yourself.

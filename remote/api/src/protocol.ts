@@ -26,7 +26,6 @@ export {
   SIGNAL_MESSAGE_BYTES_LIMIT,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
   SLACK_DELIVERY_BODY_BYTES_LIMIT,
-  SLACK_DELIVERY_RESPONSE_BYTES_LIMIT,
 } from "@openbot/contracts/signal-protocol/messages";
 export type { RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 export {

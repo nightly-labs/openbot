@@ -94,7 +94,7 @@ export interface SlackDeliveryLimits {
  * The bytes in flight to one host stay under the socket's 256 KB backpressure limit, which closes
  * the socket when it is reached. A body travels as base64, a third larger than the body.
  */
-export const DEFAULT_SLACK_DELIVERY_LIMITS: SlackDeliveryLimits = {
+const DEFAULT_SLACK_DELIVERY_LIMITS: SlackDeliveryLimits = {
   timeoutMilliseconds: 2_500,
   maximumPendingPerHost: 16,
   maximumPendingBytesPerHost: 128 * 1024,
