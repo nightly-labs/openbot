@@ -849,10 +849,24 @@ function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
 }
 
 /** A greeting as a card with a front and a back face, so its motion can turn it in 3D. */
+/**
+ * The sparkles glyph drawn three times, each copy masked to one star, so each star can light up and
+ * twinkle on its own. Together the three copies are the whole glyph.
+ */
+const SPARKLE_STAR_CLASSES = [
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-large",
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-upper",
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-lower",
+] as const;
+
 function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
   return (
     <span class="dynamic-island-surface-idle-greeting-card">
-      <span class="dynamic-island-surface-idle-greeting-face">{props.emoji}</span>
+      <span class="dynamic-island-surface-idle-greeting-face">
+        <Show when={props.emoji === "✨"} fallback={props.emoji}>
+          <For each={SPARKLE_STAR_CLASSES}>{(starClass) => <span class={starClass}>{props.emoji}</span>}</For>
+        </Show>
+      </span>
       <Show when={IDLE_GREETING_BACKS[props.emoji]}>
         {(back) => (
           <span class="dynamic-island-surface-idle-greeting-face dynamic-island-surface-idle-greeting-face-back">

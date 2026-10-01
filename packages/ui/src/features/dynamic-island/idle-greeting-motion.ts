@@ -28,7 +28,37 @@ export function playIdleGreetingMotion(name: IdleGreetingMotionName, layer: HTML
   if (name === "wave") return playWave(parts);
   if (name === "smile") return playSmile(parts);
   if (name === "cheer") return playCheer(parts);
-  return [];
+  return playSparkles(front);
+}
+
+/**
+ * Each star lights up on a spring, the large one first, then each twinkles once: a short dip in
+ * size and light with a small turn. The stars are copies of the glyph, each masked to one star.
+ */
+function playSparkles(face: HTMLElement): Animation[] {
+  const duration = 3600;
+  const light = spring(0.5, 0.45);
+  const stars = Array.from(face.querySelectorAll<HTMLElement>(".dynamic-island-surface-idle-greeting-sparkle"));
+  return stars.map((star, index) => {
+    const start = index * 220;
+    const twinkleStart = 1500 + index * 600;
+    const twinkle = (t: number) => Math.sin(Math.PI * clamp((t - twinkleStart) / 280, 0, 1));
+    return animate(
+      star,
+      duration,
+      (t) => {
+        const lit = light(t - start);
+        const dip = twinkle(t);
+        return {
+          opacity: clamp(0.15 + 0.85 * lit, 0, 1) - 0.55 * dip,
+          scale: (0.4 + 0.6 * lit) * (1 - 0.3 * dip),
+          rotate: `${15 * dip}deg`,
+        };
+      },
+      { opacity: "1", scale: "1", rotate: "0deg" },
+      "both",
+    );
+  });
 }
 
 /** The hand waves from the wrist, then the card turns to the heart hands. */
@@ -109,20 +139,22 @@ function faceBlur(face: HTMLElement | undefined, duration: number, theta: (t: nu
 
 /**
  * Samples a motion into keyframes. The last keyframe is exact, so the card rests square on its face,
- * and `fill: forwards` holds it there until the greeting changes.
+ * and `fill: forwards` holds it there until the greeting changes. A motion that does not start from
+ * rest, such as the sparkles, also holds its first keyframe through the delay (`both`).
  */
 function animate(
   element: HTMLElement,
   duration: number,
   frame: (t: number) => Record<string, string | number>,
   final: Record<string, string>,
+  fill: FillMode = "forwards",
 ): Animation {
   const keyframes: Keyframe[] = Array.from({ length: SAMPLE_COUNT + 1 }, (_, index) => {
     const offset = index / SAMPLE_COUNT;
     const values = index === SAMPLE_COUNT ? final : frame(duration * offset);
     return { ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])), offset };
   });
-  return element.animate(keyframes, { duration, delay: MOTION_DELAY, easing: "linear", fill: "forwards" });
+  return element.animate(keyframes, { duration, delay: MOTION_DELAY, easing: "linear", fill });
 }
 
 /** A blur while the card turns fast, so the edge-on moment does not read as a thin line. */

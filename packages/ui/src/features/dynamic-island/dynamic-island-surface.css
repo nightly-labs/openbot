@@ -252,10 +252,9 @@ body:has(.dynamic-island-surface),
   opacity: 1;
 }
 
-/* Each greeting is a small 3D card with a front and a back face. `idle-greeting-motion.ts` turns the
-   wave, the smile and the raised hands as they show. The sparkles light up one star at a time here,
-   the large one first. Each starts after the crossfade, and Reduce motion turns them off, so the
-   front face stays. */
+/* Each greeting is a small 3D card with a front and a back face. `idle-greeting-motion.ts` moves it
+   once as it shows: it turns the wave, the smile and the raised hands, and lights up and twinkles
+   each sparkle. Reduce motion turns the motions off, so the front face stays. */
 .dynamic-island-surface-idle-greeting-layer {
   perspective: 80px;
 }
@@ -275,78 +274,31 @@ body:has(.dynamic-island-surface),
   transform: rotateY(180deg);
 }
 
-@property --dynamic-island-sparkle-large {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
+/* Each copy of the sparkles glyph shows one star, through a star-shaped mask a little larger than the
+   star. The transform origin is the star's centre, so it twinkles in place. */
+.dynamic-island-surface-idle-greeting-face:has(.dynamic-island-surface-idle-greeting-sparkle) {
+  display: grid;
 }
 
-@property --dynamic-island-sparkle-upper {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
+.dynamic-island-surface-idle-greeting-sparkle {
+  grid-area: 1 / 1;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
 }
 
-@property --dynamic-island-sparkle-lower {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
+.dynamic-island-surface-idle-greeting-sparkle-large {
+  transform-origin: 60% 48%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M60%207.9Q70.3%2036.0%2094.2%2048Q70.3%2060.0%2060%2088.1Q49.7%2060.0%2025.8%2048Q49.7%2036.0%2060%207.9Z'/%3E%3C/svg%3E");
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  /* A soft glow behind each star, in the order the stars light up. */
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="sparkles"] {
-    background:
-      radial-gradient(
-        circle at 60% 46%,
-        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-large)), transparent),
-        transparent 45%
-      ),
-      radial-gradient(
-        circle at 24% 28%,
-        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-upper)), transparent),
-        transparent 22%
-      ),
-      radial-gradient(
-        circle at 36% 69%,
-        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-lower)), transparent),
-        transparent 22%
-      );
-    animation: dynamic-island-greeting-sparkles 1400ms ease-out 250ms both;
-  }
+.dynamic-island-surface-idle-greeting-sparkle-upper {
+  transform-origin: 24% 28%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M24%207.4Q28.2%2021.8%2038.2%2028Q28.2%2034.2%2024%2048.6Q19.8%2034.2%209.8%2028Q19.8%2021.8%2024%207.4Z'/%3E%3C/svg%3E");
 }
 
-@keyframes dynamic-island-greeting-sparkles {
-  0% {
-    opacity: 0.55;
-    --dynamic-island-sparkle-large: 0;
-    --dynamic-island-sparkle-upper: 0;
-    --dynamic-island-sparkle-lower: 0;
-  }
-
-  20% {
-    --dynamic-island-sparkle-large: 1;
-    --dynamic-island-sparkle-upper: 0;
-  }
-
-  40% {
-    --dynamic-island-sparkle-large: 0.2;
-    --dynamic-island-sparkle-upper: 1;
-    --dynamic-island-sparkle-lower: 0;
-  }
-
-  60% {
-    opacity: 1;
-    --dynamic-island-sparkle-upper: 0.2;
-    --dynamic-island-sparkle-lower: 1;
-  }
-
-  100% {
-    opacity: 1;
-    --dynamic-island-sparkle-large: 0;
-    --dynamic-island-sparkle-upper: 0;
-    --dynamic-island-sparkle-lower: 0;
-  }
+.dynamic-island-surface-idle-greeting-sparkle-lower {
+  transform-origin: 36% 70%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M36%2051.1Q40.8%2064.3%2051.9%2070Q40.8%2075.7%2036%2088.9Q31.2%2075.7%2020.1%2070Q31.2%2064.3%2036%2051.1Z'/%3E%3C/svg%3E");
 }
 
 .dynamic-island-surface-avatar-stack {
