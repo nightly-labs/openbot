@@ -252,12 +252,12 @@ body:has(.dynamic-island-surface),
   opacity: 1;
 }
 
-/* Each greeting is a small 3D card, and it moves once as it shows: the hand waves and turns into
-   heart hands, the smile spins like a ball into a grin, the raised hands turn to clap twice and turn
-   back raised, and the sparkles light up one star at a time, the large one first. Each starts after
-   the crossfade, and Reduce motion turns them off, so the front face stays. */
+/* Each greeting is a small 3D card with a front and a back face. `idle-greeting-motion.ts` turns the
+   wave, the smile and the raised hands as they show. The sparkles light up one star at a time here,
+   the large one first. Each starts after the crossfade, and Reduce motion turns them off, so the
+   front face stays. */
 .dynamic-island-surface-idle-greeting-layer {
-  perspective: 48px;
+  perspective: 80px;
 }
 
 .dynamic-island-surface-idle-greeting-card {
@@ -294,32 +294,6 @@ body:has(.dynamic-island-surface),
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="wave"]
-    .dynamic-island-surface-idle-greeting-card {
-    animation: dynamic-island-greeting-card-wave 1900ms 250ms both;
-  }
-
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="wave"]
-    .dynamic-island-surface-idle-greeting-face:first-child {
-    transform-origin: 70% 80%;
-    animation: dynamic-island-greeting-hand-wave 800ms ease-in-out 250ms both;
-  }
-
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="smile"]
-    .dynamic-island-surface-idle-greeting-card {
-    animation: dynamic-island-greeting-card-spin 1500ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both;
-  }
-
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="cheer"]
-    .dynamic-island-surface-idle-greeting-card {
-    animation: dynamic-island-greeting-card-cheer 2000ms 250ms both;
-  }
-
-  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="cheer"]
-    .dynamic-island-surface-idle-greeting-face-back {
-    animation: dynamic-island-greeting-clap 2000ms 250ms both;
-  }
-
   /* A soft glow behind each star, in the order the stars light up. */
   .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="sparkles"] {
     background:
@@ -338,107 +312,7 @@ body:has(.dynamic-island-surface),
         color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-lower)), transparent),
         transparent 22%
       );
-    animation: dynamic-island-greeting-sparkles 1400ms ease-out 200ms both;
-  }
-}
-
-@keyframes dynamic-island-greeting-hand-wave {
-  0%,
-  100% {
-    rotate: 0deg;
-  }
-
-  20% {
-    rotate: 12deg;
-  }
-
-  40% {
-    rotate: -6deg;
-  }
-
-  60% {
-    rotate: 10deg;
-  }
-
-  80% {
-    rotate: -3deg;
-  }
-}
-
-/* The wave plays first, then the card turns to the heart hands with a little overshoot. */
-@keyframes dynamic-island-greeting-card-wave {
-  0%,
-  45% {
-    transform: rotateY(0deg);
-    animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
-  }
-
-  75%,
-  100% {
-    transform: rotateY(180deg);
-  }
-}
-
-/* One and a half turns, so the ball lands on the grin, with a small hop at the top. */
-@keyframes dynamic-island-greeting-card-spin {
-  0% {
-    transform: rotateY(0deg);
-    translate: 0 0;
-  }
-
-  40% {
-    translate: 0 -1.5px;
-  }
-
-  100% {
-    transform: rotateY(540deg);
-    translate: 0 0;
-  }
-}
-
-/* Turn to the clapping hands, hold for the claps, turn back raised, and lift them up. */
-@keyframes dynamic-island-greeting-card-cheer {
-  0% {
-    transform: rotateY(0deg);
-    translate: 0 0;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  22%,
-  58% {
-    transform: rotateY(180deg);
-    translate: 0 0;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  80% {
-    transform: rotateY(360deg);
-    translate: 0 0;
-  }
-
-  88% {
-    translate: 0 -2.5px;
-  }
-
-  100% {
-    transform: rotateY(360deg);
-    translate: 0 0;
-  }
-}
-
-/* Two claps while the clapping hands face the viewer. */
-@keyframes dynamic-island-greeting-clap {
-  0%,
-  28%,
-  38%,
-  48%,
-  100% {
-    scale: 1 1;
-  }
-
-  33%,
-  43% {
-    scale: 0.78 1;
+    animation: dynamic-island-greeting-sparkles 1400ms ease-out 250ms both;
   }
 }
 

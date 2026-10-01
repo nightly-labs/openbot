@@ -50,6 +50,7 @@ import {
   untrack,
 } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { playIdleGreetingMotion } from "./idle-greeting-motion";
 import {
   animateModeLayers,
   type CapturedModeLayerState,
@@ -869,8 +870,20 @@ function IdleGreetingEmoji(): JSX.Element {
   const [firstEmoji, setFirstEmoji] = createSignal<IdleGreetingEmoji>(IDLE_GREETING_EMOJIS[0]);
   const [secondEmoji, setSecondEmoji] = createSignal<IdleGreetingEmoji>(IDLE_GREETING_EMOJIS[0]);
   let animationFrame: number | undefined;
+  const layers: [HTMLSpanElement | undefined, HTMLSpanElement | undefined] = [undefined, undefined];
+  // Each layer keeps its motion until it shows again, so the one that fades out keeps its last pose.
+  const motions: [Animation[], Animation[]] = [[], []];
+
+  function playMotion(slot: 0 | 1, emoji: IdleGreetingEmoji): void {
+    for (const motion of motions[slot]) motion.cancel();
+    motions[slot] = [];
+    const layer = layers[slot];
+    if (!layer || prefersReducedMotion()) return;
+    motions[slot] = playIdleGreetingMotion(IDLE_GREETING_NAMES[emoji], layer);
+  }
 
   onSettled(() => {
+    playMotion(0, IDLE_GREETING_EMOJIS[0]);
     const timer = setInterval(() => {
       const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
       const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
@@ -880,11 +893,13 @@ function IdleGreetingEmoji(): JSX.Element {
       animationFrame = requestAnimationFrame(() => {
         setIndex(nextIndex);
         setActiveSlot(nextSlot);
+        playMotion(nextSlot, nextEmoji);
       });
     }, IDLE_GREETING_INTERVAL);
     return () => {
       clearInterval(timer);
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+      for (const motion of [...motions[0], ...motions[1]]) motion.cancel();
     };
   });
 
@@ -897,6 +912,9 @@ function IdleGreetingEmoji(): JSX.Element {
       aria-hidden="true"
     >
       <span
+        ref={(element) => {
+          layers[0] = element;
+        }}
         class="dynamic-island-surface-idle-greeting-layer"
         data-greeting={IDLE_GREETING_NAMES[firstEmoji()]}
         data-active={activeSlot() === 0 ? "true" : undefined}
@@ -904,6 +922,9 @@ function IdleGreetingEmoji(): JSX.Element {
         <IdleGreetingCard emoji={firstEmoji()} />
       </span>
       <span
+        ref={(element) => {
+          layers[1] = element;
+        }}
         class="dynamic-island-surface-idle-greeting-layer"
         data-greeting={IDLE_GREETING_NAMES[secondEmoji()]}
         data-active={activeSlot() === 1 ? "true" : undefined}
