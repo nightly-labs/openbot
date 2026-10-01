@@ -1016,6 +1016,12 @@ a {
   margin-top: 30px;
 }
 
+/* One action, such as Open OpenBot after a Slack install, sits in the middle. */
+.join-card-actions:has(> :only-child) {
+  grid-template-columns: auto;
+  justify-content: center;
+}
+
 .join-card-disabled {
   opacity: 0.5;
 }

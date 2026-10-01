@@ -123,11 +123,13 @@ Then the same with production, in the unlisted pilot.
 | Item | State |
 | --- | --- |
 | Slack CLI login | `hello` in `openbotdev` (`T0C5B1XG542`) |
-| Apps | `A0C5H5C95NH` (production), `A0C5G5XGS83` (development). OpenBot manifest and icons applied on 2026-10-01. Request URL not verified (Signal not deployed). Distribution off. |
+| Apps | `A0C5H5C95NH` (production), `A0C5G5XGS83` (development). OpenBot manifest and icons applied on 2026-10-01. Distribution off. |
 | Old apps | `A0C5K4J6AUW`, `A0C5QNZTWLC` in `openbot-dev` (`T0C5443H7CP`). Not used, not deleted. |
-| Code | Branch `slack-messaging`, not merged |
-| Worker and Signal secrets | Encrypted in this repository. Not uploaded. GitHub `REMOTE_TICKET_PUBLIC_JWKS` has no route key. |
-| Worker and Signal with the Slack route | Not deployed (404 on 2026-10-01) |
+| Code | #1152 merged on 2026-10-01 (`e9c04806`). No desktop release has it yet. |
+| Worker | Deployed by CI with D1 `0025`. Slack secrets set, and the JWKS lists `openbot-slack-route-1`. GitHub `REMOTE_TICKET_PUBLIC_JWKS` has the route key. |
+| Signal | Release `e9c04806` on `sui-alexandria`, with `SLACK_SIGNING_SECRET` for both apps and the `/v1/slack/` nginx block. Rollback image `openbot-remote-api:before-slack`. |
+| End-to-end | A dev build of `main` connected a workspace on production on 2026-10-01 and answered in Slack. The `openbot://` return reached the installed release, so the link was sent to the dev app by hand. |
+| Not done | Request URL check in the production app settings, distribution, device checks after the Signal restart, desktop release. |
 
 ## Sources
 

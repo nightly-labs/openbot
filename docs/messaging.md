@@ -75,7 +75,9 @@ also has an installed OpenBot. The operating system sends `openbot://` to the in
 
 ## Troubleshooting
 
-| State | Cause | Action |
+The workspace row says what is wrong.
+
+| Problem | Cause | Action |
 | --- | --- | --- |
 | Token not accepted | Slack refused the token, or OpenBot was uninstalled from the workspace. | **Connect Slack** again. |
 | Missing permissions | The install has fewer scopes than OpenBot asks for. | **Disconnect**, then **Connect Slack** again. |

@@ -25,6 +25,11 @@ export function SlackConnectPage() {
     window.location.assign(target);
   });
 
+  return <SlackConnectView openUrl={openUrl()} failure={failure()} />;
+}
+
+/** The page's card: the link back to OpenBot, or why Slack did not finish. */
+export function SlackConnectView(props: { openUrl: string; failure: string | null }) {
   return (
     <main class="join-page">
       <a class="landing-brand join-page-brand" href="/" aria-label="OpenBot home">
@@ -36,17 +41,17 @@ export function SlackConnectPage() {
         <p class="join-card-eyebrow">Slack</p>
         <h1 id="slack-connect-title">Return to OpenBot</h1>
         <Show
-          when={!failure()}
+          when={!props.failure}
           fallback={
             <p class="join-card-error">
-              {failure() === "slack_workspace_taken"
+              {props.failure === "slack_workspace_taken"
                 ? "Another OpenBot server already answers this Slack workspace. Disconnect it on that server, then try again."
                 : "Slack did not finish the connection. Go back to OpenBot and start again."}
             </p>
           }
         >
           <p class="join-card-copy">OpenBot finishes the Slack connection on your computer.</p>
-          <Show when={openUrl()}>
+          <Show when={props.openUrl}>
             {(href) => (
               <div class="join-card-actions">
                 <Button href={href()} variant="primary" size="lg" icon="open">
