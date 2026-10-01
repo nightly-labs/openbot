@@ -21,10 +21,10 @@ export function MarketplaceFilter(props: { groups: readonly FilterGroup[] }) {
     props.groups.flatMap((group) =>
       group.options.filter((option) => option.value === group.value).map((option) => option.label),
     );
-  const item = (label: string, value: string, selected: boolean) => (
+  const item = (label: () => string, value: string, selected: () => boolean) => (
     <DropdownMenu.RadioItem value={value} closeOnSelect={false}>
-      <MenuCheck on={selected} />
-      {label}
+      <MenuCheck on={selected()} />
+      {label()}
     </DropdownMenu.RadioItem>
   );
   return (
@@ -40,23 +40,34 @@ export function MarketplaceFilter(props: { groups: readonly FilterGroup[] }) {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content class="marketplace-menu">
-          <For each={props.groups}>
+          {/* Keyed rows: a choice gives new group objects, and a new row would lose the focus. */}
+          <For each={props.groups} keyed={(group) => group.legend}>
             {(group, index) => (
               <>
                 <Show when={index() > 0}>
                   <DropdownMenu.Separator />
                 </Show>
                 <span class="ui-menu-label" aria-hidden="true">
-                  {group.legend}
+                  {group().legend}
                 </span>
                 <DropdownMenu.RadioGroup
-                  aria-label={group.legend}
-                  value={group.value ?? ""}
-                  onChange={(value: string) => group.set(value === "" ? null : value)}
+                  aria-label={group().legend}
+                  value={group().value ?? ""}
+                  onChange={(value: string) => group().set(value === "" ? null : value)}
                 >
-                  {item(t("marketplace.filter.all"), "", group.value === null)}
-                  <For each={group.options}>
-                    {(option) => item(option.label, option.value, group.value === option.value)}
+                  {item(
+                    () => t("marketplace.filter.all"),
+                    "",
+                    () => group().value === null,
+                  )}
+                  <For each={group().options} keyed={(option) => option.value}>
+                    {(option) =>
+                      item(
+                        () => option().label,
+                        option().value,
+                        () => group().value === option().value,
+                      )
+                    }
                   </For>
                 </DropdownMenu.RadioGroup>
               </>

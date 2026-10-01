@@ -45,6 +45,17 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
   );
 
+  /* GitHub joins the apps only when its status read ends. A link that came first opens its page then. */
+  createEffect(
+    () => {
+      const slug = nav.state.missingApp;
+      return slug && controller.model.apps().some((app) => app.id === slug) ? slug : null;
+    },
+    (slug) => {
+      if (slug) nav.go({ kind: "app", id: slug });
+    },
+  );
+
   return (
     <>
       <Marketplace model={controller.model} nav={nav} open={props.open} onOpenChange={props.onOpenChange} />

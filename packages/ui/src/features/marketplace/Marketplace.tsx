@@ -93,15 +93,27 @@ function MarketplaceWindow(props: MarketplaceProps) {
     fades.stop();
     frameObserver.disconnect();
   });
+  // For each open view: its scroll offset, and the name of the control the user last clicked, which
+  // opened the next view. Back returns to that place and that control.
+  const places: { top: number; opener: string | null }[] = [];
+  const remember = (place: Partial<(typeof places)[number]>) => {
+    const depth = nav.state.stack.length - 1;
+    places[depth] = { top: 0, opener: null, ...places[depth], ...place };
+  };
   // A new view moves the focus to its name, as a route change does. The first view keeps the focus.
   createEffect(
     () => nav.state.stack.length,
     (length, previous) => {
       if (previous === undefined) return;
-      body?.scrollTo({ top: 0 });
+      const place = length < previous ? places[length - 1] : undefined;
+      places.length = length;
+      body?.scrollTo({ top: place?.top ?? 0 });
+      const opener = place?.opener
+        ? body?.querySelector<HTMLElement>(`[aria-label="${CSS.escape(place.opener)}"]`)
+        : null;
       const heading = length > 1 ? body?.querySelector<HTMLElement>(".marketplace-view h3") : null;
       if (heading && !heading.hasAttribute("tabindex")) heading.tabIndex = -1;
-      (heading ?? document.querySelector<HTMLElement>(".skills-marketplace .marketplace-title"))?.focus({
+      (opener ?? heading ?? document.querySelector<HTMLElement>(".skills-marketplace .marketplace-title"))?.focus({
         preventScroll: true,
       });
     },
@@ -122,8 +134,19 @@ function MarketplaceWindow(props: MarketplaceProps) {
         ref={(element) => {
           body = element;
           fades.bind(element);
+          element.addEventListener(
+            "click",
+            (event) => {
+              const control = event.target instanceof Element ? event.target.closest("[aria-label]") : null;
+              remember({ opener: control && element.contains(control) ? control.getAttribute("aria-label") : null });
+            },
+            true,
+          );
         }}
-        onScroll={fades.measure}
+        onScroll={() => {
+          fades.measure();
+          if (body) remember({ top: body.scrollTop });
+        }}
       >
         <div class="marketplace-frame" ref={(element) => frameObserver.observe(element)}>
           <Show when={nav.state.stack.at(-1)} keyed>

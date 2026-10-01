@@ -6,7 +6,9 @@ uninstall, the public pages and the deep link exist. The served catalog does not
 
 The catalog has no GitHub plugin. The built-in GitHub connector is the GitHub app, in the
 Marketplace and in Server settings › Connectors. An MCP row that the retired plugin saved stays,
-and the Marketplace shows it as a server that the user added.
+and the Marketplace shows it as a server that the user added. While that row is named `github`, it
+hides the connector's MCP server from agents (`src/backend/agent/mcp-gateway.ts`), so the user must
+remove it.
 
 ## Why this document exists
 

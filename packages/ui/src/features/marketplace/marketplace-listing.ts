@@ -92,6 +92,8 @@ export interface MarketplaceListing<T> {
   loading: () => boolean;
   loadingMore: () => boolean;
   error: () => string | null;
+  /** The server has not answered the current search yet, so an empty `items` is not "no match". */
+  pending: () => boolean;
   /** The server holds rows past the loaded ones. */
   hasMore: () => boolean;
   loadMore: () => void;
@@ -229,6 +231,7 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     loading: () => state.loading,
     loadingMore: () => state.loadingMore,
     error: () => state.error,
+    pending: () => state.loadedQuery !== options.query().trim(),
     hasMore: () => Boolean(state.nextCursor) && !searchPending(),
     loadMore: () => {
       const cursor = state.nextCursor;
@@ -236,7 +239,9 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     },
     retry: () => {
       clearTimeout(timer);
-      void load(options.category(), options.query());
+      /* A failed "Load more" keeps its rows and its cursor: ask for that page again. */
+      const cursor = state.items.length > 0 ? (state.nextCursor ?? undefined) : undefined;
+      void load(options.category(), options.query(), cursor);
     },
   };
 }

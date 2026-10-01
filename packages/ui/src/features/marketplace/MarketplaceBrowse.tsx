@@ -114,6 +114,16 @@ function ListingPanel(props: {
   children: JSX.Element;
 }) {
   const { t } = useText();
+  const failure = () => (
+    <div class="marketplace-empty" role="alert">
+      <Text as="p" variant="body-sm" tone="muted">
+        {props.listing.error()}
+      </Text>
+      <Button type="button" variant="outline" size="sm" onClick={props.listing.retry}>
+        {t("common.retry")}
+      </Button>
+    </div>
+  );
   return (
     <Show
       when={!props.listing.loading()}
@@ -131,34 +141,25 @@ function ListingPanel(props: {
         </div>
       }
     >
-      <Show
-        when={!props.listing.error()}
-        fallback={
-          <div class="marketplace-empty" role="alert">
-            <Text as="p" variant="body-sm" tone="muted">
-              {props.listing.error()}
-            </Text>
-            <Button type="button" variant="outline" size="sm" onClick={props.listing.retry}>
-              {t("common.retry")}
-            </Button>
-          </div>
-        }
-      >
+      {/* A failed "Load more" keeps the rows that loaded. */}
+      <Show when={!props.listing.error() || props.count > 0} fallback={failure()}>
         <div class="marketplace-stack">
-          <Show when={props.count > 0} fallback={props.empty}>
+          <Show when={props.count > 0 || props.listing.pending()} fallback={props.empty}>
             {props.children}
           </Show>
-          {/* A filter can hide each loaded row while a later page still holds a match. */}
-          <Show when={props.listing.hasMore()}>
-            <Button
-              type="button"
-              variant="outline"
-              class="marketplace-load-more"
-              loading={props.listing.loadingMore()}
-              onClick={props.listing.loadMore}
-            >
-              {t("marketplace.loadMore")}
-            </Button>
+          <Show when={!props.listing.error()} fallback={failure()}>
+            {/* A filter can hide each loaded row while a later page still holds a match. */}
+            <Show when={props.listing.hasMore()}>
+              <Button
+                type="button"
+                variant="outline"
+                class="marketplace-load-more"
+                loading={props.listing.loadingMore()}
+                onClick={props.listing.loadMore}
+              >
+                {t("marketplace.loadMore")}
+              </Button>
+            </Show>
           </Show>
         </div>
       </Show>
@@ -206,7 +207,8 @@ export function MarketplaceBrowse(props: { scope: MarketplaceScope }) {
   const categoryOptions = () =>
     SKILL_CATEGORIES.map((category) => ({ value: category, label: t(CATEGORY_LABELS[category]) }));
   const agentGroups = (): FilterGroup[] => [
-    ...(props.scope.agents.items().some((item) => model().agentState(item) !== null)
+    /* A chosen status stays in the menu, so that the user can clear it. */
+    ...(state().agentsOwned !== null || props.scope.agents.items().some((item) => model().agentState(item) !== null)
       ? [
           {
             legend: t("marketplace.filter.status"),

@@ -22,6 +22,9 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
   const have = () => skillAgents(props.scope, props.skill);
   const all = () => have().length > 0 && have().length === model().agents().length;
   const has = (id: string) => have().some((agent) => agent.id === id);
+  /* An agent whose list did not load may have the skill already, changed by the user: leave it alone. */
+  const known = (id: string) => model().skillRead(id) === "loaded";
+  const busy = () => model().skillBusy(props.skill.id);
   const label = () => {
     const first = have()[0];
     if (!first) return t("marketplace.skill.installMenu.install");
@@ -43,8 +46,8 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
           variant: have().length === 0 && props.emphasis ? "default" : "outline",
           size: props.emphasis ? "default" : "sm",
         })} marketplace-install-trigger`}
-        disabled={model().skillBusy(props.skill.id)}
-        aria-busy={model().skillBusy(props.skill.id) ? "true" : undefined}
+        disabled={busy()}
+        aria-busy={busy() ? "true" : undefined}
         aria-label={
           have().length === 0
             ? t("marketplace.skill.installMenu.installNamed", { name: props.skill.name })
@@ -66,11 +69,12 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
           <DropdownMenu.CheckboxItem
             checked={all()}
             closeOnSelect={false}
+            disabled={busy()}
             onChange={(on: boolean) =>
               set(
                 model()
                   .agents()
-                  .filter((agent) => has(agent.id) !== on)
+                  .filter((agent) => known(agent.id) && has(agent.id) !== on)
                   .map((agent) => agent.id),
                 on,
               )
@@ -85,6 +89,7 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
               <DropdownMenu.CheckboxItem
                 checked={has(agent.id)}
                 closeOnSelect={false}
+                disabled={busy() || !known(agent.id)}
                 onChange={(on: boolean) => set([agent.id], on)}
               >
                 <MenuCheck on={has(agent.id)} />

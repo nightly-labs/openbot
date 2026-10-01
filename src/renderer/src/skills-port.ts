@@ -26,23 +26,17 @@ export interface SkillsPort {
     | "testMcpServer"
     | "uninstallAgentSkill"
   >;
-  marketplaceAgents: Pick<
-    OpenBotDesktopApi["marketplaceAgents"],
-    "get" | "install" | "list" | "listMine" | "preview" | "submit"
-  >;
+  marketplaceAgents: Pick<OpenBotDesktopApi["marketplaceAgents"], "get" | "install" | "list">;
   skills: Pick<
     OpenBotDesktopApi["skills"],
-    | "choosePackage"
     | "get"
     | "install"
     | "list"
     | "listInstalled"
-    | "listMine"
     | "localGet"
     | "localInstall"
     | "localList"
     | "setEnabled"
-    | "submit"
     | "uninstall"
   >;
 }

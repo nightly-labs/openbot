@@ -7,5 +7,5 @@
 
 ### Removed
 
-- The GitHub plugin that used a personal access token. Use the GitHub connector. A server that the plugin added stays, and shows as a custom server.
+- The GitHub plugin that used a personal access token. Use the GitHub connector. A server that the plugin added stays, and shows as a custom server. Remove that server, so that your agents use the GitHub connector.
 - Skill and agent publishing from the desktop Marketplace.

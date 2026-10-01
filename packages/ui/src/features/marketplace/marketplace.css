@@ -201,6 +201,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 
 .marketplace-page-title {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .marketplace-command {
@@ -390,6 +391,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 .marketplace-card {
   position: relative;
   display: grid;
+  min-width: 0;
   grid-template-rows: auto 1fr auto;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-4);
@@ -414,6 +416,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   flex: 1;
   min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The action sits above the hit area, so "Add" adds and the rest of the card opens the page. */
@@ -517,6 +520,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   flex: 1;
   gap: var(--openbot-space-0-5);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* ---------------------------------------------------------------- pages */

@@ -1,12 +1,11 @@
 import type { MarketplaceSkillSummary } from "@openbot/contracts/ipc";
-import { Sparkles } from "@openbot/ui";
 import { skillExamplePrompt, skillInstructions } from "@openbot/ui/components/SkillPreview";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, Show } from "solid-js";
 import { useInstalls } from "./MarketplaceCards";
 import { SkillAction, skillAgents } from "./MarketplaceInstallSkill";
-import { Block, DetailState, PageHead, Properties, SkillMark, TryCard } from "./MarketplaceParts";
+import { Block, DetailState, PageHead, Properties, SkillIcon, SkillMark, TryCard } from "./MarketplaceParts";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import { createDetail, type MarketplaceScope } from "./marketplace-view";
 
@@ -75,11 +74,7 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
               chip={{
                 kind: "skill",
                 name: skill().name,
-                icon: (
-                  <Show when={skill().iconUrl} fallback={<Sparkles />}>
-                    {(url) => <img src={url()} alt="" />}
-                  </Show>
-                ),
+                icon: <SkillIcon url={skill().iconUrl} />,
               }}
               requests={[{ id: "example", text: skillExamplePrompt(full(), t) }]}
               tryLabel={() => {

@@ -140,10 +140,28 @@ export function SkillMark(props: { skill: Pick<MarketplaceSkillSummary, "iconUrl
   const url = () => (props.skill.iconUrl && props.skill.iconUrl !== failed() ? props.skill.iconUrl : null);
   return (
     <span class="marketplace-skill-mark" data-size={props.size} data-kind={url() ? "icon" : "none"} aria-hidden="true">
-      <Show when={url()} fallback={<Sparkles />} keyed>
-        {(src) => <img src={src} alt="" onError={() => setFailed(src)} />}
-      </Show>
+      <SkillIcon url={url()} onError={setFailed} />
     </span>
+  );
+}
+
+/** A skill's icon, or the sparkles when it has none or the icon does not load. */
+export function SkillIcon(props: { url: string | null | undefined; onError?: (url: string) => void }) {
+  const [failed, setFailed] = createSignal<string | null>(null);
+  const url = () => (props.url && props.url !== failed() ? props.url : null);
+  return (
+    <Show when={url()} fallback={<Sparkles />} keyed>
+      {(src) => (
+        <img
+          src={src}
+          alt=""
+          onError={() => {
+            setFailed(src);
+            props.onError?.(src);
+          }}
+        />
+      )}
+    </Show>
   );
 }
 
