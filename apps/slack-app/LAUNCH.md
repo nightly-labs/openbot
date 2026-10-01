@@ -39,7 +39,6 @@ context.
 ## Steps you can do now
 
 1. **Slack app settings** (`apps/slack-app/README.md`). For `A0C5H5C95NH` and `A0C5G5XGS83`:
-   - [ ] Set the icon and the description.
    - [ ] Copy the client ID, client secret and signing secret (steps 2 and 3).
 2. **Worker secrets** (`apps/auth-api`). Without them, the Slack routes return
    `503 slack_not_configured`. Use the development app for test and the production app for
@@ -71,8 +70,9 @@ context.
    new `ingress` hello.
    - [ ] Set `SLACK_SIGNING_SECRET` in `remote/.env.production` (Dotenvx).
    - [ ] Deploy Signal (`docs/remote-session-deployment.md`) and `remote/nginx/signal.openbot.run.conf`.
-4. **Manifests.** After Signal serves `/v1/slack/events`:
-   - [ ] `slack manifest sync` in `apps/slack-app/production` and `development`.
+4. **Manifests.** Applied on 2026-10-01 with `apps.manifest.update` (`slack manifest sync` needs an
+   installed app). After Signal serves `/v1/slack/events`:
+   - [ ] Verify the request URL in each app's **Event Subscriptions** and **Interactivity** pages.
 5. **Desktop.**
    - [ ] Open a PR for `slack-messaging`. It changes the unreleased database migration 25.
    - [ ] Merge after Signal is live. Run `release-upgrade-safety`, then release.
@@ -109,7 +109,7 @@ Then the same with production, in the unlisted pilot.
 | Item | State |
 | --- | --- |
 | Slack CLI login | `hello` in `openbotdev` (`T0C5B1XG542`) |
-| Apps | `A0C5H5C95NH` (production), `A0C5G5XGS83` (development). Old manifest, not synced. |
+| Apps | `A0C5H5C95NH` (production), `A0C5G5XGS83` (development). OpenBot manifest and icons applied on 2026-10-01. Request URL not verified (Signal not deployed). Distribution off. |
 | Old apps | `A0C5K4J6AUW`, `A0C5QNZTWLC` in `openbot-dev` (`T0C5443H7CP`). Not used, not deleted. |
 | Code | Branch `slack-messaging`, not merged |
 | Worker secrets, Signal secret | Not set |
