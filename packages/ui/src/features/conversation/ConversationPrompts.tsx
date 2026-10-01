@@ -89,7 +89,9 @@ export function ChoiceCard(props: {
           setAnswer(value);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") void submit();
+          // The browser owns the key that commits an IME composition. Safari sends it
+          // after `compositionend` without `isComposing`; keyCode 229 marks it.
+          if (event.key === "Enter" && !event.isComposing && event.keyCode !== 229) void submit();
         }}
       />
     </div>

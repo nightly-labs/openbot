@@ -447,7 +447,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     disabled={busy()}
                     onValueChange={(value) => setCustomDrafts((drafts) => ({ ...drafts, [current().id]: value }))}
                     onKeyDown={(event) => {
-                      if (event.key !== "Enter") return;
+                      // The browser owns the key that commits an IME composition. Safari sends it
+                      // after `compositionend` without `isComposing`; keyCode 229 marks it.
+                      if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
                       event.preventDefault();
                       commitCustomAnswer(current(), pageProps.index);
                     }}

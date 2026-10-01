@@ -158,6 +158,35 @@ describe("QuestionPromptBubble", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
   });
 
+  it("leaves Enter that commits an IME composition to the browser", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.compositionStart(input);
+    await fireEvent.input(input, { target: { value: "にほんご" } });
+    // Chromium: before compositionend, with isComposing.
+    await fireEvent.keyDown(input, { key: "Enter", keyCode: 229, isComposing: true });
+    await fireEvent.input(input, { target: { value: "日本語" } });
+    await fireEvent.compositionEnd(input);
+    // Safari: after compositionend, without isComposing.
+    await fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input).toHaveValue("日本語");
+
+    await fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["日本語"] }));
+  });
+
   it("blocks all prompt interaction while an answer is pending", async () => {
     const onSubmit = vi.fn(async () => true);
     render(() => <QuestionPromptBubble questions={questions} pending onSubmit={onSubmit} />);
