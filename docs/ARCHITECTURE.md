@@ -1530,7 +1530,9 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   it starts with five memories, which are facts only, because the model reads memories as data. It
   gives work to one teammate with `send_message`; the request carries `messagingReturn`, so the
   teammate's answer runs as a follow-up turn in the same Slack thread. A turn that only asked a
-  teammate posts "A teammate is working on it" (`MessagingThreads.awaitsTeammate`).
+  teammate posts "A teammate is working on it" (`MessagingThreads.awaitsTeammate`). It goes in the
+  sidebar's Integrations section, which `MessagingService` creates the first time; the renderer shows
+  that section collapsed.
 - **Execution threads.** Each Slack thread is a link with its own execution thread in
   `projection_threads`, as a channel-agent pair is. A direct message is answered in a thread under
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation

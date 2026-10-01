@@ -287,7 +287,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
     };
     await connect();
     const connection = () => messaging?.slackOverview().connections[0];
-    const orchestratorId = await messaging.addOrchestrator({ workspaceId: "T1" });
+    const { agentId: orchestratorId } = await messaging.addOrchestrator({ workspaceId: "T1" });
     await waitFor(() => connection()?.state === "connected");
     expect(connection()).toMatchObject({ workspaceId: "T1", workspaceName: "Test workspace", credentials: "saved" });
     // The socket told Signal its workspaces with a new route ticket after the connect.

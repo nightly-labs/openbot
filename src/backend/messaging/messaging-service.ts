@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddSlackOrchestratorInput,
+  AddSlackOrchestratorResult,
   AgentApproval,
   AgentEvent,
   AgentSummary,
@@ -20,6 +21,7 @@ import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { MessagingOrigin } from "../mailbox-store";
+import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
 import type { MessagingActivity, MessagingThreads } from "./messaging-threads";
 import {
@@ -81,6 +83,8 @@ export interface MessagingServiceOptions {
   slackApp?: SlackAppPort;
   /** Only tests change this. */
   slackOrigin?: string;
+  /** Where the Slack Orchestrator goes in the sidebar: an Integrations section. */
+  sidebar?: Pick<SidebarLayoutStore, "getSnapshot" | "mutate">;
 }
 
 interface LiveConnection {
@@ -146,6 +150,7 @@ export class MessagingService {
   readonly #ingress: MessagingIngress | null;
   readonly #connect: SlackConnect | null;
   readonly #slackOrigin: string | undefined;
+  readonly #sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "mutate"> | null;
   #started = false;
 
   constructor(options: MessagingServiceOptions) {
@@ -157,6 +162,7 @@ export class MessagingService {
     this.#ingress = options.ingress ?? null;
     this.#connect = options.ingress && options.slackApp ? new SlackConnect(options.slackApp) : null;
     this.#slackOrigin = options.slackOrigin;
+    this.#sidebar = options.sidebar ?? null;
   }
 
   async start(): Promise<void> {
@@ -224,10 +230,10 @@ export class MessagingService {
    * starts with, on the model the user picked. It receives every new conversation of the workspace.
    * A workspace that already has one keeps it.
    */
-  async addOrchestrator(input: AddSlackOrchestratorInput): Promise<string> {
+  async addOrchestrator(input: AddSlackOrchestratorInput): Promise<AddSlackOrchestratorResult> {
     const record = this.#requireConnection(input.workspaceId);
     const current = this.#agents.listAgents().find((agent) => agent.id === record.orchestratorAgentId);
-    if (current) return current.id;
+    if (current) return { agentId: current.id, sectionId: null };
     const agent = await this.#agents.createAgentProfile({
       ...slackOrchestratorProfile(),
       ...SLACK_ORCHESTRATOR_AVATAR,
@@ -238,7 +244,29 @@ export class MessagingService {
     for (const text of slackOrchestratorMemories(record.workspaceName))
       this.#agents.createMemory({ agentId: agent.id, text });
     this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agent.id });
-    return agent.id;
+    // A sidebar it cannot reach leaves the agent where new agents go; the orchestrator still answers.
+    const sectionId = await this.#placeInIntegrations(agent.id).catch((error) => {
+      this.#warn(error);
+      return null;
+    });
+    return { agentId: agent.id, sectionId };
+  }
+
+  /**
+   * Puts the orchestrator in the sidebar's Integrations section, which it creates the first time, so
+   * the agents that serve an integration stay apart from the user's own. Returns the section id.
+   */
+  async #placeInIntegrations(agentId: string): Promise<string | null> {
+    const sidebar = this.#sidebar;
+    if (!sidebar) return null;
+    const name = sourceText("status.messaging.integrationsSection");
+    const agentIds = new Set(this.#agents.listAgents().map((agent) => agent.id));
+    const existing = sidebar.getSnapshot().sections.find((section) => section.name === name);
+    const layout = await sidebar.mutate(
+      existing ? { type: "assign", agentId, sectionId: existing.id } : { type: "create", name, agentId },
+      agentIds,
+    );
+    return layout.agentAssignments[agentId] ?? null;
   }
 
   /** Opens the OpenBot Slack app's install in the browser. A deep link to `completeSlackWorkspace` ends it. */

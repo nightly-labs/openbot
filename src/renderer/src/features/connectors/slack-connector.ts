@@ -33,6 +33,8 @@ export interface SlackConnectorController {
 export function createSlackConnector(
   port: () => SlackConnectorPort = slackConnectorPort,
   models: () => SlackOrchestratorModels | undefined = () => undefined,
+  /** Called with the sidebar section that main put the new orchestrator in. */
+  onOrchestratorSection: (sectionId: string) => void = () => undefined,
 ): SlackConnectorController {
   const [overview, setOverview] = createSignal<SlackOverview | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -86,6 +88,9 @@ export function createSlackConnector(
     setEnabled: (workspaceId, enabled) => run(() => messaging().setSlackEnabled({ workspaceId, enabled })),
     models,
     addOrchestrator: (workspaceId, choice) =>
-      run(() => messaging().addSlackOrchestrator({ workspaceId, ...(choice ?? {}) })),
+      run(async () => {
+        const { sectionId } = await messaging().addSlackOrchestrator({ workspaceId, ...(choice ?? {}) });
+        if (sectionId) onOrchestratorSection(sectionId);
+      }),
   };
 }

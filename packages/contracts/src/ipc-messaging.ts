@@ -77,6 +77,12 @@ export interface AddSlackOrchestratorInput {
   reasoningEffort?: AgentReasoningEffort;
 }
 
+/** The new orchestrator, and the sidebar section it went to, which the screen shows collapsed. */
+export interface AddSlackOrchestratorResult {
+  agentId: string;
+  sectionId: string | null;
+}
+
 function isScopeList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&

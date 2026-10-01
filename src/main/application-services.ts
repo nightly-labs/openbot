@@ -924,6 +924,7 @@ export async function createApplicationServices({
     drivers: [slackDriver({ ingress: slackIngress })],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
     ingress: slackIngress,
+    sidebar: sidebarLayout,
     slackApp: {
       authorize: (input) => {
         const hostId = slackIngressHostId();

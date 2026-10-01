@@ -28,6 +28,8 @@ export const messages = defineMessages("status.messaging", {
   // The name and title of the agent that OpenBot adds to answer in Slack. The user can rename it.
   "status.messaging.orchestratorName": "Slack Orchestrator",
   "status.messaging.orchestratorTitle": "Answers in Slack and asks the team",
+  // The sidebar section that OpenBot puts the Slack Orchestrator in. The user can rename it.
+  "status.messaging.integrationsSection": "Integrations",
   // The page a development Slack install ends on.
   "status.messaging.signInReceived": "OpenBot received the Slack install. You can close this tab.",
   "status.messaging.signInUnknown": "OpenBot did not start this Slack install. Start it again in OpenBot.",

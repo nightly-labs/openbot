@@ -15,7 +15,8 @@ service, which passes them to this computer.
 2. Select **Connect Slack**, then **Connect in Slack**. Slack opens in the browser. Select the
    workspace in the top-right corner, and select **Allow**. The dialog continues by itself.
 3. Pick the model of the Slack Orchestrator, and select **Add agent**. OpenBot adds the agent, with its
-   instructions and the facts it starts with. You can rename it or change its model in agent settings.
+   instructions and the facts it starts with, in a sidebar section named **Integrations**, which starts
+   collapsed. You can rename it or change its model in agent settings.
 4. In Slack, mention @OpenBot in any public channel, or send it a direct message.
 
 OpenBot joins every public channel of the workspace when it connects, and each public channel that is

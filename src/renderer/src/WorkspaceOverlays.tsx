@@ -28,6 +28,7 @@ import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
+import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useGlobalSearchSources } from "./global-search-sources";
 import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
@@ -297,17 +298,26 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
   } = useServerSettings();
   // The Slack Orchestrator runs on this computer, so its picker lists this computer's models: none
   // while a joined server is on screen, and then it starts on a new agent's default.
-  const slack = createSlackConnector(undefined, () => {
-    const options = modelOptions();
-    if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
-    return {
-      modelOptions: options,
-      agentStatus: agentStatus(),
-      initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
-      customProviders: localEndpoints.customProviders(),
-      customAgents: localAgents.customAgents(),
-    };
-  });
+  const { collapseSidebarSection } = useSidebar();
+  const slack = createSlackConnector(
+    undefined,
+    () => {
+      const options = modelOptions();
+      if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
+      return {
+        modelOptions: options,
+        agentStatus: agentStatus(),
+        initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
+        customProviders: localEndpoints.customProviders(),
+        customAgents: localAgents.customAgents(),
+      };
+    },
+    // The Integrations section starts collapsed: the orchestrator is not an agent people chat with
+    // every day. The collapse belongs to the local server, the one on screen when Slack connects.
+    (sectionId) => {
+      if (activeServer()?.kind === "local") collapseSidebarSection(sectionId);
+    },
+  );
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {

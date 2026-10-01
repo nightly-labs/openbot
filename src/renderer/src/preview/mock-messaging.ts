@@ -37,7 +37,7 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     addSlackOrchestrator: async ({ workspaceId }) => {
       const agentId = orchestrator();
       change(workspaceId, { orchestratorAgentId: agentId });
-      return agentId;
+      return { agentId, sectionId: null };
     },
   };
 }
