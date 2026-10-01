@@ -26,6 +26,8 @@ export const messages = defineMessages("update", {
   "update.provider.unavailable": "Provider updates are unavailable.",
   "update.provider.downloadsUnavailable": "Provider downloads are unavailable.",
   "update.provider.startFailed": "The update could not start. Try again.",
+  "update.provider.showDetails": "Show details",
+  "update.provider.hideDetails": "Hide details",
 
   // An update that an admin of this server asked for. {name} is the admin.
   "update.scheduled.title": "{name} scheduled an OpenBot update",

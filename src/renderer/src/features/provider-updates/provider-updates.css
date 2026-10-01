@@ -43,12 +43,42 @@
   flex-direction: column;
 }
 
+/* A block, so the ellipsis applies in a state with no bar too, where the description is not a flex
+   column. */
 .provider-update-toast-line {
+  display: block;
   min-width: 0;
   overflow: hidden;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A failure is a sentence, not a version. It wraps, also inside a long path or address, and stops
+   after three lines until the user opens it. */
+.provider-update-toast-line[data-failed="true"] {
+  display: -webkit-box;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.provider-update-toast-line[data-failed="true"][data-expanded="true"] {
+  display: block;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+}
+
+/* The control that opens the rest of the failure sits under it, at the start of the line, in the
+   description's colour. */
+.provider-update-toast .provider-update-toast-details {
+  margin-top: var(--openbot-space-1);
+  color: inherit;
+  font-size: inherit;
+  text-decoration: underline;
 }
 
 /* The bar and the percentage, on one line under the version. */
