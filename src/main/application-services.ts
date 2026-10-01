@@ -955,9 +955,12 @@ export async function createApplicationServices({
   void messaging.start().catch((error) => logger.warn("Messaging connections did not start.", toLogValue(error)));
   teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => messaging.stop());
   if (developmentSlackCallbackPort > 0) {
-    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, (nonce, grant) =>
-      messaging.completeSlackWorkspace(nonce, grant),
-    );
+    // As `openbot://` does for a packaged build, a finished install brings OpenBot to the front.
+    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, async (nonce, grant) => {
+      const received = await messaging.completeSlackWorkspace(nonce, grant);
+      if (received) app.focus({ steal: true });
+      return received;
+    });
     teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
   }
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
