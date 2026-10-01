@@ -34,8 +34,9 @@ export function Toaster(props: ToasterProps): JSX.Element {
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
         theme={props.theme ?? "dark"}
         position={props.position ?? "top-right"}
-        visibleToasts={props.visibleToasts ?? 3}
-        // Collapsed, sonner hides every toast but the front one, so an update offer waits behind another.
+        // Collapsed, or past the visible count, sonner hides a toast, so an update offer waits behind
+        // another. Six providers can offer an update at once.
+        visibleToasts={props.visibleToasts ?? 6}
         expand={props.expand ?? true}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}
