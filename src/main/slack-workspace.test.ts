@@ -104,19 +104,19 @@ class FakeSignal {
 
 /** Slack's Web API for the bot of the OpenBot app in one workspace. */
 class FakeSlack {
-  readonly calls: Array<{ method: string; token: string | undefined }> = [];
+  readonly calls: Array<{ method: string; token: string | undefined; params: Record<string, string> }> = [];
   #server: Server | null = null;
   #ts = 1000;
   origin = "";
 
   async start(): Promise<void> {
     this.#server = createServer(async (request, response) => {
-      for await (const _chunk of request) {
-        // The parameters do not matter here.
-      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const params = Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString()));
       const method = (request.url ?? "").replace("/api/", "");
       const token = request.headers.authorization?.replace("Bearer ", "");
-      this.calls.push({ method, token });
+      this.calls.push({ method, token, params });
       const reply = (value: DynamicRecord, headers: Record<string, string> = {}) => {
         for (const [name, header] of Object.entries(headers)) response.setHeader(name, header);
         response.setHeader("content-type", "application/json");
@@ -135,6 +135,17 @@ class FakeSlack {
           return reply({ user: { name: "alice", profile: { display_name: "Alice" } } });
         case "conversations.info":
           return reply({ channel: { name: "general" } });
+        // Two pages of public channels; OpenBot is already in C2.
+        case "conversations.list":
+          return params.cursor
+            ? reply({ channels: [{ id: "C3", is_member: false }], response_metadata: { next_cursor: "" } })
+            : reply({
+                channels: [
+                  { id: "C1", is_member: false },
+                  { id: "C2", is_member: true },
+                ],
+                response_metadata: { next_cursor: "page-2" },
+              });
         case "conversations.replies":
           return reply({ messages: [] });
         case "chat.postMessage":
@@ -292,6 +303,16 @@ describe.sequential("OpenBot Slack app end to end", () => {
     expect((await signal.deliver("T9", mention("Ev2", "101.000"))).status).toBe(404);
     const [link] = started.service.messaging.store.links(orchestratorId);
     if (!link) throw new Error("The mention has no conversation.");
+
+    // OpenBot is in every public channel without an invitation, and in each new one.
+    const joined = () => slack.of("conversations.join").map((call) => call.params.channel);
+    await waitFor(() => joined().includes("C3"));
+    expect(joined()).toEqual(expect.arrayContaining(["C1", "C3"]));
+    expect(joined()).not.toContain("C2");
+    expect(
+      await signal.deliver("T1", { event_id: "Ev4", event: { type: "channel_created", channel: { id: "C4" } } }),
+    ).toEqual({ status: 200 });
+    await waitFor(() => joined().includes("C4"));
 
     // Slack uninstalled OpenBot: the connection stops, and Signal stops routing the workspace here.
     expect(await signal.deliver("T1", { event_id: "Ev3", event: { type: "app_uninstalled" } })).toEqual({

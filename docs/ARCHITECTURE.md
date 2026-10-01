@@ -1530,6 +1530,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
 - **Approvals and stop.** An approval of a messaging thread is also posted with buttons. Only the
   Slack user whose message started the turn can answer or stop it; the host can always answer. The
   button value is a random token that exists only in memory.
+- **Channels.** When a connection starts, OpenBot joins every public channel it is not in
+  (`conversations.list`, `conversations.join`, scope `channels:join`), so people can mention it with
+  no invitation. It joins each new public channel on `channel_created`. A private channel needs
+  `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart. Events that arrive while no socket is open are lost after Slack's retries.
 - **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents shows each

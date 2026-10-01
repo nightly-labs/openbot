@@ -447,9 +447,9 @@ answers go from the computer to the Slack Web API directly.
   agent removes its conversations.
 - **Read from Slack.** The messages that mention OpenBot, the replies in a thread an agent answers,
   its direct messages, the files in them, the display names of their authors, the names of the
-  channels, and earlier messages of a thread as context. Slack sends every message of each channel
-  that OpenBot is in; the computer keeps only the messages that address OpenBot or continue a
-  conversation.
+  channels, and earlier messages of a thread as context. OpenBot joins every public channel of the
+  workspace, and Slack sends every message of each channel that OpenBot is in; the computer keeps
+  only the messages that address OpenBot or continue a conversation.
 - **Given to the Slack Orchestrator.** Every new Slack request goes first to the orchestrator agent,
   which runs on its provider like any other agent and passes the work to a teammate with the facts
   it needs.

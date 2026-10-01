@@ -117,14 +117,16 @@ export const messages = defineMessages("connector", {
     "This agent receives every request from Slack. It answers short ones itself, gives other work to the right agent, and posts the answer in the thread.",
   "connector.slack.orchestratorNone": "No agent answers yet",
   "connector.slack.orchestratorNoneDescription": "Add the Slack Orchestrator, or Slack gets no answer.",
-  "connector.slack.inviteNote": "To use OpenBot in a channel, invite it there: /invite @OpenBot.",
+  "connector.slack.inviteNote":
+    "OpenBot joins every public channel by itself, and each new one. For a private channel, invite it: /invite @OpenBot.",
   "connector.slack.warning":
     "Anyone who can post in the Slack workspace can give these agents work. They run on this computer with the access you gave them, and a hosted server stays awake while Slack is connected.",
   // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.slack.stepWorkspace": "Workspace",
   "connector.slack.stepAgent": "Agent",
   "connector.slack.connectTitle": "Connect a Slack workspace",
-  "connector.slack.connectDescription": "OpenBot installs one app in the workspace, named OpenBot.",
+  "connector.slack.connectDescription":
+    "OpenBot installs one app in the workspace, named OpenBot, and it joins every public channel.",
   "connector.slack.connectStepBrowser": "Slack opens in your browser",
   "connector.slack.connectStepAllow": "Select the workspace in the top-right corner, then Allow",
   "connector.slack.connectStepReturn": "This dialog continues when Slack is done",
@@ -141,7 +143,7 @@ export const messages = defineMessages("connector", {
   "connector.slack.orchestratorDoesAnswer": "Posts the answer in the Slack thread",
   "connector.slack.orchestratorModel": "Model",
   "connector.slack.doneTitle": "OpenBot is in {workspace}",
-  "connector.slack.doneDescription": "Invite @OpenBot to a channel and mention it, or send it a direct message.",
+  "connector.slack.doneDescription": "Mention @OpenBot in any public channel, or send it a direct message.",
   "connector.slack.done": "Done",
   "connector.slack.previewLabel": "How OpenBot looks in Slack",
   // A sample Slack channel name, shown without the # sign.

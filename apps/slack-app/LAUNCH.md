@@ -84,7 +84,7 @@ First with the test Worker and the development app, in a separate workspace:
 
 - [ ] Turn on distribution for the development app, so the test workspace can install it.
 - [ ] **Connect Slack**: Slack's install page, then the workspace shows **Connected**.
-- [ ] Mention @OpenBot in a channel after `/invite @OpenBot`, and send it a direct message. The
+- [ ] OpenBot joins every public channel. Mention @OpenBot in one, and send it a direct message. The
       orchestrator answers or asks a teammate, and the answer comes in the thread.
 - [ ] A follow-up in the same thread goes to the same agent.
 - [ ] **Approve** and **Deny** work only for the person who asked. **Stop** stops the turn.

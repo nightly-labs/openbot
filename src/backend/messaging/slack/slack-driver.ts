@@ -23,6 +23,7 @@ import { SlackApiError, SlackWebApi } from "./slack-web-api";
 /** Slack's own limit for one uploaded file is 1 GB; the host holds its uploads to this. */
 const UPLOAD_BYTES = 100 * 1024 * 1024;
 const HISTORY_LIMIT = 100;
+const CHANNEL_PAGE_LIMIT = 200;
 
 const REACTIONS: Record<StatusReaction, string> = {
   received: "eyes",
@@ -225,6 +226,33 @@ export class SlackAdapter implements MessagingAdapter {
       this.#places.set(platformChannelId, name);
     }
     return name;
+  }
+
+  /** Every public channel of the workspace that OpenBot is not in yet. Archived ones are left out. */
+  async joinPublicPlaces(): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.#api.call("conversations.list", {
+        types: "public_channel",
+        exclude_archived: true,
+        limit: CHANNEL_PAGE_LIMIT,
+        cursor,
+      });
+      const channels = Array.isArray(page.channels) ? page.channels.filter(isDynamicRecord) : [];
+      for (const channel of channels)
+        if (isString(channel.id) && channel.is_member !== true) await this.joinPlace(channel.id);
+      const next = isDynamicRecord(page.response_metadata) ? page.response_metadata.next_cursor : undefined;
+      cursor = isString(next) && next ? next : undefined;
+    } while (cursor);
+  }
+
+  async joinPlace(platformChannelId: string): Promise<void> {
+    try {
+      await this.#api.call("conversations.join", { channel: platformChannelId });
+    } catch (error) {
+      // A channel that was archived, or that the workspace keeps apps out of, stays without OpenBot.
+      if (!(error instanceof SlackApiError)) throw error;
+    }
   }
 
   /**

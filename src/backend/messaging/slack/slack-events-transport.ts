@@ -78,6 +78,10 @@ export class SlackEventsTransport implements MessagingTransport {
       sink.state("invalid_token");
       return OK;
     }
+    if (isDynamicRecord(event) && event.type === "channel_created") {
+      if (isDynamicRecord(event.channel) && isString(event.channel.id)) sink.placeCreated?.(event.channel.id);
+      return OK;
+    }
     const message = slackInboundMessage(body, this.#identity.workspaceId, this.#identity.botUserId);
     if (message) sink.message(message);
     return OK;

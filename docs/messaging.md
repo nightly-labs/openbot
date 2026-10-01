@@ -16,8 +16,11 @@ service, which passes them to this computer.
    workspace in the top-right corner, and select **Allow**. The dialog continues by itself.
 3. Pick the model of the Slack Orchestrator, and select **Add agent**. OpenBot adds the agent, with its
    instructions and the facts it starts with. You can rename it or change its model in agent settings.
-4. In Slack, invite OpenBot to a channel (`/invite @OpenBot`) and mention it there, or send it a
-   direct message.
+4. In Slack, mention @OpenBot in any public channel, or send it a direct message.
+
+OpenBot joins every public channel of the workspace when it connects, and each public channel that is
+created later. Slack shows "joined #channel" in each one. A private channel needs an invitation:
+`/invite @OpenBot`.
 
 A workspace answers to one OpenBot server. Another account cannot connect a workspace that your
 server answers until you disconnect it. **Disconnect** revokes the token, removes it from this
@@ -88,8 +91,9 @@ also has an installed OpenBot. The operating system sends `openbot://` to the in
 - An agent runs one turn at a time. A Slack request waits behind the agent's own work and behind
   channel work, and the thread shows that it waits. One agent keeps at most 5 Slack requests waiting,
   and one person at most 2.
-- Slack sends every message of every channel that OpenBot is in to this computer, through Signal. The
-  host keeps only the messages that address OpenBot or continue a conversation it has.
+- Slack sends every message of every channel that OpenBot is in to this computer, through Signal.
+  Since OpenBot is in every public channel, a busy workspace sends many events. The host keeps only
+  the messages that address OpenBot or continue a conversation it has.
 - Until the Slack Marketplace approves OpenBot, Slack limits reading a thread to 1 request per minute
   and 15 messages, so an agent can see less context.
 - Anyone who can post in the workspace, guests and Slack Connect members included, can give the

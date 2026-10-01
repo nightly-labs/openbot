@@ -113,12 +113,18 @@ export interface MessagingAdapter {
   authorName(userId: string): Promise<string>;
   placeName(platformChannelId: string): Promise<string>;
   mention(userId: string): string;
+  /** Joins every public place the platform lets OpenBot join without an invitation. */
+  joinPublicPlaces?(): Promise<void>;
+  /** Joins one public place, such as a channel that was just created. */
+  joinPlace?(platformChannelId: string): Promise<void>;
 }
 
 export interface TransportSink {
   state(state: MessagingConnectionState, detail?: { retryAt?: string }): void;
   message(message: InboundMessage): void;
   action(action: InboundAction): void;
+  /** A public place was created that OpenBot can join. */
+  placeCreated?(platformChannelId: string): void;
 }
 
 export interface MessagingTransport {

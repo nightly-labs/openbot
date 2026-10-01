@@ -2,7 +2,8 @@
 
 - Your agents can answer in Slack. Open **Server settings → Connectors → Slack**, select **Connect
   Slack** one time and install OpenBot in your workspace. People mention @OpenBot in a channel or
-  send it a direct message; to use it in a channel, `/invite @OpenBot` there. The connect dialog also
+  send it a direct message. OpenBot joins every public channel by itself; a private channel needs
+  `/invite @OpenBot`. The connect dialog also
   adds the Slack Orchestrator, an agent on the model you pick: it receives each request, gives the
   work to the agent that fits best, and posts the answer in the thread. The answer comes in the same thread, can include
   files, and asks the person who wrote for approval with buttons. Reply `stop` to stop a request.

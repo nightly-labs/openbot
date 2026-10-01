@@ -356,7 +356,12 @@ export class MessagingService {
       },
       message: (message) => void this.#receive(live, message).catch((error) => this.#warn(error)),
       action: (action) => void this.#action(live, action).catch((error) => this.#warn(error)),
+      placeCreated: (platformChannelId) =>
+        void live.adapter.joinPlace?.(platformChannelId).catch((error) => this.#warn(error)),
     });
+    // So people can mention OpenBot in any public channel without inviting it first. Channels made
+    // while the host was off are joined here too.
+    void live.adapter.joinPublicPlaces?.().catch((error) => this.#warn(error));
   }
 
   async #restart(connectionId: string): Promise<void> {

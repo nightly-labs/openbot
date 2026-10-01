@@ -20,6 +20,7 @@
       "bot": [
         "app_mentions:read",
         "channels:history",
+        "channels:join",
         "channels:read",
         "chat:write",
         "files:read",
@@ -40,6 +41,7 @@
       "request_url": "https://signal.openbot.run/v1/slack/events",
       "bot_events": [
         "app_mention",
+        "channel_created",
         "message.channels",
         "message.groups",
         "message.im",
