@@ -5,8 +5,7 @@
   place first and showed outside the island while it grew.
 - Settings → Dynamic Island → Size: the built-in display preview now draws the island that display
   shows. On a built-in display with no notch, it no longer draws a notch. Each preview scales so
-  that the widest width fits its frame, and keeps that scale while the setting changes. The
-  built-in preview draws the top edge of the display, so the notch shoulders run into it.
+  that the widest width fits its frame, and keeps that scale while the setting changes.
 
 - A lower Dynamic Island now has smaller bottom corners (7.9px at 75% height, 14px at 100%), and a
   higher one larger corners. On an external display the island stays a capsule at every height. At

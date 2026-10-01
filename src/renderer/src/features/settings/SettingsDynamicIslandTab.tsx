@@ -112,7 +112,7 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
         <ItemGroup class="settings-modal-card settings-dynamic-island-size">
           <div class="settings-dynamic-island-preview">
             <figure class="settings-dynamic-island-preview-display">
-              <PreviewFit widestWidth={widestBuiltInWidth()} bezel>
+              <PreviewFit widestWidth={widestBuiltInWidth()}>
                 <OpenBotDynamicIsland
                   presentation={IDLE_DYNAMIC_ISLAND_PRESENTATION}
                   state="compact"
@@ -177,9 +177,8 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
  * A preview frame. It scales its island so that the widest width setting fits, such as the
  * built-in island with no notch at 130%. The scale changes only with the frame, not with the
  * setting, so a slider drag moves the island alone and every width shows at the same scale.
- * `bezel` draws the top edge of a built-in display, which the notch shoulders run into.
  */
-function PreviewFit(props: { widestWidth: number | undefined; bezel?: boolean; children: JSX.Element }): JSX.Element {
+function PreviewFit(props: { widestWidth: number | undefined; children: JSX.Element }): JSX.Element {
   let frame: HTMLDivElement | undefined;
   const [available, setAvailable] = createSignal(0);
   const scale = () => {
@@ -195,14 +194,7 @@ function PreviewFit(props: { widestWidth: number | undefined; bezel?: boolean; c
     return () => resize.disconnect();
   });
   return (
-    <div
-      ref={frame}
-      class={[
-        "settings-dynamic-island-preview-bar",
-        { "settings-dynamic-island-preview-bar-bezel": props.bezel ?? false },
-      ]}
-      inert
-    >
+    <div ref={frame} class="settings-dynamic-island-preview-bar" inert>
       <div class="settings-dynamic-island-preview-fit" style={{ "--settings-dynamic-island-preview-scale": scale() }}>
         {props.children}
       </div>
