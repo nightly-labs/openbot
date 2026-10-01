@@ -292,15 +292,6 @@ body:has(.dynamic-island-surface),
   transform: rotateY(180deg);
 }
 
-/* The sphere the smile turns on. It shows only while its motion draws it. */
-.dynamic-island-surface-idle-greeting-sphere {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Each copy of the sparkles glyph shows one star, through a star-shaped mask a little larger than the
    star. The transform origin is the star's centre, so it twinkles in place. */
 .dynamic-island-surface-idle-greeting-face:has(.dynamic-island-surface-idle-greeting-sparkle) {
