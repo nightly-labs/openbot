@@ -35,6 +35,8 @@ export function Toaster(props: ToasterProps): JSX.Element {
         theme={props.theme ?? "dark"}
         position={props.position ?? "top-right"}
         visibleToasts={props.visibleToasts ?? 3}
+        // Collapsed, sonner hides every toast but the front one, so an update offer waits behind another.
+        expand={props.expand ?? true}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}
         richColors={props.richColors ?? false}
