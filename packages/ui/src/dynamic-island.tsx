@@ -89,6 +89,9 @@ const COMPACT_RESIZE_SETTLE = 0.6;
 // blurs, and a jump across the range, or a fast drag the surface lags behind, blurs in full.
 const COMPACT_RESIZE_FULL_MOTION_DISTANCE = 120;
 const COMPACT_RESIZE_LARGE_MOTION = 0.5;
+// After a large move, `data-compact-settled` marks the landing for this long, so the compact content
+// can play a short arrival. A small move, such as one slow slider step, gets none.
+const COMPACT_SETTLED_DURATION = 480;
 const CONTENT_ENTER_DELAY = 90;
 const CONTENT_BLUR_OPEN_DURATION = 460;
 const CONTENT_BLUR_CLOSE_DURATION = 450;
@@ -598,14 +601,26 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
   const previousCompactContentSizes = new Map<HTMLElement, { width: number; height: number } | undefined>();
   let compactContentAnimating = false;
   let compactResizeSettleTimer: ReturnType<typeof setTimeout> | undefined;
+  let compactSettledTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function clearCompactSettled(): void {
+    if (compactSettledTimer !== undefined) clearTimeout(compactSettledTimer);
+    compactSettledTimer = undefined;
+    options.container()?.removeAttribute("data-compact-settled");
+  }
 
   function settleCompactResize(): void {
     if (compactResizeSettleTimer !== undefined) clearTimeout(compactResizeSettleTimer);
     compactResizeSettleTimer = undefined;
     const container = options.container();
+    const landedLargeMove = container?.dataset.compactMotion === "large";
     container?.removeAttribute("data-compact-resize");
     container?.style.removeProperty("--dynamic-island-compact-motion");
     container?.removeAttribute("data-compact-motion");
+    if (!container || !landedLargeMove) return;
+    clearCompactSettled();
+    container.dataset.compactSettled = "true";
+    compactSettledTimer = setTimeout(clearCompactSettled, COMPACT_SETTLED_DURATION);
   }
 
   createEffect(options.silhouetteTarget, (target) => {
@@ -772,6 +787,7 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
         // Tells the compact content that it moves, and which way the row goes.
         const row = compactContent[0] && compactContentTargets.get(compactContent[0]);
         const rowStart = compactContent[0] && compactContentStarts.get(compactContent[0]);
+        clearCompactSettled();
         container.dataset.compactResize = row && rowStart && row.width < rowStart.width ? "shrink" : "grow";
         const travel = row && rowStart ? Math.abs(row.width - rowStart.width) : COMPACT_RESIZE_FULL_MOTION_DISTANCE;
         const motion = Math.min(1, travel / COMPACT_RESIZE_FULL_MOTION_DISTANCE);
@@ -801,6 +817,7 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
   onCleanup(() => {
     for (const active of animations) active.cancel();
     finishAnimation();
+    clearCompactSettled();
   });
 }
 
