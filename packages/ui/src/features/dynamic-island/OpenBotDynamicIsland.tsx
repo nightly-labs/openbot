@@ -874,6 +874,11 @@ function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
           </span>
         )}
       </Show>
+      {/* The smile turns as a ball: its motion draws both faces onto a sphere here. The greeting is
+          aria-hidden as a whole. */}
+      <Show when={props.emoji === "😊"}>
+        <canvas class="dynamic-island-surface-idle-greeting-sphere" />
+      </Show>
     </span>
   );
 }
