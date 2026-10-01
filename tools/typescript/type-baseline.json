@@ -165,7 +165,6 @@
     "src/renderer/src/features/conversation/LocalSkillsLibrary.tsx": 2,
     "src/renderer/src/features/conversation/RoutineChatCard.tsx": 1,
     "src/renderer/src/features/conversation/WorkspaceConversation.tsx": 1,
-    "src/renderer/src/features/dynamic-island/DynamicIslandSurface.tsx": 1,
     "src/renderer/src/features/files/AgentFilesSettings.tsx": 1,
     "src/renderer/src/features/onboarding/OnboardingFlow.test.tsx": 2,
     "src/renderer/src/features/servers/RemoteDesktopSetup.tsx": 1,
