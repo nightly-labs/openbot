@@ -46,7 +46,7 @@ class SlackAdapter implements MessagingAdapter {
   readonly #places = new Map<string, Promise<string>>();
   #botUserId = "";
 
-  constructor(botToken: string, options: MessagingDriverOptions & { origin?: string }) {
+  constructor(botToken: string, options: MessagingDriverOptions & { origin?: string | undefined }) {
     this.#api = new SlackWebApi({ token: botToken, origin: options.origin, rateLimited: options.rateLimited });
   }
 

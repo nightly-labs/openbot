@@ -72,9 +72,9 @@ interface ProviderModelPickerProps {
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   /** Endpoints the user named; served by OpenCode, separated out only by the picker. */
-  customProviders?: readonly CustomProviderSummary[];
+  customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents; provider `acp`, drawn on the Custom tab with one group each. */
-  customAgents?: readonly CustomAgentSummary[];
+  customAgents?: readonly CustomAgentSummary[] | undefined;
   onAddCustomProvider?: () => void;
   /**
    * This agent's standing approval, below Effort. Without the callback the row is absent, which is

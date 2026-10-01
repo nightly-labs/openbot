@@ -14,8 +14,10 @@ export const SLACK_ROUTE_AUDIENCE = "openbot-slack-route";
 
 export const SLACK_EVENTS_PATH = "/v1/slack/events";
 
-// How long a route ticket stays valid. Signal checks it only when an `ingress` socket connects.
-export const SLACK_ROUTE_TTL_SECONDS = 24 * 60 * 60;
+// How long a route ticket stays valid. Signal checks it only when an `ingress` socket connects, and
+// the host asks for one just before it connects. A short life limits how long a host that lost a
+// workspace (disconnected, or moved to another host) can still claim it with an old ticket.
+export const SLACK_ROUTE_TTL_SECONDS = 5 * 60;
 
 // The most workspaces one host can link.
 export const SLACK_ROUTE_TEAMS_LIMIT = 32;

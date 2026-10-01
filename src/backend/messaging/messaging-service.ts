@@ -121,6 +121,8 @@ const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected"
 const APPROVAL_TEXT_LIMIT = 2_500;
 const CANCEL_TEXT = /^(cancel|stop)$/i;
 const RECENT_MESSAGES = 2_000;
+/** How long a connection waits before it tries Slack again after Slack was unreachable. */
+const IDENTIFY_RETRY_MS = 30_000;
 /** The marker `mention` uses. Text that did not come from the host has it taken out. */
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
 
@@ -359,11 +361,15 @@ export class MessagingService {
     } catch (error) {
       if (this.#live.get(record.connectionId) !== live) return;
       if (error instanceof MessagingConnectionError) return this.#setState(live, error.state);
-      // Slack is unreachable now. Reconnect tries again; a wake from sleep does too.
+      // Slack is unreachable now. Try again later; Reconnect and a wake from sleep do it at once.
+      const retry = setTimeout(() => {
+        if (this.#live.get(record.connectionId) === live) void this.#restart(record.connectionId);
+      }, IDENTIFY_RETRY_MS);
+      retry.unref?.();
       live.transport = {
         start: () => undefined,
         reconnect: () => void this.#restart(record.connectionId),
-        stop: async () => undefined,
+        stop: async () => clearTimeout(retry),
       };
       return this.#setState(live, "reconnecting");
     }
@@ -444,6 +450,10 @@ export class MessagingService {
     if (!live.identity) return;
     // Before any await: a redelivered event can arrive while the first copy is still downloading its
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
+    const store = this.#threads.store;
+    const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
+    // Before the dedup key: a reply with a mention also arrives as `app_mention`, which must still run.
+    if (message.requiresLink && !existing) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
     if (this.#recent.has(dedupKey)) return;
     this.#recent.add(dedupKey);
@@ -451,9 +461,6 @@ export class MessagingService {
       const oldest = this.#recent.values().next().value;
       if (oldest !== undefined) this.#recent.delete(oldest);
     }
-    const store = this.#threads.store;
-    const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
-    if (message.requiresLink && !existing) return;
     if (existing && CANCEL_TEXT.test(message.text) && message.files.length === 0) {
       if (await this.#threads.stop(existing.linkId, message.authorId)) {
         await live.adapter.react(message.target, message.platformMessageId, "stopped", true).catch(() => undefined);
@@ -618,7 +625,8 @@ export class MessagingService {
       await this.#say(adapter, target, placeholder, sourceText("status.messaging.failed"));
       return;
     }
-    if (activity.answer) await adapter.postAnswer(target, activity.answer, placeholder);
+    // Slack is outside this computer, so a secret in the answer must not reach it.
+    if (activity.answer) await adapter.postAnswer(target, redactText(activity.answer), placeholder);
     // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
     else if (!activity.followUp && this.#threads.awaitsTeammate(activity.link.linkId))
       await this.#say(adapter, target, placeholder, sourceText("status.messaging.delegated"));

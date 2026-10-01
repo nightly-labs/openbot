@@ -90,7 +90,7 @@ also has an installed OpenBot. The operating system sends `openbot://` to the in
 - The host must run. Slack sends an event again after about 1 and 5 minutes when this computer does
   not answer, then drops it.
 - An agent runs one turn at a time. A Slack request waits behind the agent's own work and behind
-  channel work, and the thread shows that it waits. One agent keeps at most 5 Slack requests waiting,
+  channel work, and the thread shows that it waits. One agent keeps at most 20 Slack requests waiting,
   and one person at most 2.
 - Slack sends every message of every channel that OpenBot is in to this computer, through Signal.
   Since OpenBot is in every public channel, a busy workspace sends many events. The host keeps only

@@ -115,7 +115,11 @@ function setup(extra: { is_enterprise_install?: boolean } = {}, developmentOrigi
       ...extra,
     }),
   );
-  const bindings = { DB: sqliteD1(database), ...secrets, SLACK_DEV_PUBLIC_ORIGIN: developmentOrigin };
+  const bindings = {
+    DB: sqliteD1(database),
+    ...secrets,
+    ...(developmentOrigin ? { SLACK_DEV_PUBLIC_ORIGIN: developmentOrigin } : {}),
+  };
   return { service: new SlackAppService(bindings, { fetch }), database, fetch };
 }
 

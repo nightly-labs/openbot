@@ -24,7 +24,7 @@ export class SlackApiError extends Error {
 export interface SlackWebApiOptions {
   token: string;
   /** Only tests change this. The token is never sent to another origin. */
-  origin?: string;
+  origin?: string | undefined;
   rateLimited?(retryAt: string): void;
   /** Waits between rate-limit retries. Only tests replace it. */
   delay?(milliseconds: number): Promise<void>;

@@ -91,6 +91,7 @@ export class MessagingThreads {
   readonly #mailbox: MailboxStore;
   readonly #hooks: MessagingThreadsHooks;
   readonly #listeners = new Set<(activity: MessagingActivity) => void>();
+  readonly #admissions = new Map<string, Promise<unknown>>();
   /** The external message each running turn answers, by turn id. */
   readonly #turnOrigins = new Map<string, { origin: MessagingOrigin | null; followUp: boolean }>();
   #contextSource: ((link: MessagingLink, origin: MessagingOrigin) => Promise<MessagingPromptContext>) | null = null;
@@ -126,6 +127,20 @@ export class MessagingThreads {
     // The link decides the agent: a conversation that already has one keeps it, even when another
     // message routed it elsewhere at the same time.
     const agentId = link.agentId;
+    // One admission at a time for each agent: the enqueue awaits file copies, and the queue limits
+    // must count the requests before it.
+    const previous = this.#admissions.get(agentId) ?? Promise.resolve();
+    const admission = previous.then(() => this.#admit(agentId, link, input));
+    const settled = admission.catch(() => undefined);
+    this.#admissions.set(agentId, settled);
+    try {
+      return await admission;
+    } finally {
+      if (this.#admissions.get(agentId) === settled) this.#admissions.delete(agentId);
+    }
+  }
+
+  async #admit(agentId: string, link: MessagingLink, input: MessagingReceiveInput): Promise<MessagingReceiveResult> {
     // Only external messages count: a teammate's answer to a request from here is the agent's own work.
     const pending = this.store
       .links(agentId)
