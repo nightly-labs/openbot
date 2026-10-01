@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 897e18978b1cca852872afcf42c698a0766311d4..fdb51147fc10da7bef7ff6f2799ad8851f718556 100644
+index 897e18978b1cca852872afcf42c698a0766311d4..f657d50bc9f56b44dbfb600efd2b5e2d24958bc6 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,6 +1,5 @@
@@ -186,8 +186,17 @@ index 897e18978b1cca852872afcf42c698a0766311d4..fdb51147fc10da7bef7ff6f2799ad885
  		const handleKeyDown = (event) => {
  			if (propsWithDefaults.hotkey.length > 0 && propsWithDefaults.hotkey.every((key) => event[key] || event.code === key)) {
  				setExpanded(true);
+@@ -1146,7 +1149,7 @@ function Toaster(props) {
+ 						}));
+ 						effect((_p$) => {
+ 							var _v$31 = propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir, _v$32 = className$2(), _v$33 = actualTheme(), _v$34 = {
+-								"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++								"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
+ 								"--gap": `${propsWithDefaults.gap}px`,
+ 								...propsWithDefaults.style,
+ 								...assignOffset(propsWithDefaults.offset, propsWithDefaults.mobileOffset)
 diff --git a/dist/index.jsx b/dist/index.jsx
-index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..961ab08ad091db3575a43e93aa9887a1c90dd84d 100644
+index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..38ebcf50731d4b5d63c5a79b2227b4bf82f9b403 100644
 --- a/dist/index.jsx
 +++ b/dist/index.jsx
 @@ -1,12 +1,11 @@
@@ -461,14 +470,16 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..961ab08ad091db3575a43e93aa9887a1
  	});
  	onCleanup(() => {
  		if (lastFocusedElementRef()) {
-@@ -830,7 +849,9 @@ function Toaster(props) {
+@@ -830,8 +849,10 @@ function Toaster(props) {
  		const toastsByPosition = createMemo(() => filteredToasts().filter((toast) => !toast.position && index() === 0 || toast.position === position));
  		const heightsByPosition = createMemo(() => heights().filter((height) => index() === 0 && !height.position || height.position === position));
  		return <Show when={filteredToasts().length > 0}>
 -              <ol tabIndex={-1} ref={listRef} dir={propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir} class={className()} data-sonner-toaster data-sonner-theme={actualTheme()} data-y-position={y} data-x-position={x} style={{
+-			"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
 +              <ol tabIndex={-1} ref={(element) => {
 +                listRef = element;
 +              }} dir={propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir} class={className()} data-sonner-toaster data-sonner-theme={actualTheme()} data-y-position={y} data-x-position={x} style={{
- 			"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++			"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
  			"--width": `${TOAST_WIDTH}px`,
  			"--gap": `${propsWithDefaults.gap}px`,
+ 			...propsWithDefaults.style,
