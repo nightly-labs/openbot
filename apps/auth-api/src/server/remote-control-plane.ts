@@ -6,6 +6,7 @@ import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
   SLACK_ROUTE_TTL_SECONDS,
+  type SlackRouteTeam,
 } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   REMOTE_TICKET_AUDIENCE,
@@ -43,7 +44,7 @@ export class RemoteControlPlaneError extends Error {
 }
 
 /** A SQL condition and its binds, which a statement adds to its WHERE clause. */
-interface SqlCondition {
+export interface SqlCondition {
   sql: string;
   binds: unknown[];
 }
@@ -195,7 +196,7 @@ export class SlackRouteSigner {
     this.#privateJwk = parseJwk(config.privateJwk);
   }
 
-  async issue(input: { hostId: string; teams: string[]; now: number }): Promise<string> {
+  async issue(input: { hostId: string; teams: SlackRouteTeam[]; now: number }): Promise<string> {
     this.#key ??= await importJWK(this.#privateJwk, "ES256");
     const issuedAt = Math.floor(input.now / 1_000);
     return new SignJWT({ hid: input.hostId, teams: input.teams })
@@ -1161,20 +1162,33 @@ export class RemoteControlPlane {
     }
     await this.authenticateHost(hostId, machineToken);
     const rows = await this.#database
-      .prepare("SELECT team_id FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?")
+      .prepare(
+        "SELECT team_id, connected_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+      )
       .bind(hostId, SLACK_ROUTE_TEAMS_LIMIT)
-      .all<{ team_id: string }>();
-    const teams = rows.results.map((row) => row.team_id);
-    return { ticket: await this.#slackRouteSigner.issue({ hostId, teams, now: this.#now() }), teams };
+      .all<{ team_id: string; connected_at: number }>();
+    const teams = rows.results.map((row) => ({ id: row.team_id, linkedAt: row.connected_at }));
+    return {
+      ticket: await this.#slackRouteSigner.issue({ hostId, teams, now: this.#now() }),
+      teams: teams.map((team) => team.id),
+    };
   }
 
   /** Unlinks a Slack workspace from this host, after the host disconnected it or Slack uninstalled it. */
   async disconnectSlackWorkspace(hostId: string, machineToken: string, teamId: string): Promise<void> {
     await this.authenticateHost(hostId, machineToken);
-    await this.#database
-      .prepare("DELETE FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
-      .bind(teamId, hostId)
-      .run();
+    const now = this.#now();
+    // Signal drops the route now, so the host cannot keep the workspace with the ticket it holds.
+    await this.#database.batch([
+      this.#authEventStatement({ type: "slack-route-revoked", teamId, through: now }, now, {
+        sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?)",
+        binds: [teamId, hostId],
+      }),
+      this.#database
+        .prepare("DELETE FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
+        .bind(teamId, hostId),
+    ]);
+    await this.#flushAuthEvents();
   }
 
   /** Checks the credential that a host received when it registered. */
@@ -1300,7 +1314,7 @@ export async function notifyAccountProfileChanged(
 }
 
 /** Queues one event for Signal. `remote/api` decodes each event type with its own schema. */
-function authEventStatement(
+export function authEventStatement(
   database: D1Database,
   event: RemoteAuthEvent,
   now: number,

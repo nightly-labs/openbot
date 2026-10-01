@@ -278,7 +278,11 @@ export function remoteControlPlaneErrorResponse(error: unknown): Response {
 }
 
 export function requestSlackApp(): SlackAppService {
-  return new SlackAppService(requireWorkerBindings(env));
+  const bindings = requireWorkerBindings(env);
+  // The events are already in D1 and the cron redelivers them, so the answer does not wait.
+  return new SlackAppService(bindings, {
+    flushAuthEvents: async () => waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now())),
+  });
 }
 
 export function slackAppErrorResponse(error: unknown): Response {

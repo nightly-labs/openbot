@@ -47,6 +47,8 @@ describe("OpenBot Slack app install", () => {
       redirectUri,
     });
     expect(database.prepare("SELECT host_id FROM slack_workspace_routes").all()).toEqual([{ host_id: "host-2" }]);
+    // Each link tells Signal to drop older routes, so host-1 cannot keep the workspace.
+    expect(revocations(database)).toHaveLength(2);
 
     // Another account cannot take it.
     await expect(
@@ -57,6 +59,7 @@ describe("OpenBot Slack app install", () => {
       }),
     ).rejects.toMatchObject({ code: "slack_workspace_taken" });
     expect(database.prepare("SELECT host_id FROM slack_workspace_routes").all()).toEqual([{ host_id: "host-2" }]);
+    expect(revocations(database)).toHaveLength(2);
   });
 
   it("refuses an install for a whole Enterprise organization", async () => {
@@ -94,6 +97,13 @@ describe("OpenBot Slack app install", () => {
     });
   });
 });
+
+function revocations(database: ReturnType<typeof migratedDatabase>) {
+  return database
+    .prepare("SELECT payload FROM remote_auth_events WHERE payload LIKE '%slack-route-revoked%'")
+    .all()
+    .map((row) => JSON.parse(String(row.payload)));
+}
 
 function setup(extra: { is_enterprise_install?: boolean } = {}, developmentOrigin?: string) {
   const database = migratedDatabase();

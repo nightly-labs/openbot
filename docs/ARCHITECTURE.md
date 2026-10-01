@@ -1511,8 +1511,10 @@ the answer. Every answer comes from OpenBot.
   or 503 so that Slack sends it again. The route ticket is an ES256 JWT that `apps/auth-api` signs
   with its own key for a host that proves its machine token. It names only the workspaces that D1
   links to that host, expires after 5 minutes, and the host asks for a new one each time the socket
-  connects. A workspace goes to the socket with the newest ticket that names it, so a host that lost
-  the workspace cannot take it back with an older ticket. The host trusts a delivery because Signal checked the signature; no host has the
+  connects. Each workspace in the ticket carries the time D1 linked it. When a workspace is unlinked
+  or moved, the Worker sends Signal `slack-route-revoked` through the signed auth-event outbox:
+  Signal drops the route and refuses tickets with that link or an older one, so a host that lost the
+  workspace cannot keep it with the ticket it holds. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`

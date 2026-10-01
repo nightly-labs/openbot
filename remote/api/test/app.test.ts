@@ -186,9 +186,9 @@ describe("Slack request route", () => {
     expect((await pressed).status).toBe(503);
   });
 
-  it("keeps a workspace with its newest route ticket", async () => {
-    const { app, signal, route } = await slackRoute(signingSecret);
-    const connect = async (id: string, issuedSecondsAgo: number) => {
+  it("keeps a workspace with its newest link, and drops a revoked one", async () => {
+    const { app, signal, route, revoke } = await slackRoute(signingSecret);
+    const connect = async (id: string, linkedAt: number) => {
       const socket = testSocket(id);
       signal.connect(socket);
       await signal.receive(
@@ -198,28 +198,42 @@ describe("Slack request route", () => {
           version: 1,
           peer: "ingress",
           token: "host-ticket",
-          slackRoute: await route({ hid: "host-1", teams: ["T1"] }, 3_600, issuedSecondsAgo),
+          slackRoute: await route({ hid: "host-1", teams: ["T1"] }, 3_600, linkedAt),
         }),
       );
       expect(socket.messages.at(-1)).toContain('"type":"ready"');
       socket.messages.length = 0;
       return socket;
     };
-    // The workspace moved to the host that got the newer ticket. The host that lost it still holds
-    // its older, unexpired ticket, and connects after the new one.
-    const current = await connect("current", 60);
-    const stale = await connect("stale", 240);
-
     const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev2","event":{"type":"app_mention"}}';
-    const pending = post(app, body);
-    await vi.waitFor(() => expect(current.messages).toHaveLength(1));
+    const delivered = async (socket: TestSocket) => {
+      const pending = post(app, body);
+      await vi.waitFor(() => expect(socket.messages).toHaveLength(1));
+      const { requestId } = JSON.parse(socket.messages.pop() ?? "{}");
+      await signal.receive(
+        socket,
+        JSON.stringify({ type: "slack-delivery-result", version: 1, requestId, status: 200 }),
+      );
+      expect((await pending).status).toBe(200);
+    };
+
+    // The workspace moved to a new host. The host that lost it still holds an unexpired ticket with
+    // the older link, and connects after the new one.
+    const current = await connect("current", 2_000);
+    const stale = await connect("stale", 1_000);
+    await delivered(current);
     expect(stale.messages).toHaveLength(0);
-    const { requestId } = JSON.parse(current.messages[0] ?? "{}");
-    await signal.receive(
-      current,
-      JSON.stringify({ type: "slack-delivery-result", version: 1, requestId, status: 200 }),
-    );
-    expect((await pending).status).toBe(200);
+
+    // Unlinked: the route goes at once, and the last ticket cannot bring it back.
+    await revoke("T1", 2_500);
+    expect((await post(app, body)).status).toBe(503);
+    await connect("replay", 2_000);
+    expect((await post(app, body)).status).toBe(503);
+
+    // A later link answers again. A revocation older than the current link changes nothing.
+    const relinked = await connect("relinked", 3_000);
+    await revoke("T1", 2_999);
+    await delivered(relinked);
   });
 
   it("answers 503 when the signing secret is not configured", async () => {
@@ -274,14 +288,32 @@ async function slackRoute(signingSecret: string | null) {
     8,
   );
   const now = Math.floor(Date.now() / 1_000);
-  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600, issuedSecondsAgo = 120) =>
-    new SignJWT(claims)
+  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600, linkedAt = 1_000) =>
+    new SignJWT({ hid: claims.hid, teams: claims.teams.map((id) => ({ id, linkedAt })) })
       .setProtectedHeader({ alg: "ES256", kid: "slack-route-1" })
       .setAudience("openbot-slack-route")
-      .setIssuedAt(now - issuedSecondsAgo)
+      .setIssuedAt(now - 120)
       .setExpirationTime(now + lifetimeSeconds)
       .sign(privateKey);
-  return { app: createRemoteApiApp(config, signal), signal, route };
+  const app = createRemoteApiApp(config, signal);
+  // What the account service sends when it unlinks or moves a workspace.
+  const revoke = async (teamId: string, through: number) => {
+    const body = JSON.stringify({ type: "slack-route-revoked", teamId, through });
+    const timestamp = String(Math.floor(Date.now() / 1_000));
+    const response = await app.handle(
+      new Request("http://localhost/internal/auth-events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "OpenBot-Timestamp": timestamp,
+          "OpenBot-Signature": signServiceRequest(body, timestamp, config.authWebhookSecret),
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(204);
+  };
+  return { app, signal, route, revoke };
 }
 
 interface TestSocket {

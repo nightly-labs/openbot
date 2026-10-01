@@ -1,3 +1,4 @@
+import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   decodeSignalClientMessage,
   encodeSignalServerMessage,
@@ -11,10 +12,9 @@ import {
   type SlackDeliveryStatus,
 } from "./protocol";
 
-/** The workspaces a verified route ticket names, and when the account service issued it. */
+/** The workspaces a verified route ticket names, each with the time it was linked to the host. */
 export interface SlackRoute {
-  teams: string[];
-  issuedAt: number;
+  teams: SlackRouteTeam[];
 }
 
 export interface RemoteTokenProvider {
@@ -128,9 +128,10 @@ export class SignalService {
   readonly #hosts = new Map<string, Set<string>>();
   // Slack workspace ID to the `ingress` socket that said hello last with a route ticket for it.
   readonly #slackTeams = new Map<string, string>();
-  // The issue time of the newest route ticket that claimed each workspace. A host that lost a
-  // workspace keeps its last ticket until it expires; an older ticket never takes the route back.
-  readonly #slackRouteIssuedAt = new Map<string, number>();
+  // The oldest link that each workspace still accepts: the link of its current route, or the moment
+  // after the account service revoked it. A host that lost a workspace keeps its last ticket until it
+  // expires; this keeps that ticket from taking the route back.
+  readonly #slackRouteFloor = new Map<string, number>();
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #slackLimits: SlackDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
@@ -329,6 +330,15 @@ export class SignalService {
     }
   }
 
+  /** The account service unlinked a Slack workspace, or moved it, after `through`'s link. */
+  revokeSlackRoute(teamId: string, through: number): void {
+    const floor = this.#slackRouteFloor.get(teamId) ?? 0;
+    // A newer link already holds the route.
+    if (floor > through) return;
+    this.#slackRouteFloor.set(teamId, through + 1);
+    this.#slackTeams.delete(teamId);
+  }
+
   revokeSession(sessionId: string): void {
     this.#revokedSessions.set(sessionId, Math.floor(Date.now() / 1_000) + 24 * 60 * 60);
     this.#tokens.revokeSession?.(sessionId);
@@ -424,7 +434,7 @@ export class SignalService {
     }
     let claims: RemoteTicketClaims;
     let usedInitialTicket = true;
-    let slackRoute: SlackRoute = { teams: [], issuedAt: 0 };
+    let slackRoute: SlackRoute = { teams: [] };
     try {
       try {
         claims = await this.#tokens.verifyTicket(message.token);
@@ -464,7 +474,7 @@ export class SignalService {
       connectionId: null,
       resumed: !usedInitialTicket,
       multiplex: message.peer === "host" && message.multiplex === true,
-      slackTeams: slackRoute.teams,
+      slackTeams: slackRoute.teams.map((team) => team.id),
     };
     this.#peers.set(socket.id, peer);
     this.#schedulePeerExpiration(peer);
@@ -472,10 +482,10 @@ export class SignalService {
     this.#metrics.activeSockets = this.#sockets.size;
     const resumeToken = await this.#tokens.issueResumeToken(claims);
     if (message.peer === "ingress") {
-      for (const teamId of slackRoute.teams) {
-        if (slackRoute.issuedAt < (this.#slackRouteIssuedAt.get(teamId) ?? 0)) continue;
-        this.#slackRouteIssuedAt.set(teamId, slackRoute.issuedAt);
-        this.#slackTeams.set(teamId, socket.id);
+      for (const team of slackRoute.teams) {
+        if (team.linkedAt < (this.#slackRouteFloor.get(team.id) ?? 0)) continue;
+        this.#slackRouteFloor.set(team.id, team.linkedAt);
+        this.#slackTeams.set(team.id, socket.id);
       }
       this.#send(socket, {
         type: "ready",

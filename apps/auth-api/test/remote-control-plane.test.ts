@@ -587,12 +587,22 @@ describe("RemoteControlPlane", () => {
       .run();
     const route = await controlPlane.issueSlackRoute("host-1", registration.machineToken);
     expect(route.teams).toEqual(["T1"]);
-    expect(decodeJwt(route.ticket)).toMatchObject({ aud: "openbot-slack-route", hid: "host-1", teams: ["T1"] });
+    expect(decodeJwt(route.ticket)).toMatchObject({
+      aud: "openbot-slack-route",
+      hid: "host-1",
+      teams: [{ id: "T1", linkedAt: 1 }],
+    });
     await expect(
       controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1"),
     ).rejects.toMatchObject({ code: "host_unauthorized" });
+    const revocations = () =>
+      webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "slack-route-revoked");
     await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
     expect((await controlPlane.issueSlackRoute("host-1", registration.machineToken)).teams).toEqual([]);
+    // Signal drops the route, so the host cannot keep the workspace with the ticket it holds.
+    expect(revocations()).toEqual([{ type: "slack-route-revoked", teamId: "T1", through: expect.any(Number) }]);
+    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
+    expect(revocations()).toHaveLength(1);
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

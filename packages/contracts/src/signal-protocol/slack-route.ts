@@ -15,8 +15,7 @@ export const SLACK_ROUTE_AUDIENCE = "openbot-slack-route";
 export const SLACK_EVENTS_PATH = "/v1/slack/events";
 
 // How long a route ticket stays valid. Signal checks it only when an `ingress` socket connects, and
-// the host asks for one just before it connects. A short life limits how long a host that lost a
-// workspace (disconnected, or moved to another host) can still claim it with an old ticket.
+// the host asks for one just before it connects.
 export const SLACK_ROUTE_TTL_SECONDS = 5 * 60;
 
 // The most workspaces one host can link.
@@ -26,8 +25,17 @@ export interface SlackRouteClaims {
   aud: typeof SLACK_ROUTE_AUDIENCE;
   // The remote host that receives the requests.
   hid: string;
-  // The Slack workspace IDs linked to that host.
-  teams: string[];
+  // The Slack workspaces linked to that host.
+  teams: SlackRouteTeam[];
   iat: number;
   exp: number;
+}
+
+export interface SlackRouteTeam {
+  // The Slack workspace ID.
+  id: string;
+  // When the account service linked the workspace to the host, in milliseconds. Signal keeps a
+  // workspace with its newest link, so a host that lost the workspace cannot take it back with an
+  // older ticket.
+  linkedAt: number;
 }

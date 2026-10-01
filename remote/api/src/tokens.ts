@@ -53,8 +53,9 @@ const identifierSchema = z
   .regex(/^[A-Za-z0-9_-]+$/u);
 const slackRouteClaimsSchema = z.object({
   hid: identifierSchema,
-  teams: z.array(identifierSchema).max(SLACK_ROUTE_TEAMS_LIMIT),
-  iat: z.number().int(),
+  teams: z
+    .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
+    .max(SLACK_ROUTE_TEAMS_LIMIT),
 });
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
@@ -124,12 +125,12 @@ export class RemoteTokenService {
     const { payload } = await jwtVerify(token, this.#ticketKey, {
       audience: SLACK_ROUTE_AUDIENCE,
       algorithms: ["ES256"],
-      requiredClaims: ["exp", "iat"],
+      requiredClaims: ["exp"],
       currentDate: now,
     });
     const claims = slackRouteClaimsSchema.parse(payload);
     if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
-    return { teams: claims.teams, issuedAt: claims.iat };
+    return { teams: claims.teams };
   }
 
   validateClaims(claims: RemoteTicketClaims): Promise<boolean> {

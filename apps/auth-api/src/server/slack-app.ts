@@ -8,6 +8,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { isRawP256PublicKey, sealSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { hmacSha256 } from "./crypto";
+import { authEventStatement } from "./remote-control-plane";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const STATE_TTL_MS = 10 * 60_000;
@@ -48,13 +49,15 @@ export class SlackAppService {
   readonly #fetch: Fetch;
   readonly #now: () => number;
   readonly #developmentOrigin: string | null;
+  readonly #flushAuthEvents: () => Promise<void>;
 
   constructor(
     bindings: Pick<
       WorkerBindings,
       "DB" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_STATE_SECRET" | "SLACK_DEV_PUBLIC_ORIGIN"
     >,
-    options: { fetch?: Fetch; now?: () => number } = {},
+    // Sends the queued Signal events. The Worker passes its delivery; the cron sends them otherwise.
+    options: { fetch?: Fetch; now?: () => number; flushAuthEvents?: () => Promise<void> } = {},
   ) {
     const clientId = bindings.SLACK_CLIENT_ID?.trim();
     const clientSecret = bindings.SLACK_CLIENT_SECRET?.trim();
@@ -69,6 +72,7 @@ export class SlackAppService {
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
     this.#developmentOrigin = bindings.SLACK_DEV_PUBLIC_ORIGIN?.trim() || null;
+    this.#flushAuthEvents = options.flushAuthEvents ?? (async () => undefined);
   }
 
   /**
@@ -159,17 +163,26 @@ export class SlackAppService {
       throw new SlackAppError(502, "slack_exchange_failed", "Slack did not accept the install.");
     }
     // One statement, so two connects at once cannot both win. Another account's row stays as it is.
-    const linked = await this.#database
-      .prepare(
-        `INSERT INTO slack_workspace_routes (team_id, host_id, account_id, app_id, bot_user_id, connected_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(team_id) DO UPDATE SET host_id = excluded.host_id, app_id = excluded.app_id,
-           bot_user_id = excluded.bot_user_id, connected_at = excluded.connected_at
-         WHERE slack_workspace_routes.account_id = excluded.account_id`,
-      )
-      .bind(team.id, state.h, state.u, body.app_id, body.bot_user_id, this.#now())
-      .run();
-    if (linked.meta.changes === 0) {
+    // When the link is made, Signal drops any older route of the workspace: a host that the workspace
+    // moved away from cannot keep it with the ticket it holds.
+    const now = this.#now();
+    const [linked] = await this.#database.batch([
+      this.#database
+        .prepare(
+          `INSERT INTO slack_workspace_routes (team_id, host_id, account_id, app_id, bot_user_id, connected_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(team_id) DO UPDATE SET host_id = excluded.host_id, app_id = excluded.app_id,
+             bot_user_id = excluded.bot_user_id, connected_at = excluded.connected_at
+           WHERE slack_workspace_routes.account_id = excluded.account_id`,
+        )
+        .bind(team.id, state.h, state.u, body.app_id, body.bot_user_id, now),
+      authEventStatement(this.#database, { type: "slack-route-revoked", teamId: team.id, through: now - 1 }, now, {
+        sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND account_id = ? AND connected_at = ?)",
+        binds: [team.id, state.u, now],
+      }),
+    ]);
+    await this.#flushAuthEvents();
+    if (!linked || linked.meta.changes === 0) {
       throw new SlackAppError(
         409,
         "slack_workspace_taken",

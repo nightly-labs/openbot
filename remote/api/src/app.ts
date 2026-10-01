@@ -31,6 +31,11 @@ const authEventSchema = z.discriminatedUnion("type", [
     hostId: z.string().min(1),
     sessionId: z.string().min(1),
   }),
+  z.object({
+    type: z.literal("slack-route-revoked"),
+    teamId: z.string().min(1),
+    through: z.number().int().nonnegative(),
+  }),
 ]) satisfies z.ZodType<RemoteAuthEvent>;
 
 export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalService) {
@@ -53,6 +58,7 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
       if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
       else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
       else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
+      else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.teamId, event.through);
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })
