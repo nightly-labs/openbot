@@ -138,7 +138,12 @@ import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-
 import { recordAgentRestartActivity } from "./restart-activity";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
-import { type ResolvedSharedFile, resolveSharedFile, resolveWorkspaceFile } from "./workspace-paths";
+import {
+  type ResolvedSharedFile,
+  type ResolvedWorkspaceFile,
+  resolveSharedFile,
+  resolveWorkspaceFile,
+} from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
 
@@ -151,7 +156,7 @@ const DEFAULT_BUNDLED_EXECUTABLES: BundledProviderExecutables = { claude: null, 
 
 export type { TestMcpServerOptions } from "./agent/mcp-gateway";
 export type { RoutineMutationOptions } from "./agent/routine-scheduler";
-export type { ResolvedSharedFile } from "./workspace-paths";
+export type { ResolvedSharedFile, ResolvedWorkspaceFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
   event: [event: AgentEvent];
@@ -1389,10 +1394,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return resolveSharedFile(this.#store.sharedRoot, inputPath);
   }
 
-  async resolveWorkspaceFile(agentId: string, inputPath: string): Promise<ResolvedSharedFile> {
+  /** A file a remote member asks for. It must be inside the agent's workspace. */
+  async resolveWorkspaceFile(agentId: string, inputPath: string): Promise<ResolvedWorkspaceFile> {
+    return resolveWorkspaceFile(this.#agentForFile(agentId), inputPath);
+  }
+
+  /**
+   * A file the local user opens from the agent's reply. An agent with full computer access edits files
+   * anywhere, and it could already read each of them, so its links can point outside the workspace.
+   */
+  async resolveLocalWorkspaceFile(agentId: string, inputPath: string): Promise<ResolvedWorkspaceFile> {
+    const agent = this.#agentForFile(agentId);
+    return resolveWorkspaceFile(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) });
+  }
+
+  #agentForFile(agentId: string): AgentSummary {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
-    return resolveWorkspaceFile(agent, inputPath);
+    return agent;
   }
 
   deleteAgent(agentId: string): Promise<void> {

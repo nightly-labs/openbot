@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import {
@@ -2466,6 +2466,64 @@ describe.sequential("AgentService: providers", () => {
     await expect(service.resolveWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
     await expect(service.resolveWorkspaceFile(agent.id, link)).rejects.toThrow("inside the agent workspace");
     await expect(service.resolveWorkspaceFile("missing", page)).rejects.toThrow("Unknown agent");
+  });
+
+  it("opens local links to files the agent edited anywhere, but serves remote members only the workspace", async () => {
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
+
+    const agent = await store.createAgent(CREATE_AGENT_INPUT);
+    const page = join(agent.workspacePath, "page.tsx");
+    const colonName = join(agent.workspacePath, "notes:2");
+    const outside = join(root, "project", "edited.ts");
+    const link = join(agent.workspacePath, "outside-link.ts");
+    await mkdir(dirname(outside), { recursive: true });
+    await writeFile(page, "export default function Page() {}\n");
+    await writeFile(colonName, "literal\n");
+    await writeFile(outside, "edited\n");
+    await symlink(outside, link);
+    const realPage = await realpath(page);
+    const realOutside = await realpath(outside);
+
+    for (const reference of ["page.tsx:12", "page.tsx:12:3", "page.tsx#L12", "page.tsx#L12-L20", "page.tsx#L12C3"]) {
+      await expect(service.resolveWorkspaceFile(agent.id, reference)).resolves.toMatchObject({
+        path: realPage,
+        insideWorkspace: true,
+      });
+    }
+    await expect(service.resolveWorkspaceFile(agent.id, "notes:2")).resolves.toMatchObject({
+      path: await realpath(colonName),
+    });
+    await expect(service.resolveWorkspaceFile(agent.id, "missing.ts:4")).rejects.toThrow(/ENOENT/u);
+
+    const home = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      await expect(service.resolveLocalWorkspaceFile(agent.id, "~/project/edited.ts:7")).resolves.toMatchObject({
+        path: realOutside,
+        insideWorkspace: false,
+      });
+      await expect(service.resolveWorkspaceFile(agent.id, "~/project/edited.ts")).rejects.toThrow(
+        "inside the agent workspace",
+      );
+    } finally {
+      process.env.HOME = home;
+    }
+
+    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).resolves.toMatchObject({
+      path: realOutside,
+      name: "edited.ts",
+      insideWorkspace: false,
+    });
+    await expect(service.resolveLocalWorkspaceFile(agent.id, link)).resolves.toMatchObject({ path: realOutside });
+    // The Team API and the web client call `resolveWorkspaceFile`; it keeps the workspace boundary.
+    await expect(service.resolveWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveWorkspaceFile(agent.id, link)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveLocalWorkspaceFile(agent.id, join(root, "project"))).rejects.toThrow("not a file");
+
+    await store.updateAgent({ agentId: agent.id, access: "workspace" });
+    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveLocalWorkspaceFile(agent.id, page)).resolves.toMatchObject({ path: realPage });
   });
 
   it("does not surface the skills context-budget notice as an agent error", async () => {

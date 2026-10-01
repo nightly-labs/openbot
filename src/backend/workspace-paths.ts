@@ -1,4 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { legacyAgentId } from "@openbot/contracts/validation";
@@ -10,6 +11,13 @@ export interface ResolvedSharedFile {
   name: string;
   size: number;
 }
+
+export interface ResolvedWorkspaceFile extends ResolvedSharedFile {
+  insideWorkspace: boolean;
+}
+
+/** A line or column reference that agents write after a path: `:12`, `:12:3`, `#L12`, `#L12-L20`, `#L12C3`. */
+const LOCATION_SUFFIX = /(?::\d+(?::\d+)?|#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?)$/u;
 
 export function sharedPathFromInput(sharedRoot: string, inputPath: string): string {
   const normalized = inputPath.replaceAll("\\", "/");
@@ -39,6 +47,7 @@ export function workspacePathFromInput(workspaceRoot: string, agentId: string, i
   ]) {
     if (normalized.startsWith(prefix)) return join(workspaceRoot, normalized.slice(prefix.length));
   }
+  if (normalized.startsWith("~/")) return join(homedir(), normalized.slice(2));
   return isAbsolute(decoded) ? decoded : join(workspaceRoot, normalized);
 }
 
@@ -100,15 +109,40 @@ export async function resolveSharedFile(sharedRootPath: string, inputPath: strin
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
 }
 
+/**
+ * `allowOutside` is for the local desktop only, and only for an agent with full computer access: that
+ * agent could already read the file. The Team API and the web client never pass it, so a remote member
+ * still reaches nothing outside the workspace.
+ */
 export async function resolveWorkspaceFile(
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-): Promise<ResolvedSharedFile> {
+  options: { allowOutside?: boolean } = {},
+): Promise<ResolvedWorkspaceFile> {
   const workspaceRoot = await realpath(agent.workspacePath);
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
-  const resolvedPath = await realpath(candidatePath).catch(async (error: unknown) => {
+  const resolvedPath = await realpathWithLegacyRoot(agent, candidatePath).catch(async (error: unknown) => {
+    // The literal path goes first, so a real file named `notes:2` still opens.
+    const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
+    if (!isRecord(error) || error.code !== "ENOENT" || withoutLocation === candidatePath) throw error;
+    return await realpathWithLegacyRoot(agent, withoutLocation);
+  });
+  const insideWorkspace = isWithin(workspaceRoot, resolvedPath);
+  if (!insideWorkspace && !options.allowOutside) {
+    throw new Error(sourceText("error.backend.workspaceFileOutside"));
+  }
+  const metadata = await stat(resolvedPath);
+  if (!metadata.isFile()) throw new Error(sourceText("error.backend.workspacePathNotFile"));
+  return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size, insideWorkspace };
+}
+
+async function realpathWithLegacyRoot(
+  agent: Pick<AgentSummary, "id" | "workspacePath">,
+  candidatePath: string,
+): Promise<string> {
+  return await realpath(candidatePath).catch(async (error: unknown) => {
     // The file may be one the provider's own transcript still names under this agent's pre-rename
-    // workspace root. The containment check below is unchanged and runs on whatever comes back.
+    // workspace root. The containment check in the caller is unchanged and runs on whatever comes back.
     const rebased =
       isRecord(error) && error.code === "ENOENT"
         ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
@@ -116,10 +150,4 @@ export async function resolveWorkspaceFile(
     if (rebased === null) throw error;
     return await realpath(rebased);
   });
-  if (!isWithin(workspaceRoot, resolvedPath)) {
-    throw new Error(sourceText("error.backend.workspaceFileOutside"));
-  }
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error(sourceText("error.backend.workspacePathNotFile"));
-  return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
 }

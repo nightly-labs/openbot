@@ -8,16 +8,17 @@ import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type Invoke = (event: { senderFrame: { url: string } }, payload: unknown) => Promise<void>;
-const { bound, saveDialog, openPath, userData } = vi.hoisted(() => ({
+const { bound, saveDialog, openPath, showItemInFolder, userData } = vi.hoisted(() => ({
   bound: new Map<string, Invoke>(),
   saveDialog: vi.fn<(options?: unknown) => Promise<{ canceled: boolean; filePath?: string }>>(),
   openPath: vi.fn(async (_path: string) => ""),
+  showItemInFolder: vi.fn((_path: string) => undefined),
   userData: { path: "" },
 }));
 vi.mock("electron", () => ({
   app: { getPath: () => userData.path || tmpdir() },
   dialog: { showSaveDialog: saveDialog },
-  shell: { openPath },
+  shell: { openPath, showItemInFolder },
   ipcMain: { handle: (channel: string, invoke: Invoke) => bound.set(channel, invoke) },
 }));
 const { saveAttachmentArchive, attachmentIpcHandlers } = await import("./attachment-handlers");
@@ -98,7 +99,7 @@ describe("ZIP attachment IPC", () => {
         prepareImportedAttachments: vi.fn(),
         discardDraftAttachment: vi.fn(),
         resolveSharedFile: vi.fn(),
-        resolveWorkspaceFile: vi.fn(),
+        resolveLocalWorkspaceFile: vi.fn(),
       },
       mailbox: { resolveAttachment: async () => ({ path: sourcePath, mimeType: "text/plain", name: "source.txt" }) },
       remoteServers: {
@@ -151,7 +152,7 @@ describe("single attachment download", () => {
         prepareImportedAttachments: vi.fn(),
         discardDraftAttachment: vi.fn(),
         resolveSharedFile: vi.fn(),
-        resolveWorkspaceFile: vi.fn(),
+        resolveLocalWorkspaceFile: vi.fn(),
       },
       mailbox: { resolveAttachment: async () => resolved },
       remoteServers: {
@@ -207,5 +208,55 @@ describe("single attachment download", () => {
     expect(dirname(opened)).toBe(join(directory, "remote-attachments"));
     expect(await readFile(opened)).toEqual(Buffer.from([1]));
     expect(await readdir(directory)).toEqual(["remote-attachments"]);
+  });
+});
+
+describe("workspace file links", () => {
+  function registerOpen(insideWorkspace: boolean) {
+    const resolveLocalWorkspaceFile = vi.fn(async (_agentId: string, path: string) => ({
+      path,
+      name: "notes.md",
+      size: 1,
+      insideWorkspace,
+    }));
+    const handlers = attachmentIpcHandlers({
+      getMainWindow: () => null,
+      translate: translateFor("en"),
+      service: {
+        prepareAttachments: vi.fn(),
+        prepareImportedAttachments: vi.fn(),
+        discardDraftAttachment: vi.fn(),
+        resolveSharedFile: vi.fn(),
+        resolveLocalWorkspaceFile,
+      },
+      mailbox: { resolveAttachment: vi.fn() },
+      remoteServers: {
+        supportsCapability: vi.fn(),
+        request: vi.fn(),
+        downloadSharedFile: vi.fn(),
+        downloadWorkspaceFile: vi.fn(),
+        uploadAttachment: vi.fn(),
+        downloadAttachment: vi.fn(),
+      },
+    });
+    handlers.agentAttachments.openWorkspaceFile("open-workspace-file");
+    const invoke = bound.get("open-workspace-file");
+    if (!invoke) throw new Error("Open workspace file handler was not registered.");
+    return invoke;
+  }
+
+  it.each([
+    { insideWorkspace: true, opened: 1, revealed: 0 },
+    { insideWorkspace: false, opened: 0, revealed: 1 },
+  ])("runs only a workspace file; insideWorkspace=$insideWorkspace", async ({ insideWorkspace, opened, revealed }) => {
+    openPath.mockClear();
+    showItemInFolder.mockClear();
+    const invoke = registerOpen(insideWorkspace);
+    await invoke(
+      { senderFrame: { url: "openbot-app://app/index.html" } },
+      { serverId: "local", payload: { agentId: "agent-1", path: "/Users/me/project/run.sh" } },
+    );
+    expect(openPath).toHaveBeenCalledTimes(opened);
+    expect(showItemInFolder).toHaveBeenCalledTimes(revealed);
   });
 });

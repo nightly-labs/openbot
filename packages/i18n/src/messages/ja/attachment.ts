@@ -17,7 +17,6 @@ export const messages = {
   "attachment.error.open": "この添付ファイルを開くか保存できませんでした。もう一度お試しください。",
   "attachment.error.openFile": "このファイルを開けませんでした。もう一度お試しください。",
   "attachment.error.fileFallback": "ファイル",
-  "attachment.error.fileNotFound":
-    "「{name}」が見つかりません。エージェントにファイルの作成または復元を依頼してから、もう一度リンクをクリックしてください。",
+  "attachment.error.fileNotFound": "「{name}」はこの場所に見つかりません。移動または削除された可能性があります。",
   "attachment.error.previewFile": "「{name}」をプレビューできませんでした。もう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

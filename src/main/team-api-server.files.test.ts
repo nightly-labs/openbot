@@ -44,6 +44,7 @@ describe("TeamApiServer files", () => {
         path: filePath,
         name: `${agentId}-${path.split("/").at(-1)}`,
         size: 21,
+        insideWorkspace: true,
       }),
     });
     const { base } = await start({ agents });

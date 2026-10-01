@@ -17,7 +17,6 @@ export const messages = {
   "attachment.error.open": "Bu ek açılamadı veya kaydedilemedi. Tekrar deneyin.",
   "attachment.error.openFile": "Bu dosya açılamadı. Tekrar deneyin.",
   "attachment.error.fileFallback": "Dosya",
-  "attachment.error.fileNotFound":
-    "“{name}” bulunamadı. Ajandan dosyayı oluşturmasını veya geri yüklemesini isteyin, ardından bağlantıya tekrar tıklayın.",
+  "attachment.error.fileNotFound": "“{name}” bu konumda bulunamadı. Taşınmış veya silinmiş olabilir.",
   "attachment.error.previewFile": "“{name}” önizlenemedi. Tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

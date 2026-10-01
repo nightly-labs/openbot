@@ -576,8 +576,9 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const sharedPath = sharedFileTarget(token.href);
-            const workspacePath = workspaceFileTarget(token.href);
+            const localHref = fileUrlPath(token.href) ?? token.href;
+            const sharedPath = sharedFileTarget(localHref);
+            const workspacePath = workspaceFileTarget(localHref);
             return url ? (
               <MessageLink url={url} title={token.title} onOpenLink={props.content.onOpenLink}>
                 {token.text === token.href ? (
@@ -1002,6 +1003,19 @@ function localFileTarget(value: string): string | null {
   const shared = sharedFileTarget(path);
   if (shared) return shared;
   return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
+}
+
+/** The local path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. */
+function fileUrlPath(value: string): string | null {
+  const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
+  if (!match?.[1]) return null;
+  let path = match[1];
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // A literal percent sign can be part of a file name.
+  }
+  return /^\/[A-Za-z]:\//u.test(path) ? path.slice(1) : path;
 }
 
 function workspaceFileTarget(value: string): string | null {
