@@ -43,8 +43,7 @@
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
-@import "./features/settings/skills-marketplace.css";
-@import "@openbot/ui/features/settings/marketplace-plugin-detail.css";
+@import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";

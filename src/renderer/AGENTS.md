@@ -87,7 +87,7 @@ together are one record — a saved-and-draft form pair, a `data`/`loaded`/`load
 phase plus the numbers only one phase uses, several `Record`s keyed by the same `agentId`. Declare the
 shape up front, so replacing one field re-renders only what read that field;
 `packages/ui/src/features/agents/FirstAgentSetup.tsx` is the form version. Keep the setter private
-behind named mutations where the store *is* a module's or a hook's exported surface, as `app-stored-values.ts` and `createAsyncPanel.ts` do. Inside a
+behind named mutations where the store *is* a module's or a hook's exported surface, as `app-stored-values.ts` does. Inside a
 component, write the field where it changes — `setPanels((state) => { state.x = value; })` at the
 call site, as `SettingsModal.tsx` does — and let a named mutation there earn its name: more than one
 field, a guard or a side effect, or enough call sites that the name deduplicates something. A

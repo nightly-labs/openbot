@@ -26,7 +26,7 @@ describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
     // Load the real lazy panels before measuring their visible behavior under CI load.
     await import("./features/conversation/AgentSettingsPanel");
-    await import("./features/settings/SkillsMarketplaceModal");
+    await import("./features/settings/MarketplaceModal");
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
@@ -39,7 +39,8 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(addFromMarketplace);
     expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
-    expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();
+    // The skills dialog opens again and reads the list again, so the button is enabled after the read.
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Add from marketplace" })[0]).toBeEnabled());
   });
   beforeEach(() => {
     installOpenbotStub();

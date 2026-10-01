@@ -15,12 +15,6 @@
       "detailSha256": "f3650d9ba3101c75fb8fea0685a3515d1c0d93c8a6798dc1046672b3c655c127"
     },
     {
-      "slug": "github",
-      "version": "1.0.0",
-      "featured": true,
-      "detailSha256": "f33dc7018e8fcdbb9bc10051d051c06b2913d385f98e52ca01c039a337e419a0"
-    },
-    {
       "slug": "linear",
       "version": "1.0.0",
       "featured": false,

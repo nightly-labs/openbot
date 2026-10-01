@@ -9,13 +9,6 @@ import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } fr
 export interface MarketplaceCalls {
   skills: Pick<SkillsPort["skills"], "get" | "list">;
   agents: Pick<SkillsPort["marketplaceAgents"], "get" | "list">;
-  /** The account's own submissions. Absent where nothing can be published from, as in the browser. */
-  publishing?:
-    | {
-        skills: Pick<SkillsPort["skills"], "choosePackage" | "listMine" | "submit">;
-        agents: Pick<SkillsPort["marketplaceAgents"], "listMine" | "preview" | "submit">;
-      }
-    | undefined;
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
   mcp: Pick<SkillsPort["agent"], "listMcpServers" | "removeMcpServer" | "saveMcpServer" | "testMcpServer">;
   /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
@@ -29,7 +22,6 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
   return {
     skills: port.skills,
     agents: port.marketplaceAgents,
-    publishing: { skills: port.skills, agents: port.marketplaceAgents },
     agentSkills: agentSkillCalls,
     mcp: port.agent,
     addAgent: async (input, serverId) =>

@@ -35,7 +35,7 @@ import {
 import type { JSX } from "@solidjs/web";
 import { createStore, Show } from "solid-js";
 import { useText } from "../../text";
-import { PluginIcon } from "./MarketplacePluginDetail";
+import { PluginIcon } from "../marketplace/PluginIcon";
 
 /** What is being connected, in the words the listing uses for it. */
 export interface McpConnectSubject {

@@ -1,7 +1,7 @@
 // The public plugin pages, over the catalog the desktop app installs from.
 //
 // The listings are `./plugin-catalog.generated`, which `scripts/build-plugin-catalog.ts` writes
-// from `marketplace/plugin-catalog/` - the same source the app's Plugins tab is built from. That is
+// from `marketplace/plugin-catalog/` - the same source the app's Apps tab is built from. That is
 // the point of the page: an address a reader can open says exactly what the app would show them,
 // and it cannot drift, because both sides are generated from one folder.
 //

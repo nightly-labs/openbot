@@ -11,7 +11,7 @@ import {
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
-import type { GitHubConnectorController } from "./github-connector";
+import { type GitHubConnectorController, githubPanelProps } from "./github-connector";
 import type { SlackConnectorController } from "./slack-connector";
 
 type View = "hub" | "github" | "slack";
@@ -99,17 +99,7 @@ export function ConnectorsPanel(props: {
         {(github) => (
           <div class="integrations-hub">
             <Back />
-            <GitHubConnectorPanel
-              status={github().status()}
-              busy={github().busy()}
-              repositories={github().repositories()}
-              repositoriesError={github().repositoriesError()}
-              onConnect={github().connect}
-              onCancel={github().cancel}
-              onDisconnect={github().disconnect}
-              onOpenVerification={github().openVerification}
-              onOpenInstall={github().openInstall}
-            />
+            <GitHubConnectorPanel {...githubPanelProps(github())} />
           </div>
         )}
       </Match>

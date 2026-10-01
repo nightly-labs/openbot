@@ -103,7 +103,7 @@ routes. A member or role change revokes every session on the host; the browser r
 the directory still lists the host. `ConversationRuntime.admin` carries the skills and shared-table
 calls to the agent settings panel, which shows only Skills and Tables in the browser. Memories,
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
-route. `web-marketplace.ts` gives `SkillsMarketplaceModal` its calls: the public catalog routes of
+route. `web-marketplace.ts` gives `MarketplaceModal` its calls: the public catalog routes of
 the account service that serves `/app` (`@openbot/team-client/marketplace-catalog`), and installs on
 the host over `skills-admin-v1`, `agent-install-v1`, `agent-update-v1`, and `mcp-servers-v1`. Try skill and a plugin
 prompt add a line to the agent's draft, as on desktop. A shared agent page also links
@@ -500,7 +500,7 @@ can take minutes. The end of the turn cancels the request, so the agent keeps wa
 also when the provider returns control while the call runs. In the smoke runs, Codex `exec` did this
 about every 30 seconds. After an error or a cancel, the agent does not point to a takeover window.
 When the agent reaches a service in the browser and the plugin for it is not in its tools, the answer
-ends with a fixed sentence: install the plugin in Marketplace, on the Plugins tab, or enable it in MCP
+ends with a fixed sentence: install the plugin in Marketplace, on the Apps tab, or enable it in MCP
 servers. The sentence names both actions because `read_agent` and the agent's tools show only enabled
 servers, so an agent cannot tell a disabled plugin from a missing one.
 
@@ -1687,7 +1687,7 @@ files the message already has, and adds new ones.
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
 
-See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Apps tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, generated from `marketplace/plugin-catalog/`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
 
 ## Agent templates
 
@@ -1866,6 +1866,13 @@ stylesheet is exported as `@openbot/ui/features/conversation/conversation.css`; 
 import it in the same cascade position as the former renderer stylesheet. This file is an ordered
 manifest of component styles in `features/conversation/styles/`. Preserve import order: later
 surface and responsive rules override earlier component rules.
+
+`@openbot/ui/features/marketplace/*` renders the Marketplace window: the Agents, Apps and Skills
+tabs, and a page for each listing. It reads a typed `MarketplaceModel` and holds no data of its
+own. The renderer's `marketplace-controller.ts` builds the model on the injected `MarketplaceCalls`,
+and `MarketplaceModal` adds the connect and uninstall dialogs. `WorkspaceOverlays` creates one
+`GitHubConnectorController`; the GitHub app page and Server settings › Connectors show the same
+`GitHubConnectorPanel` from it.
 
 `AgentSettingsPanel` owns the form draft, ordered save queue, avatar editor, and model controls.
 Its renderer adapter owns persisted width and native memories, routines, skills, and tables,

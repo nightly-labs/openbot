@@ -4,6 +4,7 @@ import {
   type GitHubConnectorStatus,
 } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
+import type { GitHubConnectorPanelProps } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
 import { type GitHubConnectorPort, githubConnectorPort } from "./github-connector-port";
@@ -135,5 +136,28 @@ export function createGitHubConnector(
         awaitingInstall = true;
         await port().openInstall();
       }),
+  };
+}
+
+/** The panel of the connector. Server settings and the Marketplace show the same controller through it. */
+export function githubPanelProps(controller: GitHubConnectorController): GitHubConnectorPanelProps {
+  return {
+    get status() {
+      return controller.status();
+    },
+    get busy() {
+      return controller.busy();
+    },
+    get repositories() {
+      return controller.repositories();
+    },
+    get repositoriesError() {
+      return controller.repositoriesError();
+    },
+    onConnect: controller.connect,
+    onCancel: controller.cancel,
+    onDisconnect: controller.disconnect,
+    onOpenVerification: controller.openVerification,
+    onOpenInstall: controller.openInstall,
   };
 }

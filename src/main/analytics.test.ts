@@ -934,7 +934,7 @@ describe("usage analytics", () => {
     const servers = await loadCatalogPluginServers("resources/plugin-catalog");
     const config = (fields: Partial<McpServerConfig>): McpServerConfig => ({
       id: "server",
-      name: "github",
+      name: "linear",
       transport: "http",
       enabled: true,
       command: "",
@@ -942,12 +942,12 @@ describe("usage analytics", () => {
       env: [],
       envPassthrough: [],
       workingDirectory: "",
-      url: "https://api.githubcopilot.com/mcp/",
+      url: "https://mcp.linear.app/mcp",
       headers: [],
       ...fields,
     });
-    expect(catalogPluginSlug(config({}), servers, "/home/user")).toBe("github");
-    expect(catalogPluginSlug(config({ url: "https://mcp.private.example/github" }), servers, "/home/user")).toBeNull();
+    expect(catalogPluginSlug(config({}), servers, "/home/user")).toBe("linear");
+    expect(catalogPluginSlug(config({ url: "https://mcp.private.example/linear" }), servers, "/home/user")).toBeNull();
     expect(catalogPluginSlug(config({ name: "composio", url: "https://mcp.composio.dev/abc" }), servers, "/home")).toBe(
       "composio",
     );

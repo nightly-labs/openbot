@@ -1,4 +1,4 @@
-import type { AddedAgent, AgentSummary, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
+import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import type { ComponentProps } from "@solidjs/web";
@@ -6,6 +6,7 @@ import { createMemo, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
 import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
+import type { GitHubConnectorController } from "./features/connectors/github-connector";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
@@ -13,13 +14,14 @@ import type { ServerSettingsModalProps } from "./features/servers/ServerSettings
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
 import { remoteAdminServer, serverCanAdminister } from "./features/servers/server-capabilities";
 import type { MarketplaceCalls } from "./features/settings/marketplace-calls";
+import type { MarketplaceAgentRow } from "./features/settings/marketplace-controller";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 import {
   AgentTemplateInstall,
   GlobalSearch,
   JoinServerDialog,
+  MarketplaceModal,
   ServerSettingsModal,
-  SkillsMarketplaceModal,
 } from "./lazy-views";
 
 /**
@@ -54,7 +56,7 @@ export function MarketplaceOverlay(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   server: ServerSummary | undefined;
-  agents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
+  agents: readonly MarketplaceAgentRow[];
   activeAgentId: string;
   /** Whether the client could take another line into a composer, before the controller is asked. */
   composerAvailable: boolean;
@@ -64,6 +66,8 @@ export function MarketplaceOverlay(props: {
   /** The listing a plugin link named. Closing the marketplace forgets it too. */
   pluginSlug?: string | null | undefined;
   onPluginSlugConsumed: () => void;
+  /** This computer's GitHub connection. Absent in the web client and on a joined server. */
+  githubConnector?: GitHubConnectorController | undefined;
   /** What the dialog calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }) {
@@ -91,9 +95,10 @@ export function MarketplaceOverlay(props: {
   return (
     <Show when={props.open}>
       <Loading>
-        <SkillsMarketplaceModal
+        <MarketplaceModal
           open={true}
           calls={props.calls}
+          githubConnector={props.githubConnector}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}

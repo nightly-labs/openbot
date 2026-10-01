@@ -1426,7 +1426,7 @@ export const STORY_MARKETPLACE_AGENT_DETAILS: Record<string, MarketplaceAgentDet
  * real server (`mcp.aave.com`) so the page is reviewed against the lengths a published listing
  * really has, rather than against text written to fit the layout.
  */
-export const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
+const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
   id: "plugin-aave",
   slug: "aave",
   name: "Aave",

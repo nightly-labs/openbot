@@ -16,7 +16,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -29,12 +29,6 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: true,
       detailSha256: "f3650d9ba3101c75fb8fea0685a3515d1c0d93c8a6798dc1046672b3c655c127",
-    },
-    {
-      slug: "github",
-      version: "1.0.0",
-      featured: true,
-      detailSha256: "f33dc7018e8fcdbb9bc10051d051c06b2913d385f98e52ca01c039a337e419a0",
     },
     {
       slug: "linear",
@@ -218,59 +212,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.canva.com",
     privacyPolicyUrl: "https://www.canva.com/policies/privacy-policy/",
     termsUrl: "https://www.canva.com/policies/terms-of-use/",
-    skills: [],
-  },
-  github: {
-    slug: "github",
-    name: "GitHub",
-    tagline: "Issues, pull requests and code",
-    description:
-      "GitHub lets agents review pull requests, open and triage issues, search code, and manage releases in the repositories a personal access token can reach. The token stays on this computer and travels as one Authorization header.",
-    category: "coding",
-    creatorName: "github.com",
-    iconUrl: "https://github.com/fluidicon.png",
-    version: "1.0.0",
-    prompts: [
-      { id: "prompt-pr-review", text: "Review my open pull requests and flag the riskiest one." },
-      { id: "prompt-issue-triage", text: "What issues were opened against my repos this week?" },
-      { id: "prompt-release-notes", text: "Draft release notes from merged pull requests since the last tag." },
-    ],
-    apps: [
-      {
-        id: "app-github-mcp",
-        name: "GitHub",
-        description:
-          "Issues, pull requests, code search, and releases, over GitHub's remote MCP server with a personal access token.",
-        iconUrl: "https://github.com/fluidicon.png",
-        server: {
-          name: "github",
-          transport: "http",
-          url: "https://api.githubcopilot.com/mcp/",
-          auth: [
-            {
-              id: "github-pat",
-              kind: "key",
-              label: "Personal access token",
-              fields: [
-                {
-                  id: "token",
-                  label: "Personal access token",
-                  header: "Authorization",
-                  prefix: "Bearer ",
-                  placeholder: "github_pat_…",
-                  hint: "GitHub Settings → Developer settings → Personal access tokens",
-                },
-              ],
-              docsUrl: "https://github.com/settings/tokens",
-              docsLabel: "Create a token",
-            },
-          ],
-        },
-      },
-    ],
-    websiteUrl: "https://github.com",
-    privacyPolicyUrl: "https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement",
-    termsUrl: "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
     skills: [],
   },
   linear: {

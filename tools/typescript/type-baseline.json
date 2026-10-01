@@ -53,8 +53,6 @@
     "packages/ui/src/features/import/AgentImportView.tsx": 2,
     "packages/ui/src/features/remote-desktop/RemoteDesktopWorkspace.tsx": 2,
     "packages/ui/src/features/settings/LanguageSelect.tsx": 1,
-    "packages/ui/src/features/settings/MarketplaceDetail.tsx": 1,
-    "packages/ui/src/features/settings/MarketplacePluginDetail.tsx": 2,
     "packages/ui/src/features/sidebar/createSidebarDragEngine.ts": 1,
     "packages/ui/src/features/sidebar/SidebarAgentContextMenu.tsx": 1,
     "packages/ui/src/features/team/TeamPersonAvatar.tsx": 1,
@@ -174,7 +172,6 @@
     "src/renderer/src/features/settings/SettingsGeneralTab.tsx": 2,
     "src/renderer/src/features/settings/SettingsModal.test.tsx": 1,
     "src/renderer/src/features/settings/SettingsModal.tsx": 2,
-    "src/renderer/src/features/settings/SkillsMarketplaceModal.tsx": 7,
     "src/renderer/src/features/settings/stores/general-store.ts": 1,
     "src/renderer/src/features/sidebar/WorkspaceSidebar.tsx": 1,
     "src/renderer/src/features/usage/AgentUsagePanel.tsx": 4,
@@ -198,7 +195,6 @@
     "src/renderer/stories/DynamicIsland.stories.tsx": 1,
     "src/renderer/stories/FilesStorage.stories.tsx": 1,
     "src/renderer/stories/LanguageSelect.stories.tsx": 1,
-    "src/renderer/stories/MarketplacePluginDetail.stories.tsx": 1,
     "src/renderer/stories/McpKeyDialog.stories.tsx": 1,
     "src/renderer/stories/MessageBody.stories.tsx": 1,
     "src/renderer/stories/OnboardingFlow.stories.tsx": 6,
@@ -206,7 +202,6 @@
     "src/renderer/stories/Select.stories.tsx": 2,
     "src/renderer/stories/ServerSettingsModal.stories.tsx": 1,
     "src/renderer/stories/SettingsModal.stories.tsx": 1,
-    "src/renderer/stories/Sidebar.stories.tsx": 1,
-    "src/renderer/stories/SkillsMarketplaceModal.stories.tsx": 2
+    "src/renderer/stories/Sidebar.stories.tsx": 1
   }
 }

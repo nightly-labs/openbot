@@ -301,7 +301,7 @@ describe("desktop analytics", () => {
       }).listing_slug;
     expect(listing("openbot-curated-skill-pdf")).toBe("pdf");
     expect(listing("openbot-curated-agent-chief-of-staff")).toBe("chief-of-staff");
-    expect(listing("github")).toBe("github");
+    expect(listing("linear")).toBe("linear");
     expect(listing("4f1c2a8e-9b7d-4c3e-8a1f-2d6e5b9c0a7f")).toBeUndefined();
     expect(listing("my-private-plugin")).toBeUndefined();
   });
