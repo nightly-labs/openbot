@@ -214,7 +214,7 @@ describe("single attachment download", () => {
 describe("workspace file links", () => {
   function registerOpen(insideWorkspace: boolean) {
     const resolveLocalWorkspaceFile = vi.fn(async (_agentId: string, path: string) => ({
-      path,
+      path: `/resolved${path}`,
       name: "notes.md",
       size: 1,
       insideWorkspace,
@@ -246,9 +246,9 @@ describe("workspace file links", () => {
   }
 
   it.each([
-    { insideWorkspace: true, opened: 1, revealed: 0 },
-    { insideWorkspace: false, opened: 0, revealed: 1 },
-  ])("runs only a workspace file; insideWorkspace=$insideWorkspace", async ({ insideWorkspace, opened, revealed }) => {
+    { insideWorkspace: true, called: openPath, notCalled: showItemInFolder },
+    { insideWorkspace: false, called: showItemInFolder, notCalled: openPath },
+  ])("runs only a workspace file; insideWorkspace=$insideWorkspace", async ({ insideWorkspace, called, notCalled }) => {
     openPath.mockClear();
     showItemInFolder.mockClear();
     const invoke = registerOpen(insideWorkspace);
@@ -256,7 +256,7 @@ describe("workspace file links", () => {
       { senderFrame: { url: "openbot-app://app/index.html" } },
       { serverId: "local", payload: { agentId: "agent-1", path: "/Users/me/project/run.sh" } },
     );
-    expect(openPath).toHaveBeenCalledTimes(opened);
-    expect(showItemInFolder).toHaveBeenCalledTimes(revealed);
+    expect(called).toHaveBeenCalledExactlyOnceWith("/resolved/Users/me/project/run.sh");
+    expect(notCalled).not.toHaveBeenCalled();
   });
 });

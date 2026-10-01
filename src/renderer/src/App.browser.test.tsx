@@ -1621,7 +1621,7 @@ describe("OpenBot connected desktop shell", () => {
           author: "assistant",
           text:
             agentId === "chief"
-              ? "Edited [edited.ts](file:///Users/me/my%20project/edited.ts) and [page.tsx](/Users/me/project/page.tsx:12)."
+              ? "Edited [edited.ts](file:///Users/me/my%20project/edited.ts), [page.tsx](/Users/me/project/page.tsx:12) and [menu.txt](file:///tmp/OpenBot/Shared/my%20menu.txt)."
               : "Edited [notes.md](notes.md).",
           createdAt: "2026-08-24T12:16:00.000Z",
           status: "completed",
@@ -1649,6 +1649,10 @@ describe("OpenBot connected desktop shell", () => {
       agentId: "chief",
       path: "/Users/me/project/page.tsx:12",
     });
+    await fireEvent.click(screen.getByRole("button", { name: "Open shared file my menu.txt" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.previewSharedFile).toHaveBeenCalledWith({ path: "/tmp/OpenBot/Shared/my menu.txt" }),
+    );
 
     await fireEvent.click(screen.getByRole("button", { name: /^Sales Outbound/ }));
     await fireEvent.click(await screen.findByRole("button", { name: "Open workspace file notes.md" }));
