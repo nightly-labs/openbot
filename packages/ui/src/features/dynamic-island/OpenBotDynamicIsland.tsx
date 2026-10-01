@@ -134,12 +134,12 @@ const STATUS_COMPACT_NAME_MAX_WIDTH = { notch: 72, island: 96 } as const;
 /** The narrowest idle ear beside a notch: the 20px logo, its 16px edge inset and a 4px gap. */
 const IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH = COMPACT_LEADING_SIZE + 20;
 /**
- * The narrowest idle island on a built-in display with no notch: the 20px logo and the 14px greeting,
+ * The narrowest idle island on a built-in display with no notch: the 20px logo and the 16px greeting,
  * each 16px from its edge, with a 16px gap between them.
  */
-const IDLE_COMPACT_NO_NOTCH_MIN_WIDTH = 16 + COMPACT_LEADING_SIZE + 16 + 14 + 16;
+const IDLE_COMPACT_NO_NOTCH_MIN_WIDTH = 16 + COMPACT_LEADING_SIZE + 16 + 16 + 16;
 /** The narrowest idle capsule: the logo and the greeting with their insets and a gap between them. */
-const IDLE_COMPACT_ISLAND_MIN_WIDTH = 72;
+const IDLE_COMPACT_ISLAND_MIN_WIDTH = 74;
 
 interface SharedLeadingMotion {
   notch: { x: number; y: number; scale: number };

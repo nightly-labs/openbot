@@ -61,11 +61,11 @@ function playSparkles(face: HTMLElement): Animation[] {
   });
 }
 
-/** The hand waves from the wrist, then the card turns to the heart hands. */
+/** The hand waves from the wrist, the card turns to the heart hands, and then on, back to the wave. */
 function playWave(parts: IdleGreetingParts): Animation[] {
-  const duration = 2000;
+  const duration = 3500;
   const turn = spring(0.62, 0.7);
-  const theta = (t: number) => 180 * turn(t - 820);
+  const theta = (t: number) => 180 * turn(t - 820) + 180 * turn(t - 2600);
   const wave = (t: number) => {
     if (t >= 820) return 0;
     const seconds = t / 1000;
@@ -75,7 +75,7 @@ function playWave(parts: IdleGreetingParts): Animation[] {
   parts.front.style.transformOrigin = "70% 80%";
   return [
     animate(parts.card, duration, (t) => ({ transform: `rotateY(${theta(t)}deg)`, scale: edgeScale(theta(t)) }), {
-      transform: "rotateY(180deg)",
+      transform: "rotateY(360deg)",
       scale: "1",
     }),
     animate(parts.front, duration, (t) => ({ rotate: `${wave(t)}deg`, filter: turnBlur(theta, t) }), {
@@ -86,18 +86,19 @@ function playWave(parts: IdleGreetingParts): Animation[] {
   ];
 }
 
-/** The smile turns once like a ball, with a small hop, and lands on the grin. */
+/** The smile turns like a ball, with a small hop, to the grin, and after a moment back to the smile. */
 function playSmile(parts: IdleGreetingParts): Animation[] {
-  const duration = 1500;
+  const duration = 3300;
   const turn = spring(0.6, 0.8);
-  const theta = (t: number) => 180 * turn(t);
-  const hop = (t: number) => -1.5 * Math.sin(Math.PI * clamp(t / 650, 0, 1));
+  const theta = (t: number) => 180 * turn(t) + 180 * turn(t - 2200);
+  const hop = (t: number) =>
+    -1.5 * Math.sin(Math.PI * clamp(t / 650, 0, 1)) - Math.sin(Math.PI * clamp((t - 2200) / 650, 0, 1));
   return [
     animate(
       parts.card,
       duration,
       (t) => ({ transform: `rotateY(${theta(t)}deg)`, translate: `0 ${hop(t)}px`, scale: edgeScale(theta(t)) }),
-      { transform: "rotateY(180deg)", translate: "0 0", scale: "1" },
+      { transform: "rotateY(360deg)", translate: "0 0", scale: "1" },
     ),
     ...faceBlur(parts.front, duration, theta),
     ...faceBlur(parts.back, duration, theta),

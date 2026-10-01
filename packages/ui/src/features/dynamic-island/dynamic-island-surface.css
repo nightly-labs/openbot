@@ -162,14 +162,20 @@ body:has(.dynamic-island-surface),
   flex: 0 0 20px;
 }
 
+/* The idle greeting is a little larger than the 14px trailing slot of a status. */
+.dynamic-island-idle .dynamic-island-trailing-content {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
 .dynamic-island-surface-idle-greeting {
   position: relative;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   display: block;
   flex: 0 0 auto;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
-  font-size: var(--openbot-text-md);
+  font-size: var(--openbot-text-xl);
   line-height: 1;
   transition:
     opacity var(--openbot-duration-slow) var(--openbot-ease-out),
@@ -242,9 +248,9 @@ body:has(.dynamic-island-surface),
   transition: opacity 250ms var(--openbot-ease-out);
 }
 
-/* Mirrors the logo: its 20px box sits 10px from the left edge, this 14px box sits 6px from the right. */
+/* Mirrors the logo: its 20px box sits 10px from the left edge, this 16px box sits 6px from the right. */
 .dynamic-island-external.dynamic-island-idle .dynamic-island-surface-idle-greeting-layer {
-  transform: translateX(-7px);
+  transform: translateX(-6px);
 }
 
 .dynamic-island-surface-idle-greeting[data-active-slot="0"] .dynamic-island-surface-idle-greeting-layer:first-child,
