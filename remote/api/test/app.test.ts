@@ -100,10 +100,12 @@ describe("signed account notifications", () => {
 // workspaces that a route ticket from the account service links to it.
 describe("Slack request route", () => {
   const signingSecret = "8f742231b10e8888abcd99yyyzzz85a5";
+  const developmentSecret = "d".repeat(32);
 
   it("checks Slack's signature and passes the request to the workspace's host", async () => {
     const { app, signal, route } = await slackRoute(signingSecret);
-    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev1","event":{"type":"app_mention"}}';
+    const body =
+      '{"type":"event_callback","api_app_id":"APROD","team_id":"T1","event_id":"Ev1","event":{"type":"app_mention"}}';
 
     // Nothing unsigned passes, and a challenge is answered with no host.
     expect((await post(app, body, { signature: `v0=${"a".repeat(64)}` })).status).toBe(401);
@@ -178,7 +180,7 @@ describe("Slack request route", () => {
     expect((await pending).status).toBe(200);
 
     // A button press carries the workspace inside the form's `payload`.
-    const press = `payload=${encodeURIComponent('{"type":"block_actions","team":{"id":"T1"}}')}`;
+    const press = `payload=${encodeURIComponent('{"type":"block_actions","api_app_id":"APROD","team":{"id":"T1"}}')}`;
     const pressed = post(app, press, { contentType: "application/x-www-form-urlencoded" });
     await vi.waitFor(() => expect(ingress.messages).toHaveLength(2));
     expect(JSON.parse(ingress.messages[1] ?? "{}")).toMatchObject({ teamId: "T1", kind: "interactivity" });
@@ -205,7 +207,8 @@ describe("Slack request route", () => {
       socket.messages.length = 0;
       return socket;
     };
-    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev2","event":{"type":"app_mention"}}';
+    const body =
+      '{"type":"event_callback","api_app_id":"APROD","team_id":"T1","event_id":"Ev2","event":{"type":"app_mention"}}';
     const delivered = async (socket: TestSocket) => {
       const pending = post(app, body);
       await vi.waitFor(() => expect(socket.messages).toHaveLength(1));
@@ -259,7 +262,8 @@ describe("Slack request route", () => {
       );
       return socket;
     };
-    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev3","event":{"type":"app_mention"}}';
+    const body =
+      '{"type":"event_callback","api_app_id":"APROD","team_id":"T1","event_id":"Ev3","event":{"type":"app_mention"}}';
 
     // The ticket of a host that lost the workspace before the restart.
     expect((await hello(1_000)).messages.at(-1)).toContain('"type":"ready"');
@@ -282,6 +286,67 @@ describe("Slack request route", () => {
     expect((await pending).status).toBe(200);
   });
 
+  it("keeps each app's route of a workspace apart, and binds each secret to its app", async () => {
+    // The production and development apps are both installed in T1, each linked to its own host.
+    const { app, signal, route } = await slackRoute(signingSecret);
+    const connect = async (id: string, appId: string) => {
+      const socket = testSocket(id);
+      signal.connect(socket);
+      await signal.receive(
+        socket,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          slackRoute: await route({ hid: "host-1", teams: ["T1"] }, 3_600, 1_000, appId),
+        }),
+      );
+      socket.messages.length = 0;
+      return socket;
+    };
+    const production = await connect("production", "APROD");
+    const development = await connect("development", "ADEV");
+    const event = (appId: string) =>
+      `{"type":"event_callback","api_app_id":"${appId}","team_id":"T1","event_id":"Ev4","event":{"type":"app_mention"}}`;
+
+    // The development app's secret cannot send a request in the production app's name.
+    expect((await post(app, event("APROD"), { secret: developmentSecret })).status).toBe(401);
+    expect(production.messages).toHaveLength(0);
+
+    const answer = async (socket: TestSocket, pending: Promise<Response>) => {
+      await vi.waitFor(() => expect(socket.messages).toHaveLength(1));
+      const { requestId } = JSON.parse(socket.messages.pop() ?? "{}");
+      await signal.receive(
+        socket,
+        JSON.stringify({ type: "slack-delivery-result", version: 1, requestId, status: 200 }),
+      );
+      expect((await pending).status).toBe(200);
+    };
+    await answer(development, post(app, event("ADEV"), { secret: developmentSecret }));
+    expect(production.messages).toHaveLength(0);
+    await answer(production, post(app, event("APROD")));
+    expect(development.messages).toHaveLength(0);
+  });
+
+  it("turns the Slack route off for a signing secret without its app", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(
+      readRemoteApiConfig({
+        REMOTE_TICKET_PUBLIC_JWKS: '{"keys":[]}',
+        REMOTE_TLS_DISABLED: "true",
+        REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
+        REMOTE_SESSION_SECRET: "s".repeat(32),
+        REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
+        TURN_SHARED_SECRET: "t".repeat(32),
+        TURN_HOST: "localhost",
+        SLACK_SIGNING_SECRET: signingSecret,
+      }).slackSigningSecrets,
+    ).toEqual([]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("answers 503 when the signing secret is not configured", async () => {
     const { app } = await slackRoute(null);
     expect((await post(app, '{"type":"url_verification","challenge":"abc"}')).status).toBe(503);
@@ -290,12 +355,18 @@ describe("Slack request route", () => {
   function post(
     app: ReturnType<typeof createRemoteApiApp>,
     body: string,
-    options: { contentType?: string; timestamp?: string; signature?: string; signedBody?: string } = {},
+    options: {
+      contentType?: string;
+      timestamp?: string;
+      signature?: string;
+      signedBody?: string;
+      secret?: string;
+    } = {},
   ) {
     const timestamp = options.timestamp ?? String(Math.floor(Date.now() / 1_000));
     const signature =
       options.signature ??
-      `v0=${createHmac("sha256", signingSecret)
+      `v0=${createHmac("sha256", options.secret ?? signingSecret)
         .update(`v0:${timestamp}:${options.signedBody ?? body}`)
         .digest("hex")}`;
     return app.handle(
@@ -331,7 +402,7 @@ async function slackRoute(
     TURN_SHARED_SECRET: "t".repeat(32),
     TURN_HOST: "localhost",
     // The development app's secret is listed too: one Signal serves both apps.
-    ...(signingSecret ? { SLACK_SIGNING_SECRET: `${"d".repeat(32)}, ${signingSecret}` } : {}),
+    ...(signingSecret ? { SLACK_SIGNING_SECRET: `ADEV:${"d".repeat(32)}, APROD:${signingSecret}` } : {}),
   });
   const routes = new RemoteTokenService(config);
   const signal = new SignalService(
@@ -343,8 +414,13 @@ async function slackRoute(
     8,
   );
   const now = Math.floor(Date.now() / 1_000);
-  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600, linkedAt = 1_000) =>
-    new SignJWT({ hid: claims.hid, teams: claims.teams.map((id) => ({ id, linkedAt })) })
+  const route = (
+    claims: { hid: string; teams: string[] },
+    lifetimeSeconds = 3_600,
+    linkedAt = 1_000,
+    appId = "APROD",
+  ) =>
+    new SignJWT({ hid: claims.hid, teams: claims.teams.map((id) => ({ id, appId, linkedAt })) })
       .setProtectedHeader({ alg: "ES256", kid: "slack-route-1" })
       .setAudience("openbot-slack-route")
       .setIssuedAt(now - 120)
@@ -353,7 +429,7 @@ async function slackRoute(
   const app = createRemoteApiApp(config, signal);
   // What the account service sends when it unlinks or moves a workspace.
   const revoke = async (teamId: string, through: number) => {
-    const body = JSON.stringify({ type: "slack-route-revoked", teamId, through });
+    const body = JSON.stringify({ type: "slack-route-revoked", appId: "APROD", teamId, through });
     const timestamp = String(Math.floor(Date.now() / 1_000));
     const response = await app.handle(
       new Request("http://localhost/internal/auth-events", {

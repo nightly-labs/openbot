@@ -34,6 +34,8 @@ export interface SlackRouteClaims {
 export interface SlackRouteTeam {
   // The Slack workspace ID.
   id: string;
+  // The OpenBot Slack app installed there. Signal routes each app's requests on their own.
+  appId: string;
   // When the account service linked the workspace to the host, in milliseconds. Signal keeps a
   // workspace with its newest link, so a host that lost the workspace cannot take it back with an
   // older ticket.

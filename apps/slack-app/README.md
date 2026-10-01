@@ -36,7 +36,7 @@ The manifest cannot set these. Use `slack app settings --app <id>`:
 
 - **Basic Information**: copy the client ID, the client secret and the signing secret.
   - The Worker gets `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET`.
-  - Signal gets `SLACK_SIGNING_SECRET`.
+  - Signal gets `SLACK_SIGNING_SECRET` as `<app ID>:<signing secret>`, one entry for each app.
   - Use the development app's values for the test Worker and for `bun run dev:slack` only.
 - **Basic Information**: set the app icon.
 - **Manage Distribution**: turn on distribution. When it is on, any workspace can install the app.

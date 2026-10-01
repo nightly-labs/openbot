@@ -21,6 +21,8 @@ const logger = createOpenBotLogger("dev-slack");
 
 const SLACK_FILE = ".env.slack-dev";
 const SLACK_KEYS = ["OPENBOT_DEV_SLACK_SIGNING_SECRET"] as const;
+/** `OpenBot (dev)`, the app that `apps/slack-app/development` describes. */
+const DEVELOPMENT_SLACK_APP_ID = "A0C5G5XGS83";
 const TUNNEL_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/u;
 const TUNNEL_TIMEOUT_MS = 45_000;
 
@@ -74,7 +76,8 @@ export async function attachSlackTunnels(specs: TunnelledSpec[], projectRoot: st
     const [signalUrl, apiUrl] = await Promise.all([openTunnel(signalPort, tunnels), openTunnel(apiPort, tunnels)]);
     const tunnelled = {
       REMOTE_SIGNAL_URL: `${signalUrl.replace("https://", "wss://")}/v1/signal`,
-      SLACK_SIGNING_SECRET: values.OPENBOT_DEV_SLACK_SIGNING_SECRET,
+      // Signal binds each signing secret to its app.
+      SLACK_SIGNING_SECRET: `${DEVELOPMENT_SLACK_APP_ID}:${values.OPENBOT_DEV_SLACK_SIGNING_SECRET}`,
       SLACK_DEV_PUBLIC_ORIGIN: apiUrl,
       OPENBOT_DEV_SLACK_CALLBACK_PORT: callbackPort,
     };

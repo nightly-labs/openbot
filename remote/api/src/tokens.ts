@@ -58,7 +58,7 @@ const identifierSchema = z
 const slackRouteClaimsSchema = z.object({
   hid: identifierSchema,
   teams: z
-    .array(z.object({ id: identifierSchema, linkedAt: z.number().int().nonnegative() }))
+    .array(z.object({ id: identifierSchema, appId: identifierSchema, linkedAt: z.number().int().nonnegative() }))
     .max(SLACK_ROUTE_TEAMS_LIMIT),
 });
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;

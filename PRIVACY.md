@@ -437,7 +437,7 @@ message. It gives the bot token to the computer encrypted to a key that only tha
 
 Slack sends the workspace's events, which contain the Slack messages in the channels OpenBot is in
 and its direct messages, to OpenBot's Signal service (`signal.openbot.run`). Signal checks Slack's
-signature and reads only the workspace ID, to find the computer. It passes each request to that
+signature and reads only the app ID and the workspace ID, to find the computer. It passes each request to that
 computer over its Signal connection, in transit only: it does not store or log the message. The
 answers go from the computer to the Slack Web API directly.
 

@@ -1163,11 +1163,11 @@ export class RemoteControlPlane {
     await this.authenticateHost(hostId, machineToken);
     const rows = await this.#database
       .prepare(
-        "SELECT team_id, connected_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+        "SELECT team_id, app_id, connected_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
       )
       .bind(hostId, SLACK_ROUTE_TEAMS_LIMIT)
-      .all<{ team_id: string; connected_at: number }>();
-    const teams = rows.results.map((row) => ({ id: row.team_id, linkedAt: row.connected_at }));
+      .all<{ team_id: string; app_id: string; connected_at: number }>();
+    const teams = rows.results.map((row) => ({ id: row.team_id, appId: row.app_id, linkedAt: row.connected_at }));
     return {
       ticket: await this.#slackRouteSigner.issue({ hostId, teams, now: this.#now() }),
       teams: teams.map((team) => team.id),
@@ -1178,20 +1178,30 @@ export class RemoteControlPlane {
   async validateSlackRoute(input: { hostId: string; teams: SlackRouteTeam[] }): Promise<string[]> {
     if (input.teams.length === 0) return [];
     const rows = await this.#database
-      .prepare("SELECT team_id, connected_at FROM slack_workspace_routes WHERE host_id = ?")
+      .prepare("SELECT team_id, app_id, connected_at FROM slack_workspace_routes WHERE host_id = ?")
       .bind(input.hostId)
-      .all<{ team_id: string; connected_at: number }>();
-    const linked = new Map(rows.results.map((row) => [row.team_id, row.connected_at]));
-    return input.teams.filter((team) => linked.get(team.id) === team.linkedAt).map((team) => team.id);
+      .all<{ team_id: string; app_id: string; connected_at: number }>();
+    const linked = new Map(rows.results.map((row) => [row.team_id, row]));
+    return input.teams
+      .filter((team) => {
+        const row = linked.get(team.id);
+        return row?.app_id === team.appId && row.connected_at === team.linkedAt;
+      })
+      .map((team) => team.id);
   }
 
   /** Unlinks a Slack workspace from this host, after the host disconnected it or Slack uninstalled it. */
   async disconnectSlackWorkspace(hostId: string, machineToken: string, teamId: string): Promise<void> {
     await this.authenticateHost(hostId, machineToken);
+    const link = await this.#database
+      .prepare("SELECT app_id FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
+      .bind(teamId, hostId)
+      .first<{ app_id: string }>();
+    if (!link) return;
     const now = this.#now();
     // Signal drops the route now, so the host cannot keep the workspace with the ticket it holds.
     await this.#database.batch([
-      this.#authEventStatement({ type: "slack-route-revoked", teamId, through: now }, now, {
+      this.#authEventStatement({ type: "slack-route-revoked", appId: link.app_id, teamId, through: now }, now, {
         sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?)",
         binds: [teamId, hostId],
       }),

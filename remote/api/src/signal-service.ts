@@ -46,6 +46,7 @@ interface AuthenticatedPeer {
   resumed: boolean;
   multiplex: boolean;
   // `ingress` only: the Slack workspaces whose requests this socket receives.
+  // The routes this socket holds: `<app ID>:<workspace ID>`.
   slackTeams: string[];
 }
 
@@ -272,8 +273,8 @@ export class SignalService {
       if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
     }
     if (peer.peer === "ingress") {
-      for (const teamId of peer.slackTeams) {
-        if (this.#slackTeams.get(teamId) === socket.id) this.#slackTeams.delete(teamId);
+      for (const route of peer.slackTeams) {
+        if (this.#slackTeams.get(route) === socket.id) this.#slackTeams.delete(route);
       }
       for (const [requestId, pending] of [...this.#pendingDeliveries]) {
         if (pending.socketId === socket.id) this.#settleDelivery(requestId, this.#unavailable());
@@ -336,12 +337,13 @@ export class SignalService {
   }
 
   /** The account service unlinked a Slack workspace, or moved it, after `through`'s link. */
-  revokeSlackRoute(teamId: string, through: number): void {
-    const floor = this.#slackRouteFloor.get(teamId) ?? 0;
+  revokeSlackRoute(appId: string, teamId: string, through: number): void {
+    const route = slackRouteKey(appId, teamId);
+    const floor = this.#slackRouteFloor.get(route) ?? 0;
     // A newer link already holds the route.
     if (floor > through) return;
-    this.#slackRouteFloor.set(teamId, through + 1);
-    this.#slackTeams.delete(teamId);
+    this.#slackRouteFloor.set(route, through + 1);
+    this.#slackTeams.delete(route);
   }
 
   revokeSession(sessionId: string): void {
@@ -363,8 +365,8 @@ export class SignalService {
    * its answer. It resolves 503 when no host holds the workspace, the host is too busy, or it does
    * not answer in time: Slack then sends the request again, so nothing needs to be kept here.
    */
-  deliverSlack(teamId: string, delivery: SlackDelivery): Promise<SlackDeliveryResponse> {
-    const socketId = this.#slackTeams.get(teamId);
+  deliverSlack(appId: string, teamId: string, delivery: SlackDelivery): Promise<SlackDeliveryResponse> {
+    const socketId = this.#slackTeams.get(slackRouteKey(appId, teamId));
     const ingress = socketId ? this.#peers.get(socketId) : undefined;
     if (!ingress) return Promise.resolve(this.#unavailable());
     const hostId = ingress.claims.hostId;
@@ -484,7 +486,7 @@ export class SignalService {
       connectionId: null,
       resumed: !usedInitialTicket,
       multiplex: message.peer === "host" && message.multiplex === true,
-      slackTeams: slackRoute.teams.map((team) => team.id),
+      slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
     };
     this.#peers.set(socket.id, peer);
     this.#schedulePeerExpiration(peer);
@@ -493,9 +495,10 @@ export class SignalService {
     const resumeToken = await this.#tokens.issueResumeToken(claims);
     if (message.peer === "ingress") {
       for (const team of slackRoute.teams) {
-        if (team.linkedAt < (this.#slackRouteFloor.get(team.id) ?? 0)) continue;
-        this.#slackRouteFloor.set(team.id, team.linkedAt);
-        this.#slackTeams.set(team.id, socket.id);
+        const route = slackRouteKey(team.appId, team.id);
+        if (team.linkedAt < (this.#slackRouteFloor.get(route) ?? 0)) continue;
+        this.#slackRouteFloor.set(route, team.linkedAt);
+        this.#slackTeams.set(route, socket.id);
       }
       this.#send(socket, {
         type: "ready",
@@ -779,4 +782,9 @@ function memberRole(role: RemoteTicketClaims["role"]): "owner" | "admin" | "memb
 
 function randomIdentifier(): string {
   return crypto.randomUUID().replaceAll("-", "");
+}
+
+/** One Slack app in one workspace. The production and development apps can share a workspace. */
+function slackRouteKey(appId: string, teamId: string): string {
+  return `${appId}:${teamId}`;
 }

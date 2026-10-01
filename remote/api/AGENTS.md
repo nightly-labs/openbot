@@ -3,7 +3,7 @@
 The Remote API is the Signal service. It verifies remote tickets, issues resume tokens and TURN
 credentials, and relays WebRTC signalling between peers. It does not carry team chats, files, or
 commands. The one exception is `POST /v1/slack/events`: it checks the OpenBot Slack app's signature,
-reads only the workspace ID (`team_id`) and the `url_verification` challenge, and passes the body to
+reads only the app ID (`api_app_id`), the workspace ID (`team_id`) and the `url_verification` challenge, and passes the body to
 the `ingress` socket of the workspace's host in transit. Do not store or log that body, and do not
 read more of it. Hosts trust a delivery because Signal checked the signature; never remove that
 check.

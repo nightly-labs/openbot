@@ -7,11 +7,12 @@ import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./proto
 import type { SignalService, SignalSocket, SlackDeliveryResponse } from "./signal-service";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
 
-const SLACK_TEAM_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
+const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
+  api_app_id: z.string().optional(),
   challenge: z.string().max(1_024).optional(),
   team_id: z.string().optional(),
   team: z.object({ id: z.string() }).nullish(),
@@ -33,6 +34,7 @@ const authEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("slack-route-revoked"),
+    appId: z.string().min(1),
     teamId: z.string().min(1),
     through: z.number().int().nonnegative(),
   }),
@@ -58,13 +60,13 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
       if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
       else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
       else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
-      else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.teamId, event.through);
+      else if (event.type === "slack-route-revoked") signal.revokeSlackRoute(event.appId, event.teamId, event.through);
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })
     // The OpenBot Slack app's one request URL, for the events and button presses of every
-    // workspace. Signal checks Slack's signature, reads only the workspace ID, and passes the exact
-    // body to the ingress socket of the host that the workspace is linked to. Nothing here stores or
+    // workspace. Signal checks Slack's signature, reads only the app and workspace IDs, and passes the
+    // exact body to the ingress socket of the host that the app's workspace is linked to. Nothing here stores or
     // logs the body.
     .post(
       SLACK_EVENTS_PATH,
@@ -80,7 +82,10 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
         if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
         const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
         const signature = request.headers.get("x-slack-signature") ?? "";
-        if (!config.slackSigningSecrets.some((secret) => verifySlackSignature(body, timestamp, signature, secret))) {
+        const signer = config.slackSigningSecrets.find(({ secret }) =>
+          verifySlackSignature(body, timestamp, signature, secret),
+        );
+        if (!signer) {
           const address = signalClientIp(
             server?.requestIP(request)?.address,
             request.headers.get("x-forwarded-for"),
@@ -93,11 +98,13 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
         if ("challenge" in slack) {
           return slackResponse({ status: 200, contentType: "text/plain", body: slack.challenge });
         }
+        // The secret binds the app: a request signed by one app cannot reach another app's route.
+        if (slack.appId !== signer.appId) return slackResponse({ status: 401 });
         if (!signal.acceptSlackRequest(`team:${slack.teamId}`)) return slackResponse({ status: 429 });
         const retryNum = Number(request.headers.get("x-slack-retry-num") ?? "");
         const retryReason = request.headers.get("x-slack-retry-reason");
         return slackResponse(
-          await signal.deliverSlack(slack.teamId, {
+          await signal.deliverSlack(slack.appId, slack.teamId, {
             kind,
             retryNum: Number.isInteger(retryNum) && retryNum >= 0 && retryNum < 100 ? retryNum : null,
             retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
@@ -178,7 +185,10 @@ function slackDeliveryKind(contentType: string | null): SlackDeliveryKind | null
  * Signal answers itself, or the workspace ID that picks the host. Events carry it as `team_id`, and
  * button presses as `payload.team.id`.
  */
-function slackRequest(kind: SlackDeliveryKind, body: Uint8Array): { challenge: string } | { teamId: string } | null {
+function slackRequest(
+  kind: SlackDeliveryKind,
+  body: Uint8Array,
+): { challenge: string } | { appId: string; teamId: string } | null {
   let value: unknown;
   try {
     const text = new TextDecoder().decode(body);
@@ -192,7 +202,8 @@ function slackRequest(kind: SlackDeliveryKind, body: Uint8Array): { challenge: s
     return { challenge: parsed.data.challenge };
   }
   const teamId = parsed.data.team_id ?? parsed.data.team?.id ?? parsed.data.authorizations?.[0]?.team_id;
-  return teamId && SLACK_TEAM_PATTERN.test(teamId) ? { teamId } : null;
+  const appId = parsed.data.api_app_id;
+  return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId) ? { appId, teamId } : null;
 }
 
 function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 429 | 401 | 400 | 503 }): Response {

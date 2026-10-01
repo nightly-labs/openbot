@@ -13,7 +13,13 @@ import {
 const slackRouteSchema = z.object({
   hostId: z.string().min(1).max(256),
   teams: z
-    .array(z.object({ id: z.string().min(1).max(128), linkedAt: z.number().int().nonnegative() }))
+    .array(
+      z.object({
+        id: z.string().min(1).max(128),
+        appId: z.string().min(1).max(128),
+        linkedAt: z.number().int().nonnegative(),
+      }),
+    )
     .max(SLACK_ROUTE_TEAMS_LIMIT),
 });
 

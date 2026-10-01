@@ -176,10 +176,15 @@ export class SlackAppService {
            WHERE slack_workspace_routes.account_id = excluded.account_id`,
         )
         .bind(team.id, state.h, state.u, body.app_id, body.bot_user_id, now),
-      authEventStatement(this.#database, { type: "slack-route-revoked", teamId: team.id, through: now - 1 }, now, {
-        sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND account_id = ? AND connected_at = ?)",
-        binds: [team.id, state.u, now],
-      }),
+      authEventStatement(
+        this.#database,
+        { type: "slack-route-revoked", appId: body.app_id, teamId: team.id, through: now - 1 },
+        now,
+        {
+          sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND account_id = ? AND connected_at = ?)",
+          binds: [team.id, state.u, now],
+        },
+      ),
     ]);
     await this.#flushAuthEvents();
     if (!linked || linked.meta.changes === 0) {

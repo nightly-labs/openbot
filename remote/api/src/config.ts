@@ -18,9 +18,32 @@ export interface RemoteApiConfig {
   maximumConnectionsPerIp: number;
   maximumMessagesPerMinute: number;
   trustProxy: boolean;
-  // The signing secrets of the OpenBot Slack apps, production and development, which share this
-  // Signal. Without one, the Slack route answers 503.
-  slackSigningSecrets: string[];
+  // The signing secret of each OpenBot Slack app, production and development, which share this
+  // Signal. A request must name the app whose secret signed it. Without one, the Slack route answers 503.
+  slackSigningSecrets: SlackSigningSecret[];
+}
+
+export interface SlackSigningSecret {
+  appId: string;
+  secret: string;
+}
+
+/**
+ * `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`. A malformed value
+ * turns off only the Slack route, which then answers 503: the remote sessions keep running.
+ */
+function readSlackSigningSecrets(value: string | undefined): SlackSigningSecret[] {
+  const secrets: SlackSigningSecret[] = [];
+  for (const entry of (value ?? "").split(",").map((part) => part.trim())) {
+    if (!entry) continue;
+    const [appId, secret] = entry.split(":", 2).map((part) => part.trim());
+    if (!appId || !secret || !/^A[A-Z0-9]{1,31}$/u.test(appId)) {
+      console.error("SLACK_SIGNING_SECRET must list <app ID>:<signing secret> pairs. The Slack route is off.");
+      return [];
+    }
+    secrets.push({ appId, secret });
+  }
+  return secrets;
 }
 
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
@@ -49,10 +72,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     maximumConnectionsPerIp: positiveInteger(environment.REMOTE_MAX_CONNECTIONS_PER_IP, 32),
     maximumMessagesPerMinute: positiveInteger(environment.REMOTE_MAX_MESSAGES_PER_MINUTE, 600),
     trustProxy: environment.REMOTE_TRUST_PROXY === "true",
-    slackSigningSecrets: (environment.SLACK_SIGNING_SECRET ?? "")
-      .split(",")
-      .map((secret) => secret.trim())
-      .filter(Boolean),
+    slackSigningSecrets: readSlackSigningSecrets(environment.SLACK_SIGNING_SECRET),
   };
 }
 

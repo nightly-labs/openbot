@@ -47,8 +47,11 @@ describe("OpenBot Slack app install", () => {
       redirectUri,
     });
     expect(database.prepare("SELECT host_id FROM slack_workspace_routes").all()).toEqual([{ host_id: "host-2" }]);
-    // Each link tells Signal to drop older routes, so host-1 cannot keep the workspace.
-    expect(revocations(database)).toHaveLength(2);
+    // Each link tells Signal to drop the app's older routes, so host-1 cannot keep the workspace.
+    expect(revocations(database)).toEqual([
+      { type: "slack-route-revoked", appId: "A1", teamId: "T1", through: expect.any(Number) },
+      { type: "slack-route-revoked", appId: "A1", teamId: "T1", through: expect.any(Number) },
+    ]);
 
     // Another account cannot take it.
     await expect(

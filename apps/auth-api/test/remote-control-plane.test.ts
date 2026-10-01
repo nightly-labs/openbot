@@ -590,7 +590,7 @@ describe("RemoteControlPlane", () => {
     expect(decodeJwt(route.ticket)).toMatchObject({
       aud: "openbot-slack-route",
       hid: "host-1",
-      teams: [{ id: "T1", linkedAt: 1 }],
+      teams: [{ id: "T1", appId: "A1", linkedAt: 1 }],
     });
     await expect(
       controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1"),
@@ -600,25 +600,31 @@ describe("RemoteControlPlane", () => {
       controlPlane.validateSlackRoute({
         hostId: "host-1",
         teams: [
-          { id: "T1", linkedAt: 1 },
-          { id: "T2", linkedAt: 1 },
+          { id: "T1", appId: "A1", linkedAt: 1 },
+          { id: "T2", appId: "A1", linkedAt: 1 },
         ],
       }),
     ).resolves.toEqual(["T1"]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", linkedAt: 0 }] }),
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 0 }] }),
     ).resolves.toEqual([]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-2", teams: [{ id: "T1", linkedAt: 1 }] }),
+      controlPlane.validateSlackRoute({ hostId: "host-2", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+    ).resolves.toEqual([]);
+    // Another app's link to the same workspace is not this one.
+    await expect(
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A2", linkedAt: 1 }] }),
     ).resolves.toEqual([]);
     const revocations = () =>
       webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "slack-route-revoked");
     await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
     expect((await controlPlane.issueSlackRoute("host-1", registration.machineToken)).teams).toEqual([]);
     // Signal drops the route, so the host cannot keep the workspace with the ticket it holds.
-    expect(revocations()).toEqual([{ type: "slack-route-revoked", teamId: "T1", through: expect.any(Number) }]);
+    expect(revocations()).toEqual([
+      { type: "slack-route-revoked", appId: "A1", teamId: "T1", through: expect.any(Number) },
+    ]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", linkedAt: 1 }] }),
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
     ).resolves.toEqual([]);
     await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
     expect(revocations()).toHaveLength(1);

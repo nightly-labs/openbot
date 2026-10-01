@@ -33,15 +33,18 @@ validation window.
 
 The OpenBot Slack app sends the events and button presses of every workspace to one request URL,
 `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's signing
-secret (`SLACK_SIGNING_SECRET`; a comma-separated list, because the production and development apps
-share Signal), answers Slack's `url_verification` challenge, and reads only the
-workspace ID. Then it passes the exact request body to the `ingress` socket of the host that the
-workspace is linked to, and returns the host's answer, or 503 when no host holds the workspace or the
+secret, answers Slack's `url_verification` challenge, and reads only the app ID (`api_app_id`) and
+the workspace ID. `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`,
+because the production and development apps share Signal. A request must name the app whose secret
+signed it, so one app's secret cannot reach the other app's hosts; a malformed value turns off only
+the Slack route. Then Signal passes the exact request body to the `ingress` socket of the host that
+the app and workspace are linked to, and returns the host's answer, or 503 when no host holds the workspace or the
 host does not answer in 2.5 seconds. Slack then sends the request again.
 
 An `ingress` socket names its workspaces with a Slack route ticket: an ES256 JWT with the audience
 `openbot-slack-route`, signed by the Worker with `SLACK_ROUTE_PRIVATE_JWK` (key id
-`SLACK_ROUTE_KEY_ID`) for the workspaces that the account service links to that host. Its public key
+`SLACK_ROUTE_KEY_ID`) for the workspaces, each with its app, that the account service links to that
+host. Its public key
 must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the Worker, or
 `REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
 `SLACK_SIGNING_SECRET`, the Slack route answers 503.
