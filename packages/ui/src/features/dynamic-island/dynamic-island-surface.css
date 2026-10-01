@@ -274,7 +274,7 @@ body:has(.dynamic-island-surface),
    once as it shows: it turns the wave, the smile and the raised hands, and lights up and twinkles
    each sparkle. Reduce motion turns the motions off, so the front face stays. */
 .dynamic-island-surface-idle-greeting-layer {
-  perspective: 80px;
+  perspective: 60px;
 }
 
 .dynamic-island-surface-idle-greeting-card {

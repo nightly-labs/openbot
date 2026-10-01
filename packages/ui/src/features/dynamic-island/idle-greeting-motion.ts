@@ -14,8 +14,14 @@ interface IdleGreetingParts {
 const SAMPLE_COUNT = 30;
 /** The motion starts as the crossfade from the previous greeting settles. */
 const MOTION_DELAY = 350;
-const TURN_BLUR_LIMIT = 0.6;
+const TURN_BLUR_LIMIT = 1.4;
+const TURN_SPEED_BLUR_LIMIT = 0.4;
 const TURN_BLUR_PER_DEGREE_PER_MS = 0.75;
+const TURN_EDGE_BLUR = 1.2;
+const TURN_EDGE_FADE = 0.5;
+const TURN_EDGE_SHADE = 0.3;
+/** The look of a face at rest, so the last keyframe lists the same filter functions. */
+const FACE_AT_REST = { filter: "blur(0px) brightness(1)", opacity: "1" };
 const EDGE_SCALE_DIP = 0.07;
 
 /** Plays the motion of a greeting that just showed, and returns its animations to cancel. */
@@ -83,11 +89,11 @@ function playWave(parts: IdleGreetingParts): Animation[] {
       transform: "rotateY(360deg)",
       scale: "1",
     }),
-    animate(parts.front, duration, (t) => ({ rotate: `${wave(t)}deg`, filter: turnBlur(theta, t) }), {
+    animate(parts.front, duration, (t) => ({ rotate: `${wave(t)}deg`, ...turnLook(theta, t) }), {
       rotate: "0deg",
-      filter: "blur(0px)",
+      ...FACE_AT_REST,
     }),
-    ...faceBlur(parts.back, duration, theta),
+    ...faceTurn(parts.back, duration, theta),
   ];
 }
 
@@ -105,8 +111,8 @@ function playSmile(parts: IdleGreetingParts): Animation[] {
       (t) => ({ transform: `rotateY(${theta(t)}deg)`, translate: `0 ${hop(t)}px`, scale: edgeScale(theta(t)) }),
       { transform: "rotateY(360deg)", translate: "0 0", scale: "1" },
     ),
-    ...faceBlur(parts.front, duration, theta),
-    ...faceBlur(parts.back, duration, theta),
+    ...faceTurn(parts.front, duration, theta),
+    ...faceTurn(parts.back, duration, theta),
   ];
 }
 
@@ -153,7 +159,7 @@ function playCheer(parts: IdleGreetingParts): Animation[] {
       "forwards",
       54,
     ),
-    ...faceBlur(parts.front, duration, theta),
+    ...faceTurn(parts.front, duration, theta),
     ...(parts.back
       ? [
           animate(
@@ -163,9 +169,9 @@ function playCheer(parts: IdleGreetingParts): Animation[] {
               const squash = clapAt(t);
               const across = squash < 0 ? 1 + 0.22 * squash : 1 + 0.06 * squash;
               const up = squash < 0 ? 1 - 0.05 * squash : 1;
-              return { scale: `${across} ${up}`, rotate: `${clapTilt(t)}deg`, filter: turnBlur(theta, t) };
+              return { scale: `${across} ${up}`, rotate: `${clapTilt(t)}deg`, ...turnLook(theta, t) };
             },
-            { scale: "1 1", rotate: "0deg", filter: "blur(0px)" },
+            { scale: "1 1", rotate: "0deg", ...FACE_AT_REST },
             "forwards",
             54,
           ),
@@ -174,9 +180,9 @@ function playCheer(parts: IdleGreetingParts): Animation[] {
   ];
 }
 
-function faceBlur(face: HTMLElement | undefined, duration: number, theta: (t: number) => number): Animation[] {
+function faceTurn(face: HTMLElement | undefined, duration: number, theta: (t: number) => number): Animation[] {
   if (!face) return [];
-  return [animate(face, duration, (t) => ({ filter: turnBlur(theta, t) }), { filter: "blur(0px)" })];
+  return [animate(face, duration, (t) => turnLook(theta, t), FACE_AT_REST)];
 }
 
 /**
@@ -200,10 +206,20 @@ function animate(
   return element.animate(keyframes, { duration, delay: MOTION_DELAY, easing: "linear", fill });
 }
 
-/** A blur while the card turns fast, so the edge-on moment does not read as a thin line. */
-function turnBlur(theta: (t: number) => number, t: number): string {
+/**
+ * How a face looks as the card turns, for an illusion of depth. Edge-on, the face blurs, fades and
+ * darkens, as a card turning away from the light does; a fast turn adds a little motion blur. Both
+ * faces get the same look, and the one turned away is hidden by its back face.
+ */
+function turnLook(theta: (t: number) => number, t: number): { filter: string; opacity: number } {
+  const edge = Math.abs(Math.sin((theta(t) * Math.PI) / 180));
   const degreesPerMs = Math.abs(theta(t + 4) - theta(t - 4)) / 8;
-  return `blur(${clamp(degreesPerMs * TURN_BLUR_PER_DEGREE_PER_MS, 0, TURN_BLUR_LIMIT)}px)`;
+  const speedBlur = clamp(degreesPerMs * TURN_BLUR_PER_DEGREE_PER_MS, 0, TURN_SPEED_BLUR_LIMIT);
+  const blur = clamp(TURN_EDGE_BLUR * edge + speedBlur, 0, TURN_BLUR_LIMIT);
+  return {
+    filter: `blur(${blur}px) brightness(${1 - TURN_EDGE_SHADE * edge})`,
+    opacity: 1 - TURN_EDGE_FADE * edge ** 1.5,
+  };
 }
 
 /** The card gets a little smaller as it turns edge-on. */
