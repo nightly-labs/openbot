@@ -68,9 +68,34 @@ describe("OpenBot Slack app install", () => {
     });
     expect(database.prepare("SELECT team_id FROM slack_workspace_routes").all()).toEqual([]);
   });
+  it("takes a loopback return address only on a development API", async () => {
+    const host = await createSlackWorkspaceKeyPair();
+    const request = (returnUrl: string) => ({
+      hostId: "host-1",
+      hostNonce: "nonce-0123456789abcdef",
+      hostPublicKey: host.publicKey,
+      redirectUri,
+      returnUrl,
+    });
+    const loopback = "http://127.0.0.1:43123/slack-workspace";
+    await expect(setup().service.authorizeUrl(owner, request(loopback))).rejects.toMatchObject({
+      code: "invalid_slack_request",
+    });
+    const development = setup({}, "https://tunnel.trycloudflare.com").service;
+    expect(development.redirectUri("http://127.0.0.1:3100/v2/slack/authorize")).toBe(
+      "https://tunnel.trycloudflare.com/v2/slack/callback",
+    );
+    await expect(
+      development.authorizeUrl(owner, request("https://attacker.example/slack-workspace")),
+    ).rejects.toMatchObject({ code: "invalid_slack_request" });
+    const state = new URL(await development.authorizeUrl(owner, request(loopback))).searchParams.get("state") ?? "";
+    await expect(development.complete({ code: "code", state, redirectUri })).resolves.toMatchObject({
+      returnUrl: loopback,
+    });
+  });
 });
 
-function setup(extra: { is_enterprise_install?: boolean } = {}) {
+function setup(extra: { is_enterprise_install?: boolean } = {}, developmentOrigin?: string) {
   const database = migratedDatabase();
   database.exec(`
     INSERT INTO users(id, identity_key, email, created_at, updated_at)
@@ -90,7 +115,8 @@ function setup(extra: { is_enterprise_install?: boolean } = {}) {
       ...extra,
     }),
   );
-  return { service: new SlackAppService({ DB: sqliteD1(database), ...secrets }, { fetch }), database, fetch };
+  const bindings = { DB: sqliteD1(database), ...secrets, SLACK_DEV_PUBLIC_ORIGIN: developmentOrigin };
+  return { service: new SlackAppService(bindings, { fetch }), database, fetch };
 }
 
 async function stateOf(

@@ -152,6 +152,7 @@ import {
 } from "./session-configuration";
 import { readSetupState } from "./setup-store";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
+import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
 import { SlackIngress } from "./slack-ingress";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -895,6 +896,9 @@ export async function createApplicationServices({
     issueSlackRoute: (hostId) => centralAuth.issueSlackRoute(hostId),
   });
   teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack ingress socket", () => slackIngress.dispose());
+  // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
+  // dev app and not to an installed OpenBot that owns `openbot://`.
+  const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
   const messaging = new MessagingService({
     threads: service.messaging,
     agents: {
@@ -919,7 +923,13 @@ export async function createApplicationServices({
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hostId, ...input }),
+            body: JSON.stringify({
+              hostId,
+              ...input,
+              ...(developmentSlackCallbackPort > 0
+                ? { returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}` }
+                : {}),
+            }),
           },
           (value) => requiredString(decodeRecord(value, "Slack sign-in"), "authorizeUrl"),
         );
@@ -934,6 +944,12 @@ export async function createApplicationServices({
   // Not awaited: a connection waits for Slack, and the app does not wait for it.
   void messaging.start().catch((error) => logger.warn("Messaging connections did not start.", toLogValue(error)));
   teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => messaging.stop());
+  if (developmentSlackCallbackPort > 0) {
+    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, (nonce, grant) =>
+      messaging.completeSlackWorkspace(nonce, grant),
+    );
+    teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
+  }
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
   githubConnector.onAgentAccessChanged(() => service.notifyGitHubConnectorChanged());
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no

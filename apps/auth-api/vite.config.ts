@@ -35,7 +35,8 @@ export default defineConfig(({ command }) => {
       host: readApiHost(process.env.OPENBOT_API_HOST),
       port,
       strictPort: true,
-      allowedHosts: [".openbot.localhost"],
+      // `bun run dev:slack` tunnels Slack's install return to this server.
+      allowedHosts: [".openbot.localhost", ".trycloudflare.com"],
     },
     plugins: [
       developmentLanGuard(),

@@ -41,6 +41,8 @@ export interface WorkerBindings {
   SLACK_CLIENT_SECRET?: string;
   /** Signs the OAuth `state` of the Slack install. At least 32 bytes. */
   SLACK_STATE_SECRET?: string;
+  /** Development only: the public HTTPS tunnel of a local API, which Slack can send the browser back to. */
+  SLACK_DEV_PUBLIC_ORIGIN?: string;
   /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;

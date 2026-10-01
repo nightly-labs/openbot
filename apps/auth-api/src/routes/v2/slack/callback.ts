@@ -17,11 +17,13 @@ export const Route = createFileRoute("/v2/slack/callback")({
           return redirect(target);
         }
         try {
-          const result = await requestSlackApp().complete({
-            code,
-            state,
-            redirectUri: new URL("/v2/slack/callback", url).toString(),
-          });
+          const slack = requestSlackApp();
+          const result = await slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) });
+          // Development only: the dev app's loopback listener takes the grant, not `openbot://`.
+          if (result.returnUrl)
+            return redirect(
+              new URL(`${result.returnUrl}?${new URLSearchParams({ nonce: result.nonce, grant: result.grant })}`),
+            );
           target.hash = new URLSearchParams({ nonce: result.nonce, grant: result.grant }).toString();
         } catch (error) {
           target.hash = new URLSearchParams({

@@ -13,6 +13,8 @@ import type { AuthUser, WorkerBindings } from "./types";
 const STATE_TTL_MS = 10 * 60_000;
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const SLACK_ID_PATTERN = /^[A-Z0-9]{1,32}$/u;
+/** Development only: the dev app's listener on the same computer as the browser. */
+const DEVELOPMENT_RETURN_PATTERN = /^http:\/\/127\.0\.0\.1:[0-9]{2,5}\/slack-workspace$/u;
 
 export class SlackAppError extends Error {
   constructor(
@@ -34,6 +36,8 @@ interface StatePayload {
   n: string;
   k: string;
   e: number;
+  // Development only: where the grant goes instead of `/slack/connect`.
+  r?: string;
 }
 
 export class SlackAppService {
@@ -43,9 +47,13 @@ export class SlackAppService {
   readonly #stateSecret: string;
   readonly #fetch: Fetch;
   readonly #now: () => number;
+  readonly #developmentOrigin: string | null;
 
   constructor(
-    bindings: Pick<WorkerBindings, "DB" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_STATE_SECRET">,
+    bindings: Pick<
+      WorkerBindings,
+      "DB" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_STATE_SECRET" | "SLACK_DEV_PUBLIC_ORIGIN"
+    >,
     options: { fetch?: Fetch; now?: () => number } = {},
   ) {
     const clientId = bindings.SLACK_CLIENT_ID?.trim();
@@ -60,14 +68,30 @@ export class SlackAppService {
     this.#stateSecret = stateSecret;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
+    this.#developmentOrigin = bindings.SLACK_DEV_PUBLIC_ORIGIN?.trim() || null;
+  }
+
+  /**
+   * Where Slack sends the browser back. A local development API is plain HTTP, which Slack refuses,
+   * so `bun run dev:slack` gives it a public HTTPS tunnel origin.
+   */
+  redirectUri(requestUrl: string): string {
+    return new URL("/v2/slack/callback", this.#developmentOrigin ?? requestUrl).toString();
   }
 
   /** The Slack install URL for one connect of one host that the account owns. */
   async authorizeUrl(
     user: AuthUser,
-    input: { hostId: string; hostNonce: string; hostPublicKey: string; redirectUri: string },
+    input: { hostId: string; hostNonce: string; hostPublicKey: string; redirectUri: string; returnUrl?: string },
   ): Promise<string> {
     if (!NONCE_PATTERN.test(input.hostNonce) || !isRawP256PublicKey(input.hostPublicKey)) {
+      throw new SlackAppError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
+    }
+    // Only a development API takes a return address, and only one on this computer's loopback.
+    if (
+      input.returnUrl !== undefined &&
+      (!this.#developmentOrigin || !DEVELOPMENT_RETURN_PATTERN.test(input.returnUrl))
+    ) {
       throw new SlackAppError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
     }
     const host = await this.#database
@@ -83,6 +107,7 @@ export class SlackAppService {
       n: input.hostNonce,
       k: input.hostPublicKey,
       e: this.#now() + STATE_TTL_MS,
+      ...(input.returnUrl ? { r: input.returnUrl } : {}),
     });
     const url = new URL("https://slack.com/oauth/v2/authorize");
     url.searchParams.set("client_id", this.#clientId);
@@ -103,7 +128,7 @@ export class SlackAppService {
     code: string;
     state: string;
     redirectUri: string;
-  }): Promise<{ nonce: string; grant: string }> {
+  }): Promise<{ nonce: string; grant: string; returnUrl?: string }> {
     const state = await this.#verifyState(input.state);
     const response = await this.#fetch("https://slack.com/api/oauth.v2.access", {
       method: "POST",
@@ -152,6 +177,7 @@ export class SlackAppService {
       );
     }
     return {
+      ...(state.r ? { returnUrl: state.r } : {}),
       nonce: state.n,
       grant: await sealSlackWorkspaceGrant(state.k, state.n, {
         botToken: body.access_token,
@@ -195,11 +221,19 @@ export class SlackAppService {
       !isString(payload.n) ||
       !isString(payload.k) ||
       typeof payload.e !== "number" ||
-      payload.e < this.#now()
+      payload.e < this.#now() ||
+      (payload.r !== undefined && (!isString(payload.r) || !DEVELOPMENT_RETURN_PATTERN.test(payload.r)))
     ) {
       throw invalidState();
     }
-    return { u: payload.u, h: payload.h, n: payload.n, k: payload.k, e: payload.e };
+    return {
+      u: payload.u,
+      h: payload.h,
+      n: payload.n,
+      k: payload.k,
+      e: payload.e,
+      ...(isString(payload.r) ? { r: payload.r } : {}),
+    };
   }
 }
 

@@ -26,4 +26,7 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.hostOnly": "Only the OpenBot host can answer this request.",
   "status.messaging.questionOnHost": "OpenBot asked a question. Answer it on the OpenBot host.",
   "status.messaging.filesSkipped": "Some files were not sent: {names}.",
+  // The page a development Slack install ends on.
+  "status.messaging.signInReceived": "OpenBot received the Slack install. You can close this tab.",
+  "status.messaging.signInUnknown": "OpenBot did not start this Slack install. Start it again in OpenBot.",
 });

@@ -15,11 +15,15 @@ export const Route = createFileRoute("/v2/slack/authorize")({
           const body = await readJsonObject(request);
           if (!isString(body.hostId) || !isString(body.hostNonce) || !isString(body.hostPublicKey))
             return apiError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
-          const authorizeUrl = await requestSlackApp().authorizeUrl(user, {
+          if (body.returnUrl !== undefined && !isString(body.returnUrl))
+            return apiError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
+          const slack = requestSlackApp();
+          const authorizeUrl = await slack.authorizeUrl(user, {
             hostId: body.hostId,
             hostNonce: body.hostNonce,
             hostPublicKey: body.hostPublicKey,
-            redirectUri: new URL("/v2/slack/callback", request.url).toString(),
+            redirectUri: slack.redirectUri(request.url),
+            ...(body.returnUrl ? { returnUrl: body.returnUrl } : {}),
           });
           return json({ authorizeUrl });
         } catch (error) {
