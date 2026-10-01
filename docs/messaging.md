@@ -103,7 +103,7 @@ also has an installed OpenBot. The operating system sends `openbot://` to the in
 - When an agent asks another OpenBot agent for something in a Slack conversation, the reply comes
   back to that conversation. The agent then posts its answer in the same thread, and the original
   message keeps its reactions.
-- A question the agent asks is answered on the host, not in Slack.
+- A question the agent asks is answered on the host. Slack shows nothing for it.
 
 ## Adding a platform
 

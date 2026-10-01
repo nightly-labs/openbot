@@ -24,7 +24,6 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.requestInactive": "This request is no longer active.",
   "status.messaging.onlyRequester": "Only {user} can do this. The OpenBot host can also answer.",
   "status.messaging.hostOnly": "Only the OpenBot host can answer this request.",
-  "status.messaging.questionOnHost": "OpenBot asked a question. Answer it on the OpenBot host.",
   "status.messaging.filesSkipped": "Some files were not sent: {names}.",
   // The name and title of the agent that OpenBot adds to answer in Slack. The user can rename it.
   "status.messaging.orchestratorName": "Slack Orchestrator",

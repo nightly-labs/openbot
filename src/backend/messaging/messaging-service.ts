@@ -618,7 +618,6 @@ export class MessagingService {
     if (event.type === "approval") void this.#approval(event.approval).catch((error) => this.#warn(error));
     else if (event.type === "agent-input-resolved" && event.kind === "approval")
       void this.#approvalResolved(event.requestId).catch((error) => this.#warn(error));
-    else if (event.type === "prompt") void this.#question(event.threadId).catch((error) => this.#warn(error));
   }
 
   async #approval(approval: AgentApproval): Promise<void> {
@@ -683,13 +682,6 @@ export class MessagingService {
     await live?.adapter.edit(pending.target, pending.messageId, {
       text: `${pending.text}\n${sourceText("status.messaging.answeredOnHost")}`,
     });
-  }
-
-  async #question(threadId: string): Promise<void> {
-    const link = this.#threads.store.linkForThread(threadId);
-    const live = link ? this.#live.get(link.connectionId) : undefined;
-    if (!link || !live) return;
-    await live.adapter.post(linkTarget(link), { text: sourceText("status.messaging.questionOnHost") });
   }
 
   async #action(live: LiveConnection, action: InboundAction): Promise<void> {
