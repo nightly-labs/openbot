@@ -1016,8 +1016,8 @@ a {
   margin-top: 30px;
 }
 
-/* One action, such as Open OpenBot after a Slack install, sits in the middle. */
-.join-card-actions:has(> :only-child) {
+/* The one action after a Slack install sits in the middle. */
+.join-card-actions-single {
   grid-template-columns: auto;
   justify-content: center;
 }

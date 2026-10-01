@@ -53,7 +53,7 @@ export function SlackConnectView(props: { openUrl: string; failure: string | nul
           <p class="join-card-copy">OpenBot finishes the Slack connection on your computer.</p>
           <Show when={props.openUrl}>
             {(href) => (
-              <div class="join-card-actions">
+              <div class="join-card-actions join-card-actions-single">
                 <Button href={href()} variant="primary" size="lg" icon="open">
                   Open OpenBot
                 </Button>
