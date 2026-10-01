@@ -87,6 +87,13 @@ const COMPACT_INDICES = [0, 1, 2] as const;
 const ROW_INDICES = [0, 1, 2] as const;
 const IDLE_GREETING_EMOJIS = ["👋", "😊", "🙌", "✨"] as const;
 type IdleGreetingEmoji = (typeof IDLE_GREETING_EMOJIS)[number];
+/** Each greeting has a small motion of its own when it shows; the CSS finds it by this name. */
+const IDLE_GREETING_NAMES = {
+  "👋": "wave",
+  "😊": "smile",
+  "🙌": "cheer",
+  "✨": "sparkles",
+} as const satisfies Record<IdleGreetingEmoji, string>;
 const IDLE_GREETING_INTERVAL = 8_000;
 const QUESTION_SWAP_EXIT_DURATION = 200;
 const QUESTION_SWAP_ENTER_DURATION = 320;
@@ -862,8 +869,20 @@ function IdleGreetingEmoji(): JSX.Element {
       data-island-spatial-anchor="end"
       aria-hidden="true"
     >
-      <span class="dynamic-island-surface-idle-greeting-layer">{firstEmoji()}</span>
-      <span class="dynamic-island-surface-idle-greeting-layer">{secondEmoji()}</span>
+      <span
+        class="dynamic-island-surface-idle-greeting-layer"
+        data-greeting={IDLE_GREETING_NAMES[firstEmoji()]}
+        data-active={activeSlot() === 0 ? "true" : undefined}
+      >
+        {firstEmoji()}
+      </span>
+      <span
+        class="dynamic-island-surface-idle-greeting-layer"
+        data-greeting={IDLE_GREETING_NAMES[secondEmoji()]}
+        data-active={activeSlot() === 1 ? "true" : undefined}
+      >
+        {secondEmoji()}
+      </span>
     </span>
   );
 }

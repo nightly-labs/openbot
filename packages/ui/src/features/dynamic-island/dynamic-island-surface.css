@@ -176,12 +176,11 @@ body:has(.dynamic-island-surface),
     scale var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* While the island moves, the greeting gets smaller and fainter, as much as the move is large. When
+/* While the island moves, the greeting gets a little fainter, as much as the move is large. When
    a large move lands, it pops: a short overshoot with a small tilt each way, then rest. A small move,
    such as one slow slider step, has no pop, so a slow drag stays quiet. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-surface-idle-greeting {
-  opacity: calc(1 - 0.3 * var(--dynamic-island-compact-motion, 1));
-  scale: calc(1 - 0.06 * var(--dynamic-island-compact-motion, 1));
+  opacity: calc(1 - 0.15 * var(--dynamic-island-compact-motion, 1));
 }
 
 .dynamic-island-shell[data-compact-settled] .dynamic-island-surface-idle-greeting {
@@ -189,7 +188,7 @@ body:has(.dynamic-island-surface),
 }
 
 /* One damped spring (damping 0.5, response 0.4s, with a push), sampled, so the pop is one smooth
-   overshoot to about 1.03 and back, not a curve per keyframe. The tilt rides the same spring. */
+   overshoot to about 1.015 and back, not a curve per keyframe. The tilt rides the same spring. */
 .dynamic-island-shell {
   --dynamic-island-greeting-pop-ease: linear(
     0,
@@ -222,9 +221,9 @@ body:has(.dynamic-island-surface),
 
 @keyframes dynamic-island-greeting-pop {
   from {
-    opacity: 0.7;
-    scale: 0.94;
-    rotate: -3deg;
+    opacity: 0.85;
+    scale: 0.97;
+    rotate: -1.5deg;
   }
 
   to {
@@ -251,6 +250,149 @@ body:has(.dynamic-island-surface),
 .dynamic-island-surface-idle-greeting[data-active-slot="0"] .dynamic-island-surface-idle-greeting-layer:first-child,
 .dynamic-island-surface-idle-greeting[data-active-slot="1"] .dynamic-island-surface-idle-greeting-layer:last-child {
   opacity: 1;
+}
+
+/* Each greeting moves once as it shows: the hand waves, the raised hands bounce, the smile tilts,
+   and the sparkles light up one star at a time, the large one first. Each starts after the
+   crossfade, and Reduce motion turns them off. */
+@property --dynamic-island-sparkle-large {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --dynamic-island-sparkle-upper {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --dynamic-island-sparkle-lower {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="wave"] {
+    transform-origin: 70% 80%;
+    animation: dynamic-island-greeting-wave 1300ms ease-in-out 200ms both;
+  }
+
+  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="cheer"] {
+    animation: dynamic-island-greeting-cheer 1100ms ease-in-out 200ms both;
+  }
+
+  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="smile"] {
+    animation: dynamic-island-greeting-smile 1000ms ease-in-out 200ms both;
+  }
+
+  /* A soft glow behind each star, in the order the stars light up. */
+  .dynamic-island-surface-idle-greeting-layer[data-active][data-greeting="sparkles"] {
+    background:
+      radial-gradient(
+        circle at 60% 46%,
+        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-large)), transparent),
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 24% 28%,
+        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-upper)), transparent),
+        transparent 22%
+      ),
+      radial-gradient(
+        circle at 36% 69%,
+        color-mix(in srgb, var(--openbot-warning) calc(50% * var(--dynamic-island-sparkle-lower)), transparent),
+        transparent 22%
+      );
+    animation: dynamic-island-greeting-sparkles 1400ms ease-out 200ms both;
+  }
+}
+
+@keyframes dynamic-island-greeting-wave {
+  0%,
+  75%,
+  100% {
+    rotate: 0deg;
+  }
+
+  15% {
+    rotate: 12deg;
+  }
+
+  30% {
+    rotate: -6deg;
+  }
+
+  45% {
+    rotate: 10deg;
+  }
+
+  60% {
+    rotate: -3deg;
+  }
+}
+
+@keyframes dynamic-island-greeting-cheer {
+  0%,
+  40%,
+  80%,
+  100% {
+    translate: 0 0;
+  }
+
+  20%,
+  60% {
+    translate: 0 -1.5px;
+  }
+}
+
+@keyframes dynamic-island-greeting-smile {
+  0%,
+  100% {
+    rotate: 0deg;
+  }
+
+  35% {
+    rotate: -7deg;
+  }
+
+  70% {
+    rotate: 3deg;
+  }
+}
+
+@keyframes dynamic-island-greeting-sparkles {
+  0% {
+    opacity: 0.55;
+    --dynamic-island-sparkle-large: 0;
+    --dynamic-island-sparkle-upper: 0;
+    --dynamic-island-sparkle-lower: 0;
+  }
+
+  20% {
+    --dynamic-island-sparkle-large: 1;
+    --dynamic-island-sparkle-upper: 0;
+  }
+
+  40% {
+    --dynamic-island-sparkle-large: 0.2;
+    --dynamic-island-sparkle-upper: 1;
+    --dynamic-island-sparkle-lower: 0;
+  }
+
+  60% {
+    opacity: 1;
+    --dynamic-island-sparkle-upper: 0.2;
+    --dynamic-island-sparkle-lower: 1;
+  }
+
+  100% {
+    opacity: 1;
+    --dynamic-island-sparkle-large: 0;
+    --dynamic-island-sparkle-upper: 0;
+    --dynamic-island-sparkle-lower: 0;
+  }
 }
 
 .dynamic-island-surface-avatar-stack {
