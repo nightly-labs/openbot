@@ -110,29 +110,65 @@ function playSmile(parts: IdleGreetingParts): Animation[] {
   ];
 }
 
-/** The raised hands turn to clapping hands, clap twice, turn back raised, and lift. */
+/**
+ * The raised hands turn to clapping hands and clap twice, each clap a squash with a small rebound
+ * and tilt. Then they crouch a little, throw themselves up as they turn back raised, and land on a
+ * spring.
+ */
 function playCheer(parts: IdleGreetingParts): Animation[] {
-  const duration = 2400;
+  const duration = 2700;
   const turn = spring(0.62, 0.65);
-  const lift = spring(0.5, 0.55);
-  const theta = (t: number) => 180 * turn(t) + 180 * turn(t - 1350);
-  const rise = (t: number) => -2.2 * (lift(t - 1450) - lift(t - 1850));
-  const clap = (t: number) =>
-    t < 650 || t > 1250 ? 1 : 1 - 0.2 * Math.abs(Math.sin((2 * Math.PI * (t - 650)) / 600)) ** 1.5;
+  const launch = spring(0.45, 0.5);
+  const land = spring(0.55, 0.5);
+  const claps = [700, 1000];
+  const theta = (t: number) => 180 * turn(t) + 180 * turn(t - 1420);
+  // A crouch before the throw, the throw up, and the landing.
+  const crouch = (t: number) => 0.8 * Math.sin(Math.PI * clamp((t - 1280) / 160, 0, 1));
+  const rise = (t: number) => crouch(t) - 3 * (launch(t - 1420) - land(t - 1800));
+  const pop = (t: number) => 1 - (0.04 * crouch(t)) / 0.8 + 0.1 * (launch(t - 1420) - land(t - 1760));
+  // Each clap squashes the hands across and stretches them a little up, then rebounds.
+  const clapAt = (t: number) => {
+    for (const at of claps) {
+      const since = t - at;
+      if (since < 0 || since > 320) continue;
+      if (since < 110) return -Math.sin((Math.PI * since) / 110);
+      return 0.28 * Math.sin((Math.PI * (since - 110)) / 210) * Math.exp(-(since - 110) / 160);
+    }
+    return 0;
+  };
+  const clapTilt = (t: number) => {
+    const since = Math.min(...claps.map((at) => (t >= at ? t - at : Number.POSITIVE_INFINITY)));
+    return since > 320 ? 0 : 4 * Math.sin((Math.PI * since) / 320) * (since < 160 ? 1 : -0.5);
+  };
   return [
     animate(
       parts.card,
       duration,
-      (t) => ({ transform: `rotateY(${theta(t)}deg)`, translate: `0 ${rise(t)}px`, scale: edgeScale(theta(t)) }),
+      (t) => ({
+        transform: `rotateY(${theta(t)}deg)`,
+        translate: `0 ${rise(t)}px`,
+        scale: edgeScale(theta(t)) * pop(t),
+      }),
       { transform: "rotateY(360deg)", translate: "0 0", scale: "1" },
+      "forwards",
+      54,
     ),
     ...faceBlur(parts.front, duration, theta),
     ...(parts.back
       ? [
-          animate(parts.back, duration, (t) => ({ scale: `${clap(t)} 1`, filter: turnBlur(theta, t) }), {
-            scale: "1 1",
-            filter: "blur(0px)",
-          }),
+          animate(
+            parts.back,
+            duration,
+            (t) => {
+              const squash = clapAt(t);
+              const across = squash < 0 ? 1 + 0.22 * squash : 1 + 0.06 * squash;
+              const up = squash < 0 ? 1 - 0.05 * squash : 1;
+              return { scale: `${across} ${up}`, rotate: `${clapTilt(t)}deg`, filter: turnBlur(theta, t) };
+            },
+            { scale: "1 1", rotate: "0deg", filter: "blur(0px)" },
+            "forwards",
+            54,
+          ),
         ]
       : []),
   ];
