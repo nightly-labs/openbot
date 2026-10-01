@@ -147,7 +147,7 @@ function MarketplaceWindow(props: MarketplaceProps) {
         </div>
         <Show when={props.model.error()}>
           {(message) => (
-            <div class="skills-marketplace-error" role="alert">
+            <div class="skills-marketplace-error">
               <span>{message()}</span>
               <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
                 <X />
@@ -156,8 +156,16 @@ function MarketplaceWindow(props: MarketplaceProps) {
           )}
         </Show>
       </div>
-      <p class="marketplace-visually-hidden" role="status">
+      {/*
+        The skill install menu stays open while installs run, and an open menu hides the rest of the
+        window from screen readers. It keeps an element with `data-live-announcer` visible, so the
+        results are said from here.
+      */}
+      <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
+      </p>
+      <p class="marketplace-visually-hidden" role="alert" data-live-announcer="">
+        {props.model.error()}
       </p>
     </>
   );

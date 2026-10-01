@@ -14,10 +14,10 @@ export const messages = {
   "plugin.info.category": "Catégorie",
   "plugin.info.version": "Version",
 
-  "plugin.uninstallDialog.title": "Désinstaller {name} ?",
+  "plugin.uninstallDialog.title": "Déconnecter {name} ?",
   "plugin.uninstallDialog.description":
     "Cette action supprime ce que {name} a installé sur cet ordinateur. Rien d’autre ne change sur cet hôte ni sur cet agent.",
-  "plugin.uninstallDialog.confirm": "Désinstaller",
+  "plugin.uninstallDialog.confirm": "Déconnecter",
   "plugin.uninstallDialog.appsLabel": "Apps à supprimer : {number}",
   "plugin.uninstallDialog.appsTitle": "Apps supprimées de cet hôte",
   "plugin.uninstallDialog.appsNote":

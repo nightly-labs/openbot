@@ -223,8 +223,8 @@ describe("MarketplaceModal", () => {
 
       await waitFor(() => expect(install).toHaveBeenCalledTimes(3));
       expect(install.mock.calls.map(([input]) => input.agentId)).toEqual(["writer", "research", "coder"]);
-      // The menu stays open for more changes, and hides the rest of the window while it is open.
-      fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+      // The menu stays open for more changes, and a screen reader still hears the results.
+      expect(screen.getByRole("menu")).toBeInTheDocument();
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "Release Notes did not change on these agents: Research and Coder. The agent workspace is read-only.",
       );
@@ -609,7 +609,7 @@ describe("MarketplaceModal", () => {
       renderMarketplace({ ...writer, plugins: [withSkill] });
       const confirm = await askToDisconnect();
 
-      expect(within(confirm).getByRole("heading", { name: "Uninstall Aave?" })).toBeInTheDocument();
+      expect(within(confirm).getByRole("heading", { name: "Disconnect Aave?" })).toBeInTheDocument();
       expect(within(confirm).getByText(appName)).toBeInTheDocument();
       expect(within(confirm).getByText("yield-analysis")).toBeInTheDocument();
       expect(window.openbot.agent.removeMcpServer).not.toHaveBeenCalled();
@@ -633,7 +633,7 @@ describe("MarketplaceModal", () => {
       const confirm = await askToDisconnect();
       hostRows = [];
       held = [];
-      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+      fireEvent.click(within(confirm).getByRole("button", { name: "Disconnect" }));
 
       await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
       expect(removeMcpServer).toHaveBeenCalledWith({ mcpServerId: "mcp-1" }, "local");
@@ -677,10 +677,10 @@ describe("MarketplaceModal", () => {
       renderMarketplace({ ...writer, plugins: [withSkill] });
       const confirm = await askToDisconnect();
       held = [];
-      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+      fireEvent.click(within(confirm).getByRole("button", { name: "Disconnect" }));
 
       await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("This MCP server no longer exists."));
       // What stayed still has a way out: the retry.
       expect(screen.getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     });

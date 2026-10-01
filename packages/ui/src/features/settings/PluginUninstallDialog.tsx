@@ -1,9 +1,9 @@
 /**
- * The step between pressing Uninstall and the plugin going.
+ * The step between pressing Disconnect and the plugin going.
  *
- * An install puts a plugin in two places - MCP servers on the host, skills on one agent - so an
- * uninstall takes things from two places as well. Neither is visible from the other, so the dialog
- * names every piece before it removes any of them: a user who reads "Uninstall Aave?" alone cannot
+ * An install puts a plugin in two places - MCP servers on the host, skills on one agent - so a
+ * disconnect takes things from two places as well. Neither is visible from the other, so the dialog
+ * names every piece before it removes any of them: a user who reads "Disconnect Aave?" alone cannot
  * tell whether the skill they wrote instructions around is about to go with it.
  *
  * It lists only what is really there. A plugin the user installed before it published a second app,
