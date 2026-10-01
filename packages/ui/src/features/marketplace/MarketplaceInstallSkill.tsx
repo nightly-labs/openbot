@@ -39,10 +39,10 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
       }}
     >
       <DropdownMenu.Trigger
-        class={buttonVariants({
+        class={`${buttonVariants({
           variant: have().length === 0 && props.emphasis ? "default" : "outline",
           size: props.emphasis ? "default" : "sm",
-        })}
+        })} marketplace-install-trigger`}
         disabled={model().skillBusy(props.skill.id)}
         aria-busy={model().skillBusy(props.skill.id) ? "true" : undefined}
         aria-label={
@@ -58,7 +58,7 @@ export function InstallSkill(props: { scope: MarketplaceScope; skill: Marketplac
         <Show when={have().length > 0}>
           <Check aria-hidden="true" />
         </Show>
-        {label()}
+        <span class="marketplace-install-label">{label()}</span>
         <ChevronDown aria-hidden="true" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

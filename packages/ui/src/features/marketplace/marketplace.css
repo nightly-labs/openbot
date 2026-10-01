@@ -185,8 +185,10 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 
 .marketplace-head-actions {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
+  min-width: 0;
+  max-width: 50%;
   gap: var(--openbot-space-1);
 }
 
@@ -230,6 +232,23 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 
 .marketplace-install-menu {
   min-width: 220px;
+}
+
+/* The button can show an agent's name. A long name is cut, and the skill name keeps its space. */
+.marketplace-install-trigger {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.marketplace-install-trigger svg {
+  flex: none;
+}
+
+.marketplace-install-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .marketplace-tab-slot {
@@ -388,6 +407,7 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   display: flex;
   align-items: center;
   gap: var(--openbot-space-3);
+  min-width: 0;
 }
 
 .marketplace-card-name {
@@ -401,9 +421,11 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   position: relative;
   z-index: 2;
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--openbot-space-2);
+  min-width: 0;
+  max-width: 60%;
 }
 
 .marketplace-card-body {
