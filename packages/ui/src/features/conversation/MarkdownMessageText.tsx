@@ -1005,17 +1005,14 @@ function localFileTarget(value: string): string | null {
   return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
 }
 
-/** The local path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. */
+/**
+ * The path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. It stays
+ * percent-encoded like any other link target: the main process decodes it once.
+ */
 function fileUrlPath(value: string): string | null {
   const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
   if (!match?.[1]) return null;
-  let path = match[1];
-  try {
-    path = decodeURIComponent(path);
-  } catch {
-    // A literal percent sign can be part of a file name.
-  }
-  return /^\/[A-Za-z]:\//u.test(path) ? path.slice(1) : path;
+  return /^\/[A-Za-z]:\//u.test(match[1]) ? match[1].slice(1) : match[1];
 }
 
 function workspaceFileTarget(value: string): string | null {

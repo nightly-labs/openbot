@@ -1639,10 +1639,10 @@ describe("OpenBot connected desktop shell", () => {
 
     const view = render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "Open workspace file edited.ts" }));
-    expect(await screen.findByText("body of /Users/me/my project/edited.ts")).toBeInTheDocument();
+    expect(await screen.findByText("body of /Users/me/my%20project/edited.ts")).toBeInTheDocument();
     expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenLastCalledWith({
       agentId: "chief",
-      path: "/Users/me/my project/edited.ts",
+      path: "/Users/me/my%20project/edited.ts",
     });
     await fireEvent.click(screen.getByRole("button", { name: "Open workspace file page.tsx:12" }));
     expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenLastCalledWith({
