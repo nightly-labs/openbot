@@ -103,7 +103,7 @@ export const AddOrchestrator: DialogStory = {
   args: dialogArgs(workspace({ orchestratorAgentId: null })),
 };
 
-/** Done: how OpenBot looks in Slack. */
+/** Done: the workspace has its Slack Orchestrator. */
 export const ConnectDone: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(workspace()),

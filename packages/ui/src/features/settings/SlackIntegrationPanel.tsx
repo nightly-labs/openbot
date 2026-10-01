@@ -18,7 +18,6 @@ import {
   Button,
   Check,
   ExternalLink,
-  Hash,
   Item,
   ItemActions,
   ItemContent,
@@ -363,39 +362,6 @@ function WorkspaceRow(props: {
   );
 }
 
-/** How OpenBot looks in a Slack channel: one app, named OpenBot, whichever agent answers. */
-function SlackMessagePreview() {
-  const { t } = useText();
-  return (
-    <figure class="slack-preview" aria-label={t("connector.slack.previewLabel")}>
-      <div class="slack-preview-channel">
-        <Hash size={14} aria-hidden="true" />
-        <Text as="span" variant="label-sm">
-          {t("connector.slack.previewChannel")}
-        </Text>
-      </div>
-      <div class="slack-preview-message">
-        <span class="slack-preview-avatar">
-          <AgentAvatar
-            seed={SLACK_ORCHESTRATOR_AVATAR.avatarSeed}
-            hue={SLACK_ORCHESTRATOR_AVATAR.avatarHue}
-            motion="idle"
-          />
-        </span>
-        <div class="slack-preview-body">
-          <div class="slack-preview-meta">
-            <Text as="span" variant="label">
-              {t("connector.slack.previewName")}
-            </Text>
-            <span class="slack-preview-app">{t("connector.slack.previewApp")}</span>
-          </div>
-          <Text variant="body-sm">{t("connector.slack.previewMessage")}</Text>
-        </div>
-      </div>
-    </figure>
-  );
-}
-
 /** 0 connects the workspace, 1 adds the orchestrator, and 2 is done. */
 type ConnectStep = 0 | 1 | 2;
 
@@ -575,9 +541,6 @@ export function SlackConnectDialog(props: {
               </Show>
             )}
           </Show>
-        </Match>
-        <Match when={step() === 2}>
-          <SlackMessagePreview />
         </Match>
       </Switch>
     </WizardDialog>

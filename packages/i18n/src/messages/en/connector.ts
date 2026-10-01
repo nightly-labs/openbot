@@ -143,14 +143,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.doneTitle": "OpenBot is in {workspace}",
   "connector.slack.doneDescription": "Mention @OpenBot in any public channel, or send it a direct message.",
   "connector.slack.done": "Done",
-  "connector.slack.previewLabel": "How OpenBot looks in Slack",
-  // A sample Slack channel name, shown without the # sign.
-  "connector.slack.previewChannel": "general",
-  // The name of the Slack app. Do not translate.
-  "connector.slack.previewName": "OpenBot",
-  // The label Slack shows next to the name of an app.
-  "connector.slack.previewApp": "APP",
-  "connector.slack.previewMessage": "Research is checking this. The answer comes here.",
   "connector.slack.disconnectTitle": "Disconnect {workspace}?",
   "connector.slack.disconnectDescription":
     "OpenBot stops answering in {workspace} and removes its Slack token from this computer.",
