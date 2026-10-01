@@ -239,13 +239,25 @@ body:has(.dynamic-island-surface),
   }
 }
 
+/* One greeting hands over to the next: the old one shrinks a little and blurs as it fades, and the
+   new one comes out of the blur, so the two read as one change. */
 .dynamic-island-surface-idle-greeting-layer {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   opacity: 0;
-  transition: opacity 250ms var(--openbot-ease-out);
+  transition:
+    opacity 600ms var(--openbot-ease-in-out),
+    scale 650ms var(--openbot-ease-in-out),
+    filter 600ms var(--openbot-ease-in-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dynamic-island-surface-idle-greeting-layer:not([data-active]) {
+    scale: 0.88;
+    filter: blur(2px);
+  }
 }
 
 /* Mirrors the logo: its 20px box sits 10px from the left edge, this 16px box sits 6px from the right. */

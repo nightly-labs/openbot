@@ -12,8 +12,8 @@ interface IdleGreetingParts {
 }
 
 const SAMPLE_COUNT = 30;
-/** The motion starts after the crossfade from the previous greeting. */
-const MOTION_DELAY = 250;
+/** The motion starts as the crossfade from the previous greeting settles. */
+const MOTION_DELAY = 350;
 const TURN_BLUR_LIMIT = 0.6;
 const TURN_BLUR_PER_DEGREE_PER_MS = 0.75;
 const EDGE_SCALE_DIP = 0.07;
@@ -32,31 +32,36 @@ export function playIdleGreetingMotion(name: IdleGreetingMotionName, layer: HTML
 }
 
 /**
- * Each star lights up on a spring, the large one first, then each twinkles once: a short dip in
- * size and light with a small turn. The stars are copies of the glyph, each masked to one star.
+ * Each star lights up on a soft spring, the large one first, and then shimmers: a slow breath in
+ * light, size and tilt, each star at its own pace and phase, so they glint in turn. The stars are
+ * copies of the glyph, each masked to one star.
  */
 function playSparkles(face: HTMLElement): Animation[] {
-  const duration = 3600;
-  const light = spring(0.5, 0.45);
+  const duration = 7000;
+  const light = spring(0.75, 0.6);
   const stars = Array.from(face.querySelectorAll<HTMLElement>(".dynamic-island-surface-idle-greeting-sparkle"));
   return stars.map((star, index) => {
-    const start = index * 220;
-    const twinkleStart = 1500 + index * 600;
-    const twinkle = (t: number) => Math.sin(Math.PI * clamp((t - twinkleStart) / 280, 0, 1));
+    const start = index * 260;
+    const period = 1700 + index * 380;
+    const phase = index * 2.1;
+    // The shimmer fades in after the star is lit and out before the greeting changes.
+    const envelope = (t: number) => clamp((t - start - 700) / 900, 0, 1) * clamp((duration - t) / 700, 0, 1);
+    const breath = (t: number) => Math.sin((2 * Math.PI * (t - start)) / period + phase);
     return animate(
       star,
       duration,
       (t) => {
         const lit = light(t - start);
-        const dip = twinkle(t);
+        const shimmer = envelope(t) * breath(t);
         return {
-          opacity: clamp(0.15 + 0.85 * lit, 0, 1) - 0.55 * dip,
-          scale: (0.4 + 0.6 * lit) * (1 - 0.3 * dip),
-          rotate: `${15 * dip}deg`,
+          opacity: clamp(0.2 + 0.8 * lit, 0, 1) * (1 - 0.09 * envelope(t) * (1 - breath(t))),
+          scale: (0.6 + 0.4 * lit) * (1 + 0.05 * shimmer),
+          rotate: `${6 * envelope(t) * Math.sin((2 * Math.PI * (t - start)) / (period * 1.6) + phase)}deg`,
         };
       },
       { opacity: "1", scale: "1", rotate: "0deg" },
       "both",
+      90,
     );
   });
 }
@@ -149,10 +154,11 @@ function animate(
   frame: (t: number) => Record<string, string | number>,
   final: Record<string, string>,
   fill: FillMode = "forwards",
+  samples = SAMPLE_COUNT,
 ): Animation {
-  const keyframes: Keyframe[] = Array.from({ length: SAMPLE_COUNT + 1 }, (_, index) => {
-    const offset = index / SAMPLE_COUNT;
-    const values = index === SAMPLE_COUNT ? final : frame(duration * offset);
+  const keyframes: Keyframe[] = Array.from({ length: samples + 1 }, (_, index) => {
+    const offset = index / samples;
+    const values = index === samples ? final : frame(duration * offset);
     return { ...Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])), offset };
   });
   return element.animate(keyframes, { duration, delay: MOTION_DELAY, easing: "linear", fill });
