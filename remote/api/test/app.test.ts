@@ -186,6 +186,42 @@ describe("Slack request route", () => {
     expect((await pressed).status).toBe(503);
   });
 
+  it("keeps a workspace with its newest route ticket", async () => {
+    const { app, signal, route } = await slackRoute(signingSecret);
+    const connect = async (id: string, issuedSecondsAgo: number) => {
+      const socket = testSocket(id);
+      signal.connect(socket);
+      await signal.receive(
+        socket,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          slackRoute: await route({ hid: "host-1", teams: ["T1"] }, 3_600, issuedSecondsAgo),
+        }),
+      );
+      expect(socket.messages.at(-1)).toContain('"type":"ready"');
+      socket.messages.length = 0;
+      return socket;
+    };
+    // The workspace moved to the host that got the newer ticket. The host that lost it still holds
+    // its older, unexpired ticket, and connects after the new one.
+    const current = await connect("current", 60);
+    const stale = await connect("stale", 240);
+
+    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev2","event":{"type":"app_mention"}}';
+    const pending = post(app, body);
+    await vi.waitFor(() => expect(current.messages).toHaveLength(1));
+    expect(stale.messages).toHaveLength(0);
+    const { requestId } = JSON.parse(current.messages[0] ?? "{}");
+    await signal.receive(
+      current,
+      JSON.stringify({ type: "slack-delivery-result", version: 1, requestId, status: 200 }),
+    );
+    expect((await pending).status).toBe(200);
+  });
+
   it("answers 503 when the signing secret is not configured", async () => {
     const { app } = await slackRoute(null);
     expect((await post(app, '{"type":"url_verification","challenge":"abc"}')).status).toBe(503);
@@ -238,11 +274,11 @@ async function slackRoute(signingSecret: string | null) {
     8,
   );
   const now = Math.floor(Date.now() / 1_000);
-  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600) =>
+  const route = (claims: { hid: string; teams: string[] }, lifetimeSeconds = 3_600, issuedSecondsAgo = 120) =>
     new SignJWT(claims)
       .setProtectedHeader({ alg: "ES256", kid: "slack-route-1" })
       .setAudience("openbot-slack-route")
-      .setIssuedAt(now - 120)
+      .setIssuedAt(now - issuedSecondsAgo)
       .setExpirationTime(now + lifetimeSeconds)
       .sign(privateKey);
   return { app: createRemoteApiApp(config, signal), signal, route };

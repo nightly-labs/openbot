@@ -1510,8 +1510,9 @@ the answer. Every answer comes from OpenBot.
   window) that holds a route ticket for that workspace, and returns the host's answer within 2.5 s,
   or 503 so that Slack sends it again. The route ticket is an ES256 JWT that `apps/auth-api` signs
   with its own key for a host that proves its machine token. It names only the workspaces that D1
-  links to that host, expires after 24 hours, and the host asks for a new one each time the socket
-  connects. The host trusts a delivery because Signal checked the signature; no host has the
+  links to that host, expires after 5 minutes, and the host asks for a new one each time the socket
+  connects. A workspace goes to the socket with the newest ticket that names it, so a host that lost
+  the workspace cannot take it back with an older ticket. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
 
 The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`

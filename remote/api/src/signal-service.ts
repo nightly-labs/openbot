@@ -11,6 +11,12 @@ import {
   type SlackDeliveryStatus,
 } from "./protocol";
 
+/** The workspaces a verified route ticket names, and when the account service issued it. */
+export interface SlackRoute {
+  teams: string[];
+  issuedAt: number;
+}
+
 export interface RemoteTokenProvider {
   verifyTicket(token: string): Promise<RemoteTicketClaims>;
   verifyResumeToken(token: string): Promise<RemoteTicketClaims>;
@@ -18,7 +24,7 @@ export interface RemoteTokenProvider {
   issueResumeToken(claims: RemoteTicketClaims): Promise<string>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
   /** The Slack workspaces a route ticket links to the host. Without it, no `ingress` socket connects. */
-  verifySlackRoute?(token: string, hostId: string): Promise<string[]>;
+  verifySlackRoute?(token: string, hostId: string): Promise<SlackRoute>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -122,6 +128,9 @@ export class SignalService {
   readonly #hosts = new Map<string, Set<string>>();
   // Slack workspace ID to the `ingress` socket that said hello last with a route ticket for it.
   readonly #slackTeams = new Map<string, string>();
+  // The issue time of the newest route ticket that claimed each workspace. A host that lost a
+  // workspace keeps its last ticket until it expires; an older ticket never takes the route back.
+  readonly #slackRouteIssuedAt = new Map<string, number>();
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #slackLimits: SlackDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
@@ -415,7 +424,7 @@ export class SignalService {
     }
     let claims: RemoteTicketClaims;
     let usedInitialTicket = true;
-    let slackTeams: string[] = [];
+    let slackRoute: SlackRoute = { teams: [], issuedAt: 0 };
     try {
       try {
         claims = await this.#tokens.verifyTicket(message.token);
@@ -434,7 +443,7 @@ export class SignalService {
       if (message.peer === "client" && claims.role === "host") throw new Error("Member role required.");
       if (message.peer === "ingress") {
         if (!message.slackRoute || !this.#tokens.verifySlackRoute) throw new Error("Slack route required.");
-        slackTeams = await this.#tokens.verifySlackRoute(message.slackRoute, claims.hostId);
+        slackRoute = await this.#tokens.verifySlackRoute(message.slackRoute, claims.hostId);
       }
       this.#pruneReplayCache();
       if (usedInitialTicket && this.#usedTicketIds.has(claims.jti)) throw new Error("Ticket was already used.");
@@ -455,7 +464,7 @@ export class SignalService {
       connectionId: null,
       resumed: !usedInitialTicket,
       multiplex: message.peer === "host" && message.multiplex === true,
-      slackTeams,
+      slackTeams: slackRoute.teams,
     };
     this.#peers.set(socket.id, peer);
     this.#schedulePeerExpiration(peer);
@@ -463,7 +472,11 @@ export class SignalService {
     this.#metrics.activeSockets = this.#sockets.size;
     const resumeToken = await this.#tokens.issueResumeToken(claims);
     if (message.peer === "ingress") {
-      for (const teamId of slackTeams) this.#slackTeams.set(teamId, socket.id);
+      for (const teamId of slackRoute.teams) {
+        if (slackRoute.issuedAt < (this.#slackRouteIssuedAt.get(teamId) ?? 0)) continue;
+        this.#slackRouteIssuedAt.set(teamId, slackRoute.issuedAt);
+        this.#slackTeams.set(teamId, socket.id);
+      }
       this.#send(socket, {
         type: "ready",
         version: 1,

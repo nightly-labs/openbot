@@ -21,6 +21,7 @@ import {
   type RemoteTicketClaims,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
+import type { SlackRoute } from "./signal-service";
 
 // The resume token is this service's own, minted and verified here and never seen by the account
 // API, so its audience stays local while the ticket's comes from the shared contract.
@@ -53,6 +54,7 @@ const identifierSchema = z
 const slackRouteClaimsSchema = z.object({
   hid: identifierSchema,
   teams: z.array(identifierSchema).max(SLACK_ROUTE_TEAMS_LIMIT),
+  iat: z.number().int(),
 });
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
@@ -118,16 +120,16 @@ export class RemoteTokenService {
    * The Slack workspaces that a route ticket links to `hostId`. Throws for a ticket that is expired,
    * signed with another key, or minted for another host.
    */
-  async verifySlackRoute(token: string, hostId: string, now = new Date()): Promise<string[]> {
+  async verifySlackRoute(token: string, hostId: string, now = new Date()): Promise<SlackRoute> {
     const { payload } = await jwtVerify(token, this.#ticketKey, {
       audience: SLACK_ROUTE_AUDIENCE,
       algorithms: ["ES256"],
-      requiredClaims: ["exp"],
+      requiredClaims: ["exp", "iat"],
       currentDate: now,
     });
     const claims = slackRouteClaimsSchema.parse(payload);
     if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
-    return claims.teams;
+    return { teams: claims.teams, issuedAt: claims.iat };
   }
 
   validateClaims(claims: RemoteTicketClaims): Promise<boolean> {
