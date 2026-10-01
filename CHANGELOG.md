@@ -6,6 +6,66 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-01
+
+### Added
+
+- Turkish (`tr`) language support across desktop, web, and shared packages.
+- Cursor is a provider. Select Download on the Cursor row in More providers, then sign in with your Cursor account in the browser, or set `CURSOR_API_KEY`. OpenBot uses a `cursor-agent` that you installed yourself until a download exists. Cursor agents stay on this computer: team members do not see them.
+- Settings → General → Appearance has a Logo color setting with 10 colors. The chosen color shows on
+  the Dock or taskbar icon, on the Dynamic Island and on the logos in the app. When OpenBot is
+  closed, the Dock shows the lavender icon, because macOS has no alternate app icon for desktop apps.
+  A dev or preview build keeps the color of its build.
+- Global search (⌘K) finds channels, files, routines, commands and settings pages. New filters show Channels, Files and Routines. Select a file to show the message that has it. Select a routine to open its settings. Commands such as New agent and New channel, and each settings page, show in All when the query matches. Files come only from this computer, so a joined server and the web client do not show the Files filter.
+
+### Changed
+
+- The GitHub page in Server settings > Connectors has a new design. It shows the GitHub status and
+  your account picture. A dialog guides you through the sign-in code. You can filter the list of
+  repositories. Disconnect asks you to confirm first.
+- When an account has the maximum number of paid hosted servers, the add server dialog now tells the user before they choose a plan. The plans are disabled, and a "Manage servers" button opens the list of hosted servers, where the user can delete one.
+- Hosted sites now belong to the server that published them. Each server has its own limit of active
+  sites from its plan: 1 with no plan, 3 on Starter, 10 on Standard and 50 on Pro. Uploads from a
+  computer that is not a registered server share one site for each account.
+- Manage sites in Server settings > Sites, on the desktop and in the browser. All members see the
+  list. Only an owner or admin can delete a site. The Hosted sites tab in Settings is removed.
+- After a downgrade, sites above the new limit stay until they expire. The server cannot publish a
+  new site until it is below the limit, but it can update an existing site.
+- Manage AI providers in Server settings > Providers, not in Settings. Each server shows its own
+  providers. For a server that is not active, the section offers to switch to it.
+- Global search (⌘K) has a new, more compact design. Each result uses one line, and All shows each kind of result in a separate group. The query text is highlighted in the results. The filters are in the search field, and Tab and Shift+Tab change the filter. A footer shows the keyboard shortcuts, and a spinner shows when results are slow to load. The search opens, closes and changes height with a short animation, the results fade at an edge that has more to scroll, and the highlight and the filter pill slide to the new row or filter. Long result lists scroll smoothly with the arrow keys and stay fast with thousands of results. The Messages and Files filters load more results as you scroll to the end.
+- The Marketplace is now one full-screen window with the tabs Agents, Apps and Skills, a search field and a filter menu. Each agent, app and skill has its own page.
+- You can install a skill on all your agents in one step. The Marketplace names the agents where the install failed.
+- When you add an agent, the Marketplace stays open. The button then says "Open chat".
+- The GitHub page in the Marketplace and Server settings › Connectors show the same GitHub connection.
+
+### Removed
+
+- The Cursor preset for custom ACP agents. Use the Cursor provider. A custom agent that you saved with the preset continues to work. If its ID is `cursor`, you cannot edit it: to change it, remove it and add it again with another ID.
+- The GitHub plugin that used a personal access token. Use the GitHub connector. A server that the plugin added stays, and shows as a custom server. Remove that server, so that your agents use the GitHub connector.
+- Skill and agent publishing from the desktop Marketplace.
+
+### Fixed
+
+- Search now finds a phrase that a line break splits in a message, in the chat and in global search. The chat search also highlights it. Thanks to @aniruddhaadak80 for the first fix in #1174.
+- With Grok, an MCP server from `~/.claude.json`, `~/.cursor/mcp.json` or `.mcp.json` that needs
+  an OAuth sign-in no longer shows a "Provider error". Before, Grok's `worker quit with fatal …
+  AuthRequired` line showed as an error, but the chat worked without that server.
+- An agent that another agent creates now gets the provider, model, and reasoning effort of that agent, unless the request names different ones. Before, each new teammate started on the default model. ([#1201](https://github.com/nightly-labs/openbot/issues/1201))
+- Keep the other devices connected to a desktop when one phone reconnects. Before, a late network
+  message from the old connection of that phone could disconnect every device from the desktop.
+- Keep the web client connected through a short network change. Before, it made a new connection
+  after 5 seconds without an ICE restart, and it retried only every 10 seconds.
+- The startup screen now shows the full logo animation before it fades. Before, on a fast start, the logo flashed half drawn and was gone.
+- A cancelled or unfinished Stripe payment no longer blocks a new hosted server. A new plan choice now changes the plan of the server that waits for its first payment, and does not add a second server.
+- Start the Claude and Codex CLIs on Windows when the user name holds a space, such as
+  `C:\Users\Jane Doe`. Before, the Claude sign-in check failed with "'C:\Users\Jane' is not
+  recognized as an internal or external command".
+- Pressing Enter to confirm Japanese, Chinese, or Korean input in the custom answer field of an
+  agent question no longer sends the answer. Before, the answer was sent with the unconfirmed text.
+- Keep the last successful OpenCode model list when a later catalogue refresh fails. This keeps a connected provider's model picker usable after a temporary ACP timeout (#508).
+- Notifications that arrive together merge into one stack, and hover shows all of them with no empty space. Up to six update notifications show, not three.
+
 ## [0.26.0] - 2026-09-30
 
 ### Added

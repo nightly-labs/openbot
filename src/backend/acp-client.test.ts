@@ -72,6 +72,7 @@ const CONFIG_MODELS = [
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
 let sessionCount = 0;
+let discoveryCount = 0;
 let loadCount = 0;
 const SERVICE_FAILURE = {
   code: -32603,
@@ -193,6 +194,11 @@ function handle(message) {
   if (message.method === "session/new") {
     const sessionLog = process.env.OPENBOT_FAKE_ACP_SESSION_LOG;
     if (sessionLog) fs.appendFileSync(sessionLog, JSON.stringify(message.params) + NL);
+    discoveryCount += 1;
+    if (process.env.OPENBOT_FAKE_ACP_FAIL_MODEL_REFRESH === "1" && discoveryCount > 1) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Temporary discovery failure." } });
+      return;
+    }
     if (process.env.OPENBOT_FAKE_ACP_REJECT_KEY === "1") {
       write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Invalid api key." } });
       return;
@@ -246,9 +252,15 @@ interface FakeOpencode {
 
 async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<FakeOpencode> {
   const directory = await mkdtemp(join(tmpdir(), "openbot-acp-opencode-"));
-  const executable = join(directory, "opencode");
-  await writeFile(executable, FAKE_AGENT);
-  await chmod(executable, 0o755);
+  const executable = join(directory, process.platform === "win32" ? "opencode.cmd" : "opencode");
+  if (process.platform === "win32") {
+    const script = join(directory, "fake-opencode.js");
+    await writeFile(script, FAKE_AGENT);
+    await writeFile(executable, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+  } else {
+    await writeFile(executable, FAKE_AGENT);
+    await chmod(executable, 0o755);
+  }
   const envLog = join(directory, "spawn-env.ndjson");
   const promptLog = join(directory, "prompts.ndjson");
   const configLog = join(directory, "config-options.ndjson");
@@ -350,6 +362,18 @@ describe("OpenCode ACP environment", () => {
     const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
     expect(account.account).not.toBeNull();
     const models = await client.request("model/list", {}, decodeModelListResponse);
+    expect(models.data.map((model) => model.model)).toEqual(["opencode/big-pickle"]);
+  });
+
+  it("keeps the initialized model list when a later refresh fails", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_FAIL_MODEL_REFRESH", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // Initialization discovered this model successfully. The next `model/list` refresh fails, but
+    // that temporary failure must not erase the catalogue users can already select.
     expect(models.data.map((model) => model.model)).toEqual(["opencode/big-pickle"]);
   });
 
