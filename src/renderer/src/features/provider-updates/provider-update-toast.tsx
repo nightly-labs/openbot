@@ -9,7 +9,7 @@ import {
 } from "@openbot/ui/features/provider-updates/provider-update";
 import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createRoot, createSignal, createUniqueId, onSettled, Show } from "solid-js";
+import { createEffect, createRoot, createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
 
 /**
  * The provider update, as one notification the user acts on and then watches.
@@ -84,17 +84,25 @@ function ProviderUpdateDetail(props: {
   let line: HTMLSpanElement | undefined;
 
   // An open line shows everything, so it cannot say whether the closed one cuts anything off.
-  function measure(): void {
-    if (!line || props.expanded) return;
-    props.onClampedChange(props.presentation.failed && line.scrollHeight > line.clientHeight);
+  function measure(failed: boolean, expanded: boolean): void {
+    if (!line || expanded) return;
+    props.onClampedChange(failed && line.scrollHeight > line.clientHeight);
   }
 
-  createEffect(() => [props.presentation.detail, props.presentation.failed, props.expanded], measure);
+  // The text is read here only so that a new sentence is measured again.
+  createEffect(
+    () => ({
+      detail: props.presentation.detail,
+      failed: props.presentation.failed,
+      expanded: props.expanded,
+    }),
+    (state) => measure(state.failed, state.expanded),
+  );
   // The toast is built before it is on screen, and its width can change after, so the first real
   // measurement comes from here.
   onSettled(() => {
     if (!line || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(() => measure(props.presentation.failed, props.expanded));
     observer.observe(line);
     return () => observer.disconnect();
   });
@@ -220,9 +228,11 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
 
     const live: LiveProviderUpdateToast = {
       present: (next) => {
+        const previous = untrack(current);
         setCurrent(next);
-        // A retry closes the old failure, so the next one opens at its first lines.
-        if (!next.failed) setExpanded(false);
+        // A retry closes the old failure, so the next one opens at its first lines. A retry that
+        // fails before it starts goes from one failure to the next, so new words close it too.
+        if (!next.failed || next.detail !== previous.detail) setExpanded(false);
       },
       setAct: (next) => {
         act = next;
