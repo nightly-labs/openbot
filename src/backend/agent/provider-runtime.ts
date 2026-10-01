@@ -1966,7 +1966,10 @@ export class ProviderRuntime implements ProviderPort {
                 "model/list",
                 { limit: 100, includeHidden: true, ...(cursor ? { cursor } : {}) },
                 decodeModelListResponse,
-                5_000,
+                // A custom agent can need more than 5 s to start and open its probe session: Claude
+                // Agent ACP with a few plugins and MCP servers does. It answers inside the normal
+                // timeout, and a list that timed out kept that agent out of the catalogue.
+                client.provider === "acp" ? this.#requestTimeoutMs : 5_000,
               );
               // Every model the CLI reports is offered, the ones it marks hidden included; only the
               // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such

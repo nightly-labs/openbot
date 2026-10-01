@@ -301,6 +301,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initialized: Promise<void> | null = null;
   #initialization: InitializeResponse | null = null;
   #models: AcpModel[] = [];
+  /**
+   * The catalog was read by `initialize` and no `model/list` has answered with it yet. The first
+   * `model/list` comes right after the start, and a second probe session would double the time a
+   * slow agent needs to list: a custom agent that takes 5 s to open a session never got listed.
+   */
+  #modelsFromInitialize = false;
   #signedIn = false;
   #stopping = false;
 
@@ -492,7 +498,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         );
       case "model/list":
         await this.#ensureInitialized();
-        if (this.#signedIn) this.#models = await this.#discoverModels(timeoutMs);
+        if (this.#signedIn && !this.#modelsFromInitialize) this.#models = await this.#discoverModels(timeoutMs);
+        this.#modelsFromInitialize = false;
         return decoder({
           data: this.#models.map((model) => ({
             model: model.id,
@@ -584,6 +591,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }
+      this.#modelsFromInitialize = true;
       this.#signedIn = true;
     } catch (error) {
       if (isAuthenticationError(error)) {
