@@ -1,4 +1,4 @@
-import type { SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
+import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   decodeSignalClientMessage,
   encodeSignalServerMessage,
@@ -25,6 +25,8 @@ export interface RemoteTokenProvider {
   iceServers(claims: RemoteTicketClaims): IceServer[];
   /** The Slack workspaces a route ticket links to the host. Without it, no `ingress` socket connects. */
   verifySlackRoute?(token: string, hostId: string): Promise<SlackRoute>;
+  /** The workspaces of a route that the account service still links to the host, with the same link. */
+  validateSlackRoute?(hostId: string, teams: SlackRouteTeam[]): Promise<string[]>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -142,6 +144,9 @@ export class SignalService {
   readonly #revokedSessions = new Map<string, number>();
   readonly #rateWindows = new Map<string, { startedAt: number; count: number }>();
   readonly #validateInitialTicketsUntil = Date.now() + INITIAL_TICKET_TTL_MILLISECONDS;
+  // The revocations below are in memory. Until every route ticket issued before this start has
+  // expired, the account service confirms each link.
+  readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
   #lastRatePruneAt = 0;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
@@ -454,6 +459,11 @@ export class SignalService {
       if (message.peer === "ingress") {
         if (!message.slackRoute || !this.#tokens.verifySlackRoute) throw new Error("Slack route required.");
         slackRoute = await this.#tokens.verifySlackRoute(message.slackRoute, claims.hostId);
+        if (Date.now() < this.#validateSlackRoutesUntil) {
+          if (!this.#tokens.validateSlackRoute) throw new Error("Slack route validation required.");
+          const linked = new Set(await this.#tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
+          slackRoute = { teams: slackRoute.teams.filter((team) => linked.has(team.id)) };
+        }
       }
       this.#pruneReplayCache();
       if (usedInitialTicket && this.#usedTicketIds.has(claims.jti)) throw new Error("Ticket was already used.");

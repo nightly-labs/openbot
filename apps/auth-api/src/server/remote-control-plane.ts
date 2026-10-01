@@ -1174,6 +1174,17 @@ export class RemoteControlPlane {
     };
   }
 
+  /** The workspaces of a route ticket that D1 still links to the host, with the same link. */
+  async validateSlackRoute(input: { hostId: string; teams: SlackRouteTeam[] }): Promise<string[]> {
+    if (input.teams.length === 0) return [];
+    const rows = await this.#database
+      .prepare("SELECT team_id, connected_at FROM slack_workspace_routes WHERE host_id = ?")
+      .bind(input.hostId)
+      .all<{ team_id: string; connected_at: number }>();
+    const linked = new Map(rows.results.map((row) => [row.team_id, row.connected_at]));
+    return input.teams.filter((team) => linked.get(team.id) === team.linkedAt).map((team) => team.id);
+  }
+
   /** Unlinks a Slack workspace from this host, after the host disconnected it or Slack uninstalled it. */
   async disconnectSlackWorkspace(hostId: string, machineToken: string, teamId: string): Promise<void> {
     await this.authenticateHost(hostId, machineToken);

@@ -236,6 +236,52 @@ describe("Slack request route", () => {
     await delivered(relinked);
   });
 
+  it("after a start, takes only the links that the account service confirms", async () => {
+    // Signal restarted, so it lost the revocations it held. D1 links T1 to this host with the
+    // newer link only.
+    let available = true;
+    const { app, signal, route } = await slackRoute(signingSecret, async (_hostId, teams) => {
+      if (!available) throw new Error("offline");
+      return teams.filter((team) => team.linkedAt === 2_000).map((team) => team.id);
+    });
+    const hello = async (linkedAt: number) => {
+      const socket = testSocket(crypto.randomUUID());
+      signal.connect(socket);
+      await signal.receive(
+        socket,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          slackRoute: await route({ hid: "host-1", teams: ["T1"] }, 3_600, linkedAt),
+        }),
+      );
+      return socket;
+    };
+    const body = '{"type":"event_callback","team_id":"T1","event_id":"Ev3","event":{"type":"app_mention"}}';
+
+    // The ticket of a host that lost the workspace before the restart.
+    expect((await hello(1_000)).messages.at(-1)).toContain('"type":"ready"');
+    expect((await post(app, body)).status).toBe(503);
+
+    // Without an answer from the account service, the socket does not connect, and tries again.
+    available = false;
+    expect((await hello(2_000)).messages.at(-1)).toContain('"code":"authentication_required"');
+    expect((await post(app, body)).status).toBe(503);
+
+    available = true;
+    const current = await hello(2_000);
+    const pending = post(app, body);
+    await vi.waitFor(() => expect(current.messages).toHaveLength(2));
+    const { requestId } = JSON.parse(current.messages[1] ?? "{}");
+    await signal.receive(
+      current,
+      JSON.stringify({ type: "slack-delivery-result", version: 1, requestId, status: 200 }),
+    );
+    expect((await pending).status).toBe(200);
+  });
+
   it("answers 503 when the signing secret is not configured", async () => {
     const { app } = await slackRoute(null);
     expect((await post(app, '{"type":"url_verification","challenge":"abc"}')).status).toBe(503);
@@ -266,7 +312,12 @@ describe("Slack request route", () => {
   }
 });
 
-async function slackRoute(signingSecret: string | null) {
+async function slackRoute(
+  signingSecret: string | null,
+  // What D1 answers while Signal starts: by default, every link is current.
+  validateSlackRoute: RemoteTokenProvider["validateSlackRoute"] = async (_hostId, teams) =>
+    teams.map((team) => team.id),
+) {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const jwk = await exportJWK(publicKey);
   jwk.kid = "slack-route-1";
@@ -284,7 +335,11 @@ async function slackRoute(signingSecret: string | null) {
   });
   const routes = new RemoteTokenService(config);
   const signal = new SignalService(
-    { ...hostTickets(), verifySlackRoute: (token, hostId) => routes.verifySlackRoute(token, hostId) },
+    {
+      ...hostTickets(),
+      verifySlackRoute: (token, hostId) => routes.verifySlackRoute(token, hostId),
+      validateSlackRoute,
+    },
     8,
   );
   const now = Math.floor(Date.now() / 1_000);

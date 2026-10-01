@@ -1,5 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { SLACK_ROUTE_AUDIENCE, SLACK_ROUTE_TEAMS_LIMIT } from "@openbot/contracts/signal-protocol/slack-route";
+import {
+  SLACK_ROUTE_AUDIENCE,
+  SLACK_ROUTE_TEAMS_LIMIT,
+  type SlackRouteTeam,
+} from "@openbot/contracts/signal-protocol/slack-route";
 import {
   createLocalJWKSet,
   createRemoteJWKSet,
@@ -68,6 +72,7 @@ export class RemoteTokenService {
   readonly #turnPort: number;
   readonly #turnTlsPort: number;
   readonly #validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean>;
+  readonly #validateSlackRoute: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
   readonly #trustedResumeTokens = new Map<
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
@@ -79,7 +84,11 @@ export class RemoteTokenService {
       "ticketJwks" | "ticketJwksUrl" | "sessionSecret" | "turnSecret" | "turnHost" | "turnPort" | "turnTlsPort"
     >,
     validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean> = async () => false,
-    options: { fetch?: FetchImplementation } = {},
+    options: {
+      fetch?: FetchImplementation;
+      // Asks the account service which links of a route are current. Without it, none is.
+      validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
+    } = {},
   ) {
     if (config.ticketJwks) {
       this.#remoteTicketKey = null;
@@ -98,6 +107,7 @@ export class RemoteTokenService {
     this.#turnPort = config.turnPort;
     this.#turnTlsPort = config.turnTlsPort;
     this.#validateResumeClaims = validateResumeClaims;
+    this.#validateSlackRoute = options.validateSlackRoute ?? (async () => []);
   }
 
   async initialize(): Promise<void> {
@@ -131,6 +141,10 @@ export class RemoteTokenService {
     const claims = slackRouteClaimsSchema.parse(payload);
     if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
     return { teams: claims.teams };
+  }
+
+  validateSlackRoute(hostId: string, teams: SlackRouteTeam[]): Promise<string[]> {
+    return this.#validateSlackRoute(hostId, teams);
   }
 
   validateClaims(claims: RemoteTicketClaims): Promise<boolean> {

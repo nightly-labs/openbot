@@ -94,6 +94,7 @@ import { Route as V2RemoteInvitesAcceptRouteImport } from './routes/v2/remote/in
 import { Route as V2RemoteInvitesPreviewRouteImport } from './routes/v2/remote/invites/preview'
 import { Route as V2RemoteResumeValidateRouteImport } from './routes/v2/remote/resume/validate'
 import { Route as V2RemoteSessionsIndexRouteImport } from './routes/v2/remote/sessions/index'
+import { Route as V2RemoteSlackRouteValidateRouteImport } from './routes/v2/remote/slack-route/validate'
 import { Route as V1MarketplaceAgentsAgentIdAvatarRouteImport } from './routes/v1/marketplace/agents/$agentId/avatar'
 import { Route as V1MarketplaceAgentsAgentIdInstallRouteImport } from './routes/v1/marketplace/agents/$agentId/install'
 import { Route as V1MarketplaceAgentsAdminSubmissionsRouteImport } from './routes/v1/marketplace/agents/admin/submissions'
@@ -556,6 +557,12 @@ const V2RemoteSessionsIndexRoute = V2RemoteSessionsIndexRouteImport.update({
   path: '/v2/remote/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2RemoteSlackRouteValidateRoute =
+  V2RemoteSlackRouteValidateRouteImport.update({
+    id: '/v2/remote/slack-route/validate',
+    path: '/v2/remote/slack-route/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MarketplaceAgentsAgentIdAvatarRoute =
   V1MarketplaceAgentsAgentIdAvatarRouteImport.update({
     id: '/avatar',
@@ -792,6 +799,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
+  '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing/': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
@@ -905,6 +913,7 @@ export interface FileRoutesByTo {
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
+  '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v1/marketplace/agents': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers': typeof V2HostingServersIndexRoute
@@ -1019,6 +1028,7 @@ export interface FileRoutesById {
   '/v2/remote/invites/accept': typeof V2RemoteInvitesAcceptRoute
   '/v2/remote/invites/preview': typeof V2RemoteInvitesPreviewRoute
   '/v2/remote/resume/validate': typeof V2RemoteResumeValidateRoute
+  '/v2/remote/slack-route/validate': typeof V2RemoteSlackRouteValidateRoute
   '/v1/marketplace/agents/': typeof V1MarketplaceAgentsIndexRoute
   '/v1/me/billing/': typeof V1MeBillingIndexRoute
   '/v2/hosting/servers/': typeof V2HostingServersIndexRoute
@@ -1134,6 +1144,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/accept'
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
+    | '/v2/remote/slack-route/validate'
     | '/v1/marketplace/agents/'
     | '/v1/me/billing/'
     | '/v2/hosting/servers/'
@@ -1247,6 +1258,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/accept'
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
+    | '/v2/remote/slack-route/validate'
     | '/v1/marketplace/agents'
     | '/v1/me/billing'
     | '/v2/hosting/servers'
@@ -1360,6 +1372,7 @@ export interface FileRouteTypes {
     | '/v2/remote/invites/accept'
     | '/v2/remote/invites/preview'
     | '/v2/remote/resume/validate'
+    | '/v2/remote/slack-route/validate'
     | '/v1/marketplace/agents/'
     | '/v1/me/billing/'
     | '/v2/hosting/servers/'
@@ -1465,6 +1478,7 @@ export interface RootRouteChildren {
   V2RemoteInvitesAcceptRoute: typeof V2RemoteInvitesAcceptRoute
   V2RemoteInvitesPreviewRoute: typeof V2RemoteInvitesPreviewRoute
   V2RemoteResumeValidateRoute: typeof V2RemoteResumeValidateRoute
+  V2RemoteSlackRouteValidateRoute: typeof V2RemoteSlackRouteValidateRoute
   V1MarketplaceAgentsIndexRoute: typeof V1MarketplaceAgentsIndexRoute
   V2HostingServersIndexRoute: typeof V2HostingServersIndexRoute
   V2RemoteHostsIndexRoute: typeof V2RemoteHostsIndexRoute
@@ -2088,6 +2102,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteSessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/slack-route/validate': {
+      id: '/v2/remote/slack-route/validate'
+      path: '/v2/remote/slack-route/validate'
+      fullPath: '/v2/remote/slack-route/validate'
+      preLoaderRoute: typeof V2RemoteSlackRouteValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/marketplace/agents/$agentId/avatar': {
       id: '/v1/marketplace/agents/$agentId/avatar'
       path: '/avatar'
@@ -2472,6 +2493,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2RemoteInvitesAcceptRoute: V2RemoteInvitesAcceptRoute,
   V2RemoteInvitesPreviewRoute: V2RemoteInvitesPreviewRoute,
   V2RemoteResumeValidateRoute: V2RemoteResumeValidateRoute,
+  V2RemoteSlackRouteValidateRoute: V2RemoteSlackRouteValidateRoute,
   V1MarketplaceAgentsIndexRoute: V1MarketplaceAgentsIndexRoute,
   V2HostingServersIndexRoute: V2HostingServersIndexRoute,
   V2RemoteHostsIndexRoute: V2RemoteHostsIndexRoute,
