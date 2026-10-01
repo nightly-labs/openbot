@@ -18,15 +18,18 @@ import {
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { readHostAnalytics } from "@openbot/team-client";
 import {
   cancelHostUpdate,
   checkHostForUpdate,
   clearStorage,
+  deleteHostedSite,
   deleteStoredFile,
   getAgentAdminSettings,
   getHostUpdateStatus,
   getStorageUsage,
+  listHostedSites,
   setHostUpdateSettings,
   startHostUpdate,
   updateAgentAdminSettings,
@@ -75,6 +78,7 @@ import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
 import { ChannelsControllerProvider } from "../channels/channels-context";
 import { createChannelsController } from "../channels/channels-controller";
+import { globalSearchChannels } from "../channels/global-search-channels";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
@@ -84,7 +88,7 @@ import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props"
 import { ServerOnboarding } from "../onboarding/ServerOnboarding";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { watchHostUpdate } from "../servers/host-update-toast";
-import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import { remoteAdminServer } from "../servers/server-capabilities";
 import { isReaderAuthor } from "../team/reader-identity";
@@ -96,6 +100,7 @@ import { WebHostOffline } from "./WebHostOffline";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebAccountCalls } from "./web-account";
 import { createWebAgentImportCalls } from "./web-agent-import";
+import { openWebLink } from "./web-attachments";
 import { createWebBillingCalls } from "./web-billing";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
@@ -531,13 +536,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     window.addEventListener("keydown", toggleSearch);
     return () => window.removeEventListener("keydown", toggleSearch);
   });
-  async function searchAllMessages(query: string) {
-    if (workspace.state.status !== "online") return [];
-    const page = await workspace.runtime.search(undefined, query);
-    return page.results.map((result) => ({
-      agentId: result.agentId,
-      message: toAgentMessage(result.message, result.agentId),
-    }));
+  async function searchAllMessages(query: string, cursor?: string) {
+    if (workspace.state.status !== "online") return { results: [], nextCursor: null };
+    const page = await workspace.runtime.search(undefined, query, cursor);
+    return {
+      results: page.results.map((result) => ({
+        agentId: result.agentId,
+        message: toAgentMessage(result.message, result.agentId),
+      })),
+      total: page.total,
+      nextCursor: page.nextCursor,
+    };
   }
   /** Opens an agent at one message, for a global search result and a stored file's message. */
   async function openMessage(agentId: string, messageId: string) {
@@ -647,6 +656,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         saveFile(await workspace.runtime.download(input.fileId));
       },
     },
+  };
+  const hostedSiteCalls: ServerHostedSitesOptions["api"] = {
+    list: async (serverId) => listHostedSites(hostRequest(serverId)),
+    delete: async ({ siteId }, serverId) => deleteHostedSite(hostRequest(serverId), siteId),
   };
   const agentImportCalls = createWebAgentImportCalls({
     request: hostRequest,
@@ -1243,6 +1256,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   setAddServer(null);
                   setJoinOpen(true);
                 }}
+                onManageServers={() => setBillingOpen(true)}
               />
               <JoinServerOverlay
                 open={joinOpen()}
@@ -1347,6 +1361,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         void openMessage(agentId, messageId);
                       },
                     }}
+                    // Every member lists; the host deletes only for an owner or admin.
+                    hostedSites={
+                      workspace.state.capabilities.includes(HOSTED_SITES_CAPABILITY)
+                        ? { api: hostedSiteCalls, onOpenSite: (url) => void openWebLink(url) }
+                        : undefined
+                    }
                     providers={providerSettings()}
                     hostUpdate={{ calls: hostUpdateCalls }}
                     // Any member imports into a host with `agent-import-v1`.
@@ -1376,11 +1396,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               <GlobalSearchOverlay
                 open={searchOpen()}
                 agents={workspace.profiles()}
+                channels={channels.supported() ? globalSearchChannels(channels.state.channels) : undefined}
                 onSearchMessages={searchAllMessages}
                 onOpenChange={setSearchOpen}
                 onSelectAgent={(id) => {
                   setMobilePane("conversation");
                   void select(id);
+                }}
+                onSelectChannel={(id) => {
+                  setMobilePane("conversation");
+                  void channels.open(id);
                 }}
                 onSelectMessage={(agentId, messageId) => void openMessage(agentId, messageId)}
               />

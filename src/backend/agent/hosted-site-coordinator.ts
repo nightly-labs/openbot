@@ -8,6 +8,7 @@ import type {
   HostedSiteConversationEventAction,
   HostedSiteConversationEventDetails,
   HostedSiteConversationEventStatus,
+  HostedSiteList,
   HostedSiteSummary,
   PublishHostedSiteInput,
 } from "@openbot/contracts/ipc";
@@ -30,7 +31,7 @@ import { type OpenBotToolResponse, openBotToolResult, siteToolString } from "./r
 
 /** The openbot.site host, injected so the backend never depends on the account Worker directly. */
 export interface AgentHostedSites {
-  list(): Promise<HostedSiteSummary[]>;
+  list(): Promise<HostedSiteList>;
   publish(input: PublishHostedSiteInput, allowedRoots: readonly string[]): Promise<HostedSiteSummary>;
   replace(
     input: PublishHostedSiteInput & { siteId: string },
@@ -113,7 +114,7 @@ export class HostedSiteCoordinator {
     this.#reconcileEventsAfterRestart();
   }
 
-  listSites(): Promise<HostedSiteSummary[]> {
+  listSites(): Promise<HostedSiteList> {
     return this.#requireHostedSites().list();
   }
 
@@ -269,7 +270,7 @@ export class HostedSiteCoordinator {
   }
 
   async #ownedSite(siteId: string): Promise<HostedSiteSummary> {
-    const sites = await this.#requireHostedSites().list();
+    const { sites } = await this.#requireHostedSites().list();
     for (const site of sites) if (site.id === siteId) return site;
     throw new Error("The hosted site was not found.");
   }

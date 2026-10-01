@@ -13,6 +13,15 @@ export interface HostedSiteSummary {
   size: number;
   expiresAt: string | null;
   updatedAt: string;
+  /** The server that published the site, or null when no server was proven. */
+  serverId: string | null;
+}
+
+/** The sites of one server, and how many of its plan's site slots are in use. */
+export interface HostedSiteList {
+  sites: HostedSiteSummary[];
+  limit: number;
+  used: number;
 }
 
 export interface PublishHostedSiteInput {

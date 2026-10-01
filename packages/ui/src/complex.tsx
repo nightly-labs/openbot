@@ -334,6 +334,7 @@ interface ComboboxApi {
   Item: typeof ComboboxPrimitive.Item;
   ItemLabel: typeof ComboboxPrimitive.ItemLabel;
   ItemIndicator: typeof ComboboxPrimitive.ItemIndicator;
+  Section: typeof ComboboxPrimitive.Section;
 }
 
 export const Combobox: ComboboxApi = {
@@ -351,6 +352,7 @@ export const Combobox: ComboboxApi = {
   Item: (props) => <ComboboxPrimitive.Item {...props} />,
   ItemLabel: (props) => <ComboboxPrimitive.ItemLabel {...props} />,
   ItemIndicator: (props) => <ComboboxPrimitive.ItemIndicator {...props} />,
+  Section: (props) => <ComboboxPrimitive.Section {...props} />,
 };
 
 interface ListboxApi {

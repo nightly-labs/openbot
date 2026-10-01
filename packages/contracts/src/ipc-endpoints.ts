@@ -16,6 +16,7 @@
 
 import type { ManagedProviderId } from "./agent-providers";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
+import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState } from "./billing";
 import type {
   CreateHostedServerInput,
@@ -134,6 +135,7 @@ import type {
 } from "./ipc-channel-routines";
 import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
+  ConversationFileSearchPage,
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -141,6 +143,7 @@ import type {
   MarkConversationReadInput,
   ReadConversationPageInput,
   RespondToPromptInput,
+  SearchConversationFilesInput,
   SearchConversationMessagesInput,
   SendMessageInput,
   SetMessageReactionInput,
@@ -173,6 +176,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
   DeleteHostedSiteInput,
+  HostedSiteList,
   HostedSiteSummary,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
@@ -403,6 +407,13 @@ export const IPC_ENDPOINTS = {
     // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
     // language until it was next recreated.
     appLanguagePreference: event<AppLanguagePreference>()("app:language-preference"),
+    getAppLogoColorPreference: request<undefined, AppLogoColorPreference>()("app:get-logo-color-preference"),
+    setAppLogoColorPreference: request<SetAppLogoColorPreferenceInput, AppLogoColorPreference>()(
+      "app:set-logo-color-preference",
+    ),
+    // Every window draws the logo, and the Dynamic Island has no Settings of its own, so the choice
+    // is broadcast in the same way as the language.
+    appLogoColorPreference: event<AppLogoColorPreference>()("app:logo-color-preference"),
     // The native Preferences menu item and its shortcut live in main, while the dialog lives in
     // the renderer, so the menu click is broadcast rather than handled: every window opens its
     // own Settings.
@@ -594,11 +605,12 @@ export const IPC_ENDPOINTS = {
     changed: event<GitHubConnectorStatus>()("github-connector:changed"),
   },
   hostedSites: {
-    list: request<undefined, HostedSiteSummary[]>()("hosted-sites:list"),
+    // The sites of one server. A joined server answers through `hosted-sites-v1`.
+    list: scopedQuery<HostedSiteList, "required">()("hosted-sites:list"),
     chooseDirectory: request<undefined, string | null>()("hosted-sites:choose-directory"),
     publish: request<PublishHostedSiteInput, HostedSiteSummary>()("hosted-sites:publish"),
     replace: request<ReplaceHostedSiteInput, HostedSiteSummary>()("hosted-sites:replace"),
-    delete: request<DeleteHostedSiteInput, void>()("hosted-sites:delete"),
+    delete: scopedRequest<DeleteHostedSiteInput, void, "required">()("hosted-sites:delete"),
   },
   // The account's Stripe subscription. The main process gets the Checkout or Portal URL from the
   // account server and opens it in the browser, so the renderer never sends a URL.
@@ -699,6 +711,10 @@ export const IPC_ENDPOINTS = {
     readConversationPage: scopedRequest<ReadConversationPageInput, ConversationPage>()("agent:read-conversation-page"),
     searchConversationMessages: scopedRequest<SearchConversationMessagesInput, ConversationSearchPage>()(
       "agent:search-conversation-messages",
+    ),
+    // Local only: a joined server has no file search route, so the renderer asks only this computer.
+    searchConversationFiles: request<SearchConversationFilesInput, ConversationFileSearchPage>()(
+      "agent:search-conversation-files",
     ),
     listConversationReads: scopedQuery<Record<string, ConversationReadState>>()("agent:list-conversation-reads"),
     markConversationRead: scopedRequest<MarkConversationReadInput, ConversationReadState>()(

@@ -19,6 +19,7 @@ import type {
   ChannelMemory,
   ChannelRoutine,
   ChannelRoutineRun,
+  ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
   ConversationPage,
@@ -1600,6 +1601,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   searchConversationMessages(query: string, agentId?: string, cursor?: string, limit?: number): ConversationSearchPage {
     return this.#reader.search(query, agentId, cursor, limit);
+  }
+
+  searchConversationFiles(query: string, cursor?: string, limit?: number): ConversationFileSearchPage {
+    return this.#reader.searchFiles(query, cursor, limit);
   }
 
   listConversationReads(

@@ -34,6 +34,11 @@
   padding: var(--openbot-space-6);
 }
 
+/* Over the plans, so it is as wide as the plans. */
+.add-server-limit.ui-alert {
+  align-self: stretch;
+}
+
 /* The billing switch is in the centre. The same inline padding on the two sides keeps it clear of
  * the close button of the shell. */
 .add-server-bar {
@@ -770,6 +775,17 @@
   .add-server-custom {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /* The button goes under the text, so that the text keeps the width. */
+  .add-server-limit.ui-alert {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .add-server-limit .ui-alert-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
 

@@ -144,6 +144,9 @@
   --openbot-chart-storage-app: var(--openbot-text-dim);
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
+  /* The eyes of the release logo. The logo color setting changes it with `--openbot-logo-production`;
+     a dev or preview logo keeps `--openbot-logo-eye`. */
+  --openbot-logo-production-eye: var(--openbot-logo-eye);
   /* The build colors of the logo match the app icons in `build/icon-*.png`, so the Dock, the app
      and the Dynamic Island show one color for each build. They are brand colors, not status
      colors: a change to warning or success does not change them. */

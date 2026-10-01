@@ -18,6 +18,7 @@ import type {
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SetAppLanguagePreferenceInput,
+  SetAppLogoColorPreferenceInput,
   SetApprovalAutomationInput,
   SetDynamicIslandInteractiveInput,
   SetEnabledSkillInput,
@@ -31,6 +32,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
+  isAppLogoColor,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
@@ -78,6 +80,11 @@ export function parseApprovalAutomation(input: unknown): SetApprovalAutomationIn
 export function parseAppLanguagePreference(input: unknown): SetAppLanguagePreferenceInput {
   if (!isDynamicRecord(input) || !isAppLanguage(input.language)) throw new Error("Language preference is required.");
   return { language: input.language };
+}
+
+export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPreferenceInput {
+  if (!isDynamicRecord(input) || !isAppLogoColor(input.color)) throw new Error("Logo color is required.");
+  return { color: input.color };
 }
 
 export function parseUpdatePreference(input: unknown): UpdatePreferenceChange {

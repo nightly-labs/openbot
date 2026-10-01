@@ -175,6 +175,48 @@ describe("hosted site upload recovery", () => {
   });
 });
 
+describe("hosted sites of a joined server", () => {
+  it("never shows or deletes the owner's unlinked sites for a member", async () => {
+    const requests: string[] = [];
+    const auth = authClient(async (path, init) => {
+      requests.push(`${init.method} ${path} ${new Headers(init.headers).get("OpenBot-Host-Id") ?? "no-server"}`);
+      if (init.method === "GET") return { sites: [{ ...hostedSite(), serverId: "host-1" }], limit: 3, used: 1 };
+      return { deleted: true };
+    });
+    const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
+
+    await expect(service.listServerSites()).resolves.toMatchObject({ sites: [{ id: "site-1" }], used: 1 });
+    // A Worker before server scopes lists no unfinished upload, so a site that the list does not show is refused.
+    await expect(service.deleteServerSite("site-unlinked")).rejects.toThrow("Site not found");
+    await service.deleteServerSite("site-1");
+    expect(requests).toEqual([
+      "GET /v1/sites/ host-1",
+      "GET /v1/sites/ host-1",
+      "GET /v1/sites/ host-1",
+      "DELETE /v1/sites/site-1 host-1",
+    ]);
+
+    const unregistered = new HostedSiteDesktopService(auth);
+    await expect(unregistered.listServerSites()).rejects.toThrow("not registered");
+    await expect(unregistered.deleteServerSite("site-1")).rejects.toThrow("not registered");
+    expect(requests).toHaveLength(4);
+  });
+
+  it("refuses a Worker that ignores the server credential and returns every site of the owner", async () => {
+    const deletes: string[] = [];
+    const auth = authClient(async (path, init) => {
+      if (init.method === "DELETE") deletes.push(path);
+      // A Worker before server scopes: the owner's unlinked site, with no server.
+      return { sites: [hostedSite()], limit: 10 };
+    });
+    const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
+
+    await expect(service.listServerSites()).rejects.toThrow("not supported");
+    await expect(service.deleteServerSite("site-1")).rejects.toThrow("not supported");
+    expect(deletes).toEqual([]);
+  });
+});
+
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "openbot-site-test-"));
   roots.push(root);

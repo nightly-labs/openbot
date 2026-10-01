@@ -63,6 +63,7 @@ import {
   parseQueueEdit,
   parseReadConversationPage,
   parseReorderQueue,
+  parseSearchConversationFiles,
   parseSearchConversationMessages,
   parseSendMessage,
   parseSetAgentAvatar,
@@ -71,7 +72,7 @@ import {
   parseUpdateAgent,
   parseUpdateQueuedMessage,
 } from "./agent-inputs";
-import type { IpcGroupHandlers } from "./define-ipc-group";
+import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 export interface AgentIpcDependencies {
@@ -262,6 +263,9 @@ export function agentIpcHandlers({
             serverId,
           ),
       }),
+      searchConversationFiles: payloadHandler(parseSearchConversationFiles, (parsed) =>
+        host.searchAgentConversationFiles(parsed.query, parsed.cursor, parsed.limit),
+      ),
       listConversationReads: scopedQueryHandler({
         local: () => host.listAgentConversationReads(),
         remote: (serverId) => remoteServers.listAgentConversationReads(serverId),

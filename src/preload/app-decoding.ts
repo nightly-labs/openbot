@@ -14,12 +14,13 @@ import {
   parseHostedServerList,
   parseHostedServerSummary,
 } from "@openbot/contracts/hosted-servers";
-import { parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
+import { parseHostedSiteList, parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
   type AnalyticsPreference,
   type AppInfo,
   type AppLanguagePreference,
+  type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
   type CentralAuthIssue,
@@ -37,10 +38,12 @@ import {
   type ExportResult,
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
+  type HostedSiteList,
   type HostedSiteSummary,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
+  isAppLogoColor,
   isApprovalAutomationPreference,
   isCustomAgentCheckResult,
   isCustomAgentResult,
@@ -111,6 +114,12 @@ export function decodeAppLanguagePreference(value: unknown): AppLanguagePreferen
   const preference = decodeRecord(value, "language preference");
   if (!isAppLanguage(preference.language)) throw new Error("Invalid language.");
   return { language: preference.language };
+}
+
+export function decodeAppLogoColorPreference(value: unknown): AppLogoColorPreference {
+  const preference = decodeRecord(value, "logo color preference");
+  if (!isAppLogoColor(preference.color)) throw new Error("Invalid logo color.");
+  return { color: preference.color };
 }
 
 export function decodeCentralAuthState(value: unknown): CentralAuthState {
@@ -286,9 +295,10 @@ export function decodeHostedSite(value: unknown): HostedSiteSummary {
   return site;
 }
 
-export function decodeHostedSites(value: unknown): HostedSiteSummary[] {
-  if (!Array.isArray(value)) throw new Error("Invalid hosted site list response.");
-  return value.map(decodeHostedSite);
+export function decodeHostedSiteList(value: unknown): HostedSiteList {
+  const list = parseHostedSiteList(value);
+  if (!list) throw new Error("Invalid hosted site list response.");
+  return list;
 }
 
 export function decodeGitHubConnectorStatus(value: unknown): GitHubConnectorStatus {

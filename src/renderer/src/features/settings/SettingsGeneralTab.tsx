@@ -1,3 +1,4 @@
+import type { AppVariant } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -19,8 +20,10 @@ import {
 } from "@openbot/ui";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
+import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { createSignal, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { useLogoColorChoice } from "../../logo-color";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
 
@@ -35,6 +38,8 @@ const LINK_TARGET_KEYS = {
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
+  /** A dev or preview build keeps its own logo color, so the logo color row says so. */
+  variant: AppVariant;
   /** The dialog element the Select popovers portal into, captured when the tab was created. */
   selectMount: HTMLElement | undefined;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
@@ -58,8 +63,26 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
+  const logoColor = useLogoColorChoice();
   return (
     <>
+      <SettingsSection title={i18n.t("settings.appearance.title")}>
+        <ItemGroup class="settings-modal-card">
+          <Item class="settings-modal-row settings-logo-color-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
+              <ItemDescription class="settings-logo-color-description">
+                {i18n.t("settings.logoColor.description")}
+              </ItemDescription>
+              <Show when={props.variant !== "production"}>
+                <ItemDescription>{i18n.t("settings.logoColor.buildNote")}</ItemDescription>
+              </Show>
+            </ItemContent>
+            <LogoColorPicker value={logoColor.color()} onChange={logoColor.changeColor} />
+          </Item>
+        </ItemGroup>
+      </SettingsSection>
+
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField

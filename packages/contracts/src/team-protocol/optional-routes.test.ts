@@ -7,6 +7,7 @@ import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
+import { HOSTED_SITES_ROUTES } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "./live-activity-push-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
@@ -428,5 +429,41 @@ describe("live-activity-push-v1", () => {
     expect(() => request({ ...registration, secret: "short" })).toThrow();
     expect(() => request({ ...registration, photos: [{ agentId: "chief", file: "../secret.png" }] })).toThrow();
     expect(() => request({ ...registration, environment: "staging" })).toThrow();
+  });
+});
+
+describe("hosted-sites-v1", () => {
+  const site = {
+    id: "site-1",
+    hostname: "budget-planner.openbot.site",
+    url: "https://budget-planner.openbot.site/",
+    title: "Budget planner",
+    description: "A planner.",
+    framework: "vanilla",
+    status: "active",
+    fileCount: 1,
+    size: 20,
+    expiresAt: "2026-10-30T12:00:00.000Z",
+    updatedAt: "2026-09-30T12:00:00.000Z",
+    serverId: null,
+  };
+
+  it("sends site summaries with the limit, and only a site id towards the host", () => {
+    expect(codec(HOSTED_SITES_ROUTES.list).request({ scope: "account" })).toEqual({});
+    expect(
+      codec(HOSTED_SITES_ROUTES.list).response(200, { sites: [{ ...site, token: "x" }], limit: 3, used: 1, extra: 1 }),
+    ).toEqual({ sites: [site], limit: 3, used: 1 });
+    expect(codec(HOSTED_SITES_ROUTES.remove).request({ siteId: "site-1", serverId: "server-1" })).toEqual({
+      siteId: "site-1",
+    });
+    expect(codec(HOSTED_SITES_ROUTES.remove).response(200, { deleted: true })).toEqual({});
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(() => codec(HOSTED_SITES_ROUTES.remove).request({})).toThrow();
+    expect(() => codec(HOSTED_SITES_ROUTES.list).response(200, { sites: [site], limit: 3 })).toThrow();
+    expect(() =>
+      codec(HOSTED_SITES_ROUTES.list).response(200, { sites: [{ ...site, status: "uploading" }], limit: 3, used: 1 }),
+    ).toThrow();
   });
 });

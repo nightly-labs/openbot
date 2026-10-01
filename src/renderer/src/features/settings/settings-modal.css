@@ -969,3 +969,8 @@
 .settings-panel .settings-identity-name-control {
   width: 100%;
 }
+
+/* The logo color description breaks after its first clause, as the catalog text says. */
+.settings-modal .ui-item-description.settings-logo-color-description {
+  white-space: pre-line;
+}

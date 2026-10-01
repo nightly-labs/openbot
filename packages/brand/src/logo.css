@@ -1,5 +1,6 @@
 .app-logo {
   --app-logo-background: var(--openbot-logo-production);
+  --app-logo-eye: var(--openbot-logo-production-eye);
   position: relative;
   display: inline-block;
   overflow: hidden;
@@ -17,10 +18,12 @@
 
 .app-logo[data-variant="dev"] {
   --app-logo-background: var(--openbot-logo-dev);
+  --app-logo-eye: var(--openbot-logo-eye);
 }
 
 .app-logo[data-variant="preview"] {
   --app-logo-background: var(--openbot-logo-preview);
+  --app-logo-eye: var(--openbot-logo-eye);
 }
 
 .app-logo-background {
@@ -29,7 +32,7 @@
 
 .app-logo-eye {
   fill: none;
-  stroke: var(--openbot-logo-eye);
+  stroke: var(--app-logo-eye);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 9.5px;

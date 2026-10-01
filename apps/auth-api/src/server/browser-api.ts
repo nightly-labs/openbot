@@ -6,7 +6,7 @@ import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountA
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
 import { sha256 } from "./crypto";
 import type { HostedServerService } from "./hosted-server-service";
-import { HOSTED_SITE_LIMITS, HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
+import { HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
 import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
@@ -348,11 +348,11 @@ async function handleHostedSites(
 ): Promise<Response | null> {
   try {
     if (path === "v1/sites" && request.method === "GET")
-      return json({ sites: await services.hostedSites().list(user.id), limit: HOSTED_SITE_LIMITS.activeSites });
+      return json(await services.hostedSites().list({ kind: "account", userId: user.id }));
     const [, encodedSiteId] = /^v1\/sites\/([^/]+)$/u.exec(path) ?? [];
     if (encodedSiteId === undefined || request.method !== "DELETE") return null;
     const key = requireIdempotencyKey(request);
-    await services.hostedSites().delete(user.id, decodeURIComponent(encodedSiteId), key);
+    await services.hostedSites().delete({ kind: "account", userId: user.id }, decodeURIComponent(encodedSiteId), key);
     return json({ deleted: true });
   } catch (error) {
     if (error instanceof HostedSiteInputError) return failure(error.status, error.code, error.message);

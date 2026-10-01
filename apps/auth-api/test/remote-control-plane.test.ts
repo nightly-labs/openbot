@@ -17,7 +17,7 @@ import { sqliteD1 } from "./sqlite-d1";
 
 /** The account server reads the plan of a host for its member limit, and its Slack workspaces. */
 function applyPlanMigrations(database: DatabaseSync): void {
-  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql", "0024_slack_workspace_routes.sql"]) {
+  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql", "0025_slack_workspace_routes.sql"]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
 }

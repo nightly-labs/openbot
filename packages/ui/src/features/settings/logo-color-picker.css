@@ -1,0 +1,47 @@
+/* The logo color swatches, in the same shape as the agent avatar color grid. */
+.logo-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+
+.logo-color-choice {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  transition-property: scale, background-color, box-shadow;
+  transition-duration: var(--openbot-duration-normal), var(--openbot-duration-hover), var(--openbot-duration-hover);
+  transition-timing-function: ease-out;
+}
+
+.logo-color-choice:hover {
+  background: var(--openbot-hover);
+}
+
+.logo-color-choice:active {
+  scale: 0.96;
+}
+
+.logo-color-choice-selected {
+  background: var(--openbot-border);
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-text-muted),
+    0 1px 3px var(--openbot-shadow-popover-ambient);
+}
+
+.logo-color-swatch {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
+}

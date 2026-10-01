@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from "./ipc-attachments";
 import { isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage, type MessageReaction } from "./ipc-conversation-messages";
 import { isDynamicRecord, isNumber } from "./runtime-values";
@@ -95,6 +96,26 @@ export interface ConversationSearchResult {
 export interface ConversationSearchPage {
   results: ConversationSearchResult[];
   total: number;
+  nextCursor: string | null;
+}
+
+/** A file name search across the local agent chats. An empty query lists the newest files. */
+export interface SearchConversationFilesInput {
+  query: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/** One file that a message in an agent chat carries. */
+export interface ConversationFileSearchResult {
+  agentId: string;
+  messageId: string;
+  createdAt: string;
+  attachment: AttachmentSummary;
+}
+
+export interface ConversationFileSearchPage {
+  results: ConversationFileSearchResult[];
   nextCursor: string | null;
 }
 

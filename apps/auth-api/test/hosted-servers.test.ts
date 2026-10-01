@@ -225,7 +225,7 @@ async function createRunningServer(context: Context) {
 describe("hosted servers", () => {
   it("makes a sandbox only after Stripe confirms the payment, once, with a single-use claim", async () => {
     const context = await setup();
-    await expect(context.service.list(stranger)).resolves.toEqual({ available: false, servers: [] });
+    await expect(context.service.list(stranger)).resolves.toEqual({ available: false, servers: [], maxServers: 3 });
     await expect(context.service.create(stranger, STARTER, "create-key-0000001", RETURN)).rejects.toMatchObject({
       status: 403,
       code: "hosting_unavailable",
@@ -408,15 +408,6 @@ describe("hosted servers", () => {
   it("applies a missed payment or plan end on the cron, and removes a server that is not paid in a day", async () => {
     const context = await setup();
     const paid = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
-    const unpaid = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
-    // Paid at the last minute, and each webhook delivery fails.
-    const paidLate = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
-    context.stripe.sessions.set("cs_3", "complete");
-    context.stripe.sessionSubscriptions.set("cs_3", "sub_late");
-    context.stripe.subscriptions.set(
-      "sub_late",
-      subscription("sub_late", "active", paidLate.server.serverId, "cus_1", context.clock.now, "starter"),
-    );
     // The webhook stored the subscription, but the hosting step failed.
     context.database
       .prepare(
@@ -426,6 +417,16 @@ describe("hosted servers", () => {
          ) VALUES ('sub_1', 'owner', 'cus_1', ?, 'starter', 'month', 'eur', 'active', ?, 0, 1)`,
       )
       .run(paid.server.serverId, context.clock.now + 30 * 24 * 60 * MINUTE);
+    // An account has one unpaid server, so the server that is never paid is of another account.
+    const unpaid = await context.service.create(member, STARTER, "create-key-0000002", RETURN);
+    // Paid at the last minute, and each webhook delivery fails.
+    const paidLate = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    context.stripe.sessions.set("cs_3", "complete");
+    context.stripe.sessionSubscriptions.set("cs_3", "sub_late");
+    context.stripe.subscriptions.set(
+      "sub_late",
+      subscription("sub_late", "active", paidLate.server.serverId, "cus_1", context.clock.now, "starter"),
+    );
 
     context.clock.now += 5 * MINUTE;
     await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 1, abandoned: 0, failed: 0 });
@@ -455,10 +456,37 @@ describe("hosted servers", () => {
     });
   });
 
+  it("gives a new plan choice to the unpaid server, and keeps a server paid at the last minute", async () => {
+    const context = await setup();
+    const { server } = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
+    // The user cancelled the page, the client lost its key, and the user chose another plan.
+    const changed = await context.service.create(owner, { ...STARTER, plan: "pro" }, "create-key-0000002", RETURN);
+    expect(changed.server).toMatchObject({ serverId: server.serverId, plan: "pro", size: "large" });
+    expect(changed.checkoutUrl).not.toBeNull();
+    expect(context.stripe.sessions.get("cs_1")).toBe("expired");
+    await expect(context.service.list(owner)).resolves.toMatchObject({ servers: [{ serverId: server.serverId }] });
+
+    // The user paid on the new page, and its webhook did not come yet.
+    context.stripe.sessions.set("cs_2", "complete");
+    context.stripe.sessionSubscriptions.set("cs_2", "sub_late");
+    context.stripe.subscriptions.set(
+      "sub_late",
+      subscription("sub_late", "active", server.serverId, "cus_1", context.clock.now, "pro"),
+    );
+    const paid = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    expect(paid).toMatchObject({ server: { serverId: server.serverId, plan: "pro" }, checkoutUrl: null });
+    // A retry of that request returns the same server.
+    const retried = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    expect(retried).toMatchObject({ server: { serverId: server.serverId }, checkoutUrl: null });
+
+    // The paid server is not reused.
+    const next = await context.service.create(owner, STARTER, "create-key-0000004", RETURN);
+    expect(next.server.serverId).not.toBe(server.serverId);
+  });
+
   it("recovers a setup that stopped before boat answered, and finishes a delete that came during it", async () => {
     const context = await setup();
     const lost = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
-    const deleted = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
     context.database
       .prepare(
         `INSERT INTO billing_subscriptions(
@@ -467,6 +495,7 @@ describe("hosted servers", () => {
          ) VALUES ('sub_1', 'owner', 'cus_1', ?, 'starter', 'month', 'eur', 'active', ?, 0, 1)`,
       )
       .run(lost.server.serverId, context.clock.now + 30 * 24 * 60 * MINUTE);
+    const deleted = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
     // The Worker stopped after the claim and before boat answered.
     context.database.exec("UPDATE hosted_servers SET observed_state = 'creating', checkout_session_id = NULL");
 

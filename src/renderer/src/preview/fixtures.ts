@@ -1736,6 +1736,7 @@ export const STORY_HOSTED_SITES: HostedSiteSummary[] = [
     size: 3_145_728,
     expiresAt: null,
     updatedAt: "2026-08-18T18:30:00.000Z",
+    serverId: "host-preview",
   },
   {
     id: "site-design-review",
@@ -1749,5 +1750,7 @@ export const STORY_HOSTED_SITES: HostedSiteSummary[] = [
     size: 512_000,
     expiresAt: "2026-09-18T18:30:00.000Z",
     updatedAt: "2026-08-14T12:00:00.000Z",
+    // Published before this computer was a registered server.
+    serverId: null,
   },
 ];

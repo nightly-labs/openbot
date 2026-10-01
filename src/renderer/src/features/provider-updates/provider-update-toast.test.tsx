@@ -1,15 +1,14 @@
 import type {
+  AgentStatus,
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
   ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import type { ProviderUpdate } from "@openbot/ui/features/provider-updates/provider-update";
-import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
-import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
-import { SettingsModal } from "../settings/SettingsModal";
+import { HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import { createProviderRuntimeStore } from "./provider-runtime-store";
 import { dismissProviderUpdateToast } from "./provider-update-toast";
 
@@ -18,6 +17,17 @@ const offer: ProviderUpdate = {
   name: "Claude",
   runtime: { phase: "ready", progress: null, message: null, version: "2.1.246" },
   availableVersion: "2.1.250",
+};
+
+/** No provider signed in: the rows come from the runtime statuses alone. */
+const agentStatus: AgentStatus = {
+  phase: "ready",
+  cliVersion: null,
+  auth: { kind: "unknown" },
+  providers: [],
+  capabilities: { chat: "unavailable", browser: "unavailable", computerUse: "unavailable" },
+  message: null,
+  fullAccess: true,
 };
 
 afterEach(() => {
@@ -61,24 +71,15 @@ function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1
       };
     },
   };
-  const onOpenChange = vi.fn();
   let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
   render(() => {
     const runtimes = createProviderRuntimeStore(() => api, owners);
     store = runtimes;
     return (
       <>
-        <SettingsModal
-          open
-          onOpenChange={onOpenChange}
-          value={DEFAULT_GENERAL_SETTINGS}
-          onValueChange={() => {}}
-          appInfo={null}
-          updateStatus={FALLBACK_UPDATE_STATUS}
-          onUpdateAction={async () => {}}
-          account={{ id: "test", name: "Test", email: "test@example.com", avatarUrl: null }}
-          onUpdateAccountName={async () => {}}
-          onUpdateAccountAvatar={async () => {}}
+        <HostProviderSettingsPanel
+          selectMount={undefined}
+          agentStatus={agentStatus}
           providerRuntimeStatuses={runtimes.providerRuntimeStatuses()}
           providerAvailableVersions={runtimes.providerAvailableVersions()}
           onUpdateProvider={runtimes.downloadProviderRuntime}
@@ -90,14 +91,13 @@ function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1
     );
   });
   if (!store) throw new Error("The provider runtime store did not mount.");
-  return { store, api, emit, onOpenChange };
+  return { store, api, emit };
 }
 
 it("announces an offer and follows only current snapshots", async () => {
   const { store, emit } = runtimeHarness();
   await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
   expect(await screen.findByText("Claude update available")).toBeInTheDocument();
-  fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
   // The row's offer is in its actions menu, a Kobalte trigger that wants the pointer press too.
   const moreActions = await screen.findByRole("button", { name: "More actions for Claude" });
   fireEvent.pointerDown(moreActions, { button: 0 });

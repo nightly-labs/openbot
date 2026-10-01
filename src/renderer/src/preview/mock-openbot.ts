@@ -11,6 +11,7 @@ import {
   type AnalyticsPreference,
   type AppInfo,
   type AppLanguagePreference,
+  type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
   type AttachmentImportEvent,
@@ -25,6 +26,7 @@ import {
   composedCustomModelId,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
+  DEFAULT_APP_LOGO_COLOR,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
@@ -211,6 +213,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
+  let logoColorPreference: AppLogoColorPreference = { color: DEFAULT_APP_LOGO_COLOR };
+  const logoColorListeners = new Set<(preference: AppLogoColorPreference) => void>();
   const approvalAutomationListeners = new Set<(preference: ApprovalAutomationPreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
@@ -449,6 +453,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       languageListeners.add(listener);
       return () => languageListeners.delete(listener);
     },
+    getAppLogoColorPreference: async () => clone(logoColorPreference),
+    setAppLogoColorPreference: async ({ color }) => {
+      logoColorPreference = { color };
+      for (const listener of logoColorListeners) listener(clone(logoColorPreference));
+      return clone(logoColorPreference);
+    },
+    onAppLogoColorPreference: (listener) => {
+      logoColorListeners.add(listener);
+      return () => logoColorListeners.delete(listener);
+    },
     onOpenSettings: () => () => undefined,
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
@@ -525,7 +539,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     auth: mockAuth.auth,
     skills: mockSkills.skills,
     hostedSites: {
-      list: async () => clone(hostedSites),
+      // The preview server is on the Starter plan.
+      list: async () => ({
+        sites: clone(hostedSites),
+        limit: 3,
+        used: hostedSites.filter((site) => site.status === "active").length,
+      }),
       chooseDirectory: async () => "/mock/OpenBot/Sites/launch-notes",
       publish: async (input) => {
         const hostname = `${input.title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}.openbot.site`;
@@ -541,6 +560,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           size: 786_432,
           expiresAt: null,
           updatedAt: new Date().toISOString(),
+          serverId: "host-preview",
         };
         hostedSites = [site, ...hostedSites];
         return clone(site);
@@ -1263,6 +1283,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             .map((message) => ({ agentId: agent.id, message: clone(message) })),
         );
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };
+      },
+      searchConversationFiles: async (input) => {
+        const query = input.query.trim().toLocaleLowerCase();
+        const results = agents.flatMap((agent) =>
+          getSnapshot(agent.id).messages.flatMap((message) =>
+            (message.attachments ?? [])
+              .filter((attachment) => attachment.name.toLocaleLowerCase().includes(query))
+              .map((attachment) => ({
+                agentId: agent.id,
+                messageId: message.id,
+                createdAt: message.createdAt,
+                attachment: clone(attachment),
+              })),
+          ),
+        );
+        // Newest first, as the backend returns them.
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const offset = Number(input.cursor ?? 0);
+        const end = offset + (input.limit ?? 50);
+        return { results: results.slice(offset, end), nextCursor: end < results.length ? String(end) : null };
       },
       listConversationReads: async () => ({}),
       markConversationRead: async (input) => ({

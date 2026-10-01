@@ -65,7 +65,7 @@ context.
    console.log(JSON.stringify({ ...(await exportJWK(publicKey)), kid, alg: "ES256", use: "sig" }));'
    ```
 
-   - [ ] Apply D1 migration `0024_slack_workspace_routes.sql` (the CI deploy does this first).
+   - [ ] Apply D1 migration `0025_slack_workspace_routes.sql` (the CI deploy does this first).
    - [ ] Test: `bun run deploy:test`. Production: `bun run deploy`.
 3. **Signal** (`remote/`). Deploy it before any desktop release with Slack: an old Signal refuses the
    new `ingress` hello.

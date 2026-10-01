@@ -187,6 +187,14 @@ bun run api:deploy
 
 The service applies limits per email, per IP, per challenge, and per resend.
 
+## Hosted sites
+
+`/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
+of a registered server. With them, a request sees only that server's sites, and a new site counts
+against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
+goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
+bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+
 ## Authentication data retention
 
 The production Worker runs once each 5 minutes. Each run delivers pending remote

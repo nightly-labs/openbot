@@ -16,6 +16,7 @@ import { createStoredProfile, updateStored } from "../../app-stored-values";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
+import type { AgentSettingsRequest } from "../conversation/conversation-types";
 import { useDirectMessages } from "../conversation/direct-messages-context";
 import { remoteAdminServer } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -97,10 +98,7 @@ const Agents = createSimpleContext({
         serverSetupChoice() === null &&
         remoteAdminServer(activeServer(), "providers-v1") !== undefined,
     );
-    const [settingsRequest, setSettingsRequest] = createSignal<{
-      agentId: string;
-      nonce: number;
-    } | null>(null);
+    const [settingsRequest, setSettingsRequest] = createSignal<AgentSettingsRequest | null>(null);
     const [agentStatus, setAgentStatus] = createSignal<AgentStatus>(FALLBACK_STATUS);
     let openedAgentChatId: string | null = null;
 

@@ -115,8 +115,10 @@ checks it for secrets and publishes it with the account signed in on the host; t
 the share card from the preview. An agent that the host added from a
 listing gets Update when the host serves `agent-update-v1`; the host downloads the current version.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
-the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
-sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The
+the Providers section of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
+sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as the desktop app. On
+desktop the section shows the providers of the active server only, because provider state exists
+only for that server; for another server it offers to switch. The
 browser applies host `status` events, and reads the status every 3 seconds while a code sign-in waits.
 A provider key stays in the dialog input until it is sent to the host.
 
@@ -424,9 +426,9 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-Settings starts the shared renderer runtime store. The store announces each provider that gains an
-offer as one notification, from an effect over both the runtime snapshot and the agent status,
-because the two arrive separately and either one can complete an offer. An explicit update opens
+`ProvidersProvider` starts the shared renderer runtime store for the active server. The store
+announces each provider that gains an offer as one notification, from an effect over both the
+runtime snapshot and the agent status, because the two arrive separately and either one can complete an offer. An explicit update opens
 the same notification; revisioned snapshots move it through progress, failure, retry, and
 completion. Only the crossing into "update available" is announced, so a dismissed notification
 stays dismissed until the offer changes. Closing the notification does not cancel the download,
@@ -1099,6 +1101,26 @@ exists. Every member reads usage; delete and clear need an owner or admin (`requ
 renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
+
+### Hosted sites per server
+
+A hosted site belongs to the server that published it (`hosted_sites.server_id`, D1 `0024`). The user
+stays the accountable owner, for abuse reports, blocks and account deletion. The desktop sends
+`OpenBot-Host-Id` and `OpenBot-Host-Token` (the machine token of `/v2/remote/hosts/register`) on each
+`/v1/sites` request when it is a registered server. The Worker checks the hash and that the host owner
+is the request user; a wrong token is refused with 401, never counted as unlinked. The active-site
+limit comes from the server's plan (`siteLimitForPlan`: none 1, Starter 3, Standard 10, Pro 50). A
+request with no server headers creates only into the account's unlinked bucket (limit 1,
+`server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
+the released meaning of `/v1/sites`. Replace and delete in a server scope refuse a site of another
+bucket with 409 `site_other_server`. A downgrade deletes nothing: a server above its limit cannot
+create a site, but it can replace one, and the extra sites end at their expiry. Removing a server moves its sites to the owner's unlinked bucket, so the owner's desktop can still delete them. A registered server updates a site that it published before registration in the unlinked scope.
+
+`hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
+optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and
+`POST /v1/hosted-sites/delete` for an owner or admin, with the frozen codec in
+`team-protocol/hosted-sites-v1.ts`. The host answers with its own account and credential, and only with the server's own sites: the owner's unlinked sites never reach a member, and the Team API has no fallback to delete one. Sites are
+managed in Server settings > Sites, on the desktop and in the browser.
 
 ### Leaving a server
 

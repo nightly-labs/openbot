@@ -4,6 +4,7 @@ import {
   apiError,
   hostedSiteErrorResponse,
   json,
+  requestHostedSiteScope,
   requestHostedSiteService,
   requestUser,
 } from "../../../server/request-auth";
@@ -15,7 +16,8 @@ export const Route = createFileRoute("/v1/sites/$siteId")({
         try {
           const user = await requestUser(request);
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await requestHostedSiteService().delete(user.id, params.siteId, requireIdempotencyKey(request));
+          const scope = await requestHostedSiteScope(request, user.id);
+          await requestHostedSiteService().delete(scope, params.siteId, requireIdempotencyKey(request));
           return json({ deleted: true });
         } catch (error) {
           return hostedSiteErrorResponse(error);

@@ -45,6 +45,7 @@ import {
 import {
   parseAnalyticsPreference,
   parseAppLanguagePreference,
+  parseAppLogoColorPreference,
   parseApprovalAutomation,
   parseDeleteHostedSite,
   parseDynamicIslandAction,
@@ -89,6 +90,12 @@ describe("app IPC input parsing", () => {
   it("accepts only shipped app languages", () => {
     expect(parseAppLanguagePreference({ language: "fr" })).toEqual({ language: "fr" });
     expect(() => parseAppLanguagePreference({ language: "kl" })).toThrowError("Language preference is required.");
+  });
+
+  it("accepts only shipped logo colors", () => {
+    // The color names an icon file under `build/logo-colors/`, so any other string must not reach it.
+    expect(parseAppLogoColorPreference({ color: "white" })).toEqual({ color: "white" });
+    expect(() => parseAppLogoColorPreference({ color: "../icon-dev" })).toThrowError("Logo color is required.");
   });
 
   it("validates creator photo consent and agent categories without changing legacy submissions", () => {

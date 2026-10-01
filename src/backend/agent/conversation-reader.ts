@@ -1,6 +1,7 @@
 import type {
   AgentEvent,
   AgentSummary,
+  ConversationFileSearchPage,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -83,6 +84,10 @@ export class ConversationReader {
 
   search(query: string, agentId?: string, cursor?: string, limit = 100): ConversationSearchPage {
     return this.#store.database.searchConversationMessages(query, agentId, cursor, limit);
+  }
+
+  searchFiles(query: string, cursor?: string, limit = 50): ConversationFileSearchPage {
+    return this.#store.database.searchConversationFiles(query, cursor, limit);
   }
 
   listReads(memberId: string, options: ConversationMarkerExclusions = {}): Record<string, ConversationReadState> {

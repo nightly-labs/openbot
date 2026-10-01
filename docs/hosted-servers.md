@@ -13,7 +13,13 @@ The Worker enables hosted servers only when it has the boat and Stripe secrets a
 `HOSTED_SERVER_TEMPLATE`, and only for the account IDs or emails in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
 allows each account; with no value, no account can create a server). Production sets `*` in
 `wrangler.jsonc`, so each account can buy a server. See [Production](#production). An account can have 3 servers that are not
-deleted (`MAX_SERVERS_PER_ACCOUNT`); a server that waits for its first payment counts. Each server
+deleted (`MAX_SERVERS_PER_ACCOUNT`). An account has at most one server that waits for its first
+payment: a create with a new Idempotency-Key gives its plan to that server and opens a new page. So a
+cancelled or abandoned Checkout page adds no server, also when the client lost its key (the web client
+leaves the page for Stripe). The old page closes first; when the user paid on it, the create returns
+that server with no page. The server list sends the limit as
+`maxServers`. When the paid servers reach it, the add server dialog disables the plans and opens the
+server list (Settings on desktop, Billing on the web) to delete a server. Each server
 has its own Stripe plan. Its machine comes from the plan
 (`HOSTED_PLAN_SIZE`): Starter is boat `small`, Standard is `default`, and Pro is `large`.
 

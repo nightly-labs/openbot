@@ -1,4 +1,4 @@
-import type { HostedSiteStatus, HostedSiteSummary } from "./ipc-hosted-sites";
+import type { HostedSiteList, HostedSiteStatus, HostedSiteSummary } from "./ipc-hosted-sites";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 /**
@@ -13,8 +13,16 @@ export const HOSTED_SITE_UPLOAD_LIMITS = {
   uploadLifetimeMs: 15 * 60_000,
 } as const;
 
-/** The number of sites that one account can keep active. */
-export const HOSTED_SITE_ACTIVE_LIMIT = 10;
+/**
+ * The number of active sites that one account can keep with no proven server: a desktop that is not a
+ * registered server, or a desktop release from before sites belonged to servers. A server's own limit
+ * comes from its plan (`siteLimitForPlan`).
+ */
+export const HOSTED_SITE_UNLINKED_LIMIT = 1;
+
+/** The request headers that tie a site request to a registered server: its host id and machine token. */
+export const HOSTED_SITE_HOST_ID_HEADER = "OpenBot-Host-Id";
+export const HOSTED_SITE_HOST_TOKEN_HEADER = "OpenBot-Host-Token";
 
 /** The MIME types allowed for each file extension. The desktop sends the first one. */
 export const HOSTED_SITE_MIME_TYPES: Readonly<Record<string, readonly [string, ...string[]]>> = {
@@ -79,7 +87,8 @@ export function parseHostedSiteSummary(value: unknown): HostedSiteSummary | null
     !isNumber(value.fileCount) ||
     !isNumber(value.size) ||
     (value.expiresAt !== null && !isString(value.expiresAt)) ||
-    !isString(value.updatedAt)
+    !isString(value.updatedAt) ||
+    (value.serverId !== undefined && value.serverId !== null && !isString(value.serverId))
   ) {
     return null;
   }
@@ -95,7 +104,22 @@ export function parseHostedSiteSummary(value: unknown): HostedSiteSummary | null
     size: value.size,
     expiresAt: value.expiresAt,
     updatedAt: value.updatedAt,
+    // An account server from before sites belonged to servers does not send the field.
+    serverId: isString(value.serverId) ? value.serverId : null,
   };
+}
+
+/** Returns null for a value that is not a site list. An older account server sends no `used` count. */
+export function parseHostedSiteList(value: unknown): HostedSiteList | null {
+  if (!isDynamicRecord(value) || !Array.isArray(value.sites) || !isNumber(value.limit)) return null;
+  const sites: HostedSiteSummary[] = [];
+  for (const item of value.sites) {
+    const site = parseHostedSiteSummary(item);
+    if (!site) return null;
+    sites.push(site);
+  }
+  const used = isNumber(value.used) ? value.used : sites.length;
+  return { sites, limit: value.limit, used };
 }
 
 export interface HostedSiteRouteFile {

@@ -4,6 +4,7 @@ import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUse
 import { ComputerUsePermissionHelp, permissionFromQuery } from "./features/computer-use/ComputerUsePermissionHelp";
 import { DynamicIslandSurface } from "./features/dynamic-island/DynamicIslandSurface";
 import { I18nProvider } from "./i18n-context";
+import { syncLogoColor } from "./logo-color";
 import "./styles.css";
 
 // The helper windows have an entry of their own, so they do not load `App`. There is one Dynamic
@@ -15,6 +16,7 @@ if (!root) {
 }
 
 installPointerFocusGuard();
+syncLogoColor();
 
 const query = new URLSearchParams(window.location.search);
 const surface = query.get("surface");

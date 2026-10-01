@@ -328,6 +328,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return result;
   }
 
+  /** The machine token of a registered host, so a site request can prove the server. Never log it. */
+  hostSiteCredential(hostId: string): { hostId: string; machineToken: string } | null {
+    const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+    return machineToken ? { hostId, machineToken } : null;
+  }
+
   issueRemoteHostTicket(hostId: string): Promise<RemoteConnectionBootstrap> {
     const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
     if (!machineToken) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));

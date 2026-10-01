@@ -58,6 +58,14 @@ export const messages = defineMessages("server", {
   "server.add.custom.action": "Contact us",
   "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
+  "server.add.limit.title": "This account has the maximum number of servers",
+  "server.add.limit.description": {
+    one: "An account can have {count} paid server. To add a server, delete one first.",
+    other: "An account can have {count} paid servers. To add a server, delete one first.",
+  },
+  // Opens the list of the account's hosted servers, where the user can delete one.
+  "server.add.limit.manage": "Manage servers",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
@@ -153,6 +161,8 @@ export const messages = defineMessages("server", {
   "server.settings.mcpDescription": "Connect MCP servers and choose which ones this server’s agents can use.",
   "server.settings.storageTitle": "Storage",
   "server.settings.storageDescription": "See what OpenBot keeps on this server’s disk, and free space.",
+  "server.settings.hostedSitesTitle": "Sites",
+  "server.settings.hostedSitesDescription": "The static sites that agents on this server published to openbot.site.",
   "server.settings.importTitle": "Import",
   "server.settings.importDescription": "Move your agents from Grok Bot to this server.",
   "server.settings.connectorsTitle": "Connectors",
@@ -291,6 +301,8 @@ export const messages = defineMessages("server", {
   "server.desktop.startHint": "Start Remote Control from the monitor button in the server header.",
   "server.settings.providersTitle": "Providers",
   "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
+  "server.settings.providersSwitchNote": "Switch to {name} to manage its AI providers.",
+  "server.settings.providersSwitch": "Switch to this server",
   // Server Settings > Updates: the OpenBot update of a joined server's host. {name} is the server.
   "server.settings.updatesTitle": "Updates",
   "server.settings.updatesDescription": "Update OpenBot on the computer that runs this server.",

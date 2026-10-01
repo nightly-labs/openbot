@@ -5,6 +5,7 @@ import {
 import type { JSX } from "@solidjs/web";
 import { onCleanup, onSettled } from "solid-js";
 import { App } from "../App";
+import { syncLogoColor } from "../logo-color";
 import { LANDING_PREVIEW_OPTIONS } from "./landing-fixtures";
 import { createMockOpenBot, type MockOpenBotControls, type MockOpenBotOptions } from "./mock-openbot";
 
@@ -47,6 +48,9 @@ export function OpenBotPlayground(props: OpenBotPlaygroundProps) {
     });
     void controllerLoading;
   }
+
+  // The desktop entry point starts this for each window. The preview renders `App` without it.
+  onSettled(() => syncLogoColor());
 
   onSettled(() => {
     if (!landingPreview || window.parent === window) return;

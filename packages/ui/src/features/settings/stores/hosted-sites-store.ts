@@ -6,27 +6,35 @@ export type HostedSiteDeleteResult = "succeeded" | "failed";
 
 interface HostedSitesStoreProps {
   open: boolean;
+  /** The server whose sites the store shows. Another server clears the list and reads again. */
+  serverId: string;
   hostedSitesApi?: Pick<HostedSitesDesktopApi, "list" | "delete"> | undefined;
   /** Called as a deletion starts. It returns the call that records the result, for the account that started it. */
-  trackDelete?: () => (result: HostedSiteDeleteResult) => void;
+  trackDelete?: (() => (result: HostedSiteDeleteResult) => void) | undefined;
 }
 
 interface HostedSitesPanel {
   busy: boolean;
   error: string | null;
   sites: HostedSiteSummary[];
+  /** The active-site limit of the server's plan, or null before the first read. */
+  limit: number | null;
+  /** The active sites that count against `limit`. */
+  used: number;
   /** The site the confirmation dialog asks about. */
   pendingDelete: HostedSiteSummary | null;
   /** A failed deletion, shown in the confirmation dialog so the user can try again or cancel. */
   deleteError: string | null;
 }
 
-/** The Hosted sites tab: the published site list, its reload loop and the delete confirmation. */
+/** The Sites section of one server: the published site list, its reload loop and the delete confirmation. */
 export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isActive: () => boolean) {
   const [hosting, setHosting] = createStore<HostedSitesPanel>({
     busy: false,
     error: null,
     sites: [],
+    limit: null,
+    used: 0,
     pendingDelete: null,
     deleteError: null,
   });
@@ -46,10 +54,18 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
           });
           try {
             const api = props.hostedSitesApi;
+            const serverId = props.serverId;
             if (api) {
-              const sites = await api.list();
+              const list = await api.list(serverId);
+              // The dialog moved to another server during the read: read that server instead.
+              if (serverId !== props.serverId) {
+                reloadRequested = true;
+                continue;
+              }
               setHosting((state) => {
-                state.sites = sites;
+                state.sites = list.sites;
+                state.limit = list.limit;
+                state.used = list.used;
               });
             }
           } catch (error) {
@@ -66,10 +82,23 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
     return loadPromise;
   }
 
+  let shownServerId: string | null = null;
   createEffect(
-    () => props.open && isActive(),
-    (shouldLoad) => {
-      if (shouldLoad) void load();
+    () => (props.open && isActive() ? props.serverId : null),
+    (serverId) => {
+      if (serverId === null) return;
+      if (serverId !== shownServerId) {
+        shownServerId = serverId;
+        setHosting((state) => {
+          state.error = null;
+          state.sites = [];
+          state.limit = null;
+          state.used = 0;
+          state.pendingDelete = null;
+          state.deleteError = null;
+        });
+      }
+      void load();
     },
   );
 
@@ -102,7 +131,7 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
     });
     try {
       try {
-        await props.hostedSitesApi.delete({ siteId });
+        await props.hostedSitesApi.delete({ siteId }, props.serverId);
       } catch (error) {
         track?.("failed");
         setHosting((state) => {

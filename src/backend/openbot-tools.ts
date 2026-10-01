@@ -31,7 +31,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   {
     name: "list_sites",
-    description: "List static sites hosted by the signed-in OpenBot user. Use this before retrying a hosting mutation.",
+    description:
+      "List the static sites of this OpenBot server, with its site limit and the slots in use. Use this before retrying a hosting mutation.",
     shape: {},
   },
   {

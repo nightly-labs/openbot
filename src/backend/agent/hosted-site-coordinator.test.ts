@@ -47,9 +47,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         size: 20,
         expiresAt: "2026-09-30T12:00:00.000Z",
         updatedAt: "2026-09-01T12:00:00.000Z",
+        serverId: null,
       };
       const hostedSites = {
-        list: vi.fn(async () => [site]),
+        list: vi.fn(async () => ({ sites: [site], limit: 1, used: 1 })),
         publish: vi.fn(async () => site),
         replace: vi.fn(async () => site),
         delete: vi.fn(async () => undefined),
@@ -152,9 +153,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       size: 20,
       expiresAt: "2026-09-30T12:00:00.000Z",
       updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => [hostedSite]),
+      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
       publish: vi.fn(async () => hostedSite),
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
@@ -334,9 +336,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       size: 20,
       expiresAt: "2026-09-30T12:00:00.000Z",
       updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => [hostedSite]),
+      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
       publish: vi.fn(async () => hostedSite),
       replace: vi.fn(async () => {
         throw new Error("Upload failed.");
@@ -434,9 +437,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       size: 20,
       expiresAt: "2026-09-30T12:00:00.000Z",
       updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => [hostedSite]),
+      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
       publish: vi.fn(async () => hostedSite),
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
@@ -539,9 +543,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       size: 20,
       expiresAt: "2026-09-30T12:00:00.000Z",
       updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => [hostedSite]),
+      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
       publish: vi.fn(async () => hostedSite),
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
@@ -654,9 +659,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       size: 20,
       expiresAt: "2026-09-30T12:00:00.000Z",
       updatedAt: "2026-08-31T12:00:00.000Z",
+      serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => [hostedSite]),
+      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
       publish: vi.fn(async () => hostedSite),
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),

@@ -108,6 +108,9 @@ export const messages = {
   "server.settings.storageTitle": "Stockage",
   "server.settings.storageDescription":
     "Voyez ce qu’OpenBot conserve sur le disque de ce serveur et libérez de l’espace.",
+  "server.settings.hostedSitesTitle": "Sites",
+  "server.settings.hostedSitesDescription":
+    "Les sites statiques que les agents de ce serveur ont publiés sur openbot.site.",
   "server.settings.importTitle": "Importer",
   "server.settings.importDescription": "Déplacez vos agents de Grok Bot vers ce serveur.",
   "server.settings.nameTooShort": "Saisissez au moins {limit} caractères.",
@@ -250,4 +253,6 @@ export const messages = {
   "server.desktop.startHint": "Démarrez le contrôle à distance depuis le bouton moniteur dans l’en-tête du serveur.",
   "server.settings.providersTitle": "Fournisseurs",
   "server.settings.providersDescription": "Gérez les fournisseurs d’IA de l’ordinateur qui exécute ce serveur.",
+  "server.settings.providersSwitchNote": "Passez à {name} pour gérer ses fournisseurs d’IA.",
+  "server.settings.providersSwitch": "Passer à ce serveur",
 } as const satisfies PartialTranslation<typeof source>;

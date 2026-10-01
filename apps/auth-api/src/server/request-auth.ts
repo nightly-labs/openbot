@@ -11,6 +11,7 @@ import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
+import { type HostedSiteScope, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
 import { type ApnsLiveActivitySender, sharedApnsSender } from "./live-activity-relay";
@@ -62,6 +63,11 @@ export function requestAgentMarketplace(): AgentMarketplace {
 
 export function requestAgentTemplates(): AgentTemplates {
   return new AgentTemplates(requireWorkerBindings(env));
+}
+
+/** The sites that a signed-in `/v1/sites` request can see and change. See `resolveHostedSiteScope`. */
+export function requestHostedSiteScope(request: Request, userId: string): Promise<HostedSiteScope> {
+  return resolveHostedSiteScope(requireWorkerBindings(env).DB, userId, request);
 }
 
 export function requestHostedSiteService(): HostedSiteService {

@@ -136,6 +136,7 @@ interface HostedServerRow {
   billing_interval: BillingInterval;
   currency: BillingCurrency;
   checkout_session_id: string | null;
+  idempotency_key: string;
   desired_state: DesiredState;
   observed_state: HostedServerState;
   observed_error: HostedServerError | null;
@@ -149,7 +150,7 @@ interface HostedServerRow {
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
-  checkout_session_id, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
+  checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, created_at, updated_at`;
 
 /** The billing calls that hosted servers use. */
@@ -252,7 +253,11 @@ export class HostedServerService {
       )
       .bind(user.id)
       .all<HostedServerRow>();
-    return { available: this.isAvailableFor(user), servers: rows.results.map(summary) };
+    return {
+      available: this.isAvailableFor(user),
+      servers: rows.results.map(summary),
+      maxServers: MAX_SERVERS_PER_ACCOUNT,
+    };
   }
 
   /**
@@ -279,6 +284,22 @@ export class HostedServerService {
       .bind(user.id, idempotencyKey)
       .first<HostedServerRow>();
     if (previous) return this.#checkout(previous, user, billing, returnTo);
+    const unpaid = await this.#database
+      .prepare(
+        `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE owner_user_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+           AND NOT EXISTS(
+             SELECT 1 FROM billing_subscriptions s
+             WHERE s.server_id = hosted_servers.server_id AND s.status IN ${OPEN_STATUSES_SQL}
+           )
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .bind(user.id)
+      .first<HostedServerRow>();
+    if (unpaid) {
+      const choice = { plan: input.plan, interval: input.interval, currency: input.currency };
+      return this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo);
+    }
     const count = await this.#database
       .prepare("SELECT COUNT(*) AS count FROM hosted_servers WHERE owner_user_id = ? AND desired_state != 'deleted'")
       .bind(user.id)
@@ -735,13 +756,14 @@ export class HostedServerService {
       target: returnTo.target,
       origin: returnTo.origin,
     });
+    // A new plan choice changes the key of an unpaid server, so a page for the plan before it is not stored.
     const stored = await this.#database
       .prepare(
         `UPDATE hosted_servers SET checkout_session_id = ?, updated_at = ?
-         WHERE server_id = ? AND checkout_session_id IS ?
+         WHERE server_id = ? AND checkout_session_id IS ? AND idempotency_key = ?
            AND ((observed_state = 'awaiting_payment' AND desired_state = 'running') OR desired_state = 'stopped')`,
       )
-      .bind(session.sessionId, this.#now(), row.server_id, previous)
+      .bind(session.sessionId, this.#now(), row.server_id, previous, row.idempotency_key)
       .run();
     if (stored.meta.changes !== 1) {
       // A second request stored its page first. This page closes, so only that one can take a payment.
@@ -749,6 +771,55 @@ export class HostedServerService {
       throw new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
     }
     return { server: summary(await this.#requireRow(row.server_id)), checkoutUrl: session.url };
+  }
+
+  /**
+   * Gives the account's unpaid server the plan of a new create, so an account has at most one server
+   * that waits for its first payment. A cancelled or abandoned Checkout page then adds no server, also
+   * when the client lost its Idempotency-Key. The old page closes first: when the user paid on it, the
+   * server keeps its plan and the create returns it with no page.
+   */
+  async #reuseUnpaid(
+    row: HostedServerRow,
+    choice: { plan: BillingPlanId; interval: BillingInterval; currency: BillingCurrency },
+    idempotencyKey: string,
+    user: AuthUser,
+    billing: HostedServerBilling,
+    returnTo: CheckoutReturn,
+  ): Promise<HostedServerCheckout> {
+    const previous = row.checkout_session_id;
+    if (previous && (await billing.closeCheckout(previous)) === "paid") {
+      // A retry of this request then returns the same server, and does not add a second one.
+      await this.#database
+        .prepare("UPDATE OR IGNORE hosted_servers SET idempotency_key = ? WHERE server_id = ?")
+        .bind(idempotencyKey, row.server_id)
+        .run();
+      return { server: summary(await this.#requireRow(row.server_id)), checkoutUrl: null };
+    }
+    const updated = await this.#database
+      .prepare(
+        `UPDATE hosted_servers SET plan = ?, size = ?, billing_interval = ?, currency = ?, idempotency_key = ?,
+           checkout_session_id = NULL, updated_at = ?
+         WHERE server_id = ? AND checkout_session_id IS ? AND idempotency_key = ?
+           AND observed_state = 'awaiting_payment' AND desired_state = 'running'`,
+      )
+      .bind(
+        choice.plan,
+        HOSTED_PLAN_SIZE[choice.plan],
+        choice.interval,
+        choice.currency,
+        idempotencyKey,
+        this.#now(),
+        row.server_id,
+        previous,
+        row.idempotency_key,
+      )
+      .run();
+    const claimed = await this.#requireRow(row.server_id);
+    // A second request changed the server first, or changed it again before its page was made.
+    if (updated.meta.changes !== 1 || claimed.idempotency_key !== idempotencyKey)
+      throw new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
+    return this.#checkout(claimed, user, billing, returnTo);
   }
 
   /**
