@@ -326,6 +326,14 @@
   box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
+/* The top edge of a built-in display. The notch shoulders curve into it, as on the screen, instead
+   of standing out over the light frame edge. */
+.settings-dynamic-island-preview-bar-bezel {
+  box-shadow:
+    inset 0 2px 0 var(--openbot-bg-notch),
+    inset 0 0 0 1px var(--openbot-border);
+}
+
 .settings-dynamic-island-preview-fit {
   display: flex;
   justify-content: center;
