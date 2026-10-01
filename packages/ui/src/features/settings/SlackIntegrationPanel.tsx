@@ -191,47 +191,24 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         </Alert>
       </Show>
 
-      <SettingsSection title={t("connector.slack.workspaceTitle")}>
-        <ItemGroup class="settings-modal-card">
-          <For
-            each={props.connections}
-            fallback={
-              <Item class="settings-modal-row">
-                <ItemMedia>
-                  <LogoTile>
-                    <SlackMark />
-                  </LogoTile>
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{t("connector.slack.workspaceNone")}</ItemTitle>
-                  <ItemDescription>{t("connector.slack.workspaceNoneDescription")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={props.busy}
-                    onClick={() => setDialogOpen(true)}
-                  >
-                    {t("connector.slack.connect")}
-                  </Button>
-                </ItemActions>
-              </Item>
-            }
-          >
-            {(connection) => (
-              <WorkspaceRow
-                connection={connection}
-                busy={props.busy}
-                onReconnect={() => props.onReconnect(connection.workspaceId)}
-                onSetEnabled={(enabled) => props.onSetEnabled(connection.workspaceId, enabled)}
-                onDisconnect={() => setDisconnecting(connection)}
-              />
-            )}
-          </For>
-        </ItemGroup>
-      </SettingsSection>
+      {/* Not set up, the header holds the only step: Connect Slack. */}
+      <Show when={props.connections.length > 0}>
+        <SettingsSection title={t("connector.slack.workspaceTitle")}>
+          <ItemGroup class="settings-modal-card">
+            <For each={props.connections}>
+              {(connection) => (
+                <WorkspaceRow
+                  connection={connection}
+                  busy={props.busy}
+                  onReconnect={() => props.onReconnect(connection.workspaceId)}
+                  onSetEnabled={(enabled) => props.onSetEnabled(connection.workspaceId, enabled)}
+                  onDisconnect={() => setDisconnecting(connection)}
+                />
+              )}
+            </For>
+          </ItemGroup>
+        </SettingsSection>
+      </Show>
 
       <For each={props.connections}>
         {(connection) => (

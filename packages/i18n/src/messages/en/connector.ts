@@ -100,8 +100,6 @@ export const messages = defineMessages("connector", {
   "connector.slack.addAgent": "Add agent",
   "connector.slack.actionFailed": "Slack did not accept the change",
   "connector.slack.workspaceTitle": "Workspace",
-  "connector.slack.workspaceNone": "No workspace connected",
-  "connector.slack.workspaceNoneDescription": "Slack opens in your browser, and you select the workspace there.",
   "connector.slack.workspaceDescription": "People mention @OpenBot or send it a direct message.",
   "connector.slack.disconnectWorkspace": "Disconnect",
   "connector.slack.missingScopes":
