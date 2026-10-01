@@ -180,8 +180,8 @@ body:has(.dynamic-island-surface),
    a large move lands, it pops: a short overshoot with a small tilt each way, then rest. A small move,
    such as one slow slider step, has no pop, so a slow drag stays quiet. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-surface-idle-greeting {
-  opacity: calc(1 - 0.5 * var(--dynamic-island-compact-motion, 1));
-  scale: calc(1 - 0.15 * var(--dynamic-island-compact-motion, 1));
+  opacity: calc(1 - 0.3 * var(--dynamic-island-compact-motion, 1));
+  scale: calc(1 - 0.06 * var(--dynamic-island-compact-motion, 1));
 }
 
 .dynamic-island-shell[data-compact-settled] .dynamic-island-surface-idle-greeting {
@@ -189,7 +189,7 @@ body:has(.dynamic-island-surface),
 }
 
 /* One damped spring (damping 0.5, response 0.4s, with a push), sampled, so the pop is one smooth
-   overshoot to about 1.06 and back, not a curve per keyframe. The tilt rides the same spring. */
+   overshoot to about 1.03 and back, not a curve per keyframe. The tilt rides the same spring. */
 .dynamic-island-shell {
   --dynamic-island-greeting-pop-ease: linear(
     0,
@@ -222,9 +222,9 @@ body:has(.dynamic-island-surface),
 
 @keyframes dynamic-island-greeting-pop {
   from {
-    opacity: 0.6;
-    scale: 0.88;
-    rotate: -5deg;
+    opacity: 0.7;
+    scale: 0.94;
+    rotate: -3deg;
   }
 
   to {

@@ -17,8 +17,8 @@
 - The logo and the greeting blur a little while the Dynamic Island changes size, as much as the move
   is large: one slow step of the width setting barely blurs them, and a large move blurs them in
   full. The logo also gets a little smaller and half closes its eyes, and on a large move rounds its
-  corners a little. The greeting gets smaller and fainter, and when a large move lands it pops with
-  a small tilt. Both are sharp and at rest again as the island settles. With Reduce motion on, none
+  corners a little. The greeting gets a little smaller and fainter, and when a large move lands it
+  pops softly with a small tilt. Both are sharp and at rest again as the island settles. With Reduce motion on, none
   of this happens.
 - Below 100%, the idle Dynamic Island width now changes with each step of the width setting, from
   the smallest island at 20% to the default at 100%. Before, the lowest steps gave the same island.
