@@ -6,9 +6,10 @@ Checked against Slack docs and the Slack API Terms of Service on 2026-09-30. Sou
 
 One Slack app, `OpenBot`, for every workspace. A workspace installs it one time from OpenBot
 (**Server settings → Connectors → Slack → Connect Slack**), and the workspace is linked to that
-OpenBot server. People mention @OpenBot in a channel or send it a direct message. The router agent
-on that server picks the agent that answers each new request, and that agent answers the rest of the
-thread. Every answer comes from OpenBot, with the OpenBot name and icon.
+OpenBot server. People mention @OpenBot in a channel or send it a direct message. The Slack
+Orchestrator, an agent that the connect dialog adds, receives each new request, gives the work to the
+agent that fits best, and posts the answer in the thread. Every answer comes from OpenBot, with the
+OpenBot name and icon.
 
 This needs no Slack approval to work: it uses only normal bot scopes. The design that gave each agent
 its own app needed Slack's manager-app enrollment, which is only for Slack partners, so it is gone.
@@ -84,10 +85,10 @@ First with the test Worker and the development app, in a separate workspace:
 - [ ] Turn on distribution for the development app, so the test workspace can install it.
 - [ ] **Connect Slack**: Slack's install page, then the workspace shows **Connected**.
 - [ ] Mention @OpenBot in a channel after `/invite @OpenBot`, and send it a direct message. The
-      router picks an agent, and the answer comes in the thread.
+      orchestrator answers or asks a teammate, and the answer comes in the thread.
 - [ ] A follow-up in the same thread goes to the same agent.
 - [ ] **Approve** and **Deny** work only for the person who asked. **Stop** stops the turn.
-- [ ] Uncheck an agent in **Who answers**: the router no longer picks it.
+- [ ] Before **Add agent**: Slack answers "No agent can answer here yet". After it: the orchestrator answers.
 - [ ] Quit OpenBot, send a message, start OpenBot within 5 minutes: the message gets an answer.
 - [ ] Uninstall the app in Slack: the workspace shows **Token not accepted**. Connect it again: the
       old threads keep their agents.

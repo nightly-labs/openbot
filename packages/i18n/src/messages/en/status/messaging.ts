@@ -8,8 +8,8 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.busy": "Too many requests are waiting. Try again later.",
   "status.messaging.failed": "OpenBot could not finish this request. The OpenBot host has the details.",
   "status.messaging.noAnswer": "OpenBot finished without a written answer.",
-  "status.messaging.routeFailed": "OpenBot could not find who answers this request. The OpenBot host has the details.",
-  "status.messaging.noAgent": "No agent can answer here yet. Add one in OpenBot.",
+  "status.messaging.noAgent": "No agent can answer here yet. Add the Slack Orchestrator in OpenBot.",
+  "status.messaging.delegated": "A teammate is working on it. The answer comes here.",
   "status.messaging.stopped": "Stopped.",
   "status.messaging.stop": "Stop",
   "status.messaging.approvalTitle": "OpenBot asks for approval to continue.",
@@ -26,6 +26,9 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.hostOnly": "Only the OpenBot host can answer this request.",
   "status.messaging.questionOnHost": "OpenBot asked a question. Answer it on the OpenBot host.",
   "status.messaging.filesSkipped": "Some files were not sent: {names}.",
+  // The name and title of the agent that OpenBot adds to answer in Slack. The user can rename it.
+  "status.messaging.orchestratorName": "Slack Orchestrator",
+  "status.messaging.orchestratorTitle": "Answers in Slack and asks the team",
   // The page a development Slack install ends on.
   "status.messaging.signInReceived": "OpenBot received the Slack install. You can close this tab.",
   "status.messaging.signInUnknown": "OpenBot did not start this Slack install. Start it again in OpenBot.",

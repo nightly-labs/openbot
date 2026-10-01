@@ -290,6 +290,21 @@ export class MailboxStore {
     return structuredClone(request.messagingReturn);
   }
 
+  /**
+   * The deliveries of requests that an agent sent from one messaging link, whose answer goes back to
+   * it, and that have not ended.
+   */
+  pendingMessagingReturns(linkId: string): number {
+    const messageIds = new Set(
+      this.#state.messages.filter((message) => message.messagingReturn?.linkId === linkId).map((message) => message.id),
+    );
+    return this.#state.deliveries.filter(
+      (delivery) =>
+        messageIds.has(delivery.messageId) &&
+        (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
+    ).length;
+  }
+
   /** The deliveries of one messaging link that have not ended, oldest first. */
   unresolvedMessagingDeliveries(linkId: string): DeliveryContext[] {
     const messageIds = new Set(

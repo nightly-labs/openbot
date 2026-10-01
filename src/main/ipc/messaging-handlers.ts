@@ -3,12 +3,21 @@
 
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { parseSetSlackEnabledInput, parseSetSlackRoutingInput, parseSlackWorkspaceInput } from "./messaging-inputs";
+import {
+  parseAddSlackOrchestratorInput,
+  parseSetSlackEnabledInput,
+  parseSlackWorkspaceInput,
+} from "./messaging-inputs";
 
 interface MessagingIpcDependencies {
   messaging: Pick<
     MessagingService,
-    "slackOverview" | "connectSlackWorkspace" | "disconnectSlackWorkspace" | "reconnect" | "setEnabled" | "setRouting"
+    | "slackOverview"
+    | "connectSlackWorkspace"
+    | "disconnectSlackWorkspace"
+    | "reconnect"
+    | "setEnabled"
+    | "addOrchestrator"
   >;
 }
 
@@ -26,7 +35,7 @@ export function messagingIpcHandlers({ messaging }: MessagingIpcDependencies): P
       setSlackEnabled: payloadHandler(parseSetSlackEnabledInput, ({ workspaceId, enabled }) =>
         messaging.setEnabled(workspaceId, enabled),
       ),
-      setSlackRouting: payloadHandler(parseSetSlackRoutingInput, (input) => messaging.setRouting(input)),
+      addSlackOrchestrator: payloadHandler(parseAddSlackOrchestratorInput, (input) => messaging.addOrchestrator(input)),
     },
   };
 }

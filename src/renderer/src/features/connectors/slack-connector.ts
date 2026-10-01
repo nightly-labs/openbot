@@ -1,5 +1,9 @@
 import type { SlackOverview } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
+import type {
+  SlackOrchestratorChoice,
+  SlackOrchestratorModels,
+} from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import { type SlackConnectorPort, slackConnectorPort } from "./slack-connector-port";
@@ -17,14 +21,19 @@ export interface SlackConnectorController {
   disconnectWorkspace: (workspaceId: string) => void;
   reconnect: (workspaceId: string) => void;
   setEnabled: (workspaceId: string, enabled: boolean) => void;
-  setRouting: (workspaceId: string, routerAgentId: string | null, agentIds: string[]) => void;
+  /** The catalog for the orchestrator's model picker, or undefined to start on a new agent's default. */
+  models: () => SlackOrchestratorModels | undefined;
+  addOrchestrator: (workspaceId: string, choice: SlackOrchestratorChoice | null) => void;
 }
 
 /**
  * The Slack workspaces of this computer, for Server settings > Connectors. Main sends no event for a
  * connection, and the install ends in the browser, so a page that shows the state calls `watch`.
  */
-export function createSlackConnector(port: () => SlackConnectorPort = slackConnectorPort): SlackConnectorController {
+export function createSlackConnector(
+  port: () => SlackConnectorPort = slackConnectorPort,
+  models: () => SlackOrchestratorModels | undefined = () => undefined,
+): SlackConnectorController {
   const [overview, setOverview] = createSignal<SlackOverview | null>(null);
   const [busy, setBusy] = createSignal(false);
   let disposed = false;
@@ -75,7 +84,8 @@ export function createSlackConnector(port: () => SlackConnectorPort = slackConne
     disconnectWorkspace: (workspaceId) => run(() => messaging().disconnectSlackWorkspace({ workspaceId })),
     reconnect: (workspaceId) => run(() => messaging().reconnectSlackWorkspace({ workspaceId })),
     setEnabled: (workspaceId, enabled) => run(() => messaging().setSlackEnabled({ workspaceId, enabled })),
-    setRouting: (workspaceId, routerAgentId, agentIds) =>
-      run(() => messaging().setSlackRouting({ workspaceId, routerAgentId, agentIds })),
+    models,
+    addOrchestrator: (workspaceId, choice) =>
+      run(() => messaging().addSlackOrchestrator({ workspaceId, ...(choice ?? {}) })),
   };
 }

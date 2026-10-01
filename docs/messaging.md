@@ -7,15 +7,15 @@ in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md).
 ## Connect Slack
 
 A workspace installs the one OpenBot Slack app. People mention @OpenBot or send it a direct message,
-and a router agent picks the agent that answers. This needs an OpenBot account and a name for this
+and the Slack Orchestrator, an agent that OpenBot adds, asks the right agent and answers. This needs an OpenBot account and a name for this
 computer (**Server settings**), because Slack sends the workspace's events to OpenBot's Signal
 service, which passes them to this computer.
 
 1. Open **Server settings → Connectors → Slack**.
-2. Select **Connect Slack**. Slack opens in the browser. Select the workspace in the top-right corner,
-   and select **Allow**. The page opens OpenBot again, and the workspace shows **Connected**.
-3. Under **Who answers**, choose the **Router agent**, and clear the agents that must not answer. By
-   default every agent can answer, and the first one routes.
+2. Select **Connect Slack**, then **Connect in Slack**. Slack opens in the browser. Select the
+   workspace in the top-right corner, and select **Allow**. The dialog continues by itself.
+3. Pick the model of the Slack Orchestrator, and select **Add agent**. OpenBot adds the agent, with its
+   instructions and the facts it starts with. You can rename it or change its model in agent settings.
 4. In Slack, invite OpenBot to a channel (`/invite @OpenBot`) and mention it there, or send it a
    direct message.
 
@@ -33,9 +33,9 @@ browser. A joined server shows no Slack page.
   reaches the same agent without a mention.
 - A direct message always reaches OpenBot. OpenBot answers in a thread under it, so each direct
   message is its own conversation.
-- For a new conversation, the router agent's model reads the message and picks one agent that can
-  answer, or asks one question back. With one agent that can answer, no model is asked. That agent
-  answers the rest of the thread.
+- A new conversation goes to the Slack Orchestrator. It answers short requests itself, and gives other
+  work to the one agent that fits best. That agent's answer comes back to the thread, and the
+  orchestrator posts it. Until you add the orchestrator, Slack gets "No agent can answer here yet".
 - Each conversation is its own OpenBot thread of that agent, so it does not mix with the agent's own
   chat.
 - The agent sees earlier messages of the thread as context, and the files of the message.

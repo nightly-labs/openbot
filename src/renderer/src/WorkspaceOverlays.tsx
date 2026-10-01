@@ -4,6 +4,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, Loading, Show } from "solid-js";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
+import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
 import { createGitHubConnector } from "./features/connectors/github-connector";
 import { createSlackConnector } from "./features/connectors/slack-connector";
@@ -203,12 +204,15 @@ function AddServer() {
  */
 function ServerSettings() {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
   const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
-  const { agentList } = useAgents();
+  const { agentList, modelOptions, agentStatus, serverSetupChoice } = useAgents();
+  const { setupState } = useSetup();
+  const { customProviders } = useCustomProviders();
+  const { customAgents } = useCustomAgents();
   const github = createGitHubConnector();
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -243,7 +247,19 @@ function ServerSettings() {
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
-  const slack = createSlackConnector();
+  // The Slack Orchestrator runs on this computer, so its picker lists this computer's models: none
+  // while a joined server is on screen, and then it starts on a new agent's default.
+  const slack = createSlackConnector(undefined, () => {
+    const options = modelOptions();
+    if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
+    return {
+      modelOptions: options,
+      agentStatus: agentStatus(),
+      initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
+      customProviders: customProviders(),
+      customAgents: customAgents(),
+    };
+  });
   // The overlay mounts with the app. A first read that failed then must not hide GitHub for good.
   createEffect(serverSettingsOpen, (open) => {
     if (open) github.reload();

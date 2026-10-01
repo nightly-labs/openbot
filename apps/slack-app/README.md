@@ -2,8 +2,8 @@
 
 Slack CLI projects for the one OpenBot Slack app. A workspace installs it through
 `POST /v2/slack/authorize`, and the workspace is linked to the OpenBot server that connected it.
-People mention @OpenBot or send it a direct message, and a router agent on that server picks the
-agent that answers. No code runs here: each directory holds only the manifest.
+People mention @OpenBot or send it a direct message, and the Slack Orchestrator agent on that server
+asks the right agent and answers. No code runs here: each directory holds only the manifest.
 
 | Directory | App | App ID | Home team | Redirect URL |
 | --- | --- | --- | --- | --- |

@@ -661,7 +661,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     // Preview has one host, so every server answers for the same agents.
-    messaging: createMockMessaging((agentId) => agents.find((agent) => agent.id === agentId)?.name),
+    // The Slack Orchestrator of the preview is its first agent.
+    messaging: createMockMessaging(() => agents[0]?.id ?? "preview-agent"),
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
       // A host signs Claude in with a code its page shows, which the user pastes back.

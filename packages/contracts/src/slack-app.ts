@@ -21,3 +21,6 @@ export const SLACK_BOT_SCOPES = [
   "reactions:write",
   "users:read",
 ] as const;
+
+/** The avatar of the Slack Orchestrator agent that OpenBot adds, so the dialog shows the agent it creates. */
+export const SLACK_ORCHESTRATOR_AVATAR = { avatarSeed: "slack-orchestrator", avatarHue: 280 } as const;

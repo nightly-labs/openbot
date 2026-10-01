@@ -1,4 +1,13 @@
-import type { MessagingConnection } from "@openbot/contracts/ipc";
+import type {
+  AgentModelId,
+  AgentModelOption,
+  AgentProviderId,
+  AgentStatus,
+  CustomAgentSummary,
+  CustomProviderSummary,
+  MessagingConnection,
+} from "@openbot/contracts/ipc";
+import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -8,7 +17,8 @@ import {
   AlertTitle,
   Button,
   Check,
-  Checkbox,
+  ExternalLink,
+  Hash,
   Item,
   ItemActions,
   ItemContent,
@@ -17,16 +27,13 @@ import {
   ItemMedia,
   ItemTitle,
   Link2Off,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   SettingsSection,
+  Spinner,
   Text,
   TriangleAlert,
 } from "@openbot/ui";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import {
@@ -35,11 +42,28 @@ import {
   LogoTile,
   SlackMark,
   StatusPill,
+  Stepper,
   WizardDialog,
+  type WizardLink,
 } from "./IntegrationLayout";
 import type { IntegrationAgent } from "./IntegrationsHub";
 
 export type SlackIntegrationAgent = IntegrationAgent & { title: string };
+
+/** The model of the Slack Orchestrator that the user picks in the connect dialog. */
+export interface SlackOrchestratorChoice {
+  provider: AgentProviderId;
+  model: AgentModelId;
+}
+
+/** The catalog behind the model picker. Absent, the orchestrator starts on a new agent's default. */
+export interface SlackOrchestratorModels {
+  modelOptions: AgentModelOption[];
+  agentStatus: AgentStatus;
+  initial: SlackOrchestratorChoice | null;
+  customProviders?: readonly CustomProviderSummary[];
+  customAgents?: readonly CustomAgentSummary[];
+}
 
 export interface SlackIntegrationPanelProps {
   /** Every agent on this computer. */
@@ -48,11 +72,12 @@ export interface SlackIntegrationPanelProps {
   connections: MessagingConnection[];
   /** True while an action runs. Every button waits for it. */
   busy: boolean;
+  models?: SlackOrchestratorModels | undefined;
   onConnectWorkspace: () => void;
   onDisconnectWorkspace: (workspaceId: string) => void;
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
-  onSetRouting: (workspaceId: string, routerAgentId: string | null, agentIds: string[]) => void;
+  onAddOrchestrator: (workspaceId: string, choice: SlackOrchestratorChoice | null) => void;
 }
 
 /** What a workspace row can do. */
@@ -99,35 +124,43 @@ const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   relay_unavailable: "messaging.help.relay_unavailable",
 };
 
-/** The agents that can answer in a workspace. An empty list means every agent. */
-export function slackAnsweringAgents<Agent extends { id: string }>(
+/** The orchestrator agent of a workspace, when it still exists. */
+export function slackOrchestrator<Agent extends { id: string }>(
   connection: MessagingConnection,
   agents: readonly Agent[],
-): Agent[] {
-  return connection.agentIds.length ? agents.filter((agent) => connection.agentIds.includes(agent.id)) : [...agents];
+): Agent | null {
+  return agents.find((agent) => agent.id === connection.orchestratorAgentId) ?? null;
 }
 
 /** The state of the whole Slack integration, for the page header and the Connectors list. */
-export function slackIntegrationState(connections: readonly MessagingConnection[]): {
-  status: IntegrationStatus;
-  label: AppTextKey;
-  attention: number;
-} {
-  const attention = connections.filter((connection) => rowKind(connection) === "attention").length;
+export function slackIntegrationState(
+  connections: readonly MessagingConnection[],
+  agents: readonly { id: string }[],
+): { status: IntegrationStatus; label: AppTextKey; attention: number } {
+  const attention = connections.filter(
+    (connection) => rowKind(connection) === "attention" || !slackOrchestrator(connection, agents),
+  ).length;
   if (attention > 0) return { status: "attention", label: "connector.slack.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "connector.slack.statusNotSetUp", attention };
   return { status: "connected", label: "connector.slack.statusConnected", attention };
 }
 
 /**
- * Server settings > Connectors > Slack. A workspace installs the one OpenBot app, and people mention
- * @OpenBot or send it a direct message. The router agent picks the agent that answers each new
- * request. No token reaches this component.
+ * Server settings > Connectors > Slack. A workspace installs the one OpenBot app, and its Slack
+ * Orchestrator agent receives every request, asks the team and answers. The connect dialog does both
+ * steps. No token reaches this component.
  */
 export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
   const { t } = useText();
+  const [dialogOpen, setDialogOpen] = createSignal(false);
   const [disconnecting, setDisconnecting] = createSignal<MessagingConnection | null>(null);
-  const state = () => slackIntegrationState(props.connections);
+  const state = () => slackIntegrationState(props.connections, props.agents);
+  const first = () => props.connections[0] ?? null;
+  /** Until the first workspace has its orchestrator, the header offers the next step of the dialog. */
+  const setUpDone = () => {
+    const connection = first();
+    return connection !== null && slackOrchestrator(connection, props.agents) !== null;
+  };
 
   return (
     <div class="slack-integration">
@@ -138,9 +171,9 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         statusLabel={t(state().label)}
         subtitle={t("connector.slack.description")}
         actions={
-          <Show when={props.connections.length === 0}>
-            <Button type="button" size="sm" loading={props.busy} onClick={props.onConnectWorkspace}>
-              {t("connector.slack.connect")}
+          <Show when={!setUpDone()}>
+            <Button type="button" size="sm" disabled={props.busy} onClick={() => setDialogOpen(true)}>
+              {first() ? t("connector.slack.addAgent") : t("connector.slack.connect")}
             </Button>
           </Show>
         }
@@ -178,8 +211,8 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
                     type="button"
                     size="sm"
                     variant="outline"
-                    loading={props.busy}
-                    onClick={props.onConnectWorkspace}
+                    disabled={props.busy}
+                    onClick={() => setDialogOpen(true)}
                   >
                     {t("connector.slack.connect")}
                   </Button>
@@ -203,21 +236,47 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
       <For each={props.connections}>
         {(connection) => (
           <SettingsSection
-            title={
-              props.connections.length > 1
-                ? t("connector.slack.routingTitleIn", { workspace: connection.workspaceName })
-                : t("connector.slack.routingTitle")
-            }
-            description={t("connector.slack.routingDescription")}
+            title={t("connector.slack.orchestratorTitle")}
+            description={t("connector.slack.orchestratorDescription")}
           >
-            <Routing
-              connection={connection}
-              agents={props.agents}
-              busy={props.busy}
-              onChange={(routerAgentId, agentIds) =>
-                props.onSetRouting(connection.workspaceId, routerAgentId, agentIds)
-              }
-            />
+            <ItemGroup class="settings-modal-card">
+              <Show
+                when={slackOrchestrator(connection, props.agents)}
+                fallback={
+                  <Item class="settings-modal-row">
+                    <ItemMedia>
+                      <OrchestratorFace />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{t("connector.slack.orchestratorNone")}</ItemTitle>
+                      <ItemDescription>{t("connector.slack.orchestratorNoneDescription")}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <Button type="button" size="sm" disabled={props.busy} onClick={() => setDialogOpen(true)}>
+                        {t("connector.slack.addAgent")}
+                      </Button>
+                    </ItemActions>
+                  </Item>
+                }
+              >
+                {(agent) => (
+                  <Item class="settings-modal-row">
+                    <ItemMedia>
+                      <span class="integrations-agent-face" data-size="md">
+                        <AgentAvatar agent={agent()} motion="idle" />
+                      </span>
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>{agent().name}</ItemTitle>
+                      <ItemDescription>{agent().title}</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                )}
+              </Show>
+            </ItemGroup>
+            <Text class="slack-integration-note" variant="caption" tone="muted">
+              {t("connector.slack.inviteNote")}
+            </Text>
           </SettingsSection>
         )}
       </For>
@@ -228,6 +287,16 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         </Text>
       </Show>
 
+      <SlackConnectDialog
+        open={dialogOpen()}
+        connection={first()}
+        agents={props.agents}
+        busy={props.busy}
+        models={props.models}
+        onConnectWorkspace={props.onConnectWorkspace}
+        onAddOrchestrator={props.onAddOrchestrator}
+        onClose={() => setDialogOpen(false)}
+      />
       <DisconnectDialog
         connection={disconnecting()}
         onConfirm={(workspaceId) => {
@@ -237,6 +306,18 @@ export function SlackIntegrationPanel(props: SlackIntegrationPanelProps) {
         onClose={() => setDisconnecting(null)}
       />
     </div>
+  );
+}
+
+function OrchestratorFace(props: { size?: "md" | "lg" }) {
+  return (
+    <span class="integrations-agent-face" data-size={props.size ?? "md"}>
+      <AgentAvatar
+        seed={SLACK_ORCHESTRATOR_AVATAR.avatarSeed}
+        hue={SLACK_ORCHESTRATOR_AVATAR.avatarHue}
+        motion="idle"
+      />
+    </span>
   );
 }
 
@@ -305,103 +386,224 @@ function WorkspaceRow(props: {
   );
 }
 
-/** The router agent of one workspace, and the agents that can answer there. */
-function Routing(props: {
-  connection: MessagingConnection;
-  agents: SlackIntegrationAgent[];
+/** How OpenBot looks in a Slack channel: one app, named OpenBot, whichever agent answers. */
+function SlackMessagePreview() {
+  const { t } = useText();
+  return (
+    <figure class="slack-preview" aria-label={t("connector.slack.previewLabel")}>
+      <div class="slack-preview-channel">
+        <Hash size={14} aria-hidden="true" />
+        <Text as="span" variant="label-sm">
+          {t("connector.slack.previewChannel")}
+        </Text>
+      </div>
+      <div class="slack-preview-message">
+        <span class="slack-preview-avatar">
+          <AgentAvatar
+            seed={SLACK_ORCHESTRATOR_AVATAR.avatarSeed}
+            hue={SLACK_ORCHESTRATOR_AVATAR.avatarHue}
+            motion="idle"
+          />
+        </span>
+        <div class="slack-preview-body">
+          <div class="slack-preview-meta">
+            <Text as="span" variant="label">
+              {t("connector.slack.previewName")}
+            </Text>
+            <span class="slack-preview-app">{t("connector.slack.previewApp")}</span>
+          </div>
+          <Text variant="body-sm">{t("connector.slack.previewMessage")}</Text>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
+/** 0 connects the workspace, 1 adds the orchestrator, and 2 is done. */
+type ConnectStep = 0 | 1 | 2;
+
+/**
+ * Connects Slack in two steps. Both end outside the dialog (the browser, then main), so the step
+ * follows the first workspace's state: no workspace is step 1, a workspace with no orchestrator is
+ * step 2, and one with an orchestrator is done.
+ */
+export function SlackConnectDialog(props: {
+  open: boolean;
+  connection: MessagingConnection | null;
+  agents: readonly { id: string }[];
   busy: boolean;
-  onChange: (routerAgentId: string | null, agentIds: string[]) => void;
+  models?: SlackOrchestratorModels | undefined;
+  onConnectWorkspace: () => void;
+  onAddOrchestrator: (workspaceId: string, choice: SlackOrchestratorChoice | null) => void;
+  onClose: () => void;
 }) {
   const { t } = useText();
-  const answering = () => new Set(slackAnsweringAgents(props.connection, props.agents).map((agent) => agent.id));
-  /** Null names the first agent that can answer, which is the router until the user picks one. */
-  const router = () =>
-    props.agents.find((agent) => agent.id === props.connection.routerAgentId) ??
-    props.agents.find((agent) => answering().has(agent.id)) ??
-    null;
-  const toggle = (agentId: string, on: boolean) => {
-    const next = new Set(answering());
-    if (on) next.add(agentId);
-    else next.delete(agentId);
-    // Every agent is stored as no list, so an agent added later can answer too.
-    const agentIds =
-      next.size === props.agents.length ? [] : props.agents.map((agent) => agent.id).filter((id) => next.has(id));
-    props.onChange(props.connection.routerAgentId, agentIds);
+  const [waiting, setWaiting] = createSignal(false);
+  const [choice, setChoice] = createSignal<SlackOrchestratorChoice | null>(null);
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open) return;
+      setWaiting(false);
+      setChoice(props.models?.initial ?? null);
+    },
+  );
+  const step = (): ConnectStep => {
+    const connection = props.connection;
+    if (!connection) return 0;
+    return slackOrchestrator(connection, props.agents) ? 2 : 1;
   };
+  const link = (): WizardLink => (step() === 2 ? "connected" : "connecting");
+  const workspace = () => props.connection?.workspaceName ?? "";
+  const copy = () => {
+    switch (step()) {
+      case 0:
+        return { title: t("connector.slack.connectTitle"), description: t("connector.slack.connectDescription") };
+      case 1:
+        return {
+          title: t("connector.slack.agentStepTitle"),
+          description: t("connector.slack.agentStepDescription", { workspace: workspace() }),
+        };
+      case 2:
+        return {
+          title: t("connector.slack.doneTitle", { workspace: workspace() }),
+          description: t("connector.slack.doneDescription"),
+        };
+    }
+  };
+  const steps = () => [t("connector.slack.stepWorkspace"), t("connector.slack.stepAgent")];
   return (
-    <>
-      <ItemGroup class="settings-modal-card">
-        <Item class="settings-modal-row">
-          <ItemContent>
-            <ItemTitle>{t("connector.slack.routerLabel")}</ItemTitle>
-            <ItemDescription>{t("connector.slack.routerDescription")}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Select<SlackIntegrationAgent>
-              class="settings-modal-select"
-              options={props.agents}
-              optionValue="id"
-              optionTextValue="name"
-              value={router()}
-              disabled={props.busy || props.agents.length === 0}
-              onChange={(agent) => agent && props.onChange(agent.id, props.connection.agentIds)}
-              placement="bottom-end"
-              itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+    <WizardDialog
+      open={props.open}
+      closeLabel={t("connector.slack.close")}
+      onClose={props.onClose}
+      logo={<SlackMark />}
+      link={link()}
+      title={copy().title}
+      description={copy().description}
+      stepper={<Stepper steps={steps()} current={step()} label={t("connector.slack.connect")} />}
+      footer={
+        <Switch>
+          <Match when={step() === 0}>
+            <Button
+              type="button"
+              size="sm"
+              loading={props.busy}
+              onClick={() => {
+                setWaiting(true);
+                props.onConnectWorkspace();
+              }}
             >
-              <SelectTrigger size="sm" aria-label={t("connector.slack.routerLabel")}>
-                <SelectValue<SlackIntegrationAgent>>{(selected) => selected.selectedOption()?.name}</SelectValue>
-              </SelectTrigger>
-              <SelectContent />
-            </Select>
-          </ItemActions>
-        </Item>
-      </ItemGroup>
-      <div class="slack-integration-table-wrap">
-        <table class="slack-integration-table">
-          <caption class="sr-only">{t("connector.slack.answeringCaption")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("connector.slack.columnAgent")}</th>
-              <th scope="col">{t("connector.slack.columnAnswers")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={props.agents}>
-              {(agent) => (
-                <tr>
-                  <th scope="row">
-                    <span class="slack-integration-agent">
-                      <span class="integrations-agent-face" data-size="sm">
-                        <AgentAvatar agent={agent} motion="idle" />
-                      </span>
-                      <span class="slack-integration-stack">
-                        <Text as="span" variant="label-sm">
-                          {agent.name}
-                        </Text>
-                        <Text as="span" variant="caption" tone="muted">
-                          {agent.title}
-                        </Text>
-                      </span>
-                    </span>
-                  </th>
-                  <td>
-                    <Checkbox
-                      checked={answering().has(agent.id)}
+              <ExternalLink size={14} aria-hidden="true" />
+              {t("connector.slack.connectInSlack")}
+            </Button>
+          </Match>
+          <Match when={step() === 1 && props.connection}>
+            {(connection) => (
+              <Button
+                type="button"
+                size="sm"
+                loading={props.busy}
+                onClick={() => props.onAddOrchestrator(connection().workspaceId, choice())}
+              >
+                {t("connector.slack.addAgent")}
+              </Button>
+            )}
+          </Match>
+          <Match when={step() === 2}>
+            <Button type="button" size="sm" onClick={props.onClose}>
+              {t("connector.slack.done")}
+            </Button>
+          </Match>
+        </Switch>
+      }
+    >
+      <Switch>
+        <Match when={step() === 0}>
+          <Show
+            when={waiting()}
+            fallback={
+              <ol class="slack-checklist">
+                <li>
+                  <span class="slack-checklist-dot" aria-hidden="true" />
+                  {t("connector.slack.connectStepBrowser")}
+                </li>
+                <li>
+                  <span class="slack-checklist-dot" aria-hidden="true" />
+                  {t("connector.slack.connectStepAllow")}
+                </li>
+                <li>
+                  <span class="slack-checklist-dot" aria-hidden="true" />
+                  {t("connector.slack.connectStepReturn")}
+                </li>
+              </ol>
+            }
+          >
+            <div class="slack-waiting" aria-live="polite">
+              <Spinner size="sm" />
+              <Text variant="caption" tone="muted">
+                {t("connector.slack.connectWaiting")}
+              </Text>
+            </div>
+          </Show>
+        </Match>
+        <Match when={step() === 1}>
+          <div class="slack-orchestrator-card">
+            <OrchestratorFace size="lg" />
+            <div class="slack-integration-stack">
+              <Text as="span" variant="label">
+                {t("connector.slack.orchestratorName")}
+              </Text>
+              <Text as="span" variant="caption" tone="muted">
+                {t("connector.slack.orchestratorRole")}
+              </Text>
+            </div>
+          </div>
+          <ol class="slack-checklist">
+            <li data-state="done">
+              <Check size={14} aria-hidden="true" />
+              {t("connector.slack.orchestratorDoesReceive")}
+            </li>
+            <li data-state="done">
+              <Check size={14} aria-hidden="true" />
+              {t("connector.slack.orchestratorDoesDelegate")}
+            </li>
+            <li data-state="done">
+              <Check size={14} aria-hidden="true" />
+              {t("connector.slack.orchestratorDoesAnswer")}
+            </li>
+          </ol>
+          <Show when={props.models}>
+            {(models) => (
+              <Show when={choice()}>
+                {(current) => (
+                  <div class="slack-orchestrator-model">
+                    <Text as="span" variant="label-sm">
+                      {t("connector.slack.orchestratorModel")}
+                    </Text>
+                    <ProviderModelPicker
+                      variant="field"
+                      ariaLabel={t("connector.slack.orchestratorModel")}
+                      provider={current().provider}
+                      value={current().model}
+                      modelOptions={models().modelOptions}
+                      agentStatus={models().agentStatus}
+                      customProviders={models().customProviders}
+                      customAgents={models().customAgents}
                       disabled={props.busy}
-                      aria-label={t("connector.slack.answerToggle", { name: agent.name })}
-                      onChange={(event) => toggle(agent.id, event.currentTarget.checked)}
+                      onChange={(model, provider) => setChoice({ provider, model })}
                     />
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </div>
-      <Text class="slack-integration-note" variant="caption" tone="muted">
-        {t("connector.slack.inviteNote")}
-      </Text>
-    </>
+                  </div>
+                )}
+              </Show>
+            )}
+          </Show>
+        </Match>
+        <Match when={step() === 2}>
+          <SlackMessagePreview />
+        </Match>
+      </Switch>
+    </WizardDialog>
   );
 }
 

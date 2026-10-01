@@ -12,7 +12,6 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
-import type { AgentSummary } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { sealSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
@@ -219,7 +218,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
   it("connects a workspace, receives its events through Signal, and disconnects it", async () => {
     const started = await startService(root, { provider: "codex", autoComplete: true });
     service = started.service;
-    const agent: AgentSummary = await started.store.getOrCreate("slack-agent");
+    await started.store.getOrCreate("slack-agent");
     const credentials = new MemoryCredentials();
     const authorizations: Array<{ hostNonce: string; hostPublicKey: string }> = [];
     const unlinked: string[] = [];
@@ -239,7 +238,8 @@ describe.sequential("OpenBot Slack app end to end", () => {
           started.service.on("event", listener);
           return () => started.service.off("event", listener);
         },
-        generate: async () => JSON.stringify({ agentId: agent.id }),
+        createAgentProfile: (input) => started.service.createAgentProfile(input),
+        createMemory: (input) => started.service.createMemory(input),
       },
       credentials,
       drivers: [slackDriver({ origin: slack.origin, ingress })],
@@ -276,6 +276,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
     };
     await connect();
     const connection = () => messaging?.slackOverview().connections[0];
+    const orchestratorId = await messaging.addOrchestrator({ workspaceId: "T1" });
     await waitFor(() => connection()?.state === "connected");
     expect(connection()).toMatchObject({ workspaceId: "T1", workspaceName: "Test workspace", credentials: "saved" });
     // The socket told Signal its workspaces with a new route ticket after the connect.
@@ -289,7 +290,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
     const turns = started.client.requests.filter((request) => request.method === "turn/start");
     expect(turns).toHaveLength(1);
     expect((await signal.deliver("T9", mention("Ev2", "101.000"))).status).toBe(404);
-    const [link] = started.service.messaging.store.links(agent.id);
+    const [link] = started.service.messaging.store.links(orchestratorId);
     if (!link) throw new Error("The mention has no conversation.");
 
     // Slack uninstalled OpenBot: the connection stops, and Signal stops routing the workspace here.
@@ -302,7 +303,8 @@ describe.sequential("OpenBot Slack app end to end", () => {
     // Connected again, the workspace keeps its conversation and its agent.
     await connect();
     await waitFor(() => connection()?.state === "connected");
-    expect(started.service.messaging.store.links(agent.id).map((item) => item.linkId)).toEqual([link.linkId]);
+    expect(started.service.messaging.store.links(orchestratorId).map((item) => item.linkId)).toEqual([link.linkId]);
+    expect(connection()?.orchestratorAgentId).toBe(orchestratorId);
 
     // Disconnect revokes the bot token, forgets it, and unlinks the workspace.
     await messaging.disconnectSlackWorkspace("T1");

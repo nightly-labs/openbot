@@ -6,8 +6,8 @@
 // a driver for.
 //
 // A connection is one workspace of a platform, such as a Slack workspace that installed the OpenBot
-// app. Every agent answers through it: the router agent picks the one that answers each new
-// conversation. No token is stored here. The tokens of a connection live in the main process's
+// app. Its orchestrator agent receives each new conversation and asks its teammates. No token is
+// stored here. The tokens of a connection live in the main process's
 // encrypted credential file, keyed by `connection_id`.
 //
 // A messaging thread is an execution thread of the agent that answers it, like a channel context:
@@ -21,16 +21,11 @@ export const MESSAGING_SCHEMA_SQL = `
     enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
     bot_user_id TEXT,
     app_id TEXT,
-    router_agent_id TEXT,
+    orchestrator_agent_id TEXT,
     last_error_code TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(platform, workspace_id)
-  );
-  CREATE TABLE IF NOT EXISTS projection_messaging_agents (
-    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id) ON DELETE CASCADE,
-    agent_id TEXT NOT NULL,
-    PRIMARY KEY(connection_id, agent_id)
   );
   CREATE TABLE IF NOT EXISTS projection_messaging_threads (
     link_id TEXT PRIMARY KEY,

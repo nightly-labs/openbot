@@ -3,6 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AddSlackOrchestratorInput,
   AgentApproval,
   AgentEvent,
   AgentSummary,
@@ -11,15 +12,14 @@ import type {
   MessagingCredentialState,
   MessagingPlatform,
   RespondToApprovalInput,
-  SetSlackRoutingInput,
   SlackOverview,
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { MessagingOrigin } from "../mailbox-store";
-import { parseRouteDecision, routePrompt } from "./messaging-router";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
 import type { MessagingActivity, MessagingThreads } from "./messaging-threads";
 import {
@@ -36,6 +36,7 @@ import {
   type MessagingTransport,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect } from "./slack/slack-connect";
+import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
 import { SlackWebApi } from "./slack/slack-web-api";
 
 const logger = createOpenBotLogger("messaging");
@@ -55,8 +56,17 @@ export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Promise<void>;
   onEvent(listener: (event: AgentEvent) => void): () => void;
-  /** One text completion of the agent's own model, with no tools: the router's decision. */
-  generate(agentId: string, prompt: string): Promise<string>;
+  /** Creates an agent with no first message, on the named model or a new agent's default. */
+  createAgentProfile(
+    input: Pick<AddSlackOrchestratorInput, "provider" | "model" | "reasoningEffort"> & {
+      name: string;
+      title: string;
+      description: string;
+      avatarSeed: string;
+      avatarHue: AgentSummary["avatarHue"];
+    },
+  ): Promise<AgentSummary>;
+  createMemory(input: { agentId: string; text: string }): unknown;
 }
 
 export interface MessagingServiceOptions {
@@ -209,13 +219,26 @@ export class MessagingService {
     if (enabled && updated) await this.#startConnection(updated);
   }
 
-  /** Which agent routes the workspace's new conversations, and which agents can answer them. */
-  setRouting(input: SetSlackRoutingInput): void {
+  /**
+   * Adds the workspace's Slack Orchestrator: a new agent with its standing remit and the facts it
+   * starts with, on the model the user picked. It receives every new conversation of the workspace.
+   * A workspace that already has one keeps it.
+   */
+  async addOrchestrator(input: AddSlackOrchestratorInput): Promise<string> {
     const record = this.#requireConnection(input.workspaceId);
-    if (input.routerAgentId) this.#requireAgent(input.routerAgentId);
-    for (const agentId of input.agentIds) this.#requireAgent(agentId);
-    this.#threads.store.updateConnection(record.connectionId, { routerAgentId: input.routerAgentId });
-    this.#threads.store.setAnsweringAgents(record.connectionId, input.agentIds);
+    const current = this.#agents.listAgents().find((agent) => agent.id === record.orchestratorAgentId);
+    if (current) return current.id;
+    const agent = await this.#agents.createAgentProfile({
+      ...slackOrchestratorProfile(),
+      ...SLACK_ORCHESTRATOR_AVATAR,
+      ...(input.provider ? { provider: input.provider } : {}),
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+    });
+    for (const text of slackOrchestratorMemories(record.workspaceName))
+      this.#agents.createMemory({ agentId: agent.id, text });
+    this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agent.id });
+    return agent.id;
   }
 
   /** Opens the OpenBot Slack app's install in the browser. A deep link to `completeSlackWorkspace` ends it. */
@@ -378,8 +401,7 @@ export class MessagingService {
       missingScopes: live?.identity?.missingScopes ?? [],
       retryAt: state === "rate_limited" ? (live?.retryAt ?? null) : null,
       credentials,
-      routerAgentId: record.routerAgentId,
-      agentIds: this.#threads.store.answeringAgents(record.connectionId),
+      orchestratorAgentId: record.orchestratorAgentId,
     };
   }
 
@@ -408,14 +430,13 @@ export class MessagingService {
     const { adapter } = live;
     const authorName = await adapter.authorName(message.authorId);
     const place = message.isDirect ? null : await adapter.placeName(message.platformChannelId);
-    const agentId = existing
-      ? existing.agentId
-      : await this.#route(live, message, place ?? "direct message").catch(async (error) => {
-          this.#warn(error);
-          await adapter.post(message.target, { text: sourceText("status.messaging.routeFailed") });
-          return null;
-        });
-    if (!agentId) return;
+    // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
+    // teammates; without one, nothing answers.
+    const agentId = existing?.agentId ?? this.#orchestrator(live.record);
+    if (!agentId) {
+      await adapter.post(message.target, { text: sourceText("status.messaging.noAgent") });
+      return;
+    }
     const staging = join(this.#downloadsRoot, randomUUID());
     try {
       const { paths, skipped } = await this.#download(adapter, message, staging);
@@ -460,32 +481,9 @@ export class MessagingService {
     }
   }
 
-  /**
-   * The agent that answers a new conversation. With one agent that can answer, no model is asked.
-   * Otherwise the router agent's model picks one, or asks the person a question, which is posted in
-   * the thread and starts nothing. Null when no agent answers.
-   */
-  async #route(live: LiveConnection, message: InboundMessage, place: string): Promise<string | null> {
-    const agents = this.#agents.listAgents();
-    const allowed = new Set(this.#threads.store.answeringAgents(live.record.connectionId));
-    const candidates = allowed.size ? agents.filter((agent) => allowed.has(agent.id)) : agents;
-    const [only, ...others] = candidates;
-    if (!only) {
-      await live.adapter.post(message.target, { text: sourceText("status.messaging.noAgent") });
-      return null;
-    }
-    if (others.length === 0) return only.id;
-    // The model takes seconds. The person sees that OpenBot has the message.
-    await live.adapter.react(message.target, message.platformMessageId, "received", true).catch(() => undefined);
-    const router = agents.find((agent) => agent.id === live.record.routerAgentId) ?? only;
-    const decision = parseRouteDecision(
-      await this.#agents.generate(router.id, routePrompt({ agents: candidates, place, text: message.text })),
-      candidates,
-    );
-    if ("agentId" in decision) return decision.agentId;
-    await live.adapter.post(message.target, { text: decision.question });
-    await live.adapter.react(message.target, message.platformMessageId, "received", false).catch(() => undefined);
-    return null;
+  #orchestrator(record: MessagingConnectionRecord): string | null {
+    const id = this.#threads.store.connection(record.connectionId)?.orchestratorAgentId ?? null;
+    return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
   }
 
   /** Downloads the files of a message into `staging`, within the attachment limits. */
@@ -588,6 +586,9 @@ export class MessagingService {
       return;
     }
     if (activity.answer) await adapter.postAnswer(target, activity.answer, placeholder);
+    // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
+    else if (!activity.followUp && this.#threads.awaitsTeammate(activity.link.linkId))
+      await this.#say(adapter, target, placeholder, sourceText("status.messaging.delegated"));
     else await this.#say(adapter, target, placeholder, sourceText("status.messaging.noAnswer"));
     if (activity.files.length) {
       const skipped = await adapter.upload(target, activity.files);
@@ -749,12 +750,6 @@ export class MessagingService {
         if (this.#chains.get(linkId) === next) this.#chains.delete(linkId);
       });
     this.#chains.set(linkId, next);
-  }
-
-  #requireAgent(agentId: string): AgentSummary {
-    const agent = this.#agents.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.team.agentNotFound"));
-    return agent;
   }
 
   #requireConnection(workspaceId: string): MessagingConnectionRecord {

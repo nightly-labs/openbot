@@ -80,23 +80,24 @@ export const messages = defineMessages("connector", {
   // {names} lists the agents, such as "Chief, Research".
   "connector.hub.usedBy": "Used by {names}",
 
-  // Server settings > Connectors > Slack: a workspace installs the one OpenBot app, and a router agent
-  // picks the agent that answers each request.
+  // Server settings > Connectors > Slack: a workspace installs the one OpenBot app, and the Slack
+  // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
   "connector.slack.description":
-    "People mention @OpenBot in Slack or send it a direct message. A router agent picks the agent that answers.",
+    "People mention @OpenBot in Slack or send it a direct message. The Slack Orchestrator asks the right agent and answers.",
   "connector.slack.statusNotSetUp": "Not set up",
   "connector.slack.statusConnected": "Connected",
   "connector.slack.statusAttention": "Needs attention",
   // {workspace} is the Slack workspace name.
-  "connector.slack.summaryNoAgents": "{workspace} · No agents yet",
-  "connector.slack.summaryAgents": { one: "{workspace} · {count} agent", other: "{workspace} · {count} agents" },
+  "connector.slack.summaryConnected": "{workspace} · Slack Orchestrator answers",
+  "connector.slack.summaryNoAgent": "{workspace} · No agent answers yet",
   "connector.slack.attentionTitle": {
     one: "{count} workspace needs attention",
     other: "{count} workspaces need attention",
   },
-  "connector.slack.attentionDescription": "The status of each workspace below says what to do.",
+  "connector.slack.attentionDescription": "The status below says what to do.",
   "connector.slack.connect": "Connect Slack",
+  "connector.slack.addAgent": "Add agent",
   "connector.slack.actionFailed": "Slack did not accept the change",
   "connector.slack.workspaceTitle": "Workspace",
   "connector.slack.workspaceNone": "No workspace connected",
@@ -111,25 +112,50 @@ export const messages = defineMessages("connector", {
   "connector.slack.resume": "Resume",
   // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}: {name}",
-  "connector.slack.routingTitle": "Who answers",
-  "connector.slack.routingTitleIn": "Who answers in {workspace}",
-  "connector.slack.routingDescription":
-    "For each new request, the router agent picks one agent to answer it. That agent answers the rest of the thread.",
-  "connector.slack.routerLabel": "Router agent",
-  "connector.slack.routerDescription":
-    "Its model reads the request and picks the agent. With one agent, no model is asked.",
-  "connector.slack.answeringCaption": "The agents that can answer in Slack",
-  "connector.slack.columnAgent": "Agent",
-  "connector.slack.columnAnswers": "Can answer",
-  "connector.slack.answerToggle": "{name} can answer in Slack",
+  "connector.slack.orchestratorTitle": "Slack Orchestrator",
+  "connector.slack.orchestratorDescription":
+    "This agent receives every request from Slack. It answers short ones itself, gives other work to the right agent, and posts the answer in the thread.",
+  "connector.slack.orchestratorNone": "No agent answers yet",
+  "connector.slack.orchestratorNoneDescription": "Add the Slack Orchestrator, or Slack gets no answer.",
   "connector.slack.inviteNote": "To use OpenBot in a channel, invite it there: /invite @OpenBot.",
   "connector.slack.warning":
     "Anyone who can post in the Slack workspace can give these agents work. They run on this computer with the access you gave them, and a hosted server stays awake while Slack is connected.",
+  // The connect dialog. The steps show as numbers; screen readers read the names.
+  "connector.slack.stepWorkspace": "Workspace",
+  "connector.slack.stepAgent": "Agent",
+  "connector.slack.connectTitle": "Connect a Slack workspace",
+  "connector.slack.connectDescription": "OpenBot installs one app in the workspace, named OpenBot.",
+  "connector.slack.connectStepBrowser": "Slack opens in your browser",
+  "connector.slack.connectStepAllow": "Select the workspace in the top-right corner, then Allow",
+  "connector.slack.connectStepReturn": "This dialog continues when Slack is done",
+  "connector.slack.connectInSlack": "Connect in Slack",
+  "connector.slack.connectWaiting": "Waiting for Slack. Finish the install in your browser.",
+  "connector.slack.agentStepTitle": "Add the Slack Orchestrator",
+  // {workspace} is the Slack workspace name.
+  "connector.slack.agentStepDescription":
+    "This new agent answers everything that people send to @OpenBot in {workspace}.",
+  "connector.slack.orchestratorName": "Slack Orchestrator",
+  "connector.slack.orchestratorRole": "Answers in Slack and asks the team",
+  "connector.slack.orchestratorDoesReceive": "Receives every Slack request first",
+  "connector.slack.orchestratorDoesDelegate": "Gives each task to the agent that fits best",
+  "connector.slack.orchestratorDoesAnswer": "Posts the answer in the Slack thread",
+  "connector.slack.orchestratorModel": "Model",
+  "connector.slack.doneTitle": "OpenBot is in {workspace}",
+  "connector.slack.doneDescription": "Invite @OpenBot to a channel and mention it, or send it a direct message.",
+  "connector.slack.done": "Done",
+  "connector.slack.previewLabel": "How OpenBot looks in Slack",
+  // A sample Slack channel name, shown without the # sign.
+  "connector.slack.previewChannel": "general",
+  // The name of the Slack app. Do not translate.
+  "connector.slack.previewName": "OpenBot",
+  // The label Slack shows next to the name of an app.
+  "connector.slack.previewApp": "APP",
+  "connector.slack.previewMessage": "Research is checking this. The answer comes here.",
   "connector.slack.disconnectTitle": "Disconnect {workspace}?",
   "connector.slack.disconnectDescription":
     "OpenBot stops answering in {workspace} and removes its Slack token from this computer.",
   "connector.slack.disconnectEffect": "People in {workspace} can no longer reach your agents through @OpenBot.",
-  "connector.slack.removeEffectKept": "The conversations stay in OpenBot.",
+  "connector.slack.removeEffectKept": "The conversations and the Slack Orchestrator stay in OpenBot.",
   "connector.slack.keep": "Keep connected",
   "connector.slack.close": "Close",
 });

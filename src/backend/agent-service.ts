@@ -596,7 +596,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.channels = new ChannelService(store.database, mailbox, {
       agents: () => this.listAgents(),
-      generate: (lead, prompt) => this.#generate(lead, prompt, "error.backend.channelLeadModelUnavailable"),
+      generate: async (lead, prompt) => {
+        await this.#providers.ensureProvider(lead.provider);
+        const model = this.#endpoints
+          .available()
+          .find((item) => item.provider === lead.provider && item.id === lead.model);
+        if (!model) throw new Error(sourceText("error.backend.channelLeadModelUnavailable"));
+        const client = this.#providers.createProfileClient(lead.provider);
+        return this.#profileClients.run(client, (cancelled) =>
+          generateTextWithoutTools(
+            client,
+            { ...model, defaultReasoningEffort: lead.reasoningEffort },
+            prompt,
+            cancelled,
+          ),
+        );
+      },
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       awaitDrain: (agentId) => this.#drain.taskFor(agentId),
       contextCharacters: (agentId, threadId) => {
@@ -822,32 +837,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.team.agentNotFound"));
     return this.#providers.usage({ provider: agent.provider, model: agent.model });
-  }
-
-  /**
-   * One text completion of the agent's own model, with no tools and no thread: a routing decision.
-   * The Slack router uses it to pick the agent that answers a new conversation.
-   */
-  generateText(agentId: string, prompt: string): Promise<string> {
-    const agent = this.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.team.agentNotFound"));
-    return this.#generate(agent, prompt, "error.backend.routerModelUnavailable");
-  }
-
-  async #generate(
-    agent: AgentSummary,
-    prompt: string,
-    unavailable: "error.backend.channelLeadModelUnavailable" | "error.backend.routerModelUnavailable",
-  ): Promise<string> {
-    await this.#providers.ensureProvider(agent.provider);
-    const model = this.#endpoints
-      .available()
-      .find((item) => item.provider === agent.provider && item.id === agent.model);
-    if (!model) throw new Error(sourceText(unavailable));
-    const client = this.#providers.createProfileClient(agent.provider);
-    return this.#profileClients.run(client, (cancelled) =>
-      generateTextWithoutTools(client, { ...model, defaultReasoningEffort: agent.reasoningEffort }, prompt, cancelled),
-    );
   }
 
   listAgents(): AgentSummary[] {
@@ -1249,8 +1238,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       await this.#prepareAgentWorkspace(agent);
       // A template, a marketplace agent and an imported one name no model. They start where a new
       // agent does; with nothing listed yet they keep the record's own, because no message waits.
-      const starting = this.#startingChoice();
-      if (starting) agent = await this.#landOnStartingChoice(agent, starting);
+      // The Slack orchestrator names the model the user picked.
+      const requested = creationModel(input, this.#endpoints.available());
+      const starting = requested ? null : this.#startingChoice();
+      if (requested)
+        agent = await this.#store.updateAgent({
+          agentId: agent.id,
+          provider: requested.provider,
+          model: requested.model.id,
+          reasoningEffort:
+            input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
+              ? input.reasoningEffort
+              : requested.model.defaultReasoningEffort,
+        });
+      else if (starting) agent = await this.#landOnStartingChoice(agent, starting);
       if (input.title) agent = await this.#store.updateAgent({ agentId: agent.id, title: input.title });
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       return agent;

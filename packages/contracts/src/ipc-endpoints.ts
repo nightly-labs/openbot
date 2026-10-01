@@ -195,7 +195,12 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
-import type { SetSlackEnabledInput, SetSlackRoutingInput, SlackOverview, SlackWorkspaceInput } from "./ipc-messaging";
+import type {
+  AddSlackOrchestratorInput,
+  SetSlackEnabledInput,
+  SlackOverview,
+  SlackWorkspaceInput,
+} from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   DetectedModelServer,
@@ -560,7 +565,8 @@ export const IPC_ENDPOINTS = {
     disconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:disconnect-slack-workspace"),
     reconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:reconnect-slack-workspace"),
     setSlackEnabled: request<SetSlackEnabledInput, void>()("messaging:set-slack-enabled"),
-    setSlackRouting: request<SetSlackRoutingInput, void>()("messaging:set-slack-routing"),
+    // Returns the new agent's id.
+    addSlackOrchestrator: request<AddSlackOrchestratorInput, string>()("messaging:add-slack-orchestrator"),
   },
   // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The

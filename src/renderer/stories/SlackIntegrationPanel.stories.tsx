@@ -1,5 +1,9 @@
 import type { MessagingConnection } from "@openbot/contracts/ipc";
-import { type SlackIntegrationAgent, SlackIntegrationPanel } from "@openbot/ui/features/settings/SlackIntegrationPanel";
+import {
+  SlackConnectDialog,
+  type SlackIntegrationAgent,
+  SlackIntegrationPanel,
+} from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_SUMMARIES } from "./fixtures";
@@ -22,11 +26,14 @@ const AGENTS: SlackIntegrationAgent[] = STORY_AGENT_SUMMARIES.map((agent) => ({
   avatarUrl: null,
 }));
 
-function agentId(index: number): string {
-  const agent = AGENTS[index];
-  if (!agent) throw new Error(`Story agent ${index} is missing.`);
-  return agent.id;
-}
+const ORCHESTRATOR: SlackIntegrationAgent = {
+  id: "agent-slack-orchestrator",
+  name: "Slack Orchestrator",
+  title: "Answers in Slack and asks the team",
+  avatarSeed: "slack-orchestrator",
+  avatarHue: 280,
+  avatarUrl: null,
+};
 
 function workspace(update: Partial<MessagingConnection> = {}): MessagingConnection {
   return {
@@ -39,33 +46,30 @@ function workspace(update: Partial<MessagingConnection> = {}): MessagingConnecti
     missingScopes: [],
     retryAt: null,
     credentials: "saved",
-    routerAgentId: null,
-    agentIds: [],
+    orchestratorAgentId: ORCHESTRATOR.id,
     ...update,
   };
 }
 
 const args = (connections: MessagingConnection[], busy = false) => ({
-  agents: AGENTS,
+  agents: [ORCHESTRATOR, ...AGENTS],
   connections,
   busy,
   onConnectWorkspace: fn(),
   onDisconnectWorkspace: fn(),
   onReconnect: fn(),
   onSetEnabled: fn(),
-  onSetRouting: fn(),
+  onAddOrchestrator: fn(),
 });
 
-/** No workspace yet: Connect Slack is the only step. */
+/** No workspace yet: Connect Slack opens the dialog. */
 export const NotSetUp: Story = { args: args([]) };
 
-/** Every agent can answer, and the first one routes. */
+/** The workspace is connected, and the Slack Orchestrator answers. */
 export const Connected: Story = { args: args([workspace()]) };
 
-/** A chosen router, and two agents that can answer. */
-export const ChosenAgents: Story = {
-  args: args([workspace({ routerAgentId: agentId(1), agentIds: [agentId(0), agentId(1)] })]),
-};
+/** The workspace is connected, and no agent answers yet. */
+export const NoOrchestrator: Story = { args: args([workspace({ orchestratorAgentId: null })]) };
 
 export const Paused: Story = { args: args([workspace({ enabled: false, state: "paused" })]) };
 
@@ -73,4 +77,34 @@ export const Uninstalled: Story = { args: args([workspace({ state: "invalid_toke
 
 export const MissingPermissions: Story = {
   args: args([workspace({ state: "missing_scope", missingScopes: ["files:read"] })]),
+};
+
+type DialogStory = StoryObj<typeof SlackConnectDialog>;
+
+const dialogArgs = (connection: MessagingConnection | null) => ({
+  open: true,
+  connection,
+  agents: [ORCHESTRATOR, ...AGENTS],
+  busy: false,
+  onConnectWorkspace: fn(),
+  onAddOrchestrator: fn(),
+  onClose: fn(),
+});
+
+/** Step 1: Slack's install page opens in the browser. */
+export const ConnectWorkspace: DialogStory = {
+  render: (props) => <SlackConnectDialog {...props} />,
+  args: dialogArgs(null),
+};
+
+/** Step 2: the workspace is connected, and the Slack Orchestrator is added next. */
+export const AddOrchestrator: DialogStory = {
+  render: (props) => <SlackConnectDialog {...props} />,
+  args: dialogArgs(workspace({ orchestratorAgentId: null })),
+};
+
+/** Done: how OpenBot looks in Slack. */
+export const ConnectDone: DialogStory = {
+  render: (props) => <SlackConnectDialog {...props} />,
+  args: dialogArgs(workspace()),
 };

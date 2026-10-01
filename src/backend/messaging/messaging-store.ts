@@ -20,8 +20,8 @@ export interface MessagingConnectionRecord {
   enabled: boolean;
   botUserId: string | null;
   appId: string | null;
-  /** The agent whose model picks who answers a new conversation. Null: the first agent that can answer. */
-  routerAgentId: string | null;
+  /** The agent that receives every new conversation. Null until the user adds it. */
+  orchestratorAgentId: string | null;
   /** The last failure that stops the connection until the user acts, such as a revoked token. */
   lastErrorCode: string | null;
 }
@@ -53,7 +53,7 @@ export interface MessagingLinkInput {
 const LINK_LIST_LIMIT = 200;
 
 /**
- * Owns `projection_messaging_connections`, `projection_messaging_agents` and `projection_messaging_threads`. It never stores a
+ * Owns `projection_messaging_connections` and `projection_messaging_threads`. It never stores a
  * token, and it never imports the database facade's callers.
  *
  * A connection row is configuration, so it is written directly, as MCP servers are. A link creates
@@ -121,7 +121,7 @@ export class MessagingStore {
     this.#database.connection
       .prepare(
         `UPDATE projection_messaging_connections
-         SET enabled = ?, workspace_name = ?, bot_user_id = ?, app_id = ?, router_agent_id = ?,
+         SET enabled = ?, workspace_name = ?, bot_user_id = ?, app_id = ?, orchestrator_agent_id = ?,
              last_error_code = ?, updated_at = ?
          WHERE connection_id = ?`,
       )
@@ -130,36 +130,11 @@ export class MessagingStore {
         next.workspaceName,
         next.botUserId,
         next.appId,
-        next.routerAgentId,
+        next.orchestratorAgentId,
         next.lastErrorCode,
         new Date().toISOString(),
         connectionId,
       );
-  }
-
-  /** The agents that can answer in this workspace. Empty: every agent. */
-  answeringAgents(connectionId: string): string[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare("SELECT agent_id FROM projection_messaging_agents WHERE connection_id = ? ORDER BY agent_id")
-        .all(connectionId),
-    ).map((row) => requiredStringColumn(row, "agent_id"));
-  }
-
-  setAnsweringAgents(connectionId: string, agentIds: readonly string[]): void {
-    const database = this.#database.connection;
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      database.prepare("DELETE FROM projection_messaging_agents WHERE connection_id = ?").run(connectionId);
-      const insert = database.prepare(
-        "INSERT INTO projection_messaging_agents (connection_id, agent_id) VALUES (?, ?)",
-      );
-      for (const agentId of new Set(agentIds)) insert.run(connectionId, agentId);
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
   }
 
   link(linkId: string): MessagingLink | null {
@@ -270,9 +245,9 @@ export class MessagingStore {
   }
 
   /**
-   * Removes every link of an agent, with the execution threads and their history, and takes the
-   * agent out of every connection. The caller releases the provider sessions of `threadIdsForAgent`
-   * first.
+   * Removes every link of an agent, with the execution threads and their history. A workspace whose
+   * orchestrator it was has none until the user adds one again. The caller releases the provider
+   * sessions of `threadIdsForAgent` first.
    */
   deleteForAgent(agentId: string): void {
     const links = databaseRows(
@@ -308,10 +283,9 @@ export class MessagingStore {
         db.prepare("DELETE FROM projection_messaging_threads WHERE agent_id = ?").run(agentId);
         for (const { threadId } of links)
           db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
-        db.prepare("DELETE FROM projection_messaging_agents WHERE agent_id = ?").run(agentId);
-        db.prepare("UPDATE projection_messaging_connections SET router_agent_id = NULL WHERE router_agent_id = ?").run(
-          agentId,
-        );
+        db.prepare(
+          "UPDATE projection_messaging_connections SET orchestrator_agent_id = NULL WHERE orchestrator_agent_id = ?",
+        ).run(agentId);
         return null;
       },
     );
@@ -354,7 +328,7 @@ function decodeConnection(row: DynamicRecord): MessagingConnectionRecord[] {
       enabled: requiredNumberColumn(row, "enabled") === 1,
       botUserId: optionalStringColumn(row, "bot_user_id"),
       appId: optionalStringColumn(row, "app_id"),
-      routerAgentId: optionalStringColumn(row, "router_agent_id"),
+      orchestratorAgentId: optionalStringColumn(row, "orchestrator_agent_id"),
       lastErrorCode: optionalStringColumn(row, "last_error_code"),
     },
   ];

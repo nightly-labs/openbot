@@ -1471,8 +1471,9 @@ No account API, Signal, IPC contract, or database migration changes are required
 The agents of a computer can answer in an external chat platform. Slack is the first platform;
 [messaging.md](messaging.md) has the setup, the limits and how to add a platform. Every workspace
 installs the one OpenBot Slack app (`apps/slack-app`), and the workspace is linked to the host that
-connected it. People mention @OpenBot or send it a direct message. A router agent picks the agent that
-answers each new conversation, and every answer comes from OpenBot.
+connected it. People mention @OpenBot or send it a direct message. The workspace's Slack Orchestrator,
+an agent that the connect dialog adds, receives each new conversation, asks its teammates and posts
+the answer. Every answer comes from OpenBot.
 
 - **Install.** The desktop asks `POST /v2/slack/authorize` for Slack's install URL, with a one-use host
   key. The Worker exchanges the code at `/v2/slack/callback`, because the app's client secret lives
@@ -1496,15 +1497,18 @@ beside `ChannelService` and knows no platform. `MessagingService` is built in th
 owns the live connections, through one `MessagingDriver` per platform: an adapter for its API and a
 transport for its events. `messaging-types.ts` is the seam; the core never reads a platform payload.
 
-- **Storage.** Migration 25 adds `projection_messaging_connections` (one per workspace, with its router
-  agent), `projection_messaging_agents` (the agents that can answer; none means all) and
-  `projection_messaging_threads` (one per external conversation, with the agent that answers it).
+- **Storage.** Migration 25 adds `projection_messaging_connections` (one per workspace, with its
+  orchestrator agent) and `projection_messaging_threads` (one per external conversation, with the
+  agent that answers it).
   Tokens are not in the database: `MessagingCredentialStore` keeps the bot token encrypted by
   `safeStorage`, keyed by connection, and only its state crosses IPC.
-- **Routing.** A message in a thread that has a link goes to the link's agent. A new conversation goes
-  to the only agent that can answer, or else `messaging-router.ts` asks the router agent's own model,
-  with no tools, to name one agent or to ask the person a question (`AgentService.generateText`, the
-  same completion that routes channel work). The link then keeps the agent for the whole thread.
+- **Orchestrator.** A message in a thread that has a link goes to the link's agent. A new conversation
+  goes to the workspace's orchestrator; without one, Slack is told that no agent answers. The
+  orchestrator is a normal agent (`slack-orchestrator.ts`): its description is its standing remit, and
+  it starts with five memories, which are facts only, because the model reads memories as data. It
+  gives work to one teammate with `send_message`; the request carries `messagingReturn`, so the
+  teammate's answer runs as a follow-up turn in the same Slack thread. A turn that only asked a
+  teammate posts "A teammate is working on it" (`MessagingThreads.awaitsTeammate`).
 - **Execution threads.** Each Slack thread is a link with its own execution thread in
   `projection_threads`, as a channel-agent pair is. A direct message is answered in a thread under
   it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
@@ -1529,7 +1533,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
   covers a restart. Events that arrive while no socket is open are lost after Slack's retries.
 - **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents shows each
-  workspace, its router agent and the agents that can answer (`messaging:*`). A remote server shows
+  workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
+  orchestrator on the model the user picks (`messaging:*`). A remote server shows
   no Slack page, because the install returns to the host's own browser. A live connection counts as
   use, so a hosted server does not idle out.
 

@@ -71,8 +71,11 @@ export interface MessagingThreadsHooks {
   forgetThread(threadId: string): Promise<void>;
 }
 
-/** Enough work from one conversation platform to hold an agent for a long time. */
-const AGENT_QUEUE_LIMIT = 5;
+/**
+ * Enough work from one conversation platform to hold an agent for a long time. The Slack
+ * orchestrator receives every new conversation, and it mostly asks teammates, so its turns are short.
+ */
+const AGENT_QUEUE_LIMIT = 20;
 const AUTHOR_QUEUE_LIMIT = 2;
 const CONTEXT_TIMEOUT_MS = 5_000;
 
@@ -295,6 +298,11 @@ export class MessagingThreads {
     }
     if (stopped) this.#hooks.schedule(link.agentId);
     return stopped;
+  }
+
+  /** True while a teammate works on a request that the agent sent from this conversation. */
+  awaitsTeammate(linkId: string): boolean {
+    return this.#mailbox.pendingMessagingReturns(linkId) > 0;
   }
 
   /** Removes the agent's links and execution threads, and takes it out of every connection. The mailbox leaves separately. */

@@ -908,7 +908,8 @@ export async function createApplicationServices({
         service.on("event", listener);
         return () => service.off("event", listener);
       },
-      generate: (agentId, prompt) => service.generateText(agentId, prompt),
+      createAgentProfile: (input) => service.createAgentProfile(input),
+      createMemory: (input) => service.createMemory(input),
     },
     credentials: messagingCredentials,
     drivers: [slackDriver({ ingress: slackIngress })],

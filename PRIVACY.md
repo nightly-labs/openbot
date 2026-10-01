@@ -440,7 +440,7 @@ answers go from the computer to the Slack Web API directly.
 
 - **Stored on the host.** The bot token is encrypted by the operating system's secret storage, like
   provider API keys, and redacted from logs, exports and diagnostics. The database holds the
-  workspace name and IDs, the router agent and the agents that can answer, and one row per Slack
+  workspace name and IDs, which agent is its Slack Orchestrator, and one row per Slack
   thread that an agent answers. The messages of that thread are kept as a conversation of that
   agent, with the Slack display name of each author, and files people send are kept with the agent's
   attachments. Disconnect revokes and removes the token and keeps the conversations; deleting an
@@ -450,11 +450,11 @@ answers go from the computer to the Slack Web API directly.
   channels, and earlier messages of a thread as context. Slack sends every message of each channel
   that OpenBot is in; the computer keeps only the messages that address OpenBot or continue a
   conversation.
-- **Given to the router agent's model.** For a new conversation, the text of the message, the channel
-  name, and the name, title and description of each agent that can answer, so that the model picks
-  one. This goes to that agent's provider like any other prompt.
+- **Given to the Slack Orchestrator.** Every new Slack request goes first to the orchestrator agent,
+  which runs on its provider like any other agent and passes the work to a teammate with the facts
+  it needs.
 - **Sent to Slack.** The agents' answers and the files they attach, short status posts ("Working on
-  it…"), the router's questions, reactions, and approval requests with the command, folder and
+  it…"), reactions, and approval requests with the command, folder and
   reason the provider gave, redacted. A failed request posts a fixed sentence, never the provider's
   error.
 

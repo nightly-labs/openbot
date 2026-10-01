@@ -6,8 +6,8 @@ import { GitHubMark, type IntegrationStatus, SlackMark } from "@openbot/ui/featu
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
 import {
   SlackIntegrationPanel,
-  slackAnsweringAgents,
   slackIntegrationState,
+  slackOrchestrator,
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -57,9 +57,9 @@ export function ConnectorsPanel(props: {
   };
   const slackRow = (slack: SlackConnectorController): IntegrationsHubRow => {
     const connections = slack.overview()?.connections ?? [];
-    const state = slackIntegrationState(connections);
+    const state = slackIntegrationState(connections, props.agents);
     const [connection] = connections;
-    const members = connection ? slackAnsweringAgents(connection, props.agents) : [];
+    const orchestrator = connection ? slackOrchestrator(connection, props.agents) : null;
     const workspace = connection?.workspaceName;
     return {
       id: "slack",
@@ -72,10 +72,10 @@ export function ConnectorsPanel(props: {
           ? t("connector.slack.attentionTitle", { count: state.attention })
           : workspace === undefined
             ? t("connector.slack.description")
-            : members.length > 0
-              ? t("connector.slack.summaryAgents", { workspace, count: members.length })
-              : t("connector.slack.summaryNoAgents", { workspace }),
-      agents: members,
+            : orchestrator
+              ? t("connector.slack.summaryConnected", { workspace })
+              : t("connector.slack.summaryNoAgent", { workspace }),
+      agents: orchestrator ? [orchestrator] : [],
       onOpen: () => setView("slack"),
     };
   };
@@ -123,11 +123,12 @@ export function ConnectorsPanel(props: {
                   agents={props.agents}
                   connections={overview().connections}
                   busy={slack().busy()}
+                  models={slack().models()}
                   onConnectWorkspace={slack().connectWorkspace}
                   onDisconnectWorkspace={slack().disconnectWorkspace}
                   onReconnect={slack().reconnect}
                   onSetEnabled={slack().setEnabled}
-                  onSetRouting={slack().setRouting}
+                  onAddOrchestrator={slack().addOrchestrator}
                 />
               )}
             </Show>

@@ -1,10 +1,12 @@
 /**
  * Messaging connections: a chat platform workspace, such as a Slack workspace that installed the
- * OpenBot app, where the agents of this computer answer. The router agent picks the agent that
- * answers each new conversation. The connection belongs to the computer that runs the agents.
- * Tokens travel only towards that host; no result carries one.
+ * OpenBot app, where the agents of this computer answer. Each new conversation goes to the
+ * workspace's orchestrator agent, which asks its teammates and answers. The connection belongs to the
+ * computer that runs the agents. Tokens travel only towards that host; no result carries one.
  */
 
+import type { AgentModelId, AgentReasoningEffort } from "./ipc-agent-identity";
+import type { AgentProviderId } from "./ipc-agent-status";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
@@ -34,7 +36,6 @@ export const MESSAGING_LIMITS = {
   name: 256,
   scope: 64,
   scopes: 32,
-  agents: 1_000,
   connections: 32,
 } as const;
 
@@ -50,10 +51,8 @@ export interface MessagingConnection {
   /** When the connection tries again after a rate limit, as an ISO time. */
   retryAt: string | null;
   credentials: MessagingCredentialState;
-  /** The agent whose model picks who answers. Null: the first agent that can answer. */
-  routerAgentId: string | null;
-  /** The agents that can answer. Empty: every agent. */
-  agentIds: string[];
+  /** The agent that receives every new conversation. Null until the user adds it: nothing answers. */
+  orchestratorAgentId: string | null;
 }
 
 /** The Slack workspaces connected on this computer. */
@@ -70,10 +69,12 @@ export interface SetSlackEnabledInput {
   enabled: boolean;
 }
 
-export interface SetSlackRoutingInput {
+/** Creates the workspace's orchestrator agent. Absent, the provider and model are a new agent's default. */
+export interface AddSlackOrchestratorInput {
   workspaceId: string;
-  routerAgentId: string | null;
-  agentIds: string[];
+  provider?: AgentProviderId;
+  model?: AgentModelId;
+  reasoningEffort?: AgentReasoningEffort;
 }
 
 function isScopeList(value: unknown): value is string[] {
@@ -96,10 +97,7 @@ export function isMessagingConnection(value: unknown): value is MessagingConnect
     isScopeList(value.missingScopes) &&
     isNullableBoundedString(value.retryAt, 64) &&
     isOneOf(MESSAGING_CREDENTIAL_STATES, value.credentials) &&
-    (value.routerAgentId === null || isIdentifier(value.routerAgentId)) &&
-    Array.isArray(value.agentIds) &&
-    value.agentIds.length <= MESSAGING_LIMITS.agents &&
-    value.agentIds.every(isIdentifier)
+    (value.orchestratorAgentId === null || isIdentifier(value.orchestratorAgentId))
   );
 }
 
