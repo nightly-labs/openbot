@@ -229,7 +229,8 @@ async function slackRoute(signingSecret: string | null) {
     REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
     TURN_SHARED_SECRET: "t".repeat(32),
     TURN_HOST: "localhost",
-    ...(signingSecret ? { SLACK_SIGNING_SECRET: signingSecret } : {}),
+    // The development app's secret is listed too: one Signal serves both apps.
+    ...(signingSecret ? { SLACK_SIGNING_SECRET: `${"d".repeat(32)}, ${signingSecret}` } : {}),
   });
   const routes = new RemoteTokenService(config);
   const signal = new SignalService(

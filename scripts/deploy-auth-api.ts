@@ -29,6 +29,10 @@ async function main(): Promise<void> {
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
   // Without the key, agents act on GitHub as the signed-in user and not as the OpenBot GitHub App.
   await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
+  // Slack is optional: without these, the Slack routes answer 503 slack_not_configured. The test
+  // Worker takes the development app's values from .env.shared, which dotenvx reads first.
+  await putOptionalSecretSet("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_STATE_SECRET");
+  await putOptionalSecretSet("SLACK_ROUTE_PRIVATE_JWK", "SLACK_ROUTE_KEY_ID");
   if (cloudflareEnvironment === "test") {
     await putTestAllowList();
     // The key is in the encrypted .env.shared. Each developer who can decrypt it can create servers.

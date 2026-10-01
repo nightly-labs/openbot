@@ -63,7 +63,7 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
     .post(
       SLACK_EVENTS_PATH,
       async ({ request, server }) => {
-        if (!config.slackSigningSecret) return slackResponse({ status: 503 });
+        if (config.slackSigningSecrets.length === 0) return slackResponse({ status: 503 });
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) {
           return slackResponse({ status: 413 });
@@ -74,7 +74,7 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
         if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
         const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
         const signature = request.headers.get("x-slack-signature") ?? "";
-        if (!verifySlackSignature(body, timestamp, signature, config.slackSigningSecret)) {
+        if (!config.slackSigningSecrets.some((secret) => verifySlackSignature(body, timestamp, signature, secret))) {
           const address = signalClientIp(
             server?.requestIP(request)?.address,
             request.headers.get("x-forwarded-for"),

@@ -33,7 +33,8 @@ validation window.
 
 The OpenBot Slack app sends the events and button presses of every workspace to one request URL,
 `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's signing
-secret (`SLACK_SIGNING_SECRET`), answers Slack's `url_verification` challenge, and reads only the
+secret (`SLACK_SIGNING_SECRET`; a comma-separated list, because the production and development apps
+share Signal), answers Slack's `url_verification` challenge, and reads only the
 workspace ID. Then it passes the exact request body to the `ingress` socket of the host that the
 workspace is linked to, and returns the host's answer, or 503 when no host holds the workspace or the
 host does not answer in 2.5 seconds. Slack then sends the request again.
