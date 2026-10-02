@@ -13,7 +13,7 @@ export function automationRoot(userDataPath: string): string {
   return join(userDataPath, "automation");
 }
 
-export function automationRunPath(agentId: string, routineId: string): string {
+function automationRunPath(agentId: string, routineId: string): string {
   return `/v1/agents/${encodeURIComponent(agentId)}/routines/${encodeURIComponent(routineId)}/run`;
 }
 

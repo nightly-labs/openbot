@@ -277,9 +277,10 @@ export class RoutineScheduler implements RoutineDueSource {
         ].join("\n")
       : routine.instruction;
     const run = this.#routines.createRun({ ...routine, instruction }, null, "manual", new Date().toISOString());
-    await this.#enqueueRun(run);
+    // Return this request's row: a concurrent run of the same routine can be the newest row.
+    const queued = await this.#enqueueRun(run);
     this.stateChanged(input.agentId);
-    return this.#routines.listRuns(input.agentId, input.routineId, 1)[0] ?? run;
+    return queued;
   }
 
   listRuns(input: ListRoutineRunsInput): RoutineRun[] {
@@ -543,7 +544,7 @@ export class RoutineScheduler implements RoutineDueSource {
     });
   }
 
-  async #enqueueRun(run: RoutineRun): Promise<void> {
+  async #enqueueRun(run: RoutineRun): Promise<RoutineRun> {
     recordRestartActivity();
     const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
@@ -565,7 +566,7 @@ export class RoutineScheduler implements RoutineDueSource {
       });
       const deliveryId = receipt.deliveries[0]?.id;
       if (!deliveryId) throw new Error("Unable to create the routine delivery.");
-      this.#routines.attachDelivery(run.id, deliveryId);
+      const queued = this.#routines.attachDelivery(run.id, deliveryId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
       this.#hooks.syncMailboxMessages(snapshot);
       await this.#store.updatePreview(agent.id, run.instruction);
@@ -573,6 +574,7 @@ export class RoutineScheduler implements RoutineDueSource {
       this.#conversation.emitConversation(snapshot, "routine.run-queued", { routineId: run.routineId, runId: run.id });
       this.#hooks.emitQueue(agent.id);
       this.#hooks.scheduleDrain(agent.id);
+      return queued;
     } catch (error) {
       this.#transitionRunWithConversation(run, "failed", error instanceof Error ? error.message : String(error));
       this.stateChanged(run.agentId);
