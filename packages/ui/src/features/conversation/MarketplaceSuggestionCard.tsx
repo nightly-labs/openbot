@@ -20,16 +20,16 @@ export interface MarketplaceSuggestionCardProps {
   description: string;
   iconUrl: string | null;
   /** Drawn instead of the icon: the mark of an app with no listing icon, such as GitHub. */
-  mark?: JSX.Element;
+  mark?: JSX.Element | undefined;
   state: MarketplaceSuggestionState;
   /** Why the user cannot connect it here. Shown under the header when `unavailable`. */
   unavailableText?: string;
   /** The user dismissed the card. It stays as one line with Undo. */
   dismissed?: boolean;
   /** Runs the connect or install step. The approval and sign-in dialogs stay in the consumer. */
-  onConnect?: () => void;
+  onConnect?: (() => void) | undefined;
   /** Opens the listing in Marketplace. */
-  onOpenDetails?: () => void;
+  onOpenDetails?: (() => void) | undefined;
   onDismiss?: () => void;
   onRestore?: () => void;
 }
