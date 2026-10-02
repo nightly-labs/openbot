@@ -27,7 +27,7 @@ import { redactText } from "@openbot/logging";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
-import { AgentProcessExitError, type AgentProvider } from "./agent-client";
+import { AgentProcessExitError, type AgentProvider, type DiagnosticOrigin } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { LineTooLongError, limitLineLength } from "./jsonl";
@@ -77,9 +77,9 @@ const MODEL_REASONING_PROBE_BUDGET_MS = 5_000;
 const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 
 /**
- * What the sweep leaves of the discovery deadline for the two requests that follow it: the restore of
- * the model the session opened on, and the close of the probe session. Both are one round trip, and
- * the catalog the caller waits for is already built when they run.
+ * What the sweep leaves of the discovery deadline for the request that follows it: the restore of the
+ * model the session opened on. It is one round trip, and the catalog the caller waits for is already
+ * built when it runs. The close of the probe session is not awaited and uses none of it.
  */
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
@@ -106,7 +106,7 @@ interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
   exit: [error: Error];
-  diagnostic: [message: string];
+  diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
 interface ProcessEnd {
@@ -303,6 +303,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #models: AcpModel[] = [];
   #signedIn = false;
   #stopping = false;
+  /**
+   * Each process that `stop()` ended while it still ran. Its stderr is the shutdown that OpenBot
+   * started. Held per process, not read from `#stopping`: a crash also calls `stop()`, and `start()`
+   * clears `#stopping` before the last stderr of the previous process is read.
+   */
+  readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
 
   constructor(
     cli: AgentCliInfo,
@@ -330,10 +336,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   get running(): boolean {
     return this.#process !== null && this.#process.exitCode === null && !this.#stopping;
-  }
-
-  get stopping(): boolean {
-    return this.#stopping;
   }
 
   start(): void {
@@ -380,7 +382,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       redact: (text) => this.#redact(text),
       emit: (message) => {
         lastDiagnostic = message;
-        this.emit("diagnostic", message);
+        this.emit("diagnostic", message, { duringStop: this.#stoppedProcesses.has(child) });
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
@@ -403,6 +405,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   async stop(): Promise<void> {
     this.#stopping = true;
     const child = this.#process;
+    // After a crash `#process` is already null, so the crash reason stays an error for the user.
+    if (child && child.exitCode === null) this.#stoppedProcesses.add(child);
     this.#process = null;
     this.#connection = null;
     this.#initialized = null;
@@ -691,8 +695,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
-    // user's own next CLI session would start on a model they never chose. Half of the cleanup
-    // reserve, so the close that follows keeps the other half.
+    // user's own next CLI session would start on a model they never chose.
     if (selected !== option.currentValue) {
       await this.#requestBefore(
         () =>
@@ -701,7 +704,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             configId: option.id,
             value: option.currentValue,
           }),
-        Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS / 2, deadline),
+        Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS, deadline),
         "session/set_config_option",
       );
     }

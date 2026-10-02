@@ -15,7 +15,7 @@ import { isAgentModel } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
-import type { AgentClient } from "./agent-client";
+import type { AgentClient, DiagnosticOrigin } from "./agent-client";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -51,7 +51,7 @@ interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
   exit: [error: Error];
-  diagnostic: [message: string];
+  diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
 type ModelEntry = ModelListResponse["data"][number];
@@ -83,8 +83,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   #nextRequestId = 0;
   readonly #lastModels = new Map<string, ModelEntry[]>();
   #running = false;
-  /** Set by `stop()` alone: `#running` is also false after an agent process crashed. */
-  #stopping = false;
 
   constructor(source: CustomAgentSource, createChild: CustomAgentChildFactory, resolve = resolveAgentCommand) {
     super();
@@ -97,18 +95,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#running;
   }
 
-  get stopping(): boolean {
-    return this.#stopping;
-  }
-
   start(): void {
     this.#running = true;
-    this.#stopping = false;
   }
 
   async stop(): Promise<void> {
     this.#running = false;
-    this.#stopping = true;
     const children = [...this.#children.values()];
     this.#children.clear();
     this.#requests.clear();
@@ -265,7 +257,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       this.#requests.set(id, { child, id: request.id });
       this.emit("request", withRoutedThreadId({ ...request, id }, agentId));
     });
-    child.on("diagnostic", (message) => this.emit("diagnostic", this.#redact(message)));
+    child.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
     child.once("exit", (error) => this.#childExited(agentId, child, this.#redactError(error)));
     child.start();
     try {

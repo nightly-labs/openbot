@@ -3,15 +3,14 @@ import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecode
 
 export type AgentProvider = AgentProviderId;
 
+/** Where a diagnostic came from. See `AgentClient.on("diagnostic")`. */
+export interface DiagnosticOrigin {
+  readonly duringStop: boolean;
+}
+
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly running: boolean;
-  /**
-   * True from `stop()` on. What the CLI writes to stderr then is the shutdown that OpenBot started,
-   * not an error for the user. `running` cannot tell this apart: it is also false after a crash.
-   * Optional: each stderr line of a client without it is reported as before.
-   */
-  readonly stopping?: boolean;
   start(): void;
   stop(): Promise<void>;
   /**
@@ -35,7 +34,11 @@ export interface AgentClient {
   respondError(id: RequestId, error: RpcError): void;
   on(event: "notification", listener: (notification: AppServerNotification) => void): this;
   on(event: "request", listener: (request: AppServerRequest) => void): this;
-  on(event: "diagnostic", listener: (message: string) => void): this;
+  /**
+   * `origin.duringStop` marks a stderr line of a process that `stop()` ended while it still ran: the
+   * shutdown that OpenBot started, not an error for the user. A line with no `origin` is reported.
+   */
+  on(event: "diagnostic", listener: (message: string, origin?: DiagnosticOrigin) => void): this;
   once(event: "exit", listener: (error: Error) => void): this;
 }
 

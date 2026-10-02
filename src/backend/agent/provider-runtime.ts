@@ -1787,12 +1787,8 @@ export class ProviderRuntime implements ProviderPort {
     // Taken before `start()`, which is where the CLI reads the endpoint files.
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
-    client.on("diagnostic", (raw) => {
+    client.on("diagnostic", (raw, origin) => {
       if (!/error|failed|warning/i.test(raw)) return;
-      const names = new Set([
-        ...this.#credentials.mcpServers().map((config) => config.name),
-        ...this.#mcpHandoff.names(),
-      ]);
       // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
@@ -1800,10 +1796,14 @@ export class ProviderRuntime implements ProviderPort {
       const message = shortenDiagnostic(this.#redactMcp(raw));
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
-      if (client.stopping) {
+      if (origin?.duringStop) {
         logger.warn("A provider wrote an error while OpenBot stopped it.", { provider: client.provider, message });
         return;
       }
+      const names = new Set([
+        ...this.#credentials.mcpServers().map((config) => config.name),
+        ...this.#mcpHandoff.names(),
+      ]);
       if (isMcpSubsystemDiagnostic(message, [...names])) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;
