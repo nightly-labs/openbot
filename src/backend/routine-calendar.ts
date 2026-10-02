@@ -37,6 +37,8 @@ export async function buildRoutineCalendar(
     // History reaches back from now, so a range that ends before the oldest run kept here has no history.
     const history =
       range.from.getTime() < now.getTime() ? await source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage) : [];
+    // Planning does not wait, so the main process gets a turn between routines.
+    await new Promise((resolve) => setImmediate(resolve));
     return routineRuns(routine, history, range, now);
   });
   return {

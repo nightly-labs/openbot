@@ -216,9 +216,18 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
 
 function zonedDateTimeCandidates(parts: CalendarParts, timezone: string): Date[] {
   const approximate = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  // A local time falls at its UTC time less an offset that the zone uses near it. A time in a gap
+  // has no candidate, and a time that repeats has two.
+  const offsets = new Set(
+    [-18, 0, 18].map((hours) => {
+      const instant = approximate + hours * 3_600_000;
+      const local = zonedParts(new Date(instant), timezone);
+      return Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute) - instant;
+    }),
+  );
   const result: Date[] = [];
-  for (let offset = -18 * 60; offset <= 18 * 60; offset += 15) {
-    const candidate = new Date(approximate + offset * 60_000);
+  for (const offset of offsets) {
+    const candidate = new Date(approximate - offset);
     const value = zonedParts(candidate, timezone);
     if (
       value.year === parts.year &&
