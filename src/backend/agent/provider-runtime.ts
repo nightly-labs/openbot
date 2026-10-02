@@ -55,6 +55,7 @@ import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   ignoredCodexSettings,
+  isAcpRequestEchoDiagnostic,
   isBackgroundRefreshDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
@@ -99,7 +100,14 @@ const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FAL
  * The providers whose shared process reads the agent environment only when it starts. Claude reads
  * it at each session start, and Codex with each thread's config.
  */
-const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = ["grok", "opencode", "antigravity", "cursor", "acp"];
+const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
+  "grok",
+  "opencode",
+  "antigravity",
+  "cursor",
+  "cline",
+  "acp",
+];
 
 /** The CLI did not answer in time: its `--version`, or a request of its start, such as `initialize`. */
 function isProviderTimeout(error: unknown): boolean {
@@ -218,6 +226,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "opencode", state: "not-started", version: null, message: null },
     { id: "antigravity", state: "not-started", version: null, message: null },
     { id: "cursor", state: "not-started", version: null, message: null },
+    { id: "cline", state: "not-started", version: null, message: null },
     { id: "acp", state: "not-started", version: null, message: null },
   ],
   capabilities: {
@@ -711,7 +720,7 @@ export class ProviderRuntime implements ProviderPort {
             startAcpAuthentication({
               executable: cli.executable,
               argv: signIn.argv,
-              env: {},
+              env: { ...signIn.env },
               methodId: signIn.methodId,
               timeoutMs: signIn.timeoutMs,
             }),
@@ -1864,6 +1873,10 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isTelemetryExportDiagnostic(message)) {
         logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
+        return;
+      }
+      if (isAcpRequestEchoDiagnostic(message)) {
+        logger.warn("A provider logged an error that it also sent as a reply.", { provider: client.provider, message });
         return;
       }
       if (isToolCallDiagnostic(message)) {

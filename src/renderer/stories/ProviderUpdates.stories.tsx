@@ -12,7 +12,7 @@ import {
   showProviderUpdateToast,
 } from "../src/features/provider-updates/provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor"] as const;
+const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor", "cline"] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
   claude: "Claude",
@@ -20,6 +20,7 @@ const NAMES: Record<ManagedProviderId, string> = {
   opencode: "OpenCode",
   antigravity: "Gemini",
   cursor: "Cursor",
+  cline: "Cline",
 };
 const INSTALLED: Record<ManagedProviderId, string> = {
   codex: "0.149.1",
@@ -28,6 +29,7 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   opencode: "1.18.30",
   antigravity: "1.2.1",
   cursor: "2026.09.28-64d2043",
+  cline: "3.0.68",
 };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
@@ -38,6 +40,7 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   opencode: null,
   antigravity: null,
   cursor: null,
+  cline: null,
 };
 
 /** Fast enough to finish in a couple of seconds, slow enough to read. */
@@ -53,6 +56,7 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     opencode: { phase: "ready", progress: 100, message: null, version: INSTALLED.opencode },
     antigravity: { phase: "ready", progress: 100, message: null, version: INSTALLED.antigravity },
     cursor: { phase: "ready", progress: 100, message: null, version: INSTALLED.cursor },
+    cline: { phase: "ready", progress: 100, message: null, version: INSTALLED.cline },
   };
 }
 

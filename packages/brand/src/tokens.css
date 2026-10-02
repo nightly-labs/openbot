@@ -388,6 +388,10 @@
   --openbot-provider-current: var(--openbot-text-primary);
 }
 
+[data-provider="cline"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

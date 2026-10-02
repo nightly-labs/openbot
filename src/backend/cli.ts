@@ -12,6 +12,9 @@ const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 144, 1] as const;
 const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
+// The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
+// session with the ACP resource-not-found error.
+const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
 
 export interface CodexCliInfo {
   executable: string;
@@ -49,13 +52,20 @@ export interface CursorCliInfo {
   source?: "system" | "managed";
 }
 
+export interface ClineCliInfo {
+  executable: string;
+  version: string;
+  source?: "system" | "managed";
+}
+
 export type AgentCliInfo =
   | CodexCliInfo
   | ClaudeCliInfo
   | GrokCliInfo
   | OpencodeCliInfo
   | AntigravityCliInfo
-  | CursorCliInfo;
+  | CursorCliInfo
+  | ClineCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -345,6 +355,39 @@ export function parseCursorManifestVersion(manifest: string): string {
   return parseCursorVersion(version);
 }
 
+/**
+ * The Cline CLI is `cline` on `PATH`, which the npm package `cline` installs. There is no minimum
+ * version, as for OpenCode: a user who already has the CLI keeps it.
+ */
+export async function resolveClineCli(
+  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+): Promise<ClineCliInfo> {
+  const candidates = await cliCandidates("cline", input.systemCandidates, input.bundledExecutable ?? null);
+  const failures: CodexCliError[] = [];
+  for (const candidate of candidates) {
+    if (!(await isExecutable(candidate.executable))) continue;
+    try {
+      const version = parseClineVersion(await readCliVersion(candidate.executable, "cline"));
+      if (!isMinimumVersion(version, MINIMUM_CLINE_VERSION)) {
+        throw new CodexCliError(sourceText("error.provider.clineOutdated", { version }), "outdated");
+      }
+      return { executable: candidate.executable, version, source: candidate.source };
+    } catch (error) {
+      if (isCliTimeout(error)) throw error;
+      failures.push(
+        error instanceof CodexCliError
+          ? error
+          : new CodexCliError(sourceText("error.provider.clineNotStarted"), "invalid"),
+      );
+    }
+  }
+  throw (
+    failures.find((failure) => failure.code === "outdated") ??
+    failures[0] ??
+    new CodexCliError(sourceText("error.provider.clineMissing"), "missing")
+  );
+}
+
 export function bundledOpencodeExecutable(
   platform = process.platform,
   architecture = process.arch,
@@ -408,6 +451,13 @@ export function parseGrokVersion(output: string): string {
 export function parseOpencodeVersion(output: string): string {
   const match = output.trim().match(/^(?:opencode\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
   if (!match) throw new CodexCliError(sourceText("error.provider.opencodeVersionUnreadable"), "invalid");
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
+}
+
+/** Cline prints a bare `3.0.68`, the npm version of its package. */
+export function parseClineVersion(output: string): string {
+  const match = output.trim().match(/^(?:cline\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
+  if (!match) throw new CodexCliError(sourceText("error.provider.clineVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 

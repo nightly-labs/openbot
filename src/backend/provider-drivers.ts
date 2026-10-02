@@ -11,6 +11,7 @@ import {
   type AgentCliInfo,
   resolveAntigravityCli,
   resolveClaudeCli,
+  resolveClineCli,
   resolveCodexCli,
   resolveCursorCli,
   resolveGrokCli,
@@ -34,6 +35,7 @@ import {
 import { readOpenCodeGoUsage } from "./opencode-usage";
 import {
   antigravityStatePaths,
+  clineStatePaths,
   confineSpawnTarget,
   cursorConfinedEnv,
   cursorStatePaths,
@@ -41,6 +43,7 @@ import {
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
   type ProcessConfinement,
+  type SpawnTarget,
 } from "./process-confinement";
 import type { AccountReadResult } from "./protocol";
 
@@ -86,7 +89,13 @@ type ProviderSignIn =
    * OpenBot starts the ACP server and calls `authenticate` with this method, which opens a browser
    * from the server. Only the sign-in process calls it: in a status probe it would open a browser.
    */
-  | { kind: "acp-authenticate"; methodId: string; argv: readonly string[]; timeoutMs: number };
+  | {
+      kind: "acp-authenticate";
+      methodId: string;
+      argv: readonly string[];
+      env?: Readonly<Record<string, string>>;
+      timeoutMs: number;
+    };
 
 /**
  * A sign-in the user finishes on another device, for a host with no browser the user can see.
@@ -103,6 +112,28 @@ type ProviderCodeSignIn =
  * argument. OpenBot starts it the same way.
  */
 const ANTIGRAVITY_ARGV: readonly string[] = process.platform === "linux" ? ["--uid="] : [];
+
+const CLINE_ARGV: readonly string[] = ["--acp"];
+
+/**
+ * By default, the Cline CLI runs its sessions in a hub process that it detaches and that other Cline
+ * processes share. That process would outlive OpenBot and would escape a Workspace only sandbox, so
+ * every Cline process runs its sessions in itself. The managed CLI must not replace itself.
+ */
+const CLINE_ENV: Readonly<Record<string, string>> = {
+  CLINE_SESSION_BACKEND_MODE: "local",
+  CLINE_NO_AUTO_UPDATE: "1",
+};
+
+/**
+ * The sandbox lets a Cline process write in its data folder, not create `~/.cline` itself. A CLI
+ * that only `CLINE_API_KEY` signs in has not made that folder yet, so OpenBot makes it.
+ */
+function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement): SpawnTarget {
+  const state = clineStatePaths();
+  for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
+  return confineSpawnTarget(target, confinement, state);
+}
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -405,6 +436,44 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "cursor", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "cline",
+    // The `cline` method opens the Cline sign-in page. `CLINE_API_KEY` in the user's environment
+    // signs the CLI in without it.
+    signIn: {
+      kind: "acp-authenticate",
+      methodId: "cline",
+      argv: CLINE_ARGV,
+      env: CLINE_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    resolveCli: resolveClineCli,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "cline",
+        argv: CLINE_ARGV,
+        env: { ...CLINE_ENV },
+        ...(confinement ? { confine: (target) => confineClineTarget(target, confinement) } : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.clineSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpAuthorization: context.mcpAuthorization,
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "cline",
+        argv: CLINE_ARGV,
+        profileGeneration: true,
+        env: { ...CLINE_ENV },
+        signInMessage: sourceText("error.provider.clineSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "cline", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

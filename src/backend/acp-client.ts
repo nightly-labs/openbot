@@ -733,7 +733,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       await this.#startThread(params, true);
     } catch (error) {
       // The next turn replaces the missing session, so the user has nothing to act on.
-      if (!(error instanceof MissingOpenCodeSessionError)) {
+      if (!(error instanceof MissingAcpSessionError)) {
         this.emit("diagnostic", this.#redact(`ACP session load for a read failed: ${String(error)}`));
       }
       return null;
@@ -866,6 +866,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * An agent that follows the protocol answers a session missing from its store with `-32002`, the
+   * resource-not-found error, naming the session. Cline does.
+   *
    * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
    * failure" as a fault of its internal server. Only a `session/list` that answers in full without
    * the session shows it is missing: the caller then replaces it and hands it the transcript. A
@@ -877,11 +880,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       return await connection.loadSession(request);
     } catch (error) {
+      if (isSessionNotFound(error, request.sessionId)) {
+        throw new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error);
+      }
       if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) throw error;
       failure = error;
     }
     const listing = await this.#sessionListing(connection, request);
-    if (listing === "absent") throw new MissingOpenCodeSessionError(request.sessionId, failure);
+    if (listing === "absent") {
+      throw new MissingAcpSessionError(
+        `OpenCode session not found: ${request.sessionId} (OpenCode service failure)`,
+        failure,
+      );
+    }
     await new Promise((resolve) => setTimeout(resolve, OPENCODE_LOAD_RETRY_MS));
     try {
       // The process can have stopped during the wait; this reports that instead of a closed stream.
@@ -1576,13 +1587,20 @@ function isDynamicToolResult(value: unknown): value is DynamicToolResult {
   );
 }
 
-/** A session load that OpenCode failed while its internal server worked. */
-class MissingOpenCodeSessionError extends Error {
-  constructor(sessionId: string, cause: unknown) {
+/** A session that the agent does not have, so the caller opens a new one. */
+class MissingAcpSessionError extends Error {
+  constructor(message: string, cause: unknown) {
     // The wording is what `isMissingProviderSessionError` recognizes.
-    super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`, { cause });
-    this.name = "MissingOpenCodeSessionError";
+    super(message, { cause });
+    this.name = "MissingAcpSessionError";
   }
+}
+
+/** The protocol's resource-not-found error, for this session. */
+function isSessionNotFound(error: unknown, sessionId: string): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32002) return false;
+  const uri = isRecord(error.data) ? error.data.uri : undefined;
+  return uri === sessionId || error.message.includes(sessionId);
 }
 
 /**

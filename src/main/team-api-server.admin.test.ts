@@ -486,7 +486,15 @@ describe("Team API providers-v1", () => {
     };
     const snapshot: ProviderRuntimeSnapshot = {
       revision: 3,
-      providers: { codex: idle, claude: failed, grok: idle, opencode: idle, antigravity: idle, cursor: idle },
+      providers: {
+        codex: idle,
+        claude: failed,
+        grok: idle,
+        opencode: idle,
+        antigravity: idle,
+        cursor: idle,
+        cline: idle,
+      },
       toolRuntimes: { bun: idle },
     };
     const downloads: string[] = [];
@@ -582,6 +590,7 @@ describe("Team API providers-v1", () => {
     // A long download error is cut to the wire bound, so the client does not refuse the snapshot.
     expect(download.providers.claude.message).toHaveLength(1024);
     expect((await send("/v1/admin/providers/runtimes/download", { provider: "cursor" })).status).toBe(400);
+    expect((await send("/v1/admin/providers/runtimes/download", { provider: "cline" })).status).toBe(400);
     // Gemini stays on the host: providers-v1 has no entry for it, and a peer cannot name it.
     expect(Object.keys(download.providers)).toEqual(["codex", "claude", "grok", "opencode"]);
     for (const path of ["/v1/admin/providers/runtimes/download", "/v1/admin/providers/api-key/state"]) {
@@ -600,8 +609,9 @@ describe("Team API providers-v1", () => {
         .status,
     ).toBe(403);
     expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "acp" }, v2)).status).toBe(400);
-    // Cursor stays on the host in every protocol.
+    // Cursor and Cline stay on the host in every protocol.
     expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "cursor" }, v2)).status).toBe(400);
+    expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "cline" }, v2)).status).toBe(400);
     const gemini = await (
       await send("/v1/admin/providers/v2/runtimes/download", { provider: "antigravity" }, v2)
     ).json();

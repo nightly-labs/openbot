@@ -47,25 +47,31 @@ describe("provider visibility", () => {
     expect(hiddenAgentView(payload, new Set(), 5)).toEqual(payload);
   });
 
-  it("keeps Cursor on this computer for every protocol, and keeps an endpoint saved as cursor", () => {
-    const payload = {
-      agents: [{ id: "agent-cursor", provider: "cursor", model: "auto" }],
-      providers: [{ id: "cursor", state: "ready" }],
-      customProviders: [{ id: "cursor", name: "An endpoint saved before the provider existed" }],
-      cliVersion: "2026.09.28-64d2043",
-      auth: { kind: "cursor", email: null },
-      message: "Sign in to Cursor.",
-    };
-    const hidden = {
-      agents: [],
-      providers: [],
-      customProviders: [{ id: "cursor", name: "An endpoint saved before the provider existed" }],
-      cliVersion: null,
-      auth: { kind: "unknown" },
-      message: null,
-    };
-    expect(legacyProviderView(payload, new Set())).toEqual(hidden);
-    expect(hiddenAgentView(payload, new Set(), 4)).toEqual(hidden);
-    expect(hiddenAgentView(payload, new Set(), 5)).toEqual(hidden);
-  });
+  it.each([
+    { provider: "cursor", version: "2026.09.28-64d2043" },
+    { provider: "cline", version: "3.0.68" },
+  ])(
+    "keeps $provider on this computer for every protocol, and keeps an endpoint with its id",
+    ({ provider, version }) => {
+      const payload = {
+        agents: [{ id: `agent-${provider}`, provider, model: "auto" }],
+        providers: [{ id: provider, state: "ready" }],
+        customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
+        cliVersion: version,
+        auth: { kind: provider, email: null },
+        message: "Sign in.",
+      };
+      const hidden = {
+        agents: [],
+        providers: [],
+        customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
+        cliVersion: null,
+        auth: { kind: "unknown" },
+        message: null,
+      };
+      expect(legacyProviderView(payload, new Set())).toEqual(hidden);
+      expect(hiddenAgentView(payload, new Set(), 4)).toEqual(hidden);
+      expect(hiddenAgentView(payload, new Set(), 5)).toEqual(hidden);
+    },
+  );
 });

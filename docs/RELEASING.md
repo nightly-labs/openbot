@@ -162,6 +162,16 @@ set the archive SHA-256 and size, `installedBytes` above the extracted size, and
 each file in `files`. The paths in `files` are relative to `dist-package/`. Do not commit the
 archives: Cursor's terms do not allow redistribution.
 
+## Pin the Cline CLI
+
+`native-runtime.lock.json` pins the Cline CLI by hand. Read the npm `latest` version of
+`@cline/cli-darwin-arm64` and set `version`. For each target, download the platform package
+`@cline/cli-<os>-<arch>` (`windows-x64` for Windows) from `registry.npmjs.org`, and set the tarball
+SHA-256 and size, the SHA-256 of `bin/cline` (`bin/cline.exe` on Windows) and of
+`extensions/plugin-sandbox-bootstrap.js`, and `installedBytes` above the extracted size. The npm
+packages have no license file, so set `licenseSha256` to the SHA-256 of `LICENSE` at the
+`cli-v<version>` tag of `github.com/cline/cline`.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

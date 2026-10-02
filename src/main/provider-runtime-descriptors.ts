@@ -1,4 +1,17 @@
-import { access, chmod, copyFile, link, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  copyFile,
+  cp,
+  link,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import type { ManagedRuntimeId } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -11,6 +24,7 @@ import {
   parseAntigravityVersion,
   parseBunVersion,
   parseClaudeVersion,
+  parseClineVersion,
   parseCodexVersion,
   parseCursorManifestVersion,
   parseGrokVersion,
@@ -115,6 +129,11 @@ export function cursorPackageUrl(
   artifact: AgentRuntimeLock["cursor"]["artifacts"][RuntimeTarget],
 ): string {
   return `${distribution}/${version}/${artifact.platformDirectory}/${artifact.architecture}/${artifact.asset}`;
+}
+
+/** Cline tags each CLI release `cli-v<version>`, apart from the tags of its editor extension. */
+function clineTag(version: string): string {
+  return `cli-v${version}`;
 }
 
 /** The lock's hash for a file of a pinned version; an upstream release's file has none to compare. */
@@ -507,6 +526,71 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     // the manifest that OpenBot wrote, as for Antigravity.
     versionFile: CURSOR_MANIFEST,
     parseVersion: parseCursorManifestVersion,
+  },
+  cline: {
+    runtime: "cline",
+    spec: (target, lock) => {
+      const artifact = lock.cline.artifacts[target];
+      return {
+        runtime: "cline",
+        target,
+        version: lock.cline.version,
+        packageVersion: lock.cline.version,
+        source: "lock",
+        url: `${lock.cline.registry}/${artifact.package}/-/${artifact.asset}`,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
+        downloadBytes: artifact.downloadBytes,
+        installedBytes: artifact.installedBytes,
+        executableName: artifact.executable,
+      };
+    },
+    stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
+      const artifact = lock.cline.artifacts[spec.target];
+      await withNpmPackage(
+        downloadedPath,
+        staging,
+        {
+          name: artifact.package,
+          version: spec.packageVersion,
+          archivePathError: sourceText("error.provider.clineArchivePath"),
+          mismatchError: sourceText("error.provider.clinePackageMismatch"),
+        },
+        async (packageRoot) => {
+          // The platform tarball carries no licence, so it comes from the tagged source like OpenCode's.
+          const license = await downloadSmallFile(
+            `${lock.cline.repository}/raw/${encodeURIComponent(clineTag(spec.version))}/LICENSE`,
+            pinnedHash(spec, lock.cline.licenseSha256),
+          );
+          // The CLI finds its plugin bootstrap and hub webview from the folder of its executable, so
+          // the whole package keeps its layout. Only the npm manifest stays out.
+          const entries = (await readdir(packageRoot)).filter((entry) => entry !== "package.json");
+          await Promise.all(
+            entries.map((entry) => cp(join(packageRoot, entry), join(staging, entry), { recursive: true })),
+          );
+          await Promise.all([
+            writeFile(join(staging, "LICENSE"), license),
+            writeFile(
+              join(staging, "cline-package.json"),
+              layoutManifest({ version: spec.version, target: spec.target, executable: `bin/${spec.executableName}` }),
+            ),
+          ]);
+          if (spec.target !== "win32-x64") await chmod(join(staging, "bin", spec.executableName), 0o755);
+        },
+      );
+    },
+    verify: async (root, spec, lock) => {
+      const artifact = lock.cline.artifacts[spec.target];
+      const [executable, bootstrap, license] = await Promise.all([
+        sha256File(join(root, "bin", spec.executableName)),
+        sha256File(join(root, "extensions", "plugin-sandbox-bootstrap.js")),
+        sha256File(join(root, "LICENSE")),
+      ]);
+      if (executable !== artifact.binarySha256 || bootstrap !== artifact.bootstrapSha256) {
+        throw new Error(sourceText("error.provider.clineChecksum"));
+      }
+      if (license !== lock.cline.licenseSha256) throw new Error(sourceText("error.provider.clineLicenseChecksum"));
+    },
+    parseVersion: parseClineVersion,
   },
   bun: {
     runtime: "bun",

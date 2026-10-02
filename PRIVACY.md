@@ -418,8 +418,8 @@ Network traffic can also occur when:
   the right token to each call;
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
-  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
-  OpenCode, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
+  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude,
+  OpenCode and Cline, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
   `dl.google.com` (for the download size) for Gemini, and the same registry and
   `downloads.cursor.com` (for the download size) for Cursor, and it reads a list of blocked
   versions from `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
@@ -592,6 +592,19 @@ not store it. The CLI keeps its login and session files
 in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
 upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
 on this computer: OpenBot does not show them to team members.
+
+### Cline
+
+OpenBot downloads the Cline CLI from `registry.npmjs.org`, and its license file from `github.com`,
+when you select Download on the Cline row. OpenBot starts the CLI as a local process. Prompts,
+attachments, and tool results go to that process, and the CLI sends them to Cline and to the model
+provider you select in Cline. The provider of a free model can use your prompts to train models.
+Sign in opens Cline's sign-in page in your browser, or the CLI uses `CLINE_API_KEY` from the
+environment that started OpenBot. OpenBot gives that key only to the local CLI, in its environment,
+and does not store it. The CLI keeps its login and session files in `~/.cline`, or in `$CLINE_DIR`.
+OpenBot does not read, copy, or upload these files. Cline's terms apply:
+<https://cline.bot/tos>. Cline agents stay on this computer: OpenBot does not show them to team
+members.
 
 ### Local model servers
 

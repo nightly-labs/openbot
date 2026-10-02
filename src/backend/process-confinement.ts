@@ -8,11 +8,12 @@ import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok, OpenCode, Antigravity and Cursor take no sandbox per session, so a Workspace only agent on
- * them gets a provider process of its own, and OpenBot starts that process inside an operating
- * system sandbox. The whole process is confined: the file edit tools, the shell, and every command
- * and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS has the
- * sandbox now: on Linux and Windows the process does not start, and the user must choose Full access.
+ * Grok, OpenCode, Antigravity, Cursor and Cline take no sandbox per session, so a Workspace only
+ * agent on them gets a provider process of its own, and OpenBot starts that process inside an
+ * operating system sandbox. The whole process is confined: the file edit tools, the shell, and every
+ * command and MCP server it starts. Nothing inside the process can take the sandbox away. Only macOS
+ * has the sandbox now: on Linux and Windows the process does not start, and the user must choose
+ * Full access.
  */
 export interface ProcessConfinement {
   readonly writableRoots: readonly string[];
@@ -161,6 +162,37 @@ export function cursorConfinedEnv(home = homedir()): Readonly<Record<string, str
 }
 
 /**
+ * The Cline CLI keeps its sign-in, sessions, caches and logs in its data folder, `~/.cline/data`.
+ * Its agents, skills, plugins, hooks and schedules are outside that folder, in `~/.cline` and
+ * `~/Documents/Cline`, so they stay read-only. In the data folder, the global settings, the MCP
+ * servers, the connectors and the cron and task databases start commands or set approvals for every
+ * other Cline process, so they stay read-only too. The sessions stay in the shared data folder, so a
+ * thread continues when the agent changes between Workspace only and Full access.
+ */
+export function clineStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const path = (name: string) => env[name]?.trim() || undefined;
+  const clineHome = path("CLINE_DIR") ?? join(home, ".cline");
+  const data = path("CLINE_DATA_DIR") ?? join(clineHome, "data");
+  const db = path("CLINE_DB_DATA_DIR") ?? join(data, "db");
+  const connectors = path("CLINE_CONNECTOR_DATA_DIR") ?? join(data, "connectors");
+  const databases = [
+    path("CLINE_CONNECTORS_DB_PATH") ?? join(db, "connectors.db"),
+    path("CLINE_CRON_DB_PATH") ?? join(db, "cron.db"),
+    path("CLINE_TASKS_DB_PATH") ?? join(db, "tasks.db"),
+  ];
+  return {
+    writable: unique([data, db, path("CLINE_SESSION_DATA_DIR") ?? join(data, "sessions")]),
+    protected: unique([
+      path("CLINE_GLOBAL_SETTINGS_PATH") ?? join(data, "settings", "global-settings.json"),
+      path("CLINE_MCP_SETTINGS_PATH") ?? join(data, "settings", "cline_mcp_settings.json"),
+      connectors,
+      path("CLINE_CONNECTOR_SETTINGS_PATH") ?? join(connectors, "settings.json"),
+      ...databases.flatMap((file) => [file, `${file}-wal`, `${file}-shm`, `${file}-journal`]),
+    ]),
+  };
+}
+
+/**
  * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
  * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
  * access.
@@ -189,6 +221,9 @@ const PROJECT_SETTINGS = [
   "opencode.jsonc",
   // Cursor reads its project rules, MCP servers, hooks and skills from `.cursor`.
   ".cursor",
+  // Cline reads its project rules, workflows, hooks, skills and agents from these two.
+  ".cline",
+  ".clinerules",
   // Antigravity reads project skills from `.gemini` and its customizations from these four.
   ".gemini",
   ".agents",

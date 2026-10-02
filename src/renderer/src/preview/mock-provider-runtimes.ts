@@ -24,6 +24,7 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
         opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         antigravity: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         cursor: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+        cline: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
       // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
       // preview never offers an update for one.

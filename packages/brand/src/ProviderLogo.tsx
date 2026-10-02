@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { CLAUDE_PATH } from "./provider-logo-shape";
 
-export type ProviderLogoVariant = "codex" | "claude" | "grok" | "opencode" | "antigravity" | "cursor" | "acp";
+export type ProviderLogoVariant = "codex" | "claude" | "grok" | "opencode" | "antigravity" | "cursor" | "cline" | "acp";
 
 export interface ProviderLogoProps {
   provider: ProviderLogoVariant;
@@ -19,6 +19,10 @@ const GEMINI_PATH =
 const CURSOR_PATH =
   "M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23";
 
+// The Cline mark in one colour, from Simple Icons (CC0): https://simpleicons.org/?q=cline
+const CLINE_PATH =
+  "m23.365 13.556-1.442-2.895V8.994c0-2.764-2.218-5.002-4.954-5.002h-2.464c.178-.367.276-.779.276-1.213A2.77 2.77 0 0 0 12.018 0a2.77 2.77 0 0 0-2.763 2.779c0 .434.098.846.276 1.213H7.067c-2.736 0-4.954 2.238-4.954 5.002v1.667L.64 13.549c-.149.29-.149.636 0 .927l1.472 2.855v1.667C2.113 21.762 4.33 24 7.067 24h9.902c2.736 0 4.954-2.238 4.954-5.002V17.33l1.44-2.865c.143-.286.143-.622.002-.91m-12.854 2.36a2.27 2.27 0 0 1-2.261 2.273 2.27 2.27 0 0 1-2.261-2.273v-4.042A2.27 2.27 0 0 1 8.249 9.6a2.267 2.267 0 0 1 2.262 2.274zm7.285 0a2.27 2.27 0 0 1-2.26 2.273 2.27 2.27 0 0 1-2.262-2.273v-4.042A2.267 2.267 0 0 1 15.535 9.6a2.267 2.267 0 0 1 2.261 2.274z";
+
 // OpenBot's own mark for a custom ACP agent: a command prompt. No third-party mark stands for all of
 // them.
 const ACP_PROMPT_PATH =
@@ -30,6 +34,7 @@ export function ProviderLogo(props: ProviderLogoProps) {
   const isGrok = () => props.provider === "grok";
   const isGemini = () => props.provider === "antigravity";
   const isCursor = () => props.provider === "cursor";
+  const isCline = () => props.provider === "cline";
   const isAcp = () => props.provider === "acp";
 
   return (
@@ -38,7 +43,7 @@ export function ProviderLogo(props: ProviderLogoProps) {
       viewBox={
         props.provider === "opencode"
           ? "0 0 240 300"
-          : isGrok() || isGemini() || isCursor() || isAcp()
+          : isGrok() || isGemini() || isCursor() || isCline() || isAcp()
             ? "0 0 24 24"
             : isClaude()
               ? "0 0 248 248"
@@ -62,6 +67,8 @@ export function ProviderLogo(props: ProviderLogoProps) {
         <path d={GEMINI_PATH} />
       ) : isCursor() ? (
         <path d={CURSOR_PATH} />
+      ) : isCline() ? (
+        <path d={CLINE_PATH} />
       ) : isAcp() ? (
         <>
           <path d={ACP_PROMPT_PATH} />

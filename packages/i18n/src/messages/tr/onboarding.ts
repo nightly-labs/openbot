@@ -44,6 +44,7 @@ export const messages = {
   "onboarding.provider.freeModels": "Ücretsiz modeller, hesap gerekmez",
   "onboarding.provider.googlePlan": "Google AI Pro veya Ultra planı",
   "onboarding.provider.cursorPlan": "Cursor planı veya API anahtarı",
+  "onboarding.provider.clineAccount": "Cline hesabıyla ücretsiz modeller",
   "onboarding.provider.tryFree": "Ücretsiz deneyin",
   "onboarding.provider.noSignIn": "Giriş yapılması gerekmez",
   "onboarding.provider.more": "Daha fazla sağlayıcı",

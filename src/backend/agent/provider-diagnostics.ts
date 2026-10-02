@@ -47,6 +47,21 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic is the ACP SDK's copy of an error that the agent also sent back.
+ *
+ * An agent built on the TypeScript ACP SDK, such as Cline's CLI, writes `Error handling request`
+ * with the request and its error to stderr each time it answers a request with an error. The same
+ * error reaches OpenBot as the reply, and the call that waits for it reports it. A signed-out Cline
+ * answers the model-list session with "Authentication required", and the user met the copy as a
+ * "Provider error" toast just after the download. It belongs in the log.
+ *
+ * Only a request counts. A notification has no reply, so `Error handling notification` stays visible.
+ */
+export function isAcpRequestEchoDiagnostic(message: string): boolean {
+  return /^Error handling request\b/.test(message);
+}
+
+/**
  * Whether a provider diagnostic reports one failed tool call rather than a failure of the provider.
  *
  * Grok's CLI logs `tool_error: tool_output_error` on stderr each time a tool returns an error, such

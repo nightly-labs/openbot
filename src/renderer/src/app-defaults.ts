@@ -49,6 +49,7 @@ export const FALLBACK_PROVIDER_RUNTIMES: ProviderRuntimeSnapshot = {
     opencode: NO_PROVIDER_RUNTIME,
     antigravity: NO_PROVIDER_RUNTIME,
     cursor: NO_PROVIDER_RUNTIME,
+    cline: NO_PROVIDER_RUNTIME,
   },
   toolRuntimes: { bun: NO_PROVIDER_RUNTIME },
 };

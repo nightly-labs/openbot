@@ -293,6 +293,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const [agentStatus, setAgentStatus] = createSignal(initialAgentStatus);
@@ -376,6 +377,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const onDownloadProvider = vi.fn();
@@ -462,6 +464,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "ready", progress: 100, message: null, version: "1.18.27" },
     };
     const onConnectProvider = vi.fn();
@@ -523,6 +526,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     });
     const view = render(() => (
@@ -589,6 +593,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const view = render(() => (

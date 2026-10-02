@@ -61,6 +61,7 @@ const PROVIDER_PATH_ENV_VARS = [
   "OPENBOT_GROK_PATH",
   "OPENBOT_OPENCODE_PATH",
   "OPENBOT_CURSOR_PATH",
+  "OPENBOT_CLINE_PATH",
 ] as const;
 
 /** Provider paths as they were before any shard touched them. */
@@ -80,6 +81,7 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
   process.env.OPENBOT_GROK_PATH = join(root, "missing-grok");
   process.env.OPENBOT_OPENCODE_PATH = join(root, "missing-opencode");
   process.env.OPENBOT_CURSOR_PATH = join(root, "missing-cursor");
+  process.env.OPENBOT_CLINE_PATH = join(root, "missing-cline");
   return { root, logPath };
 }
 

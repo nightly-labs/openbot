@@ -43,6 +43,7 @@ export const messages = {
   "onboarding.provider.freeModels": "Modelos gratuitos, sem necessidade de conta",
   "onboarding.provider.googlePlan": "Plano Google AI Pro ou Ultra",
   "onboarding.provider.cursorPlan": "Plano Cursor ou chave de API",
+  "onboarding.provider.clineAccount": "Modelos gratuitos com uma conta Cline",
   "onboarding.provider.tryFree": "Experimente grátis",
   "onboarding.provider.noSignIn": "Não precisa entrar em uma conta",
   "onboarding.provider.more": "Mais provedores",

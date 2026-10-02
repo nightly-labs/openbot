@@ -305,7 +305,7 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-// Migrations 17, 22, 23 and 24 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// Migrations 17, 22, 23, 24 and 26 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
 // One line rather than the whole table: the substitution then survives any later baseline edit that does
 // not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
 const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
@@ -321,6 +321,9 @@ const V23_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider I
 
 // Migration 24 adds the Cursor provider. Frozen with the migration, like V22.
 const V24_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor')),`;
+
+// Migration 26 adds the Cline provider. Frozen with the migration, like V22.
+const V26_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),`;
 
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
@@ -378,7 +381,7 @@ const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
     BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-    V24_PROVIDER_SESSIONS_CHECK_SQL,
+    V26_PROVIDER_SESSIONS_CHECK_SQL,
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
@@ -501,6 +504,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     version: 25,
     // Only creates tables, so no foreign-key pause and no vacuum.
     up: (db) => db.exec(MESSAGING_SCHEMA_SQL),
+  },
+  {
+    version: 26,
+    // The same rebuild as migrations 17, 22, 23 and 24, with foreign keys off for the same reason.
+    disableForeignKeys: true,
+    up: migrateProviderSessionsForCline,
   },
 ];
 
@@ -774,7 +783,12 @@ function migrateProviderSessionsForCursor(db: DatabaseSync): void {
   widenProviderSessionsCheck(db, "'cursor'", V24_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v24");
 }
 
-// Migrations 17, 22, 23 and 24 share this SQL. Each migration gives its own CHECK line and staging table name, so the
+// Migration 26 adds the Cline provider with the same rebuild and the same skip.
+function migrateProviderSessionsForCline(db: DatabaseSync): void {
+  widenProviderSessionsCheck(db, "'cline'", V26_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v26");
+}
+
+// Migrations 17, 22, 23, 24 and 26 share this SQL. Each migration gives its own CHECK line and staging table name, so the
 // SQL that migration 17 runs is the same text as before this function was shared.
 function widenProviderSessionsCheck(
   db: DatabaseSync,

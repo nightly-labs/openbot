@@ -338,12 +338,12 @@ would refuse.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, `x.ai/cli/stable`
+`releases/latest` for Codex, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and npm `dist.integrity` for Claude and OpenCode. x.ai and the ACP registry publish no hash,
+Codex and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -1324,6 +1324,28 @@ create an agent, or add one from a template, the marketplace or an import, when 
 it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id `cursor` before the
 provider existed stays visible.
 
+### Cline
+
+The Cline provider (id `cline`) starts the Cline CLI with `cline --acp`. The runtime manager
+downloads the npm platform package `@cline/cli-<os>-<arch>` and stages all of it except
+`package.json`: the CLI finds `extensions/plugin-sandbox-bootstrap.js` next to its `bin` folder. The
+npm packages have no license file, so staging downloads `LICENSE` from the `cli-v<version>` tag and
+checks the pinned hash. `resolveClineCli` refuses a CLI older than 3.0.68.
+
+By default the CLI runs its sessions in a hub process that it detaches and that other Cline
+processes share. That process outlives OpenBot and is outside a Workspace only sandbox, so every
+Cline process, the sign-in included, gets `CLINE_SESSION_BACKEND_MODE=local` and
+`CLINE_NO_AUTO_UPDATE=1` (`CLINE_ENV` in `provider-drivers.ts`). Sign in is an ACP `authenticate`
+call with `cline`, as for Gemini. `CLINE_API_KEY` in the environment also signs the CLI in.
+`clineStatePaths` lets a confined process write `~/.cline/data` and protects the global settings,
+the MCP and connector settings, and the cron, task and connector databases there. The agents,
+skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. Cline answers a lost
+session with the ACP error `-32002`, which `AcpAgentClient` reads as a missing session. Migration 26
+adds `cline` to `projection_provider_sessions`.
+
+No Team API protocol knows `cline`. The host hides Cline agents, models, status, and sign-in state
+from every peer, as for Cursor.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -1580,16 +1602,17 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor, Cline |
 | `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode, Cursor |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
 | `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
+| `<workspace>/.cline/skills/`, `<workspace>/.clinerules/skills/` | the user, the agent | Cline |
 | `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
 | `~/.claude/skills/` | the user | Claude Code, OpenCode |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
 
-A confined agent (Grok, OpenCode, Gemini or Cursor, not in Full access) cannot write the workspace
+A confined agent (Grok, OpenCode, Gemini, Cursor or Cline, not in Full access) cannot write the workspace
 skill folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
@@ -1598,7 +1621,7 @@ does not make links. `.openbot/skills-lock.json` in the workspace records the fi
 `.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
 marker.
 
-`src/main/skill-folder-discovery.ts` lists all other skills in the five workspace folders as
+`src/main/skill-folder-discovery.ts` lists all other skills in the seven workspace folders as
 `workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
 they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
 skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
@@ -1611,8 +1634,8 @@ same for every agent, and each provider CLI changes its home-folder rules withou
 
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
-`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor and Gemini
-CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
+`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor, Cline and
+Gemini CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
 provider when the session starts. Claude starts with `strictMcpConfig`, so it ignores `.mcp.json`
 and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
 environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
