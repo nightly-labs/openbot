@@ -76,6 +76,13 @@ const COMMIT_ATTEMPTS = 3;
  */
 const HELD_SOURCE_WAITS_MS = [100, 200, 400, 800];
 /**
+ * How long a commit keeps trying to move a stage that another program holds open. Windows Defender
+ * can scan a new CLI for tens of seconds after its version check, and the move fails with `EPERM`
+ * until the scan ends. Three passes of the wait in `renameIfVacant`, about 4.5 s, were too short
+ * for that.
+ */
+const HELD_STAGE_WAIT_MS = 60_000;
+/**
  * What the sweep collects by age beside the version directories.
  *
  * `.installing-` is on the list for what it leaves, not for what this build writes. Released builds
@@ -119,6 +126,8 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
+  /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
+  heldStageWaitMs?: number;
   updateRuntime?: (runtime: ManagedRuntimeId, install: () => Promise<string>) => Promise<void>;
 }
 
@@ -148,6 +157,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
+  readonly #heldStageWaitMs: number;
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Promise<void>>();
@@ -183,6 +193,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const filesystem = await statfs(this.#root);
         return filesystem.bavail * filesystem.bsize;
       });
+    this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -721,11 +732,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     // any two steps below. Whatever it did, the next pass sees the result: a verified install is
     // adopted, and only what is still damaged is replaced.
     let held = false;
-    for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
+    let attempts = 0;
+    const heldUntil = Date.now() + this.#heldStageWaitMs;
+    while (attempts < COMMIT_ATTEMPTS) {
       if (await renameIfVacant(staging, destination)) return true;
-      // Still vacant: the stage is held open, and there is nothing to adopt or replace.
+      // Still vacant: the stage is held open, and there is nothing to adopt or replace. Each refusal
+      // has already waited in `renameIfVacant`, so a held pass uses no attempt, only time.
       held = !(await pathExists(destination));
-      if (held) continue;
+      if (held) {
+        if (this.#stopping) throw new Error(sourceText("error.provider.closing"));
+        if (Date.now() >= heldUntil) break;
+        continue;
+      }
+      attempts += 1;
       if (await this.#verifies(destination, spec)) return false;
       const outcome = await this.#replaceUnderLock(staging, destination, spec);
       if (outcome !== "moved") return outcome === "committed";
