@@ -58,7 +58,7 @@ export interface InviteLinkOptions {
    * The one self-hosted account service that this client uses. Only an origin from the client's
    * own configuration goes here, never one read from an invitation.
    */
-  selfHostedApiOrigin?: string;
+  selfHostedApiOrigin?: string | undefined;
 }
 
 /**

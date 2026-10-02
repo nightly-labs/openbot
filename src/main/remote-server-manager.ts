@@ -116,7 +116,7 @@ interface CentralAccountSession {
 interface RemoteServerManagerOptions {
   allowLocalDevelopmentInvites?: boolean;
   /** The origin of the self-hosted account service that this app is configured to use. */
-  selfHostedApiOrigin?: string;
+  selfHostedApiOrigin?: string | undefined;
   appVersion?: string;
   webrtcTransport?: TeamWebRtcClientTransport;
   getLocalHostId?: () => string | null;
