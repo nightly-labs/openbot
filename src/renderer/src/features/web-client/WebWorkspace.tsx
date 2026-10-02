@@ -256,7 +256,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
-  const hostOffline = () => !noHost() && workspace.state.status !== "online";
+  // A hosted server that sleeps or wakes keeps the workspace on screen; the server name shows why it does not answer.
+  const hostOffline = () => !noHost() && workspace.state.status !== "online" && !workspace.state.hostedSleep;
   let resetRevocation = workspace.state.revocationRevision;
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
@@ -389,6 +390,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           : null,
         active,
         state: incompatibility ? "incompatible" : hostState(host.hostId),
+        // Only the opened host has a known sleep state.
+        hostedSleep: active ? workspace.state.hostedSleep : null,
         notificationsMuted: notice.muted,
         notificationsMutedUntil: notice.mutedUntil,
         notificationLevel: notice.level,

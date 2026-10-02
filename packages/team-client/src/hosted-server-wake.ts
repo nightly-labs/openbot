@@ -1,10 +1,20 @@
-import { type HostedServerState, parseHostedServerSummary } from "@openbot/contracts/hosted-servers";
+import {
+  type HostedServerState,
+  parseHostedServerStatus,
+  parseHostedServerSummary,
+} from "@openbot/contracts/hosted-servers";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 
 /**
  * A hosted server in one of these states comes online without a user action, so the client reconnects.
  * A `running` server whose host is offline is still starting OpenBot, or it restarts.
  */
-const WAKE_RECONNECT_STATES: ReadonlySet<HostedServerState> = new Set(["creating", "starting", "waking", "running"]);
+export const WAKE_RECONNECT_STATES: ReadonlySet<HostedServerState> = new Set([
+  "creating",
+  "starting",
+  "waking",
+  "running",
+]);
 /** The reconnects for one start. With the 5 second delay of the caller, this is about 5 minutes. */
 const MAX_WAKE_ATTEMPTS = 60;
 /** A host that is not a hosted server stays so. It is asked again after this long, not on each failure. */
@@ -13,6 +23,27 @@ const NOT_HOSTED_RECHECK_MS = 10 * 60_000;
 const NEW_OUTAGE_MS = 2 * 60_000;
 /** The delay between a wake reply and the next connection attempt. */
 export const WAKE_RECONNECT_DELAY_MS = 5_000;
+/** A sleeping or ended server is asked again after this long, not on each failed connection. */
+const STATUS_RECHECK_MS = 60_000;
+/** The error code of the account server for a host that is not a hosted server of this account. */
+const NOT_FOUND_CODE = "hosted_server_not_found";
+
+/**
+ * Why a hosted server is not reachable. `sleeping`: the Worker stopped it because nobody used it, so the
+ * client waits for the user's next input. `waking`: the client asked for a start and reconnects.
+ * `offline`: the account server did not answer, so neither applies.
+ */
+export type HostedServerAvailability = "not_hosted" | "sleeping" | "ended" | "waking" | "offline";
+
+export interface HostedServerUnavailableOptions {
+  /** False when the client must not start the server now, for example a server that is not selected. */
+  wake?: boolean;
+}
+
+export interface HostedServerWakeOptions {
+  /** True for a start that the user asked for: the reconnect count of an earlier outage does not apply. */
+  fresh?: boolean;
+}
 
 /** The part of a fetch response that a wake reads. The web and the mobile fetch both give it. */
 export interface HostedServerWakeResponse {
@@ -40,7 +71,11 @@ export function createHostedServerWake(
   /** A failed connection reports itself twice, so both reports share one request. */
   const pending = new Map<string, Promise<boolean>>();
 
-  return function wake(hostId: string): Promise<boolean> {
+  return function wake(hostId: string, options: HostedServerWakeOptions = {}): Promise<boolean> {
+    if (options.fresh) {
+      attempts.delete(hostId);
+      gaveUpAt.delete(hostId);
+    }
     const current = pending.get(hostId);
     if (current) return current;
     const request = wakeOnce(hostId).finally(() => pending.delete(hostId));
@@ -84,4 +119,83 @@ export function createHostedServerWake(
     attempts.set(hostId, { count: previous + 1, at: time });
     return true;
   }
+}
+
+export type HostedServerWake = ReturnType<typeof createHostedServerWake>;
+
+/**
+ * Asks the account server whether an unreachable hosted server sleeps before it starts it. A client that
+ * started each unreachable server would start a sleeping server again while nobody uses it. `requestStatus`
+ * gets `/v2/hosting/servers/<hostId>/status`. An account server without that route answers 404 with no
+ * error code, and then the client starts the server as before.
+ */
+export function createHostedServerStatusCheck(
+  requestStatus: (hostId: string) => Promise<HostedServerWakeResponse>,
+  wake: HostedServerWake,
+  now: () => number = Date.now,
+) {
+  /** A result that does not change soon, and when it came. */
+  const known = new Map<string, { result: "not_hosted" | "sleeping" | "ended"; at: number }>();
+  const pending = new Map<string, Promise<HostedServerAvailability>>();
+
+  return {
+    /**
+     * A connection to the host failed. Starts the server only when it does not sleep and `wake` is not
+     * false. A server that the client does not start is `offline`.
+     */
+    unavailable(hostId: string, options: HostedServerUnavailableOptions = {}): Promise<HostedServerAvailability> {
+      const startServer = options.wake ?? true;
+      const key = `${startServer}:${hostId}`;
+      const current = pending.get(key);
+      if (current) return current;
+      const request = check(hostId, startServer).finally(() => pending.delete(key));
+      pending.set(key, request);
+      return request;
+    },
+    /** The user acted in the app while the server sleeps. Returns true while it starts. */
+    wakeForInput(hostId: string): Promise<boolean> {
+      known.delete(hostId);
+      return wake(hostId, { fresh: true });
+    },
+    /** The client started the server another way, so the stored result is out of date. */
+    forget(hostId: string): void {
+      known.delete(hostId);
+    },
+  };
+
+  async function check(hostId: string, startServer: boolean): Promise<HostedServerAvailability> {
+    const time = now();
+    const last = known.get(hostId);
+    const recheck = last?.result === "not_hosted" ? NOT_HOSTED_RECHECK_MS : STATUS_RECHECK_MS;
+    if (last && time - last.at < recheck) return last.result;
+    let response: HostedServerWakeResponse;
+    try {
+      response = await requestStatus(hostId);
+    } catch {
+      return "offline";
+    }
+    if (response.status === 404) {
+      const body = await response.json().catch(() => null);
+      if (errorCode(body) === NOT_FOUND_CODE) return remember(hostId, "not_hosted", time);
+      return startServer && (await wake(hostId)) ? "waking" : "offline";
+    }
+    if (!response.ok) return "offline";
+    const status = parseHostedServerStatus(await response.json().catch(() => null));
+    if (!status) return "offline";
+    if (status.sleeping) return remember(hostId, "sleeping", time);
+    if (status.error === "plan_ended") return remember(hostId, "ended", time);
+    known.delete(hostId);
+    // A server that should run and does not answer stopped for another reason, or still starts.
+    return startServer && (await wake(hostId)) ? "waking" : "offline";
+  }
+
+  function remember<T extends "not_hosted" | "sleeping" | "ended">(hostId: string, result: T, at: number): T {
+    known.set(hostId, { result, at });
+    return result;
+  }
+}
+
+function errorCode(body: unknown): string | null {
+  if (!isDynamicRecord(body) || !isDynamicRecord(body.error)) return null;
+  return typeof body.error.code === "string" ? body.error.code : null;
 }

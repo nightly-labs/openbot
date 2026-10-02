@@ -248,7 +248,7 @@ export const messages = {
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB de memória, {disk} GB de armazenamento",
   "settings.hostedServers.creating": "Criando…",
   "settings.hostedServers.usageNote":
-    "Um servidor para após 15 minutos sem uso e inicia novamente com uma mensagem ou rotina agendada. Seus agentes e rotinas funcionam quando este computador está desligado.",
+    "Um servidor para cerca de 15 minutos após a última mensagem ou alteração, mesmo com um app aberto. Uma tecla ou um clique no app, uma mensagem ou uma rotina agendada o inicia novamente. Seus agentes e rotinas funcionam quando este computador está desligado.",
   "settings.hostedServers.empty": "Você ainda não tem um servidor hospedado.",
   "settings.hostedServers.state.awaitingPayment": "Aguardando pagamento",
   "settings.hostedServers.state.planEnded": "Plano encerrado",

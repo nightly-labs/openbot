@@ -51,7 +51,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
 
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
-    if (server?.kind !== "remote") return null;
+    // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
+    if (server?.kind !== "remote" || server.hostedSleep) return null;
     return server.state === "incompatible" || server.issue != null ? server : null;
   });
   const activePeopleEnabled = createMemo(

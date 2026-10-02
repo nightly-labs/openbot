@@ -771,8 +771,8 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.connectedClientCount();
   }
 
-  lastClientRequestAt(): number | null {
-    return this.#api.lastClientRequestAt();
+  lastClientUseAt(): number | null {
+    return this.#api.lastClientUseAt();
   }
 
   announceRestart(state: HostRestartState, version: string | null): void {

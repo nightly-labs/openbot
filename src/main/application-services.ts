@@ -492,6 +492,7 @@ export async function createApplicationServices({
     (serverId) => {
       if (!remoteServers.list().some((server) => server.id === serverId)) remoteServers.invalidateDirectory();
     },
+    (serverId) => remoteServers.hostedServerStarting(serverId),
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -1350,7 +1351,10 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
-      onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),
+      hostedServers: {
+        unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
+        wake: (serverId) => hostedServers.wake(serverId),
+      },
       webrtcTransport: new TeamWebRtcClientTransport({
         bridge: teamWebRtcBridge,
         listHosts: () => centralAuth.listRemoteHosts(),
@@ -1548,12 +1552,14 @@ export async function createApplicationServices({
     );
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
-      // A live Slack connection counts: stopped, the server could not hear the next message.
+      // A live Slack connection counts: stopped, the server could not hear the next message. An open
+      // browser view does not: a view that the user forgot would keep the server running. Its clicks
+      // are requests, so they count as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
         messaging.hasLiveConnection() ||
-        host.describeRestartBlockers().length > 0 ||
-        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+        host.describeRestartBlockers().some((reason) => reason !== "browser-view") ||
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientUseAt() ?? 0) < CLIENT_USE_WINDOW_MS),
       nextRunAt: () => {
         const dueAt = service.nextRoutineDueAt();
         return dueAt ? Date.parse(dueAt) : null;

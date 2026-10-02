@@ -252,8 +252,18 @@ export function decodeRemoteDesktopConnectResult(value: unknown): RemoteDesktopC
 }
 
 function server(summary: DynamicRecord): ServerSummary {
-  const { notificationLevel, kind, state, role, compatibility, issue, connectionSequence, hostRestart, memberLimit } =
-    summary;
+  const {
+    notificationLevel,
+    kind,
+    state,
+    role,
+    compatibility,
+    issue,
+    connectionSequence,
+    hostRestart,
+    hostedSleep,
+    memberLimit,
+  } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
   if (!isOneOf(SERVER_STATES, state)) throw new Error("Invalid state.");
@@ -280,6 +290,10 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
+    // Only the indicator reads it, so a value from a newer main process shows no indicator.
+    ...(hostedSleep === undefined
+      ? {}
+      : { hostedSleep: hostedSleep === "sleeping" || hostedSleep === "waking" ? hostedSleep : null }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
   };
 }

@@ -3,7 +3,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, flush, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
@@ -87,6 +87,32 @@ const Servers = createSimpleContext({
     function activeServerSupportsCapability(capability: TeamCurrentCapability): boolean {
       return serverSupportsCapability(activeServer(), capability);
     }
+
+    // The account service stops a hosted server that nobody uses. The selected server starts again on the
+    // user's next key or pointer press, not when the app only shows it.
+    createEffect(
+      () => {
+        const server = activeServer();
+        return server?.hostedSleep === "sleeping" ? server.id : null;
+      },
+      (serverId) => {
+        if (!serverId) return;
+        const removeListeners = () => {
+          window.removeEventListener("pointerdown", wake, true);
+          window.removeEventListener("keydown", wake, true);
+        };
+        const wake = () => {
+          removeListeners();
+          // Main asks the account service again when this fails, so the indicator stays right.
+          void serversPort()
+            .hostedServers.wake(serverId)
+            .catch(() => undefined);
+        };
+        window.addEventListener("pointerdown", wake, true);
+        window.addEventListener("keydown", wake, true);
+        return removeListeners;
+      },
+    );
 
     /** Opens Server Settings > Updates. The settings context below this one sets it. */
     let openHostUpdate: ((serverId: string) => void) | undefined;
