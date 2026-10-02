@@ -1,6 +1,6 @@
 ### Added
 
-- OpenBot writes provider diagnostics to `logs/providers/providers.log` in its data folder: state changes, CLI checks, start times and model list results. The file contains no credentials, environment values or conversation text.
+- OpenBot writes provider diagnostics to `logs/providers/providers.log` in its data folder: state changes, CLI checks, start times, model list results and provider errors. OpenBot removes credentials from each line, and does not write environment values, tool output or conversation text to the file.
 - The provider settings show the last error of each provider until the provider lists its models again, with a "Copy diagnostics" action.
 
 ### Changed

@@ -87,6 +87,11 @@ import { providerForAgent, providerLabel } from "./thread-items";
 import { workspaceWritableRoots } from "./workspace-sandbox";
 
 const logger = createOpenBotLogger("provider-runtime");
+/**
+ * Stderr records that the classifiers sort out as noise. They can quote a tool call's output or a
+ * command line, so they go to the console only and not to the provider log file.
+ */
+const stderrLogger = createOpenBotLogger("provider-stderr");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
 /**
@@ -130,10 +135,6 @@ function isProviderTimeout(error: unknown): boolean {
   );
 }
 
-/**
- * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
- * then does a usage read start a released provider again. `resetsAt` is in seconds.
- */
 /** One log line for each row whose state changes, so the provider log shows when a provider went away. */
 function logProviderStateChanges(previous: readonly AgentProviderStatus[], next: readonly AgentProviderStatus[]): void {
   for (const row of next) {
@@ -149,6 +150,10 @@ function logProviderStateChanges(previous: readonly AgentProviderStatus[], next:
   }
 }
 
+/**
+ * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
+ * then does a usage read start a released provider again. `resetsAt` is in seconds.
+ */
 function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   const now = Date.now() / 1_000;
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
@@ -2023,7 +2028,7 @@ export class ProviderRuntime implements ProviderPort {
       const echo = readAcpRequestEcho(raw);
       if (echo !== undefined) {
         if (echo !== null) {
-          logger.warn("A provider logged an error that it also sent as a reply.", {
+          stderrLogger.warn("A provider logged an error that it also sent as a reply.", {
             provider: client.provider,
             method: echo.method,
             message: echo.error === null ? null : shortenDiagnostic(this.#redactMcp(echo.error)),
@@ -2040,7 +2045,10 @@ export class ProviderRuntime implements ProviderPort {
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
-        logger.warn("A provider wrote an error while OpenBot stopped it.", { provider: client.provider, message });
+        stderrLogger.warn("A provider wrote an error while OpenBot stopped it.", {
+          provider: client.provider,
+          message,
+        });
         return;
       }
       const names = new Set([
@@ -2048,39 +2056,39 @@ export class ProviderRuntime implements ProviderPort {
         ...this.#mcpHandoff.names(),
       ]);
       if (isMcpSubsystemDiagnostic(message, [...names])) {
-        logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
+        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
-        logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
+        stderrLogger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
         return;
       }
       if (isToolCallDiagnostic(message)) {
-        logger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
+        stderrLogger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
         return;
       }
       if (isBackgroundRefreshDiagnostic(message)) {
-        logger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
+        stderrLogger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
         return;
       }
       if (isAcpHandlerDiagnostic(message)) {
-        logger.warn("A provider logged a request that it answered with an error.", {
+        stderrLogger.warn("A provider logged a request that it answered with an error.", {
           provider: client.provider,
           message,
         });
         return;
       }
       if (isIgnoredConfigDiagnostic(message)) {
-        logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
+        stderrLogger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
         return;
       }
       if (isUsageLimitDiagnostic(message)) {
-        logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
+        stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         this.refreshUsageAfterLimit(client);
         return;
       }
       if (isGlogBelowErrorDiagnostic(message)) {
-        logger.info("A provider logged an info or warning record.", { provider: client.provider, message });
+        stderrLogger.info("A provider logged an info or warning record.", { provider: client.provider, message });
         return;
       }
       // Without the timestamp, a repeat of one failure is the same message, and the renderer shows
