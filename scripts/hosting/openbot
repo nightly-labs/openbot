@@ -53,15 +53,24 @@ wait_for_socket() {
   fail "OpenBot does not answer. Read the log with: openbot logs"
 }
 
+# Percent-encodes each byte. printf is a shell builtin, so the value is in no process arguments.
+form_value() {
+  printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n' | sed 's/../%&/g'
+}
+
 # control <method> <path> [<name>=<value> ...]. Sets `response` to the answer lines and a last
-# `status=<HTTP status>` line.
+# `status=<HTTP status>` line. The body goes to curl on standard input: other users can read the
+# arguments of a process in /proc, and a value can be the sign-in code.
 control() {
-  local method=$1 path=$2 field arguments=()
+  local method=$1 path=$2 field body="" arguments=()
   shift 2
-  for field in "$@"; do arguments+=(--data-urlencode "$field"); done
+  for field in "$@"; do body+="${body:+&}${field%%=*}=$(form_value "${field#*=}")"; done
+  if [ "$#" -gt 0 ]; then
+    arguments=(--header 'content-type: application/x-www-form-urlencoded' --data-binary @-)
+  fi
   wait_for_socket
-  response=$(curl --silent --show-error --max-time 120 --unix-socket "$SOCKET" -X "$method" \
-    --write-out 'status=%{http_code}\n' "${arguments[@]}" "http://openbot$path") ||
+  response=$(printf '%s' "$body" | curl --silent --show-error --max-time 120 --unix-socket "$SOCKET" \
+    -X "$method" "${arguments[@]}" --write-out 'status=%{http_code}\n' "http://openbot$path") ||
     fail "OpenBot does not answer. Read the log with: openbot logs"
 }
 

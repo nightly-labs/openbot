@@ -4,9 +4,11 @@
 #   curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
 #
 # Options (after `sudo bash -s --`):
-#   --user <name>             The user that runs OpenBot and its agents. Default: openbot, which the
-#                             install makes when it does not exist.
-#   --auth-api-url <origin>   Another account server, for development. Default: the one in the build.
+#   --user <name>             The user that runs OpenBot and its agents. Default: the user of the
+#                             installed server, else openbot, which the install makes when it does
+#                             not exist.
+#   --auth-api-url <origin>   Another account server, for development. Default: the one of the
+#                             installed server, else the one in the build.
 #
 # This file only downloads the latest release and checks it against the release manifest, the
 # manifest that the Linux desktop updater reads. The install steps come from that release
@@ -16,7 +18,7 @@ set -euo pipefail
 export LC_ALL=C DEBIAN_FRONTEND=noninteractive
 
 RELEASES=https://github.com/nightly-labs/openbot/releases
-service_user=openbot
+service_user=""
 auth_api_url=""
 
 fail() {

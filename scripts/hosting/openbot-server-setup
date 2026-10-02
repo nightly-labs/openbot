@@ -4,6 +4,9 @@
 #
 #   openbot-server-setup <service-user> <unpacked release> [<account server URL>]
 #
+# An empty user or no URL keeps the ones of the installed server: the keyring and the sign-in are in
+# the home folder of that user, for that account server.
+#
 # It uses the install steps of a hosted server (openbot-hosted-update), with `mode` set to `self`:
 # openbot-hosted-server then starts OpenBot for a terminal sign-in, not for a claim. Run it again to
 # reinstall or upgrade; the data in the home folder of the service user stays.
@@ -18,6 +21,15 @@ source "$SOURCE/openbot-hosted-update"
 SERVICE_USER=$1
 RELEASE=$2
 AUTH_API_URL=${3:-}
+installed_user=""
+if [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ] && [ -r "$INSTALL/hosted/service-user" ]; then
+  installed_user=$(<"$INSTALL/hosted/service-user")
+fi
+if [ -z "$SERVICE_USER" ]; then
+  SERVICE_USER=${installed_user:-openbot}
+elif [ -n "$installed_user" ] && [ "$SERVICE_USER" != "$installed_user" ]; then
+  fail "OpenBot is installed for the user $installed_user. Install again without --user, or with --user $installed_user."
+fi
 
 [[ $SERVICE_USER =~ ^[a-z_][a-z0-9_-]*$ ]] && [ "$SERVICE_USER" != root ] || fail "The service user is not valid."
 [ -x "$RELEASE/openbot" ] || fail "The release has no openbot executable."
@@ -61,8 +73,8 @@ install -d -o "$SERVICE_USER" -g "$(id -gn "$SERVICE_USER")" -m 0700 /srv/openbo
 if [ -n "$AUTH_API_URL" ]; then
   printf 'OPENBOT_AUTH_API_URL=%s\n' "${AUTH_API_URL%/}" >"$INSTALL/hosted/openbot.env"
   chmod 0644 "$INSTALL/hosted/openbot.env"
-else
-  rm -f "$INSTALL/hosted/openbot.env"
 fi
 systemctl start openbot.service
+# install_hosting only enables the timer, and the first boot is maybe a long time away.
+systemctl start openbot-update.timer
 echo "Installed OpenBot $version. It runs as the user $SERVICE_USER."

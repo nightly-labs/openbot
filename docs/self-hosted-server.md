@@ -24,11 +24,12 @@ Install options go after `sudo bash -s --`:
 
 | Option | Default | Use |
 | --- | --- | --- |
-| `--user <name>` | `openbot` | The user that runs OpenBot and its agents. The install makes it when it does not exist, with its home folder in `/var/lib/<name>`. |
-| `--auth-api-url <origin>` | the URL in the build | Another account server, for example the `test` Worker or a [self-hosted account service](self-hosting.md). |
+| `--user <name>` | the installed user, else `openbot` | The user that runs OpenBot and its agents. The install makes it when it does not exist, with its home folder in `/var/lib/<name>`. |
+| `--auth-api-url <origin>` | the installed one, else the URL in the build | Another account server, for example the `test` Worker or a [self-hosted account service](self-hosting.md). |
 
 Run the install again to reinstall or upgrade. The data stays in the home folder of the service
-user. The install refuses an older release than the installed one, because an older OpenBot cannot
+user. A reinstall keeps the user and the account server, because the sign-in belongs to them, and
+refuses another `--user`. The install refuses an older release than the installed one, because an older OpenBot cannot
 open a database that a newer one migrated. It also refuses a computer that is a hosted server.
 
 ## Commands
