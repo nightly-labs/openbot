@@ -136,7 +136,11 @@ function isProviderTimeout(error: unknown): boolean {
 }
 
 /** One log line for each row whose state changes, so the provider log shows when a provider went away. */
-function logProviderStateChanges(previous: readonly AgentProviderStatus[], next: readonly AgentProviderStatus[]): void {
+function logProviderStateChanges(
+  previous: readonly AgentProviderStatus[],
+  next: readonly AgentProviderStatus[],
+  redactMcp: (text: string) => string,
+): void {
   for (const row of next) {
     const before = previous.find((candidate) => candidate.id === row.id);
     if (before?.state === row.state) continue;
@@ -145,7 +149,7 @@ function logProviderStateChanges(previous: readonly AgentProviderStatus[], next:
       from: before?.state ?? null,
       to: row.state,
       version: row.version,
-      message: row.message === null ? null : shortenDiagnostic(row.message),
+      message: row.message === null ? null : shortenDiagnostic(redactMcp(row.message)),
     });
   }
 }
@@ -653,7 +657,7 @@ export class ProviderRuntime implements ProviderPort {
           } catch (error) {
             logger.warn("Could not read provider usage.", {
               provider,
-              message: error instanceof Error ? error.message : "unknown",
+              message: error instanceof Error ? this.#redactMcp(error.message) : "unknown",
             });
           }
         }),
@@ -2426,7 +2430,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #setStatus(patch: Partial<AgentStatus>): void {
     if (patch.providers) {
-      logProviderStateChanges(this.#status.providers ?? [], patch.providers);
+      logProviderStateChanges(this.#status.providers ?? [], patch.providers, this.#redactMcp);
       // A provider with no CLI has nothing left to diagnose, and its row already says why: an error
       // from a removed custom agent must not stay under an empty list.
       for (const row of patch.providers) if (row.state === "not-installed") this.#lastErrors.delete(row.id);
