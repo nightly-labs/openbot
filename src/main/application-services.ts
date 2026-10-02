@@ -1553,8 +1553,8 @@ export async function createApplicationServices({
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
       // A live Slack connection counts: stopped, the server could not hear the next message. An open
-      // browser view does not: a view that the user forgot would keep the server running. Its clicks
-      // are requests, so they count as client use.
+      // browser view does not: a view that the user forgot would keep the server running. Input in
+      // the view counts as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
         messaging.hasLiveConnection() ||

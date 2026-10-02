@@ -580,6 +580,8 @@ export function createWebWorkspace(
     void (starting ? hostedServer.wake(id) : Promise.resolve(false)).then(async (waking) => {
       const availability = waking ? "waking" : await hostedServer.unavailable(id);
       if (disposed || hostId !== id || state.status === "online") return;
+      // The 5-minute recheck can find that the server does not sleep now, so input does not wake it.
+      if (availability !== "sleeping") stopWaitingForInput?.();
       setHostedSleep(availability === "sleeping" ? "sleeping" : availability === "waking" ? "waking" : null);
       if (availability === "waking") reconnectAfterWake(id);
       else if (availability === "sleeping") waitForInput(id);

@@ -78,8 +78,9 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    host. `registerHost` refuses the host ID for any other account.
 5. **In use.** OpenBot checks each minute whether the server is in use: an agent works, a remote
    desktop view is open, a file moves, or a remote client is connected (an open Team API event
-   stream) and sent a user action or a typing event in the last 5 minutes. An open browser view does
-   not count, because a view that the user forgot would keep the server on. It sends
+   stream) and sent a user action or a typing event in the last 5 minutes. A key press or pointer
+   input in a browser view is a user action. An open browser view with no input does not count,
+   because a view that the user forgot would keep the server on. It sends
    `POST /v2/hosting/servers/:id/activity` with `{inUse, nextRunAt}` and the session from its claim:
    at once when the use starts, then at most each 5 minutes while the use continues, and each time
    the next routine run changes. The Worker accepts only that session, not the owner's own sessions.

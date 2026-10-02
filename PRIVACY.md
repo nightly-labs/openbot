@@ -223,7 +223,8 @@ France). The sandbox holds the server's workspaces, conversations, attachments, 
 team data, the same as your own computer would. The server stops 15 to 30 minutes after its last use and
 starts again when you press a key or click in an app that shows it, or a few minutes before its next
 scheduled routine run. Use means that an agent works, a remote desktop is open, a file moves, or you
-sent a message, made a change or typed in the last 5 minutes. An app that is only open does not count.
+sent a message, made a change, typed or used a shared browser view in the last 5 minutes. An app
+that is only open does not count.
 To show whether a server is asleep, the app asks the account service for its state. This request
 stores nothing. When boat stops the sandbox, boat keeps a snapshot of its disk until
 the server starts again. Deleting the server

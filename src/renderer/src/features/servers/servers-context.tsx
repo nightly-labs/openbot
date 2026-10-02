@@ -1,6 +1,7 @@
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
@@ -97,20 +98,33 @@ const Servers = createSimpleContext({
       },
       (serverId) => {
         if (!serverId) return;
+        let active = true;
+        const addListeners = () => {
+          window.addEventListener("pointerdown", wake, true);
+          window.addEventListener("keydown", wake, true);
+        };
         const removeListeners = () => {
           window.removeEventListener("pointerdown", wake, true);
           window.removeEventListener("keydown", wake, true);
         };
         const wake = () => {
           removeListeners();
-          // Main asks the account service again when this fails, so the indicator stays right.
+          // A wake that does not start the server leaves it asleep, so the next input asks again.
           void serversPort()
             .hostedServers.wake(serverId)
-            .catch(() => undefined);
+            .then(
+              (server) => WAKE_RECONNECT_STATES.has(server.state),
+              () => false,
+            )
+            .then((started) => {
+              if (!started && active) addListeners();
+            });
         };
-        window.addEventListener("pointerdown", wake, true);
-        window.addEventListener("keydown", wake, true);
-        return removeListeners;
+        addListeners();
+        return () => {
+          active = false;
+          removeListeners();
+        };
       },
     );
 

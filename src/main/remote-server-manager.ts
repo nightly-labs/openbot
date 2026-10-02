@@ -291,7 +291,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
-      if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId) && !this.#awaitsHostedStart(serverId)) {
+      // Each failure checks the start time, so a start that fails for another reason also ends.
+      const hostedStarting = this.#awaitsHostedStart(serverId);
+      if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId) && !hostedStarting) {
         this.#events.markHostOffline(serverId);
         // A hosted server that another reason stopped starts again only for the selected server with the
         // app in focus. A server that sleeps waits for the user's input.
@@ -746,8 +748,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     void this.#hostedServers
       .unavailable(serverId, wake)
       .then((availability) => {
-        // A wake request calls `hostedServerStarting` itself; a connection that came back ends the sleep.
-        if (availability === "waking" || !this.#store.has(serverId)) return;
+        // A wake request calls `hostedServerStarting` itself, also one that came after this check started.
+        // A connection that came back ends the sleep.
+        if (availability === "waking" || this.#hostedStartAt.has(serverId) || !this.#store.has(serverId)) return;
         if (this.#connections.stateFor(serverId) === "online") return;
         if (this.#connections.setHostedSleep(serverId, availability === "sleeping" ? "sleeping" : null))
           this.#emitChanged();
