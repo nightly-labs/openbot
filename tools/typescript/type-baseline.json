@@ -59,7 +59,7 @@
     "packages/ui/src/features/usage/UsageChart.tsx": 1,
     "packages/ui/src/select.tsx": 1,
     "packages/ui/src/slider.tsx": 1,
-    "packages/ui/src/switch.tsx": 2,
+    "packages/ui/src/switch.tsx": 1,
     "scripts/backfill-openpanel-identities.ts": 1,
     "scripts/cua-driver-doctor.ts": 1,
     "scripts/deploy-auth-api.ts": 1,

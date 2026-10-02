@@ -26,6 +26,10 @@ interface GeneralStoreProps {
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** The joined server whose host runs these providers. Absent when this computer runs them. */
   providerHostName?: string | undefined;
+  /** The providers that the user turned off in OpenBot. */
+  offProviders?: readonly AgentProviderId[] | undefined;
+  /** The names of the agents that use each provider. */
+  providerUsers?: Partial<Record<AgentProviderId, readonly string[]>> | undefined;
 }
 
 /**
@@ -65,6 +69,8 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         diagnostics: agent ? providerDiagnosticsText(agent) : undefined,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,
+        off: props.offProviders?.includes(provider),
+        usedBy: props.providerUsers?.[provider],
         /*
          * A CLI the user installed themselves is the one the provider runs, whatever the managed
          * runtime holds, so the row reads it as ready on the version the provider reports. An

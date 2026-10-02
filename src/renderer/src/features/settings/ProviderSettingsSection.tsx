@@ -46,6 +46,7 @@ interface ProviderSettingsSectionProps {
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
@@ -117,6 +118,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onUpdateProvider={props.onUpdateProvider}
         onRestartProvider={props.onRestartProvider}
         onCancelProviderRestart={props.onCancelProviderRestart}
+        onSetProviderOn={props.onSetProviderOn}
         onConnectProvider={props.onConnectProvider}
         onInstallProvider={props.onInstallProvider}
         onAddCustomProvider={
@@ -295,6 +297,14 @@ export interface HostProviderSettings {
   /** The provider restart is of this computer, so only its section has it. */
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /**
+   * The providers the user turned off, and the switch that turns one on or off. Only the stories
+   * give them until OpenBot saves the setting (issue #1261).
+   */
+  offProviders?: readonly AgentProviderId[] | undefined;
+  /** The names of the agents that use each provider. A provider with one stays on. */
+  providerUsers?: Partial<Record<AgentProviderId, readonly string[]>> | undefined;
+  onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
   onAddCustomProvider?: ((value: SaveCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
@@ -342,6 +352,12 @@ export function HostProviderSettingsPanel(
     get providerHostName() {
       return props.hostName;
     },
+    get offProviders() {
+      return props.offProviders;
+    },
+    get providerUsers() {
+      return props.providerUsers;
+    },
   });
   return (
     <>
@@ -353,6 +369,7 @@ export function HostProviderSettingsPanel(
         onUpdateProvider={props.onUpdateProvider}
         onRestartProvider={props.onRestartProvider}
         onCancelProviderRestart={props.onCancelProviderRestart}
+        onSetProviderOn={props.onSetProviderOn}
         onConnectProvider={props.onConnectProvider}
         onInstallProvider={props.onInstallProvider}
         onAddCustomProvider={props.onAddCustomProvider}
