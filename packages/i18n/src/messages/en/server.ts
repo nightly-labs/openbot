@@ -141,6 +141,10 @@ export const messages = defineMessages("server", {
   "server.compatibility.versionMismatchTitle": "Different OpenBot versions on {name}",
   "server.compatibility.versionMismatchDescription":
     "The connection uses protocol {protocol}. Some newer features may be unavailable. Client {clientVersion}; host {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Update OpenBot on {name} to use all features. The connection uses protocol {protocol}. Client {clientVersion}; host {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Update this OpenBot app to use all features. The connection uses protocol {protocol}. Client {clientVersion}; host {hostVersion}.",
   "server.connection.failedTitle": "The connection failed",
   "server.connection.failedDescription":
     "Could not connect to this server. Check that the host is online and try again.",

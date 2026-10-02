@@ -75,6 +75,20 @@ export function isBackgroundRefreshDiagnostic(message: string): boolean {
   return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
 }
 
+/**
+ * Whether a provider diagnostic is the ACP SDK's own copy of an error that the agent also answered.
+ *
+ * The TypeScript ACP SDK that a Node agent is built on writes `Error handling request`, the whole
+ * request and the error to stderr each time a handler fails, and then sends the same error as the
+ * JSON-RPC answer. OpenBot reports that answer where the request was made: a failed prompt in the
+ * chat. The stderr copy reached the user as an `Error handling request {` toast, with nothing to act
+ * on and the request's own fields in it (#1193). Newer SDKs write `Error handling notification` for a
+ * notification, which has no answer and no action for the user either.
+ */
+export function isAcpHandlerDiagnostic(message: string): boolean {
+  return /^Error handling (?:request|notification)\b/.test(message);
+}
+
 const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring (\d+) unrecognized configuration settings?\b/;
 
 /**

@@ -8,7 +8,7 @@ import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
 import { watchHostUpdate } from "./host-update-toast";
-import { remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
+import { olderAppSide, remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
 
 /**
@@ -115,12 +115,20 @@ const Servers = createSimpleContext({
           const { t } = currentText();
           const opener = openHostUpdate;
           const serverId = server.id;
+          const older = olderAppSide(compatibility.localAppVersion, compatibility.hostAppVersion);
+          const descriptionParams = {
+            name: server.name,
+            protocol: String(compatibility.negotiatedProtocol),
+            clientVersion: compatibility.localAppVersion,
+            hostVersion: compatibility.hostAppVersion,
+          };
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
-            description: t("server.compatibility.versionMismatchDescription", {
-              protocol: String(compatibility.negotiatedProtocol),
-              clientVersion: compatibility.localAppVersion,
-              hostVersion: compatibility.hostAppVersion,
-            }),
+            description:
+              older === "host"
+                ? t("server.compatibility.versionMismatchUpdateHostDescription", descriptionParams)
+                : older === "client"
+                  ? t("server.compatibility.versionMismatchUpdateClientDescription", descriptionParams)
+                  : t("server.compatibility.versionMismatchDescription", descriptionParams),
             action:
               opener && administersUpdate
                 ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }

@@ -55,6 +55,7 @@ import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   ignoredCodexSettings,
+  isAcpHandlerDiagnostic,
   isBackgroundRefreshDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
@@ -1872,6 +1873,13 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isBackgroundRefreshDiagnostic(message)) {
         logger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
+        return;
+      }
+      if (isAcpHandlerDiagnostic(message)) {
+        logger.warn("A provider logged a request that it answered with an error.", {
+          provider: client.provider,
+          message,
+        });
         return;
       }
       if (isIgnoredConfigDiagnostic(message)) {

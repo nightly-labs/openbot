@@ -144,6 +144,10 @@ export const messages = {
   "server.compatibility.versionMismatchTitle": "{name} üzerinde farklı OpenBot sürümleri",
   "server.compatibility.versionMismatchDescription":
     "Bağlantı {protocol} protokolünü kullanıyor. Bazı yeni özellikler kullanılamayabilir. İstemci {clientVersion}; ana makine {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Tüm özellikleri kullanmak için {name} üzerindeki OpenBot'u güncelleyin. Bağlantı {protocol} protokolünü kullanıyor. İstemci {clientVersion}; ana makine {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Tüm özellikleri kullanmak için bu OpenBot uygulamasını güncelleyin. Bağlantı {protocol} protokolünü kullanıyor. İstemci {clientVersion}; ana makine {hostVersion}.",
   "server.connection.failedTitle": "Bağlantı başarısız oldu",
   "server.connection.failedDescription":
     "Bu sunucuya bağlanılamadı. Ana makinenin çevrim içi olduğunu kontrol edip tekrar deneyin.",

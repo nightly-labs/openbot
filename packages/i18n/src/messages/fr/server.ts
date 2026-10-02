@@ -20,6 +20,10 @@ export const messages = {
   "server.compatibility.versionMismatchTitle": "Versions d’OpenBot différentes sur {name}",
   "server.compatibility.versionMismatchDescription":
     "La connexion utilise le protocole {protocol}. Certaines fonctions récentes peuvent être indisponibles. Client {clientVersion} ; hôte {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Mettez à jour OpenBot sur {name} pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Mettez à jour cette application OpenBot pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
   "server.join.title": "Rejoindre un serveur",
   "server.join.verifiedFrom": "Invitation vérifiée de {hostname}.",
   "server.join.pasteToContinue": "Collez un lien d’invitation pour continuer.",

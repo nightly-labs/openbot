@@ -138,6 +138,10 @@ export const messages = {
   "server.compatibility.versionMismatchTitle": "Versões diferentes do OpenBot em {name}",
   "server.compatibility.versionMismatchDescription":
     "A conexão usa o protocolo {protocol}. Alguns recursos mais recentes podem estar indisponíveis. Cliente {clientVersion}; computador anfitrião {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Atualize o OpenBot em {name} para usar todos os recursos. A conexão usa o protocolo {protocol}. Cliente {clientVersion}; computador anfitrião {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Atualize este app OpenBot para usar todos os recursos. A conexão usa o protocolo {protocol}. Cliente {clientVersion}; computador anfitrião {hostVersion}.",
   "server.connection.failedTitle": "A conexão falhou",
   "server.connection.failedDescription":
     "Não foi possível conectar a este servidor. Verifique se o computador anfitrião está online e tente novamente.",
