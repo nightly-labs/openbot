@@ -183,7 +183,9 @@ export function createProviderRuntimeStore(
       if (update.runtime.phase === "not-downloaded" || (update.runtime.phase === "ready" && update.availableVersion))
         continue;
       reportProviderUpdateToast(update, () => void downloadProviderRuntime(provider));
+      // The report replaced whatever the notification said before, a failure included.
       if (update.runtime.phase === "download-error") failed.add(provider);
+      else failed.delete(provider);
       if (update.runtime.phase !== "downloading" && update.runtime.phase !== "finishing") updating.delete(provider);
     }
     for (const provider of failed) {

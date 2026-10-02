@@ -718,13 +718,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     // Each pass reads the destination again, because a sibling can fill it or replace it between
     // any two steps below. Whatever it did, the next pass sees the result: a verified install is
     // adopted, and only what is still damaged is replaced.
+    let held = false;
     for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
       if (await renameIfVacant(staging, destination)) return true;
+      // Still vacant: the stage is held open, and there is nothing to adopt or replace.
+      held = !(await pathExists(destination));
+      if (held) continue;
       if (await this.#verifies(destination, spec)) return false;
       const outcome = await this.#replaceUnderLock(staging, destination, spec);
       if (outcome !== "moved") return outcome === "committed";
     }
-    throw new Error(sourceText("error.provider.runtimeReplacing"));
+    throw new Error(sourceText(held ? "error.provider.runtimeFilesInUse" : "error.provider.runtimeReplacing"));
   }
 
   /**
@@ -977,26 +981,31 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
  * check has just run, or an antivirus scan of it -- while `to` is vacant. Reading that as occupied
  * sent the commit looking for an install no one had made, and three empty looks ended in "another
  * instance is replacing it" on a computer with one instance. So `to` is looked at: present means
- * occupied, and absent means the source is held, which passes, and is waited for before failing.
+ * occupied, and absent means the source is held, which passes and is waited for. A source still
+ * held after the wait answers `false` like an occupied one, so every caller keeps its own reading of
+ * what is there; `#commit` is the one that tells the user which of the two it was.
  */
-async function renameIfVacant(from: string, to: string, attempt = 0): Promise<boolean> {
-  try {
-    await rename(from, to);
-    return true;
-  } catch (error) {
-    const code = errorCode(error);
-    if (code === "ENOTEMPTY" || code === "EEXIST") return false;
-    if (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") throw error;
-    const occupied = await access(to).then(
-      () => true,
-      () => false,
-    );
-    if (occupied) return false;
-    const wait = HELD_SOURCE_WAITS_MS[attempt];
-    if (wait === undefined) throw new Error(sourceText("error.provider.runtimeFilesInUse"), { cause: error });
-    await delay(wait);
-    return await renameIfVacant(from, to, attempt + 1);
+async function renameIfVacant(from: string, to: string): Promise<boolean> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(from, to);
+      return true;
+    } catch (error) {
+      const code = errorCode(error);
+      if (code === "ENOTEMPTY" || code === "EEXIST") return false;
+      if (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") throw error;
+      const wait = HELD_SOURCE_WAITS_MS[attempt];
+      if (wait === undefined || (await pathExists(to))) return false;
+      await delay(wait);
+    }
   }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  return await access(path).then(
+    () => true,
+    () => false,
+  );
 }
 
 /**
