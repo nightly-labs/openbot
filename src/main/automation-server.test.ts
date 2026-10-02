@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
+import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { AUTOMATION_RUNS_PER_HOUR, AutomationServer, type AutomationServerOptions } from "./automation-server";
+
+const FILES = [AUTOMATION_URL_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_HEADERS_FILE];
 
 interface Reply {
   status: number;
@@ -163,8 +165,7 @@ describe("AutomationServer", () => {
     const { root } = await startServer();
 
     expect((await stat(root)).mode & 0o777).toBe(0o700);
-    expect((await stat(join(root, AUTOMATION_TOKEN_FILE))).mode & 0o777).toBe(0o600);
-    expect((await stat(join(root, AUTOMATION_URL_FILE))).mode & 0o777).toBe(0o600);
+    for (const name of FILES) expect((await stat(join(root, name))).mode & 0o777).toBe(0o600);
   });
 
   it("stops and removes its files when the last agent turns local scripts off", async () => {
@@ -173,8 +174,7 @@ describe("AutomationServer", () => {
     agents[0] = { id: "agent-1", name: "Ada", allowAutomation: false };
     await server.sync();
 
-    await expect(stat(join(root, AUTOMATION_TOKEN_FILE))).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(stat(join(root, AUTOMATION_URL_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    for (const name of FILES) await expect(stat(join(root, name))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(run(url, token, {})).rejects.toMatchObject({ code: "ECONNREFUSED" });
 
     agents[0] = { id: "agent-1", name: "Ada", allowAutomation: true };

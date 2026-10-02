@@ -8,7 +8,8 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { writeFileAtomically } from "../backend/atomic-json-file";
-import { AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
+import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
+import { RoutineInputError } from "../backend/routine-schedule";
 
 const logger = createOpenBotLogger("automation");
 
@@ -107,6 +108,7 @@ export class AutomationServer {
       if (process.platform !== "win32") await chmod(root, 0o700);
       // The token first: a script that finds the new URL also finds the token that goes with it.
       await writeFileAtomically(join(root, AUTOMATION_TOKEN_FILE), token);
+      await writeFileAtomically(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`);
       await writeFileAtomically(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${this.#port}`);
     } catch (error) {
       // Closed, so that the next `sync` starts again instead of keeping a door nobody can find.
@@ -123,7 +125,9 @@ export class AutomationServer {
     this.#token = Buffer.alloc(0);
     this.#runs.clear();
     await Promise.all(
-      [AUTOMATION_URL_FILE, AUTOMATION_TOKEN_FILE].map((name) => rm(join(this.#options.root, name), { force: true })),
+      [AUTOMATION_URL_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_HEADERS_FILE].map((name) =>
+        rm(join(this.#options.root, name), { force: true }),
+      ),
     );
     this.#filesClean = true;
     if (!server) return;
@@ -146,7 +150,10 @@ export class AutomationServer {
       const match = RUN_PATH.exec(path);
       if (!match?.[1] || !match[2]) return send(response, 404, { error: "not found" });
       if (request.method !== "POST") return send(response, 405, { error: "method not allowed" });
-      await this.#run(request, response, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
+      const agentId = decodePathPart(match[1]);
+      const routineId = decodePathPart(match[2]);
+      if (agentId === null || routineId === null) return send(response, 404, { error: "not found" });
+      await this.#run(request, response, agentId, routineId);
     } catch (error) {
       logger.warn("An automation request failed.", error);
       if (!response.headersSent) send(response, 500, { error: "internal error" });
@@ -184,13 +191,17 @@ export class AutomationServer {
       const error = sourceText("error.agent.automationRateLimited", { limit: AUTOMATION_RUNS_PER_HOUR });
       return send(response, 429, { error });
     }
+    // The slot is taken before the run starts, so parallel requests cannot pass the limit together.
+    this.#runs.set(agentId, [...recent, now]);
     let run: Pick<RoutineRun, "id" | "deliveryId">;
     try {
       run = await this.#options.runRoutine({ agentId, routineId, payload });
     } catch (error) {
-      return send(response, 409, { error: error instanceof Error ? error.message : String(error) });
+      this.#releaseSlot(agentId, now);
+      // Only a known refusal goes back to the script; another error is logged and gets a 500.
+      if (error instanceof RoutineInputError) return send(response, 409, { error: error.message });
+      throw error;
     }
-    this.#runs.set(agentId, [...recent, now]);
     logger.info(`A local script ran routine ${routineId} of agent ${agentId}.`);
     send(response, 202, { runId: run.id, deliveryId: run.deliveryId });
   }
@@ -208,10 +219,25 @@ export class AutomationServer {
       }));
   }
 
+  #releaseSlot(agentId: string, time: number): void {
+    const runs = this.#runs.get(agentId);
+    const index = runs?.indexOf(time) ?? -1;
+    if (runs && index >= 0) runs.splice(index, 1);
+  }
+
   #authorized(header: string | undefined): boolean {
     if (!header?.startsWith("Bearer ") || this.#token.length === 0) return false;
     const candidate = Buffer.from(header.slice(7));
     return candidate.length === this.#token.length && timingSafeEqual(candidate, this.#token);
+  }
+}
+
+/** A path segment, or null when its percent encoding is not valid. */
+function decodePathPart(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
   }
 }
 
