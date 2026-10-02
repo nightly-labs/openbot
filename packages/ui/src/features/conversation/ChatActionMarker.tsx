@@ -36,12 +36,12 @@ import { formatChatTimestamp } from "./chat-timestamp";
 interface ChatActionMarkerProps {
   marker: ChatActionMarkerModel;
   agents: AgentProfile[];
-  announce?: boolean;
-  onOpenSkill?: (skill: { skillId: string }) => void;
-  routineAvailable?: boolean;
+  announce?: boolean | undefined;
+  onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
+  routineAvailable?: boolean | undefined;
   onSelectAgent: (agentId: string) => void;
-  onOpenRoutine?: (routine: { routineId: string; name: string }) => void;
-  onOpenHostedSite?: (url: string) => void;
+  onOpenRoutine?: ((routine: { routineId: string; name: string }) => void) | undefined;
+  onOpenHostedSite?: ((url: string) => void) | undefined;
 }
 
 const STATUS_LABELS = {
@@ -68,6 +68,14 @@ function singleMarker(marker: ChatActionMarkerModel): SingleChatActionMarkerMode
 }
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
+  /*
+   * A single agent message turns into a group when the next one arrives, and this component stays
+   * mounted while it does. A message after the ones drawn at mount joins later and is announced. A new
+   * row announces all of its messages.
+   */
+  const drawnMessageCount = untrack(() =>
+    props.announce ? 0 : (agentMessageGroup(props.marker)?.messages.length ?? 1),
+  );
   return (
     <Show
       when={agentMessageGroup(props.marker)}
@@ -92,7 +100,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
         <AgentMessageGroupMarker
           group={group()}
           agents={props.agents}
-          announce={props.announce}
+          drawnMessageCount={drawnMessageCount}
           onSelectAgent={props.onSelectAgent}
         />
       )}
@@ -107,7 +115,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
 function AgentMessageGroupMarker(props: {
   group: AgentMessageGroupMarkerModel;
   agents: AgentProfile[];
-  announce?: boolean;
+  drawnMessageCount: number;
   onSelectAgent: (agentId: string) => void;
 }) {
   const { t, format } = useText();
@@ -136,19 +144,14 @@ function AgentMessageGroupMarker(props: {
     if (ids.length !== 1) return t("chat.marker.agentCount", { count: ids.length });
     return agents()[0]?.name ?? t("chat.marker.unavailableAgent");
   };
-  // A message that joins the group has no row of its own to announce it. The live text is empty when
-  // the row mounts, so a group drawn from history or by a scroll stays silent.
-  const mountedCount = untrack(() => props.group.messages.length);
-  const joinedMessage = () => {
-    const newest = props.group.messages.at(-1);
-    if (props.group.messages.length <= mountedCount || !newest) return "";
-    return markerAccessibleLabel(newest.marker, props.agents, t);
-  };
+  // A message that joins the group has no row of its own to announce it. The newest one that joined
+  // gets a new node in the live text, so a reader announces it even when its text is the same.
+  const joinedMessages = () =>
+    props.group.messages.slice(Math.max(props.drawnMessageCount, props.group.messages.length - 1));
   return (
     <Marker
       class="chat-action-marker chat-action-marker-agent-message chat-action-marker-agent-message-group"
-      role={props.announce ? "status" : "group"}
-      aria-live={props.announce ? "polite" : "off"}
+      role="group"
       aria-label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
     >
       <div class="chat-action-marker-summary">
@@ -210,11 +213,11 @@ function AgentMessageGroupMarker(props: {
           </div>
         </Show>
       </div>
-      <Show when={!props.announce}>
-        <span class="sr-only" role="status" aria-live="polite">
-          {joinedMessage()}
-        </span>
-      </Show>
+      <span class="sr-only" role="status" aria-live="polite">
+        <For each={joinedMessages()} keyed={(entry) => entry.id}>
+          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t)}</span>}
+        </For>
+      </span>
     </Marker>
   );
 }
