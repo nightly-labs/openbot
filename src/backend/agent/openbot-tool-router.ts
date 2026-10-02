@@ -661,12 +661,7 @@ export class OpenBotToolRouter {
       if (!isRecord(args) || !isString(args.app) || !isPluginSlug(args.app)) {
         throw new Error("app must be a Marketplace plugin slug, or github.");
       }
-      const itemType = marketplaceSuggestionItemType({ appId: args.app });
       const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-      // One card per app in a conversation: the person already decided about the first one.
-      if (snapshot.messages.some((message) => message.itemType === itemType)) {
-        return openBotToolResult({ status: "already-suggested", app: args.app });
-      }
       snapshot.messages.push({
         id: randomUUID(),
         turnId: params.turnId,
@@ -674,7 +669,7 @@ export class OpenBotToolRouter {
         source: "system",
         status: "completed",
         createdAt: new Date().toISOString(),
-        itemType,
+        itemType: marketplaceSuggestionItemType({ appId: args.app }),
         text: args.app,
       });
       const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
