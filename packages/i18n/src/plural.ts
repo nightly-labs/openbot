@@ -19,6 +19,12 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // Japanese has one form for every count.
   ja: () => "other",
+  // CLDR Portuguese: one for integer parts 0 and 1; many for nonzero multiples of one million.
+  pt: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute < 2) return "one";
+    return Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
+  },
   // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),
 };

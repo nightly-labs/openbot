@@ -1,0 +1,60 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/auth";
+
+export const messages = {
+  "mobile.auth.logo.animate": "Animar logotipo do OpenBot",
+  "mobile.auth.logo.animateHint": "Faz o logotipo piscar",
+  "mobile.auth.scanQrCode": "Ler código QR",
+  "mobile.auth.closeScanner": "Fechar leitor",
+  "mobile.auth.scanner.connectFailed": "Não foi possível conectar",
+  "mobile.auth.scanner.codeFailed": "Não foi possível usar este código",
+  "mobile.auth.scanner.scanAgain": "Ler novamente",
+  "mobile.auth.scanner.connecting": "Conectando seu celular…",
+  "mobile.auth.scanner.readingInvitation": "Lendo o convite…",
+  "mobile.auth.scanner.scanDesktop": "Leia o código do computador",
+  "mobile.auth.scanner.scanInvitation": "Leia o código do convite",
+  "mobile.auth.scanner.verifying": "Verificando o código de uso único.",
+  "mobile.auth.scanner.checkingServer": "Verificando a identidade do servidor.",
+  "mobile.auth.scanner.keepCentered": "Mantenha o código QR centralizado dentro do quadro.",
+  "mobile.auth.scanner.connectFallback": "O OpenBot não conseguiu conectar este celular.",
+  "mobile.auth.scanner.cameraFailed": "Não foi possível iniciar a câmera. Tente novamente.",
+  "mobile.auth.camera.title": "É necessário permitir o acesso à câmera",
+  "mobile.auth.camera.pairingReason":
+    "O OpenBot usa a câmera apenas para ler o código QR de uso único mostrado no app para computador.",
+  "mobile.auth.camera.invitationReason": "O OpenBot usa a câmera apenas para ler o código QR do convite.",
+  "mobile.auth.camera.blocked":
+    "O acesso à câmera está bloqueado. Ative-o para o OpenBot nas configurações do dispositivo e volte aqui para ler o código.",
+  "mobile.auth.camera.allow": "Permitir acesso à câmera",
+  "mobile.auth.camera.openSettings": "Abrir configurações",
+  "mobile.auth.signIn.title": "Seus agentes, em qualquer lugar.",
+  "mobile.auth.signIn.subtitle": "Conecte-se ao OpenBot no seu computador.",
+  "mobile.auth.signIn.helpTitle": "Onde está o código QR?",
+  "mobile.auth.signIn.helpStep1": "1. Abra o OpenBot no seu computador.",
+  "mobile.auth.signIn.helpStep2": "2. Acesse Configurações → Conectar celular.",
+  "mobile.auth.signIn.helpStep3": "3. Escolha Gerar código QR e leia-o aqui.",
+  "mobile.auth.error.sessionEnded": "Sua sessão terminou. Leia um novo código do OpenBot no computador.",
+  "mobile.auth.error.connectionInProgress": "Outra conexão está em andamento. Aguarde a conclusão.",
+  "mobile.auth.error.invalidCode": "Este não é um código válido de Conectar celular do OpenBot.",
+  "mobile.auth.error.codeOutdated": "Gere um novo código de Conectar celular no app para computador atualizado.",
+  "mobile.auth.error.alreadySignedIn": "Você já está conectado. Saia antes de conectar outra conta.",
+  "mobile.auth.error.desktopUnreachable":
+    "O OpenBot não conseguiu acessar seu computador. Mantenha os dois dispositivos na mesma rede Wi-Fi e permita o acesso à Rede local.",
+  "mobile.auth.error.accountServiceUnreachable":
+    "O OpenBot não conseguiu acessar o serviço de contas. Verifique sua conexão e tente novamente.",
+  "mobile.auth.error.codeExpired": "Este código de Conectar celular é inválido ou expirou.",
+  "mobile.auth.error.revokePreviousFailed":
+    "Não foi possível revogar a sessão móvel anterior. Verifique sua conexão e leia novamente.",
+  "mobile.auth.error.verifyFailed": "O OpenBot não conseguiu verificar esta sessão móvel.",
+  "mobile.auth.error.sessionsLoadFailed": "Não foi possível carregar as sessões da conta. Tente novamente.",
+  "mobile.auth.error.useSignOut": "Use Sair para desconectar este dispositivo.",
+  "mobile.auth.error.desktopSession": "As sessões do computador não podem ser desconectadas pelo celular.",
+  "mobile.auth.error.disconnectFailed": "Não foi possível desconectar esta sessão. Atualize e tente novamente.",
+  "mobile.auth.error.nameLength": "Digite um nome de exibição com 3 a 20 caracteres.",
+  "mobile.auth.error.photoTooLarge": "Escolha uma foto menor que 512 KB.",
+  "mobile.auth.error.photoInvalid": "A foto selecionada é inválida. Escolha outra imagem.",
+  "mobile.auth.error.tooManyChanges": "Muitas alterações. Aguarde um momento e tente novamente.",
+  "mobile.auth.error.photoConflict": "Sua foto mudou em outro dispositivo. Tente novamente.",
+  "mobile.auth.error.profileSaveFailed": "Não foi possível salvar seu perfil. Verifique sua conexão e tente novamente.",
+  "mobile.auth.error.signOutUnconfirmed":
+    "Não foi possível confirmar a saída. Verifique sua conexão e tente novamente.",
+} as const satisfies PartialTranslation<typeof source>;

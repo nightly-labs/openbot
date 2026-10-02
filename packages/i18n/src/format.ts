@@ -3,6 +3,7 @@ import { createTranslate } from "./message";
 import { messages as en } from "./messages/en/format";
 import { messages as fr } from "./messages/fr/format";
 import { messages as ja } from "./messages/ja/format";
+import { messages as pt } from "./messages/pt/format";
 import { messages as tr } from "./messages/tr/format";
 
 /**
@@ -30,7 +31,7 @@ export interface AppFormat {
   fileSize: (bytes: number) => string;
 }
 
-const catalogs = { en, fr, ja, tr } as const;
+const catalogs = { en, fr, ja, pt, tr } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 

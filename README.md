@@ -415,7 +415,7 @@ Cloudflare Workers
 - `src/renderer` contains the SolidJS interface.
 - `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
-- `packages/i18n` contains the interface text in English, French and Japanese for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.
+- `packages/i18n` contains the interface text in English, French, Japanese, Brazilian Portuguese and Turkish for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
 rules for new modules.
