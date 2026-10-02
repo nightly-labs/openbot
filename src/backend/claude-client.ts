@@ -1011,11 +1011,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
        so it is demoted as soon as the next one proves it was not the end of the turn. A restored
        thread otherwise reopens with the chat bubbles a live turn no longer draws. */
     let currentAnswer: ThreadItem | null = null;
+    /* Claude writes its compaction summary as a user entry, and the reply after it finishes a turn
+       the app already published live under that turn's own ID. Neither is restored. */
+    let skippingCompaction = false;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
       if (message.type === "user") {
-        if (!text) continue;
+        if (!text || isClaudeInterruptMarker(text)) continue;
+        if (isClaudeCompactionSummary(text)) {
+          skippingCompaction = true;
+          current = null;
+          continue;
+        }
+        skippingCompaction = false;
         // A task notification still opens the turn that answers it, but the user did not write it.
         current = {
           id: message.uuid,
@@ -1035,6 +1044,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         currentThinking = null;
         currentAnswer = null;
       } else if (message.type === "assistant") {
+        if (skippingCompaction) continue;
         const thinking = messageThinking(message.message);
         const endsStep = messageToolCalls(message.message).length > 0;
         if (!thinking && !text && !endsStep) continue;
@@ -1331,6 +1341,16 @@ function readInputText(params: unknown): string {
     .filter((item) => item.type === "text" && isString(item.text))
     .map((item) => item.text)
     .join("\n");
+}
+
+/** The SDK drops the transcript's `isCompactSummary` flag, so the summary's fixed opening identifies it. */
+function isClaudeCompactionSummary(text: string): boolean {
+  return text.startsWith("This session is being continued from a previous conversation that ran out of context.");
+}
+
+/** Claude records a user interrupt as a user entry with this text. */
+function isClaudeInterruptMarker(text: string): boolean {
+  return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
 }
 
 function messageText(message: unknown): string {
