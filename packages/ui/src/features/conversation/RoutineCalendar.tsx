@@ -161,6 +161,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     });
   };
 
+  let heading: HTMLHeadingElement | undefined;
   const moveTo = (anchor: CalendarDay, view: RoutineCalendarView = state.view) => {
     setState((draft) => {
       draft.anchor = anchor;
@@ -170,6 +171,11 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     const first = days[0];
     const last = days.at(-1);
     if (first && last) props.onRangeChange?.(first, last);
+  };
+  /** Today disables itself, and a day or "+N more" leaves the week: focus goes to the heading, not to the page. */
+  const moveFrom = (anchor: CalendarDay, view?: RoutineCalendarView) => {
+    moveTo(anchor, view);
+    heading?.focus();
   };
   const step = (direction: -1 | 1) =>
     moveTo(addCalendarDays(state.anchor, direction * (state.view === "week" ? 7 : 1)));
@@ -185,7 +191,6 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     });
   };
 
-  let heading: HTMLHeadingElement | undefined;
   onSettled(() => {
     if (untrack(() => props.onBack)) heading?.focus();
   });
@@ -229,7 +234,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
               variant="outline"
               size="sm"
               disabled={visibleDays().includes(today())}
-              onClick={() => moveTo(today())}
+              onClick={() => moveFrom(today())}
             >
               {t("routine.calendar.today")}
             </Button>
@@ -337,7 +342,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                             size="xs"
                             class="routine-planner-day-button"
                             aria-label={t("routine.calendar.openDay", { day: longDay(day) })}
-                            onClick={() => moveTo(day, "day")}
+                            onClick={() => moveFrom(day, "day")}
                           >
                             <span>{dayText(day, { weekday: "short" })}</span>
                             <strong>{dayText(day, { day: "numeric" })}</strong>
@@ -378,7 +383,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                               count: dayEntries().length,
                               day: longDay(day),
                             })}
-                            onClick={() => moveTo(day, "day")}
+                            onClick={() => moveFrom(day, "day")}
                           >
                             {t("routine.calendar.more", { count: hidden() })}
                           </Button>

@@ -17,6 +17,7 @@ export function useServerActions() {
   const { t, errorMessage } = useText();
   const { openUsage, openSchedule } = useUsage();
   const {
+    activeServerId,
     servers,
     setServerMuted,
     setServerNotificationLevel,
@@ -36,12 +37,14 @@ export function useServerActions() {
     ];
   }
 
-  function select(serverId: string): void {
-    void selectServer(serverId).catch((error) => {
-      toast.error(t("server.select.failedTitle"), {
-        description: errorMessage(error, t("server.select.failedDescription")),
-      });
+  function selectFailed(error: unknown): void {
+    toast.error(t("server.select.failedTitle"), {
+      description: errorMessage(error, t("server.select.failedDescription")),
     });
+  }
+
+  function select(serverId: string): void {
+    void selectServer(serverId).catch(selectFailed);
   }
 
   /**
@@ -60,7 +63,15 @@ export function useServerActions() {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
     onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
     onOpenUsage: openUsage,
-    onOpenSchedule: openSchedule,
+    onOpenSchedule: (serverId, trigger) => {
+      if (serverId === activeServerId()) return openSchedule(serverId, trigger);
+      // The schedule opens agents and channels in the active server, so it shows the active one.
+      // The trigger goes with the old server.
+      void selectServer(serverId).then(
+        () => openSchedule(serverId, null),
+        (error) => selectFailed(error),
+      );
+    },
     onOpenSettings: openServerSettings,
   };
 

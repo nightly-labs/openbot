@@ -262,10 +262,9 @@ export function parseTestRoutine(value: unknown): TestRoutineInput {
 
 /** The range is a whole number of instants the host reads in one pass, so its length is limited. */
 export function parseRoutineCalendar(value: unknown): RoutineCalendarInput {
-  if (!isObject(value) || !isString(value.from) || !isString(value.to))
-    throw new Error("Invalid routine calendar request.");
-  const from = new Date(value.from);
-  const to = new Date(value.to);
+  if (!isObject(value)) throw new Error("Invalid routine calendar request.");
+  const from = new Date(requireString(value.from, "from"));
+  const to = new Date(requireString(value.to, "to"));
   const length = to.getTime() - from.getTime();
   if (Number.isNaN(length) || length <= 0 || length > INPUT_LIMITS.routineCalendarDays * 86_400_000) {
     throw new Error("Invalid routine calendar range.");

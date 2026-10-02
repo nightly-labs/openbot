@@ -12,6 +12,7 @@ import { createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
+import { useUsage } from "../usage/usage-context";
 import { type SchedulePort, schedulePort } from "./schedule-port";
 
 const DAY = 86_400_000;
@@ -54,6 +55,7 @@ export function SchedulePanel(props: SchedulePanelProps) {
   const { agentList, agentSetupOpen, creatingAgent, setSettingsRequest } = useAgents();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
+  const { dismissUsage } = useUsage();
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [now, setNow] = createSignal(new Date());
   const [state, setState] = createStore<{ phase: "loading" | "ready" | "error"; calendar: HostCalendar | null }>({
@@ -81,7 +83,8 @@ export function SchedulePanel(props: SchedulePanelProps) {
         draft.phase = "ready";
       });
     } catch {
-      if (request !== generation || (background && state.calendar)) return;
+      // A failed refresh keeps the calendar on screen, unless a range change already blanked it.
+      if (request !== generation || (background && state.calendar && state.phase !== "loading")) return;
       setState((draft) => {
         draft.phase = "error";
       });
@@ -114,6 +117,8 @@ export function SchedulePanel(props: SchedulePanelProps) {
     const routine = state.calendar?.routines.find((candidate) => candidate.id === routineId);
     if (!routine) return;
     if (routine.owner.kind === "channel") {
+      // An open channel does not open again, so its settings would stay under the pane.
+      dismissUsage();
       // The channel settings hold its routines one step down.
       void channels.editChannel(routine.owner.channelId);
       return;

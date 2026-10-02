@@ -2,6 +2,7 @@
 // routine of a host.
 
 import {
+  CHANNEL_CHATS_CAPABILITY,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
@@ -132,9 +133,12 @@ function localCalendarSource(service: AgentService): RoutineCalendarSource {
 function remoteCalendarSource(remoteServers: RemoteServerManager, serverId: string): RoutineCalendarSource {
   return {
     owners: async () => {
+      // A host from before channels rejects the channel routes; its agents still have routines.
       const [agents, channels] = await Promise.all([
         remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
-        remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
+        remoteServers.supportsCapability(serverId, CHANNEL_CHATS_CAPABILITY)
+          ? remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)
+          : [],
       ]);
       return [
         ...agents.map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),

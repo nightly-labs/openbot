@@ -14,6 +14,8 @@ import { nextRoutineOccurrence } from "./routine-schedule";
 
 /** A routine that runs every few minutes would fill the range; the calendar shows a count past this. */
 const MAX_SCHEDULED_RUNS = 500;
+/** A remote host gets one request for each owner and each routine; this many run at the same time. */
+const PARALLEL_REQUESTS = 8;
 
 export interface RoutineCalendarSource {
   owners(): Promise<RoutineCalendarOwner[]>;
@@ -28,18 +30,16 @@ export async function buildRoutineCalendar(
   source: RoutineCalendarSource,
 ): Promise<RoutineCalendar> {
   const owners = await source.owners();
-  const routineLists = await Promise.all(
-    owners.map(async (owner) => (await source.routines(owner)).map((routine) => ({ owner, routine }))),
+  const routineLists = await mapLimited(owners, async (owner) =>
+    (await source.routines(owner)).map((routine) => ({ owner, routine })),
   );
   const routines = routineLists.flat();
-  const runLists = await Promise.all(
-    routines.map(async ({ owner, routine }) => {
-      // History reaches back from now, so a range that ends before the oldest run kept here has no history.
-      const history =
-        range.from.getTime() < now.getTime() ? await source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage) : [];
-      return routineRuns(routine, history, range, now);
-    }),
-  );
+  const runLists = await mapLimited(routines, async ({ owner, routine }) => {
+    // History reaches back from now, so a range that ends before the oldest run kept here has no history.
+    const history =
+      range.from.getTime() < now.getTime() ? await source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage) : [];
+    return routineRuns(routine, history, range, now);
+  });
   return {
     routines: routines.map(({ owner, routine }) => ({
       id: routine.id,
@@ -51,6 +51,18 @@ export async function buildRoutineCalendar(
     })),
     runs: runLists.flat(),
   };
+}
+
+/** Like `Promise.all` over `map`, with at most `PARALLEL_REQUESTS` calls in flight. Results keep the input order. */
+async function mapLimited<T, R>(items: readonly T[], map: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  // The workers share one iterator, so each item is taken once.
+  const queue = items.entries();
+  const worker = async () => {
+    for (const [index, item] of queue) results[index] = await map(item);
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALLEL_REQUESTS, items.length) }, worker));
+  return results;
 }
 
 function routineRuns(
