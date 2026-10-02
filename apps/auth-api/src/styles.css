@@ -48,12 +48,11 @@ a {
   text-decoration: none;
 }
 
-/* The hero lines rise in with CSS when the page loads, not after hydration: the
-   title is the largest paint, and Google measures when it shows. Same motion as
-   the shared `t-stagger`. */
+/* The hero lines rise in with CSS when the page loads, not after hydration. The
+   text is the largest paint, and Chrome does not count it while its opacity is 0,
+   so the lines only move and sharpen: they never fade. */
 @keyframes landing-hero-in {
   from {
-    opacity: 0;
     transform: translateY(var(--stagger-distance));
     filter: blur(var(--stagger-blur));
   }
