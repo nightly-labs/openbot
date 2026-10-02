@@ -244,6 +244,7 @@
     "./components/ProviderPicker": "./src/components/ProviderPicker.tsx",
     "./components/PanelResizer": "./src/components/PanelResizer.tsx",
     "./components/SettingsPanel": "./src/components/SettingsPanel.tsx",
+    "./features/provider-diagnostics/provider-diagnostics": "./src/features/provider-diagnostics/provider-diagnostics.ts",
     "./features/provider-updates/provider-update": "./src/features/provider-updates/provider-update.ts",
     "./features/conversation/FilePreviewPanel": "./src/features/conversation/FilePreviewPanel.tsx",
     "./features/conversation/BrowserPreviewSidebar": "./src/features/conversation/BrowserPreviewSidebar.tsx",

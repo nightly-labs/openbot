@@ -8,6 +8,7 @@ import {
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import { createMemo, createSignal } from "solid-js";
 import { useI18n } from "../../../i18n-context";
 
@@ -60,6 +61,8 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         connectionState: agent?.connectionState,
         restartPending: agent?.restartPending,
         checkError: agent?.checkError,
+        lastError: agent?.lastError,
+        diagnostics: agent ? providerDiagnosticsText(agent) : undefined,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,
         /*

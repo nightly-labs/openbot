@@ -15,6 +15,7 @@ import {
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
+  isAgentModelOption,
   parseAgentAnalyticsInput,
   parseBrowserSecretResponse,
   parseChannelCommand,
@@ -23,10 +24,12 @@ import {
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
@@ -74,6 +77,27 @@ import {
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
+
+/** Its lines also go to the provider log. See `PROVIDER_LOG_PREFIXES`. */
+const modelLogger = createOpenBotLogger("provider-models");
+
+/**
+ * Names each member of a model list that fails `isAgentModelOption`, and returns the list unchanged.
+ * The preload refuses the whole list for one such member and has no log of its own, so without this
+ * the window shows "Invalid agent model response." and nothing records which model it was.
+ */
+function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
+  if (!Array.isArray(models)) return models;
+  for (const model of models) {
+    if (isAgentModelOption(model)) continue;
+    modelLogger.warn("A model list member fails the contract, so the window refuses the list.", {
+      source,
+      provider: isDynamicRecord(model) && typeof model.provider === "string" ? model.provider : null,
+      id: isDynamicRecord(model) && typeof model.id === "string" ? model.id : null,
+    });
+  }
+  return models;
+}
 
 export interface AgentIpcDependencies {
   service: AgentService;
@@ -126,8 +150,11 @@ export function agentIpcHandlers({
             : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
       }),
       listModels: scopedQueryHandler({
-        local: () => service.listModels(),
-        remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, decodeAgentModelOptions),
+        local: () => logRejectedModels(service.listModels(), "local"),
+        remote: (serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
+            decodeAgentModelOptions(logRejectedModels(value, "remote")),
+          ),
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),

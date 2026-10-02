@@ -1,4 +1,5 @@
-import type { AgentModelId, AgentModelOption, CreateAgentInput } from "@openbot/contracts/ipc";
+import { customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import type { AgentModelId, AgentModelOption, AgentProviderStatus, CreateAgentInput } from "@openbot/contracts/ipc";
 import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
@@ -38,6 +39,38 @@ export function startingModel(
 }
 
 /**
+ * Why `model` of `provider` is not in `models`: the provider is not connected, it listed no models
+ * (with its last error), or its list does not hold the id. A custom agent's model is checked against
+ * that agent's own models, because one agent that failed to list leaves the others on `acp`. With no
+ * provider there is nothing to check, and the error names no cause.
+ */
+export function modelUnavailableError(
+  model: string,
+  provider: AgentProvider | undefined,
+  models: readonly AgentModelOption[],
+  providers: readonly AgentProviderStatus[],
+): Error {
+  if (provider === undefined) return new Error(sourceText("error.agent.modelUnavailable"));
+  const customAgentId = provider === "acp" ? customAgentIdOfModel(model) : null;
+  const name = customAgentId ?? providerLabel(provider);
+  const row = providers.find((candidate) => candidate.id === provider);
+  if (row?.state !== "available") {
+    return new Error(sourceText("error.agent.modelProviderNotConnected", { model, provider: name }));
+  }
+  const listed = models.some(
+    (candidate) =>
+      candidate.provider === provider &&
+      (customAgentId === null || customAgentIdOfModel(candidate.id) === customAgentId),
+  );
+  if (listed) return new Error(sourceText("error.agent.modelNotInProviderList", { model, provider: name }));
+  return new Error(
+    row.lastError
+      ? sourceText("error.agent.modelListEmpty", { model, provider: name, detail: row.lastError })
+      : sourceText("error.agent.modelListEmptyNoError", { model, provider: name }),
+  );
+}
+
+/**
  * The provider and model a creation request names, resolved against what the CLIs list right now,
  * or `null` when the request names neither. A named model must be listed for the named provider;
  * a lone provider takes its default when listed, else whatever it lists first.
@@ -45,6 +78,7 @@ export function startingModel(
 export function creationModel(
   input: Pick<CreateAgentInput, "provider" | "model">,
   models: AgentModelOption[],
+  providers: readonly AgentProviderStatus[] = [],
 ): ModelChoice | null {
   const { provider, model: requestedId } = input;
   if (provider === undefined && requestedId === undefined) return null;
@@ -52,7 +86,7 @@ export function creationModel(
     const model = models.find(
       (candidate) => candidate.id === requestedId && (provider === undefined || candidate.provider === provider),
     );
-    if (!model) throw new Error(sourceText("error.agent.modelUnavailable"));
+    if (!model) throw modelUnavailableError(requestedId, provider, models, providers);
     if (provider !== undefined && model.provider !== provider) {
       throw new Error(sourceText("error.agent.modelProviderMismatch"));
     }

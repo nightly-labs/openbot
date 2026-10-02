@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
@@ -266,6 +267,13 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
     // One process group runs every custom agent, so its restart is the restart of all of them.
     get restartPending() {
       return agentStatus().providers?.some((provider) => provider.id === "acp" && provider.restartPending) === true;
+    },
+    get lastError() {
+      return agentStatus().providers?.find((provider) => provider.id === "acp")?.lastError;
+    },
+    get diagnostics() {
+      const status = agentStatus().providers?.find((provider) => provider.id === "acp");
+      return status ? providerDiagnosticsText(status) : undefined;
     },
     restart: () => restartProvider("acp"),
     cancelRestart: () => cancelProviderRestart("acp"),

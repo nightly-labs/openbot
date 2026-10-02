@@ -111,6 +111,7 @@ import { MemoryHold } from "./agent/memory-hold";
 import {
   creationModel,
   type ModelChoice,
+  modelUnavailableError,
   type ProviderPreference,
   startingChoice,
   startingModel,
@@ -1192,7 +1193,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * the record keeps the built-in default.
    */
   newAgentProvider(input: Pick<CreateAgentInput, "provider" | "model"> = {}): AgentProvider | null {
-    return (creationModel(input, this.#endpoints.available()) ?? this.#startingChoice())?.provider ?? null;
+    return (
+      (creationModel(input, this.#endpoints.available(), this.#providers.status().providers) ?? this.#startingChoice())
+        ?.provider ?? null
+    );
   }
 
   /** The provider and model setup or Settings recorded. */
@@ -1216,7 +1220,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       await this.#prepareAgentWorkspace(agent);
       // A named pair lands before the initial message is queued: a provider change afterwards is
       // rejected while the delivery or turn is active, so a follow-up update could never apply it.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -1290,7 +1294,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // A template, a marketplace agent and an imported one name no model. They start where a new
       // agent does; with nothing listed yet they keep the record's own, because no message waits.
       // The Slack orchestrator names the model the user picked.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       const starting = requested ? null : this.#startingChoice();
       if (requested)
         agent = await this.#store.updateAgent({
@@ -1343,7 +1347,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           .available()
           .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
       : undefined;
-    if (input.model && !requestedModel) throw new Error(sourceText("error.agent.modelUnavailable"));
+    if (input.model && !requestedModel) {
+      // A change of model alone stays on the agent's provider, so that provider is the one to explain.
+      const provider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
+      throw modelUnavailableError(
+        input.model,
+        provider,
+        this.#endpoints.available(),
+        this.#providers.status().providers ?? [],
+      );
+    }
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
     if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
       throw new Error(sourceText("error.agent.modelProviderMismatch"));

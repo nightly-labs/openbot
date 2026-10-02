@@ -13,6 +13,7 @@ import {
   Badge,
   Button,
   buttonVariants,
+  Copy,
   DropdownMenu,
   Ellipsis,
   Input,
@@ -59,6 +60,10 @@ export interface ProviderPickerOption {
   callout?: { title: string; detail: string } | null;
   /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
+  /** The provider's last failure, kept until a model list fetched after it succeeds. */
+  lastError?: string | null | undefined;
+  /** What "Copy diagnostics" puts on the clipboard. Offered only while the row has a last error. */
+  diagnostics?: string | undefined;
 }
 
 export interface ProviderPickerProps {
@@ -416,7 +421,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 Boolean(props.onUpdateProvider) && (runtimeStatus()?.phase === "ready" || updatable());
               const restartOffered = () =>
                 Boolean(props.onRestartProvider) && (option().restartPending || (available() && !connecting()));
-              const actionsMenu = () => codeSignInOffered() || updateOffered() || restartOffered();
+              const diagnosticsOffered = () => Boolean(option().lastError && option().diagnostics);
+              const actionsMenu = () =>
+                codeSignInOffered() || updateOffered() || restartOffered() || diagnosticsOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               return (
                 <div
@@ -455,6 +462,13 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Show>
                       <Show when={option().checkError}>
                         {(checkError) => <small class="provider-picker-check-error">{sourceText(checkError())}</small>}
+                      </Show>
+                      <Show when={option().lastError !== option().checkError ? option().lastError : undefined}>
+                        {(lastError) => (
+                          <small class="provider-picker-check-error" title={sourceText(lastError())}>
+                            {t("provider.lastError", { detail: sourceText(lastError()) })}
+                          </small>
+                        )}
                       </Show>
                       <Show when={option().restartPending}>
                         <small class="provider-picker-email" role="status">
@@ -649,6 +663,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                               <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
                                 <Smartphone aria-hidden="true" />
                                 {t("provider.action.signInWithCode")}
+                              </DropdownMenu.Item>
+                            </Show>
+                            <Show when={diagnosticsOffered()}>
+                              <DropdownMenu.Item
+                                onSelect={() => void navigator.clipboard.writeText(option().diagnostics ?? "")}
+                              >
+                                <Copy aria-hidden="true" />
+                                {t("provider.action.copyDiagnostics")}
                               </DropdownMenu.Item>
                             </Show>
                           </DropdownMenu.Content>

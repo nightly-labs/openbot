@@ -22,6 +22,14 @@ export const messages = {
   "error.agent.setupCleanupFailed":
     "La configuration de l’agent a échoué et l’agent incomplet n’a pas pu être supprimé.",
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
+  "error.agent.modelProviderNotConnected":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas connecté.",
+  "error.agent.modelListEmpty":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’a listé aucun modèle. Dernière erreur : {detail}",
+  "error.agent.modelListEmptyNoError":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’a listé aucun modèle.",
+  "error.agent.modelNotInProviderList":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} ne le liste pas.",
   "error.agent.modelProviderMismatch": "Le modèle sélectionné n’appartient pas à ce fournisseur.",
   "error.agent.modelNotListed": "Le modèle « {model} » n’est pas disponible. Modèles disponibles : {models}.",
   "error.agent.providerNotListed":

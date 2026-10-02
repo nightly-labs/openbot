@@ -1107,8 +1107,8 @@ A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `delet
 attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
 It keeps a path that another live record uses, and it deletes only a real path under the Transfers
 folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
-shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
-`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote`,
+`logs/update` and `logs/providers` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
 
 `storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
 exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen

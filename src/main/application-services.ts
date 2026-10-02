@@ -140,6 +140,7 @@ import { NotificationPreferenceStore } from "./notification-preference-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
+import { startProviderLog } from "./provider-log";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -253,6 +254,8 @@ const TEARDOWN_ORDER = {
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
+  // After the service, so the lines its providers write while they stop are kept.
+  providerLog: 121,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -385,6 +388,12 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // First, so the provider lines of the whole startup reach the file.
+  teardown.push(
+    TEARDOWN_ORDER.providerLog,
+    "the provider log",
+    startProviderLog(join(app.getPath("userData"), "logs")),
+  );
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -1070,7 +1079,7 @@ export async function createApplicationServices({
       caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
         join(userData, name),
       ),
-      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update"), join(userData, "logs", "providers")],
       runtimes: providerRuntimeRoot({
         appData: app.getPath("appData"),
         userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),

@@ -1741,7 +1741,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // Saved again under the same id, and a fresh process lists it, so both the list and the
     // selection accept it once more.
@@ -1782,7 +1782,9 @@ describe.sequential("AgentService: providers", () => {
     writes[0]?.();
     await removal;
 
-    await expect(selection).rejects.toThrow("The selected agent model is unavailable.");
+    await expect(selection).rejects.toThrow(
+      'The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.',
+    );
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "house/router-llm" });
   });
 
@@ -1830,7 +1832,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A restart that fails is reported as a provider status, not as a throw of its own, so what it
     // answers here says nothing about which process answers on the endpoint now.
@@ -1903,7 +1905,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A process that spawned after the removal read the files as they are, so its catalogue counts.
     expect(await service.reloadOpenCodeConfig()).toBe("restarted");
