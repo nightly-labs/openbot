@@ -235,6 +235,8 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   Routine,
+  RoutineCalendar,
+  RoutineCalendarInput,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -763,6 +765,8 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<DeleteRoutineInput, void>()("agent:delete-routine"),
     testRoutine: scopedRequest<TestRoutineInput, RoutineRun>()("agent:test-routine"),
     listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
+    // Every routine of the host, of agents and channels, with its runs in a range.
+    routineCalendar: scopedRequest<RoutineCalendarInput, RoutineCalendar>()("agent:routine-calendar"),
   },
   channelMemories: {
     listChannelMemories: scopedRequest<string, ChannelMemory[]>()("agent:channel-memories:list"),

@@ -2,19 +2,37 @@ import { createEffect, createStore, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 
+/**
+ * The host pane over the middle of the workspace: the usage report or the routine schedule. One
+ * state holds both, so each path that uncovers the conversation closes either of them.
+ */
+export type HostPaneView = "usage" | "schedule";
+
 const context = createSimpleContext({
   name: "UsageProvider",
   init: () => {
-    const [state, setState] = createStore<{ serverId: string | null; agentId?: string }>({ serverId: null });
+    const [state, setState] = createStore<{ serverId: string | null; agentId?: string; view: HostPaneView }>({
+      serverId: null,
+      view: "usage",
+    });
     const { activeServerId } = useServers();
     let trigger: HTMLElement | null = null;
 
-    function openUsage(serverId: string, source: HTMLElement | null, agentId?: string) {
+    function open(view: HostPaneView, serverId: string, source: HTMLElement | null, agentId?: string) {
       trigger = source;
       setState((draft) => {
         draft.serverId = serverId;
         draft.agentId = agentId;
+        draft.view = view;
       });
+    }
+
+    function openUsage(serverId: string, source: HTMLElement | null, agentId?: string) {
+      open("usage", serverId, source, agentId);
+    }
+
+    function openSchedule(serverId: string, source: HTMLElement | null) {
+      open("schedule", serverId, source);
     }
 
     /**
@@ -32,7 +50,12 @@ const context = createSimpleContext({
      */
     let previousServer = untrack(activeServerId);
     createEffect(activeServerId, (serverId) => {
-      if (serverId !== previousServer && untrack(() => state.serverId)) openUsage(serverId, null);
+      if (serverId !== previousServer && untrack(() => state.serverId))
+        open(
+          untrack(() => state.view),
+          serverId,
+          null,
+        );
       previousServer = serverId;
     });
 
@@ -46,6 +69,7 @@ const context = createSimpleContext({
     return {
       state,
       openUsage,
+      openSchedule,
       closeUsage() {
         clear();
         queueMicrotask(() => {

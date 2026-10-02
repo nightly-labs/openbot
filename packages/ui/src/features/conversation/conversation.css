@@ -7,6 +7,7 @@
 @import "./styles/browser-panel.css";
 @import "./styles/agent-settings.css";
 @import "./styles/routine-schedule.css";
+@import "./styles/routine-calendar.css";
 @import "./styles/chat-action-card.css";
 @import "./styles/task-list.css";
 @import "./styles/awaiting-replies.css";

@@ -36,6 +36,7 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  type RoutineCalendarInput,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
@@ -257,6 +258,19 @@ export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
 
 export function parseTestRoutine(value: unknown): TestRoutineInput {
   return parseDeleteRoutine(value);
+}
+
+/** The range is a whole number of instants the host reads in one pass, so its length is limited. */
+export function parseRoutineCalendar(value: unknown): RoutineCalendarInput {
+  if (!isObject(value) || !isString(value.from) || !isString(value.to))
+    throw new Error("Invalid routine calendar request.");
+  const from = new Date(value.from);
+  const to = new Date(value.to);
+  const length = to.getTime() - from.getTime();
+  if (Number.isNaN(length) || length <= 0 || length > INPUT_LIMITS.routineCalendarDays * 86_400_000) {
+    throw new Error("Invalid routine calendar range.");
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {

@@ -108,6 +108,7 @@
     "./features/conversation/RichMessageText": "./src/features/conversation/RichMessageText.tsx",
     "./features/conversation/RoutineRunHistory": "./src/features/conversation/RoutineRunHistory.tsx",
     "./features/conversation/RoutineSchedulePicker": "./src/features/conversation/RoutineSchedulePicker.tsx",
+    "./features/conversation/RoutineCalendar": "./src/features/conversation/RoutineCalendar.tsx",
     "./features/conversation/RoutineScheduleCard": "./src/features/conversation/RoutineScheduleCard.tsx",
     "./features/conversation/routine-schedule-draft": "./src/features/conversation/routine-schedule-draft.ts",
     "./features/conversation/routine-schedule-saved": "./src/features/conversation/routine-schedule-saved.ts",

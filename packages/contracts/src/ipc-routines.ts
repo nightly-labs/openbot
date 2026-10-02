@@ -238,3 +238,87 @@ export interface ListRoutineRunsInput {
   routineId: string;
   limit?: number;
 }
+
+/** A time range of the routine calendar, as two ISO instants. The host limits its length. */
+export interface RoutineCalendarInput {
+  from: string;
+  to: string;
+}
+
+export type RoutineCalendarOwner = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
+
+/** One routine of an agent or a channel, with what the calendar needs to place and name it. */
+export interface RoutineCalendarRoutine {
+  id: string;
+  name: string;
+  owner: RoutineCalendarOwner;
+  active: boolean;
+  timezone: string;
+  schedule: RoutineSchedule;
+}
+
+/** `scheduled` is a run the schedule will make. The other values are the status of a run the host made. */
+export type RoutineCalendarRunStatus = RoutineRunStatus | "scheduled";
+
+export interface RoutineCalendarRun {
+  id: string;
+  routineId: string;
+  at: string;
+  status: RoutineCalendarRunStatus;
+}
+
+/** Every routine of a host, and its runs in the range: past runs from history, later runs from the schedule. */
+export interface RoutineCalendar {
+  routines: RoutineCalendarRoutine[];
+  runs: RoutineCalendarRun[];
+}
+
+const ROUTINE_CALENDAR_RUN_STATUSES = [
+  "scheduled",
+  "queued",
+  "running",
+  "needs-attention",
+  "succeeded",
+  "failed",
+  "interrupted",
+  "cancelled",
+] as const;
+
+function isRoutineCalendarOwner(value: unknown): value is RoutineCalendarOwner {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "agent") return isString(value.agentId);
+  return value.kind === "channel" && isString(value.channelId);
+}
+
+function isRoutineCalendarRoutine(value: unknown): value is RoutineCalendarRoutine {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isRoutineCalendarOwner(value.owner) &&
+    isBoolean(value.active) &&
+    isString(value.timezone) &&
+    isRoutineSchedule(value.schedule)
+  );
+}
+
+function isRoutineCalendarRun(value: unknown): value is RoutineCalendarRun {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.id) &&
+    isString(value.routineId) &&
+    isString(value.at) &&
+    !Number.isNaN(Date.parse(value.at)) &&
+    isOneOf(ROUTINE_CALENDAR_RUN_STATUSES, value.status)
+  );
+}
+
+export function isRoutineCalendar(value: unknown): value is RoutineCalendar {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.routines) &&
+    value.routines.every(isRoutineCalendarRoutine) &&
+    Array.isArray(value.runs) &&
+    value.runs.every(isRoutineCalendarRun)
+  );
+}

@@ -15,7 +15,7 @@ import { useServers } from "./servers-context";
 export function useServerActions() {
   const platform = usePlatform();
   const { t, errorMessage } = useText();
-  const { openUsage } = useUsage();
+  const { openUsage, openSchedule } = useUsage();
   const {
     servers,
     setServerMuted,
@@ -60,6 +60,7 @@ export function useServerActions() {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
     onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
     onOpenUsage: openUsage,
+    onOpenSchedule: openSchedule,
     onOpenSettings: openServerSettings,
   };
 

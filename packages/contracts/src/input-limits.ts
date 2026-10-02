@@ -30,6 +30,8 @@ export const INPUT_LIMITS = {
   routineName: 80,
   routineInstruction: 100_000,
   routineRunsPage: 100,
+  // Six weeks: the longest range the routine calendar reads, with room for a month view.
+  routineCalendarDays: 42,
   routineCron: 255,
   messageText: 100_000,
   directMessageText: 20_000,

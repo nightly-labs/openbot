@@ -210,6 +210,7 @@ export function ServerMenu(props: ServerMenuProps) {
                           onSetMuted={props.onSetMuted}
                           onSetNotificationLevel={props.onSetNotificationLevel}
                           onOpenUsage={props.onOpenUsage}
+                          onOpenSchedule={props.onOpenSchedule}
                           onOpenSettings={props.onOpenSettings}
                         />
                       </DropdownMenu.SubContent>
@@ -235,6 +236,7 @@ export function ServerMenu(props: ServerMenuProps) {
                       server={server()}
                       trigger={() => trigger ?? null}
                       onOpenUsage={props.onOpenUsage}
+                      onOpenSchedule={props.onOpenSchedule}
                       onOpenSettings={props.onOpenSettings}
                     />
                   </>
@@ -307,6 +309,7 @@ export function ServerMenu(props: ServerMenuProps) {
                   onSetMuted={props.onSetMuted}
                   onSetNotificationLevel={props.onSetNotificationLevel}
                   onOpenUsage={props.onOpenUsage}
+                  onOpenSchedule={props.onOpenSchedule}
                   onOpenSettings={props.onOpenSettings}
                 />
               )}
