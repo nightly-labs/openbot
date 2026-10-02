@@ -1810,82 +1810,116 @@ a {
   text-wrap: pretty;
 }
 
-/* A bento: the team picture is the widest tile, and the data tile has the
-   colour of the macOS download card. */
+/* A bento on 12 columns: the team window is the tall tile on the left, and the
+   data tile has the colour of the macOS download card. Each picture is a piece
+   of the app, and it reacts when the pointer is on its tile. */
 .landing-features-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 16px;
   margin: clamp(48px, 6vw, 72px) 0 0;
   padding: 0;
   list-style: none;
 }
 
+/* Provider marks in their brand colours. Gemini's mark is a gradient. */
+.landing-section svg[data-provider] {
+  color: var(--openbot-provider-current);
+  fill: currentColor;
+}
+
+.landing-section svg[data-provider="antigravity"] {
+  fill: url(#landing-gemini-gradient);
+}
+
+.landing-paint-servers {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .landing-feature {
-  --landing-feature-tint: var(--openbot-text-primary);
+  position: relative;
   min-width: 0;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--landing-card-border);
-  border-radius: 24px;
-  background:
-    radial-gradient(
-      120% 80% at 50% 0%,
-      color-mix(in srgb, var(--landing-feature-tint) 12%, transparent),
-      transparent 70%
-    ),
-    var(--openbot-bg-surface);
-  transition: border-color 200ms ease;
+  border-radius: 28px;
+  background: var(--openbot-bg-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
 }
 
 .landing-feature:hover {
   border-color: var(--landing-card-border-hover);
+  background: var(--openbot-bg-surface-raised);
 }
 
 .landing-feature[data-feature="team"] {
-  --landing-feature-tint: var(--openbot-logo-dev);
-  grid-column: span 4;
+  grid-column: 1 / 8;
+  grid-row: 1 / 3;
 }
 
 .landing-feature[data-feature="providers"] {
-  grid-column: span 2;
-}
-
-.landing-feature[data-feature="persist"] {
-  --landing-feature-tint: var(--openbot-logo-preview);
-  grid-column: span 3;
+  grid-column: 8 / 13;
+  grid-row: 1;
 }
 
 .landing-feature[data-feature="local"] {
-  grid-column: span 3;
+  grid-column: 8 / 13;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-areas: "copy visual";
   border-color: var(--openbot-download-card-border);
   background: var(--openbot-logo-production);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%);
   color: var(--openbot-text-on-light);
 }
 
+.landing-feature[data-feature="persist"] {
+  grid-column: 1 / 6;
+  grid-row: 3;
+}
+
+.landing-feature[data-feature="browser"] {
+  grid-column: 6 / 10;
+  grid-row: 3;
+}
+
+.landing-feature[data-feature="queue"] {
+  grid-column: 10 / 13;
+  grid-row: 3;
+}
+
 .landing-feature-visual {
-  min-height: 240px;
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
-  padding: clamp(24px, 3vw, 36px);
+  padding: 32px 32px 0;
 }
 
 .landing-feature-copy {
-  margin-top: auto;
-  padding: 0 clamp(24px, 2.6vw, 32px) clamp(24px, 2.6vw, 32px);
+  padding: 28px 32px 32px;
 }
 
 .landing-feature h3 {
   margin: 0;
-  font-size: clamp(22px, 2.2vw, 26px);
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.15;
 }
 
 .landing-feature p {
-  max-width: 54ch;
+  max-width: 44ch;
   margin: 10px 0 0;
   color: var(--openbot-text-secondary);
   font-size: 15px;
@@ -1897,34 +1931,76 @@ a {
   color: var(--openbot-download-card-muted);
 }
 
-/* Three agents hand one task down the line, as they would in a channel. */
-.landing-team {
-  width: min(100%, 480px);
-  display: grid;
+/* A window from the app: the channel, the data folder and the browser. */
+.landing-window {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--landing-card-border);
+  background: var(--openbot-bg-canvas);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 28%);
+}
+
+.landing-window-bar {
+  display: flex;
+  align-items: center;
   gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--landing-card-border);
+}
+
+/* The channel runs off the right edge and fades out above the copy. */
+.landing-feature[data-feature="team"] .landing-feature-visual {
+  display: flex;
+  padding: 36px 0 0 36px;
+}
+
+.landing-team-window {
+  flex: 1;
+  margin-right: -24px;
+  border-radius: 20px 0 0;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+
+.landing-team-channel {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.landing-team-hash {
+  margin-right: 6px;
+  color: var(--openbot-text-muted);
+  font-weight: 400;
+}
+
+.landing-team-stack {
+  display: flex;
+  margin-left: auto;
+  padding-right: 24px;
+}
+
+.landing-team-stack > * + * {
+  margin-left: -4px;
+}
+
+/* Three agents hand one task down the line. */
+.landing-team {
+  display: grid;
+  gap: 20px;
   margin: 0;
-  padding: 0;
+  padding: 22px 28px 40px 22px;
   list-style: none;
 }
 
 .landing-team-message {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.landing-team-message:nth-child(2) {
-  margin-left: clamp(16px, 4vw, 56px);
-}
-
-.landing-team-message:nth-child(3) {
-  margin-left: clamp(32px, 8vw, 112px);
+  align-items: flex-start;
+  gap: 14px;
 }
 
 /* The selector outranks the generic `.agent-avatar` size rule, which loads with
    the avatar's own code after this stylesheet. */
-.landing-team .landing-team-avatar {
-  --landing-team-avatar-size: 44px;
+.landing-feature .landing-team-avatar {
+  --landing-team-avatar-size: 46px;
   flex: none;
   display: grid;
   place-items: center;
@@ -1933,12 +2009,18 @@ a {
   border-radius: var(--openbot-radius-pill);
 }
 
+.landing-feature .landing-team-avatar-small {
+  --landing-team-avatar-size: 28px;
+  box-shadow: 0 0 0 2px var(--openbot-bg-canvas);
+  background: var(--openbot-bg-surface-raised);
+}
+
 /* The empty circle the Worker renders until the avatar loads. */
-.landing-team .landing-team-avatar:empty {
+.landing-feature .landing-team-avatar:empty {
   background: var(--landing-card-fill);
 }
 
-.landing-team .landing-team-avatar > svg {
+.landing-feature .landing-team-avatar > svg {
   display: block;
   width: 128%;
   height: 128%;
@@ -1949,68 +2031,147 @@ a {
 .landing-team-copy {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.landing-team-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .landing-team-name {
-  padding-left: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.landing-team-time {
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-team-text {
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.landing-team-system {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--openbot-text-muted);
   font-size: 12px;
   font-weight: 500;
 }
 
-.landing-team-bubble {
-  padding: 10px 14px;
-  border: 1px solid var(--landing-card-border);
-  border-radius: 16px 16px 16px 4px;
-  background: color-mix(in srgb, var(--openbot-bg-canvas) 70%, transparent);
-  font-size: 14px;
-  line-height: 1.45;
+.landing-team-system::before,
+.landing-team-system::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--landing-card-border);
 }
 
-.landing-provider-grid {
+/* The typing dots and the reply share one place: on hover the reply arrives. */
+.landing-team-next {
   display: grid;
-  grid-template-columns: repeat(4, 56px);
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.landing-provider-grid li {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border: 1px solid var(--landing-card-border);
-  border-radius: 16px;
+.landing-team-next > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-team-typing {
+  display: inline-flex;
+  align-self: start;
+  justify-self: start;
+  gap: 4px;
+  margin-left: 60px;
+  padding: 12px 14px;
+  border-radius: var(--openbot-radius-pill);
   background: var(--landing-card-fill);
 }
 
-.landing-provider-grid-logo {
-  width: 26px;
-  height: 26px;
+.landing-team-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+  animation: landing-typing 1200ms ease-in-out infinite;
 }
 
-.landing-provider-grid .landing-provider-grid-more {
-  color: var(--openbot-text-muted);
-  font-family: var(--openbot-font-mono);
-  font-size: 14px;
+.landing-team-typing span:nth-child(2) {
+  animation-delay: 150ms;
 }
 
-.landing-persist {
+.landing-team-typing span:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+.landing-team-reply {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.landing-feature[data-feature="team"]:hover .landing-team-typing {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.landing-feature[data-feature="team"]:hover .landing-team-reply {
+  opacity: 1;
+  transform: none;
+  transition-delay: 120ms;
+}
+
+/* Two rows of providers that scroll the opposite way. Each track holds its
+   list twice, so moving it by half loops with no jump. The pointer stops them. */
+.landing-feature[data-feature="providers"] .landing-feature-visual {
+  padding: 36px 0 0;
+}
+
+.landing-marquee {
+  width: 100%;
   display: grid;
-  justify-items: center;
-  gap: 22px;
+  gap: 12px;
+  /* The mask hides all that is outside this box, so leave room for a pill that
+     moves up on hover. */
+  padding-block: 4px;
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
 }
 
-.landing-persist-switch {
+.landing-marquee-row {
+  /* Clip only the sides, so a pill that moves up on hover keeps its top edge. A clip,
+     unlike a scroll container, does not let a grid item shrink, so set the minimum. */
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.landing-marquee-track {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  gap: 10px;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: landing-marquee 36s linear infinite;
 }
 
-.landing-persist-provider {
+.landing-marquee-row + .landing-marquee-row .landing-marquee-track {
+  animation-direction: reverse;
+}
+
+.landing-feature[data-feature="providers"]:hover .landing-marquee-track {
+  animation-play-state: paused;
+}
+
+.landing-provider-pill {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -2018,236 +2179,646 @@ a {
   border: 1px solid var(--landing-card-border);
   border-radius: var(--openbot-radius-pill);
   background: var(--landing-card-fill);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
 }
 
-.landing-persist-logo {
+.landing-provider-pill:hover {
+  border-color: color-mix(in srgb, var(--openbot-provider-current) 55%, transparent);
+  background: color-mix(in srgb, var(--openbot-provider-current) 12%, transparent);
+  transform: translateY(-2px);
+}
+
+.landing-provider-pill-logo {
   width: 20px;
   height: 20px;
 }
 
-.landing-persist-arrow {
-  width: 18px;
-  height: 18px;
-  color: var(--openbot-text-muted);
+/* The copy on the left, and the data folder that runs off the bottom right. */
+.landing-feature[data-feature="local"] .landing-feature-visual {
+  grid-area: visual;
+  align-self: end;
+  display: block;
+  place-items: normal;
+  padding: 32px 0 0;
 }
 
-.landing-check-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 18px;
+.landing-feature[data-feature="local"] .landing-feature-copy {
+  grid-area: copy;
+  align-self: end;
+}
+
+.landing-local-window {
+  border-color: var(--openbot-download-card-border);
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 16px 0 0;
+  background: color-mix(in srgb, var(--openbot-text-primary) 42%, transparent);
+  box-shadow: 0 20px 44px color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
+}
+
+.landing-local-window .landing-window-bar {
+  padding: 11px 16px;
+  border-bottom-color: var(--openbot-download-card-border);
+}
+
+.landing-local-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.landing-lock {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing-feature[data-feature="local"]:hover .landing-lock-shackle {
+  animation: landing-lock-click 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-local-files {
+  display: grid;
+  gap: 2px;
   margin: 0;
-  padding: 0;
-  color: var(--openbot-text-secondary);
-  font-size: 14px;
+  padding: 8px;
   list-style: none;
 }
 
-.landing-check-list li {
+.landing-local-files li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 140ms ease;
+}
+
+.landing-local-files li:hover {
+  background: var(--openbot-download-card-chip);
+}
+
+.landing-local-folder {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--openbot-download-card-muted);
+}
+
+/* A chat with one agent. On hover the provider changes, and the next message
+   continues the same task. The thread has a fixed height, so the new messages
+   push the old ones up and the tile keeps its size. */
+.landing-feature[data-feature="persist"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-persist-window {
+  border-radius: 16px;
+}
+
+.landing-persist-window .landing-window-bar {
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+}
+
+.landing-persist-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 10px 6px 9px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 10px;
+  background: var(--landing-card-fill);
+}
+
+.landing-persist-swap {
+  display: grid;
+  overflow: hidden;
+}
+
+.landing-persist-provider {
+  grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-}
-
-.landing-check-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--openbot-logo-preview);
-}
-
-.landing-local {
-  display: grid;
-  justify-items: center;
-  gap: 24px;
-}
-
-.landing-local-device {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
-.landing-local-laptop {
-  width: 96px;
-  height: 96px;
-  stroke-width: 1.4;
-}
-
-.landing-local-lock {
-  position: absolute;
-  right: -8px;
-  bottom: 6px;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-on-light);
-  color: var(--openbot-logo-production);
-}
-
-.landing-local-lock-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.landing-local-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.landing-local-chips li {
-  padding: 6px 12px;
-  border: 1px solid var(--openbot-download-card-border);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-download-card-chip);
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
+  transition:
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Three numbered steps on one line, each with a picture of what you do. */
-.landing-steps-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(18px, 2.4vw, 32px);
-  margin: clamp(48px, 6vw, 72px) 0 0;
-  padding: 0;
-  list-style: none;
+.landing-persist-provider + .landing-persist-provider {
+  opacity: 0;
+  transform: translateY(100%);
 }
 
-.landing-step {
-  min-width: 0;
+.landing-feature[data-feature="persist"]:hover .landing-persist-provider {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.landing-feature[data-feature="persist"]:hover .landing-persist-provider + .landing-persist-provider {
+  opacity: 1;
+  transform: none;
+}
+
+.landing-persist-logo {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.landing-persist-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--openbot-text-muted);
+}
+
+.landing-persist-thread {
+  height: 178px;
   display: flex;
   flex-direction: column;
-}
-
-.landing-step-number {
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 14px;
-  color: var(--openbot-logo-production);
-  font-family: var(--openbot-font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  margin: 0;
+  padding: 16px 16px 18px;
+  overflow: hidden;
+  list-style: none;
+  mask-image: linear-gradient(to bottom, transparent, #000 28px);
 }
 
-.landing-step-number::after {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--landing-card-border-hover), transparent);
-  content: "";
-}
-
-.landing-step h3 {
-  margin: 22px 0 0;
-  font-size: clamp(22px, 2.2vw, 26px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
-}
-
-.landing-step p {
-  margin: 10px 0 24px;
-  color: var(--openbot-text-secondary);
-  font-size: 15px;
-  line-height: 1.6;
-  text-wrap: pretty;
-}
-
-.landing-step-visual {
-  min-height: 132px;
-  display: grid;
-  place-items: center;
-  margin-top: auto;
-  padding: 24px;
-  border: 1px solid var(--landing-card-border);
-  border-radius: 20px;
-  background: var(--openbot-bg-surface);
-}
-
-.landing-step-platforms {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
-.landing-step-platform {
-  width: 34px;
-  height: 34px;
-}
-
-.landing-step-providers {
-  display: flex;
-  align-items: center;
-}
-
-.landing-step-provider {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  margin-left: -12px;
-  border: 3px solid var(--openbot-bg-surface);
-  border-radius: var(--openbot-radius-pill);
-  background: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-surface));
-}
-
-.landing-step-provider:first-child {
-  margin-left: 0;
-}
-
-.landing-step-provider-logo {
-  width: 24px;
-  height: 24px;
-}
-
-.landing-step-provider-more {
-  color: var(--openbot-text-muted);
-  font-family: var(--openbot-font-mono);
-  font-size: 13px;
-}
-
-.landing-step-prompt {
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 12px 12px 12px 16px;
-  border: 1px solid var(--landing-card-border-hover);
-  border-radius: 16px;
-  background: var(--openbot-bg-canvas);
-}
-
-.landing-step-prompt-text {
-  flex: 1;
-  color: var(--openbot-text-secondary);
+.landing-persist-request {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 9px 14px;
+  border-radius: 16px 16px 4px;
+  background: var(--openbot-bg-surface-raised);
   font-size: 14px;
   line-height: 1.45;
 }
 
-.landing-step-prompt-send {
-  flex: none;
+.landing-persist-reply {
   display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
-  color: var(--openbot-bg-canvas);
+  gap: 4px;
 }
 
-.landing-step-prompt-icon {
+.landing-persist-reply .landing-team-text {
+  font-size: 14px;
+}
+
+.landing-persist-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.landing-persist-meta .landing-team-time {
+  font-weight: 400;
+}
+
+/* The later messages take no room until the pointer is on the tile. */
+.landing-persist-later {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: -14px;
+  opacity: 0;
+  transition:
+    grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease;
+}
+
+.landing-persist-later > ul {
+  min-height: 0;
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.landing-feature[data-feature="persist"]:hover .landing-persist-later {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+  transition-delay: 160ms;
+}
+
+/* The app's browser panel: tabs, a toolbar and a light page. Grace controls the
+   first tab. On hover she types into the form and continues. */
+.landing-feature[data-feature="browser"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-browser {
+  position: relative;
+  border-radius: 16px;
+}
+
+/* The sizes of the app's tabs: 28px high, on the bottom line of a 34px header.
+   The open tab has the toolbar's colour, so the two read as one piece. */
+.landing-browser-tabs {
+  display: flex;
+  height: 34px;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.landing-browser-tab {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  width: 148px;
+  height: 28px;
+  flex: 0 1 148px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 8px 8px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+}
+
+.landing-browser-tab[data-controlled] {
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+}
+
+.landing-browser-tab-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-browser-tab > svg,
+.landing-browser-new svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.landing-browser-new {
+  display: grid;
+  width: 24px;
+  height: 28px;
+  place-items: center;
+  color: var(--openbot-text-muted);
+}
+
+/* The agent's pointer takes the place of the page icon. */
+.landing-browser-control {
+  display: grid;
+  flex: none;
+  color: var(--openbot-accent-text);
+}
+
+.landing-browser-control svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.landing-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+}
+
+.landing-browser-toolbar svg {
+  flex: none;
   width: 16px;
   height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.landing-browser-address {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  margin-left: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-browser-page {
+  display: grid;
+  justify-items: start;
+  padding: 18px 20px 22px;
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+}
+
+.landing-browser-heading {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.landing-browser-label {
+  margin-top: 12px;
+  color: color-mix(in srgb, var(--openbot-text-on-light) 60%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.landing-browser-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  margin-top: 5px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
+  border-radius: 8px;
+  font-size: 13px;
+  transition: border-color 160ms ease;
+}
+
+.landing-browser-typed {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.landing-browser-caret {
+  width: 1px;
+  height: 15px;
+  margin-left: 1px;
+  background: currentColor;
+  opacity: 0;
+}
+
+.landing-browser-submit {
+  margin-top: 12px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--openbot-text-on-light);
+  color: var(--openbot-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.landing-feature[data-feature="browser"]:hover .landing-browser-input {
+  border-color: color-mix(in srgb, var(--openbot-text-on-light) 55%, transparent);
+}
+
+/* One step for each character, as if typed. */
+.landing-feature[data-feature="browser"]:hover .landing-browser-typed {
+  max-width: 16ch;
+  transition: max-width 900ms steps(15) 200ms;
+}
+
+.landing-feature[data-feature="browser"]:hover .landing-browser-caret {
+  animation: landing-caret 1s steps(1) infinite;
+}
+
+/* One press when the email is typed. */
+.landing-feature[data-feature="browser"]:hover .landing-browser-submit {
+  animation: landing-press 240ms ease 1200ms;
+}
+
+/* The app's queue panel on top of the composer. On hover, the message in the
+   composer joins the queue. The wrapper keeps room for the new row, so the
+   tile does not change size. */
+.landing-feature[data-feature="queue"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-queue {
+  min-width: 0;
+  min-height: 186px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.landing-queue-panel {
+  position: relative;
+  margin: 0 10px -14px;
+  padding: 6px 5px 19px;
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: 14px;
+  background: var(--openbot-queue-surface);
+}
+
+.landing-queue-hold {
+  display: block;
+  overflow: hidden;
+  padding: 0 8px 4px 9px;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-queue-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 29px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  transition: background 140ms ease;
+}
+
+.landing-queue-row:hover {
+  background: var(--openbot-bg-surface-raised);
+}
+
+.landing-queue-row svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.landing-queue-row > svg {
+  color: var(--openbot-text-muted);
+}
+
+.landing-queue-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* As in the app, a row's buttons show when the pointer is on the row. They sit
+   on top of the end of the text, so the text has all the width until then. */
+.landing-queue-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 24px;
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(to right, transparent, var(--openbot-bg-surface-raised) 20px);
+  color: var(--openbot-text-muted);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.landing-queue-row:hover .landing-queue-actions {
+  opacity: 1;
+}
+
+.landing-queue-steer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.landing-queue-added {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease;
+}
+
+.landing-queue-added > .landing-queue-row {
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.landing-queue-added > .landing-queue-row > * {
+  margin-block: 6.5px;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-added {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-delay: 180ms;
+}
+
+.landing-queue-composer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 16px;
+  background: var(--openbot-bg-canvas);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 28%);
+}
+
+.landing-queue-input {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  font-size: 14px;
+}
+
+.landing-queue-input > * {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    opacity 200ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-queue-placeholder {
+  color: var(--openbot-text-muted);
+  opacity: 0;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-draft {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-placeholder {
+  opacity: 1;
+  transition-delay: 200ms;
+}
+
+.landing-queue-send {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+  transition:
+    transform 140ms ease,
+    opacity 200ms ease;
+}
+
+.landing-queue-send-icon {
+  width: 15px;
+  height: 15px;
   rotate: -90deg;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-send {
+  opacity: 0.4;
+  transform: scale(0.9);
 }
 
 /* The heading stays beside the questions while they open. */
@@ -2304,15 +2875,14 @@ a {
   list-style: none;
 }
 
-/* The marks on top and the name under them, so a long name does not push the
-   marks or the arrow out of line. */
+/* A strip of the comparison's gradient with the two marks on it, and the name
+   under it, so a long name does not push the marks or the arrow out of line. */
 .landing-compare-links a {
   position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 18px 20px 20px;
+  overflow: hidden;
   border: 1px solid var(--landing-card-border);
   border-radius: 18px;
   background: var(--openbot-bg-surface);
@@ -2329,35 +2899,45 @@ a {
   background: var(--openbot-bg-surface-raised);
 }
 
-.landing-compare-marks {
-  flex: none;
+.landing-compare-art {
+  position: relative;
   display: flex;
+  height: 92px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-compare-marks {
+  position: relative;
+  display: flex;
+  pointer-events: none;
 }
 
 .landing-compare-mark {
-  width: 38px;
-  height: 38px;
-  padding: 7px;
-  border: 2px solid var(--openbot-bg-surface);
+  width: 40px;
+  height: 40px;
+  padding: 8px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-canvas);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 24%);
 }
 
 .landing-compare-mark-rival {
   margin-left: -8px;
-  background: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-surface));
+  background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-primary);
 }
 
 .landing-compare-label {
   min-width: 0;
-  padding-right: 24px;
+  padding: 16px 44px 18px 20px;
 }
 
 .landing-compare-arrow {
   position: absolute;
-  top: 26px;
   right: 20px;
+  bottom: 20px;
   width: 16px;
   height: 16px;
   color: var(--openbot-text-muted);
@@ -2372,12 +2952,12 @@ a {
 }
 
 .landing-section[data-revealed="false"]
-  :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links li) {
+  :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
   opacity: 0;
 }
 
 .landing-section[data-revealed="true"]
-  :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links li) {
+  :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
   animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(120ms + var(--landing-index, 0) * 80ms);
 }
@@ -2387,14 +2967,21 @@ a {
 }
 
 @media (max-width: 1100px) {
-  .landing-feature[data-feature="team"],
-  .landing-feature[data-feature="local"] {
-    grid-column: span 6;
+  .landing-features-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .landing-feature[data-feature="providers"],
-  .landing-feature[data-feature="persist"] {
+  .landing-feature[data-feature] {
     grid-column: span 3;
+    grid-row: auto;
+  }
+
+  .landing-feature:is([data-feature="team"], [data-feature="local"]) {
+    grid-column: 1 / -1;
+  }
+
+  .landing-feature[data-feature="team"] .landing-feature-visual {
+    min-height: 400px;
   }
 
   .landing-compare-links ul {
@@ -2416,13 +3003,28 @@ a {
     grid-column: auto;
   }
 
-  .landing-feature-visual {
-    min-height: 200px;
+  .landing-feature[data-feature="team"] .landing-feature-visual {
+    min-height: 360px;
+    padding: 24px 0 0 20px;
   }
 
-  .landing-steps-list {
+  .landing-feature-copy {
+    padding: 24px 24px 28px;
+  }
+
+  .landing-marquee-row + .landing-marquee-row {
+    display: none;
+  }
+
+  .landing-feature[data-feature="local"] {
     grid-template-columns: minmax(0, 1fr);
-    gap: 48px;
+    grid-template-areas:
+      "visual"
+      "copy";
+  }
+
+  .landing-feature[data-feature="local"] .landing-feature-visual {
+    padding: 24px 0 0 24px;
   }
 
   .landing-faq-layout {
@@ -2444,16 +3046,26 @@ a {
   .landing-compare-links a {
     flex-direction: row;
     align-items: center;
-    gap: 14px;
-    padding: 12px 16px;
+  }
+
+  .landing-compare-art {
+    width: 96px;
+    height: 64px;
+  }
+
+  .landing-compare-mark {
+    width: 34px;
+    height: 34px;
+    padding: 7px;
   }
 
   .landing-compare-label {
     flex: 1;
+    padding: 0 44px 0 16px;
   }
 
   .landing-compare-arrow {
-    top: auto;
+    bottom: auto;
   }
 }
 
@@ -2698,6 +3310,49 @@ a {
     opacity: 1;
     filter: blur(0.001px);
     transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-marquee {
+  to {
+    transform: translateX(calc(-50% - 5px));
+  }
+}
+
+@keyframes landing-lock-click {
+  40% {
+    transform: translateY(-3px);
+  }
+
+  75% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes landing-press {
+  50% {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes landing-caret {
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes landing-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
   }
 }
 
@@ -3118,8 +3773,15 @@ a {
   }
 
   .landing-section[data-revealed]
-    :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links li) {
+    :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
     opacity: 1;
+    animation: none;
+  }
+
+  .landing-marquee-track,
+  .landing-team-typing span,
+  .landing-feature[data-feature="local"]:hover .landing-lock-shackle,
+  .landing-feature[data-feature="browser"]:hover :is(.landing-browser-caret, .landing-browser-submit) {
     animation: none;
   }
 

@@ -1,10 +1,12 @@
 import { AppLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { For } from "solid-js";
+import { COMPARE_COLLECTION } from "../../lib/compare";
 import { LANDING_COMPARISON_LINKS } from "../../lib/landing-content";
 import { LANDING_FAQ } from "../../lib/landing-faq";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 import { RivalMark } from "../compare/RivalMark";
+import { ArticleGradient } from "../content/ArticleGradient";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
@@ -23,7 +25,7 @@ export function FaqSection() {
         <div class="landing-faq-layout">
           <header class="landing-section-heading landing-faq-heading">
             <h2 id="faq-title">Questions</h2>
-            <p>Short answers about price, providers and your data.</p>
+            <p>Short answers about price, setup, providers and your data.</p>
             <a class="landing-faq-contact" href={OPENBOT_LINKS.contact} target="_blank" rel={EXTERNAL_LINK_REL}>
               Ask us something else
               <LandingIcon name="arrow-up-right" class="landing-faq-contact-icon" />
@@ -49,18 +51,30 @@ export function FaqSection() {
           <h3 id="landing-compare-title">Compare OpenBot</h3>
           <ul>
             <For each={LANDING_COMPARISON_LINKS}>
-              {(comparison, index) => (
-                <li style={{ "--landing-index": index() }}>
-                  <Link to="/compare/$slug" params={{ slug: comparison.slug }}>
-                    <span class="landing-compare-marks" aria-hidden="true">
-                      <AppLogo variant="production" class="landing-compare-mark" />
-                      <RivalMark name={comparison.mark} class="landing-compare-mark landing-compare-mark-rival" />
-                    </span>
-                    <span class="landing-compare-label">{comparison.label}</span>
-                    <LandingIcon name="arrow-right" class="landing-compare-arrow" />
-                  </Link>
-                </li>
-              )}
+              {(comparison, index) => {
+                let card: HTMLAnchorElement | undefined;
+                return (
+                  <li style={{ "--landing-index": index() }}>
+                    <Link ref={card} to="/compare/$slug" params={{ slug: comparison.slug }}>
+                      {/* The gradient of the comparison's own card, so the two pages match. */}
+                      <span class="landing-compare-art" aria-hidden="true">
+                        <ArticleGradient
+                          title={comparison.title}
+                          art={{ collection: COMPARE_COLLECTION, slug: comparison.slug, shape: "card" }}
+                          mode="hover"
+                          hoverTarget={() => card}
+                        />
+                        <span class="landing-compare-marks">
+                          <AppLogo variant="production" class="landing-compare-mark" />
+                          <RivalMark name={comparison.mark} class="landing-compare-mark landing-compare-mark-rival" />
+                        </span>
+                      </span>
+                      <span class="landing-compare-label">{comparison.label}</span>
+                      <LandingIcon name="arrow-right" class="landing-compare-arrow" />
+                    </Link>
+                  </li>
+                );
+              }}
             </For>
           </ul>
         </nav>

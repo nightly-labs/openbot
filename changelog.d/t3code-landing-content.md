@@ -1,6 +1,6 @@
 ### Added
 
-- The openbot.run home page explains what OpenBot does and how to start, answers common questions, and links to each comparison.
+- The openbot.run home page shows what OpenBot does, answers common questions, and links to each comparison.
 
 ### Fixed
 

@@ -12,7 +12,6 @@ import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
 import { PricingSection } from "./PricingSection";
 import { SiteHeader } from "./SiteHeader";
-import { StepsSection } from "./StepsSection";
 
 export function LandingPage() {
   let hero: HTMLDivElement | undefined;
@@ -113,7 +112,6 @@ export function LandingPage() {
           <LandingAppPreview />
         </section>
         <FeaturesSection />
-        <StepsSection />
         <PricingSection />
         <FaqSection />
         <DownloadSection />

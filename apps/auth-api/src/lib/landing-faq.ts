@@ -11,11 +11,12 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
   {
     question: "Is OpenBot free?",
     answer:
-      "Yes. OpenBot costs $0, with no locked features. Your agents use the AI plans or API keys you already pay for.",
+      "Yes. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.",
   },
   {
-    question: "Do I need an account?",
-    answer: "No. The app works without an account.",
+    question: "Can I use my ChatGPT or Claude plan?",
+    answer:
+      "Yes. Codex signs in with your ChatGPT plan, and Claude Code with your Claude plan. Gemini uses a Google AI Pro or Ultra plan. OpenCode has free models that need no account.",
   },
   {
     question: "Which AI models can OpenBot use?",
@@ -23,9 +24,18 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor and Cline. You can also connect any OpenAI-compatible endpoint, and local models in Ollama or LM Studio.",
   },
   {
+    question: "How do I start?",
+    answer:
+      "Download OpenBot and connect a provider. Then describe the agent you want in one prompt, check its instructions and save it. You can send it work at once: messages wait in a queue until it is free.",
+  },
+  {
     question: "Where does my data go?",
     answer:
       "Workspaces, conversations, attachments and browser data stay on the computer that runs OpenBot. The AI provider you choose receives the prompts that your agents send to it, and the pages that agents open use the network.",
+  },
+  {
+    question: "Do I need an account?",
+    answer: "No. The app works without an account. You need one only to invite other people to your team.",
   },
   {
     question: "Which computers can run OpenBot?",
@@ -33,7 +43,7 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64, and Linux on x64 or arm64 as an AppImage.",
   },
   {
-    question: "What can agents do on my computer?",
+    question: "Is it safe to let agents work on my computer?",
     answer:
       "OpenBot is a development preview. Agents can read and change files, run commands, use the network and control the built-in browser without asking each time. Give them only tasks you trust, and keep backups.",
   },

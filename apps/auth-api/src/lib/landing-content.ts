@@ -9,7 +9,7 @@ import { RIVAL_MARK_SHAPES, type RivalMarkName } from "../components/compare/riv
 import { COMPARE_COLLECTION } from "./compare";
 
 /** Each feature has its own picture, which the section draws for this id. */
-export type LandingFeatureId = "team" | "providers" | "persist" | "local";
+export type LandingFeatureId = "team" | "providers" | "local" | "persist" | "browser" | "queue";
 
 export interface LandingFeature {
   id: LandingFeatureId;
@@ -17,30 +17,42 @@ export interface LandingFeature {
   description: string;
 }
 
+/** In reading order. The bento places each tile from its id. */
 export const LANDING_FEATURES: readonly LandingFeature[] = [
   {
     id: "team",
-    title: "A team, not one chat",
+    title: "Agents work as a team",
     description:
       "Each agent has its own name, instructions and workspace. Agents send each other messages, hand off tasks and share files.",
   },
   {
     id: "providers",
-    title: "The AI you already pay for",
+    title: "Use the AI plan you have",
     description:
       "Run Codex, Claude Code, Gemini, Grok, OpenCode, Cursor or Cline. Or connect an OpenAI-compatible endpoint, Ollama or LM Studio.",
   },
   {
+    id: "local",
+    title: "Stored on your computer",
+    description:
+      "Workspaces, conversations, files and browser data stay on the computer that runs OpenBot, not on our servers.",
+  },
+  {
     id: "persist",
-    title: "Agents that stay",
+    title: "Change the provider, keep the agent",
     description:
       "An agent keeps its workspace and conversation when you restart the app or move it to a different provider.",
   },
   {
-    id: "local",
-    title: "Your data stays with you",
+    id: "browser",
+    title: "A built-in browser",
+    description: "Agents open, read and control pages in a browser that is built into OpenBot.",
+  },
+  {
+    id: "queue",
+    title: "Queue the next task",
     description:
-      "Workspaces, conversations, files and browser data stay on the computer that runs OpenBot, not on our servers.",
+      "Send more work while an agent is busy. Messages wait in a queue that you can pause, resume or cancel.",
   },
 ];
 
@@ -48,24 +60,53 @@ export interface LandingTeammate {
   name: string;
   avatarSeed: string;
   avatarHue: AvatarHue;
-  message: string;
+}
+
+const ADA: LandingTeammate = { name: "Ada", avatarSeed: "landing-ada", avatarHue: 245 };
+const LINUS: LandingTeammate = { name: "Linus", avatarSeed: "landing-linus", avatarHue: 150 };
+const GRACE: LandingTeammate = { name: "Grace", avatarSeed: "landing-grace", avatarHue: 30 };
+
+/** The agent who moves to a different provider in the persist picture. */
+export const LANDING_PERSIST_AGENT = ADA;
+
+/** The members of the channel in the team picture. */
+export const LANDING_TEAM: readonly LandingTeammate[] = [ADA, LINUS, GRACE];
+
+export interface LandingTeamMessage {
+  from: LandingTeammate;
+  time: string;
+  text: string;
 }
 
 /** The example conversation in the team picture: one task, handed from agent to agent. */
-export const LANDING_TEAM: readonly LandingTeammate[] = [
-  { name: "Ada", avatarSeed: "landing-ada", avatarHue: 245, message: "I found the cause. Linus, the fix is yours." },
-  { name: "Linus", avatarSeed: "landing-linus", avatarHue: 150, message: "Fix is ready. Grace, can you review it?" },
-  { name: "Grace", avatarSeed: "landing-grace", avatarHue: 30, message: "Approved. I sent the notes to the team." },
+export const LANDING_TEAM_MESSAGES: readonly LandingTeamMessage[] = [
+  { from: ADA, time: "9:12", text: "The sign-in test fails on Safari. Linus, can you take it?" },
+  { from: LINUS, time: "9:26", text: "Fixed in session.ts. Grace, can you review it?" },
+  { from: GRACE, time: "9:31", text: "Looks good. I merged it." },
 ];
+
+/** The message that replaces the typing dots when the pointer is on the tile. */
+export const LANDING_TEAM_REPLY: LandingTeamMessage = {
+  from: ADA,
+  time: "9:32",
+  text: "Thanks. I closed the issue.",
+};
+
+/** The channel the team picture shows, and the line OpenBot writes when the task changes owner. */
+export const LANDING_TEAM_CHANNEL = "launch";
+export const LANDING_TEAM_HANDOFF = "Ada gave the task to Linus";
 
 export interface LandingProvider {
   provider: ProviderLogoVariant;
   name: string;
 }
 
+const CODEX: LandingProvider = { provider: "codex", name: "Codex" };
+const CLAUDE_CODE: LandingProvider = { provider: "claude", name: "Claude Code" };
+
 export const LANDING_PROVIDERS: readonly LandingProvider[] = [
-  { provider: "codex", name: "Codex" },
-  { provider: "claude", name: "Claude Code" },
+  CODEX,
+  CLAUDE_CODE,
   { provider: "antigravity", name: "Gemini" },
   { provider: "grok", name: "Grok" },
   { provider: "opencode", name: "OpenCode" },
@@ -73,45 +114,65 @@ export const LANDING_PROVIDERS: readonly LandingProvider[] = [
   { provider: "cline", name: "Cline" },
 ];
 
-/** What an agent keeps when it moves to a different provider. */
-export const LANDING_KEPT_STATE: readonly string[] = ["Workspace", "Conversation", "Name and instructions"];
+export interface LandingPersistReply {
+  from: LandingProvider;
+  time: string;
+  text: string;
+}
+
+/**
+ * The chat in the persist picture. Ada does a task on Codex. On hover, she moves
+ * to Claude Code and continues the same task.
+ */
+export const LANDING_PERSIST_EARLIER: LandingPersistReply = {
+  from: CODEX,
+  time: "9:58",
+  text: "I read the billing code. Six tables use it.",
+};
+export const LANDING_PERSIST_REQUEST = "Move the billing tables to their own schema.";
+export const LANDING_PERSIST_BEFORE: LandingPersistReply = {
+  from: CODEX,
+  time: "10:04",
+  text: "Done. I changed 4 files and wrote the migration.",
+};
+export const LANDING_PERSIST_SWITCH = `${ADA.name} now uses ${CLAUDE_CODE.name}`;
+export const LANDING_PERSIST_AFTER: LandingPersistReply = {
+  from: CLAUDE_CODE,
+  time: "10:06",
+  text: "I continue from the billing migration. Next is its test.",
+};
 
 /** What stays on the computer that runs OpenBot. */
 export const LANDING_LOCAL_DATA: readonly string[] = ["Workspaces", "Conversations", "Files", "Browser data"];
 
-/** Each step has its own picture, which the section draws for this id. */
-export type LandingStepId = "download" | "connect" | "create";
+/**
+ * The queue picture copies the app's queue panel, which sits on top of the
+ * composer. On hover, the message in the composer joins the queue.
+ */
+export const LANDING_QUEUE: readonly string[] = ["Summarize the support inbox", "Draft the release notes"];
+export const LANDING_QUEUE_DRAFT = "Check the new sign-ups";
+export const LANDING_QUEUE_HOLD = `Waiting - ${LINUS.name} is working in #${LANDING_TEAM_CHANNEL}`;
+export const LANDING_QUEUE_PLACEHOLDER = `Message ${LINUS.name}`;
+export const LANDING_QUEUE_STEER = "Steer";
 
-export interface LandingStep {
-  id: LandingStepId;
-  title: string;
-  description: string;
-}
+/**
+ * The browser picture copies the app's browser panel. Grace checks the sign-in
+ * page that Linus fixed in the team picture. The first tab is the one she controls.
+ */
+export const LANDING_BROWSER_TABS: readonly string[] = ["Sign in", "Dashboard"];
+export const LANDING_BROWSER_URL = "localhost:3000/sign-in";
+export const LANDING_BROWSER_HEADING = "Sign in";
+export const LANDING_BROWSER_FIELD = "Email";
+export const LANDING_BROWSER_TYPED = "grace@acme.test";
+export const LANDING_BROWSER_SUBMIT = "Continue";
 
-export const LANDING_STEPS: readonly LandingStep[] = [
-  {
-    id: "download",
-    title: "Download OpenBot",
-    description: "Install it on macOS 13 or newer, Windows 10 or newer, or Linux.",
-  },
-  {
-    id: "connect",
-    title: "Connect your AI",
-    description: "Choose Codex, Claude, Gemini, Grok or another provider, with your plan, an API key or a local model.",
-  },
-  {
-    id: "create",
-    title: "Create an agent",
-    description:
-      "Describe the agent in one prompt and check its instructions before you save. Then give it work: messages wait in a queue until it is free.",
-  },
-];
-
-/** The example prompt in the last step's picture. */
-export const LANDING_EXAMPLE_PROMPT = "An agent that reads my inbox each morning and drafts the replies";
+/** What the folder list in the data picture shows. */
+export const LANDING_LOCAL_TITLE = "On this computer";
 
 export interface LandingComparisonLink {
   slug: string;
+  /** The article title, which the card's gradient is drawn from, as on the compare pages. */
+  title: string;
   label: string;
   mark: RivalMarkName;
 }
@@ -128,6 +189,13 @@ function isRivalMarkName(slug: string): slug is RivalMarkName {
 export const LANDING_COMPARISON_LINKS: readonly LandingComparisonLink[] = COMPARE_COLLECTION.articles.flatMap(
   (article) =>
     isRivalMarkName(article.slug)
-      ? [{ slug: article.slug, label: article.title.split(":")[0] ?? article.title, mark: article.slug }]
+      ? [
+          {
+            slug: article.slug,
+            title: article.title,
+            label: article.title.split(":")[0] ?? article.title,
+            mark: article.slug,
+          },
+        ]
       : [],
 );
