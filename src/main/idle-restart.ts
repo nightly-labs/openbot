@@ -138,10 +138,13 @@ export class IdleRestart {
       this.#handedOff = true;
       this.#publish(null);
     } catch (error) {
-      // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready.
+      // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready, and
+      // the routines run again. A failure after teardown stopped the services: only a relaunch runs
+      // the held routines, so the saved window stays.
       const message = error instanceof Error ? error.message : String(error);
       this.#log(`The restart when idle failed: ${message}`);
       this.#restarting = false;
+      if (this.#updater.getStatus().errorCode === "install_failed") this.#handedOff = true;
       this.#end({ ...status, waitingFor: [], error: message });
     }
   }
