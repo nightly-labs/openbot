@@ -484,6 +484,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     const status = parseAuthStatus(stdout);
     if (status && (failure === null || status.loggedIn === false)) return status;
+    // `execFile` marks a child it stopped at its timeout: a busy computer, not a failed check.
+    if (isDynamicRecord(failure) && failure.killed === true) throw new RequestTimeoutError("Claude", "account/read");
     throw failure ?? new Error("Claude returned an unreadable sign-in status.");
   }
 

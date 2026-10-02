@@ -648,8 +648,7 @@ export class ProviderRuntime implements ProviderPort {
 
   async refreshProvider(provider: AgentProvider): Promise<AgentStatus> {
     if (this.#clients.has(provider)) return this.status();
-    // A refresh the user asked for gets new automatic retries.
-    this.#restartAttempts.delete(provider);
+    this.#resetRestarts(provider);
     let start = this.#providerStarts.get(provider);
     if (!start) {
       start = this.#connect("starting", [provider], {
@@ -1307,17 +1306,16 @@ export class ProviderRuntime implements ProviderPort {
     const pendingStarts = () =>
       providers.flatMap((provider) => this.#providerStarts.get(provider)?.catch(() => undefined) ?? []);
     for (let pending = pendingStarts(); pending.length > 0; pending = pendingStarts()) await Promise.all(pending);
-    for (const provider of providers) {
-      // A refresh the user asked for gets new automatic retries.
-      if (!this.#clients.has(provider)) this.#restartAttempts.delete(provider);
-    }
+    // Only these start here: the connect skips a provider whose client runs.
+    const starting = providers.filter((provider) => !this.#clients.has(provider));
+    for (const provider of starting) this.#resetRestarts(provider);
     const start = this.#connect("starting", providers, { preserveCheckErrors: true, refreshRuntimeInBackground: true });
     // A start asked for during this connect waits for it rather than starting a second client.
-    for (const provider of providers) this.#providerStarts.set(provider, start);
+    for (const provider of starting) this.#providerStarts.set(provider, start);
     try {
       await start;
     } finally {
-      for (const provider of providers) {
+      for (const provider of starting) {
         if (this.#providerStarts.get(provider) === start) this.#providerStarts.delete(provider);
       }
     }
@@ -1741,7 +1739,6 @@ export class ProviderRuntime implements ProviderPort {
           if (isProviderTimeout(error)) {
             // A busy computer, not a broken CLI: say so, keep the version, and try again later.
             const message = this.#retryAfterTimeout(provider, !disposed());
-            this.#dropProviderModels(provider);
             this.#setStatus({
               providers: updateProviderStatus(this.#status.providers, provider, {
                 state: "error",
@@ -1755,11 +1752,6 @@ export class ProviderRuntime implements ProviderPort {
           // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
           const message = this.#redactMcp(error instanceof Error ? error.message : String(error));
           const failure = providerFailureStatus(provider, error, cli?.version);
-          // An error row with models would let a picker or a tool choose what nothing can run.
-          // A missing Codex or Claude runtime is also an error row, but keeps the startup fallbacks.
-          if (failure.state === "error" && !(error instanceof CodexCliError && error.code === "missing")) {
-            this.#dropProviderModels(provider);
-          }
           this.#setStatus({
             providers: updateProviderStatus(this.#status.providers, provider, {
               ...failure,
@@ -1926,7 +1918,6 @@ export class ProviderRuntime implements ProviderPort {
     const attempts = this.#restartAttempts.get(client.provider) ?? 0;
 
     if (attempts >= 3) {
-      this.#dropProviderModels(client.provider);
       this.#setStatus(
         anotherProviderIsReady
           ? {
@@ -1962,18 +1953,33 @@ export class ProviderRuntime implements ProviderPort {
             message: `${providerLabel(client.provider)} stopped. Retrying (${attempts + 1}/3)…`,
           },
     );
-    const provider = client.provider;
+    this.#scheduleRestart(client.provider, delayMs);
+  }
+
+  /**
+   * `afterTimeout`: the provider never connected, so its start is restart recovery only when no
+   * other provider is live. `onProvidersReady` settles every unresolved delivery, and would record a
+   * turn that another provider still runs as interrupted.
+   */
+  #scheduleRestart(provider: AgentProvider, delayMs: number, afterTimeout = false): void {
     clearTimeout(this.#restartTimers.get(provider));
     this.#restartTimers.set(
       provider,
       setTimeout(() => {
         this.#restartTimers.delete(provider);
-        void this.#restart(provider);
+        void this.#restart(provider, afterTimeout);
       }, delayMs),
     );
   }
 
-  async #restart(provider: AgentProvider): Promise<void> {
+  /** A refresh the user asked for gets new automatic retries, and no retry of the old ones is left. */
+  #resetRestarts(provider: AgentProvider): void {
+    this.#restartAttempts.delete(provider);
+    clearTimeout(this.#restartTimers.get(provider));
+    this.#restartTimers.delete(provider);
+  }
+
+  async #restart(provider: AgentProvider, afterTimeout = false): Promise<void> {
     const disposals = this.#disposals;
     // A turn in the backoff may have started the provider already: a second connect would replace
     // that client and leave it running. That start can also end with no client, when the client it
@@ -1982,7 +1988,8 @@ export class ProviderRuntime implements ProviderPort {
       await pending.catch(() => undefined);
     }
     if (this.#hooks.isStopping() || disposals !== this.#disposals || this.#clients.has(provider)) return;
-    const start = this.#connect("restarting", [provider])
+    const notifyReady = !afterTimeout || (this.#clients.size === 0 && this.#released.size === 0);
+    const start = this.#connect("restarting", [provider], { notifyReady })
       .catch((error) => this.#emitError(`${provider}_restart_failed`, error))
       .finally(() => {
         this.#providerStarts.delete(provider);
@@ -2000,26 +2007,11 @@ export class ProviderRuntime implements ProviderPort {
     const retry = schedule && attempts < 3;
     if (retry) {
       this.#restartAttempts.set(provider, attempts + 1);
-      clearTimeout(this.#restartTimers.get(provider));
-      this.#restartTimers.set(
-        provider,
-        setTimeout(
-          () => {
-            this.#restartTimers.delete(provider);
-            void this.#restart(provider);
-          },
-          5_000 * 2 ** attempts,
-        ),
-      );
+      this.#scheduleRestart(provider, 5_000 * 2 ** attempts, true);
     }
     return sourceText(retry ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh", {
       provider: providerLabel(provider),
     });
-  }
-
-  /** A provider in the error state lists no models: nothing can run them until it connects again. */
-  #dropProviderModels(provider: AgentProvider): void {
-    this.#models = this.#models.filter((model) => model.provider !== provider);
   }
 
   /**

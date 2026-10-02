@@ -93,6 +93,7 @@ export async function resolveCodexCli(
 
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
+      if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
           ? error
@@ -103,8 +104,6 @@ export async function resolveCodexCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
-  const timedOut = failures.find((failure) => failure.code === "timeout");
-  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.codexNotStartedHint"), "invalid");
   }
@@ -138,6 +137,7 @@ export async function resolveClaudeCli(
       }
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
+      if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
           ? error
@@ -148,8 +148,6 @@ export async function resolveClaudeCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
-  const timedOut = failures.find((failure) => failure.code === "timeout");
-  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.claudeNotStartedHint"), "invalid");
   }
@@ -183,6 +181,7 @@ export async function resolveGrokCli(
       }
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
+      if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
           ? error
@@ -193,8 +192,6 @@ export async function resolveGrokCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
-  const timedOut = failures.find((failure) => failure.code === "timeout");
-  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.grokNotStartedHint"), "invalid");
   }
@@ -213,7 +210,6 @@ export async function resolveOpencodeCli(
     input.bundledExecutable === undefined ? bundledOpencodeExecutable() : input.bundledExecutable;
   const candidates = await cliCandidates("opencode", input.systemCandidates, bundledExecutable);
   let found = false;
-  let timedOut: CodexCliError | null = null;
   for (const candidate of candidates) {
     if (!(await isExecutable(candidate.executable))) continue;
     found = true;
@@ -224,11 +220,10 @@ export async function resolveOpencodeCli(
       // as the user's, which suppressed every later update offer.
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
+      if (isCliTimeout(error)) throw error;
       /* Try the remaining installed candidates. */
-      if (!timedOut && error instanceof CodexCliError && error.code === "timeout") timedOut = error;
     }
   }
-  if (timedOut) throw timedOut;
   throw new CodexCliError(
     found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
     found ? "invalid" : "missing",
@@ -306,7 +301,6 @@ export async function resolveCursorCli(
 ): Promise<CursorCliInfo> {
   const candidates = await cliCandidates("cursor", input.systemCandidates, input.bundledExecutable ?? null);
   let found = false;
-  let timedOut: CodexCliError | null = null;
   for (const candidate of candidates) {
     if (!(await isExecutable(candidate.executable))) continue;
     found = true;
@@ -314,11 +308,10 @@ export async function resolveCursorCli(
       const version = parseCursorVersion(await readCliVersion(candidate.executable, "cursor"));
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
+      if (isCliTimeout(error)) throw error;
       /* Try the remaining installed candidates. */
-      if (!timedOut && error instanceof CodexCliError && error.code === "timeout") timedOut = error;
     }
   }
-  if (timedOut) throw timedOut;
   throw new CodexCliError(
     found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
     found ? "invalid" : "missing",
@@ -677,9 +670,18 @@ export function cliSpawnTarget(
 
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
- * reported apart from a failure: the CLI is not broken, and reinstalling it does not help.
+ * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
+ * provider runtime tries again later, so this limit only has to cover one slow answer.
  */
-const CLI_VERSION_TIMEOUT_MS = 15_000;
+const CLI_VERSION_TIMEOUT_MS = 10_000;
+
+/**
+ * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
+ * wait for the next candidate. It also wins over a candidate that answered as outdated.
+ */
+function isCliTimeout(error: unknown): error is CodexCliError {
+  return error instanceof CodexCliError && error.code === "timeout";
+}
 
 async function readCliVersion(candidate: string, provider: AgentProviderId): Promise<string> {
   try {
