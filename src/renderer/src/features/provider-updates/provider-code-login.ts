@@ -4,10 +4,10 @@ import {
   agentProviderDescriptor,
   type ProviderCodeLoginStart,
 } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 
 /** The computer that runs the providers: it issues the code, and a cancel goes to the same one. */
@@ -202,7 +202,7 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
     const name = agentProviderDescriptor(provider).displayName;
     const { t, sourceText } = currentText();
     if (outcome.kind === "connected") {
-      toast.success(t("app.provider.connected", { name }), {
+      actionToast.success(t("app.provider.connected", { name }), {
         description: outcome.accountLabel
           ? t("app.provider.signedInAs", { account: outcome.accountLabel })
           : t("app.provider.signedInElsewhere"),
@@ -211,13 +211,13 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
     }
     const retry = { label: t("app.provider.newCode"), onClick: () => void startProviderCodeLogin(provider) };
     if (outcome.kind === "expired") {
-      toast.warning(t("app.provider.codeExpired", { name }), {
+      actionToast.warning(t("app.provider.codeExpired", { name }), {
         description: t("app.provider.codeExpiredDescription"),
         action: retry,
       });
       return;
     }
-    toast.error(t("app.provider.connectFailed", { name }), {
+    actionToast.error(t("app.provider.connectFailed", { name }), {
       description: sourceText(outcome.message),
       action: { ...retry, label: t("common.tryAgain") },
     });

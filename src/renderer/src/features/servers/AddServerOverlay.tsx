@@ -1,7 +1,6 @@
 import type { BillingInterval } from "@openbot/contracts/billing";
 import type { HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type {
   CreatedHostedServer,
   CreateHostedServerInput,
@@ -14,6 +13,7 @@ import {
 } from "@openbot/ui/features/servers/HostedServerPricing";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, Loading, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { AddServerDialog } from "../../lazy-views";
 
 /** How often the dialog reads the new server while it waits for the payment and the setup. */
@@ -140,7 +140,7 @@ function AddServerSession(
     } catch (error) {
       const text = currentText();
       const title = text.t("settings.hostedServers.loadFailed");
-      toast.error(title, { description: text.errorMessage(error, title) });
+      actionToast.error(title, { description: text.errorMessage(error, title) });
       if (resume) props.onPendingResume(resume);
       props.onClose();
     }
@@ -266,7 +266,7 @@ function AddServerSession(
     } catch (error) {
       const text = currentText();
       const title = text.t("settings.hostedServers.wakeFailed");
-      toast.error(title, { description: text.errorMessage(error, title) });
+      actionToast.error(title, { description: text.errorMessage(error, title) });
     }
   }
 

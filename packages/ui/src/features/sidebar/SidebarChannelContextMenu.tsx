@@ -22,7 +22,10 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
             <span>{t("sidebar.new.channel")}</span>
           </ContextMenu.Item>
         </Show>
-        <ContextMenu.Item onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}>
+        <ContextMenu.Item
+          data-cuelume-tap="toggle"
+          onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}
+        >
           <Show when={menuProps.pinned} fallback={<Pin class="agent-context-icon size-4" aria-hidden="true" />}>
             <PinOff class="agent-context-icon size-4" aria-hidden="true" />
           </Show>

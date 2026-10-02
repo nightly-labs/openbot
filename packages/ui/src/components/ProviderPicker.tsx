@@ -17,9 +17,11 @@ import {
   Ellipsis,
   Input,
   RefreshCw,
+  RotateCcw,
   SlidersHorizontal,
   Smartphone,
   Spinner,
+  X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
@@ -36,6 +38,8 @@ export interface ProviderPickerOption {
   email?: string | null | undefined;
   connectionState?: "connecting" | undefined;
   checkError?: string | null | undefined;
+  /** A restart the user asked for waits for the provider's tasks to stop. */
+  restartPending?: boolean | undefined;
   runtimeStatus?: ProviderRuntimeStatus | undefined;
   /**
    * Whether the optional OpenCode key is saved. Only the OpenCode row carries it: no other
@@ -77,6 +81,12 @@ export interface ProviderPickerProps {
    * knows who owns the install.
    */
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /**
+   * Restarts a connected provider's process after its tasks stop. Only the computer that runs the
+   * provider has it; a row with `restartPending` offers `onCancelProviderRestart` instead.
+   */
+  onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
@@ -404,7 +414,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                */
               const updateOffered = () =>
                 Boolean(props.onUpdateProvider) && (runtimeStatus()?.phase === "ready" || updatable());
-              const actionsMenu = () => codeSignInOffered() || updateOffered();
+              const restartOffered = () =>
+                Boolean(props.onRestartProvider) && (option().restartPending || (available() && !connecting()));
+              const actionsMenu = () => codeSignInOffered() || updateOffered() || restartOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               return (
                 <div
@@ -443,6 +455,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Show>
                       <Show when={option().checkError}>
                         {(checkError) => <small class="provider-picker-check-error">{sourceText(checkError())}</small>}
+                      </Show>
+                      <Show when={option().restartPending}>
+                        <small class="provider-picker-email" role="status">
+                          {t("provider.restartPending")}
+                        </small>
                       </Show>
                     </span>
                     {/* Version shares the badge column. */}
@@ -612,6 +629,22 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                   : t("provider.action.checkForUpdates")}
                               </DropdownMenu.Item>
                             </Show>
+                            <Show when={restartOffered()}>
+                              <Show
+                                when={option().restartPending}
+                                fallback={
+                                  <DropdownMenu.Item onSelect={() => void props.onRestartProvider?.(option().id)}>
+                                    <RotateCcw aria-hidden="true" />
+                                    {t("provider.action.restart")}
+                                  </DropdownMenu.Item>
+                                }
+                              >
+                                <DropdownMenu.Item onSelect={() => void props.onCancelProviderRestart?.(option().id)}>
+                                  <X aria-hidden="true" />
+                                  {t("provider.action.cancelRestart")}
+                                </DropdownMenu.Item>
+                              </Show>
+                            </Show>
                             <Show when={codeSignInOffered()}>
                               <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
                                 <Smartphone aria-hidden="true" />
@@ -649,6 +682,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             size="xs"
             class="provider-picker-refresh provider-picker-more"
             aria-haspopup="dialog"
+            data-cuelume-tap="open"
             ref={(element: HTMLButtonElement) => {
               moreButton = element;
             }}

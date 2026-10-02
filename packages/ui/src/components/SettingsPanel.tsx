@@ -85,6 +85,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
           type="button"
           class="settings-panel-nav-button"
           aria-label={props.backLabel ?? t("common.back")}
+          data-cuelume-tap="navigate"
           onClick={() => props.onBack?.()}
         >
           <SettingsBackIcon />
@@ -96,6 +97,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
         type="button"
         class="settings-panel-nav-button"
         aria-label={props.closeLabel}
+        data-cuelume-tap="close"
         onClick={() => props.onClose()}
       >
         <SettingsForwardIcon />
@@ -142,7 +144,13 @@ export interface SettingsLinkRowProps {
 /** One row of the group: what it opens on the left, where that stands on the right. */
 export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
   return (
-    <Button variant="ghost" type="button" class="settings-link" onClick={(event) => props.onClick(event.currentTarget)}>
+    <Button
+      variant="ghost"
+      type="button"
+      class="settings-link"
+      data-cuelume-tap="navigate"
+      onClick={(event) => props.onClick(event.currentTarget)}
+    >
       <span class="settings-link-label">{props.label}</span>
       <span class="settings-link-value">
         {props.value}

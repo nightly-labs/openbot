@@ -389,6 +389,9 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
             aria-controls={panelId}
             aria-expanded={isExpanded() ? "true" : "false"}
             aria-label={`${isExpanded() ? "Collapse" : "Expand"} ${local.label}`}
+            // A click that does not toggle gets no cue. The cue reads the state before the toggle.
+            data-cuelume-open={local.pointerToggle === false ? undefined : isExpanded() ? "close" : ""}
+            data-cuelume-emphasis="subtle"
             onClick={(event) => {
               if (event.detail > 0 && local.pointerToggle === false) return;
               toggle(event.detail === 0 ? "keyboard" : "pointer");

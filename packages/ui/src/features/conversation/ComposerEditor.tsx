@@ -626,6 +626,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-disabled={props.disabled ? "true" : "false"}
         aria-multiline="true"
         spellcheck="true"
+        data-cuelume-type=""
         onFocus={() => ensureEditorSelection(true)}
         onInput={() => {
           emitValue();

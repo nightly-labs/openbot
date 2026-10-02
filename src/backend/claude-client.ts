@@ -36,6 +36,7 @@ import {
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
+import { isClaudeTaskNotification } from "./conversation-snapshots";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -1015,17 +1016,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const text = messageText(message.message);
       if (message.type === "user") {
         if (!text) continue;
+        // A task notification still opens the turn that answers it, but the user did not write it.
         current = {
           id: message.uuid,
           status: "completed",
-          items: [
-            {
-              id: message.uuid,
-              type: "userMessage",
-              clientId: message.uuid,
-              content: [{ type: "text", text }],
-            },
-          ],
+          items: isClaudeTaskNotification(text)
+            ? []
+            : [
+                {
+                  id: message.uuid,
+                  type: "userMessage",
+                  clientId: message.uuid,
+                  content: [{ type: "text", text }],
+                },
+              ],
         };
         turns.push(current);
         currentThinking = null;

@@ -79,6 +79,7 @@ function EmbeddedSkill(props: { name: string; markdown: string }) {
         size="sm"
         class="agent-template-skill-toggle"
         aria-expanded={open() ? "true" : "false"}
+        data-cuelume-tap={open() ? "close" : "open"}
         onClick={() => setOpen(!open())}
       >
         <Show when={open()} fallback={<ChevronRight aria-hidden="true" />}>

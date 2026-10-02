@@ -3,6 +3,7 @@ import { toast } from "@openbot/ui";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { writeClipboardText } from "../../clipboard";
 import { renderAgentTemplateCard } from "./agent-template-card";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "./agent-templates-port";
@@ -44,7 +45,7 @@ export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () =
         draft.loading = false;
       });
       const { t, errorMessage } = currentText();
-      toast.error(errorMessage(error, t("agentTemplate.publish.readFailed")));
+      actionToast.error(errorMessage(error, t("agentTemplate.publish.readFailed")));
     }
   }
 
@@ -91,7 +92,7 @@ export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () =
     // The agent is published even when the copy fails, so that is said, not reported as a failure.
     const copied = await copyShareLink();
     const { t } = currentText();
-    toast.success(update ? t("agentTemplate.publish.updated") : t("agentTemplate.publish.publishedToast"), {
+    actionToast.success(update ? t("agentTemplate.publish.updated") : t("agentTemplate.publish.publishedToast"), {
       description: copied ? t("agentTemplate.publish.linkCopied") : t("agentTemplate.publish.copyHint"),
     });
   }
@@ -105,7 +106,9 @@ export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () =
       if (draft.preview) draft.preview.publication = null;
     });
     const { t } = currentText();
-    toast.success(t("agentTemplate.publish.unpublished"), { description: t("agentTemplate.publish.linkRemoved") });
+    actionToast.success(t("agentTemplate.publish.unpublished"), {
+      description: t("agentTemplate.publish.linkRemoved"),
+    });
   }
 
   const dialog = () => (

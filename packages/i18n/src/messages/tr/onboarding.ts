@@ -83,6 +83,8 @@ export const messages = {
   "onboarding.meet.addToPrompt": "İsteme ekle",
   "onboarding.meet.sendMessage": "Mesaj gönder",
   "onboarding.computer.title": "OpenBot bilgisayarınızı kontrol edebilir",
+  "onboarding.sounds.title": "Seslerinizi seçin",
+  "onboarding.sounds.description": "Kısa sesler, mesaj göndermek gibi işlemlerinizi onaylar.",
   "onboarding.jobs.title": "Her ajana bir görev verin",
   "onboarding.jobs.description": "Odaklanmış ajanlarla başlayın, ardından ekibi çalışmanızın etrafında kurun.",
   "onboarding.jobs.example": "Örnek ajan görevleri",

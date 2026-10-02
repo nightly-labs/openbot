@@ -1,0 +1,164 @@
+/* Sound feedback off, or on in one sound theme. Each card shows a moving dither tile. */
+.sound-theme-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  width: 100%;
+  min-width: 0;
+  gap: var(--openbot-space-2);
+}
+
+.sound-theme-option {
+  display: flex;
+  min-width: 0;
+}
+
+.sound-theme-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  text-align: left;
+  cursor: pointer;
+  transition-property: scale, background-color, box-shadow;
+  transition-duration: var(--openbot-duration-normal), var(--openbot-duration-hover), var(--openbot-duration-normal);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.sound-theme-card:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.sound-theme-card:active {
+  scale: 0.96;
+}
+
+.sound-theme-card[data-checked] {
+  box-shadow:
+    inset 0 0 0 1.5px var(--openbot-text-primary),
+    0 1px 3px var(--openbot-shadow-popover-ambient);
+}
+
+.sound-theme-card[data-popped][data-checked] {
+  animation: sound-theme-pop var(--openbot-duration-toast-enter) var(--openbot-ease-out);
+}
+
+.sound-theme-option:has(:focus-visible) .sound-theme-card {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+/* The shader reads the ink from `color` and the back from `background-color`. Before it starts, or
+   without WebGL, the same colors show as a dot screen. */
+.sound-theme-dither {
+  --sound-theme-ink: var(--openbot-sound-off-ink);
+  --sound-theme-back: var(--openbot-sound-off-back);
+  position: relative;
+  height: 56px;
+  overflow: hidden;
+  clip-path: inset(0 round var(--openbot-radius-md));
+  border-radius: var(--openbot-radius-md);
+  color: var(--sound-theme-ink);
+  background-color: var(--sound-theme-back);
+  background-image:
+    radial-gradient(var(--sound-theme-ink) 1px, transparent 1.5px),
+    linear-gradient(135deg, transparent, var(--sound-theme-ink));
+  background-size:
+    4px 4px,
+    100% 100%;
+  opacity: 0.72;
+  filter: saturate(0.7);
+  transition-property: opacity, filter;
+  transition-duration: var(--openbot-duration-overlay);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.sound-theme-dither canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sound-theme-card:hover .sound-theme-dither,
+.sound-theme-card[data-checked] .sound-theme-dither {
+  opacity: 1;
+  filter: none;
+}
+
+.sound-theme-dither[data-choice="default"] {
+  --sound-theme-ink: var(--openbot-sound-warm-ink);
+  --sound-theme-back: var(--openbot-sound-warm-back);
+}
+
+.sound-theme-dither[data-choice="mech"] {
+  --sound-theme-ink: var(--openbot-sound-mech-ink);
+  --sound-theme-back: var(--openbot-sound-mech-back);
+}
+
+.sound-theme-dither[data-choice="bubble"] {
+  --sound-theme-ink: var(--openbot-sound-bubble-ink);
+  --sound-theme-back: var(--openbot-sound-bubble-back);
+}
+
+.sound-theme-dither[data-choice="press"] {
+  --sound-theme-ink: var(--openbot-sound-press-ink);
+  --sound-theme-back: var(--openbot-sound-press-back);
+}
+
+.sound-theme-text {
+  display: grid;
+  min-width: 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-1) var(--openbot-space-0-5);
+}
+
+.sound-theme-name {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: inherit;
+}
+
+.sound-theme-hint {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+@keyframes sound-theme-pop {
+  0% {
+    scale: 1;
+  }
+
+  35% {
+    scale: 1.06;
+    rotate: -1.5deg;
+  }
+
+  70% {
+    scale: 0.98;
+    rotate: 0.8deg;
+  }
+
+  100% {
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-theme-card[data-popped][data-checked] {
+    animation: none;
+  }
+
+  .sound-theme-card:active {
+    scale: 1;
+  }
+}

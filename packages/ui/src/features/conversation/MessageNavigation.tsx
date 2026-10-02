@@ -41,6 +41,7 @@ export function ScrollToLatestButton(props: { onClick: () => void; newMessageCou
         type="button"
         class="scroll-to-latest-button"
         aria-label={showCount() ? t("chat.newMessages.jump", { count: count() }) : t("chat.newMessages.scrollToLatest")}
+        data-cuelume-tap="navigate"
         onClick={props.onClick}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -56,6 +57,7 @@ export function ScrollToLatestButton(props: { onClick: () => void; newMessageCou
           type="button"
           class="scroll-to-latest-dismiss"
           aria-label={t("chat.newMessages.dismiss")}
+          data-cuelume-tap="close"
           onClick={() => props.onDismiss?.()}
         >
           <X aria-hidden="true" />

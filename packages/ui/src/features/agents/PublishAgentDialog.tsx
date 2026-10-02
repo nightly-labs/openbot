@@ -255,7 +255,7 @@ function TemplateDetailView(props: {
   return (
     <div class="agent-template-body">
       <header class="agent-template-detail-header">
-        <IconButton label={t("common.back")} variant="ghost" onClick={props.onBack}>
+        <IconButton label={t("common.back")} variant="ghost" data-cuelume-tap="navigate" onClick={props.onBack}>
           <ArrowLeft />
         </IconButton>
         <Heading as="h3" size="sm">

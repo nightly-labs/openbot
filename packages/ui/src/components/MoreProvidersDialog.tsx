@@ -67,7 +67,7 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
               <Dialog.Title as="h2" class="provider-more-title">
                 {t("onboarding.provider.more")}
               </Dialog.Title>
-              <IconButton label={t("common.close")} variant="ghost" onClick={close}>
+              <IconButton label={t("common.close")} variant="ghost" data-cuelume-tap="close" onClick={close}>
                 <X />
               </IconButton>
             </header>
@@ -85,7 +85,13 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
             <div class="provider-more-list">
               <For each={matches()} keyed={false}>
                 {(provider) => (
-                  <Button type="button" variant="ghost" class="provider-more-row" onClick={() => choose(provider().id)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    class="provider-more-row"
+                    data-cuelume-tap="select"
+                    onClick={() => choose(provider().id)}
+                  >
                     <ProviderLogo provider={provider().id} class="provider-picker-logo" />
                     <span class="provider-picker-identity">
                       <span class="provider-picker-name">{provider().name}</span>
@@ -101,7 +107,13 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
               </Show>
               <Show when={props.custom}>
                 <hr class="provider-more-divider" />
-                <Button type="button" variant="ghost" class="provider-more-row" onClick={chooseCustom}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  class="provider-more-row"
+                  data-cuelume-tap="select"
+                  onClick={chooseCustom}
+                >
                   <SlidersHorizontal class="provider-picker-custom-mark" aria-hidden="true" />
                   <span class="provider-picker-identity">
                     <span class="provider-picker-name">{t("provider.custom.name")}</span>

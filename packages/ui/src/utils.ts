@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { createSignal } from "solid-js";
 
 type ClassValue = JSX.HTMLAttributes<HTMLElement>["class"] | false | null | undefined;
 
@@ -54,4 +55,20 @@ export function motionDuration(name: string, fallback: number): number {
   if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
   if (value.endsWith("s")) return (Number.parseFloat(value) || fallback / 1_000) * 1_000;
   return Number.parseFloat(value) || fallback;
+}
+
+/**
+ * Sound cue for a trigger that opens and closes its popup on pointerdown, such as a menu or a select.
+ * The click that plays the cue comes after the change, so keep the state that the pointerdown found:
+ * `close` when the popup was open. Put `cue()` on `data-cuelume-open` and add `ref` to the trigger.
+ */
+export function createPressedPopupCue(): { ref: (element: HTMLElement) => void; cue: () => string } {
+  const [closing, setClosing] = createSignal(false);
+  return {
+    ref: (element) =>
+      element.addEventListener("pointerdown", () => setClosing(element.getAttribute("aria-expanded") === "true"), {
+        capture: true,
+      }),
+    cue: () => (closing() ? "close" : ""),
+  };
 }

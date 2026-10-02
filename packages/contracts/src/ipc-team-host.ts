@@ -79,7 +79,14 @@ export interface ServerSummary {
   connectionSequence?: number;
   /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
   hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
+  /**
+   * A hosted server that the account service stopped for no use (`sleeping`), or that starts after the
+   * user's input (`waking`). Cleared when the connection comes back.
+   */
+  hostedSleep?: HostedServerSleep | null;
 }
+
+export type HostedServerSleep = "sleeping" | "waking";
 
 export interface JoinServerInput {
   inviteUrl: string;

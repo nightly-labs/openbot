@@ -24,6 +24,7 @@ import {
 } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
+import { restartReasonKey } from "../updates/restart-reasons";
 import type { GeneralSettingsValue } from "./app-settings";
 import type { SettingsUpdatesStore } from "./stores/updates-store";
 
@@ -43,8 +44,10 @@ interface SettingsUpdatesTabProps {
 }
 
 export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
-  const { t } = useText();
+  const { t, format, errorMessage } = useText();
   const managed = () => props.store.presentation().managed;
+  const idleRestartWaitingFor = (reasons: readonly string[]) =>
+    t("update.idleRestart.waitingFor", { reasons: format.list(reasons.map((reason) => t(restartReasonKey(reason)))) });
 
   return (
     <SettingsSection title={t("settings.updates.title")}>
@@ -73,6 +76,43 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
                 onClick={() => void props.store.cancelScheduledRestart()}
               >
                 {t("update.scheduled.cancel")}
+              </Button>
+            </AlertActions>
+          </Alert>
+        )}
+      </Show>
+      <Show when={props.store.idleRestart()}>
+        {(restart) => (
+          <Alert tone={restart().error === undefined ? "neutral" : "danger"} role="status">
+            <AlertIcon>
+              <Clock3 />
+            </AlertIcon>
+            <AlertContent>
+              <AlertTitle>
+                {restart().error !== undefined
+                  ? t("update.idleRestart.failedTitle")
+                  : restart().target === "update"
+                    ? t("update.idleRestart.updateTitle")
+                    : t("update.idleRestart.relaunchTitle")}
+              </AlertTitle>
+              <AlertDescription>
+                {restart().error !== undefined
+                  ? errorMessage(restart().error, t("update.idleRestart.failedTitle"))
+                  : t("update.idleRestart.description")}
+              </AlertDescription>
+              <Show when={restart().error === undefined && restart().waitingFor.length > 0}>
+                <AlertDescription>{idleRestartWaitingFor(restart().waitingFor)}</AlertDescription>
+              </Show>
+            </AlertContent>
+            <AlertActions>
+              <Button
+                variant="outline"
+                type="button"
+                size="sm"
+                loading={props.store.idleRestartBusy()}
+                onClick={() => void props.store.cancelIdleRestart()}
+              >
+                {restart().error === undefined ? t("update.idleRestart.cancel") : t("common.close")}
               </Button>
             </AlertActions>
           </Alert>
@@ -129,6 +169,32 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </ItemActions>
           </Show>
         </Item>
+        <Show when={props.store.idleRestartOffered()}>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{t("settings.updates.idleRestart.title")}</ItemTitle>
+              <ItemDescription>
+                {props.store.idleRestartInstalls()
+                  ? t("settings.updates.idleRestart.updateDescription", { target: props.store.targetUpdate() })
+                  : t("settings.updates.idleRestart.relaunchDescription")}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button
+                variant="outline"
+                type="button"
+                size="sm"
+                loading={props.store.idleRestartBusy()}
+                disabled={props.store.idleRestart() !== undefined && props.store.idleRestart()?.error === undefined}
+                onClick={() => void props.store.restartWhenIdle()}
+              >
+                {props.store.idleRestartInstalls()
+                  ? t("settings.updates.idleRestart.update")
+                  : t("settings.updates.idleRestart.relaunch")}
+              </Button>
+            </ItemActions>
+          </Item>
+        </Show>
         <Show
           when={managed()}
           fallback={

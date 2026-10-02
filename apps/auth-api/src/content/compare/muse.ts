@@ -11,10 +11,10 @@ export const MUSE_COMPARISON: Comparison = {
   answer:
     "For most people who want agents for their work, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free and needs no account. Choose Muse if you want one personal assistant from Meta that runs on Meta's cloud and helps with email and purchases.",
   chooseOpenBot: [
-    "You already pay for ChatGPT, Claude, Gemini or Grok, or you run your own model.",
+    "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer, not on Meta's cloud.",
     "You want a team of agents that give work to each other, not one assistant.",
-    "You live outside the United States, or you want a desktop app for Windows or Linux.",
+    "You live outside the US and Canada, or you want a desktop app for Windows or Linux.",
     "You want a free app that works without an account, and source code that you can read.",
   ],
   rivalPlans: "Muse uses Muse Spark, Meta's own model. Muse is free with a weekly limit, or $20 or $100 a month.",
@@ -28,7 +28,7 @@ export const MUSE_COMPARISON: Comparison = {
       icon: "cpu",
       topic: "Models and plans",
       openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival: "Muse Spark, Meta's own model. Meta states no choice of other models.",
       better: "openbot",
     },
@@ -44,9 +44,8 @@ export const MUSE_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot. Only that computer must stay on, not your laptop.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival: "Muse keeps working after you close the app. You keep no computer on.",
-      better: "rival",
     },
     {
       icon: "phone",
@@ -79,7 +78,16 @@ export const MUSE_COMPARISON: Comparison = {
       openbot:
         "Free for noncommercial use; commercial use needs a license. No account is necessary on one computer. Your agents use the plans you already pay for.",
       rival:
-        "Free with a weekly usage limit. Power costs $20 a month and Maximum $100 a month. Needs an account, and is for people aged 18 or more in the United States.",
+        "Free with a weekly usage limit. Power costs $20 a month and Maximum $100 a month. Needs an account, and is for people aged 18 or more in the US and Canada.",
+      better: "openbot",
+    },
+    {
+      icon: "globe",
+      topic: "Where you can use it",
+      openbot:
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      rival:
+        "Only in the US and Canada, for people 18 and over. Meta says Muse comes to more markets, but gives no countries or dates.",
       better: "openbot",
     },
     {
@@ -103,7 +111,7 @@ export const MUSE_COMPARISON: Comparison = {
     {
       title: "Models and the plans you pay for",
       openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
         "Muse runs on Muse Spark, Meta's own model, and Meta states no way to use a different one. You pay Meta for use: Muse is free with a weekly limit, and the Power and Maximum plans give more Muse tokens each week. A plan that you already pay for at another AI company does not apply.",
       better: "openbot",
@@ -111,7 +119,7 @@ export const MUSE_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Each Muse lives on its own cloud computer, the Muse Secure VM: a Linux computer with a browser and storage that Meta hosts. Your data and the sign-ins of the services you connect are kept there. Muse keeps working after you close the app. With your permission, Muse for Mac can also use the apps on your Mac.",
       better: "openbot",
@@ -135,7 +143,7 @@ export const MUSE_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
       rival:
         "Muse keeps your data on your cloud computer at Meta. A separate agent, Sentinel, must approve each action through a connected service and all network traffic, and Muse asks you before sensitive actions such as an email or a purchase. By default, Meta can use your conversations to train its models; you can turn this off in Settings. Meta says it does not give Muse conversations or VM data to its ad systems. A Confidential VM that stops Meta from reading the data in your VM is planned for later in 2026.",
       better: "openbot",
@@ -155,7 +163,7 @@ export const MUSE_COMPARISON: Comparison = {
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
       answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key. OpenBot adds no charge of its own.",
+        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
     },
     {
       question: "Which model does Muse use?",
@@ -180,12 +188,12 @@ export const MUSE_COMPARISON: Comparison = {
     {
       question: "Do agents keep working when my laptop is closed?",
       answer:
-        "Yes, with both. With OpenBot, run it on a desktop or a server that stays on, and connect from your laptop or phone. Only that computer must stay on. Muse keeps working on its cloud computer after you close the app.",
+        "Yes, with both. With OpenBot, run it on a desktop or a server that stays on, or on a hosted OpenBot server, and connect from your laptop or phone. Only that computer must stay on. Muse keeps working on its cloud computer after you close the app.",
     },
     {
-      question: "Can I use Muse outside the United States?",
+      question: "Can I use Muse in Europe?",
       answer:
-        "At launch, Meta made Muse available in the United States, for people aged 18 or more. OpenBot has no country limit: it runs on your computer, and each provider tool follows its own availability.",
+        "Not for now. Meta offers Muse in the US and Canada, to people aged 18 or more, and says it is working to bring Muse to more markets, with no countries or dates. OpenBot has no country limit: it runs on your computer in any country, hosted OpenBot servers run in the EU, and each provider tool follows its own availability.",
     },
     {
       question: "How much do OpenBot and Muse cost?",
@@ -204,6 +212,7 @@ export const MUSE_COMPARISON: Comparison = {
       label: "Meta: Everything we announced at Connect 2026",
       url: "https://www.meta.com/blog/meta-connect-2026-everything-we-announced/",
     },
+    { label: "Muse for Small Business", url: "https://muse.ai/business" },
     { label: "Muse subscription plans", url: "https://www.meta.com/help/subscriptions/1021145227643680/" },
     { label: "Muse side chats", url: "https://www.meta.com/help/artificial-intelligence/1331373868832401/" },
     { label: "Muse Privacy Policy", url: "https://muse.ai/privacy" },
@@ -211,5 +220,5 @@ export const MUSE_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

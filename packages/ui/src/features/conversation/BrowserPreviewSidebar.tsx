@@ -95,7 +95,13 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
             <Plus />
           </Button>
         </Show>
-        <Button variant="ghost" size="icon-sm" aria-label={t("browser.previews.collapse")} onClick={props.onCollapse}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("browser.previews.collapse")}
+          data-cuelume-tap="close"
+          onClick={props.onCollapse}
+        >
           <ChevronRight />
         </Button>
       </header>
@@ -208,6 +214,7 @@ export function BrowserPreviewCard(props: {
         variant="ghost"
         class="browser-preview-open"
         aria-label={t("browser.preview.open", { title: title() })}
+        data-cuelume-tap="open"
         onClick={(event) => props.onOpen(props.tab.id, event.currentTarget)}
       >
         <span class="browser-preview-image">
@@ -239,6 +246,7 @@ export function BrowserPreviewCard(props: {
           size="icon-xs"
           class="browser-preview-close"
           aria-label={t("browser.preview.close", { title: title() })}
+          data-cuelume-tap="close"
           onClick={() => props.onClose?.(props.tab.id)}
         >
           <X />

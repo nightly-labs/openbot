@@ -68,6 +68,8 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                       aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? presence(member.online)}`}
                       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                       aria-pressed={props.activeDirectMemberId === member.id ? "true" : "false"}
+                      data-cuelume-tap="navigate"
+                      data-cuelume-emphasis="normal"
                       onClick={(event: MouseEvent) => {
                         if (sidebarClickIsSuppressed(event)) return;
                         props.onPreloadDirectConversation?.();

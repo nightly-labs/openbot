@@ -12,7 +12,7 @@ export function Checkbox(props: CheckboxProps): JSX.Element {
   const others = omit(props, "class", "type");
   return (
     <span class={cx("ui-checkbox", local.class)}>
-      <input class="ui-checkbox-input" type="checkbox" {...others} />
+      <input class="ui-checkbox-input" type="checkbox" data-cuelume-toggle="" {...others} />
       <span class="ui-checkbox-visual" aria-hidden="true">
         <Check />
       </span>

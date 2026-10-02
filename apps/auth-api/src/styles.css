@@ -3760,6 +3760,11 @@ a {
   list-style: none;
 }
 
+/* A card alone in the last row takes the full row. */
+.compare-plan:last-child:nth-child(3n + 1) {
+  grid-column: 1 / -1;
+}
+
 .compare-plan {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -4362,6 +4367,14 @@ a {
 
   .compare-plans-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compare-plan:last-child:nth-child(3n + 1) {
+    grid-column: auto;
+  }
+
+  .compare-plan:last-child:nth-child(2n + 1) {
+    grid-column: 1 / -1;
   }
 }
 

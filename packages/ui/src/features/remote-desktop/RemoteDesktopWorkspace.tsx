@@ -192,7 +192,14 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
               </div>
             </Show>
             <div class="no-drag remote-desktop-actions">
-              <Button type="button" class="remote-desktop-back-button" size="sm" variant="ghost" onClick={props.onHide}>
+              <Button
+                type="button"
+                class="remote-desktop-back-button"
+                size="sm"
+                variant="ghost"
+                data-cuelume-tap="navigate"
+                onClick={props.onHide}
+              >
                 <ArrowLeft size={14} aria-hidden="true" />
                 {t("remoteDesktop.backToOpenBot")}
               </Button>

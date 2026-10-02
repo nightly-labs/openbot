@@ -985,3 +985,12 @@
 .settings-modal .ui-item-description.settings-logo-color-description {
   white-space: pre-line;
 }
+
+/* The sound theme cards are too wide to sit beside the text, so they wrap below it. */
+.settings-sound-theme-row {
+  flex-wrap: wrap;
+}
+
+.settings-sound-theme-row > .sound-theme-picker {
+  flex-basis: 100%;
+}

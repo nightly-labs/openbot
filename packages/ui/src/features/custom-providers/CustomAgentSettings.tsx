@@ -18,9 +18,11 @@ import {
   ItemTitle,
   Pencil,
   Plus,
+  RotateCcw,
   SettingsSection,
   Text,
   Trash2,
+  X,
 } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -42,6 +44,14 @@ export interface CustomAgentSettingsApi {
   remove: (id: string) => Promise<CustomProviderRestart>;
   /** One trial start. Rejects with the reason the agent did not answer. */
   check: (input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>;
+  /**
+   * Restarts the process group of the custom agents after their tasks stop. Without it the section
+   * offers no restart.
+   */
+  restart?: (() => Promise<void>) | undefined;
+  cancelRestart?: (() => Promise<void>) | undefined;
+  /** A restart waits for the tasks of the custom agents to stop. */
+  restartPending?: boolean | undefined;
 }
 
 /**
@@ -150,16 +160,40 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
       title={t("customProvider.agents.title")}
       description={t("customProvider.agents.description")}
       actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={removing() !== null}
-          onClick={() => open({ draft: emptyCustomAcpAgentDraft() })}
-        >
-          <Plus size={14} aria-hidden="true" />
-          {t("customProvider.agents.add")}
-        </Button>
+        <>
+          <Show when={props.api.restart && (props.api.agents.length > 0 || props.api.restartPending)}>
+            <Show
+              when={props.api.restartPending}
+              fallback={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={removing() !== null}
+                  onClick={() => void props.api.restart?.()}
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                  {t("customProvider.agents.restart")}
+                </Button>
+              }
+            >
+              <Button type="button" variant="ghost" size="sm" onClick={() => void props.api.cancelRestart?.()}>
+                <X size={14} aria-hidden="true" />
+                {t("customProvider.agents.cancelRestart")}
+              </Button>
+            </Show>
+          </Show>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={removing() !== null}
+            onClick={() => open({ draft: emptyCustomAcpAgentDraft() })}
+          >
+            <Plus size={14} aria-hidden="true" />
+            {t("customProvider.agents.add")}
+          </Button>
+        </>
       }
     >
       <Show
@@ -204,6 +238,11 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
             )}
           </For>
         </ItemGroup>
+      </Show>
+      <Show when={props.api.restartPending}>
+        <Text tone="muted" variant="caption" role="status">
+          {t("customProvider.agents.restartPending")}
+        </Text>
       </Show>
       <Show when={note()}>
         {(message) => (

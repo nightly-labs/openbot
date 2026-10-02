@@ -18,9 +18,11 @@ import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
+import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
+import { readActionSoundChoice, replayActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import type { WebAccountCalls } from "./web-account";
 
@@ -62,9 +64,13 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const [activeTab, setActiveTab] = createSignal<WebAccountSettingsTab>("profile");
   const [completionSound, setCompletionSound] = createSignal(isCompletionSoundEnabled());
   // Playback reads the stored value on each event, so the switch follows a change from another tab.
-  const readCompletionSound = () => setCompletionSound(isCompletionSoundEnabled());
-  window.addEventListener("storage", readCompletionSound);
-  onCleanup(() => window.removeEventListener("storage", readCompletionSound));
+  const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
+  const readSoundSettings = () => {
+    setCompletionSound(isCompletionSoundEnabled());
+    setSoundChoice(readActionSoundChoice());
+  };
+  window.addEventListener("storage", readSoundSettings);
+  onCleanup(() => window.removeEventListener("storage", readSoundSettings));
   let modalElement: HTMLElement | undefined;
 
   const profile = createSettingsProfileStore(
@@ -156,6 +162,20 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 label={t("settings.taskSound.title")}
                 description={t("settings.taskSound.description")}
               />
+              <Item class="settings-modal-row settings-sound-theme-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.soundFeedback.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.soundFeedback.description")}</ItemDescription>
+                </ItemContent>
+                <SoundThemePicker
+                  value={soundChoice()}
+                  onChange={(value) => {
+                    setSoundChoice(value);
+                    setActionSoundChoice(value);
+                  }}
+                  onReplay={replayActionSoundChoice}
+                />
+              </Item>
             </ItemGroup>
           </SettingsSection>
         </Tabs.Content>

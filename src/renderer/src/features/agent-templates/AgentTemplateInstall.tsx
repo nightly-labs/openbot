@@ -1,8 +1,8 @@
 import type { AddedAgent, AgentTemplateDetail, ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { type AgentTemplateInstallCalls, agentTemplatesPort } from "./agent-templates-port";
 
 interface InstallState {
@@ -52,7 +52,7 @@ export function AgentTemplateInstall(props: {
             draft.loading = false;
           });
           props.onClose();
-          toast.error(errorMessage(error, t("agentTemplate.install.readFailed")));
+          actionToast.error(errorMessage(error, t("agentTemplate.install.readFailed")));
         });
       return () => {
         current = false;
@@ -75,7 +75,7 @@ export function AgentTemplateInstall(props: {
       ? await port.agent.addTemplateAgent(input, server.id)
       : (await port.agentTemplates.install(input)).agent;
     props.onClose();
-    toast.success(
+    actionToast.success(
       server
         ? t("agentTemplate.install.addedTo", { name: agent.name, server: server.name })
         : t("agentTemplate.install.added", { name: agent.name }),

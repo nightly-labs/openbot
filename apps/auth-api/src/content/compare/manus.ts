@@ -14,13 +14,13 @@ export const MANUS_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want your agents on your own computer, with the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok: the app is free and needs no account. Choose Manus if you want a general agent that works in its own cloud computer, keeps working with no computer of yours on, and chooses the model for you.",
   chooseOpenBot: [
-    "You already pay for ChatGPT, Claude, Gemini or Grok, or you run your own model.",
+    "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer, not in a cloud in the US or Singapore.",
     "You want a team of coding agents that give work to each other, each with its own job.",
     "You want a desktop app for Linux, or a free app that works without an account.",
   ],
   rivalPlans:
-    "Manus chooses the model for each task; you choose only between Manus 1.6 Lite, Manus 1.6 and Manus 1.6 Max. You pay Manus in credits: 300 free credits a day, or Pro plans from $20 a month.",
+    "Manus chooses the model for each task; you choose only between Manus 2.0 Lite, Manus 2.0 and Manus 2.0 Max. You pay Manus in credits: 300 free credits a day, or Pro plans from $20 a month.",
   chooseRival: [
     "You want an agent that works in a cloud computer, with no computer of yours to keep on.",
     "You want research, websites and slides from one prompt, with many agents in parallel.",
@@ -31,9 +31,9 @@ export const MANUS_COMPARISON: Comparison = {
       icon: "cpu",
       topic: "Models and plans",
       openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival:
-        "Manus chooses the model for each task. You choose Manus 1.6 Lite, Manus 1.6 or Manus 1.6 Max. Manus states no way to use your own AI plan, API key or model.",
+        "Manus chooses the model for each task. You choose Manus 2.0 Lite, Manus 2.0 or Manus 2.0 Max. Manus states no way to use your own AI plan, API key or model.",
       better: "openbot",
     },
     {
@@ -48,10 +48,9 @@ export const MANUS_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot. Only that computer must stay on, not your laptop.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival:
         "Cloud tasks keep working after you close the app, and scheduled tasks run while you are offline. Tasks on your own computer need it on.",
-      better: "rival",
     },
     {
       icon: "phone",
@@ -88,6 +87,14 @@ export const MANUS_COMPARISON: Comparison = {
       better: "openbot",
     },
     {
+      icon: "globe",
+      topic: "Where you can use it",
+      openbot:
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      rival:
+        "Worldwide, except countries under a US embargo, for people 18 and over. Its data is stored in the US and Singapore. The website is in 17 languages.",
+    },
+    {
       icon: "devices",
       topic: "Apps",
       openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
@@ -107,15 +114,15 @@ export const MANUS_COMPARISON: Comparison = {
     {
       title: "Models and the plans you pay for",
       openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
-        "Manus says it is LLM-agnostic: it chooses the right model for each task, so you do not have to. It does not name the models. You choose only between its own tiers: the free plan gets Manus 1.6 Lite in Agent mode, and paid plans also get Manus 1.6 and Manus 1.6 Max. You pay Manus in credits, and a plan that you already pay for at another AI company does not apply.",
+        "Manus says it is LLM-agnostic: it chooses the right model for each task, so you do not have to. It does not name the models. You choose only between its own tiers: the free plan gets Manus 2.0 Lite in Agent mode, and paid plans also get Manus 2.0 and Manus 2.0 Max. You pay Manus in credits, and a plan that you already pay for at another AI company does not apply.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "By default, each Manus task works in a temporary sandbox: a virtual computer with internet access in Manus's cloud. A Cloud Computer that stays on costs $30 or $50 a month more. Cloud tasks and scheduled tasks keep running while you are offline. Since March 2026, the desktop app for macOS and Windows can also let Manus run commands in the folders that you allow on your own computer; those tasks need that computer on.",
       better: "openbot",
@@ -130,14 +137,14 @@ export const MANUS_COMPARISON: Comparison = {
     {
       title: "How agents work as a team",
       openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
       rival:
         "Manus is one agent that can split a large task: Wide Research starts hundreds of independent agents that work in parallel. Paid plans run up to 20 tasks at the same time. Up to 50 people can work in one task, and only the owner of the task pays the credits. The Team plan pools credits and adds single sign-on; the owner of a team can see all the session data of its members.",
     },
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
         "Manus stores your data in the US and Singapore. Its privacy policy says that it collects the files of each task, the shell commands the agent runs and their output, and the code. Manus says its model providers do not train on your data. For individual plans, it states no training opt-out, and its terms give Manus a permanent license to use your content, in aggregate, to improve the service. The Team plan says Manus does not train models on your data.",
       better: "openbot",
@@ -157,12 +164,12 @@ export const MANUS_COMPARISON: Comparison = {
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
       answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key. OpenBot adds no charge of its own.",
+        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
     },
     {
       question: "Can I use my own AI plan or model with Manus?",
       answer:
-        "Manus states no way to do this. It chooses the model for each task, and you pay Manus in credits. You can choose only between Manus 1.6 Lite, Manus 1.6 and Manus 1.6 Max.",
+        "Manus states no way to do this. It chooses the model for each task, and you pay Manus in credits. You can choose only between Manus 2.0 Lite, Manus 2.0 and Manus 2.0 Max.",
     },
     {
       question: "Is Manus owned by Meta?",
@@ -182,7 +189,7 @@ export const MANUS_COMPARISON: Comparison = {
     {
       question: "Do agents keep working when my laptop is closed?",
       answer:
-        "Yes, with both. Manus works in its cloud, so no computer of yours must stay on. OpenBot agents work on the computer or server that runs OpenBot: keep that computer on, and connect from your laptop or phone.",
+        "Yes, with both. Manus works in its cloud, so no computer of yours must stay on. OpenBot agents work on the computer or server that runs OpenBot: keep that computer on, or use a hosted OpenBot server, and connect from your laptop or phone.",
     },
     {
       question: "How much do OpenBot and Manus cost?",
@@ -192,6 +199,7 @@ export const MANUS_COMPARISON: Comparison = {
   ],
   sources: [
     { label: "Manus", url: "https://manus.im" },
+    { label: "Introducing Manus 2.0", url: "https://manus.im/blog/introducing-manus-2-0" },
     { label: "Manus pricing", url: "https://manus.im/pricing" },
     {
       label: "Manus membership pricing",
@@ -230,5 +238,5 @@ export const MANUS_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

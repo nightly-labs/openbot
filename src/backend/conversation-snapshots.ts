@@ -125,7 +125,9 @@ export function mergeProviderHistory(
   provider?: AgentProviderId,
 ): ConversationSnapshot {
   if (provider === "claude") {
-    return mergeConversationSnapshots(stored, reconcileClaudeHistory(stored, imported));
+    // Earlier builds imported Claude's task notifications as user messages. Nobody sent those.
+    const kept = { ...stored, messages: stored.messages.filter((message) => !isStoredClaudeTaskNotification(message)) };
+    return mergeConversationSnapshots(kept, reconcileClaudeHistory(kept, imported));
   }
   const importedIds = new Set(imported.messages.map((message) => message.id));
   const importedAssistantMessages = new Set(
@@ -257,6 +259,19 @@ function isClaudeNarration(message: ConversationMessage): boolean {
     Boolean(message.turnId) &&
     message.id !== `${message.turnId}:reasoning`
   );
+}
+
+/**
+ * A notice Claude Code adds to its session as a user message, when a background task ends or a
+ * restart finds one that did not. Claude answers it in a turn of its own, but the user did not write it.
+ */
+export function isClaudeTaskNotification(text: string): boolean {
+  return text.startsWith("<task-notification>");
+}
+
+/** A message sent through the mailbox keeps its delivery. An imported notification has none. */
+function isStoredClaudeTaskNotification(message: ConversationMessage): boolean {
+  return message.author === "user" && !message.delivery && isClaudeTaskNotification(message.text);
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {

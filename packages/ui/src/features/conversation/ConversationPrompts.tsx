@@ -202,6 +202,8 @@ export function ApprovalCard(props: {
           type="button"
           class="approval-button"
           disabled={submitting()}
+          data-cuelume-tap="close"
+          data-cuelume-emphasis="normal"
           onClick={() => void submit("decline")}
         >
           {submitting() ? t("prompt.approval.waiting") : t("prompt.approval.deny")}
@@ -384,6 +386,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             loading={submitting() === "cancel"}
             loadingLabel={t("prompt.browser.cancelling")}
             disabled={Boolean(submitting())}
+            data-cuelume-tap="close"
             onClick={() => void submit("cancel")}
           >
             {t("common.cancel")}

@@ -5,10 +5,10 @@ import {
   STORAGE_CAPABILITY,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type FilesPort, filesPort } from "./files-port";
 
@@ -140,7 +140,7 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
       await calls().storage.openFile({ fileId: file.id, action }, current.serverId);
     } catch (error) {
       const text = currentText();
-      toast.error(text.t("files.storage.openFailed", { name: file.name }), {
+      actionToast.error(text.t("files.storage.openFailed", { name: file.name }), {
         description: text.errorMessage(error, text.t("files.storage.tryAgain")),
       });
     }

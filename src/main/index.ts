@@ -397,6 +397,7 @@ function registerIpcHandlers({
   analyticsPreferenceFile,
   updatePreferenceFile,
   requestedUpdate,
+  idleRestart,
   approvalAutomation,
   agentAdminSettings,
   language,
@@ -483,7 +484,7 @@ function registerIpcHandlers({
         ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
         : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
     }),
-    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate }),
+    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate, idleRestart }),
     ...notificationIpcHandlers({
       notificationPreference,
       translate: language.translate,

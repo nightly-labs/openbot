@@ -42,6 +42,8 @@ export interface SettingsModalProps {
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
   onCancelScheduledRestart?: () => Promise<void>;
+  onRestartWhenIdle?: () => Promise<void>;
+  onCancelIdleRestart?: () => Promise<void>;
   account: CentralAuthUser;
   onUpdateAccountName: (name: string) => Promise<void>;
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
@@ -187,6 +189,7 @@ export function SettingsModal(props: SettingsModalProps) {
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
             onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
             selectMount={modalElement}
             turboModePending={props.turboModePending}
             onTestNotification={props.onTestNotification}

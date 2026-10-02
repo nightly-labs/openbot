@@ -66,7 +66,12 @@ export function SliderField(props: SliderFieldProps): JSX.Element {
       <Show when={props.description}>
         <SliderPrimitive.Description class="ui-slider-description">{props.description}</SliderPrimitive.Description>
       </Show>
-      <SliderPrimitive.Track class="ui-slider-track">
+      {/* The track keeps the pointer during a drag, so the cue plays once, when the user releases it. */}
+      <SliderPrimitive.Track
+        class="ui-slider-track"
+        data-cuelume-select={props.disabled ? undefined : ""}
+        data-cuelume-emphasis="subtle"
+      >
         <SliderPrimitive.Fill class="ui-slider-fill" />
         {/* Kobalte renders `calc(NaN%)` until the thumb registers, so the wrapper sets the position.
             Its thumb value text ignores getValueLabel, so the wrapper sets that too,

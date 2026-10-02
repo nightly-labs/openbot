@@ -37,17 +37,29 @@ export const buttonVariants = cva("ui-button", {
 
 export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
 
+/** Cue markers that a caller can set in place of the default tap. */
+const OTHER_CUE_MARKERS = [
+  "data-cuelume-select",
+  "data-cuelume-toggle",
+  "data-cuelume-open",
+  "data-cuelume-close",
+  "data-cuelume-navigate",
+] as const;
+
 type OpenBotButtonProps = VariantProps<typeof buttonVariants> & {
   class?: JSX.HTMLAttributes<HTMLElement>["class"];
   children?: JSX.Element;
   loading?: boolean;
   loadingLabel?: string;
   fullWidth?: boolean;
-};
+} & { [Marker in (typeof OTHER_CUE_MARKERS)[number]]?: string | undefined };
 
 export type ButtonProps<T extends ValidComponent = "button"> = PolymorphicProps<T, ButtonRootProps<T>> &
   OpenBotButtonProps &
   Partial<Pick<ComponentProps<T>, "class">>;
+
+/** Variants for minor actions. With sound feedback on, they play a softer tap than a main action. */
+const quietVariants = new Set<string>(["outline", "secondary", "ghost", "destructive-ghost", "link"]);
 
 export function Button<T extends ValidComponent = "button">(props: ButtonProps<T>): JSX.Element {
   const others = omit(
@@ -74,6 +86,9 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
       data-slot="button"
       data-variant={props.variant ?? "default"}
       data-size={props.size ?? "default"}
+      // bind() reads tap before the other markers, so drop the tap when a caller sets another one.
+      data-cuelume-tap={OTHER_CUE_MARKERS.some((marker) => props[marker] !== undefined) ? undefined : ""}
+      data-cuelume-emphasis={quietVariants.has(props.variant ?? "default") ? "subtle" : undefined}
       disabled={Boolean(props.disabled || props.loading)}
       aria-busy={props.loading ? "true" : undefined}
       {...rootProps}

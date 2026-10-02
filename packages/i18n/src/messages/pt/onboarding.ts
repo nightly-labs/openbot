@@ -82,6 +82,8 @@ export const messages = {
   "onboarding.meet.addToPrompt": "Adicionar ao prompt",
   "onboarding.meet.sendMessage": "Enviar mensagem",
   "onboarding.computer.title": "O OpenBot pode controlar seu computador",
+  "onboarding.sounds.title": "Escolha seus sons",
+  "onboarding.sounds.description": "Sons curtos confirmam o que você faz, como enviar uma mensagem.",
   "onboarding.jobs.title": "Dê uma função a cada agente",
   "onboarding.jobs.description": "Comece com agentes focados e monte a equipe conforme seu trabalho.",
   "onboarding.jobs.example": "Exemplos de funções dos agentes",

@@ -438,6 +438,11 @@
   height: 128%;
 }
 
+.onboarding-sound-picker {
+  width: min(100%, 600px);
+  margin-top: 32px;
+}
+
 .onboarding-error {
   width: min(100%, 480px);
   margin: 12px 0 0;

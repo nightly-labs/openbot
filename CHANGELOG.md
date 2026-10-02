@@ -6,6 +6,109 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-02
+
+### Added
+
+- Your agents can answer in Slack. Open **Server settings → Connectors → Slack**, select **Connect
+  Slack** one time and install OpenBot in your workspace. People mention @OpenBot in a channel or
+  send it a direct message. OpenBot joins every public channel by itself; a private channel needs
+  `/invite @OpenBot`. The connect dialog also
+  adds the Slack Orchestrator, an agent on the model you pick, in a collapsed **Integrations** section of
+  the sidebar: it receives each request, gives the
+  work to the agent that fits best, and posts the answer in the thread. The answer comes in the same thread, can include
+  files, and asks the person who wrote for approval with buttons. Reply `stop` to stop a request.
+  Slack's events reach this computer through OpenBot's Signal service, which checks them and passes
+  them on without storing them, so this needs an OpenBot account and a name for this computer. A
+  hosted server stays awake while Slack is connected.
+- Brazilian Portuguese for the desktop app and web client. Select Português (Brasil) in Settings, or use your system language.
+- More of the desktop app and the web client is in Turkish, including server settings, providers, marketplace, routines, usage and remote desktop.
+- Cline is a provider. Its free models have a limit for each model, and the provider of a free model can use your prompts to train models. Select Download on the Cline row in More providers, then sign in with your Cline account in the browser, or set `CLINE_API_KEY`. Cline agents stay on this computer: team members do not see them.
+- You can run your own account service, Signal and TURN for remote access. Start the app with `OPENBOT_AUTH_API_URL` and `OPENBOT_REMOTE_SIGNAL_URL`. Invitations for your service are `openbot://join` links. See [Self-hosted remote access](https://github.com/nightly-labs/openbot/blob/main/docs/self-hosting.md). ([#1263](https://github.com/nightly-labs/openbot/issues/1263))
+- A Schedule view shows the routines of all agents and channels on a server in a day or week calendar, with past results and planned runs. Open it from the server menu or the command palette.
+- Restart a provider from its menu in Settings, and restart all custom agents from the Custom agents section. OpenBot waits until no agent of that provider works, then starts the provider again and reads its version, sign-in state and models again. Agents of other providers continue to work, and messages sent during the wait run after the restart.
+- Restart OpenBot when no agent works, from Settings > Updates. New routine runs wait until the restart and run after it. When an update is downloaded, the same action installs it.
+- Add sound feedback. When you turn it on, short sounds play across the app: for buttons, switches,
+  tabs and menu choices, for dialogs and menus that open and close, for moves between agents,
+  channels and servers, and for typing. Other sounds tell you that an action worked or failed,
+  that an agent waits for your approval or answer, that a run failed, and that an attachment
+  import finished. Choose Warm, Mechanical, Bubbly or Clicky sounds, or Off, in a new step of the
+  first setup, or in Settings > Notifications on the desktop app and the web app. Click a choice to
+  hear a preview again. It is off by default.
+
+### Changed
+
+- Server settings → Connectors lists GitHub and Slack. Select one to open its page.
+- The logo and the greeting blur a little while the Dynamic Island changes size, as much as the move
+  is large: one slow step of the width setting barely blurs them, and a large move blurs them in
+  full. The logo also gets a little smaller and half closes its eyes, and on a large move rounds its
+  corners a little. The greeting gets a little fainter, and when a large move lands it pops softly.
+  Both are sharp and at rest again as the island settles. With Reduce motion on, none of this
+  happens.
+- Each idle greeting is now a small 3D card that moves once as it shows, and then turns back to
+  itself: the hand waves, turns into heart hands and back; the smile spins like a ball into a grin
+  and back; the raised hands turn to clap twice and turn back raised; and the sparkles light up one
+  star at a time and then shimmer. One greeting hands over to the next with a soft blur, fade and
+  scale. The greeting is a little larger (16px). With Reduce motion on, the greetings do not move.
+- Below 100%, the idle Dynamic Island width now changes with each step of the width setting, from
+  the smallest island at 20% to the default at 100%. Before, the lowest steps gave the same island.
+  On a built-in display with no notch, the smallest idle island is now 84px, with a 16px gap between
+  the logo and the greeting. It was 120px. The same percent can give a different width than before.
+  Beside a physical notch, the width does not change.
+- The notice about different OpenBot versions on a server now says which side to update: OpenBot on the server, or this app. It offers the host update only when the server is the older side.
+- A hosted server now stops about 15 to 30 minutes after your last message, change or typing, also
+  when an app is open. Before, an open app that nobody used kept the server running for 1 hour or
+  more. While the server is asleep, you can still look at it: a moon beside the server name shows that
+  it sleeps. Press a key or click to wake it. Your draft stays.
+
+### Fixed
+
+- A custom ACP agent that is slow to start now shows its models. Model discovery waited only 5 seconds for it. ([#1230](https://github.com/nightly-labs/openbot/issues/1230))
+- The **Open OpenBot** button on the page that Slack returns to after you install OpenBot is now in the
+  middle of the card.
+- A link to a file that an agent edited now opens the file. Before, a link to a file outside the agent's workspace, a link with a line number such as `page.tsx:12`, a `~/` path or a `file://` link showed "not found" or an error. A file outside the workspace opens only for an agent with Full access, and "Open file externally" shows it in the file manager. ([#1240](https://github.com/nightly-labs/openbot/issues/1240))
+- A link to a file that was moved or deleted now says so. Before, it told you to ask the agent to create the file.
+- A long error after a failed provider update ran out of its notification. Now it stays inside, stops after three lines, and "Show details" shows the full text.
+- When the Dynamic Island width or height changes, the logo and the greeting now move with the black
+  island, on the same curve and at the same distance from each edge. Before, they got to their new
+  place first and showed outside the island while it grew.
+- Settings → Dynamic Island → Size: the built-in display preview now draws the island that display
+  shows. On a built-in display with no notch, it no longer draws a notch. Each preview scales so
+  that the widest width fits its frame, and keeps that scale while the setting changes. The
+  preview island hangs below the frame edge, so the edge runs over it.
+- A lower Dynamic Island now has smaller bottom corners (7.9px at 75% height, 14px at 100%), and a
+  higher one larger corners. On an external display the island stays a capsule at every height. At
+  100% height nothing changes.
+- With the Cursor provider connected, the model picker showed no models for any provider. Now the
+  Cursor models load and you can select them. A model with an id that OpenBot cannot use no longer
+  removes the models of all providers.
+- When a custom ACP agent is slow to list its models, OpenBot now closes the session that it opened
+  to read the list. Before, each slow model list kept one idle agent process open until OpenBot quit.
+- When OpenBot stops an ACP agent (because it is idle, to restart it, or at quit), the errors that
+  the agent writes while it stops go to the log. Before, OpenBot showed each of them as a "Provider
+  error" message. When an agent stops on its own, OpenBot still shows its errors.
+- A provider CLI download no longer fails with "another instance is replacing it" when no other OpenBot runs. When another program holds the new files open, OpenBot now waits for a moment, and then tells you to close that program. ([#1264](https://github.com/nightly-labs/openbot/issues/1264))
+- A failed update notification now closes when the CLI is updated later. Retry on a provider row now removes the old error text, and the custom provider row no longer shows a second Retry next to Add. ([#1264](https://github.com/nightly-labs/openbot/issues/1264))
+- On a busy computer, a provider CLI that answers slowly no longer shows as broken. OpenBot now waits 10 seconds for its version, says that it did not answer in time, keeps the last known version, and tries again by itself. ([#1258](https://github.com/nightly-labs/openbot/issues/1258))
+- A provider refresh no longer marks a connected provider as failed while its models stay in the model list. ([#1258](https://github.com/nightly-labs/openbot/issues/1258))
+- A desktop chat no longer shows an empty bubble when an agent ends its turn without an answer, for
+  example after it reads a teammate update that needs no reply. The phone app and channels already
+  hid these rows.
+- Keep OpenCode's free model picker available when a temporary model-discovery failure occurs.
+- On Windows, an agent that starts from a `.cmd` or `.bat` file now gets each argument as written.
+  Before, the command processor split or changed an argument with a space, a quote, `&` or `%`.
+- An agent request that failed no longer shows an `Error handling request {` toast, and the lines under it no longer show as more toasts. The failure shows in the chat with the reason that the agent gave, and the full text goes to the log.
+- Gemini no longer fails with "Download failed" when its first start after the download is slow. OpenBot now waits up to 3 minutes for a CLI that it just installed to start, and onboarding shows why a download or that first start failed.
+- When more than one provider updated at the same time, the update notifications jumped and
+  overlapped. Now they stay in place while the downloads continue.
+- On Windows, a provider CLI install (for example OpenCode or Gemini) no longer fails with "another program has its files open" while Windows Defender scans the new files. OpenBot now waits up to 60 seconds for the scan to end.
+- A custom agent kept its saved model after a restart. Before, a custom agent that started slowly could move its agents to its default model.
+- The Usage panel shows the remaining Grok usage. Before, a Grok account with no use in the current period showed a dash in place of a percentage.
+- A provider row in the Usage panel shows "Loading…" while usage loads, and "Unavailable" with "No limit reported" when the provider reports no limit. Before, both showed a dash.
+- A Claude Code agent no longer shows a `<task-notification>` block as a message from you after
+  OpenBot restarts. These blocks are notices about background tasks. Notices that earlier versions
+  added are removed the next time OpenBot starts.
+
 ## [0.27.0] - 2026-10-01
 
 ### Added

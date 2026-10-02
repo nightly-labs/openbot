@@ -29,6 +29,8 @@ export interface RemoteServerConnectionStatus {
   // connection, so it has to change even when nothing else about the status does.
   connectionSequence: number;
   hostRestart: ServerSummary["hostRestart"];
+  /** A hosted server that the account service stopped for no use, or that it starts now. */
+  hostedSleep: ServerSummary["hostedSleep"];
 }
 
 export interface RemoteConnectionOutcome {

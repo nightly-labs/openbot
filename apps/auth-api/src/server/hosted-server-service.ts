@@ -17,6 +17,7 @@ import {
   type HostedServerList,
   type HostedServerSize,
   type HostedServerState,
+  type HostedServerStatus,
   type HostedServerSummary,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
@@ -398,17 +399,22 @@ export class HostedServerService {
     await this.#finishDelete(await this.#requireRow(serverId));
   }
 
+  /**
+   * The state of a server for its owner or a member. It changes nothing, so a client can ask on each lost
+   * connection whether the server sleeps, and wake it only on the user's next input.
+   */
+  async status(user: AuthUser, serverId: string): Promise<HostedServerStatus> {
+    const row = await this.#requireUsableRow(user, serverId);
+    return {
+      serverId: row.server_id,
+      state: row.observed_state,
+      error: row.observed_error,
+      sleeping: row.desired_state === "idle",
+    };
+  }
+
   async wake(user: AuthUser, serverId: string): Promise<HostedServerSummary> {
-    const row = await this.#database
-      .prepare(
-        `SELECT ${ROW_COLUMNS} FROM hosted_servers h
-         WHERE h.server_id = ? AND h.desired_state != 'deleted' AND (h.owner_user_id = ? OR EXISTS(
-           SELECT 1 FROM remote_memberships m WHERE m.host_id = h.server_id AND m.user_id = ? AND m.status = 'active'
-         ))`,
-      )
-      .bind(serverId, user.id, user.id)
-      .first<HostedServerRow>();
-    if (!row) throw notFound();
+    const row = await this.#requireUsableRow(user, serverId);
     if (row.desired_state === "stopped") {
       throw new HostedServerServiceError(
         402,
@@ -1441,6 +1447,21 @@ export class HostedServerService {
       );
     }
     return { billing: this.#billing };
+  }
+
+  /** A server that is not deleted, of which the user is the owner or an active member. */
+  async #requireUsableRow(user: AuthUser, serverId: string): Promise<HostedServerRow> {
+    const row = await this.#database
+      .prepare(
+        `SELECT ${ROW_COLUMNS} FROM hosted_servers h
+         WHERE h.server_id = ? AND h.desired_state != 'deleted' AND (h.owner_user_id = ? OR EXISTS(
+           SELECT 1 FROM remote_memberships m WHERE m.host_id = h.server_id AND m.user_id = ? AND m.status = 'active'
+         ))`,
+      )
+      .bind(serverId, user.id, user.id)
+      .first<HostedServerRow>();
+    if (!row) throw notFound();
+    return row;
   }
 
   async #requireRow(serverId: string): Promise<HostedServerRow> {

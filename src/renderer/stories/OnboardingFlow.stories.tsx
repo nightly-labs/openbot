@@ -17,6 +17,7 @@ import { createFakeCodeLogin } from "./code-login-fixture";
 import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
+import { createStorySoundFeedback } from "./sound-feedback-fixture";
 
 const setupState: AppSetupState = { completed: false, preferredProvider: null, preferredModel: null };
 
@@ -446,6 +447,11 @@ export const NarrowProviderVersions: Story = {
 
 export const OptionalPermissions: Story = {
   render: (storyArgs) => <MockedOnboardingFlow args={storyArgs} permissions />,
+};
+
+/** Adds the sound feedback step after the computer step. Press Next twice to reach it. */
+export const SoundFeedback: Story = {
+  render: (storyArgs) => <MockedOnboardingFlow args={{ ...storyArgs, soundFeedback: createStorySoundFeedback() }} />,
 };
 
 export const NoProvidersConnected: Story = {

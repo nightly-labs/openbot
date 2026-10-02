@@ -1,5 +1,6 @@
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { onSettled, Show } from "solid-js";
+import { playActionSound } from "../../action-sounds";
 import { useLayout } from "../../layout";
 import { usePlatform } from "../../platform";
 import { useServerActions } from "./server-actions";
@@ -38,7 +39,10 @@ export function WorkspaceServerRail() {
       if (!server) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!server.active) select(server.id);
+      if (server.active) return;
+      // A click on the rail plays its own cue. This key press clicks nothing.
+      playActionSound("navigate");
+      select(server.id);
     };
     window.addEventListener("keydown", handleServerShortcut);
     return () => window.removeEventListener("keydown", handleServerShortcut);

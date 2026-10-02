@@ -47,7 +47,7 @@ export interface BrowserApiServices {
   >;
   /** The stored logo of one host version, or null. The handler checks membership and the version first. */
   hostLogo: (hostId: string, version: string) => Promise<Response | null>;
-  hosting: () => Pick<HostedServerService, "list" | "plans" | "create" | "checkout" | "delete" | "wake">;
+  hosting: () => Pick<HostedServerService, "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "status">;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   /** The billing service, or null when this deployment has no Stripe key. */
   billing: () => Pick<BillingService, "getState" | "createPortal"> | null;
@@ -321,10 +321,11 @@ async function handleHosting(
       201,
     );
   }
-  const [, encodedServerId, action] = /^v2\/hosting\/servers\/([^/]+)(?:\/(wake|checkout))?$/u.exec(path) ?? [];
+  const [, encodedServerId, action] = /^v2\/hosting\/servers\/([^/]+)(?:\/(wake|checkout|status))?$/u.exec(path) ?? [];
   if (encodedServerId === undefined) return null;
   const serverId = decodeURIComponent(encodedServerId);
   if (action === "wake" && request.method === "POST") return json(await services.hosting().wake(user, serverId));
+  if (action === "status" && request.method === "GET") return json(await services.hosting().status(user, serverId));
   if (action === "checkout" && request.method === "POST") {
     return json(await services.hosting().checkout(user, serverId, returnTo));
   }

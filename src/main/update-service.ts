@@ -1,7 +1,13 @@
 import { EventEmitter } from "node:events";
 import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { ScheduledUpdateRestart, UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
+import type {
+  IdleRestart,
+  ScheduledUpdateRestart,
+  UpdateBusyPhase,
+  UpdateFailureCode,
+  UpdateStatus,
+} from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
@@ -170,6 +176,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #downloadedVersion: string | null = null;
   #managedByHost = false;
   #scheduledRestart: ScheduledUpdateRestart | null = null;
+  #idleRestart: IdleRestart | null = null;
   #cancellationToken: UpdateCancellationToken | null = null;
   #checkGeneration = 0;
   #downloadGeneration = 0;
@@ -266,6 +273,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#managedByHost) status.managedByHost = true;
     if (this.#scheduledRestart)
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
+    if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
     return status;
   }
 
@@ -275,6 +283,12 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
    */
   setScheduledRestart(restart: ScheduledUpdateRestart | null): void {
     this.#scheduledRestart = restart ? { ...restart, waitingFor: [...restart.waitingFor] } : null;
+    this.emit("status", this.getStatus());
+  }
+
+  /** Shows the restart that the user of this computer asked for. `IdleRestart` owns it, as above. */
+  setIdleRestart(restart: IdleRestart | null): void {
+    this.#idleRestart = restart ? { ...restart, waitingFor: [...restart.waitingFor] } : null;
     this.emit("status", this.getStatus());
   }
 

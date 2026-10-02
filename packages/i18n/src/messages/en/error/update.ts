@@ -23,4 +23,5 @@ export const messages = defineMessages("error.update", {
   // A joined server's admin reads these from the host.
   "error.update.remoteDisabled": "Updates from server admins are turned off on this computer.",
   "error.update.restartStarted": "OpenBot is already restarting to install the update.",
+  "error.update.alreadyRestarting": "OpenBot is already restarting.",
 });

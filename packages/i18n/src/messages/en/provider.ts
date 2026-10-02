@@ -42,6 +42,8 @@ export const messages = defineMessages("provider", {
   "provider.action.restart": "Restart",
   "provider.action.updateTo": "Update to {version}",
   "provider.action.checkForUpdates": "Check for updates",
+  "provider.action.cancelRestart": "Cancel restart",
+  "provider.restartPending": "Restarts after the current tasks stop",
   "provider.action.install": "Install",
   "provider.action.signIn": "Sign in",
   "provider.action.signInWithCode": "Log in with code",

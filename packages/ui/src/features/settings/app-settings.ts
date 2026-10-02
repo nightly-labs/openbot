@@ -1,5 +1,11 @@
 export type ExternalLinkTarget = "Default browser" | "OpenBot";
 
+/** The sound materials of sound feedback, by their cuelume theme names. */
+export const SOUND_THEMES = ["default", "mech", "bubble", "press"] as const;
+export type SoundTheme = (typeof SOUND_THEMES)[number];
+/** What the sound picker shows: no sounds, or sounds in one theme. */
+export type SoundChoice = "off" | SoundTheme;
+
 export interface GeneralSettingsValue {
   launchAtLogin: boolean;
   keepRunningInBackground: boolean;
@@ -14,6 +20,9 @@ export interface GeneralSettingsValue {
   macBookNotchWidthPercent: number;
   macBookNotchHeightPercent: number;
   taskCompletionSound: boolean;
+  /** Short sounds that confirm the user's own actions, such as a click or a sent message. */
+  soundFeedback: boolean;
+  soundTheme: SoundTheme;
   /**
    * Turbo mode. Agents run commands and change files without asking. Permission grants and site
    * publishing still ask, so this is not the same as "no boundary at all".
@@ -40,6 +49,8 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   macBookNotchWidthPercent: 100,
   macBookNotchHeightPercent: 100,
   taskCompletionSound: true,
+  soundFeedback: false,
+  soundTheme: "default",
   turboMode: false,
   autoDownloadUpdates: true,
   allowRemoteUpdates: true,

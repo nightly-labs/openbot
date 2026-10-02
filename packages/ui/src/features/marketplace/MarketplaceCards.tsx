@@ -65,6 +65,7 @@ function AgentCard(props: { scope: MarketplaceScope; listing: MarketplaceAgentSu
         type="button"
         variant="ghost"
         class="marketplace-hitarea"
+        data-cuelume-tap="navigate"
         ref={(element) => (hit = element)}
         aria-label={t("marketplace.open", { name: props.listing.name })}
         onClick={() => props.scope.nav.go({ kind: "agent", listing: props.listing })}
@@ -102,6 +103,7 @@ function SkillCard(props: { scope: MarketplaceScope; skill: MarketplaceSkillSumm
         type="button"
         variant="ghost"
         class="marketplace-hitarea"
+        data-cuelume-tap="navigate"
         aria-label={t("marketplace.open", { name: props.skill.name })}
         onClick={() => props.scope.nav.go({ kind: "skill", listing: props.skill })}
       />
@@ -216,6 +218,7 @@ export function AppCard(props: { scope: MarketplaceScope; app: MarketplaceApp })
         type="button"
         variant="ghost"
         class="marketplace-hitarea"
+        data-cuelume-tap="navigate"
         aria-label={open()}
         onClick={() => props.scope.nav.go({ kind: "app", id: props.app.id })}
       />

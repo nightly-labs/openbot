@@ -3,10 +3,11 @@ import {
   agentAutoApprovalEnabled,
   type DynamicIslandGeometry,
 } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onSettled } from "solid-js";
+import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
+import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
@@ -63,6 +64,8 @@ const Settings = createSimpleContext({
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
+      soundFeedback: isActionSoundEnabled(),
+      soundTheme: readActionSoundTheme(),
     });
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,
@@ -123,6 +126,9 @@ const Settings = createSimpleContext({
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
         setCompletionSoundEnabled(value.taskCompletionSound);
       }
+      if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
+        setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");
+      }
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);
@@ -151,7 +157,9 @@ const Settings = createSimpleContext({
           .catch(() => {
             setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
             const { t } = currentText();
-            toast.error(previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"));
+            actionToast.error(
+              previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"),
+            );
           })
           .finally(() => setTurboModePending(false));
       }
