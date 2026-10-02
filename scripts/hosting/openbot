@@ -209,9 +209,10 @@ uninstall_command() {
     read -rp "Remove OpenBot from this computer? The data of the user $user stays. [y/N] " reply
     [[ $reply == [yY]* ]] || return 0
   fi
-  # The session then stops on the account server too, not only on this computer.
-  if systemctl is-active --quiet "$UNIT"; then
-    (control POST /v1/logout >/dev/null) || echo "OpenBot did not sign out. Remove the server in the app." >&2
+  # The session then stops on the account server too, and the data keeps no session. A stopped
+  # service starts for it.
+  if ! (systemctl start "$UNIT" && control POST /v1/logout && check_answer); then
+    echo "OpenBot did not sign out. Remove the server in the app." >&2
   fi
   # Waits for an update that runs now.
   exec 9>"$LOCK"
