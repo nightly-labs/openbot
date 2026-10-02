@@ -45,6 +45,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     appSettingsOpen,
     skillsMarketplaceOpen,
     setSkillsMarketplaceOpen,
+    setPendingPluginSlug,
+    setPendingPluginConnect,
     setAgentAutoApprove,
     agentAutoApproves,
     generalSettings,
@@ -215,6 +217,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     <Conversation
       platform={platform.appInfo()?.platform}
       onOpenMarketplace={() => setSkillsMarketplaceOpen(true)}
+      onOpenMarketplaceApp={(request) => {
+        setPendingPluginConnect(request.connect);
+        setPendingPluginSlug(request.appId);
+        setSkillsMarketplaceOpen(true);
+      }}
       onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
       agentStatus={agentStatus()}
       accountUsage={auth.accountUsage()}

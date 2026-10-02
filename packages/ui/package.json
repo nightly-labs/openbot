@@ -84,6 +84,7 @@
     "./features/conversation/AttachmentCards": "./src/features/conversation/AttachmentCards.tsx",
     "./features/conversation/AttachmentReference": "./src/features/conversation/AttachmentReference.tsx",
     "./features/conversation/ChatActionCard": "./src/features/conversation/ChatActionCard.tsx",
+    "./features/conversation/MarketplaceSuggestionCard": "./src/features/conversation/MarketplaceSuggestionCard.tsx",
     "./features/conversation/ChatActionMarker": "./src/features/conversation/ChatActionMarker.tsx",
     "./features/conversation/ChatMessageRow": "./src/features/conversation/ChatMessageRow.tsx",
     "./features/conversation/ChatSearch": "./src/features/conversation/ChatSearch.tsx",

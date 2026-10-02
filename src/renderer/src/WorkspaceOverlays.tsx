@@ -134,7 +134,14 @@ function PermissionsReview(props: AccountProps) {
  * its listing only when its host serves `agent-update-v1`.
  */
 function SkillsMarketplace(props: { githubConnector: GitHubConnectorController | undefined }) {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
+  const {
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    pendingPluginSlug,
+    setPendingPluginSlug,
+    pendingPluginConnect,
+    setPendingPluginConnect,
+  } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
@@ -151,7 +158,11 @@ function SkillsMarketplace(props: { githubConnector: GitHubConnectorController |
       onOpenAgent={selectAgent}
       onAgentInstalled={openInstalledMarketplaceAgent}
       pluginSlug={pendingPluginSlug()}
-      onPluginSlugConsumed={() => setPendingPluginSlug(null)}
+      pluginConnect={pendingPluginConnect()}
+      onPluginSlugConsumed={() => {
+        setPendingPluginSlug(null);
+        setPendingPluginConnect(false);
+      }}
       githubConnector={props.githubConnector}
     />
   );

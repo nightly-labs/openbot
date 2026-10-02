@@ -96,6 +96,8 @@ export type ChatActionMarkerModel =
       timestamp: string;
     }
   | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
+  | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   | {

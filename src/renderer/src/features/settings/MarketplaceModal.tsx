@@ -9,10 +9,16 @@ import { createMarketplaceController, type MarketplaceControllerProps } from "./
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
   /**
-   * The listing an `openbot://plugins/<slug>` link asked for. It opens the app page; it never
-   * connects, so what a link can do is show a user a listing they then decide about.
+   * The listing an `openbot://plugins/<slug>` link or a chat suggestion asked for. It opens the app
+   * page; a link never connects, so what a link can do is show a user a listing they then decide
+   * about.
    */
   initialPluginSlug?: string | undefined;
+  /**
+   * The person pressed Connect for `initialPluginSlug` on a chat suggestion card, so the page starts
+   * the connect step with its sign-in and approval dialogs. An agent cannot set it.
+   */
+  initialPluginConnect?: boolean | undefined;
   /**
    * Runs after the modal consumes `initialPluginSlug`. The owner clears the pending slug there, so
    * a second link to the same listing reads as a new request instead of no change.
@@ -24,21 +30,37 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const nav = createMarketplaceNavigation();
   const controller = createMarketplaceController(props);
+  /** A Connect press for a listing that is not in the apps yet. It runs when the listing arrives. */
+  let connectWhenListed: string | null = null;
+  const startConnect = (slug: string) => {
+    const model = controller.model;
+    const app = model.apps().find((candidate) => candidate.id === slug);
+    if (!app || app.status === "connected") return;
+    // GitHub signs in with a device code, and its page, which is open now, shows that dialog.
+    if (app.kind === "github") model.github?.().onConnect();
+    else if (app.kind === "plugin" && model.canConnectApps()) void model.connectApp(app);
+  };
 
   createEffect(
     () => (props.open ? props.initialPluginSlug : undefined),
     (slug) => {
       if (!slug) return;
+      const connect = untrack(() => props.initialPluginConnect) === true;
       // A link replaces the page on screen.
       nav.reset();
       nav.set((draft) => {
         draft.tab = "apps";
       });
-      if (untrack(() => controller.model.apps().some((app) => app.id === slug))) nav.go({ kind: "app", id: slug });
-      else
+      connectWhenListed = null;
+      if (untrack(() => controller.model.apps().some((app) => app.id === slug))) {
+        nav.go({ kind: "app", id: slug });
+        if (connect) untrack(() => startConnect(slug));
+      } else {
+        connectWhenListed = connect ? slug : null;
         nav.set((draft) => {
           draft.missingApp = slug;
         });
+      }
       // The page holds this listing now, so the owner forgets the link: the same slug arriving
       // again changes the signal from nothing, and this effect runs for it.
       untrack(() => props.onInitialPluginSlugConsumed)?.();
@@ -52,7 +74,11 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       return slug && controller.model.apps().some((app) => app.id === slug) ? slug : null;
     },
     (slug) => {
-      if (slug) nav.go({ kind: "app", id: slug });
+      if (!slug) return;
+      nav.go({ kind: "app", id: slug });
+      if (connectWhenListed !== slug) return;
+      connectWhenListed = null;
+      untrack(() => startConnect(slug));
     },
   );
 

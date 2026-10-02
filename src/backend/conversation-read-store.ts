@@ -6,6 +6,7 @@ import {
   type ConversationReadState,
   type ConversationSnapshot,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
+  MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
@@ -202,6 +203,7 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+      AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') != '${CONTEXT_RESET_ITEM_TYPE}'`;
     const countRow = this.database.connection
       .prepare(
@@ -309,6 +311,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX) &&
+        !message.itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX) &&
         message.itemType !== CONTEXT_RESET_ITEM_TYPE,
     );
   return {

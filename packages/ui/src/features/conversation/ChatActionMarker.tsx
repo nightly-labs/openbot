@@ -438,6 +438,7 @@ const SKILL_ACTION_LABELS = {
 function markerLabel(marker: ChatActionMarkerModel, t: AppTranslate): string {
   if (marker.kind === "unavailable") return marker.label;
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
+  if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
   if (marker.kind === "skill-lifecycle") return t(SKILL_ACTION_LABELS[marker.action]);
   if (marker.kind === "agent-message") {
     if (marker.expectsReply)
@@ -499,7 +500,8 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
 
 function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfile[], t: AppTranslate): string {
   const label = markerLabel(marker, t);
-  if (marker.kind === "unavailable" || marker.kind === "context-reset") return label;
+  if (marker.kind === "unavailable" || marker.kind === "context-reset" || marker.kind === "marketplace-suggestion")
+    return label;
   if (marker.kind === "skill-lifecycle") return t("chat.marker.accessible.named", { label, name: marker.skillName });
   const unavailable = t("chat.marker.unavailableAgent");
   if (marker.kind === "agent-message") {
