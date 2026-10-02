@@ -111,16 +111,17 @@ describe("routine calendar", () => {
     expect(calendar.runs.map(({ at, status }) => [at, status])).toEqual([["2026-10-01T07:00:00.000Z", "succeeded"]]);
   });
 
-  it("stops planning a fast interval at the run limit", async () => {
+  it("plans every run of the shortest interval in the range", async () => {
     const { calendarSource } = source([
-      routine({ kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-10-01T00:00:00.000Z" }),
+      routine({ kind: "interval", amount: 3, unit: "minutes", anchorAt: "2026-10-01T00:00:00.000Z" }),
     ]);
     const calendar = await buildRoutineCalendar(
-      range("2026-10-02T00:00:00.000Z", "2026-10-16T00:00:00.000Z"),
+      range("2026-10-02T00:00:00.000Z", "2026-10-09T00:00:00.000Z"),
       new Date("2026-10-01T00:00:00.000Z"),
       calendarSource,
     );
 
-    expect(calendar.runs).toHaveLength(500);
+    expect(calendar.runs).toHaveLength(7 * 480);
+    expect(calendar.runs.at(-1)?.at).toBe("2026-10-08T23:57:00.000Z");
   });
 });

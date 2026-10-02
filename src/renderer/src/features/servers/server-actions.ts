@@ -67,8 +67,9 @@ export function useServerActions() {
       if (serverId === activeServerId()) return openSchedule(serverId, trigger);
       // The schedule opens agents and channels in the active server, so it shows the active one.
       // The trigger goes with the old server.
+      // A selection can also end without the server, as when a newer selection replaces it.
       void selectServer(serverId).then(
-        () => openSchedule(serverId, null),
+        (selected) => selected && openSchedule(serverId, null),
         (error) => selectFailed(error),
       );
     },

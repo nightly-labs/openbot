@@ -71,6 +71,11 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
 
 export function nextRoutineOccurrence(schedule: RoutineSchedule, timezone: string, after: Date): Date {
   validateRoutineSchedule(schedule, timezone);
+  return nextValidRoutineOccurrence(schedule, timezone, after);
+}
+
+/** For a schedule that `validateRoutineSchedule` accepted: a custom one costs 200 searches to validate. */
+export function nextValidRoutineOccurrence(schedule: RoutineSchedule, timezone: string, after: Date): Date {
   if (schedule.kind === "interval") {
     const duration = intervalMilliseconds(schedule.amount, schedule.unit);
     const anchor = Date.parse(schedule.anchorAt);

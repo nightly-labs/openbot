@@ -3,17 +3,16 @@
 // one give the same source, so both calendars place runs with the same schedule code.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  RoutineCalendar,
-  RoutineCalendarOwner,
-  RoutineCalendarRun,
-  RoutineFields,
-  RoutineRunFields,
+import {
+  ROUTINE_MINIMUM_INTERVAL_MINUTES,
+  type RoutineCalendar,
+  type RoutineCalendarOwner,
+  type RoutineCalendarRun,
+  type RoutineFields,
+  type RoutineRunFields,
 } from "@openbot/contracts/ipc";
-import { nextRoutineOccurrence } from "./routine-schedule";
+import { nextValidRoutineOccurrence, validateRoutineSchedule } from "./routine-schedule";
 
-/** A routine that runs every few minutes would fill the range; the calendar shows a count past this. */
-const MAX_SCHEDULED_RUNS = 500;
 /** A remote host gets one request for each owner and each routine; this many run at the same time. */
 const PARALLEL_REQUESTS = 8;
 
@@ -80,13 +79,22 @@ function routineRuns(
     runs.push({ id: run.id, routineId: routine.id, at: new Date(at).toISOString(), status: run.status });
   }
   // A paused routine keeps its place: the calendar shows the runs it would make if it resumed.
+  try {
+    validateRoutineSchedule(routine.trigger.schedule, routine.timezone);
+  } catch {
+    // A stored schedule that no longer validates fires nothing either; its past runs still show.
+    return runs;
+  }
+  // Valid runs are at least the minimum interval apart, so the range holds no more than this.
+  const maxRuns =
+    Math.ceil((range.to.getTime() - range.from.getTime()) / (ROUTINE_MINIMUM_INTERVAL_MINUTES * 60_000)) + 1;
   let cursor = new Date(Math.max(range.from.getTime() - 1, now.getTime()));
-  for (let count = 0; count < MAX_SCHEDULED_RUNS; count += 1) {
+  for (let count = 0; count < maxRuns; count += 1) {
     let next: Date;
     try {
-      next = nextRoutineOccurrence(routine.trigger.schedule, routine.timezone, cursor);
+      next = nextValidRoutineOccurrence(routine.trigger.schedule, routine.timezone, cursor);
     } catch {
-      // A stored schedule that no longer validates fires nothing either; its past runs still show.
+      // An interval with an anchor that does not parse validates, but has no next run.
       break;
     }
     if (next.getTime() >= range.to.getTime()) break;

@@ -6,7 +6,7 @@ import { useServers } from "../servers/servers-context";
  * The host pane over the middle of the workspace: the usage report or the routine schedule. One
  * state holds both, so each path that uncovers the conversation closes either of them.
  */
-export type HostPaneView = "usage" | "schedule";
+type HostPaneView = "usage" | "schedule";
 
 const context = createSimpleContext({
   name: "UsageProvider",
