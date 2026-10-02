@@ -130,7 +130,9 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     const byDay = new Map<CalendarDay, CalendarEntry[]>();
     for (const entry of entries()) {
       const day = calendarDayOf(new Date(entry.run.at), props.timeZone);
-      byDay.set(day, [...(byDay.get(day) ?? []), entry]);
+      const list = byDay.get(day);
+      if (list) list.push(entry);
+      else byDay.set(day, [entry]);
     }
     return byDay;
   });
@@ -439,7 +441,9 @@ function RoutineCalendarDay(props: RoutineCalendarDayProps) {
     const byHour = new Map<number, CalendarEntry[]>();
     for (const entry of props.entries) {
       const hour = calendarHourOf(new Date(entry.run.at), props.timeZone);
-      byHour.set(hour, [...(byHour.get(hour) ?? []), entry]);
+      const list = byHour.get(hour);
+      if (list) list.push(entry);
+      else byHour.set(hour, [entry]);
     }
     return [...byHour.values()];
   });
