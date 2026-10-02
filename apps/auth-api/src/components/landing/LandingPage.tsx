@@ -14,18 +14,7 @@ import { PricingSection } from "./PricingSection";
 import { SiteHeader } from "./SiteHeader";
 
 export function LandingPage() {
-  let hero: HTMLDivElement | undefined;
-
-  onSettled(() => {
-    const cleanup = landingAnalytics.start(document, window.location.hostname);
-    if (hero) {
-      hero.classList.remove("is-hiding");
-      hero.classList.remove("is-shown");
-      void hero.offsetHeight;
-      hero.classList.add("is-shown");
-    }
-    return cleanup;
-  });
+  onSettled(() => landingAnalytics.start(document, window.location.hostname));
 
   return (
     <div class="landing-page">
@@ -34,8 +23,8 @@ export function LandingPage() {
       <main>
         <section class="landing-hero" aria-labelledby="landing-title">
           <div class="landing-hero-grid" data-slot="hero-grid" aria-hidden="true" />
-          <div ref={hero} class="landing-hero-copy t-stagger">
-            <p class="landing-availability t-stagger-line t-stagger-line--1">
+          <div class="landing-hero-copy">
+            <p class="landing-availability landing-hero-line" style={{ "--landing-hero-line": 0 }}>
               <span class="landing-availability-new">NEW</span>
               <span class="landing-availability-copy">Available on</span>
               <span class="landing-availability-platform">
@@ -58,14 +47,14 @@ export function LandingPage() {
               </span>
             </p>
 
-            <h1 id="landing-title" class="landing-title t-stagger-line t-stagger-line--2">
+            <h1 id="landing-title" class="landing-title landing-hero-line" style={{ "--landing-hero-line": 1 }}>
               {/* The spaces do not render in the flex row. They keep the words apart in
                   the text that search engines read, which was "MeetOpenBot". */}
               <span>Meet</span> <AppLogo variant="production" animation="blink" interactive class="landing-hero-logo" />{" "}
               <span>OpenBot</span>
             </h1>
 
-            <p class="landing-description t-stagger-line t-stagger-line--3">
+            <p class="landing-description landing-hero-line" style={{ "--landing-hero-line": 2 }}>
               Persistent AI teammates on your own computer. Run{" "}
               <span class="landing-provider-item">
                 <span class="landing-provider">
@@ -93,7 +82,7 @@ export function LandingPage() {
               with the plans you already pay for, or your own model.
             </p>
 
-            <div class="landing-actions t-stagger-line t-stagger-line--4">
+            <div class="landing-actions landing-hero-line" style={{ "--landing-hero-line": 3 }}>
               <HeroDownloadSelector />
               <Button
                 href={OPENBOT_LINKS.contact}

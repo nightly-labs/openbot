@@ -36,7 +36,7 @@ export interface SitePluginSkill {
 export const PLUGIN_INDEX_ROUTE = "/plugins";
 export const PLUGIN_DETAIL_ROUTE = "/plugins/$slug";
 
-export const PLUGINS_TITLE = "Plugins — OpenBot";
+export const PLUGINS_TITLE = "OpenBot Plugins: Apps and Tools for Your AI Agents";
 export const PLUGINS_DESCRIPTION =
   "Apps and skills an OpenBot agent can use. Open a plugin in the app, and decide there what it connects to.";
 

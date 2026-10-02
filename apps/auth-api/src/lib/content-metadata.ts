@@ -16,7 +16,14 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
-import { PLUGINS_DESCRIPTION, PLUGINS_TITLE, pluginIndexUrl, pluginUrl, type SitePlugin } from "./plugins";
+import {
+  PLUGINS_DESCRIPTION,
+  PLUGINS_TITLE,
+  pluginIndexUrl,
+  pluginUrl,
+  SITE_PLUGINS,
+  type SitePlugin,
+} from "./plugins";
 import {
   OPENBOT_LOGO_URL,
   OPENBOT_SITE_TITLE,
@@ -246,6 +253,7 @@ export function pluginsIndexHead(siteUrl: string) {
     meta: [
       { title: PLUGINS_TITLE },
       { name: "description", content: PLUGINS_DESCRIPTION },
+      { "script:ld+json": pluginsIndexStructuredData(url, siteUrl) },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
@@ -264,9 +272,26 @@ export function pluginsIndexHead(siteUrl: string) {
   };
 }
 
+/** The index as a list of the plugin pages, as the comparison index is. */
+function pluginsIndexStructuredData(url: string, siteUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: PLUGINS_TITLE,
+    description: PLUGINS_DESCRIPTION,
+    url,
+    itemListElement: SITE_PLUGINS.map((plugin, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: plugin.name,
+      url: pluginUrl(plugin.slug, siteUrl),
+    })),
+  };
+}
+
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
-  const title = `${plugin.name} — OpenBot plugins`;
+  const title = `${plugin.name} Plugin for AI Agents — OpenBot`;
   const description = searchDescription(plugin.description);
 
   return {

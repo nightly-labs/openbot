@@ -15,7 +15,7 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   indexRoute: "/guides",
   articleRoute: "/guides/$slug",
   name: "Guides",
-  indexTitle: "Guides — OpenBot",
+  indexTitle: "OpenBot Guides: How to Run a Team of AI Agents",
   indexDescription:
     "How OpenBot works and how to write about it. Start with OpenBot 101, then use the template guide as the worked example for the next one.",
   feedTitle: "OpenBot guides",

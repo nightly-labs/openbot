@@ -29,8 +29,7 @@ function RootComponent() {
   return <Outlet />;
 }
 
-const NO_SCRIPT_STYLE =
-  "<style>.t-stagger-line{opacity:1;transform:none;filter:none}[data-revealed=false],[data-revealed=false] *{opacity:1!important}</style>";
+const NO_SCRIPT_STYLE = "<style>[data-revealed=false],[data-revealed=false] *{opacity:1!important}</style>";
 
 function RootDocument(props: { children: JSX.Element }) {
   return (
