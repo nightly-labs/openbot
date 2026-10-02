@@ -1774,6 +1774,177 @@ a {
     landing-price-sheen 14s ease-in-out 1260ms infinite alternate;
 }
 
+/* The sections between the hero and the price: what it does, how it starts, and
+   the questions. Same width and heading as the download section. */
+.landing-section {
+  color: var(--openbot-text-primary);
+}
+
+.landing-section-inner {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: clamp(96px, 10vw, 144px) clamp(20px, 4vw, 48px) 0;
+}
+
+.landing-section-heading {
+  max-width: 720px;
+}
+
+.landing-section-heading h2 {
+  margin: 0;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.landing-section-heading p {
+  max-width: 620px;
+  margin: 22px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.landing-features-grid,
+.landing-steps-list {
+  display: grid;
+  gap: 18px;
+  margin: clamp(40px, 5vw, 64px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-features-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.landing-steps-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.landing-feature,
+.landing-step {
+  min-width: 0;
+  padding: clamp(22px, 2.2vw, 28px);
+  border: 1px solid var(--openbot-border);
+  border-radius: 20px;
+  background: var(--openbot-bg-surface);
+}
+
+.landing-feature h3,
+.landing-step h3 {
+  margin: 18px 0 0;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.landing-feature p,
+.landing-step p {
+  margin: 10px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.landing-feature-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--openbot-logo-production);
+}
+
+.landing-step-number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--openbot-border);
+  border-radius: 999px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.landing-faq-body {
+  max-width: 860px;
+  margin-top: clamp(14px, 2vw, 30px);
+}
+
+.landing-compare-links {
+  margin-top: clamp(40px, 5vw, 56px);
+}
+
+.landing-compare-links h3 {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.landing-compare-links ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-compare-links a {
+  display: inline-flex;
+  padding: 8px 14px;
+  border: 1px solid var(--openbot-border);
+  border-radius: 999px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.landing-compare-links a:hover,
+.landing-compare-links a:focus-visible {
+  border-color: var(--openbot-text-muted);
+  color: var(--openbot-text-primary);
+}
+
+.landing-section[data-revealed="false"]
+  :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links) {
+  opacity: 0;
+}
+
+.landing-section[data-revealed="true"]
+  :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links) {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(120ms + var(--landing-index, 0) * 80ms);
+}
+
+.landing-section[data-revealed="true"] .landing-section-heading {
+  animation-delay: 0ms;
+}
+
+@media (max-width: 1100px) {
+  .landing-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .landing-section-inner {
+    padding: 88px 16px 0;
+  }
+
+  .landing-features-grid,
+  .landing-steps-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
 .landing-footer {
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
@@ -2430,6 +2601,12 @@ a {
   }
 
   .landing-pricing [data-revealed] {
+    opacity: 1;
+    animation: none;
+  }
+
+  .landing-section[data-revealed]
+    :is(.landing-section-heading, .landing-feature, .landing-step, .compare-faq-item, .landing-compare-links) {
     opacity: 1;
     animation: none;
   }

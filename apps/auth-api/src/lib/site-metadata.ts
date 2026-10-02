@@ -3,6 +3,8 @@
 // resolve an `?url` specifier. That is why the font asset arrives as an argument
 // from the root route instead of as an import here.
 
+import { LANDING_FAQ_STRUCTURED_DATA } from "./landing-faq";
+
 export const OPENBOT_SITE_URL = "https://openbot.run/";
 export const OPENBOT_SITE_TITLE = "OpenBot: Run a team of AI agents on your computer";
 export const OPENBOT_SITE_DESCRIPTION =
@@ -127,6 +129,7 @@ export function openBotHomeHead() {
       { name: "twitter:description", content: OPENBOT_SITE_DESCRIPTION },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
       { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      { "script:ld+json": LANDING_FAQ_STRUCTURED_DATA },
     ],
     links: [{ rel: "canonical", href: OPENBOT_SITE_URL }],
   };
