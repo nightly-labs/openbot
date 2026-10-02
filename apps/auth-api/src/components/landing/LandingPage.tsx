@@ -9,6 +9,7 @@ import { LandingAppPreview } from "./LandingAppPreview";
 import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
 import { PricingSection } from "./PricingSection";
+import { ProductHuntPill } from "./ProductHuntLaunch";
 import { SiteHeader } from "./SiteHeader";
 
 export function LandingPage() {
@@ -33,28 +34,31 @@ export function LandingPage() {
         <section class="landing-hero" aria-labelledby="landing-title">
           <div class="landing-hero-grid" data-slot="hero-grid" aria-hidden="true" />
           <div ref={hero} class="landing-hero-copy t-stagger">
-            <p class="landing-availability t-stagger-line t-stagger-line--1">
-              <span class="landing-availability-new">NEW</span>
-              <span class="landing-availability-copy">Available on</span>
-              <span class="landing-availability-platform">
-                <PlatformLogo platform="macos" />
-                macOS
-              </span>
-              <span class="landing-availability-separator" aria-hidden="true">
-                ·
-              </span>
-              <span class="landing-availability-platform">
-                <PlatformLogo platform="windows" />
-                Windows
-              </span>
-              <span class="landing-availability-separator" aria-hidden="true">
-                ·
-              </span>
-              <span class="landing-availability-platform">
-                <PlatformLogo platform="linux" />
-                Linux
-              </span>
-            </p>
+            <div class="landing-hero-pills t-stagger-line t-stagger-line--1">
+              <ProductHuntPill />
+              <p class="landing-availability">
+                <span class="landing-availability-new">NEW</span>
+                <span class="landing-availability-copy">Available on</span>
+                <span class="landing-availability-platform">
+                  <PlatformLogo platform="macos" />
+                  macOS
+                </span>
+                <span class="landing-availability-separator" aria-hidden="true">
+                  ·
+                </span>
+                <span class="landing-availability-platform">
+                  <PlatformLogo platform="windows" />
+                  Windows
+                </span>
+                <span class="landing-availability-separator" aria-hidden="true">
+                  ·
+                </span>
+                <span class="landing-availability-platform">
+                  <PlatformLogo platform="linux" />
+                  Linux
+                </span>
+              </p>
+            </div>
 
             <h1 id="landing-title" class="landing-title t-stagger-line t-stagger-line--2">
               <span>Meet</span>
