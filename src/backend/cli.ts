@@ -356,8 +356,9 @@ export function parseCursorManifestVersion(manifest: string): string {
 }
 
 /**
- * The Cline CLI is `cline` on `PATH`, which the npm package `cline` installs. There is no minimum
- * version, as for OpenCode: a user who already has the CLI keeps it.
+ * The Cline CLI is `cline` on `PATH`, which the npm package `cline` installs. A CLI older than
+ * `MINIMUM_CLINE_VERSION` is skipped, so a managed one after it is still used. With no newer CLI,
+ * the outdated one is the error the user sees.
  */
 export async function resolveClineCli(
   input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},

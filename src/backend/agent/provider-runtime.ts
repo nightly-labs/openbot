@@ -54,8 +54,8 @@ import { type CliCodeLogin, startCliCodeLogin } from "./cli-code-login";
 import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
+  createAcpRequestEchoReader,
   ignoredCodexSettings,
-  isAcpRequestEchoDiagnostic,
   isBackgroundRefreshDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
@@ -1850,7 +1850,19 @@ export class ProviderRuntime implements ProviderPort {
     // Taken before `start()`, which is where the CLI reads the endpoint files.
     this.#configRevisions.set(client, this.#hooks.captureConfigRevision());
     this.#hooks.bindClient(client);
+    const readAcpRequestEcho = createAcpRequestEchoReader();
     client.on("diagnostic", (raw, origin) => {
+      const echo = readAcpRequestEcho(raw);
+      if (echo !== undefined) {
+        if (echo !== null) {
+          logger.warn("A provider logged an error that it also sent as a reply.", {
+            provider: client.provider,
+            method: echo.method,
+            message: echo.error === null ? null : shortenDiagnostic(this.#redactMcp(echo.error)),
+          });
+        }
+        return;
+      }
       if (!/error|failed|warning/i.test(raw)) return;
       // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
       // what it sent, so an API key or an inherited credential is in the line that is about to be
@@ -1873,10 +1885,6 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isTelemetryExportDiagnostic(message)) {
         logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
-        return;
-      }
-      if (isAcpRequestEchoDiagnostic(message)) {
-        logger.warn("A provider logged an error that it also sent as a reply.", { provider: client.provider, message });
         return;
       }
       if (isToolCallDiagnostic(message)) {

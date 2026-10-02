@@ -3,8 +3,8 @@ import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot
 
 /**
  * Tells if a peer on this protocol must not see the provider. No protocol knows Cursor (`cursor`) or
- * Cline (`cline`): they stay on this computer. Protocols 1 to 4 do not know Gemini (`antigravity`) or custom ACP
- * agents (`acp`), and protocols 1 to 3 do not know OpenCode.
+ * Cline (`cline`): they stay on this computer. Protocols 1 to 4 do not know Gemini (`antigravity`)
+ * or custom ACP agents (`acp`), and protocols 1 to 3 do not know OpenCode.
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
   return (
@@ -16,10 +16,10 @@ export function isPeerHiddenProvider(value: unknown, protocol: number): boolean 
 }
 
 /**
- * The same test for an object `id`. `acp`, `cursor` and `cline` count only for a provider status row, which
- * has a `state`: a custom endpoint saved with that id before the provider existed is a peer-visible
- * endpoint, also in the `providers` list of a custom endpoint save or delete reply, and it must stay
- * one.
+ * The same test for an object `id`. `acp`, `cursor` and `cline` count only for a provider status
+ * row, which has a `state`: a custom endpoint saved with that id before the provider existed is a
+ * peer-visible endpoint, also in the `providers` list of a custom endpoint save or delete reply, and
+ * it must stay one.
  */
 function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
   const statusRow = listKey === "providers" && typeof value.state === "string";

@@ -47,7 +47,19 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
 }
 
 /**
- * Whether a provider diagnostic is the ACP SDK's copy of an error that the agent also sent back.
+ * The most lines one ACP SDK echo may take. A process that ends inside an echo must not hide the
+ * first records of the next one for long.
+ */
+const ACP_ECHO_LINE_LIMIT = 64;
+
+/** What OpenBot keeps of one echo: the method and the error text, never the request body. */
+export interface AcpRequestEcho {
+  method: string | null;
+  error: string | null;
+}
+
+/**
+ * Reads the ACP SDK's copy of an error that the agent also sent back, one stderr record at a time.
  *
  * An agent built on the TypeScript ACP SDK, such as Cline's CLI, writes `Error handling request`
  * with the request and its error to stderr each time it answers a request with an error. The same
@@ -55,10 +67,53 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
  * answers the model-list session with "Authentication required", and the user met the copy as a
  * "Provider error" toast just after the download. It belongs in the log.
  *
- * Only a request counts. A notification has no reply, so `Error handling notification` stays visible.
+ * The SDK prints both objects over several lines, which reach OpenBot as one record each, so the
+ * reader follows the brackets to the end of the error object. Call it with every record, before any
+ * other filter: a line inside the echo, such as `message: "Internal error",`, reads as an error of
+ * its own. It returns the echo when its last line arrives, `null` while one is still open, and
+ * `undefined` for a record that is not part of one. The request body holds the MCP servers with
+ * their headers and environment, redacted one line at a time without the key above each line, so
+ * only the method and the error text are kept. Only a request counts: a notification has no reply,
+ * so `Error handling notification` stays visible.
  */
-export function isAcpRequestEchoDiagnostic(message: string): boolean {
-  return /^Error handling request\b/.test(message);
+export function createAcpRequestEchoReader(): (record: string) => AcpRequestEcho | null | undefined {
+  let lines = 0;
+  let depth = 0;
+  let method: string | null = null;
+  let error: string | null = null;
+  return (record) => {
+    if (lines === 0 && !/^Error handling request\b/.test(record)) return undefined;
+    lines += 1;
+    // The request object comes first and holds the method; the error object follows it.
+    const field = /^(method|message):\s*"(.*)",?$/.exec(record);
+    if (field?.[1] === "method" && method === null) method = field[2] ?? null;
+    if (field?.[1] === "message" && method !== null) error = field[2] ?? null;
+    depth += bracketBalance(record);
+    if (depth > 0 && lines < ACP_ECHO_LINE_LIMIT) return null;
+    const echo = { method, error };
+    lines = 0;
+    depth = 0;
+    method = null;
+    error = null;
+    return echo;
+  };
+}
+
+/** Opening minus closing brackets in one line, outside double-quoted strings. */
+function bracketBalance(line: string) {
+  let balance = 0;
+  let inString = false;
+  let escaped = false;
+  for (const char of line) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === "{" || char === "[") balance += 1;
+    else if (char === "}" || char === "]") balance -= 1;
+  }
+  return balance;
 }
 
 /**
