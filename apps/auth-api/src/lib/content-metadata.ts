@@ -22,6 +22,7 @@ import {
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
   OPENBOT_SOCIAL_IMAGE_ALT,
+  OPENBOT_SOCIAL_IMAGE_META,
   OPENBOT_SOCIAL_IMAGE_URL,
   OPENBOT_X_HANDLE,
 } from "./site-metadata";
@@ -29,6 +30,27 @@ import {
 /** The generated social cards. Matches what `content-images.ts` writes. */
 const OG_IMAGE_WIDTH = 1200;
 const OG_IMAGE_HEIGHT = 630;
+
+/** Search results cut a description after about this many characters. */
+const SEARCH_DESCRIPTION_LENGTH = 155;
+
+/**
+ * The longest run of whole sentences that a search result shows in full. A first
+ * sentence that is already too long is cut at a word and ends with an ellipsis.
+ */
+export function searchDescription(text: string): string {
+  if (text.length <= SEARCH_DESCRIPTION_LENGTH) return text;
+  let kept = "";
+  for (const sentence of text.match(/[^.!?]+[.!?]+(\s|$)/g) ?? []) {
+    const next = `${kept}${sentence}`;
+    if (next.trimEnd().length > SEARCH_DESCRIPTION_LENGTH) break;
+    kept = next;
+  }
+  if (kept.length > 0) return kept.trimEnd();
+  const cut = text.slice(0, SEARCH_DESCRIPTION_LENGTH - 1);
+  // No dangling "and" or comma before the ellipsis.
+  return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/(?:[\s,;:]+|\s+(?:and|or|to|of|the|a|an|in))+$/, "")}…`;
+}
 
 function articleOgImageAlt(title: string): string {
   return `${title} — OpenBot`;
@@ -49,11 +71,7 @@ export function collectionIndexHead(collection: ContentCollection, siteUrl: stri
       { property: "og:url", content: url },
       { property: "og:title", content: collection.indexTitle },
       { property: "og:description", content: collection.indexDescription },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:type", content: "image/png" },
-      { property: "og:image:width", content: "1600" },
-      { property: "og:image:height", content: "900" },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...OPENBOT_SOCIAL_IMAGE_META,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: collection.indexTitle },
@@ -183,6 +201,22 @@ function articleBreadcrumbData(collection: ContentCollection, article: Collectio
 }
 
 function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
+  // A comparison is a reference page, not a dated post, so the index is a list of them.
+  if (collection.id === "compare") {
+    return {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      name: collection.indexTitle,
+      description: collection.indexDescription,
+      url: collectionIndexUrl(collection, siteUrl),
+      itemListElement: collection.articles.map((article, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: article.title,
+        url: articleUrl(collection, article.slug, siteUrl),
+      })),
+    };
+  }
   return {
     "@context": "https://schema.org",
     "@type": "Blog",
@@ -218,8 +252,7 @@ export function pluginsIndexHead(siteUrl: string) {
       { property: "og:url", content: url },
       { property: "og:title", content: PLUGINS_TITLE },
       { property: "og:description", content: PLUGINS_DESCRIPTION },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...OPENBOT_SOCIAL_IMAGE_META,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: PLUGINS_TITLE },
@@ -234,24 +267,24 @@ export function pluginsIndexHead(siteUrl: string) {
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} — OpenBot plugins`;
+  const description = searchDescription(plugin.description);
 
   return {
     meta: [
       { title },
-      { name: "description", content: plugin.tagline },
+      { name: "description", content: description },
       { "script:ld+json": pluginStructuredData(plugin, siteUrl) },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
       { property: "og:url", content: url },
       { property: "og:title", content: title },
-      { property: "og:description", content: plugin.tagline },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      { property: "og:description", content: description },
+      ...OPENBOT_SOCIAL_IMAGE_META,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
-      { name: "twitter:description", content: plugin.tagline },
+      { name: "twitter:description", content: description },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
       { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
     ],

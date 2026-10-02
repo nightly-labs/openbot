@@ -684,6 +684,14 @@ a {
   }
 }
 
+/* Just above the mobile header, the brand, the full menu and three buttons do
+   not fit in one row. Contact is also in the hero and the footer. */
+@media (min-width: 901px) and (max-width: 1040px) {
+  .site-header-actions > .site-header-contact {
+    display: none;
+  }
+}
+
 /* The header on a narrow screen: the brand, the download button and a menu
    button that opens the sheet. 900px is MOBILE_HEADER_QUERY in SiteMobileMenu. */
 @media (max-width: 900px) {

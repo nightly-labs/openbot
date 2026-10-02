@@ -10,9 +10,20 @@ export const OPENBOT_SITE_DESCRIPTION =
 export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
 /** The account `OPENBOT_LINKS.contact` opens, which a shared card names. */
 export const OPENBOT_X_HANDLE = "@OpenBot_";
+const OPENBOT_X_URL = "https://x.com/OpenBot_";
+const OPENBOT_REPOSITORY_URL = "https://github.com/nightly-labs/openbot";
 /** Square, as schema.org wants for a publisher logo. */
 export const OPENBOT_LOGO_URL = `${OPENBOT_SITE_URL}icon-512x512.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
+
+/** The Open Graph tags of the site's own social card, which is 1600x900. */
+export const OPENBOT_SOCIAL_IMAGE_META = [
+  { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+  { property: "og:image:type", content: "image/png" },
+  { property: "og:image:width", content: "1600" },
+  { property: "og:image:height", content: "900" },
+  { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+] as const;
 
 // The hosts production answers on. Both serve the same pages, and those pages go by
 // openbot.run.
@@ -60,7 +71,24 @@ const OPENBOT_SOFTWARE_APPLICATION = {
     price: "0",
     priceCurrency: "USD",
   },
-  sameAs: ["https://github.com/nightly-labs/openbot"],
+  sameAs: [OPENBOT_REPOSITORY_URL],
+} as const;
+
+// Search engines read these two for the site name and the logo next to a result.
+const OPENBOT_ORGANIZATION = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "OpenBot",
+  url: OPENBOT_SITE_URL,
+  logo: OPENBOT_LOGO_URL,
+  sameAs: [OPENBOT_REPOSITORY_URL, OPENBOT_X_URL],
+} as const;
+
+const OPENBOT_WEBSITE = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "OpenBot",
+  url: OPENBOT_SITE_URL,
 } as const;
 
 export const OPENBOT_SECURITY_HEADERS = {
@@ -110,17 +138,15 @@ export function openBotHomeHead() {
   return {
     meta: [
       { "script:ld+json": OPENBOT_SOFTWARE_APPLICATION },
+      { "script:ld+json": OPENBOT_ORGANIZATION },
+      { "script:ld+json": OPENBOT_WEBSITE },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
       { property: "og:url", content: OPENBOT_SITE_URL },
       { property: "og:title", content: OPENBOT_SITE_TITLE },
       { property: "og:description", content: OPENBOT_SITE_DESCRIPTION },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:type", content: "image/png" },
-      { property: "og:image:width", content: "1600" },
-      { property: "og:image:height", content: "900" },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...OPENBOT_SOCIAL_IMAGE_META,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: OPENBOT_SITE_TITLE },

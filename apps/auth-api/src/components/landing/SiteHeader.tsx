@@ -26,7 +26,7 @@ export function SiteHeader(props: SiteHeaderProps) {
         variant="secondary"
         size="sm"
         icon="contact"
-        class="site-header-secondary"
+        class="site-header-secondary site-header-contact"
       >
         Contact
       </Button>

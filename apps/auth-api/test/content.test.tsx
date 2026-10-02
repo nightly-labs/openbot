@@ -14,7 +14,7 @@ import { COMPARISONS } from "../src/content/compare";
 import { landingAnalytics } from "../src/lib/analytics";
 import { articleGradient } from "../src/lib/article-gradient";
 import { COMPARE_COLLECTION } from "../src/lib/compare";
-import { CONTENT_COLLECTIONS, HEADER_COLLECTIONS } from "../src/lib/content";
+import { CONTENT_COLLECTIONS, HEADER_COLLECTIONS, PROSE_COLLECTIONS } from "../src/lib/content";
 import {
   articleArtPath,
   articlePath,
@@ -110,7 +110,7 @@ function stubMotionPreference(reduced: boolean, finePointer = false): string[] {
 // registry is held to the index, article and not-found behaviour of the ones before
 // it without anyone writing a second copy of these tests. Comparisons have their own
 // pages and their own block below.
-describe.each(HEADER_COLLECTIONS.map((collection) => [collection.name, collection] as const))(
+describe.each(PROSE_COLLECTIONS.map((collection) => [collection.name, collection] as const))(
   "%s",
   (_name, collection) => {
     it("offers every published article as a link to its page", () => {

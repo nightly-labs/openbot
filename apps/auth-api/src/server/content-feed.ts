@@ -34,37 +34,43 @@ function latestPublishedAt(collection: ContentCollection): string {
   return collection.articles[0]?.publishedAt ?? "2026-01-01";
 }
 
-/** The newest date anywhere on the site, for the home page entry. */
-function latestSitePublishedAt(): string {
-  return CONTENT_COLLECTIONS.map(latestPublishedAt).toSorted().at(-1) ?? "2026-01-01";
+/** When an article in the collection last changed: an edit counts, not only a new article. */
+function latestModifiedAt(collection: ContentCollection): string {
+  return (
+    collection.articles
+      .map((article) => article.updatedAt ?? article.publishedAt)
+      .toSorted()
+      .at(-1) ?? "2026-01-01"
+  );
+}
+
+/** The newest change anywhere on the site, for the home page entry. */
+function latestSiteModifiedAt(): string {
+  return CONTENT_COLLECTIONS.map(latestModifiedAt).toSorted().at(-1) ?? "2026-01-01";
 }
 
 export function contentSitemapXml(): string {
   const entries = [
-    { loc: OPENBOT_SITE_URL, lastmod: latestSitePublishedAt(), priority: "1.0" },
+    { loc: OPENBOT_SITE_URL, lastmod: latestSiteModifiedAt() },
     ...CONTENT_COLLECTIONS.flatMap((collection) => [
-      { loc: collectionIndexUrl(collection), lastmod: latestPublishedAt(collection), priority: "0.8" },
+      { loc: collectionIndexUrl(collection), lastmod: latestModifiedAt(collection) },
       ...collection.articles.map((article) => ({
         loc: articleUrl(collection, article.slug),
         lastmod: article.updatedAt ?? article.publishedAt,
-        priority: "0.7",
       })),
     ]),
     /* The plugin pages hold no secret, unlike /join, so they are indexed like any article. Each
        entry's date is the catalog's own, which is what changes when a listing ships. */
-    { loc: pluginIndexUrl(), lastmod: PLUGINS_UPDATED_AT, priority: "0.8" },
-    ...SITE_PLUGINS.map((plugin) => ({
-      loc: pluginUrl(plugin.slug),
-      lastmod: PLUGINS_UPDATED_AT,
-      priority: "0.7",
-    })),
-    { loc: changelogUrl(), lastmod: CHANGELOG_UPDATED_AT, priority: "0.6" },
+    { loc: pluginIndexUrl(), lastmod: PLUGINS_UPDATED_AT },
+    ...SITE_PLUGINS.map((plugin) => ({ loc: pluginUrl(plugin.slug), lastmod: PLUGINS_UPDATED_AT })),
+    { loc: changelogUrl(), lastmod: CHANGELOG_UPDATED_AT },
   ];
 
   const urls = entries
     .map(
       (entry) =>
-        `  <url>\n    <loc>${escapeXml(entry.loc)}</loc>\n    <lastmod>${entry.lastmod}</lastmod>\n    <priority>${entry.priority}</priority>\n  </url>`,
+        // An empty <lastmod> is invalid, and the changelog has none until a release is dated.
+        `  <url>\n    <loc>${escapeXml(entry.loc)}</loc>\n${entry.lastmod ? `    <lastmod>${entry.lastmod}</lastmod>\n` : ""}  </url>`,
     )
     .join("\n");
 

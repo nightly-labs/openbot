@@ -1,0 +1,5 @@
+# Workers static assets read this file. Vite puts a content hash in every name
+# under /assets/, so a changed file always has a new URL and a browser can keep
+# the old one for a year without asking again.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

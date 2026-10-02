@@ -13,5 +13,8 @@ export const CONTENT_COLLECTIONS: readonly ContentCollection[] = [
   COMPARE_COLLECTION,
 ];
 
-/** The collections the header menu offers, in its order. Comparisons are linked from the footer. */
-export const HEADER_COLLECTIONS = [NEWS_COLLECTION, GUIDES_COLLECTION] as const;
+/** The collections whose articles are prose. A comparison is drawn from data instead. */
+export const PROSE_COLLECTIONS = [NEWS_COLLECTION, GUIDES_COLLECTION] as const;
+
+/** The collections the header menu offers, in its order. */
+export const HEADER_COLLECTIONS = [...PROSE_COLLECTIONS, COMPARE_COLLECTION] as const;
