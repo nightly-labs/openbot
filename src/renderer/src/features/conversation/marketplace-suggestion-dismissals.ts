@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import { z } from "zod";
 
-export const MARKETPLACE_SUGGESTION_DISMISSALS_KEY = "openbot:marketplace-suggestion-dismissals:v1";
+const MARKETPLACE_SUGGESTION_DISMISSALS_KEY = "openbot:marketplace-suggestion-dismissals:v1";
 /** The newest dismissals this computer keeps. An older card shows again, which loses nothing. */
 const MAX_DISMISSALS = 200;
 

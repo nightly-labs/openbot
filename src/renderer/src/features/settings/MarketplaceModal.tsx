@@ -4,7 +4,7 @@ import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
 import { McpLocalDialog } from "@openbot/ui/features/settings/McpLocalDialog";
 import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
-import { createEffect, Match, Show, Switch, untrack } from "solid-js";
+import { createEffect, createSignal, Match, Show, Switch, untrack } from "solid-js";
 import { createMarketplaceController, type MarketplaceControllerProps } from "./marketplace-controller";
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
@@ -30,8 +30,11 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const nav = createMarketplaceNavigation();
   const controller = createMarketplaceController(props);
-  /** A Connect press for a listing that is not in the apps yet. It runs when the listing arrives. */
-  let connectWhenListed: string | null = null;
+  /**
+   * A Connect press from a chat card. It runs when the listing is in the apps and their states are
+   * read, so an installed app is not installed again.
+   */
+  const [connectWhenReady, setConnectWhenReady] = createSignal<string | null>(null);
   const startConnect = (slug: string) => {
     const model = controller.model;
     const app = model.apps().find((candidate) => candidate.id === slug);
@@ -45,18 +48,15 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     () => (props.open ? props.initialPluginSlug : undefined),
     (slug) => {
       if (!slug) return;
-      const connect = untrack(() => props.initialPluginConnect) === true;
       // A link replaces the page on screen.
       nav.reset();
       nav.set((draft) => {
         draft.tab = "apps";
       });
-      connectWhenListed = null;
+      setConnectWhenReady(untrack(() => props.initialPluginConnect) === true ? slug : null);
       if (untrack(() => controller.model.apps().some((app) => app.id === slug))) {
         nav.go({ kind: "app", id: slug });
-        if (connect) untrack(() => startConnect(slug));
       } else {
-        connectWhenListed = connect ? slug : null;
         nav.set((draft) => {
           draft.missingApp = slug;
         });
@@ -74,11 +74,27 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       return slug && controller.model.apps().some((app) => app.id === slug) ? slug : null;
     },
     (slug) => {
+      if (slug) nav.go({ kind: "app", id: slug });
+    },
+  );
+
+  createEffect(
+    () => {
+      const slug = connectWhenReady();
+      if (!slug) return null;
+      return controller.appStatesRead() && controller.model.apps().some((app) => app.id === slug) ? slug : null;
+    },
+    (slug) => {
       if (!slug) return;
-      nav.go({ kind: "app", id: slug });
-      if (connectWhenListed !== slug) return;
-      connectWhenListed = null;
+      setConnectWhenReady(null);
       untrack(() => startConnect(slug));
+    },
+  );
+  /* A Connect press ends with the window, so a later open does not connect. */
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open) setConnectWhenReady(null);
     },
   );
 
