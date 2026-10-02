@@ -105,7 +105,10 @@ Threat model:
 
 ## Not confirmed
 
-- Only the Ubuntu 24.04 package names in `packages.txt` are tested. Debian and newer Ubuntu
-  releases can name some packages differently, and then the install stops.
+- The full install runs only on Ubuntu 24.04 in tests. On Debian 12, Debian 13 and Ubuntu 26.04,
+  only the package step is tested (`apt-get --dry-run`). Debian 12 names some libraries without the
+  `t64` suffix, and the install uses those names. Debian 13 and Ubuntu 26.04 have no
+  `libminiupnpc17`, so the install skips it with a warning, and the remote desktop runtime can fail
+  to start there.
 - The full install was not run on a Linux computer before the first release that has the setup
   file. It needs a release build.

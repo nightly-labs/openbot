@@ -76,19 +76,42 @@ newer() {
   [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | tail -n 1)" = "$1" ]
 }
 
+installed_package() {
+  dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null | grep -qx installed
+}
+
+available_package() {
+  local candidate
+  candidate=$(apt-cache policy "$1" 2>/dev/null | sed -n 's/^ *Candidate: *//p')
+  [ -n "$candidate" ] && [ "$candidate" != "(none)" ]
+}
+
 # Installs only the missing packages, so a check that finds nothing new does not use apt.
+# packages.txt has the Ubuntu 24.04 names. Debian 12 names some libraries without the "t64" suffix,
+# and newer releases replace some libraries of the remote desktop runtime. A package that the system
+# does not have is skipped with a warning; then only the feature that uses it can fail.
 install_packages() {
-  local package missing=()
+  local package missing=() available=()
   while read -r package; do
     [[ -z $package || $package == \#* ]] && continue
     [[ $package =~ ^[a-z0-9][a-z0-9.+-]+$ ]] || fail "The package name is not valid: $package"
-    dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null | grep -qx installed || missing+=("$package")
+    installed_package "$package" || installed_package "${package%t64}" || missing+=("$package")
   done <"$1"
   [ "${#missing[@]}" -eq 0 ] && return 0
   # boat keeps the dpkg state, so an install that a stop interrupted must end first.
   dpkg --configure -a
   apt-get -o DPkg::Lock::Timeout=600 update
-  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "${missing[@]}"
+  for package in "${missing[@]}"; do
+    if available_package "$package"; then
+      available+=("$package")
+    elif available_package "${package%t64}"; then
+      available+=("${package%t64}")
+    else
+      echo "This system has no package $package. OpenBot continues without it." >&2
+    fi
+  done
+  [ "${#available[@]}" -eq 0 ] && return 0
+  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "${available[@]}"
   apt-get clean
 }
 
