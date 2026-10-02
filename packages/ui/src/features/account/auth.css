@@ -736,10 +736,13 @@
   white-space: nowrap;
 }
 
-/* The agents that keep a provider on. The row grows to show the whole sentence, because the user
-   must read which agents to change. */
+/* The agents that keep a provider on, on a line of its own below the row and in line with the name.
+   The row grows to show the whole sentence, because the user must read which agents to change. */
 .provider-picker-check-error.provider-picker-used-by {
+  grid-column: 1 / -1;
   overflow: visible;
+  margin-top: -6px;
+  padding: 0 0 8px 66px;
   white-space: normal;
 }
 

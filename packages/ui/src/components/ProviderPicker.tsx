@@ -180,8 +180,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
    */
   let moreChoice: AgentProviderId | "custom" | null = null;
   let focused = false;
-  /** The row whose switch the user tried to turn off while agents use it. */
-  const [refusedOff, setRefusedOff] = createSignal<AgentProviderId | null>(null);
+  /**
+   * The last switch the user tried to turn off while agents use its provider. Each attempt is a new
+   * object, so the message is drawn again and a screen reader announces it again.
+   */
+  const [refusedOff, setRefusedOff] = createSignal<{ provider: AgentProviderId } | null>(null);
 
   /** One custom row; inside group when choosable, after when add-only. */
   const customRow = (engine: () => ProviderPickerOption) => (
@@ -435,17 +438,20 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () => codeSignInOffered() || updateOffered() || restartOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               const off = () => Boolean(option().off);
-              /** The agents named after a refused switch. They go when the agents move to another provider. */
-              const refusedBy = () => {
-                const agents = option().usedBy ?? [];
-                return refusedOff() === option().id && agents.length > 0 ? agents : undefined;
+              /** The refused attempt on this row, until the agents move to another provider. */
+              const refusal = () => {
+                const attempt = refusedOff();
+                return attempt?.provider === option().id && (option().usedBy?.length ?? 0) > 0 ? attempt : undefined;
               };
+              const usedById = () => `${inputId()}-used-by`;
+              /** An off row is not a choice, so it never holds the check. */
+              const checked = () => !off() && checkedProvider() === option().id;
               return (
                 <div
                   class={[
                     "provider-picker-option",
                     {
-                      "provider-picker-option-selected": checkedProvider() === option().id,
+                      "provider-picker-option-selected": checked(),
                       "provider-picker-option-unavailable": !available() || off(),
                       "provider-picker-option-runtime": Boolean(runtimeStatus()),
                       "provider-picker-option-selectable-unavailable":
@@ -465,7 +471,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       type="radio"
                       name={props.ariaLabel}
                       value={option().id}
-                      checked={checkedProvider() === option().id}
+                      checked={checked()}
                       disabled={props.disabled || off() || (!props.allowUnavailableSelection && !available())}
                       onChange={() => props.onChange(option().id)}
                     />
@@ -478,21 +484,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <Show when={off() ? undefined : option().checkError}>
                         {(checkError) => <small class="provider-picker-check-error">{sourceText(checkError())}</small>}
                       </Show>
-                      <Show when={refusedBy()}>
-                        {(agents) => (
-                          <small
-                            id={`${inputId()}-used-by`}
-                            class="provider-picker-check-error provider-picker-used-by"
-                            role="alert"
-                          >
-                            {t("provider.use.inUse", {
-                              count: agents().length,
-                              agents: format.list(agents()),
-                              name: option().name,
-                            })}
-                          </small>
-                        )}
-                      </Show>
                       <Show when={!off() && option().restartPending}>
                         <small class="provider-picker-email" role="status">
                           {t("provider.restartPending")}
@@ -501,34 +492,37 @@ export function ProviderPicker(props: ProviderPickerProps) {
                     </span>
                     {/* Version shares the badge column. */}
                     <span class="provider-picker-state">
-                      <Show when={off()}>
-                        <Badge class="provider-picker-status provider-picker-status-off" tone="neutral" shape="pill">
-                          {t("provider.status.off")}
-                        </Badge>
-                      </Show>
-                      <Show when={!off() && version()}>
-                        {(installed) => <small class="provider-picker-version">{installed()}</small>}
-                      </Show>
-                      {/* Free-tier badge only beside runtime badge. */}
                       <Show
-                        when={
-                          !off() &&
-                          option().id === "opencode" &&
-                          (option().keyStatus === "missing" || option().keyStatus === "unreadable")
+                        when={!off()}
+                        fallback={
+                          <Badge class="provider-picker-status provider-picker-status-off" tone="neutral" shape="pill">
+                            {t("provider.status.off")}
+                          </Badge>
                         }
                       >
-                        <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
-                          {t("provider.key.free")}
-                        </Badge>
-                      </Show>
-                      <Show when={!off() && (runtimeStatus()?.phase !== "not-downloaded" || updatable())}>
-                        <Badge
-                          class={`provider-picker-status provider-picker-status-${visualState()}`}
-                          tone={providerStatusTone(visualState())}
-                          shape="pill"
+                        <Show when={version()}>
+                          {(installed) => <small class="provider-picker-version">{installed()}</small>}
+                        </Show>
+                        {/* Free-tier badge only beside runtime badge. */}
+                        <Show
+                          when={
+                            option().id === "opencode" &&
+                            (option().keyStatus === "missing" || option().keyStatus === "unreadable")
+                          }
                         >
-                          {providerStatusLabel(t, format, state(), connecting(), runtimeStatus(), updatable())}
-                        </Badge>
+                          <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
+                            {t("provider.key.free")}
+                          </Badge>
+                        </Show>
+                        <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
+                          <Badge
+                            class={`provider-picker-status provider-picker-status-${visualState()}`}
+                            tone={providerStatusTone(visualState())}
+                            shape="pill"
+                          >
+                            {providerStatusLabel(t, format, state(), connecting(), runtimeStatus(), updatable())}
+                          </Badge>
+                        </Show>
                       </Show>
                     </span>
                   </label>
@@ -706,12 +700,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         size="sm"
                         class="provider-picker-use"
                         checked={!off()}
-                        disabled={props.disabled}
+                        disabled={props.disabled || props.refreshingProviders}
                         aria-label={t("provider.aria.use", { name: option().name })}
-                        aria-describedby={refusedBy() ? `${inputId()}-used-by` : undefined}
+                        aria-describedby={refusal() ? usedById() : undefined}
                         onChange={(on: boolean) => {
                           if (!on && (option().usedBy?.length ?? 0) > 0) {
-                            setRefusedOff(option().id);
+                            setRefusedOff({ provider: option().id });
                             return;
                           }
                           setRefusedOff(null);
@@ -720,6 +714,17 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       />
                     </Show>
                   </div>
+                  {/* Outside the label: inside it, the message would be part of the radio's name, and
+                    a click on it would choose the provider. */}
+                  <Show when={refusal()} keyed>
+                    <small id={usedById()} class="provider-picker-check-error provider-picker-used-by" role="alert">
+                      {t("provider.use.inUse", {
+                        count: option().usedBy?.length ?? 0,
+                        agents: format.list(option().usedBy ?? []),
+                        name: option().name,
+                      })}
+                    </small>
+                  </Show>
                 </div>
               );
             }}
