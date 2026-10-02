@@ -46,12 +46,6 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
   );
 }
 
-/**
- * The most lines one ACP SDK echo may take. A process that ends inside an echo must not hide the
- * first records of the next one for long.
- */
-const ACP_ECHO_LINE_LIMIT = 64;
-
 /** What OpenBot keeps of one echo: the method and the error text, never the request body. */
 export interface AcpRequestEcho {
   method: string | null;
@@ -73,29 +67,32 @@ export interface AcpRequestEcho {
  * its own. It returns the echo when its last line arrives, `null` while one is still open, and
  * `undefined` for a record that is not part of one. The request body holds the MCP servers with
  * their headers and environment, redacted one line at a time without the key above each line, so
- * only the method and the error text are kept. Only a request counts: a notification has no reply,
- * so `Error handling notification` stays visible.
+ * only the method and the error text are kept. A request with many MCP servers takes many lines, so
+ * the echo has no line limit: it ends when its brackets close, or when the next echo starts. Only a
+ * request counts: a notification has no reply, so `Error handling notification` stays visible.
  */
 export function createAcpRequestEchoReader(): (record: string) => AcpRequestEcho | null | undefined {
-  let lines = 0;
+  let open = false;
   let depth = 0;
   let method: string | null = null;
   let error: string | null = null;
   return (record) => {
-    if (lines === 0 && !/^Error handling request\b/.test(record)) return undefined;
-    lines += 1;
+    const start = /^Error handling request\b/.test(record);
+    if (!open && !start) return undefined;
+    if (start) {
+      open = true;
+      depth = 0;
+      method = null;
+      error = null;
+    }
     // The request object comes first and holds the method; the error object follows it.
     const field = /^(method|message):\s*"(.*)",?$/.exec(record);
     if (field?.[1] === "method" && method === null) method = field[2] ?? null;
     if (field?.[1] === "message" && method !== null) error = field[2] ?? null;
     depth += bracketBalance(record);
-    if (depth > 0 && lines < ACP_ECHO_LINE_LIMIT) return null;
-    const echo = { method, error };
-    lines = 0;
-    depth = 0;
-    method = null;
-    error = null;
-    return echo;
+    if (depth > 0) return null;
+    open = false;
+    return { method, error };
   };
 }
 
