@@ -736,6 +736,13 @@
   white-space: nowrap;
 }
 
+/* The agents that keep a provider on. The row grows to show the whole sentence, because the user
+   must read which agents to change. */
+.provider-picker-check-error.provider-picker-used-by {
+  overflow: visible;
+  white-space: normal;
+}
+
 .provider-picker-option-selected .provider-picker-email {
   color: var(--openbot-text-readable);
 }
