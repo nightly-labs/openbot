@@ -1875,6 +1875,12 @@ sandbox. On a hosted server only, main reads the memory of the machine, and the 
 turns while it is low and limits the turns that run at the same time. See
 [hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
 
+A self-hosted server uses the same Linux build, scripts and units on the owner's own computer, with
+`/opt/OpenBot/hosted/mode` set to `self`. It has no claim: main starts in server mode
+(`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
+a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
+sign-in. See [self-hosted servers](self-hosted-server.md).
+
 ## Shared UI package
 
 `@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,

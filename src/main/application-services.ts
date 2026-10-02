@@ -149,6 +149,7 @@ import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -227,6 +228,7 @@ const TEARDOWN_ORDER = {
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
   hostedServerMemory: 16,
+  serverMode: 17,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -266,6 +268,8 @@ export interface ApplicationServiceContext {
   developmentTestClientEnabled: boolean;
   /** Set only in a hosted server VM. */
   hostedServer: HostedServerEnvironment | null;
+  /** Set only in a self-hosted server that `install-server.sh` installed. */
+  serverMode: ServerModeEnvironment | null;
   /** Set only by `bun run dev --hosting=test`. */
   hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
@@ -318,6 +322,8 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   hostedServers: HostedServerDesktopService;
+  /** The terminal control of a self-hosted server. Null in every other build. */
+  serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -373,6 +379,7 @@ export async function createApplicationServices({
   developmentRemoteRole,
   developmentTestClientEnabled,
   hostedServer,
+  serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   macHapticFeedback,
   teardown,
@@ -1606,6 +1613,35 @@ export async function createApplicationServices({
       hostedServerActivity.stop(),
     );
   }
+  const serverMode = serverModeEnvironment
+    ? new ServerMode({
+        environment: serverModeEnvironment,
+        version: app.getVersion(),
+        centralAuth,
+        host,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      })
+    : null;
+  if (serverMode) {
+    // Without the socket the server still runs, and the log says why nobody can sign it in.
+    await serverMode
+      .listen()
+      .catch((error) => logger.error("The server control socket did not start:", toLogValue(error)));
+    // Nobody presses Retry on a server either. A server that is signed out has nothing to publish.
+    const serverStartRetry = new HostedServerStartRetry({
+      hostPhase: () => host.getStatus().phase,
+      startHost: async () => {
+        if (centralAuth.getState().status === "error") await centralAuth.retry();
+        await serverMode.publish();
+      },
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    serverStartRetry.start();
+    teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
+      serverStartRetry.stop();
+      await serverMode.close();
+    });
+  }
   await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
@@ -1647,6 +1683,7 @@ export async function createApplicationServices({
     hostedSites,
     billing,
     hostedServers,
+    serverMode,
     customProviders,
     customProviderChanges,
     customAgentChanges,

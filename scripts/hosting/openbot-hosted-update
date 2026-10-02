@@ -6,7 +6,9 @@
 #                                 the packages that it needs. OpenBot keeps running.
 #   openbot-hosted-update apply   openbot-update-apply.service, at boot before openbot.service. Copies
 #                                 the staged release into place. boat stop and resume work like a
-#                                 reboot, so a server gets the update at its next wake.
+#                                 reboot, so a server gets the update at its next wake. A self-hosted
+#                                 server seldom reboots, so `openbot update` stops OpenBot, runs
+#                                 `stage` and `apply`, and starts it again.
 #
 # The manifest is the one that the Linux desktop updater reads, so a server trusts the same source as
 # a desktop install. A server only moves to a newer version: an older OpenBot cannot open a database
@@ -22,7 +24,7 @@ LOCK=/run/openbot-update.lock
 SCRATCH=/var/tmp
 # The session of the lazy disk restore that boat runs after a resume.
 RESTORE=/var/lib/ascii-lazy
-HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update)
+HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot)
 UNITS=(openbot.service openbot-update.service openbot-update.timer openbot-update-apply.service)
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor "${HOSTED_FILES[@]}" "${UNITS[@]}")
@@ -164,6 +166,10 @@ install_hosting() {
   rm -f "$INSTALL/hosted/.unit.new"
   if [ "$changed" -eq 1 ]; then systemctl daemon-reload; fi
   systemctl enable --quiet openbot.service openbot-update-apply.service openbot-update.timer
+  # The terminal command of a self-hosted server. A hosted server has no person at a terminal.
+  if [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ]; then
+    ln -sfn "$INSTALL/hosted/openbot" /usr/local/bin/openbot
+  fi
 }
 
 stage() {

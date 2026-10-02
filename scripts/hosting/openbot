@@ -1,0 +1,217 @@
+#!/bin/bash
+# The terminal command of a self-hosted server. openbot-server-setup links it to
+# /usr/local/bin/openbot. It talks to the running OpenBot over the control socket in
+# src/main/server-mode.ts, and to systemd for the service.
+#
+# The socket is in /run/openbot, which only the service user can enter. Run this as that user or
+# with sudo.
+set -euo pipefail
+# shellcheck source=openbot-hosted-update
+source "$(dirname "$(readlink -f "$0")")/openbot-hosted-update"
+umask 077
+
+SOCKET=/run/openbot/control.sock
+UNIT=openbot.service
+
+usage() {
+  cat <<'EOF'
+Usage: openbot <command>
+
+  status                         Show the account and the server.
+  login [<email>] [--name <name>]
+                                 Sign in with a code that OpenBot sends to your email.
+                                 The server then shows in the server list of that account.
+                                 Its name is "OpenBot" when you give no name.
+  logout                         Sign out. The server stops until the next sign-in.
+  name <name>                    Change the server name.
+  logs [-f]                      Show the OpenBot log.
+  start | stop | restart         Control the OpenBot service (sudo).
+  update                         Install the newest release now (sudo).
+  version                        Show the installed version.
+EOF
+}
+
+service_user() {
+  cat "$INSTALL/hosted/service-user" 2>/dev/null || echo openbot
+}
+
+require_root() {
+  [ "$(id -u)" -eq 0 ] || fail "Run this with sudo: sudo openbot $*"
+}
+
+# Waits for the socket after a start. A user that cannot enter /run/openbot never sees it.
+wait_for_socket() {
+  local second
+  for ((second = 0; second < 30; second++)); do
+    [ -S "$SOCKET" ] && return 0
+    systemctl is-active --quiet "$UNIT" || fail "OpenBot is not running. Start it with: sudo openbot start"
+    if [ -d /run/openbot ] && [ ! -x /run/openbot ]; then
+      fail "Run this with sudo, or as the user $(service_user)."
+    fi
+    sleep 1
+  done
+  fail "OpenBot does not answer. Read the log with: openbot logs"
+}
+
+# control <method> <path> [<name>=<value> ...]. Sets `response` to the answer lines and a last
+# `status=<HTTP status>` line.
+control() {
+  local method=$1 path=$2 field arguments=()
+  shift 2
+  for field in "$@"; do arguments+=(--data-urlencode "$field"); done
+  wait_for_socket
+  response=$(curl --silent --show-error --max-time 120 --unix-socket "$SOCKET" -X "$method" \
+    --write-out 'status=%{http_code}\n' "${arguments[@]}" "http://openbot$path") ||
+    fail "OpenBot does not answer. Read the log with: openbot logs"
+}
+
+value() {
+  sed -n "s/^$1=//p" <<<"$response" | head -n 1
+}
+
+# Prints the error of a failed answer and returns 1, or returns 0 for a good answer.
+check_answer() {
+  [ "$(value status)" = 200 ] && return 0
+  local message
+  message=$(value message)
+  if [ -z "$message" ]; then
+    case $(value error) in
+      invalid_email) message="Enter a valid email address." ;;
+      invalid_name) message="Enter a server name." ;;
+      signed_in) message="This server is signed in. To use another account, run: openbot logout" ;;
+      *) message="OpenBot refused the request ($(value error))." ;;
+    esac
+  fi
+  echo "$message" >&2
+  return 1
+}
+
+show_status() {
+  local account server name message staged
+  account=$(value account)
+  server=$(value server)
+  name=$(value server_name)
+  message=$(value server_message)
+  echo "OpenBot $(value version)"
+  case $account in
+    signed_in) echo "Account: $(value email)" ;;
+    signed_out) echo "Account: signed out. Sign in with: openbot login" ;;
+    code_sent) echo "Account: waiting for a sign-in code. Run: openbot login" ;;
+    error) echo "Account: the account server does not answer. $(value account_message)" ;;
+    *) echo "Account: $account" ;;
+  esac
+  if [ -n "$name" ]; then echo "Server: $name ($server)"; else echo "Server: $server"; fi
+  case $server in error | unconfigured) if [ -n "$message" ]; then echo "  $message"; fi ;; esac
+  staged=$(staged_version)
+  if [ -n "$staged" ]; then echo "OpenBot $staged is ready to install. Run: sudo openbot update"; fi
+}
+
+status_command() {
+  control GET /v1/status
+  check_answer || exit 1
+  show_status
+}
+
+login_command() {
+  local email="" name="" challenge code attempt second
+  while [ "$#" -gt 0 ]; do
+    case $1 in
+      --name)
+        [ "$#" -ge 2 ] || fail "Add a name after --name."
+        name=$2
+        shift 2
+        ;;
+      -*) fail "Unknown option: $1" ;;
+      *)
+        email=$1
+        shift
+        ;;
+    esac
+  done
+  control GET /v1/status
+  check_answer || exit 1
+  if [ "$(value account)" = signed_in ]; then
+    show_status
+    return 0
+  fi
+  [ -t 0 ] || fail "Run openbot login in a terminal."
+  if [ -z "$email" ]; then read -rp "Email: " email; fi
+  # With the name, OpenBot refuses a name that it cannot publish before it sends a code.
+  control POST /v1/login/start "email=$email" ${name:+"name=$name"}
+  check_answer || exit 1
+  challenge=$(value challenge)
+  echo "OpenBot sent a sign-in code to $email."
+  for attempt in 1 2 3; do
+    read -rp "Code: " code
+    control POST /v1/login/verify "challenge=$challenge" "code=$code" ${name:+"name=$name"}
+    if check_answer; then break; fi
+    [ "$attempt" -lt 3 ] || exit 1
+  done
+  echo "Signed in as $(value email). Publishing the server..."
+  for ((second = 0; second < 90; second += 2)); do
+    control GET /v1/status
+    case $(value server) in online | error) break ;; esac
+    # Publishing failed before the host started. The start retry tries again every minute.
+    if [ "$(value server)" = unconfigured ] && [ -n "$(value server_message)" ]; then break; fi
+    sleep 2
+  done
+  show_status
+  if [ "$(value server)" = online ]; then
+    echo "Sign in to OpenBot with $email on your computer, phone or https://openbot.run/app to use this server."
+  fi
+}
+
+logs_command() {
+  if [ "${1:-}" = -f ]; then exec journalctl --unit "$UNIT" --follow --lines 100; fi
+  exec journalctl --unit "$UNIT" --lines 200 --no-pager
+}
+
+update_command() {
+  require_root update
+  local before after reply
+  before=$(version_of "$INSTALL/app")
+  "$INSTALL/hosted/openbot-hosted-update" stage
+  after=$(staged_version)
+  if [ -z "$after" ]; then
+    echo "OpenBot $before is the newest release."
+    return 0
+  fi
+  if [ -t 0 ]; then
+    read -rp "Install OpenBot $after now? OpenBot stops for about a minute, and running agent turns stop. [y/N] " reply
+    [[ $reply == [yY]* ]] || return 0
+  fi
+  systemctl stop "$UNIT"
+  "$INSTALL/hosted/openbot-hosted-update" apply
+  systemctl start "$UNIT"
+  echo "Installed OpenBot $(version_of "$INSTALL/app")."
+}
+
+command=${1:-}
+[ "$#" -eq 0 ] || shift
+case $command in
+  status) status_command ;;
+  login) login_command "$@" ;;
+  logout)
+    control POST /v1/logout
+    check_answer || exit 1
+    echo "Signed out. The server is not available until the next sign-in."
+    ;;
+  name)
+    [ "$#" -ge 1 ] || fail "Usage: openbot name <name>"
+    control POST /v1/name "name=$*"
+    check_answer || exit 1
+    show_status
+    ;;
+  logs) logs_command "$@" ;;
+  start | stop | restart)
+    require_root "$command"
+    systemctl "$command" "$UNIT"
+    ;;
+  update) update_command ;;
+  version) version_of "$INSTALL/app" ;;
+  "" | help | --help | -h) usage ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

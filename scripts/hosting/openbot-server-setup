@@ -1,0 +1,68 @@
+#!/bin/bash
+# Installs OpenBot as a self-hosted server. install-server.sh downloads the release, checks it
+# against the release manifest, unpacks it, and runs this file from that release as root:
+#
+#   openbot-server-setup <service-user> <unpacked release> [<account server URL>]
+#
+# It uses the install steps of a hosted server (openbot-hosted-update), with `mode` set to `self`:
+# openbot-hosted-server then starts OpenBot for a terminal sign-in, not for a claim. Run it again to
+# reinstall or upgrade; the data in the home folder of the service user stays.
+set -euo pipefail
+
+SOURCE=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=openbot-hosted-update
+source "$SOURCE/openbot-hosted-update"
+
+[ "$(id -u)" -eq 0 ] || fail "Run this as root."
+[ "$#" -ge 2 ] && [ "$#" -le 3 ] || fail "usage: $0 <service-user> <unpacked release> [<account server URL>]"
+SERVICE_USER=$1
+RELEASE=$2
+AUTH_API_URL=${3:-}
+
+[[ $SERVICE_USER =~ ^[a-z_][a-z0-9_-]*$ ]] && [ "$SERVICE_USER" != root ] || fail "The service user is not valid."
+[ -x "$RELEASE/openbot" ] || fail "The release has no openbot executable."
+if [ -n "$AUTH_API_URL" ]; then
+  [[ $AUTH_API_URL =~ ^https://[^/?#[:space:]]+/?$ ]] || fail "The account server URL must be an HTTPS origin."
+fi
+if [ -f "$INSTALL/hosted/service-user" ] && ! { [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ]; }; then
+  fail "This computer is an OpenBot hosted server. A self-hosted install would replace it."
+fi
+# Agents run shell commands as this user, so it gets a login shell, and no password.
+if ! id "$SERVICE_USER" >/dev/null 2>&1; then
+  useradd --system --create-home --home-dir "/var/lib/$SERVICE_USER" --shell /bin/bash "$SERVICE_USER"
+  echo "Created the user $SERVICE_USER."
+fi
+
+exec 9>"$LOCK"
+flock 9
+install_packages "$SOURCE/packages.txt"
+install -d -m 0755 "$INSTALL" "$INSTALL/hosted"
+recover
+prepare_release "$RELEASE"
+version=$(version_of "$RELEASE")
+[ -n "$version" ] || fail "The release has no version."
+# An older OpenBot cannot open a database that a newer one migrated.
+installed=$(version_of "$INSTALL/app")
+if [ -n "$installed" ] && newer "$installed" "$version"; then
+  fail "OpenBot $installed is installed, and this release has an older version."
+fi
+# The copy below replaces the files that a running OpenBot uses.
+systemctl stop openbot.service 2>/dev/null || true
+stage_release "$RELEASE"
+swap_in
+printf '%s\n' "$SERVICE_USER" >"$INSTALL/hosted/service-user"
+printf 'self\n' >"$INSTALL/hosted/mode"
+chmod 0644 "$INSTALL/hosted/service-user" "$INSTALL/hosted/mode"
+install_hosting "$SOURCE"
+finish_swap
+
+# The keyring that keeps the account session. openbot-hosted-server explains the place.
+install -d -o "$SERVICE_USER" -g "$(id -gn "$SERVICE_USER")" -m 0700 /srv/openbot-hosted
+if [ -n "$AUTH_API_URL" ]; then
+  printf 'OPENBOT_AUTH_API_URL=%s\n' "${AUTH_API_URL%/}" >"$INSTALL/hosted/openbot.env"
+  chmod 0644 "$INSTALL/hosted/openbot.env"
+else
+  rm -f "$INSTALL/hosted/openbot.env"
+fi
+systemctl start openbot.service
+echo "Installed OpenBot $version. It runs as the user $SERVICE_USER."

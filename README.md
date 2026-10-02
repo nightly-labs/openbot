@@ -74,6 +74,19 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
+#### Linux server with no screen
+
+To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with
+systemd), install it from a terminal and sign in with an email code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+sudo openbot login
+```
+
+Then use it from the desktop app, the iPhone app or `openbot.run/app`. See
+[self-hosted servers](docs/self-hosted-server.md) for the options and the `openbot` commands.
+
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
 > warning. Check the release checksum or GitHub build attestation before you run the installer.

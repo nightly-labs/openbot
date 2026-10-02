@@ -26,6 +26,7 @@ const TEMPLATE_FILES = [
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot",
   "openbot-hosted.apparmor",
   "openbot.service",
   "openbot-update.service",
