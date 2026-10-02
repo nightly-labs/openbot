@@ -700,7 +700,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         size="sm"
                         class="provider-picker-use"
                         checked={!off()}
-                        disabled={props.disabled || props.refreshingProviders}
+                        disabled={Boolean(props.disabled || props.refreshingProviders)}
                         aria-label={t("provider.aria.use", { name: option().name })}
                         aria-describedby={refusal() ? usedById() : undefined}
                         onChange={(on: boolean) => {

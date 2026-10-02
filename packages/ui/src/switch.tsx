@@ -9,7 +9,7 @@ export type SwitchSize = "sm" | "default";
 type SwitchAccessibilityProps = {
   "aria-label"?: string;
   "aria-labelledby"?: string;
-  "aria-describedby"?: string;
+  "aria-describedby"?: string | undefined;
 };
 
 type OpenBotSwitchProps = SwitchAccessibilityProps & {
