@@ -14,7 +14,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want your agents on your own computer, with Claude and the other AI plans you already pay for, such as ChatGPT, Gemini or Grok: the app is free and needs no account. Choose Claude Cowork if you use only Claude, and you want an agent in Anthropic's cloud that keeps working with no computer of yours on.",
   chooseOpenBot: [
-    "You want Claude, ChatGPT, Gemini and Grok agents in one team, or your own model.",
+    "You want Claude, ChatGPT, Gemini, Grok and Cursor agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in Anthropic's cloud.",
     "You want a team of agents that give work to each other, each with its own job.",
     "You want a free app that works without an account, and source code that you can read.",
@@ -48,7 +48,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. With no computer to keep on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival: "Cloud sessions keep working when you close your laptop, and scheduled tasks run with no device online.",
     },
     {
@@ -89,7 +89,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       icon: "globe",
       topic: "Where you can use it",
       openbot:
-        "In any country: OpenBot has no region lock. The app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
       rival:
         "In the countries where Anthropic offers Claude, which include the US, the EU, the UK and Switzerland, but not China or Russia. The app is in 11 languages.",
     },
@@ -123,7 +123,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. With no computer to keep on, use a hosted OpenBot server: a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, that keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Claude Cowork sessions run in the cloud by default: the agent loop and the code run on Anthropic's servers, and sessions and files are saved to your Claude account. They keep working when you close your laptop, and scheduled tasks run with no device online. Existing desktop setups can still run sessions locally, in a Linux virtual machine on your computer, but from 6 October 2026, new tasks on Pro and Max run only in the cloud. On Team plans, cloud sessions are on by default; on Enterprise, an owner turns them on.",
       better: "openbot",
@@ -145,7 +145,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
         "Cloud sessions and their files are saved to your Claude account. Local files that a cloud session opens through the desktop app are processed on Anthropic's servers, not only on your computer. On Pro and Max, you can opt out of model training; if you allow it, Anthropic can keep your data for up to 5 years. A deleted conversation leaves Anthropic's storage within 30 days.",
       better: "openbot",
@@ -239,5 +239,5 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

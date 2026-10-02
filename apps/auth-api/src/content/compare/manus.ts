@@ -48,7 +48,7 @@ export const MANUS_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. With no computer to keep on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival:
         "Cloud tasks keep working after you close the app, and scheduled tasks run while you are offline. Tasks on your own computer need it on.",
     },
@@ -90,7 +90,7 @@ export const MANUS_COMPARISON: Comparison = {
       icon: "globe",
       topic: "Where you can use it",
       openbot:
-        "In any country: OpenBot has no region lock. The app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
       rival:
         "Worldwide, except countries under a US embargo, for people 18 and over. Its data is stored in the US and Singapore. The website is in 17 languages.",
     },
@@ -122,7 +122,7 @@ export const MANUS_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. With no computer to keep on, use a hosted OpenBot server: a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, that keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "By default, each Manus task works in a temporary sandbox: a virtual computer with internet access in Manus's cloud. A Cloud Computer that stays on costs $30 or $50 a month more. Cloud tasks and scheduled tasks keep running while you are offline. Since March 2026, the desktop app for macOS and Windows can also let Manus run commands in the folders that you allow on your own computer; those tasks need that computer on.",
       better: "openbot",
@@ -144,7 +144,7 @@ export const MANUS_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
         "Manus stores your data in the US and Singapore. Its privacy policy says that it collects the files of each task, the shell commands the agent runs and their output, and the code. Manus says its model providers do not train on your data. For individual plans, it states no training opt-out, and its terms give Manus a permanent license to use your content, in aggregate, to improve the service. The Team plan says Manus does not train models on your data.",
       better: "openbot",
@@ -238,5 +238,5 @@ export const MANUS_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

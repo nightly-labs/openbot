@@ -14,7 +14,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want a team of agents on your own computer, in any country, with your ChatGPT plan and the other AI plans you already pay for, such as Claude, Gemini or Grok: the app is free and needs no account. Choose ChatGPT dots if you pay for ChatGPT Pro or Business Premium, and you want one always-on agent in OpenAI's cloud.",
   chooseOpenBot: [
-    "You live in the EU, Switzerland or the UK, where ChatGPT Pro does not include dots.",
+    "You live in the European Economic Area, Switzerland or the UK, where ChatGPT Pro does not include dots.",
     "You want ChatGPT, Claude, Gemini, Grok and Cursor agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in OpenAI's cloud.",
     "You want a free app that works without an account, and source code that you can read.",
@@ -47,7 +47,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. With no computer to keep on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival:
         "A dot keeps working on its cloud computer while you are away, and runs reminders and recurring tasks on a schedule.",
     },
@@ -90,7 +90,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
       icon: "globe",
       topic: "Where you can use it",
       openbot:
-        "In any country: OpenBot has no region lock. The app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
       rival:
         "On Pro, in the ChatGPT countries except the European Economic Area, Switzerland and the UK. On Business Premium, in all ChatGPT countries. Only for people 18 and over.",
       better: "openbot",
@@ -112,7 +112,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
     },
   ],
   intro:
-    "Dots are OpenAI's always-on agents in ChatGPT, which started on 29 September 2026. Each dot runs on GPT-6 Astra, has its own cloud computer, learns from your feedback, and works toward your goals around the clock, with more than 4,000 apps through plugins. OpenBot also works with your ChatGPT plan: Codex is one of its agents. The difference is where the agents run, how many work together, and where you can use them. A dot is one agent in OpenAI's cloud, and ChatGPT Pro does not include it in Europe. OpenBot runs a team of agents on your own computer, in any country, with ChatGPT and the other AI plans you choose.",
+    "OpenAI started dots, its always-on agents in ChatGPT, on 29 September 2026. Each dot runs on GPT-6 Astra, has its own cloud computer, learns from your feedback, and works toward your goals around the clock, with more than 4,000 apps through plugins. OpenBot also works with your ChatGPT plan: Codex is one of its agents. The difference is where the agents run, how many work together, and where you can use them. A dot is one agent in OpenAI's cloud, and ChatGPT Pro does not include it in the European Economic Area, Switzerland or the UK. OpenBot runs a team of agents on your own computer, in any country, with ChatGPT and the other AI plans you choose.",
   sections: [
     {
       title: "Models and the plans you pay for",
@@ -125,7 +125,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. With no computer to keep on, use a hosted OpenBot server: a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, that keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Each dot has its own cloud computer at OpenAI, with Linux and Chrome, where it browses, makes files and runs tools. It keeps working there while you are away, and it runs reminders and recurring tasks on a schedule. Access to your own computer is off at the start: you allow it, and revoke it, in the ChatGPT desktop app. A dot can then also use your local browser when its cloud browser is blocked.",
       better: "openbot",
@@ -156,7 +156,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
         "A dot keeps what it learns from chats and connected apps for as long as you keep the dot. You cannot see, change or delete a single memory: only a reset of the dot deletes them, and the files and chats that it made stay. A dot shares memory with ChatGPT. On Business, Enterprise and Edu plans, OpenAI does not train on your data by default; on personal plans, the training setting also covers what a dot does. People at OpenAI can review content even with training off.",
       better: "openbot",
@@ -169,7 +169,7 @@ export const CHATGPT_DOTS_COMPARISON: Comparison = {
         "Yes, if you want your agents on your own computer. Both give you agents that keep working on your goals, and both work with your ChatGPT plan. OpenBot runs a team of agents on your computer, with Codex and the other providers you choose. A dot is one OpenAI agent on a cloud computer at OpenAI.",
     },
     {
-      question: "Can I use ChatGPT dots in Europe?",
+      question: "Can I use ChatGPT dots in the EU or the UK?",
       answer:
         "Not with ChatGPT Pro, for now. Dots started for Pro in the ChatGPT markets except the European Economic Area, Switzerland and the UK, and OpenAI gives no date for them. Business Premium includes dots in all ChatGPT countries. OpenBot has no region lock: it runs on your own computer in any country, and hosted OpenBot servers run in the EU.",
     },

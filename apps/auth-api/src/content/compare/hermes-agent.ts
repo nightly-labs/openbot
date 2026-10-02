@@ -15,7 +15,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     "Both apps run AI agents on your own computer, and neither needs an account. Choose OpenBot if you want Codex, Claude Code, Gemini and Grok CLI to work as a team with the plans you already pay for, including Claude Pro or Max and Google AI Pro, and to reach them from iPhone and Android apps. Choose Hermes Agent if you want an open-source agent under the MIT license that learns skills over time and talks to you in messaging apps such as Telegram or WhatsApp.",
   chooseOpenBot: [
     "You pay for Claude Pro or Max, or Google AI Pro or Ultra, and want your agents to use that plan.",
-    "You want Codex, Claude Code, Gemini and Grok CLI as agents in one team, each with its own job.",
+    "You want Codex, Claude Code, Gemini, Grok CLI and Cursor CLI as agents in one team, each with its own job.",
     "You want iPhone and Android apps that connect to your own computer.",
     "Coworkers must join your agents on one team host, with shared channels and files.",
   ],
@@ -48,7 +48,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. With no computer to keep on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival:
         "Scheduled tasks run on the server or cloud computer that runs Hermes. On a laptop, they stop while Hermes is stopped.",
     },
@@ -91,7 +91,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       icon: "globe",
       topic: "Where you can use it",
       openbot:
-        "In any country: OpenBot has no region lock. The app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
       rival:
         "Anywhere: you run it yourself. Hermes Cloud uses the nearest of 14 locations in Europe, North America, Asia and Australia. The interface is in 17 languages.",
     },
@@ -123,7 +123,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. With no computer to keep on, use a hosted OpenBot server: a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, that keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Hermes Agent runs on your computer, on a server, or in Docker. Its commands can run on that computer, in Docker, over SSH, or in cloud sandboxes such as Modal and Daytona. Hermes Cloud runs it on a computer that Nous Research hosts, for a daily price, and the models and tools it uses cost extra. On a laptop, tasks stop while Hermes is stopped.",
     },
@@ -146,7 +146,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
       rival:
         "Hermes Agent keeps conversations, memory and skills in ~/.hermes on the computer that runs it, with its sessions in SQLite. Nous Research says Hermes Agent collects no telemetry, usage data or analytics, and API calls go only to the provider that you set up.",
     },
@@ -224,5 +224,5 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };
