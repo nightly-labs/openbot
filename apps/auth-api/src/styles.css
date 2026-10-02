@@ -261,11 +261,13 @@ a {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
+  text-decoration: none;
   cursor: pointer;
   transition: color var(--openbot-duration-normal) ease;
 }
 
-.site-nav-trigger[aria-expanded="true"] {
+.site-nav-trigger[aria-expanded="true"],
+.site-nav-trigger[aria-current="page"] {
   color: var(--openbot-text-primary);
 }
 
@@ -277,11 +279,6 @@ a {
 /* A link with no panel: no chevron, so the padding is even on both sides. */
 .site-nav-link {
   padding: 0 14px;
-  text-decoration: none;
-}
-
-.site-nav-link[aria-current="page"] {
-  color: var(--openbot-text-primary);
 }
 
 .site-nav-chevron {

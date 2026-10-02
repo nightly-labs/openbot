@@ -225,8 +225,9 @@ describe("landing header", () => {
       { name: "Plugins", index: PLUGIN_INDEX_ROUTE },
     ];
     for (const section of sections) {
-      const trigger = navigation.getByRole("button", { name: section.name });
-      fireEvent.click(trigger);
+      const trigger = navigation.getByRole("link", { name: section.name });
+      expect(trigger).toHaveAttribute("href", section.index);
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
       flush();
 
       expect(trigger).toHaveAttribute("aria-expanded", "true");

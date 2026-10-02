@@ -7,10 +7,10 @@ import { SiteNavigationPanel } from "./SiteNavigationPanel";
 // The header menu on a wide screen. A Solid port of the Kobra navigation menu
 // (https://kobra.systems/components/navigation-menu), which is React on Base UI.
 //
-// It is a disclosure, not an ARIA menu: every trigger is a button that shows a
-// panel of ordinary links, and each panel sits in the DOM right after its
-// trigger, so Tab walks from a trigger into its open panel and on to the next
-// trigger. A closed panel is inert.
+// It is a disclosure, not an ARIA menu: every trigger is a link to its section's
+// index page, and a hover or ArrowDown shows its panel of ordinary links. Each
+// panel sits in the DOM right after its trigger, so Tab walks from a trigger into
+// its open panel and on to the next trigger. A closed panel is inert.
 //
 // Two things move, and neither is the panel itself:
 // - the pill, which slides behind the trigger under the pointer or focus;
@@ -34,8 +34,6 @@ interface MenuMotion {
 const OPEN_DELAY_MS = 90;
 /** Long enough to cross from a trigger to its panel, or to slip off an edge and come back. */
 const CLOSE_DELAY_MS = 180;
-/** A second press within this time of a hover opening the panel keeps it open. */
-const HOVER_CLICK_GRACE_MS = 400;
 const VIEWPORT_GUTTER_PX = 16;
 
 export function SiteNavigationMenu() {
@@ -50,12 +48,11 @@ export function SiteNavigationMenu() {
   let list: HTMLUListElement | undefined;
   let pill: HTMLSpanElement | undefined;
   let surface: HTMLDivElement | undefined;
-  const triggers = new Map<SectionId, HTMLButtonElement>();
+  const triggers = new Map<SectionId, HTMLAnchorElement>();
   const panels = new Map<SectionId, HTMLDivElement>();
 
   // The open section as of this handler. `active()` catches up a microtask later.
   let current: SectionId | null = null;
-  let openedAt = 0;
   let openTimer: ReturnType<typeof setTimeout> | undefined;
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
   let pillShown = false;
@@ -134,7 +131,6 @@ export function SiteNavigationMenu() {
     if (current === id) return;
     const previous = current;
     current = id;
-    openedAt = performance.now();
 
     if (previous === null) {
       const element = surface;
@@ -201,14 +197,6 @@ export function SiteNavigationMenu() {
     movePill(link);
   }
 
-  function handleTriggerClick(id: SectionId): void {
-    if (current === id && performance.now() - openedAt > HOVER_CLICK_GRACE_MS) {
-      close();
-      return;
-    }
-    open(id);
-  }
-
   function handleKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape" && current !== null) {
       event.preventDefault();
@@ -240,13 +228,13 @@ export function SiteNavigationMenu() {
     close();
   }
 
-  /** A link in a panel leaves the page, or moves within it: either way the menu is done. */
   /** A panel that has finished animating out is off screen, so its artwork stops. */
   function handlePanelAnimationEnd(event: AnimationEvent, id: SectionId): void {
     if (event.target !== event.currentTarget || current === id) return;
     setShown((ids) => ids.filter((shownId) => shownId !== id));
   }
 
+  /** A trigger or a link in a panel leaves the page, or moves within it: either way the menu is done. */
   function handleLinkClick(event: MouseEvent): void {
     if (event.target instanceof Element && event.target.closest("a")) close();
   }
@@ -293,19 +281,18 @@ export function SiteNavigationMenu() {
           <For each={SITE_NAVIGATION_SECTIONS}>
             {(section) => (
               <li class="site-nav-item">
-                <button
-                  ref={(element) => triggers.set(section.id, element)}
+                <Link
+                  ref={(element: HTMLAnchorElement) => triggers.set(section.id, element)}
                   class="site-nav-trigger"
-                  type="button"
+                  to={section.indexRoute}
                   aria-expanded={active() === section.id ? "true" : "false"}
                   aria-controls={panelId(section.id)}
                   onPointerEnter={(event) => handleTriggerPointerEnter(event, section.id)}
                   onPointerLeave={() => clearTimeout(openTimer)}
-                  onClick={() => handleTriggerClick(section.id)}
                 >
                   {section.label}
                   <LandingIcon name="chevron-down" class="site-nav-chevron" />
-                </button>
+                </Link>
                 <div
                   ref={(element) => panels.set(section.id, element)}
                   id={panelId(section.id)}

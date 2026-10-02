@@ -86,7 +86,7 @@ export function LandingFooter() {
         </div>
 
         <div class="landing-footer-bottom" data-revealed={revealState()}>
-          <p>&copy; {currentYear} OpenBot. All rights reserved.</p>
+          <p>&copy; {currentYear} Synthetify Labs, All rights reserved.</p>
           <div class="landing-footer-meta">
             <Link to="/" hash="download">
               <span class="landing-footer-availability" aria-hidden="true" />
