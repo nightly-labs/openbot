@@ -50,19 +50,30 @@ export interface RoutineRunMarkerTransition {
   timestamp: string;
 }
 
+export interface AgentMessageMarkerModel {
+  kind: "agent-message";
+  direction: "incoming" | "outgoing";
+  sourceAgentId: string;
+  targetDeliveries: Array<{ agentId: string; status: QueueDeliveryStatus }>;
+  status: AgentDeliveryMarkerStatus;
+  timestamp: string;
+  messageId: string;
+  replyToMessageId: string | null;
+  /** The sender asked for no answer, so the marker names it as information rather than a request. */
+  expectsReply: boolean;
+}
+
 export type ChatActionMarkerModel =
   | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
+  | AgentMessageMarkerModel
+  /**
+   * Consecutive agent messages, oldest first, drawn as one row. Only the timeline joins them: each
+   * stored message keeps its own marker. `timestamp` is the time of the newest message.
+   */
   | {
-      kind: "agent-message";
-      direction: "incoming" | "outgoing";
-      sourceAgentId: string;
-      targetDeliveries: Array<{ agentId: string; status: QueueDeliveryStatus }>;
-      status: AgentDeliveryMarkerStatus;
+      kind: "agent-message-group";
+      messages: Array<{ id: string; marker: AgentMessageMarkerModel }>;
       timestamp: string;
-      messageId: string;
-      replyToMessageId: string | null;
-      /** The sender asked for no answer, so the marker names it as information rather than a request. */
-      expectsReply: boolean;
     }
   | {
       kind: "routine-lifecycle";

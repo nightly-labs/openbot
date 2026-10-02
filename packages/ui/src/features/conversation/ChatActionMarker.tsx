@@ -20,7 +20,7 @@ import {
   X,
 } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import type {
   AgentProfile,
@@ -56,7 +56,160 @@ const STATUS_LABELS = {
   unavailable: "chat.marker.status.unavailable",
 } as const satisfies Record<ChatActionMarkerStatus, AppTextKey>;
 
+type SingleChatActionMarkerModel = Exclude<ChatActionMarkerModel, { kind: "agent-message-group" }>;
+type AgentMessageGroupMarkerModel = Extract<ChatActionMarkerModel, { kind: "agent-message-group" }>;
+
+function agentMessageGroup(marker: ChatActionMarkerModel): AgentMessageGroupMarkerModel | undefined {
+  return marker.kind === "agent-message-group" ? marker : undefined;
+}
+
+function singleMarker(marker: ChatActionMarkerModel): SingleChatActionMarkerModel | undefined {
+  return marker.kind === "agent-message-group" ? undefined : marker;
+}
+
 export function ChatActionMarker(props: ChatActionMarkerProps) {
+  return (
+    <Show
+      when={agentMessageGroup(props.marker)}
+      fallback={
+        <Show when={singleMarker(props.marker)}>
+          {(marker) => (
+            <SingleChatActionMarker
+              marker={marker()}
+              agents={props.agents}
+              announce={props.announce}
+              onOpenSkill={props.onOpenSkill}
+              routineAvailable={props.routineAvailable}
+              onSelectAgent={props.onSelectAgent}
+              onOpenRoutine={props.onOpenRoutine}
+              onOpenHostedSite={props.onOpenHostedSite}
+            />
+          )}
+        </Show>
+      }
+    >
+      {(group) => (
+        <AgentMessageGroupMarker
+          group={group()}
+          agents={props.agents}
+          announce={props.announce}
+          onSelectAgent={props.onSelectAgent}
+        />
+      )}
+    </Show>
+  );
+}
+
+/**
+ * Consecutive messages to and from other agents, drawn as one row. The row names how many messages
+ * and agents there are, and opens to show each message's own marker.
+ */
+function AgentMessageGroupMarker(props: {
+  group: AgentMessageGroupMarkerModel;
+  agents: AgentProfile[];
+  announce?: boolean;
+  onSelectAgent: (agentId: string) => void;
+}) {
+  const { t, format } = useText();
+  const [expanded, setExpanded] = createSignal(false);
+  // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
+  const [mounted, setMounted] = createSignal(false);
+  const toggle = (): void => {
+    const opening = !expanded();
+    setExpanded(opening);
+    if (opening || prefersReducedMotion()) setMounted(opening);
+  };
+  const listId = createUniqueId();
+  const agentIds = () => [
+    ...new Set(
+      props.group.messages.flatMap(({ marker }) =>
+        marker.direction === "incoming"
+          ? [marker.sourceAgentId]
+          : marker.targetDeliveries.map((delivery) => delivery.agentId),
+      ),
+    ),
+  ];
+  const agents = () => agentIds().map((agentId) => props.agents.find((agent) => agent.id === agentId));
+  const label = () => t("chat.marker.messageGroup", { count: props.group.messages.length });
+  const agentsLabel = () => {
+    const ids = agentIds();
+    if (ids.length !== 1) return t("chat.marker.agentCount", { count: ids.length });
+    return agents()[0]?.name ?? t("chat.marker.unavailableAgent");
+  };
+  return (
+    <Marker
+      class="chat-action-marker chat-action-marker-agent-message chat-action-marker-agent-message-group"
+      role={props.announce ? "status" : "group"}
+      aria-live={props.announce ? "polite" : "off"}
+      aria-label={t("chat.marker.accessible.messageGroup", { label: label(), agents: agentsLabel() })}
+    >
+      <div class="chat-action-marker-summary">
+        <MarkerContent class="chat-action-marker-content">
+          <span class="chat-action-marker-label">{label()}</span>
+          <Button
+            variant="ghost"
+            type="button"
+            class="chat-action-target"
+            style={agentTargetsStyle(agents())}
+            aria-expanded={expanded() ? "true" : "false"}
+            aria-controls={listId}
+            aria-label={
+              expanded()
+                ? t("chat.marker.hideMessages", { count: props.group.messages.length })
+                : t("chat.marker.showMessages", { count: props.group.messages.length })
+            }
+            data-cuelume-tap={expanded() ? "close" : "open"}
+            onClick={toggle}
+          >
+            <span class="chat-action-avatar-stack" aria-hidden="true">
+              <For each={agents().slice(0, 3)}>
+                {(agent) => <AgentAvatar agent={agent} class="chat-action-agent-avatar" />}
+              </For>
+            </span>
+            <span>{agentsLabel()}</span>
+          </Button>
+          <time class="chat-action-marker-time" datetime={props.group.timestamp}>
+            {formatMarkerTime(props.group.timestamp, t, format)}
+          </time>
+        </MarkerContent>
+        <Show when={mounted()}>
+          <div
+            class="chat-action-history-panel"
+            data-state={expanded() ? "open" : "closed"}
+            inert={!expanded()}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget && !expanded()) setMounted(false);
+            }}
+          >
+            <div class="chat-action-history-clip">
+              <ol
+                id={listId}
+                class="chat-action-history chat-action-group-list"
+                aria-label={t("chat.marker.groupMessages")}
+              >
+                <For each={props.group.messages}>
+                  {(entry) => (
+                    <li class="chat-action-history-entry">
+                      <SingleChatActionMarker
+                        marker={entry.marker}
+                        agents={props.agents}
+                        onSelectAgent={props.onSelectAgent}
+                      />
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </div>
+          </div>
+        </Show>
+      </div>
+    </Marker>
+  );
+}
+
+function SingleChatActionMarker(
+  props: Omit<ChatActionMarkerProps, "marker"> & { marker: SingleChatActionMarkerModel },
+) {
   const { t, format } = useText();
   const label = () => markerLabel(props.marker, t);
   const [historyExpanded, setHistoryExpanded] = createSignal(false);
@@ -435,7 +588,7 @@ const SKILL_ACTION_LABELS = {
   installed: "chat.marker.skill.installed",
 } as const satisfies Record<Extract<ChatActionMarkerModel, { kind: "skill-lifecycle" }>["action"], AppTextKey>;
 
-function markerLabel(marker: ChatActionMarkerModel, t: AppTranslate): string {
+function markerLabel(marker: SingleChatActionMarkerModel, t: AppTranslate): string {
   if (marker.kind === "unavailable") return marker.label;
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
   if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
@@ -498,7 +651,7 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
   return mixedColor ? `--chat-action-agent-color: ${mixedColor}` : undefined;
 }
 
-function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfile[], t: AppTranslate): string {
+function markerAccessibleLabel(marker: SingleChatActionMarkerModel, agents: AgentProfile[], t: AppTranslate): string {
   const label = markerLabel(marker, t);
   if (marker.kind === "unavailable" || marker.kind === "context-reset" || marker.kind === "marketplace-suggestion")
     return label;
