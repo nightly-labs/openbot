@@ -183,6 +183,9 @@ export async function readContentArtManifest(): Promise<ContentArtManifest> {
   return manifest;
 }
 
+/** Both formats, so an image left over in the other one is reported and deleted. */
+const CONTENT_ART_FILE = /\.(png|webp)$/;
+
 /** Every image in `CONTENT_ART_DIRECTORY`, as a bundle path. */
 export async function listContentArt(): Promise<string[]> {
   let entries: string[];
@@ -191,5 +194,5 @@ export async function listContentArt(): Promise<string[]> {
   } catch {
     return [];
   }
-  return entries.filter((entry) => entry.endsWith(".png")).map((entry) => entry.split(path.sep).join("/"));
+  return entries.filter((entry) => CONTENT_ART_FILE.test(entry)).map((entry) => entry.split(path.sep).join("/"));
 }

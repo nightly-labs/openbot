@@ -111,9 +111,13 @@ export function articleOgImageUrl(collection: ContentCollection, slug: string, s
 export const CONTENT_ART_SHAPES = ["featured", "card", "article"] as const;
 export type ContentArtShape = (typeof CONTENT_ART_SHAPES)[number];
 
-/** The artwork behind a card. Gradient only: the title sits over it as real text. */
+/**
+ * The artwork behind a card. Gradient only: the title sits over it as real text.
+ * WebP, because a page preloads it as its largest image. The social card stays
+ * PNG for the scrapers that read it.
+ */
 export function articleArtPath(collection: ContentCollection, slug: string, shape: ContentArtShape): string {
-  return `/${collection.id}/art/${shape}/${slug}.png`;
+  return `/${collection.id}/art/${shape}/${slug}.webp`;
 }
 
 // Fixed to UTC on purpose. The Worker renders in UTC and the reader's browser does

@@ -29,6 +29,12 @@ const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
 
+/**
+ * Lossy, for the artwork only: a smooth gradient loses nothing a reader can see,
+ * and the file is about 3% of the PNG. Bump `GENERATOR_VERSION` when this changes.
+ */
+const WEBP_QUALITY = 0.9;
+
 async function renderContentImage(job: ContentImageJob): Promise<string> {
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;left:0;top:0;width:${job.width}px;height:${job.height}px;`;
@@ -70,7 +76,9 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
       drawTitle(context, job);
     }
 
-    return canvas.toDataURL("image/png");
+    return job.fileName.endsWith(".webp")
+      ? canvas.toDataURL("image/webp", WEBP_QUALITY)
+      : canvas.toDataURL("image/png");
   } finally {
     mount.dispose();
     host.remove();
