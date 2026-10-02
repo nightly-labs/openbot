@@ -87,6 +87,16 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(stored.messages);
   });
 
+  it("removes imported Claude task notifications and keeps delivered text", () => {
+    const notice = "<task-notification>\n<status>stopped</status>\n</task-notification>";
+    const delivered: ConversationMessage = {
+      ...message("delivery-1", "user", notice),
+      delivery: { id: "delivery-1", status: "completed", position: 0 },
+    };
+    const stored = snapshot([message("session-notice", "user", notice), delivered]);
+    expect(mergeProviderHistory(stored, snapshot([]), "claude").messages).toEqual([delivered]);
+  });
+
   it("finishes an interrupted Claude answer without adding its imported parts", () => {
     const answer = {
       ...message("turn-1:assistant", "assistant", "Before.Af", "agentMessage"),
