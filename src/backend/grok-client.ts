@@ -91,7 +91,7 @@ function grokRateLimits(value: unknown): AccountRateLimitsReadResult {
 /**
  * Grok's billing service writes proto3 JSON, which omits a zero scalar: a period with no usage yet
  * has no `creditUsagePercent`, and a `$0` Cent arrives as `{}`. The Grok CLI reads both as 0, so a
- * current period with neither the percentage nor the deprecated `monthlyLimit` means 0% used.
+ * current period with no percentage and no deprecated `monthlyLimit` above $0 means 0% used.
  */
 function grokCreditUsagePercent(config: DynamicRecord): number | null {
   if (config.creditUsagePercent !== undefined) {
@@ -100,9 +100,9 @@ function grokCreditUsagePercent(config: DynamicRecord): number | null {
       : null;
   }
   const limit = grokCentValue(config, "monthlyLimit");
-  if (limit === undefined) return 0;
+  if (limit === undefined || limit === 0) return 0;
   const used = grokCentValue(config, "used");
-  if (limit === null || limit <= 0 || used === null) return null;
+  if (limit === null || limit < 0 || used === null) return null;
   return Math.max(0, Math.min(100, ((used ?? 0) / limit) * 100));
 }
 
