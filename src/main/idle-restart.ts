@@ -51,6 +51,11 @@ export class IdleRestart {
   #timer: ReturnType<typeof setTimeout> | null = null;
   /** The restart started. A cancel then would report a restart that happens. */
   #restarting = false;
+  /**
+   * The updater took over the install and stopped the services. The routines stay held, because
+   * this process can only quit or start again, which a later relaunch request still does.
+   */
+  #handedOff = false;
 
   constructor(options: IdleRestartOptions) {
     this.#updater = options.updater;
@@ -65,7 +70,9 @@ export class IdleRestart {
 
   /** A second request replaces the target of the first. */
   request(target: IdleRestartTarget): UpdateStatus {
-    if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
+    if (this.#restarting || this.#updater.getStatus().phase === "installing") {
+      throw new Error(sourceText("error.update.alreadyRestarting"));
+    }
     if (target === "update") {
       const status = this.#updater.getStatus();
       if (status.managedByHost) throw new Error(sourceText("error.update.managedByHost"));
@@ -125,7 +132,10 @@ export class IdleRestart {
     this.#log("Installing the update: no work runs.");
     try {
       await this.#updater.installUpdate();
-      // The updater owns the install from here, and reports its own failure.
+      // The updater owns the install from here, and reports its own failure, which can come after
+      // this returns. A relaunch then stays possible.
+      this.#restarting = false;
+      this.#handedOff = true;
       this.#publish(null);
     } catch (error) {
       // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready.
@@ -139,7 +149,7 @@ export class IdleRestart {
   #end(status: IdleRestartStatus | null): void {
     this.#clearTimer();
     this.#publish(status);
-    if (this.#heldSince) {
+    if (this.#heldSince && !this.#handedOff) {
       this.#heldSince = null;
       this.#recordHold(null);
       this.#releaseRoutines();
