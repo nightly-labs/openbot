@@ -61,6 +61,7 @@ export const messages = {
   "onboarding.next.downloading": "{provider} ainda está sendo baixado.",
   "onboarding.next.finishing": "{provider} ainda está sendo configurado.",
   "onboarding.next.downloadError": "Não foi possível baixar {provider}. Tente baixar novamente para continuar.",
+  "onboarding.next.downloadErrorReason": "{reason} Tente novamente para continuar.",
   "onboarding.next.notDownloaded": "Baixe {provider} para continuar.",
   "onboarding.next.connecting": "{provider} está se conectando.",
   "onboarding.next.connect": "Conecte {provider} para continuar.",

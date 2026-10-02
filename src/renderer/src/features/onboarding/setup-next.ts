@@ -9,7 +9,7 @@ import type { SetupProviders } from "./SetupProviderPicker";
  * flow and the server step both show it.
  */
 export function createSetupNext(providers: SetupProviders) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const selectedOption = () => providers.options().find((candidate) => candidate.id === providers.selectedProvider());
 
   /**
@@ -29,8 +29,14 @@ export function createSetupNext(providers: SetupProviders) {
         return t("onboarding.next.downloading", { provider });
       case "finishing":
         return t("onboarding.next.finishing", { provider });
-      case "download-error":
-        return t("onboarding.next.downloadError", { provider });
+      case "download-error": {
+        // The reason is what a support report needs. A download that worked can still fail here,
+        // when the new CLI does not start.
+        const reason = option.runtimeStatus.message;
+        return reason
+          ? t("onboarding.next.downloadErrorReason", { reason: sourceText(reason) })
+          : t("onboarding.next.downloadError", { provider });
+      }
       case "not-downloaded":
         return t("onboarding.next.notDownloaded", { provider });
       default:

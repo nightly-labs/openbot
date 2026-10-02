@@ -57,6 +57,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.next.downloading": "{provider} is still downloading.",
   "onboarding.next.finishing": "{provider} is still being set up.",
   "onboarding.next.downloadError": "{provider} could not be downloaded. Retry the download to continue.",
+  "onboarding.next.downloadErrorReason": "{reason} Retry to continue.",
   "onboarding.next.notDownloaded": "Download {provider} to continue.",
   "onboarding.next.connecting": "{provider} is connecting.",
   "onboarding.next.connect": "Connect {provider} to continue.",

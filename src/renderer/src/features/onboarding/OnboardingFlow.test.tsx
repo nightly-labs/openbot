@@ -554,11 +554,9 @@ describe("OnboardingFlow", () => {
 
     setRuntimeStatuses((current) => ({
       ...current,
-      codex: { phase: "download-error", progress: null, message: "Network error", version: null },
+      codex: { phase: "download-error", progress: null, message: "The connection was reset.", version: null },
     }));
-    expect(
-      await view.findByText("ChatGPT could not be downloaded. Retry the download to continue."),
-    ).toBeInTheDocument();
+    expect(await view.findByText("The connection was reset. Retry to continue.")).toBeInTheDocument();
     expect(view.getByRole("button", { name: "Retry ChatGPT" })).toBeEnabled();
 
     setRuntimeStatuses((current) => ({

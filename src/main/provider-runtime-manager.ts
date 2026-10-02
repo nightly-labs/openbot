@@ -18,7 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
@@ -40,6 +40,7 @@ import {
 } from "./provider-runtime-releases";
 
 const execFileAsync = promisify(execFile);
+const logger = createOpenBotLogger("provider-runtimes");
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
 /**
  * Everything the store holds. Downloading, staging, verifying, sweeping and freeing disk are the
@@ -827,6 +828,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async #handleDownloadFailure(runtime: ManagedRuntimeId, error: unknown): Promise<void> {
     if (this.#cancelled.has(runtime)) return;
     if (this.#stopping && isAbortError(error)) return;
+    // The screen shows the reason only in the row. A support report then has the log alone.
+    if (!isAbortError(error)) logger.warn(`OpenBot could not install the ${runtime} runtime.`, toLogValue(error));
     const message = isAbortError(error)
       ? sourceText("status.provider.downloadStopped")
       : error instanceof Error
