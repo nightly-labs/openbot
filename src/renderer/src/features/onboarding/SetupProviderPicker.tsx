@@ -450,6 +450,7 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
     if (!props.onDownloadProvider) return;
     keepProviderRows();
     setError("");
+    setProviderErrors((current) => ({ ...current, [provider]: undefined }));
     setProviderSelectedByUser(true);
     setSelectedProvider(provider);
     try {

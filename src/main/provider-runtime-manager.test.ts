@@ -28,9 +28,27 @@ import {
   providerRuntimeRoot,
 } from "./provider-runtime-manager";
 
+/** How many moves of a stage answer the way Windows does while a file inside it is still open. */
+const heldStage = vi.hoisted(() => ({ renames: 0 }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    rename: async (from: Parameters<typeof actual.rename>[0], to: Parameters<typeof actual.rename>[1]) => {
+      if (heldStage.renames > 0 && /[\\/]\.staging-/u.test(String(from))) {
+        heldStage.renames -= 1;
+        throw Object.assign(new Error(`EPERM: operation not permitted, rename '${String(from)}'`), { code: "EPERM" });
+      }
+      await actual.rename(from, to);
+    },
+  };
+});
+
 const roots: string[] = [];
 
 afterEach(async () => {
+  heldStage.renames = 0;
   vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -844,6 +862,38 @@ describe("ProviderRuntimeManager", () => {
     await manager.downloadAndWait("grok");
 
     expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
+  // Windows refuses to move a stage while its version check or an antivirus scan still has the
+  // binary open, with the same codes it gives for an occupied destination. The destination is vacant,
+  // and no other instance exists.
+  it("installs when the staged runtime is held open for a moment", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    // One more than the commit's passes, which used to read each refusal as a sibling's install.
+    heldStage.renames = 3;
+
+    await manager.downloadAndWait("grok");
+
+    expect(heldStage.renames).toBe(0);
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+  });
+
+  it("reports a stage held open, not another instance, when the wait runs out", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    heldStage.renames = Number.POSITIVE_INFINITY;
+
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow(
+      "The runtime could not be installed because another program has its files open. Close it and try again.",
+    );
+
+    expect(manager.getStatus().providers.grok.phase).toBe("download-error");
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
 

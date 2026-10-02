@@ -65,6 +65,8 @@ export const messages = {
     "Le téléchargement de l’environnement d’exécution a échoué au contrôle d’intégrité.",
   "error.provider.runtimeReplacing":
     "Impossible d’installer l’environnement d’exécution, car une autre instance le remplace.",
+  "error.provider.runtimeFilesInUse":
+    "Impossible d’installer l’environnement d’exécution, car un autre programme a ses fichiers ouverts. Fermez-le et réessayez.",
   "error.provider.metadataHttp":
     "Le téléchargement des métadonnées de l’environnement d’exécution a échoué avec HTTP {status}.",
   "error.provider.metadataIntegrity":

@@ -5,6 +5,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readdir, readFile, rename, rm, stat, statfs, utimes, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import {
   isManagedToolRuntime,
@@ -68,6 +69,11 @@ const VERSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  * failing says so rather than looping.
  */
 const COMMIT_ATTEMPTS = 3;
+/**
+ * How long a move waits, in turn, for a file in its source that another program still holds open.
+ * About a second and a half, the same budget Node gives `rm` with `maxRetries: 5`.
+ */
+const HELD_SOURCE_WAITS_MS = [100, 200, 400, 800];
 /**
  * What the sweep collects by age beside the version directories.
  *
@@ -664,7 +670,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (committed) await this.#discardRejected(spec);
       throw error;
     } finally {
-      await rm(staging, { recursive: true, force: true });
+      // Caught, so a stage Windows still holds open cannot replace the error that matters; the sweep
+      // collects what is left by its age.
+      await rm(staging, { recursive: true, force: true, maxRetries: 5 }).catch(() => undefined);
     }
   }
 
@@ -964,16 +972,30 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
  * Moves `from` onto `to`, or reports that something already occupies `to`.
  *
  * POSIX answers an occupied directory with `ENOTEMPTY` or `EEXIST`; Windows answers with `EEXIST`,
- * `EPERM` or `EACCES`, the last two also when a file inside it is open. Every one of them means the
- * same thing here -- the caller has to look at what is there -- and anything else is a real fault.
+ * `EPERM` or `EACCES`, the last two also when a file inside it is open. Those two are also what
+ * Windows answers when a file inside `from` is still open -- the staged CLI that its own version
+ * check has just run, or an antivirus scan of it -- while `to` is vacant. Reading that as occupied
+ * sent the commit looking for an install no one had made, and three empty looks ended in "another
+ * instance is replacing it" on a computer with one instance. So `to` is looked at: present means
+ * occupied, and absent means the source is held, which passes, and is waited for before failing.
  */
-async function renameIfVacant(from: string, to: string): Promise<boolean> {
+async function renameIfVacant(from: string, to: string, attempt = 0): Promise<boolean> {
   try {
     await rename(from, to);
     return true;
   } catch (error) {
-    if (isOccupiedError(error)) return false;
-    throw error;
+    const code = errorCode(error);
+    if (code === "ENOTEMPTY" || code === "EEXIST") return false;
+    if (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") throw error;
+    const occupied = await access(to).then(
+      () => true,
+      () => false,
+    );
+    if (occupied) return false;
+    const wait = HELD_SOURCE_WAITS_MS[attempt];
+    if (wait === undefined) throw new Error(sourceText("error.provider.runtimeFilesInUse"), { cause: error });
+    await delay(wait);
+    return await renameIfVacant(from, to, attempt + 1);
   }
 }
 
@@ -1071,9 +1093,8 @@ async function renameIfPresent(from: string, to: string): Promise<boolean> {
   }
 }
 
-function isOccupiedError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error) || !isString(error.code)) return false;
-  return ["ENOTEMPTY", "EEXIST", "EPERM", "EACCES"].includes(error.code);
+function errorCode(error: unknown): string | null {
+  return error instanceof Error && "code" in error && isString(error.code) ? error.code : null;
 }
 
 async function streamResponse(

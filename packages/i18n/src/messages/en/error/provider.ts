@@ -59,6 +59,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.downloadSize": "The runtime download has an unexpected size.",
   "error.provider.downloadIntegrity": "The runtime download failed its integrity check.",
   "error.provider.runtimeReplacing": "The runtime could not be installed because another instance is replacing it.",
+  "error.provider.runtimeFilesInUse":
+    "The runtime could not be installed because another program has its files open. Close it and try again.",
   "error.provider.metadataHttp": "Runtime metadata download failed with HTTP {status}.",
   "error.provider.metadataIntegrity": "Runtime metadata failed its integrity check.",
   "error.provider.diskSpace": "There is not enough free disk space for this provider.",

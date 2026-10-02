@@ -239,10 +239,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             {t("common.add")}
           </Button>
         </Show>
-        {/* Same OpenCode runtime fetch unblocks Add. */}
+        {/* Same OpenCode runtime fetch unblocks Add. Once Add shows, the OpenCode row keeps its own Retry. */}
         <Show
           when={(() => {
             if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
+            if (customReady()) return undefined;
             const engineOption = engine();
             const runtime = engineOption.runtimeStatus;
             if (!runtime) return undefined;

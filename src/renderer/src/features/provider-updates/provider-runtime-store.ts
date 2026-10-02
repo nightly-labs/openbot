@@ -60,6 +60,12 @@ export function createProviderRuntimeStore(
   const [providerRuntimeSnapshot, setProviderRuntimeSnapshot] =
     createSignal<ProviderRuntimeSnapshot>(FALLBACK_PROVIDER_RUNTIMES);
   const updating = new Set<AgentProviderId>();
+  /**
+   * Providers whose notification says the update failed. A failure is held on screen, and nothing
+   * reports to it once the update has let go of it, so it is taken down here when a later snapshot
+   * shows the runtime current: a sibling instance installed it, or a Retry elsewhere did.
+   */
+  const failed = new Set<AgentProviderId>();
   /** What the user was last told about, so one offer is not announced twice. */
   let announced: ProviderUpdate[] = [];
   let disposed = false;
@@ -117,6 +123,7 @@ export function createProviderRuntimeStore(
   async function checkProviderUpdates(provider: AgentProviderId): Promise<void> {
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.unavailable"));
+    failed.delete(provider);
     showProviderUpdateToast({ ...providerUpdate(provider), checking: true }, () => {});
     applyFrom(source, await source.checkForUpdates());
     if (disposed || source !== api()) return;
@@ -143,6 +150,7 @@ export function createProviderRuntimeStore(
       },
       () => void startProviderUpdate(provider),
     );
+    failed.add(provider);
   }
 
   /** Revisioned, because the pushed event and the awaited call can land out of order. */
@@ -175,7 +183,19 @@ export function createProviderRuntimeStore(
       if (update.runtime.phase === "not-downloaded" || (update.runtime.phase === "ready" && update.availableVersion))
         continue;
       reportProviderUpdateToast(update, () => void downloadProviderRuntime(provider));
+      if (update.runtime.phase === "download-error") failed.add(provider);
       if (update.runtime.phase !== "downloading" && update.runtime.phase !== "finishing") updating.delete(provider);
+    }
+    for (const provider of failed) {
+      if (updating.has(provider) || !isManagedRuntimeProvider(provider)) continue;
+      const previous = current.providers[provider];
+      const next = snapshot.providers[provider];
+      // Only the crossing into a current runtime: a failed check leaves a runtime that was ready
+      // ready, and the next unrelated snapshot must not take that failure away.
+      if (next.phase !== "ready" || next.availableVersion) continue;
+      if (previous.phase === "ready" && previous.version === next.version) continue;
+      failed.delete(provider);
+      hideProviderUpdateToast(provider);
     }
   }
 
@@ -193,6 +213,7 @@ export function createProviderRuntimeStore(
     const isUpdate = update.availableVersion !== null;
     if (isUpdate) {
       updating.add(provider);
+      failed.delete(provider);
       showProviderUpdateToast(
         { ...update, runtime: { ...update.runtime, phase: "downloading", progress: 0 } },
         () => void downloadProviderRuntime(provider),
@@ -223,6 +244,7 @@ export function createProviderRuntimeStore(
             },
             () => void downloadProviderRuntime(provider),
           );
+        failed.add(provider);
         return;
       }
       throw error;
@@ -276,6 +298,7 @@ export function createProviderRuntimeStore(
     if (previous !== undefined) {
       // Another computer: its revisions count from its own start, and nothing shown so far is its.
       updating.clear();
+      failed.clear();
       for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
       setProviderRuntimeSnapshot(FALLBACK_PROVIDER_RUNTIMES);
     }

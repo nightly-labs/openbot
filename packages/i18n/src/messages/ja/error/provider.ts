@@ -60,6 +60,8 @@ export const messages = {
   "error.provider.downloadSize": "ランタイムのダウンロードのサイズが予期しないものです。",
   "error.provider.downloadIntegrity": "ランタイムのダウンロードが整合性チェックに失敗しました。",
   "error.provider.runtimeReplacing": "別のインスタンスがランタイムを置き換えているため、インストールできませんでした。",
+  "error.provider.runtimeFilesInUse":
+    "別のプログラムがランタイムのファイルを開いているため、インストールできませんでした。そのプログラムを閉じてから、もう一度お試しください。",
   "error.provider.metadataHttp": "ランタイムのメタデータのダウンロードが HTTP {status} で失敗しました。",
   "error.provider.metadataIntegrity": "ランタイムのメタデータが整合性チェックに失敗しました。",
   "error.provider.diskSpace": "このプロバイダーに必要な空きディスク容量が足りません。",
