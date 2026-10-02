@@ -194,6 +194,9 @@ export class RemoteTeamDirectoryClient {
       token: "x".repeat(32),
     };
     createInviteUrl(payload, this.#inviteLinks);
+    // The account service sends only an openbot.run link, and a self-hosted invitation is not one.
+    if (input.email && selfHostedApiOrigin(payload.apiUrl))
+      throw new Error(sourceText("error.remote.selfHostedInviteNoEmail"));
     const value = await this.#request(`/v2/remote/hosts/${encodeURIComponent(host.hostId)}/invites`, {
       method: "POST",
       body: input,

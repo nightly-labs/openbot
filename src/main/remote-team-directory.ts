@@ -150,6 +150,9 @@ export class RemoteTeamDirectory {
       // The invitation URL carries the host fingerprint, so a host nobody has connected to yet has
       // nothing to put in it and the invitation would be unverifiable.
       if (!server.fingerprint) throw new Error(sourceText("error.remote.inviteNeedsConnection"));
+      // The account service sends only an openbot.run link, and a self-hosted invitation is not one.
+      if (input.email && selfHostedApiOrigin(transport.controlPlaneUrl))
+        throw new Error(sourceText("error.remote.selfHostedInviteNoEmail"));
       const invite = await transport.createInvite(serverId, input);
       const result: InviteSummary = {
         id: invite.inviteId,

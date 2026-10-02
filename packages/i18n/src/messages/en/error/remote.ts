@@ -116,6 +116,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.pairedIdentityChanged":
     "The paired desktop identity is missing or changed. Scan a new code from that desktop.",
   "error.remote.permanentInviteNoEmail": "Permanent invitations cannot be sent by email.",
+  "error.remote.selfHostedInviteNoEmail":
+    "An invitation from a self-hosted account service cannot be sent by email. Copy the link.",
   "error.remote.inviteOtherService": "This invitation belongs to another OpenBot service.",
   "error.remote.inviteFingerprintMismatch": "The invitation host identity does not match its fingerprint.",
   "error.remote.inviteHostKeyMissing": "The invitation host key is missing.",

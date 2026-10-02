@@ -982,6 +982,9 @@ export class HostService extends EventEmitter<HostEvents> {
     if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
     const remoteInviteApiUrl = this.#remoteInviteApiUrl();
     if (remoteInviteApiUrl && this.#options.createRemoteInvite) {
+      // The account service sends only an openbot.run link, and a self-hosted invitation is not one.
+      if (input.email && selfHostedApiOrigin(remoteInviteApiUrl))
+        throw new Error(sourceText("error.remote.selfHostedInviteNoEmail"));
       const invite = await this.#options.createRemoteInvite(identity.serverId, input);
       // The invitation belongs to the account that asked for it, so it stays on that host
       // and shows up in its invite list. What must not happen is emailing it under the new

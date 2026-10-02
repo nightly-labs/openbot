@@ -3,7 +3,7 @@ import {
   OPENBOT_AGENT_TEMPLATE_PATH_PREFIX,
   parseAgentTemplateUrl,
 } from "@openbot/contracts/agent-template-links";
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import { parseMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { createPluginShareUrl, parsePluginUrl } from "@openbot/contracts/plugin-links";
 
@@ -15,12 +15,8 @@ export type IncomingLink =
   | { kind: "invalid" };
 
 export function parseIncomingLink(value: string): IncomingLink {
-  try {
-    parseInviteUrl(value);
-    return { kind: "invite", url: value };
-  } catch {
-    // The other link kinds have separate parsers and cannot weaken invitation validation.
-  }
+  // The other link kinds have separate parsers and cannot weaken invitation validation.
+  if (isInviteLink(value)) return { kind: "invite", url: value };
   try {
     const templateId = parseAgentTemplateUrl(value);
     return { kind: "template", url: createAgentTemplateShareUrl(templateId), templateId };
@@ -36,6 +32,28 @@ export function parseIncomingLink(value: string): IncomingLink {
     return { kind: "plugin", url: createPluginShareUrl(parsePluginUrl(value)) };
   } catch {
     return { kind: "invalid" };
+  }
+}
+
+/**
+ * The session is not loaded when the system opens a link, so an `openbot://join` link for any
+ * self-hosted account service counts as an invitation here. The add-server screen checks it again
+ * with the service of the session, and refuses a link for another service.
+ */
+function isInviteLink(value: string): boolean {
+  try {
+    parseInviteUrl(value);
+    return true;
+  } catch {
+    // Not an invitation for our service.
+  }
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "openbot:") return false;
+    parseInviteUrl(value, { selfHostedApiOrigin: selfHostedApiOrigin(url.searchParams.get("api") ?? undefined) });
+    return true;
+  } catch {
+    return false;
   }
 }
 

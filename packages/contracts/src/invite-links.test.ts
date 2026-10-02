@@ -81,12 +81,16 @@ describe("OpenBot invite links", () => {
     expect(createInviteUrl(payload, options)).toMatch(/^https:\/\/openbot\.run\/join\?/u);
   });
 
-  it.each(["https://api.openbot.run", "https://openbot.run", "http://api.example.com", "not a url", undefined])(
-    "treats %s as no self-hosted account service",
-    (apiUrl) => {
-      expect(selfHostedApiOrigin(apiUrl)).toBeUndefined();
-    },
-  );
+  it.each([
+    "https://api.openbot.run",
+    "https://openbot.run",
+    "https://team-host.trycloudflare.com",
+    "http://api.example.com",
+    "not a url",
+    undefined,
+  ])("treats %s as no self-hosted account service", (apiUrl) => {
+    expect(selfHostedApiOrigin(apiUrl)).toBeUndefined();
+  });
 
   it("supports localhost invitations only when local development is explicitly enabled", () => {
     expect(() => createInviteUrl(localDevelopmentPayload)).toThrow("invalid");

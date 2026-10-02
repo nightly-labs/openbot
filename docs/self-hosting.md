@@ -13,9 +13,8 @@ self-hosted account service with its own keys. See
 
 - Accounts on your service are separate from accounts on `openbot.run`. Each person signs in again.
 - Each desktop and phone that connects to a host must use the same service.
-- Invitations are `openbot://join` links. Copy a link from the app and send it yourself. An email
-  invitation from the app does not work.
-- On iPhone, paste or scan the invitation link. A tapped `openbot://` link does not open the app.
+- Invitations are `openbot://join` links. Copy a link from the app and send it yourself. The app
+  does not send an invitation by email.
 - The browser client at `openbot.run/app` does not work with your service.
 - Hosted servers, the OpenBot GitHub App, Slack and the iPhone Live Activity relay stay off. Each
   needs secrets that only we have.

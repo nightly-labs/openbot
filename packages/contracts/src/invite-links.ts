@@ -62,14 +62,14 @@ export interface InviteLinkOptions {
 }
 
 /**
- * The origin of a self-hosted account service, or undefined for ours, for a local development one,
- * and for a value that is not a URL.
+ * The origin of a self-hosted account service, or undefined for a service that invitations already
+ * accept (ours, a tunnel, a team host), for a local development one, and for a value that is not a URL.
  */
 export function selfHostedApiOrigin(apiUrl: string | undefined): string | undefined {
   if (!apiUrl) return undefined;
   try {
     const { protocol, origin } = new URL(apiUrl);
-    return protocol === "https:" && origin !== OPENBOT_CONTROL_PLANE_ORIGIN && origin !== OPENBOT_INVITE_ORIGIN
+    return protocol === "https:" && origin !== OPENBOT_INVITE_ORIGIN && !isValidRemoteApiUrl(`${origin}/`)
       ? origin
       : undefined;
   } catch {
