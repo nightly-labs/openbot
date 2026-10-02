@@ -27,6 +27,7 @@ Usage: openbot <command>
   logs [-f]                      Show the OpenBot log.
   start | stop | restart         Control the OpenBot service (sudo).
   update                         Install the newest release now (sudo).
+  uninstall                      Sign out and remove OpenBot. The data stays (sudo).
   version                        Show the installed version.
 EOF
 }
@@ -195,6 +196,43 @@ update_command() {
   echo "Installed OpenBot $(version_of "$INSTALL/app")."
 }
 
+# Removes what openbot-server-setup installed. The home folder of the service user and the keyring in
+# /srv/openbot-hosted stay: the keyring has the key of the encrypted data in that home folder, so the
+# two go together, and a later install uses them again.
+uninstall_command() {
+  require_root uninstall
+  local user home reply unit entry
+  { [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ]; } ||
+    fail "This computer is not a self-hosted OpenBot server."
+  user=$(service_user)
+  if [ -t 0 ]; then
+    read -rp "Remove OpenBot from this computer? The data of the user $user stays. [y/N] " reply
+    [[ $reply == [yY]* ]] || return 0
+  fi
+  # The session then stops on the account server too, not only on this computer.
+  if systemctl is-active --quiet "$UNIT"; then
+    (control POST /v1/logout >/dev/null) || echo "OpenBot did not sign out. Remove the server in the app." >&2
+  fi
+  # Waits for an update that runs now.
+  exec 9>"$LOCK"
+  flock 9
+  systemctl disable --now --quiet "${UNITS[@]}" 2>/dev/null || true
+  for unit in "${UNITS[@]}"; do rm -f "/etc/systemd/system/$unit"; done
+  systemctl daemon-reload
+  if [ -f /etc/apparmor.d/openbot-hosted ] && command -v apparmor_parser >/dev/null &&
+    [ -d /sys/kernel/security/apparmor ]; then
+    apparmor_parser --remove /etc/apparmor.d/openbot-hosted 2>/dev/null || true
+  fi
+  rm -f /etc/apparmor.d/openbot-hosted /usr/local/bin/openbot
+  # The desktop .deb also installs into /opt/OpenBot, so only the entries of a server go.
+  for entry in app hosted staged staged.ready .applying; do rm -rf "${INSTALL:?}/$entry"; done
+  rmdir "$INSTALL" 2>/dev/null || true
+  home=$(getent passwd "$user" | cut -d: -f6)
+  echo "Removed OpenBot. The data stays in ${home:-the home folder of $user} and /srv/openbot-hosted."
+  echo "To install again with this data: the install command, with --user $user."
+  echo "To delete the data too: sudo userdel --remove $user && sudo rm -rf /srv/openbot-hosted"
+}
+
 command=${1:-}
 [ "$#" -eq 0 ] || shift
 case $command in
@@ -217,6 +255,7 @@ case $command in
     systemctl "$command" "$UNIT"
     ;;
   update) update_command ;;
+  uninstall) uninstall_command ;;
   version) version_of "$INSTALL/app" ;;
   "" | help | --help | -h) usage ;;
   *)
