@@ -53,6 +53,9 @@ const REMOTE_EVENT_RECONNECT_JITTER = 0.2;
 // focus. Focus and a manual retry still retry at once.
 const REMOTE_HOST_OFFLINE_RETRY_MS = 5 * 60_000;
 const REMOTE_HOST_OFFLINE_UNFOCUSED_RETRY_MS = 15 * 60_000;
+// A hosted server that starts after a wake request comes online in about a minute. It retries at
+// this delay, not with the backoff, so the user does not wait for a long delay after the start.
+const HOSTED_SERVER_START_RETRY_MS = 5_000;
 const REMOTE_EVENT_HEALTHY_MS = 30_000;
 const REMOTE_EVENT_PAYLOAD_LIMIT = 1024 * 1024;
 const REMOTE_EVENT_INITIAL_BUFFER_LIMIT = 1_000;
@@ -130,6 +133,8 @@ export class RemoteEventStream {
   readonly #authenticationPaused = new Set<string>();
   /** When Signal last reported each host offline. */
   readonly #offlineHosts = new Map<string, number>();
+  /** Hosted servers that start after a wake request. */
+  readonly #startingHosts = new Set<string>();
   #appFocused = true;
   #enabled = false;
 
@@ -208,6 +213,24 @@ export class RemoteEventStream {
     this.#reconnectTimers.delete(serverId);
     this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
+    this.#startingHosts.delete(serverId);
+  }
+
+  /**
+   * A hosted server starts after a wake request: it retries every few seconds until it connects, or
+   * until the caller ends the start. The first retry replaces a longer one already set.
+   */
+  setHostStarting(serverId: string, starting: boolean): void {
+    if (!starting) {
+      this.#startingHosts.delete(serverId);
+      return;
+    }
+    this.#startingHosts.add(serverId);
+    this.#offlineHosts.delete(serverId);
+    const reconnectTimer = this.#reconnectTimers.get(serverId);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    this.#reconnectTimers.delete(serverId);
+    this.scheduleReconnect(serverId);
   }
 
   /** Signal said that this host is not connected, and no retry has run since. */
@@ -294,6 +317,7 @@ export class RemoteEventStream {
     this.#reconnectTimers.delete(serverId);
     this.#reconnectAttempts.delete(serverId);
     this.#offlineHosts.delete(serverId);
+    this.#startingHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);
   }
@@ -350,10 +374,9 @@ export class RemoteEventStream {
       ? offlineDelay
       : Math.min(REMOTE_EVENT_RECONNECT_MAX_MS, REMOTE_EVENT_RECONNECT_BASE_MS * 2 ** (attempt - 1));
     const jitter = exponentialDelay * REMOTE_EVENT_RECONNECT_JITTER * (Math.random() * 2 - 1);
-    const delay = Math.min(
-      maximumDelay,
-      Math.max(REMOTE_EVENT_RECONNECT_BASE_MS, Math.round(exponentialDelay + jitter)),
-    );
+    const delay = this.#startingHosts.has(serverId)
+      ? HOSTED_SERVER_START_RETRY_MS
+      : Math.min(maximumDelay, Math.max(REMOTE_EVENT_RECONNECT_BASE_MS, Math.round(exponentialDelay + jitter)));
     const timer = setTimeout(() => {
       this.#reconnectTimers.delete(serverId);
       // Only the attempt that follows was delayed. When it fails for another reason, for example

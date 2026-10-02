@@ -112,6 +112,7 @@ import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { IdleRestart } from "./idle-restart";
 import { LanguageService } from "./language-service";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -147,6 +148,7 @@ import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -219,6 +221,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 
 const TEARDOWN_ORDER = {
   updater: 10,
+  idleRestart: 11,
   hostUpdateCoordinator: 12,
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
@@ -295,6 +298,8 @@ export interface ApplicationServices {
   hostUpdateCoordinator: HostUpdateCoordinator;
   /** The update restart that an admin of a joined server asked for (`host-update-v1`). */
   requestedUpdate: RequestedUpdate;
+  /** The restart that the user of this computer asked for, when no work runs. */
+  idleRestart: IdleRestart;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -492,6 +497,7 @@ export async function createApplicationServices({
     (serverId) => {
       if (!remoteServers.list().some((server) => server.id === serverId)) remoteServers.invalidateDirectory();
     },
+    (serverId) => remoteServers.hostedServerStarting(serverId),
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -540,6 +546,7 @@ export async function createApplicationServices({
   const setupFile = join(app.getPath("userData"), SETUP_FILE);
   const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
+  const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
   // Loaded before the first window and before the application menu is built, so every native
@@ -1350,7 +1357,10 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
-      onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),
+      hostedServers: {
+        unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
+        wake: (serverId) => hostedServers.wake(serverId),
+      },
       webrtcTransport: new TeamWebRtcClientTransport({
         bridge: teamWebRtcBridge,
         listHosts: () => centralAuth.listRemoteHosts(),
@@ -1491,7 +1501,7 @@ export async function createApplicationServices({
     // from the moment the runtime exists, so this waits only for what is left of it, and a
     // failure here must not keep the agents down.
     await computerUseWarmUp.catch(() => undefined);
-    await service.initialize();
+    await service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
   });
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
@@ -1530,6 +1540,29 @@ export async function createApplicationServices({
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () => remoteUpdate.dispose());
+  const idleRestart = new IdleRestart({
+    updater,
+    describeReadiness: describeRestartReadiness,
+    holdRoutines: () => service.holdRoutines(),
+    releaseRoutines: () => service.releaseRoutines(),
+    recordHold: (window) => {
+      try {
+        if (window) writeRoutineHold(routineHoldFile, window);
+        else clearRoutineHold(routineHoldFile);
+      } catch (error) {
+        // The restart goes on: the next start then skips the held routines as missed.
+        logger.warn("The routine hold could not be saved.", toLogValue(error));
+      }
+    },
+    relaunch: () => {
+      // A development build only quits: its supervisor stops the stack, and a relaunched Electron
+      // would run outside it with no renderer server.
+      if (app.isPackaged) app.relaunch();
+      app.quit();
+    },
+    log: (message) => logger.info(message),
+  });
+  teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -1548,12 +1581,14 @@ export async function createApplicationServices({
     );
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
-      // A live Slack connection counts: stopped, the server could not hear the next message.
+      // A live Slack connection counts: stopped, the server could not hear the next message. An open
+      // browser view does not: a view that the user forgot would keep the server running. Input in
+      // the view counts as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
         messaging.hasLiveConnection() ||
-        host.describeRestartBlockers().length > 0 ||
-        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+        host.describeRestartBlockers().some((reason) => reason !== "browser-view") ||
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientUseAt() ?? 0) < CLIENT_USE_WINDOW_MS),
       nextRunAt: () => {
         const dueAt = service.nextRoutineDueAt();
         return dueAt ? Date.parse(dueAt) : null;
@@ -1601,6 +1636,7 @@ export async function createApplicationServices({
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
+    idleRestart,
     describeRestartReadiness,
     sidebarLayout,
     host,

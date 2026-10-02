@@ -1,5 +1,6 @@
 import type { AppInfo, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { createMemo, createSignal } from "solid-js";
 import { currentText } from "../../../text";
 import { presentUpdateStatus } from "../../updates/update-status";
@@ -10,6 +11,9 @@ interface UpdatesStoreProps {
   onUpdateAction: () => Promise<void>;
   /** Removes a restart that a server admin asked for. */
   onCancelScheduledRestart?: () => Promise<void>;
+  /** Restarts OpenBot, or installs the downloaded update, when no work runs. Absent: no such action. */
+  onRestartWhenIdle?: () => Promise<void>;
+  onCancelIdleRestart?: () => Promise<void>;
 }
 
 /**
@@ -119,6 +123,27 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     }
   }
 
+  const [idleRestartBusy, setIdleRestartBusy] = createSignal(false);
+  /** A restart that the user asked for, while it waits or after it did not start. */
+  const idleRestart = () => (props.updateStatus.phase === "installing" ? undefined : props.updateStatus.idleRestart);
+  /** The restart installs the downloaded update when there is one. */
+  const idleRestartInstalls = () => props.updateStatus.phase === "ready" && !presentation().managed;
+  const idleRestartOffered = () => Boolean(props.onRestartWhenIdle) && props.updateStatus.phase !== "installing";
+
+  async function changeIdleRestart(action: (() => Promise<void>) | undefined, fallback: AppTextKey): Promise<void> {
+    if (idleRestartBusy() || !action) return;
+    setError(null);
+    setIdleRestartBusy(true);
+    try {
+      await action();
+    } catch (failure) {
+      const text = currentText();
+      setError(text.errorMessage(failure, text.t(fallback)));
+    } finally {
+      setIdleRestartBusy(false);
+    }
+  }
+
   return {
     installedVersion,
     message,
@@ -128,6 +153,13 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     scheduledRestart,
     cancelling,
     cancelScheduledRestart,
+    idleRestart,
+    idleRestartInstalls,
+    idleRestartOffered,
+    idleRestartBusy,
+    targetUpdate,
+    restartWhenIdle: () => changeIdleRestart(props.onRestartWhenIdle, "update.idleRestart.requestFailed"),
+    cancelIdleRestart: () => changeIdleRestart(props.onCancelIdleRestart, "update.idleRestart.cancelFailed"),
   };
 }
 

@@ -26,6 +26,7 @@ import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";
 import { collapseMissedOccurrences, RoutineInputError } from "../routine-schedule";
+import type { RoutineHoldWindow } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
 import { routineStatusForDelivery } from "./delivery-content";
@@ -151,8 +152,8 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.duplicate(sourceAgentId, targetAgentId, now);
   }
 
-  skipMissed(now: Date): void {
-    this.#routines.skipMissed(now);
+  skipMissed(now: Date, held?: RoutineHoldWindow): void {
+    this.#routines.skipMissed(now, held);
   }
 
   create(input: CreateRoutineInput, options: RoutineMutationOptions = {}): Routine {

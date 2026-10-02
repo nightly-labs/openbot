@@ -508,6 +508,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    // The preview runs no provider process, so a restart has nothing to wait for.
+    restartProvider: async () => clone(agentStatus),
+    cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there.
     startProviderCodeLogin: async () => ({
@@ -1578,6 +1581,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       cancelScheduledRestart: async () => {
         const { scheduledRestart: _cancelled, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
+      // The preview never restarts: the restart waits for one agent turn until it is cancelled.
+      restartWhenIdle: async (target) => {
+        updateStatus = { ...updateStatus, idleRestart: { target, waitingFor: ["agent-turn"] } };
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
+      cancelIdleRestart: async () => {
+        const { idleRestart: _cancelled, ...rest } = updateStatus;
         updateStatus = rest;
         emit(updateListeners, updateStatus);
         return clone(updateStatus);

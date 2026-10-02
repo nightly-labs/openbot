@@ -58,6 +58,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         message: agent?.message,
         email: agent?.email,
         connectionState: agent?.connectionState,
+        restartPending: agent?.restartPending,
         checkError: agent?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,

@@ -246,6 +246,8 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    restartProvider,
+    cancelProviderRestart,
     codeLogin,
     providerKeys,
     hostCustomProviders,
@@ -261,6 +263,12 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
     save: localAgents.saveCustomAgent,
     remove: localAgents.deleteCustomAgent,
     check: localAgents.checkCustomAgent,
+    // One process group runs every custom agent, so its restart is the restart of all of them.
+    get restartPending() {
+      return agentStatus().providers?.some((provider) => provider.id === "acp" && provider.restartPending) === true;
+    },
+    restart: () => restartProvider("acp"),
+    cancelRestart: () => cancelProviderRestart("acp"),
   };
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -378,6 +386,8 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
+      onRestartProvider: local ? restartProvider : undefined,
+      onCancelProviderRestart: local ? cancelProviderRestart : undefined,
       get providerDetection() {
         return local ? detection.detection() : undefined;
       },
@@ -552,6 +562,8 @@ function AppSettings(props: AccountProps) {
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onCancelScheduledRestart={updates.cancelScheduledRestart}
+        onRestartWhenIdle={updates.restartWhenIdle}
+        onCancelIdleRestart={updates.cancelIdleRestart}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}

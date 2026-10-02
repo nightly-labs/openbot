@@ -81,6 +81,12 @@ export interface RoutineUpdateFields {
  * subclasses re-name the owner and the handle, so `AgentRoutineStore` keeps the public signatures
  * its callers already use.
  */
+/** The time from a hold of the routines to the restart that the hold waited for. */
+export interface RoutineHoldWindow {
+  since: Date;
+  until: Date;
+}
+
 export class RoutineStore {
   constructor(
     protected readonly database: OpenBotDatabase,
@@ -391,9 +397,14 @@ export class RoutineStore {
     );
   }
 
-  /** Missed occurrences are dropped, never replayed: a closed app must not wake into a backlog. */
-  skipMissed(now = new Date()): void {
+  /**
+   * Missed occurrences are dropped, never replayed: a closed app must not wake into a backlog. A
+   * trigger that came due while a restart held the routines stays due, so it runs once now.
+   */
+  skipMissed(now = new Date(), held?: RoutineHoldWindow): void {
     for (const routine of this.#allActive()) {
+      const due = Date.parse(routine.trigger.nextRunAt);
+      if (held && due >= held.since.getTime() && due <= held.until.getTime()) continue;
       const next = nextRoutineOccurrence(routine.trigger.schedule, routine.timezone, now).toISOString();
       this.advanceTrigger(routine.id, routine.trigger.id, next);
     }

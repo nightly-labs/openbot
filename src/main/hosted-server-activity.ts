@@ -12,10 +12,11 @@ const SAMPLE_INTERVAL_MS = 60_000;
  */
 const REPORT_INTERVAL_MS = 5 * 60_000;
 /**
- * A connected client counts as use until this long after its last request. An app that is only open
- * sends no request, so it does not keep the server running.
+ * A connected client counts as use until this long after its last send, change or typing event. One
+ * report interval, so that each action reaches the Worker. An app that is only open, or that only reads,
+ * does not keep the server running: it stops 15 to 25 minutes after the last action.
  */
-export const CLIENT_USE_WINDOW_MS = 60 * 60_000;
+export const CLIENT_USE_WINDOW_MS = REPORT_INTERVAL_MS;
 
 export interface HostedServerActivityOptions {
   hostId: string;

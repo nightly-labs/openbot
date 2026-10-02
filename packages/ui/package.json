@@ -217,6 +217,7 @@
     "./features/sidebar/stores/pending-store": "./src/features/sidebar/stores/pending-store.ts",
     "./features/sidebar/stores/search-store": "./src/features/sidebar/stores/search-store.ts",
     "./features/team/TeamPersonAvatar": "./src/features/team/TeamPersonAvatar.tsx",
+    "./features/updates/restart-reasons": "./src/features/updates/restart-reasons.ts",
     "./features/updates/update-status": "./src/features/updates/update-status.ts",
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",

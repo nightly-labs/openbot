@@ -69,6 +69,24 @@ export interface UpdateStatus {
   managedByHost?: boolean;
   /** A restart that an admin of a joined server asked for. Absent when none waits. */
   scheduledRestart?: ScheduledUpdateRestart;
+  /** A restart that the user of this computer asked for. Absent when none waits. */
+  idleRestart?: IdleRestart;
+}
+
+/** `relaunch` starts OpenBot again; `update` installs the downloaded update. */
+export const IDLE_RESTART_TARGETS = ["relaunch", "update"] as const;
+export type IdleRestartTarget = (typeof IDLE_RESTART_TARGETS)[number];
+
+/**
+ * A restart that waits until no work runs. New routine runs wait for it, so a busy schedule does not
+ * stop it; they run after the restart, or after a cancel.
+ */
+export interface IdleRestart {
+  target: IdleRestartTarget;
+  /** The restart blockers that still run, such as `agent-turn`. Empty when none. */
+  waitingFor: string[];
+  /** Why the restart did not start. Nothing waits then, and the routines run again. */
+  error?: string;
 }
 
 export const UPDATE_FAILURE_CODES = ["check_failed", "download_failed", "install_failed"] as const;

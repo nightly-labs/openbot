@@ -257,7 +257,7 @@ export const messages = {
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB bellek, {disk} GB depolama",
   "settings.hostedServers.creating": "Oluşturuluyor…",
   "settings.hostedServers.usageNote":
-    "Bir sunucu 15 dakika kullanılmadığında durur ve bir mesaj veya zamanlanmış bir rutin için tekrar başlar. Ajanları ve rutinleri bu bilgisayar kapalıyken çalışır.",
+    "Bir sunucu son mesajdan veya değişiklikten yaklaşık 15 dakika sonra durur, bir uygulama açık olsa bile. Uygulamada bir tuşa basmak veya tıklamak, bir mesaj ya da zamanlanmış bir rutin onu tekrar başlatır. Ajanları ve rutinleri bu bilgisayar kapalıyken çalışır.",
   "settings.hostedServers.empty": "Henüz barındırılan bir sunucunuz yok.",
   "settings.hostedServers.state.awaitingPayment": "Ödeme bekleniyor",
   "settings.hostedServers.state.planEnded": "Plan sona erdi",

@@ -241,6 +241,14 @@ export const messages = defineMessages("settings", {
   "settings.updates.autoInstall.title": "Install updates automatically",
   "settings.updates.autoInstall.description":
     "OpenBot restarts into a downloaded update when the agents are idle. Members of your servers are disconnected for a short time.",
+  // Restart OpenBot, or install a downloaded update, when no agent works.
+  "settings.updates.idleRestart.title": "Restart OpenBot",
+  "settings.updates.idleRestart.relaunchDescription":
+    "OpenBot restarts when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.updateDescription":
+    "OpenBot installs {target} when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.relaunch": "Restart when idle",
+  "settings.updates.idleRestart.update": "Install when idle",
   "settings.updates.allowRemote.title": "Allow updates from server admins",
   "settings.updates.allowRemote.description":
     "Owners and admins of this server can download an update and restart OpenBot on this computer.",
@@ -270,7 +278,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB memory, {disk} GB storage",
   "settings.hostedServers.creating": "Creating…",
   "settings.hostedServers.usageNote":
-    "A server stops after 15 minutes with no use, and starts again for a message or a scheduled routine. Its agents and routines work when this computer is off.",
+    "A server stops about 15 minutes after the last message or change, also when an app is open. A key press or click in the app, a message, or a scheduled routine starts it again. Its agents and routines work when this computer is off.",
   "settings.hostedServers.empty": "You do not have a hosted server yet.",
   "settings.hostedServers.state.awaitingPayment": "Waiting for payment",
   "settings.hostedServers.state.planEnded": "Plan ended",

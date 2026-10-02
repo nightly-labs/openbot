@@ -463,6 +463,8 @@ const openbotApi: OpenBotDesktopApi = {
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,
     refreshAgentProviders: decodeAgentStatusFromMain,
+    restartProvider: decodeAgentStatusFromMain,
+    cancelProviderRestart: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
     setProviderApiKey: decodeAgentStatusFromMain,
     clearProviderApiKey: decodeAgentStatusFromMain,
@@ -747,6 +749,8 @@ const openbotApi: OpenBotDesktopApi = {
     getPreference: decodeUpdatePreference,
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,
+    restartWhenIdle: decodeUpdateStatus,
+    cancelIdleRestart: decodeUpdateStatus,
     event: decodeUpdateStatus,
     preference: decodeUpdatePreference,
   }),

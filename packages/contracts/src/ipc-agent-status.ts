@@ -46,6 +46,8 @@ export interface AgentProviderStatus {
    * apart, and only the provider that resolved a CLI reports one at all.
    */
   cliSource?: "system" | "managed";
+  /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
+  restartPending?: boolean;
 }
 
 function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
@@ -58,7 +60,8 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.email === undefined || isNullableBoundedString(value.email, INPUT_LIMITS.email)) &&
     (value.connectionState === undefined || isBoundedString(value.connectionState, INPUT_LIMITS.identifier)) &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
-    (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier))
+    (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.restartPending === undefined || typeof value.restartPending === "boolean")
   );
 }
 

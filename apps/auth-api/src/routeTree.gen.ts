@@ -107,6 +107,7 @@ import { Route as V1SkillsAdminSubmissionsVersionIdRouteImport } from './routes/
 import { Route as V2HostingServersServerIdIndexRouteImport } from './routes/v2/hosting/servers/$serverId/index'
 import { Route as V2HostingServersServerIdActivityRouteImport } from './routes/v2/hosting/servers/$serverId/activity'
 import { Route as V2HostingServersServerIdCheckoutRouteImport } from './routes/v2/hosting/servers/$serverId/checkout'
+import { Route as V2HostingServersServerIdStatusRouteImport } from './routes/v2/hosting/servers/$serverId/status'
 import { Route as V2HostingServersServerIdWakeRouteImport } from './routes/v2/hosting/servers/$serverId/wake'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
@@ -634,6 +635,12 @@ const V2HostingServersServerIdCheckoutRoute =
     path: '/v2/hosting/servers/$serverId/checkout',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2HostingServersServerIdStatusRoute =
+  V2HostingServersServerIdStatusRouteImport.update({
+    id: '/v2/hosting/servers/$serverId/status',
+    path: '/v2/hosting/servers/$serverId/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2HostingServersServerIdWakeRoute =
   V2HostingServersServerIdWakeRouteImport.update({
     id: '/v2/hosting/servers/$serverId/wake',
@@ -816,6 +823,7 @@ export interface FileRoutesByFullPath {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -930,6 +938,7 @@ export interface FileRoutesByTo {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -1045,6 +1054,7 @@ export interface FileRoutesById {
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/hosting/servers/$serverId/activity': typeof V2HostingServersServerIdActivityRoute
   '/v2/hosting/servers/$serverId/checkout': typeof V2HostingServersServerIdCheckoutRoute
+  '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -1161,6 +1171,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -1275,6 +1286,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -1389,6 +1401,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/hosting/servers/$serverId/activity'
     | '/v2/hosting/servers/$serverId/checkout'
+    | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -1490,6 +1503,7 @@ export interface RootRouteChildren {
   V1SkillsAdminFeaturedSkillIdRoute: typeof V1SkillsAdminFeaturedSkillIdRoute
   V2HostingServersServerIdActivityRoute: typeof V2HostingServersServerIdActivityRoute
   V2HostingServersServerIdCheckoutRoute: typeof V2HostingServersServerIdCheckoutRoute
+  V2HostingServersServerIdStatusRoute: typeof V2HostingServersServerIdStatusRoute
   V2HostingServersServerIdWakeRoute: typeof V2HostingServersServerIdWakeRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2193,6 +2207,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2HostingServersServerIdCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/hosting/servers/$serverId/status': {
+      id: '/v2/hosting/servers/$serverId/status'
+      path: '/v2/hosting/servers/$serverId/status'
+      fullPath: '/v2/hosting/servers/$serverId/status'
+      preLoaderRoute: typeof V2HostingServersServerIdStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/hosting/servers/$serverId/wake': {
       id: '/v2/hosting/servers/$serverId/wake'
       path: '/v2/hosting/servers/$serverId/wake'
@@ -2506,6 +2527,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1SkillsAdminFeaturedSkillIdRoute: V1SkillsAdminFeaturedSkillIdRoute,
   V2HostingServersServerIdActivityRoute: V2HostingServersServerIdActivityRoute,
   V2HostingServersServerIdCheckoutRoute: V2HostingServersServerIdCheckoutRoute,
+  V2HostingServersServerIdStatusRoute: V2HostingServersServerIdStatusRoute,
   V2HostingServersServerIdWakeRoute: V2HostingServersServerIdWakeRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,

@@ -45,6 +45,8 @@ export const messages = defineMessages("composer", {
   "composer.attachment.remove": "Remove {name}",
   "composer.placeholder.hostSetup": "Complete provider setup on your host to start",
   "composer.placeholder.connectHost": "Connect to your host to start",
+  "composer.placeholder.hostSleeping": "This server is asleep. Press a key or click to wake it",
+  "composer.placeholder.hostWaking": "Waking the server…",
   "composer.placeholder.cliSetup": "Complete agent CLI setup to start",
   "composer.placeholder.reply": "Reply…",
   "composer.placeholder.message": "Message {name}",

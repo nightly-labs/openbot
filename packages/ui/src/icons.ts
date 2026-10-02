@@ -66,6 +66,7 @@ export { default as Mic } from "lucide-solid/icons/mic";
 export { default as Minimize2 } from "lucide-solid/icons/minimize-2";
 export { default as Monitor } from "lucide-solid/icons/monitor";
 export { default as MonitorSmartphone } from "lucide-solid/icons/monitor-smartphone";
+export { default as Moon } from "lucide-solid/icons/moon";
 export { default as MousePointer2 } from "lucide-solid/icons/mouse-pointer-2";
 export { default as OctagonX } from "lucide-solid/icons/octagon-x";
 export { default as Palette } from "lucide-solid/icons/palette";

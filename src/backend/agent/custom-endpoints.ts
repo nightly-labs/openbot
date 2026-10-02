@@ -1,5 +1,10 @@
 import type { AgentModelOption, AgentSummary, UpdateAgentInput } from "@openbot/contracts/ipc";
-import { customAgentIdOfModel, defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
+import {
+  CUSTOM_AGENT_DEFAULT_MODEL,
+  customAgentIdOfModel,
+  defaultProviderModel,
+  PICKER_PROVIDERS,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "../agent-store";
@@ -405,9 +410,13 @@ export class CustomEndpoints {
       .filter((agent) => providerForAgent(agent) === provider && !models.some((model) => model.id === agent.model));
     for (const agent of affected) {
       // A custom agent is a program of its own, not a model: an agent moves only to another model of
-      // the same custom agent. One that listed nothing, or did not answer, keeps its model.
+      // the same custom agent. One that listed nothing, or did not answer, keeps its model. The router
+      // lists `<agent>/default` for an agent that answered with an empty list, which a slow start
+      // gives too, so that model is no proof that the saved one is gone.
       const fallback =
-        provider === "acp" ? models.find((model) => sameCustomAgent(model.id, agent.model)) : providerFallback;
+        provider === "acp"
+          ? models.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
+          : providerFallback;
       if (!fallback) continue;
       try {
         await this.#hooks.applyAgentUpdate({
@@ -433,6 +442,10 @@ export class CustomEndpoints {
       (agent.threadId ? this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId : null);
     return Boolean(active);
   }
+}
+
+function isCustomAgentDefaultModel(model: string): boolean {
+  return model.slice(model.indexOf("/") + 1) === CUSTOM_AGENT_DEFAULT_MODEL;
 }
 
 function sameCustomAgent(model: string, agentModel: string): boolean {

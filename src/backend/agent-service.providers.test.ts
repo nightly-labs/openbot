@@ -39,6 +39,7 @@ import {
 } from "./agent-service-test-harness";
 import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
+import { NO_PROVIDER_CREDENTIALS } from "./provider-drivers";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 // Every Codex session is given the plan tool.
@@ -1571,6 +1572,44 @@ describe.sequential("AgentService: providers", () => {
     // The provider stays, so the agent keeps its thread; only the model it can no longer run changes.
     await waitFor(() => service?.listAgents().find((agent) => agent.id === "chief")?.model === "gpt-6-luna");
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ provider: "codex" });
+  });
+
+  // A custom agent that starts slowly can answer `model/list` with nothing, and the router then lists
+  // only `<agent>/default`. That is no proof that the saved model is gone.
+  it("keeps a custom agent's saved model when the agent lists only its default after a restart", async () => {
+    let listed = ["goose/opus", "qwen/max"];
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "acp") client.modelList = () => ({ data: listed.map((model) => ({ model })) });
+        return client;
+      },
+      credentials: {
+        ...NO_PROVIDER_CREDENTIALS,
+        customAgents: () => [
+          { id: "goose", name: "Goose", command: "goose", args: [], env: [] },
+          { id: "qwen", name: "Qwen", command: "qwen", args: [], env: [] },
+        ],
+      },
+    });
+    service = agentService;
+    await store.getOrCreate("chief");
+    await store.getOrCreate("scout");
+    await service.updateAgent({ agentId: "chief", provider: "acp", model: "goose/opus", reasoningEffort: "high" });
+    await service.updateAgent({ agentId: "scout", provider: "acp", model: "qwen/max" });
+
+    listed = ["goose/default", "qwen/mini"];
+    await service.stop();
+    await service.initialize();
+
+    // Qwen listed models and dropped `max`, so scout moves. The update after it runs after the sweep.
+    await waitFor(() => service?.listAgents().find((agent) => agent.id === "scout")?.model === "qwen/mini");
+    await service.updateAgent({ agentId: "scout", model: "qwen/mini" });
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "acp",
+      model: "goose/opus",
+      reasoningEffort: "high",
+    });
   });
 
   // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
