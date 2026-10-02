@@ -123,9 +123,14 @@ export function formatUsageReset(resetsAt: number | null, text: UsageText = curr
   });
 }
 
-export function accountUsageRowLabel(row: AccountUsageProviderRow, text: UsageText = currentText()): string {
+export function accountUsageRowLabel(
+  row: AccountUsageProviderRow,
+  text: UsageText = currentText(),
+  loading = false,
+): string {
   const { t } = text;
-  if (row.remainingPercent === null) return t("account.usage.row.unavailable", { name: row.name });
+  if (row.remainingPercent === null)
+    return t(loading ? "account.usage.row.loading" : "account.usage.row.unavailable", { name: row.name });
   const parts = [t("account.usage.row.left", { name: row.name, percent: row.remainingPercent })];
   if (row.windowLabel) parts.push(row.windowLabel);
   if (row.resetsAtLabel) parts.push(t("account.usage.row.resets", { time: row.resetsAtLabel }));

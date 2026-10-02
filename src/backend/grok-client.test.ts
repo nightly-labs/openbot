@@ -367,7 +367,8 @@ describe.sequential("GrokAgentClient", () => {
     });
   });
 
-  it("reports unavailable usage for a unified weekly billing period without quota values", async () => {
+  it("reads a unified weekly billing period with no usage as 0% used", async () => {
+    // proto3 JSON omits a zero `creditUsagePercent`; Grok 1.0.46 sends this shape before any use.
     process.env.OPENBOT_FAKE_GROK_MODE = "unified-billing";
     client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
     client.start();
@@ -375,7 +376,9 @@ describe.sequential("GrokAgentClient", () => {
 
     await expect(
       client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
+    ).resolves.toMatchObject({
+      rateLimits: { secondary: { usedPercent: 0, windowDurationMins: 10_080, resetsAt: 1_788_825_600 } },
+    });
   });
 
   it("times out a billing request that stops responding", async () => {
