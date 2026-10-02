@@ -83,6 +83,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   #nextRequestId = 0;
   readonly #lastModels = new Map<string, ModelEntry[]>();
   #running = false;
+  /** Set by `stop()` alone: `#running` is also false after an agent process crashed. */
+  #stopping = false;
 
   constructor(source: CustomAgentSource, createChild: CustomAgentChildFactory, resolve = resolveAgentCommand) {
     super();
@@ -95,12 +97,18 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#running;
   }
 
+  get stopping(): boolean {
+    return this.#stopping;
+  }
+
   start(): void {
     this.#running = true;
+    this.#stopping = false;
   }
 
   async stop(): Promise<void> {
     this.#running = false;
+    this.#stopping = true;
     const children = [...this.#children.values()];
     this.#children.clear();
     this.#requests.clear();

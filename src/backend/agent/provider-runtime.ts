@@ -1798,6 +1798,12 @@ export class ProviderRuntime implements ProviderPort {
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
       const message = shortenDiagnostic(this.#redactMcp(raw));
+      // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
+      // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
+      if (client.stopping) {
+        logger.warn("A provider wrote an error while OpenBot stopped it.", { provider: client.provider, message });
+        return;
+      }
       if (isMcpSubsystemDiagnostic(message, [...names])) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;

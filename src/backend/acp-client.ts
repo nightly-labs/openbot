@@ -332,6 +332,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#process !== null && this.#process.exitCode === null && !this.#stopping;
   }
 
+  get stopping(): boolean {
+    return this.#stopping;
+  }
+
   start(): void {
     if (this.running) return;
     this.#stopping = false;
@@ -616,13 +620,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         try {
           return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe), deadline);
         } finally {
-          // Bounded like the probes, and for the same reason: the catalog is complete by now, and an
-          // agent that is slow to close a session it is about to lose anyway must not take it away.
-          await this.#requestBefore(
-            () => connection.closeSession({ sessionId: probe.sessionId }),
-            deadline,
-            "session/close",
-          );
+          // Sent always, and not awaited. An agent can run one process per session, so a probe left
+          // open after a slow `session/new` used the deadline, or after `model/list` timed out, is one
+          // idle process until the app quits. Not awaited, because the catalog is complete by now, and
+          // an agent that is slow to close a session must not take it away.
+          void connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
         }
       })(),
       timeoutMs,

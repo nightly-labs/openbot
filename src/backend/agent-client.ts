@@ -6,6 +6,12 @@ export type AgentProvider = AgentProviderId;
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly running: boolean;
+  /**
+   * True from `stop()` on. What the CLI writes to stderr then is the shutdown that OpenBot started,
+   * not an error for the user. `running` cannot tell this apart: it is also false after a crash.
+   * Optional: each stderr line of a client without it is reported as before.
+   */
+  readonly stopping?: boolean;
   start(): void;
   stop(): Promise<void>;
   /**
