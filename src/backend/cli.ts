@@ -4,7 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, extname, join, posix, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 
@@ -60,7 +60,7 @@ export type AgentCliInfo =
 export class CodexCliError extends Error {
   constructor(
     message: string,
-    readonly code: "missing" | "invalid" | "outdated",
+    readonly code: "missing" | "invalid" | "outdated" | "timeout",
   ) {
     super(message);
     this.name = "CodexCliError";
@@ -85,7 +85,7 @@ export async function resolveCodexCli(
     if (!(await isExecutable(candidate.executable))) continue;
 
     try {
-      const stdout = await readCliVersion(candidate.executable);
+      const stdout = await readCliVersion(candidate.executable, "codex");
       const version = parseCodexVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_CODEX_VERSION)) {
         throw new CodexCliError(sourceText("error.provider.codexOutdated", { version }), "outdated");
@@ -103,6 +103,8 @@ export async function resolveCodexCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
+  const timedOut = failures.find((failure) => failure.code === "timeout");
+  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.codexNotStartedHint"), "invalid");
   }
@@ -129,7 +131,7 @@ export async function resolveClaudeCli(
     if (!(await isExecutable(candidate.executable))) continue;
 
     try {
-      const stdout = await readCliVersion(candidate.executable);
+      const stdout = await readCliVersion(candidate.executable, "claude");
       const version = parseClaudeVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_CLAUDE_VERSION)) {
         throw new CodexCliError(sourceText("error.provider.claudeOutdated", { version }), "outdated");
@@ -146,6 +148,8 @@ export async function resolveClaudeCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
+  const timedOut = failures.find((failure) => failure.code === "timeout");
+  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.claudeNotStartedHint"), "invalid");
   }
@@ -172,7 +176,7 @@ export async function resolveGrokCli(
     if (!(await isExecutable(candidate.executable))) continue;
 
     try {
-      const stdout = await readCliVersion(candidate.executable);
+      const stdout = await readCliVersion(candidate.executable, "grok");
       const version = parseGrokVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_GROK_VERSION)) {
         throw new CodexCliError(sourceText("error.provider.grokOutdated", { version }), "outdated");
@@ -189,6 +193,8 @@ export async function resolveGrokCli(
 
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
+  const timedOut = failures.find((failure) => failure.code === "timeout");
+  if (timedOut) throw timedOut;
   if (failures.length > 0) {
     throw new CodexCliError(sourceText("error.provider.grokNotStartedHint"), "invalid");
   }
@@ -207,19 +213,22 @@ export async function resolveOpencodeCli(
     input.bundledExecutable === undefined ? bundledOpencodeExecutable() : input.bundledExecutable;
   const candidates = await cliCandidates("opencode", input.systemCandidates, bundledExecutable);
   let found = false;
+  let timedOut: CodexCliError | null = null;
   for (const candidate of candidates) {
     if (!(await isExecutable(candidate.executable))) continue;
     found = true;
     try {
-      const version = parseOpencodeVersion(await readCliVersion(candidate.executable));
+      const version = parseOpencodeVersion(await readCliVersion(candidate.executable, "opencode"));
       // `source` has to be the candidate's own: hardcoding "system" made `updateProviderCli` refuse
       // to activate the managed copy, and made `trackSystemCliVersions` report the managed version
       // as the user's, which suppressed every later update offer.
       return { executable: candidate.executable, version, source: candidate.source };
-    } catch {
+    } catch (error) {
       /* Try the remaining installed candidates. */
+      if (!timedOut && error instanceof CodexCliError && error.code === "timeout") timedOut = error;
     }
   }
+  if (timedOut) throw timedOut;
   throw new CodexCliError(
     found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
     found ? "invalid" : "missing",
@@ -297,16 +306,19 @@ export async function resolveCursorCli(
 ): Promise<CursorCliInfo> {
   const candidates = await cliCandidates("cursor", input.systemCandidates, input.bundledExecutable ?? null);
   let found = false;
+  let timedOut: CodexCliError | null = null;
   for (const candidate of candidates) {
     if (!(await isExecutable(candidate.executable))) continue;
     found = true;
     try {
-      const version = parseCursorVersion(await readCliVersion(candidate.executable));
+      const version = parseCursorVersion(await readCliVersion(candidate.executable, "cursor"));
       return { executable: candidate.executable, version, source: candidate.source };
-    } catch {
+    } catch (error) {
       /* Try the remaining installed candidates. */
+      if (!timedOut && error instanceof CodexCliError && error.code === "timeout") timedOut = error;
     }
   }
+  if (timedOut) throw timedOut;
   throw new CodexCliError(
     found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
     found ? "invalid" : "missing",
@@ -663,25 +675,46 @@ export function cliSpawnTarget(
   };
 }
 
-async function readCliVersion(candidate: string): Promise<string> {
-  if (process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase())) {
-    const commandProcessor = process.env.ComSpec?.trim() || "cmd.exe";
-    const escapedCandidate = candidate.replaceAll("%", "%%");
-    const { stdout } = await execFileAsync(commandProcessor, ["/d", "/s", "/c", `""${escapedCandidate}" --version"`], {
-      timeout: 5_000,
+/**
+ * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
+ * reported apart from a failure: the CLI is not broken, and reinstalling it does not help.
+ */
+const CLI_VERSION_TIMEOUT_MS = 15_000;
+
+async function readCliVersion(candidate: string, provider: AgentProviderId): Promise<string> {
+  try {
+    if (process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase())) {
+      const commandProcessor = process.env.ComSpec?.trim() || "cmd.exe";
+      const escapedCandidate = candidate.replaceAll("%", "%%");
+      const { stdout } = await execFileAsync(
+        commandProcessor,
+        ["/d", "/s", "/c", `""${escapedCandidate}" --version"`],
+        {
+          timeout: CLI_VERSION_TIMEOUT_MS,
+          maxBuffer: 64 * 1024,
+          windowsHide: true,
+          windowsVerbatimArguments: true,
+        },
+      );
+      return stdout;
+    }
+
+    const { stdout } = await execFileAsync(candidate, ["--version"], {
+      timeout: CLI_VERSION_TIMEOUT_MS,
       maxBuffer: 64 * 1024,
-      windowsHide: true,
-      windowsVerbatimArguments: true,
+      windowsHide: process.platform === "win32",
     });
     return stdout;
+  } catch (error) {
+    // `execFile` kills the child when its timer ends and marks the rejection with `killed`.
+    if (isDynamicRecord(error) && error.killed === true) {
+      throw new CodexCliError(
+        sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+        "timeout",
+      );
+    }
+    throw error;
   }
-
-  const { stdout } = await execFileAsync(candidate, ["--version"], {
-    timeout: 5_000,
-    maxBuffer: 64 * 1024,
-    windowsHide: process.platform === "win32",
-  });
-  return stdout;
 }
 
 async function isExecutable(path: string): Promise<boolean> {

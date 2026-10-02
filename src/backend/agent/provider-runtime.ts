@@ -21,7 +21,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { startAcpAuthentication } from "./../acp-sign-in";
-import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
+import { type AgentClient, AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import { type AgentCliInfo, type BundledProviderExecutables, CodexCliError } from "./../cli";
 import { McpHandoffLog } from "./../mcp-handoff-log";
@@ -47,7 +47,7 @@ import {
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
-import { withTimeout } from "../with-timeout";
+import { TimeoutError, withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
 import { type CliCodeLogin, startCliCodeLogin } from "./cli-code-login";
 import { CodexLoginFlow } from "./codex-login";
@@ -96,6 +96,15 @@ const PROVIDER_IDLE_CHECK_MS = 60_000;
  * it at each session start, and Codex with each thread's config.
  */
 const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = ["grok", "opencode", "antigravity", "cursor", "acp"];
+
+/** The CLI did not answer in time: its `--version`, or a request of its start, such as `initialize`. */
+function isProviderTimeout(error: unknown): boolean {
+  return (
+    (error instanceof CodexCliError && error.code === "timeout") ||
+    error instanceof TimeoutError ||
+    error instanceof RequestTimeoutError
+  );
+}
 
 /**
  * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
@@ -639,6 +648,8 @@ export class ProviderRuntime implements ProviderPort {
 
   async refreshProvider(provider: AgentProvider): Promise<AgentStatus> {
     if (this.#clients.has(provider)) return this.status();
+    // A refresh the user asked for gets new automatic retries.
+    this.#restartAttempts.delete(provider);
     let start = this.#providerStarts.get(provider);
     if (!start) {
       start = this.#connect("starting", [provider], {
@@ -1290,11 +1301,26 @@ export class ProviderRuntime implements ProviderPort {
       }),
     );
 
-    await this.#connect(
-      "starting",
-      BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id),
-      { preserveCheckErrors: true, refreshRuntimeInBackground: true },
-    );
+    const providers = BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id);
+    // A start already running, such as a turn's, would race this connect: the slower one would
+    // replace the other's row, so a running client could show as failed. Wait for it instead.
+    const pendingStarts = () =>
+      providers.flatMap((provider) => this.#providerStarts.get(provider)?.catch(() => undefined) ?? []);
+    for (let pending = pendingStarts(); pending.length > 0; pending = pendingStarts()) await Promise.all(pending);
+    for (const provider of providers) {
+      // A refresh the user asked for gets new automatic retries.
+      if (!this.#clients.has(provider)) this.#restartAttempts.delete(provider);
+    }
+    const start = this.#connect("starting", providers, { preserveCheckErrors: true, refreshRuntimeInBackground: true });
+    // A start asked for during this connect waits for it rather than starting a second client.
+    for (const provider of providers) this.#providerStarts.set(provider, start);
+    try {
+      await start;
+    } finally {
+      for (const provider of providers) {
+        if (this.#providerStarts.get(provider) === start) this.#providerStarts.delete(provider);
+      }
+    }
     return this.status();
   }
 
@@ -1618,12 +1644,15 @@ export class ProviderRuntime implements ProviderPort {
     const providerStatuses: AgentProviderStatus[] = structuredClone(
       this.#status.providers ?? INITIAL_STATUS.providers ?? [],
     );
+    /** The version each row showed before this check, kept when the check times out. */
+    const previousVersions = new Map<AgentProvider, string | null>();
     for (const provider of requestedProviders) {
       const current = this.#status.providers?.find((candidate) => candidate.id === provider);
+      previousVersions.set(provider, this.#cli.get(provider)?.version ?? current?.version ?? null);
       setProviderStatus(providerStatuses, provider, {
         // A released provider is still connected: it only waits for a turn to start its process.
         state: this.#clients.has(provider) || this.#released.has(provider) ? "available" : "checking",
-        version: this.#cli.get(provider)?.version ?? null,
+        version: previousVersions.get(provider) ?? null,
         message: null,
         email: this.#accounts.get(provider)?.email ?? null,
         checkError: options.preserveCheckErrors ? (current?.checkError ?? null) : null,
@@ -1705,11 +1734,32 @@ export class ProviderRuntime implements ProviderPort {
           return null;
         } catch (thrown) {
           if (client) await client.stop().catch(() => undefined);
+          // Another start of this provider, such as a turn's during a refresh, finished first. Its
+          // client runs and its row is current, so this failure describes nothing the app uses.
+          if (this.#clients.has(provider)) return null;
           const error = this.#withExitDetail(thrown);
+          if (isProviderTimeout(error)) {
+            // A busy computer, not a broken CLI: say so, keep the version, and try again later.
+            const message = this.#retryAfterTimeout(provider, !disposed());
+            this.#dropProviderModels(provider);
+            this.#setStatus({
+              providers: updateProviderStatus(this.#status.providers, provider, {
+                state: "error",
+                version: cli?.version ?? previousVersions.get(provider) ?? null,
+                message,
+              }),
+            });
+            return message;
+          }
           // The CLI's own words reach the status message and the joined start failure below, so
           // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
           const message = this.#redactMcp(error instanceof Error ? error.message : String(error));
           const failure = providerFailureStatus(provider, error, cli?.version);
+          // An error row with models would let a picker or a tool choose what nothing can run.
+          // A missing Codex or Claude runtime is also an error row, but keeps the startup fallbacks.
+          if (failure.state === "error" && !(error instanceof CodexCliError && error.code === "missing")) {
+            this.#dropProviderModels(provider);
+          }
           this.#setStatus({
             providers: updateProviderStatus(this.#status.providers, provider, {
               ...failure,
@@ -1876,6 +1926,7 @@ export class ProviderRuntime implements ProviderPort {
     const attempts = this.#restartAttempts.get(client.provider) ?? 0;
 
     if (attempts >= 3) {
+      this.#dropProviderModels(client.provider);
       this.#setStatus(
         anotherProviderIsReady
           ? {
@@ -1938,6 +1989,37 @@ export class ProviderRuntime implements ProviderPort {
       });
     this.#providerStarts.set(provider, start);
     recordRestartActivity();
+  }
+
+  /**
+   * Starts a provider whose CLI did not answer in time again later, with the backoff and the attempt
+   * count of `#handleExit`. Answers the status message: whether OpenBot tries again, or the user has to.
+   */
+  #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
+    const attempts = this.#restartAttempts.get(provider) ?? 0;
+    const retry = schedule && attempts < 3;
+    if (retry) {
+      this.#restartAttempts.set(provider, attempts + 1);
+      clearTimeout(this.#restartTimers.get(provider));
+      this.#restartTimers.set(
+        provider,
+        setTimeout(
+          () => {
+            this.#restartTimers.delete(provider);
+            void this.#restart(provider);
+          },
+          5_000 * 2 ** attempts,
+        ),
+      );
+    }
+    return sourceText(retry ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh", {
+      provider: providerLabel(provider),
+    });
+  }
+
+  /** A provider in the error state lists no models: nothing can run them until it connects again. */
+  #dropProviderModels(provider: AgentProvider): void {
+    this.#models = this.#models.filter((model) => model.provider !== provider);
   }
 
   /**

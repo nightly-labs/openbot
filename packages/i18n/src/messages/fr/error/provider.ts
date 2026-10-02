@@ -150,6 +150,10 @@ export const messages = {
   "error.provider.bunVersionUnreadable": "Impossible de lire la version de l’environnement d’exécution Bun.",
   "error.provider.connectBeforeProfile": "Connectez le fournisseur sélectionné avant de générer un profil.",
   "error.provider.cliNotReady": "La CLI {provider} n’est pas prête ou n’est pas connectée.",
+  "error.provider.cliTimedOut":
+    "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. OpenBot va réessayer.",
+  "error.provider.cliTimedOutRefresh":
+    "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. Actualisez les fournisseurs pour réessayer.",
   "error.provider.noCodeSignIn": "{provider} ne permet pas de se connecter avec un code.",
   "error.provider.codeLoginNoLink": "Le fournisseur n’a pas affiché de lien de connexion. Réessayez.",
   "error.provider.codeLoginNotWaiting": "Aucune connexion n’attend de code. Relancez la connexion.",
