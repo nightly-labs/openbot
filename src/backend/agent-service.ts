@@ -948,6 +948,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routineTimer.resume();
   }
 
+  /** Holds routine firing while a restart of the app waits for the agents. See RoutineTimer.hold. */
+  holdRoutines(): void {
+    this.#routineTimer.hold();
+  }
+
+  releaseRoutines(): void {
+    this.#routineTimer.release();
+  }
+
   listRoutines(agentId: string): Routine[] {
     return this.#routines.list(agentId);
   }
@@ -1474,6 +1483,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   refreshProvider(provider: AgentProvider): Promise<AgentStatus> {
     return this.#providers.refreshProvider(provider);
+  }
+
+  /** See `ProviderRuntime.restartProviderWhenIdle`. */
+  restartProvider(provider: AgentProvider): Promise<AgentStatus> {
+    return this.#providers.restartProviderWhenIdle(provider);
+  }
+
+  cancelProviderRestart(provider: AgentProvider): AgentStatus {
+    return this.#providers.cancelProviderRestart(provider);
   }
 
   connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {

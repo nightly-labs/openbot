@@ -228,6 +228,14 @@ export const messages = defineMessages("settings", {
   "settings.updates.autoInstall.title": "Install updates automatically",
   "settings.updates.autoInstall.description":
     "OpenBot restarts into a downloaded update when the agents are idle. Members of your servers are disconnected for a short time.",
+  // Restart OpenBot, or install a downloaded update, when no agent works.
+  "settings.updates.idleRestart.title": "Restart OpenBot",
+  "settings.updates.idleRestart.relaunchDescription":
+    "OpenBot restarts when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.updateDescription":
+    "OpenBot installs {target} when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.relaunch": "Restart when idle",
+  "settings.updates.idleRestart.update": "Install when idle",
   "settings.updates.allowRemote.title": "Allow updates from server admins",
   "settings.updates.allowRemote.description":
     "Owners and admins of this server can download an update and restart OpenBot on this computer.",

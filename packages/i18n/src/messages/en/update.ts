@@ -38,6 +38,16 @@ export const messages = defineMessages("update", {
   "update.scheduled.cancel": "Cancel update",
   "update.scheduled.cancelFailed": "The update could not be cancelled.",
 
+  // A restart that the user of this computer asked for. It waits until no work runs.
+  "update.idleRestart.relaunchTitle": "OpenBot restarts when the agents are idle",
+  "update.idleRestart.updateTitle": "OpenBot installs the update when the agents are idle",
+  "update.idleRestart.description": "New routine runs wait until the restart.",
+  "update.idleRestart.waitingFor": "Waiting for {reasons}.",
+  "update.idleRestart.cancel": "Cancel restart",
+  "update.idleRestart.cancelFailed": "The restart could not be cancelled.",
+  "update.idleRestart.requestFailed": "The restart could not be scheduled.",
+  "update.idleRestart.failedTitle": "OpenBot did not restart",
+
   // The "What's new" dialog after an app update.
   "update.whatsNew.title": "What’s new in OpenBot",
   "update.whatsNew.description": "The new features and changes in this version of OpenBot.",

@@ -1340,6 +1340,7 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  gap: var(--openbot-space-2);
 }
 
 .ui-qr-code {

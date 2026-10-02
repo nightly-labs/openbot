@@ -44,6 +44,8 @@ interface ProviderSettingsSectionProps {
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
@@ -113,6 +115,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onDownloadProvider={props.onDownloadProvider}
         onCancelProviderDownload={props.onCancelProviderDownload}
         onUpdateProvider={props.onUpdateProvider}
+        onRestartProvider={props.onRestartProvider}
+        onCancelProviderRestart={props.onCancelProviderRestart}
         onConnectProvider={props.onConnectProvider}
         onInstallProvider={props.onInstallProvider}
         onAddCustomProvider={
@@ -288,6 +292,9 @@ export interface HostProviderSettings {
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /** The provider restart is of this computer, so only its section has it. */
+  onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
   onAddCustomProvider?: ((value: SaveCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
@@ -344,6 +351,8 @@ export function HostProviderSettingsPanel(
         onDownloadProvider={props.onDownloadProvider}
         onCancelProviderDownload={props.onCancelProviderDownload}
         onUpdateProvider={props.onUpdateProvider}
+        onRestartProvider={props.onRestartProvider}
+        onCancelProviderRestart={props.onCancelProviderRestart}
         onConnectProvider={props.onConnectProvider}
         onInstallProvider={props.onInstallProvider}
         onAddCustomProvider={props.onAddCustomProvider}

@@ -112,6 +112,7 @@ import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { IdleRestart } from "./idle-restart";
 import { LanguageService } from "./language-service";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -219,6 +220,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 
 const TEARDOWN_ORDER = {
   updater: 10,
+  idleRestart: 11,
   hostUpdateCoordinator: 12,
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
@@ -295,6 +297,8 @@ export interface ApplicationServices {
   hostUpdateCoordinator: HostUpdateCoordinator;
   /** The update restart that an admin of a joined server asked for (`host-update-v1`). */
   requestedUpdate: RequestedUpdate;
+  /** The restart that the user of this computer asked for, when no work runs. */
+  idleRestart: IdleRestart;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -1530,6 +1534,18 @@ export async function createApplicationServices({
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () => remoteUpdate.dispose());
+  const idleRestart = new IdleRestart({
+    updater,
+    describeReadiness: describeRestartReadiness,
+    holdRoutines: () => service.holdRoutines(),
+    releaseRoutines: () => service.releaseRoutines(),
+    relaunch: () => {
+      app.relaunch();
+      app.quit();
+    },
+    log: (message) => logger.info(message),
+  });
+  teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -1601,6 +1617,7 @@ export async function createApplicationServices({
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
+    idleRestart,
     describeRestartReadiness,
     sidebarLayout,
     host,
