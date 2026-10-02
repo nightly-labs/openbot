@@ -7,7 +7,7 @@ import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
  * state changes and errors (`provider-runtime`), runtime downloads (`provider-runtimes`), and model
  * list members that the window refuses (`provider-models`).
  */
-export const PROVIDER_LOG_PREFIXES = ["provider-runtime", "provider-runtimes", "provider-models"] as const;
+const PROVIDER_LOG_PREFIXES = ["provider-runtime", "provider-runtimes", "provider-models"] as const;
 
 /**
  * Keeps the provider lines in `<logs>/providers/providers.log`, 1 MB with one rotated copy. An app
