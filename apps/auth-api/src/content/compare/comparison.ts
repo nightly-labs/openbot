@@ -49,6 +49,7 @@ export const OPENBOT_PLANS: readonly OpenBotPlan[] = [
   { provider: "claude", name: "Claude", plan: "Your Claude plan, through Claude Code." },
   { provider: "antigravity", name: "Gemini", plan: "Your Google AI Pro or Ultra plan." },
   { provider: "grok", name: "Grok", plan: "Your Grok account or an xAI API key." },
+  { provider: "cursor", name: "Cursor", plan: "Your Cursor plan, or a Cursor API key." },
   { provider: "opencode", name: "OpenCode", plan: "Free models, or an OpenCode Go key." },
   { provider: "custom", name: "Your own model", plan: "Any OpenAI-compatible server, also one on your computer." },
 ];

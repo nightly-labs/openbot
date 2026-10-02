@@ -1,5 +1,6 @@
 // Slug to comparison for /compare. Eager, for the reason given in content/news/index.ts.
 
+import { CHATGPT_DOTS_COMPARISON } from "./chatgpt-dots";
 import { CLAUDE_COWORK_COMPARISON } from "./claude-cowork";
 import type { Comparison } from "./comparison";
 import { DEVIN_COMPARISON } from "./devin";
@@ -10,6 +11,7 @@ import { MUSE_COMPARISON } from "./muse";
 import { OPENCLAW_COMPARISON } from "./openclaw";
 
 export const COMPARISONS: Readonly<Record<string, Comparison>> = {
+  "chatgpt-dots": CHATGPT_DOTS_COMPARISON,
   "claude-cowork": CLAUDE_COWORK_COMPARISON,
   devin: DEVIN_COMPARISON,
   "grok-bot": GROK_BOT_COMPARISON,

@@ -8,10 +8,19 @@
 // Manus is the glyph from its brand page (manus.im/brand), without the word mark.
 // Claude Cowork has no mark of its own: from September 2026 it rolls out inside
 // Claude, so it is the Claude mark. Devin is the mark from devin.ai, not the Cognition logo.
+// ChatGPT dots is the ring from chatgpt.com/features/dots, not the OpenAI logo.
 
 import { CLAUDE_PATH } from "@openbot/brand/provider-logo-shape";
 
-export type RivalMarkName = "claude-cowork" | "devin" | "grok-bot" | "hermes-agent" | "manus" | "muse" | "openclaw";
+export type RivalMarkName =
+  | "chatgpt-dots"
+  | "claude-cowork"
+  | "devin"
+  | "grok-bot"
+  | "hermes-agent"
+  | "manus"
+  | "muse"
+  | "openclaw";
 
 export interface RivalMarkShape {
   /** `[x, y, width, height]`, as an SVG `viewBox`. */
@@ -21,6 +30,11 @@ export interface RivalMarkShape {
 }
 
 export const RIVAL_MARK_SHAPES: Record<RivalMarkName, RivalMarkShape> = {
+  // dots-o-updated.svg from chatgpt.com/features/dots: a disc with a round hole.
+  "chatgpt-dots": {
+    viewBox: [0, 0, 81, 81],
+    path: "M40.0391 0C62.152 0 80.0781 17.9261 80.0781 40.0391C80.0781 62.152 62.152 80.0781 40.0391 80.0781C17.9261 80.0781 0 62.152 0 40.0391C0 17.9261 17.9261 0 40.0391 0ZM40.0391 24.1992C31.2907 24.1992 24.1992 31.2907 24.1992 40.0391C24.1992 48.7874 31.2907 55.8789 40.0391 55.8789C48.7874 55.8789 55.8789 48.7874 55.8789 40.0391C55.8789 31.2907 48.7874 24.1992 40.0391 24.1992Z",
+  },
   // The Claude mark that the provider logos also draw (claude.ai/favicon.svg).
   "claude-cowork": {
     viewBox: [0, 0, 248, 248],

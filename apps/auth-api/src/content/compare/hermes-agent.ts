@@ -32,7 +32,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       icon: "cpu",
       topic: "Models and plans",
       openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival:
         "API keys from many providers, OpenRouter, and local models. Sign in with ChatGPT, SuperGrok or GitHub Copilot. As its model, a Claude plan works only on Max with extra usage credits; a consumer Gemini plan does not work.",
       better: "openbot",
@@ -48,7 +48,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot. Only that computer must stay on, not your laptop.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. With no computer to keep on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival:
         "Scheduled tasks run on the server or cloud computer that runs Hermes. On a laptop, they stop while Hermes is stopped.",
     },
@@ -88,6 +88,14 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       better: "rival",
     },
     {
+      icon: "globe",
+      topic: "Where you can use it",
+      openbot:
+        "In any country: OpenBot has no region lock. The app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      rival:
+        "Anywhere: you run it yourself. Hermes Cloud uses the nearest of 14 locations in Europe, North America, Asia and Australia. The interface is in 17 languages.",
+    },
+    {
       icon: "devices",
       topic: "Apps",
       openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
@@ -107,7 +115,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       title: "Models and the plans you pay for",
       openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
         "Hermes Agent calls a model through an API. It works with many providers, OpenRouter and Nous Portal, and with local models on any OpenAI-compatible server, such as Ollama or vLLM. It can sign in with a ChatGPT account, a SuperGrok or X Premium+ subscription, or GitHub Copilot. As its own model, a Claude plan works only on Max, and then it uses only the extra usage credits that you buy; with Claude Pro, you need an API key. There is no way to use a consumer Gemini plan: Gemini needs a Google API key.",
       better: "openbot",
@@ -115,7 +123,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. With no computer to keep on, use a hosted OpenBot server: a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, that keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Hermes Agent runs on your computer, on a server, or in Docker. Its commands can run on that computer, in Docker, over SSH, or in cloud sandboxes such as Modal and Daytona. Hermes Cloud runs it on a computer that Nous Research hosts, for a daily price, and the models and tools it uses cost extra. On a laptop, tasks stop while Hermes is stopped.",
     },
@@ -130,7 +138,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       title: "How agents work as a team",
       openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
       rival:
         "Hermes Agent starts up to 10 subagents at once by default, and you can set a higher limit. In Bot Mode, each Bot has its own role, model, memory and skills; Bots talk in group chats of up to six and send messages to each other. Bundled skills can give coding work to Claude Code, Codex or OpenCode. Several people can use one Hermes instance through messaging apps such as Slack or Telegram, and an allowlist controls who can talk to it.",
       better: "openbot",
@@ -162,7 +170,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
       answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key. OpenBot adds no charge of its own.",
+        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
     },
     {
       question: "Can I use local models?",
@@ -187,7 +195,7 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
     {
       question: "Do agents keep working when my laptop is closed?",
       answer:
-        "Yes, with both, when they run on a computer that stays on. With OpenBot, run it on a desktop or a server, and connect from your laptop or phone. Hermes Agent can run on a server, or in Hermes Cloud for a daily price.",
+        "Yes, with both, when they run on a computer that stays on. With OpenBot, run it on a desktop, a server or a hosted OpenBot server, and connect from your laptop or phone. Hermes Agent can run on a server, or in Hermes Cloud for a daily price.",
     },
     {
       question: "How much do OpenBot and Hermes Agent cost?",
@@ -209,6 +217,10 @@ export const HERMES_AGENT_COMPARISON: Comparison = {
       url: `${HERMES_DOCS}/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-claude-code`,
     },
     { label: "Hermes Cloud", url: "https://portal.nousresearch.com/cloud" },
+    {
+      label: "Hermes Agent language packs",
+      url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/language-packs",
+    },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
