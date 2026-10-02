@@ -4,27 +4,35 @@ import { playActionSound } from "../../action-sounds";
 const SLOW_IMPORT_MS = 400;
 
 /**
- * The cues of an attachment import: `loading` when the import is slow, then `success` or `error`.
- * `dispose` stops a `loading` cue that did not play yet.
+ * The cues of each attachment import: `loading` when the import is slow, then `success` or `error`.
+ * `cancel` and `dispose` stop a `loading` cue that did not play yet.
  */
 export function createAttachmentImportSounds() {
-  let slowCue: ReturnType<typeof setTimeout> | undefined;
-  const cancelSlowCue = () => {
-    if (slowCue !== undefined) clearTimeout(slowCue);
-    slowCue = undefined;
+  // One timer per import, so an import that ends first does not stop the cue of a slower one.
+  const slowCues = new Map<string, ReturnType<typeof setTimeout>>();
+  const cancel = (requestId: string) => {
+    clearTimeout(slowCues.get(requestId));
+    slowCues.delete(requestId);
   };
   return {
-    started() {
-      if (slowCue !== undefined) return;
-      slowCue = setTimeout(() => {
-        slowCue = undefined;
-        playActionSound("loading", { emphasis: "subtle" });
-      }, SLOW_IMPORT_MS);
+    started(requestId: string) {
+      cancel(requestId);
+      slowCues.set(
+        requestId,
+        setTimeout(() => {
+          slowCues.delete(requestId);
+          playActionSound("loading", { emphasis: "subtle" });
+        }, SLOW_IMPORT_MS),
+      );
     },
-    finished(outcome: "success" | "error") {
-      cancelSlowCue();
+    finished(requestId: string, outcome: "success" | "error") {
+      cancel(requestId);
       playActionSound(outcome, outcome === "success" ? { emphasis: "subtle" } : undefined);
     },
-    dispose: cancelSlowCue,
+    cancel,
+    dispose() {
+      for (const timer of slowCues.values()) clearTimeout(timer);
+      slowCues.clear();
+    },
   };
 }

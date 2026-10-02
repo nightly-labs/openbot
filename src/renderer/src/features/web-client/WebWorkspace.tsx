@@ -510,7 +510,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     window.removeEventListener("keydown", unlockCompletionSound, true);
   });
   startActionSounds();
-  const playAgentEventSound = createAgentEventSounds();
+  // As with `notify`: a muted server, a server set to nothing, or a muted agent plays no cue.
+  const playAgentEventSound = createAgentEventSounds((agentId) => {
+    const hostId = workspace.state.host?.hostId;
+    if (!hostId) return false;
+    const { muted, level } = untrack(() => notifications.state(hostId));
+    return (
+      !muted &&
+      level !== "nothing" &&
+      untrack(() => workspace.state.agents).some((agent) => agent.id === agentId && agent.notifications)
+    );
+  });
   onCleanup(watchWebTabFocus());
   onCleanup(workspace.onHostNotice(notify));
   onCleanup(

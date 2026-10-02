@@ -544,7 +544,7 @@ export function createConversationViewScope(props: ConversationProps) {
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
-          importSounds.started();
+          importSounds.started(event.requestId);
         }
         setAttachmentBusy(true);
         setScopedComposerError(null);
@@ -553,7 +553,7 @@ export function createConversationViewScope(props: ConversationProps) {
         resources.importTargetAgents.delete(event.requestId);
         setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
-          importSounds.finished("error");
+          importSounds.finished(event.requestId, "error");
           setConversationErrors((current) => ({
             ...current,
             [composerDraftKey(target)]: event.message,
@@ -563,8 +563,8 @@ export function createConversationViewScope(props: ConversationProps) {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
           // A cancelled import completes with no attachments.
-          if (event.attachments.length > 0) importSounds.finished("success");
-          else importSounds.dispose();
+          if (event.attachments.length > 0) importSounds.finished(event.requestId, "success");
+          else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
             setAttachmentBusy(resources.importTargetAgents.size > 0);

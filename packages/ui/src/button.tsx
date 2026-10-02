@@ -179,7 +179,6 @@ export function CopyButton(props: CopyButtonProps): JSX.Element {
       class={cx(props.iconOnly && "ui-icon-button", props.class)}
       disabled={Boolean(props.disabled || !props.value)}
       data-copied={copied() ? "" : undefined}
-      data-cuelume-tap="success"
       {...others}
       onClick={() => void copyValue()}
     >

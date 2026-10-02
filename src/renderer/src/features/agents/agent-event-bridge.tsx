@@ -80,7 +80,9 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout } = useSidebar();
-  const playAgentEventSound = createAgentEventSounds();
+  const playAgentEventSound = createAgentEventSounds((agentId) =>
+    agentList().some((agent) => agent.id === agentId && agent.notifications),
+  );
   let readRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
