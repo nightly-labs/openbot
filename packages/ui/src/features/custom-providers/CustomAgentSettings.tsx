@@ -161,7 +161,7 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
       description={t("customProvider.agents.description")}
       actions={
         <>
-          <Show when={props.api.restart && props.api.agents.length > 0}>
+          <Show when={props.api.restart && (props.api.agents.length > 0 || props.api.restartPending)}>
             <Show
               when={props.api.restartPending}
               fallback={
