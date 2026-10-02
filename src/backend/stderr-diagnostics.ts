@@ -212,7 +212,9 @@ export function createDiagnosticStream(options: {
       // The bound was passed inside a record. What was read is emitted, and the rest of that same
       // record is read on and dropped: shown as a record of its own it would be half a payload, and
       // half a payload is the half the redactor cannot name.
-      pending = "";
+      // A dump that waits at the end of a line keeps that newline: the next line decides whether the
+      // dump goes on, and without it that line is dropped as the rest of the dump.
+      pending = inspect && depth > 0 && pending.endsWith("\n") ? "\n" : "";
       cursor = 0;
       // An undecided bracket loses its place with the text it pointed into. It counts as a payload,
       // which keeps the rest of the record held back rather than passed on.

@@ -1169,7 +1169,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeThought(thread, turn);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
-      const detail = this.#redact(String(error));
+      const detail = this.#redact(failureText(error));
       const message =
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
@@ -1583,6 +1583,18 @@ class MissingOpenCodeSessionError extends Error {
     super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`, { cause });
     this.name = "MissingOpenCodeSessionError";
   }
+}
+
+/**
+ * The text of a failed turn. When a handler in an ACP agent throws, the SDK answers `Internal error`
+ * and puts the thrown message in `data.details`, which `String(error)` leaves out (#1193).
+ */
+function failureText(error: unknown): string {
+  if (!(error instanceof RequestError) || !isRecord(error.data)) return String(error);
+  const details = error.data.details;
+  return typeof details === "string" && details && !error.message.includes(details)
+    ? `${String(error)}: ${details}`
+    : String(error);
 }
 
 /**

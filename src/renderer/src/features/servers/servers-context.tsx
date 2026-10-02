@@ -122,6 +122,8 @@ const Servers = createSimpleContext({
             clientVersion: compatibility.localAppVersion,
             hostVersion: compatibility.hostAppVersion,
           };
+          // The host action does not help when this app is the older side.
+          const offerUpdate = opener && administersUpdate && older !== "client";
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
             description:
               older === "host"
@@ -130,11 +132,11 @@ const Servers = createSimpleContext({
                   ? t("server.compatibility.versionMismatchUpdateClientDescription", descriptionParams)
                   : t("server.compatibility.versionMismatchDescription", descriptionParams),
             action:
-              opener && administersUpdate
+              opener && offerUpdate
                 ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }
                 : undefined,
           });
-          if (opener && administersUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
+          if (offerUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
         }
         // An admin learns about a new version, or sees the download that runs, when the host connects.
         if (administersUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
