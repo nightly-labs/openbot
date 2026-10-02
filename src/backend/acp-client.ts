@@ -91,14 +91,6 @@ const MODEL_REASONING_CLEANUP_MS = 1_000;
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
 /**
- * How long a starting agent may take to answer `initialize` and its first model discovery. The
- * Gemini runtime unpacks itself on its first run, and an antivirus scan of the unpacked files can
- * take minutes on a slow computer. A request timeout there failed the first start after a good
- * download, which rolled the install back, so each retry downloaded and failed again.
- */
-const ACP_START_TIMEOUT_MS = 180_000;
-
-/**
  * How long a failed request waits for the process to report its exit. Stdout ends first, and the
  * exit follows within milliseconds; a CLI that closed stdout and kept running is reported as it was.
  */
@@ -484,7 +476,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!this.running) throw new Error("ACP client is not running.");
     switch (method) {
       case "initialize":
-        await this.#ensureInitialized();
+        // The caller's timeout covers the first model discovery too: a CLI that was just installed
+        // can take minutes to answer both.
+        await this.#ensureInitialized(timeoutMs);
         return decoder({});
       case "account/read": {
         if (!this.#signedIn) return decoder({ account: null, requiresOpenaiAuth: false });
@@ -572,9 +566,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  async #ensureInitialized(): Promise<void> {
+  async #ensureInitialized(timeoutMs = this.#requestTimeoutMs): Promise<void> {
     if (this.#initialized) return this.#initialized;
-    this.#initialized = this.#initialize();
+    this.#initialized = this.#initialize(timeoutMs);
     return this.#initialized;
   }
 
@@ -592,21 +586,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  async #initialize(): Promise<void> {
+  async #initialize(timeoutMs: number): Promise<void> {
     const connection = this.#requireConnection();
-    const startTimeoutMs = Math.max(this.#requestTimeoutMs, ACP_START_TIMEOUT_MS);
     this.#initialization = await withTimeout(
       connection.initialize({
         protocolVersion: 1,
         clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: OPENBOT_ACP_CLIENT_INFO,
       }),
-      startTimeoutMs,
+      timeoutMs,
       "ACP initialization timed out.",
     );
     try {
       await this.options.authenticate?.(connection, this.#initialization);
-      this.#models = await this.#discoverModels(startTimeoutMs);
+      this.#models = await this.#discoverModels(timeoutMs);
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }

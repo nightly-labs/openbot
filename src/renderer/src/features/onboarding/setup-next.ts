@@ -34,7 +34,7 @@ export function createSetupNext(providers: SetupProviders) {
         // when the new CLI does not start.
         const reason = option.runtimeStatus.message;
         return reason
-          ? t("onboarding.next.downloadErrorReason", { reason: sourceText(reason) })
+          ? t("onboarding.next.downloadErrorReason", { provider, reason: sourceText(reason) })
           : t("onboarding.next.downloadError", { provider });
       }
       case "not-downloaded":
