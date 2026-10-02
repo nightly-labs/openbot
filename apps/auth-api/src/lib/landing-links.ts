@@ -24,6 +24,7 @@ export const OPENBOT_LINKS = {
   privacy: "https://github.com/nightly-labs/openbot/blob/main/PRIVACY.md",
   documentation: "https://github.com/nightly-labs/openbot#readme",
   troubleshooting: "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md",
+  selfHostedServer: "https://github.com/nightly-labs/openbot/blob/main/docs/self-hosted-server.md",
   architecture: "https://github.com/nightly-labs/openbot#architecture",
   contributing: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
   codex: "https://learn.chatgpt.com/docs/app-server",
@@ -71,6 +72,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
     links: [
       { label: "Documentation", external: true, href: OPENBOT_LINKS.documentation },
       { label: "Troubleshooting", external: true, href: OPENBOT_LINKS.troubleshooting },
+      { label: "Self-hosted server", external: true, href: OPENBOT_LINKS.selfHostedServer },
       { label: "Architecture", external: true, href: OPENBOT_LINKS.architecture },
       { label: "Contributing", external: true, href: OPENBOT_LINKS.contributing },
       { label: "Codex", external: true, href: OPENBOT_LINKS.codex },
