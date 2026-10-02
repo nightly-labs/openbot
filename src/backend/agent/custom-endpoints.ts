@@ -445,7 +445,7 @@ export class CustomEndpoints {
 }
 
 function isCustomAgentDefaultModel(model: string): boolean {
-  return model.endsWith(`/${CUSTOM_AGENT_DEFAULT_MODEL}`);
+  return model.slice(model.indexOf("/") + 1) === CUSTOM_AGENT_DEFAULT_MODEL;
 }
 
 function sameCustomAgent(model: string, agentModel: string): boolean {

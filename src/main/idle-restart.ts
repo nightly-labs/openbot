@@ -56,7 +56,7 @@ export class IdleRestart {
 
   /** A second request replaces the target of the first. */
   request(target: IdleRestartTarget): UpdateStatus {
-    if (this.#restarting) throw new Error(sourceText("error.update.restartStarted"));
+    if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
     if (target === "update") {
       const status = this.#updater.getStatus();
       if (status.managedByHost) throw new Error(sourceText("error.update.managedByHost"));
@@ -74,7 +74,7 @@ export class IdleRestart {
 
   /** Removes the restart, or the error of the last one, and lets the routines run. */
   cancel(): UpdateStatus {
-    if (this.#restarting) throw new Error(sourceText("error.update.restartStarted"));
+    if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
     if (this.#status && !this.#status.error) this.#log("The restart when idle was cancelled.");
     this.#end(null);
     return this.#updater.getStatus();
@@ -113,6 +113,8 @@ export class IdleRestart {
     this.#log("Installing the update: no work runs.");
     try {
       await this.#updater.installUpdate();
+      // The updater owns the install from here, and reports its own failure.
+      this.#publish(null);
     } catch (error) {
       // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready.
       const message = error instanceof Error ? error.message : String(error);
