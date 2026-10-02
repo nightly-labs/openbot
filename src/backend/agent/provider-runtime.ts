@@ -320,6 +320,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #restartAttempts = new Map<AgentProvider, number>();
   readonly #restartTimers = new Map<AgentProvider, NodeJS.Timeout>();
   /**
+   * Providers whose client exited and whose deliveries `onProviderLost` left for restart recovery.
+   * Their next connect runs `onProvidersReady`, also when it is a retry after a timeout.
+   */
+  readonly #exitRecovery = new Set<AgentProvider>();
+  /**
    * Ignored-settings warnings already shown. Codex repeats one at each start, and a reconnect does
    * not change the file it reads, so the user sees each one once per app run.
    */
@@ -1792,7 +1797,10 @@ export class ProviderRuntime implements ProviderPort {
         : this.#clients.keys().next().value;
     if (!primaryProvider) throw new Error(sourceText("error.provider.noneReady"));
     const primaryAccount = this.#accounts.get(primaryProvider);
-    for (const provider of activated) this.#restartAttempts.delete(provider);
+    for (const provider of activated) {
+      this.#restartAttempts.delete(provider);
+      if (options.notifyReady !== false) this.#exitRecovery.delete(provider);
+    }
     this.#setStatus({
       phase: "ready",
       cliVersion: this.#cli.get(primaryProvider)?.version ?? null,
@@ -1908,6 +1916,7 @@ export class ProviderRuntime implements ProviderPort {
     void client.stop().catch(() => undefined);
     this.#conversation.clearLoadedThreads();
     this.#hooks.onProviderLost(client);
+    this.#exitRecovery.add(client.provider);
     this.#emitError(`${client.provider}_exited`, error);
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
       state: "error",
@@ -1957,9 +1966,10 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * `afterTimeout`: the provider never connected, so its start is restart recovery only when no
-   * other provider is live. `onProvidersReady` settles every unresolved delivery, and would record a
-   * turn that another provider still runs as interrupted.
+   * `afterTimeout`: a retry of a start that timed out runs restart recovery only when no other
+   * provider is live, or when this provider exited and its deliveries wait for recovery.
+   * `onProvidersReady` settles every unresolved delivery, and would record a turn that another
+   * provider still runs as interrupted.
    */
   #scheduleRestart(provider: AgentProvider, delayMs: number, afterTimeout = false): void {
     clearTimeout(this.#restartTimers.get(provider));
@@ -1988,7 +1998,8 @@ export class ProviderRuntime implements ProviderPort {
       await pending.catch(() => undefined);
     }
     if (this.#hooks.isStopping() || disposals !== this.#disposals || this.#clients.has(provider)) return;
-    const notifyReady = !afterTimeout || (this.#clients.size === 0 && this.#released.size === 0);
+    const notifyReady =
+      !afterTimeout || this.#exitRecovery.has(provider) || (this.#clients.size === 0 && this.#released.size === 0);
     const start = this.#connect("restarting", [provider], { notifyReady })
       .catch((error) => this.#emitError(`${provider}_restart_failed`, error))
       .finally(() => {
