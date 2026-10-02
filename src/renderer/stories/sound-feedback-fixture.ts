@@ -4,7 +4,7 @@ import { createSignal } from "solid-js";
 import type { SoundFeedbackChoice } from "../src/features/settings/sound-feedback";
 
 /** Plays the preview that the app plays for a new sound choice, without saving the choice. */
-export function previewStorySoundChoice(choice: SoundChoice): void {
+function previewStorySoundChoice(choice: SoundChoice): void {
   if (choice === "off") play("close");
   else play("success", { theme: choice });
 }
