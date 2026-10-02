@@ -83,6 +83,27 @@ describe("AgentRoutineStore", () => {
     database.close();
   });
 
+  it("keeps a time that came due while a restart held the routines", async () => {
+    const { database, routines } = await setup();
+    const routine = routines.create(
+      {
+        agentId: "chief",
+        name: "Quarter hour",
+        instruction: "Run the check.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+      },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    routines.skipMissed(new Date("2026-08-25T10:20:00.000Z"), {
+      since: new Date("2026-08-25T10:10:00.000Z"),
+      until: new Date("2026-08-25T10:18:00.000Z"),
+    });
+    expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T10:15:00.000Z");
+    database.close();
+  });
+
   it("excludes pending agents from due and next-due routine queries", async () => {
     const { database, routines } = await setup();
     const now = new Date("2026-08-25T10:00:00.000Z");

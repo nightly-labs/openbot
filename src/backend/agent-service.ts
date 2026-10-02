@@ -137,6 +137,7 @@ import { MessagingThreads } from "./messaging/messaging-threads";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
+import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import {
@@ -1447,7 +1448,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.channels.deleteChannel(channelId);
   }
 
-  async initialize(): Promise<void> {
+  /** `heldRoutines`: the routines that came due in this window, while a restart waited, run once. */
+  async initialize(options: { heldRoutines?: RoutineHoldWindow | undefined } = {}): Promise<void> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
@@ -1457,8 +1459,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
-    this.#routines.skipMissed(new Date());
-    this.#channelRoutines.skipMissed(new Date());
+    this.#routines.skipMissed(new Date(), options.heldRoutines);
+    this.#channelRoutines.skipMissed(new Date(), options.heldRoutines);
     this.#initialized = true;
     this.#memoryHold.start();
     await this.#providers.start();

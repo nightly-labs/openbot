@@ -8,6 +8,7 @@
 
 import type { IdleRestart as IdleRestartStatus, IdleRestartTarget, UpdateStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import type { RoutineHoldWindow } from "../backend/routine-store";
 import type { RestartReadiness } from "./update-readiness";
 
 interface IdleRestartUpdater {
@@ -21,6 +22,11 @@ export interface IdleRestartOptions {
   describeReadiness: () => RestartReadiness;
   holdRoutines: () => void;
   releaseRoutines: () => void;
+  /**
+   * Keeps the hold window over a restart or a quit, so that the next start runs the routines that
+   * came due while they were held. `null` removes it.
+   */
+  recordHold: (window: RoutineHoldWindow | null) => void;
   /** Starts OpenBot again through the normal shutdown. */
   relaunch: () => void;
   log: (message: string) => void;
@@ -35,11 +41,13 @@ export class IdleRestart {
   readonly #describeReadiness: () => RestartReadiness;
   readonly #holdRoutines: () => void;
   readonly #releaseRoutines: () => void;
+  readonly #recordHold: (window: RoutineHoldWindow | null) => void;
   readonly #relaunch: () => void;
   readonly #log: (message: string) => void;
   readonly #pollMs: number;
   #status: IdleRestartStatus | null = null;
-  #held = false;
+  /** When the routines were held, or `null` when they run. */
+  #heldSince: Date | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   /** The restart started. A cancel then would report a restart that happens. */
   #restarting = false;
@@ -49,6 +57,7 @@ export class IdleRestart {
     this.#describeReadiness = options.describeReadiness;
     this.#holdRoutines = options.holdRoutines;
     this.#releaseRoutines = options.releaseRoutines;
+    this.#recordHold = options.recordHold;
     this.#relaunch = options.relaunch;
     this.#log = options.log;
     this.#pollMs = options.pollMs ?? DEFAULT_POLL_MS;
@@ -62,8 +71,8 @@ export class IdleRestart {
       if (status.managedByHost) throw new Error(sourceText("error.update.managedByHost"));
       if (status.phase !== "ready") throw new Error(sourceText("error.update.notReady"));
     }
-    if (!this.#held) {
-      this.#held = true;
+    if (!this.#heldSince) {
+      this.#heldSince = new Date();
       this.#holdRoutines();
     }
     this.#log(`The user asked for a restart when idle (${target}).`);
@@ -80,8 +89,10 @@ export class IdleRestart {
     return this.#updater.getStatus();
   }
 
+  /** A quit while the routines are held keeps the window, as a restart does. */
   dispose(): void {
     this.#clearTimer();
+    this.#keepHold();
   }
 
   #schedule(delayMs: number): void {
@@ -105,6 +116,7 @@ export class IdleRestart {
     }
     this.#restarting = true;
     this.#publish({ ...status, waitingFor: [] });
+    this.#keepHold();
     if (status.target === "relaunch") {
       this.#log("Restarting OpenBot: no work runs.");
       this.#relaunch();
@@ -127,10 +139,15 @@ export class IdleRestart {
   #end(status: IdleRestartStatus | null): void {
     this.#clearTimer();
     this.#publish(status);
-    if (this.#held) {
-      this.#held = false;
+    if (this.#heldSince) {
+      this.#heldSince = null;
+      this.#recordHold(null);
       this.#releaseRoutines();
     }
+  }
+
+  #keepHold(): void {
+    if (this.#heldSince) this.#recordHold({ since: this.#heldSince, until: new Date() });
   }
 
   #publish(status: IdleRestartStatus | null): void {

@@ -148,6 +148,7 @@ import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -544,6 +545,7 @@ export async function createApplicationServices({
   const setupFile = join(app.getPath("userData"), SETUP_FILE);
   const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
+  const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
   // Loaded before the first window and before the application menu is built, so every native
@@ -1495,7 +1497,7 @@ export async function createApplicationServices({
     // from the moment the runtime exists, so this waits only for what is left of it, and a
     // failure here must not keep the agents down.
     await computerUseWarmUp.catch(() => undefined);
-    await service.initialize();
+    await service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
   });
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
@@ -1539,6 +1541,15 @@ export async function createApplicationServices({
     describeReadiness: describeRestartReadiness,
     holdRoutines: () => service.holdRoutines(),
     releaseRoutines: () => service.releaseRoutines(),
+    recordHold: (window) => {
+      try {
+        if (window) writeRoutineHold(routineHoldFile, window);
+        else clearRoutineHold(routineHoldFile);
+      } catch (error) {
+        // The restart goes on: the next start then skips the held routines as missed.
+        logger.warn("The routine hold could not be saved.", toLogValue(error));
+      }
+    },
     relaunch: () => {
       // A development build only quits: its supervisor stops the stack, and a relaunched Electron
       // would run outside it with no renderer server.
