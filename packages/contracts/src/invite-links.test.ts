@@ -12,6 +12,7 @@ import {
   PERMANENT_INVITE_EXPIRES_AT_MS,
   parseInviteUrl,
   permanentInviteExpiresAt,
+  selfHostedApiOrigin,
   toOpenBotInviteUrl,
 } from "./invite-links";
 
@@ -67,6 +68,25 @@ describe("OpenBot invite links", () => {
     expect(isValidRemoteApiUrl("https://example.com/")).toBe(false);
     expect(isValidRemoteApiUrl(`${payload.apiUrl}path`)).toBe(false);
   });
+
+  it("accepts only the configured self-hosted account service, through the app scheme", () => {
+    const selfHosted = { ...payload, apiUrl: "https://api.example.com/" };
+    const options = { selfHostedApiOrigin: selfHostedApiOrigin("https://api.example.com") };
+
+    const url = createInviteUrl(selfHosted, options);
+    expect(url).toBe(createOpenBotInviteUrl(selfHosted, options));
+    expect(parseInviteUrl(url, options)).toEqual(selfHosted);
+    expect(() => parseInviteUrl(url)).toThrow("invalid");
+    expect(() => parseInviteUrl(url, { selfHostedApiOrigin: "https://other.example.com" })).toThrow("invalid");
+    expect(createInviteUrl(payload, options)).toMatch(/^https:\/\/openbot\.run\/join\?/u);
+  });
+
+  it.each(["https://api.openbot.run", "https://openbot.run", "http://api.example.com", "not a url", undefined])(
+    "treats %s as no self-hosted account service",
+    (apiUrl) => {
+      expect(selfHostedApiOrigin(apiUrl)).toBeUndefined();
+    },
+  );
 
   it("supports localhost invitations only when local development is explicitly enabled", () => {
     expect(() => createInviteUrl(localDevelopmentPayload)).toThrow("invalid");

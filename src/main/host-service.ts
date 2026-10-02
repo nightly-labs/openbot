@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
-import { createInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
   CentralAuthUser,
@@ -987,12 +987,15 @@ export class HostService extends EventEmitter<HostEvents> {
       // and shows up in its invite list. What must not happen is emailing it under the new
       // account's authorization, or handing it back to the renderer the new account sees.
       this.#assertStillActiveHost(identity.serverId);
-      const inviteUrl = createInviteUrl({
-        apiUrl: remoteInviteApiUrl,
-        serverId: identity.serverId,
-        fingerprint: identity.fingerprint,
-        token: invite.token,
-      });
+      const inviteUrl = createInviteUrl(
+        {
+          apiUrl: remoteInviteApiUrl,
+          serverId: identity.serverId,
+          fingerprint: identity.fingerprint,
+          token: invite.token,
+        },
+        { selfHostedApiOrigin: selfHostedApiOrigin(remoteInviteApiUrl) },
+      );
       const result: InviteSummary = {
         id: invite.inviteId,
         role: input.role,

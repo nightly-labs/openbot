@@ -31,6 +31,7 @@ import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
   AppVariant,
@@ -1346,6 +1347,7 @@ export async function createApplicationServices({
     },
     {
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
+      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),

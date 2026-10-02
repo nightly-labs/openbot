@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { basename } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { type InviteLinkOptions, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
   AgentEvent,
   AgentImportPreview,
@@ -115,6 +115,8 @@ interface CentralAccountSession {
 
 interface RemoteServerManagerOptions {
   allowLocalDevelopmentInvites?: boolean;
+  /** The origin of the self-hosted account service that this app is configured to use. */
+  selfHostedApiOrigin?: string;
   appVersion?: string;
   webrtcTransport?: TeamWebRtcClientTransport;
   getLocalHostId?: () => string | null;
@@ -149,6 +151,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #team: RemoteTeamDirectory;
   readonly #centralAccount: CentralAccountSession;
   readonly #allowLocalDevelopmentInvites: boolean;
+  readonly #inviteLinks: InviteLinkOptions;
   readonly #appVersion: string | null;
   #duplicateOperationIds = new Map<string, string>();
   /** When Signal first missed each host that restarts into an update. */
@@ -181,6 +184,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#centralAccount = centralAccount;
     this.#allowLocalDevelopmentInvites = options.allowLocalDevelopmentInvites ?? false;
+    this.#inviteLinks = {
+      allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
+      selfHostedApiOrigin: options.selfHostedApiOrigin,
+    };
     this.#webrtcTransport = options.webrtcTransport ?? null;
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
     this.#onHostUnavailable = options.onHostUnavailable ?? (() => undefined);
@@ -436,9 +443,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async join(input: JoinServerInput): Promise<ServerSummary> {
-    const invite = parseInviteUrl(input.inviteUrl, {
-      allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
-    });
+    const invite = parseInviteUrl(input.inviteUrl, this.#inviteLinks);
     if (this.#webrtcTransport && !isLocalDevelopmentApi(invite.apiUrl)) {
       const preview = await this.#webrtcTransport.previewInvite(invite.token);
       if (preview.hostId !== invite.serverId) throw new Error(sourceText("error.remote.inviteHostMismatch"));
@@ -536,9 +541,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async previewInvite(input: JoinServerInput): Promise<InvitePreview> {
-    const invite = parseInviteUrl(input.inviteUrl, {
-      allowLocalDevelopmentApiUrl: this.#allowLocalDevelopmentInvites,
-    });
+    const invite = parseInviteUrl(input.inviteUrl, this.#inviteLinks);
     if (this.#webrtcTransport && !isLocalDevelopmentApi(invite.apiUrl)) {
       const preview = await this.#webrtcTransport.previewInvite(invite.token);
       if (preview.hostId !== invite.serverId) throw new Error(sourceText("error.remote.inviteHostMismatch"));

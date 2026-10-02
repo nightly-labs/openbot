@@ -54,10 +54,33 @@ export interface InviteLinkPayload {
 
 export interface InviteLinkOptions {
   allowLocalDevelopmentApiUrl?: boolean;
+  /**
+   * The one self-hosted account service that this client uses. Only an origin from the client's
+   * own configuration goes here, never one read from an invitation.
+   */
+  selfHostedApiOrigin?: string;
+}
+
+/**
+ * The origin of a self-hosted account service, or undefined for ours, for a local development one,
+ * and for a value that is not a URL.
+ */
+export function selfHostedApiOrigin(apiUrl: string | undefined): string | undefined {
+  if (!apiUrl) return undefined;
+  try {
+    const { protocol, origin } = new URL(apiUrl);
+    return protocol === "https:" && origin !== OPENBOT_CONTROL_PLANE_ORIGIN && origin !== OPENBOT_INVITE_ORIGIN
+      ? origin
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function createInviteUrl(payload: InviteLinkPayload, options: InviteLinkOptions = {}): string {
   validatePayload(payload, options);
+  // Our website does not open a self-hosted invitation, and must not receive its token.
+  if (isSelfHostedApiUrl(new URL(payload.apiUrl), options)) return createOpenBotInviteUrl(payload, options);
   const url = new URL(OPENBOT_INVITE_PATH, OPENBOT_INVITE_ORIGIN);
   writePayload(url, payload);
   return url.toString();
@@ -161,6 +184,7 @@ export function isValidRemoteApiUrl(value: string, options: InviteLinkOptions = 
       url.search === "" &&
       url.hash === "" &&
       (localDevelopmentApi ||
+        isSelfHostedApiUrl(url, options) ||
         (url.protocol === "https:" &&
           url.port === "" &&
           (url.origin === OPENBOT_CONTROL_PLANE_ORIGIN ||
@@ -170,6 +194,10 @@ export function isValidRemoteApiUrl(value: string, options: InviteLinkOptions = 
   } catch {
     return false;
   }
+}
+
+function isSelfHostedApiUrl(url: URL, options: InviteLinkOptions): boolean {
+  return url.protocol === "https:" && url.origin === options.selfHostedApiOrigin;
 }
 
 function validatePayload(payload: InviteLinkPayload, options: InviteLinkOptions): void {

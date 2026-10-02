@@ -7,6 +7,7 @@ import {
   OPENBOT_CONTROL_PLANE_ORIGIN,
   OPENBOT_INVITE_ORIGIN,
   parseInviteUrl,
+  selfHostedApiOrigin,
 } from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
@@ -109,7 +110,9 @@ export class RemoteTeamDirectoryClient {
     this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
-    this.#inviteLinks = input.inviteLinks ?? {};
+    // A self-hosted account service accepts invitations that name it. `previewInvite` still refuses
+    // an invitation for any other service.
+    this.#inviteLinks = { selfHostedApiOrigin: selfHostedApiOrigin(input.apiUrl), ...input.inviteLinks };
     const keys = new Map<string, string>();
     this.#hostKeys = input.hostKeys ?? {
       get: async (hostId) => keys.get(hostId) ?? null,

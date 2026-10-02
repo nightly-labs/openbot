@@ -470,6 +470,8 @@ the configured HTTPS Cloudflare API. The client stores only an encrypted OpenBot
 authentication records from D1. The embedded browser uses a separate sandboxed Electron session and
 cannot access `window.openbot` or managed local attachments.
 
+To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
+
 ## Security
 
 Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not put credentials, private

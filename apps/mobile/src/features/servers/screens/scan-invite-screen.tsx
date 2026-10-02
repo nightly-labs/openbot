@@ -1,10 +1,11 @@
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { View } from "react-native";
 
 import { QrScanner } from "@/features/auth/components/qr-scanner";
 import { ScannerCloseButton } from "@/features/auth/components/scanner-close-button";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { rememberIncomingLink } from "@/features/links/model/incoming-links";
 import { useText } from "@/shared/lib/text";
 
@@ -12,13 +13,14 @@ import { useText } from "@/shared/lib/text";
 // close control ride over the camera instead of a native header.
 export function ScanInviteScreen() {
   const { t } = useText();
+  const { session } = useMobileSession();
   return (
     <QrScanner
       embedded
       pairing={false}
       onScan={async (data) => {
         try {
-          parseInviteUrl(data);
+          parseInviteUrl(data, { selfHostedApiOrigin: selfHostedApiOrigin(session?.apiUrl) });
         } catch {
           throw new Error(t("mobile.server.scan.notInvitation"));
         }

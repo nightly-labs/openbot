@@ -10,7 +10,7 @@
 // So the two arms stay visible. Hiding them behind one method would read as tidier and would cost
 // the next reader an hour the first time an invitation goes missing from the wrong server.
 
-import { createInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   InviteSummary,
   TeamInviteSummary,
@@ -159,12 +159,15 @@ export class RemoteTeamDirectory {
         email: input.email ?? null,
         permanent: invite.permanent,
         useCount: invite.useCount,
-        inviteUrl: createInviteUrl({
-          apiUrl: transport.controlPlaneUrl,
-          serverId,
-          fingerprint: server.fingerprint,
-          token: invite.token,
-        }),
+        inviteUrl: createInviteUrl(
+          {
+            apiUrl: transport.controlPlaneUrl,
+            serverId,
+            fingerprint: server.fingerprint,
+            token: invite.token,
+          },
+          { selfHostedApiOrigin: selfHostedApiOrigin(transport.controlPlaneUrl) },
+        ),
       };
       if (input.email) {
         // An invitation nobody received is worse than none: it is a live credential the user does

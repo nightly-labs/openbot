@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -113,8 +113,9 @@ const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
-const developmentInviteLinkOptions = {
+const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
+  selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
 };
 const developmentRemoteDebuggingPort = !app.isPackaged
   ? readDevelopmentRemoteDebuggingPort(process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT)
@@ -219,9 +220,7 @@ type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace"
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
 // tells a link that arrives now to be sent rather than held.
-let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(
-  findDeepLink(process.argv, developmentInviteLinkOptions),
-);
+let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
@@ -713,7 +712,7 @@ function receiveMcpAuthorizationCode(state: string, code: string): void {
 }
 
 app.on("open-url", (event, url) => {
-  const link = parseDeepLink(url, developmentInviteLinkOptions);
+  const link = parseDeepLink(url, inviteLinkOptions);
   if (!link) return;
   event.preventDefault();
   acceptDeepLink(link);
@@ -722,7 +721,7 @@ app.on("open-url", (event, url) => {
 app.on("continue-activity", (event, type, _userInfo, details) => {
   if (type !== "NSUserActivityTypeBrowsingWeb" || !details.webpageURL) return;
   try {
-    parseInviteUrl(details.webpageURL, developmentInviteLinkOptions);
+    parseInviteUrl(details.webpageURL, inviteLinkOptions);
   } catch {
     return;
   }
@@ -735,7 +734,7 @@ if (!hasSingleInstanceLock) {
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
-    const deepLink = findDeepLink(argv, developmentInviteLinkOptions);
+    const deepLink = findDeepLink(argv, inviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
     const window = windowHolder.current;
     const hasMainWindow = Boolean(window && !window.isDestroyed());
@@ -750,7 +749,7 @@ if (!hasSingleInstanceLock) {
     else if (response === "relaunch" && !relaunchRequested) {
       relaunchRequested = true;
       // The new instance takes this launch's link, not the one this process may have started with.
-      const isLink = (value: string) => parseDeepLink(value, developmentInviteLinkOptions) !== null;
+      const isLink = (value: string) => parseDeepLink(value, inviteLinkOptions) !== null;
       const link = argv.find(isLink);
       const args = process.argv.slice(1).filter((value) => !isLink(value));
       app.relaunch({ args: link ? [...args, link] : args });

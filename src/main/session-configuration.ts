@@ -16,7 +16,7 @@ import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { MailboxStore } from "../backend/mailbox-store";
-import { buildContentSecurityPolicy } from "./content-security-policy";
+import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
@@ -24,7 +24,11 @@ import type { TeamStore } from "./team-store";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
 export function configureContentSecurityPolicy(): void {
-  const policy = buildContentSecurityPolicy(app.isPackaged, process.env.REMOTE_SIGNAL_URL);
+  const policy = buildContentSecurityPolicy(
+    app.isPackaged,
+    process.env.REMOTE_SIGNAL_URL,
+    readSelfHostedSignalOrigin(process.env.OPENBOT_AUTH_API_URL, process.env.OPENBOT_REMOTE_SIGNAL_URL),
+  );
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     if (details.resourceType !== "mainFrame" || !isTrustedRendererUrl(details.url)) {
