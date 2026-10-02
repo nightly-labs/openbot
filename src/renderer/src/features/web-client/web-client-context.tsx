@@ -666,18 +666,22 @@ export function createWebWorkspace(
     if (state.status === "connecting") return;
     const current = ++generation;
     const sameHost = hostId === host.hostId;
+    // A hosted server that sleeps or wakes keeps the workspace visible, so each retry keeps its agents and the selection.
+    const keepWorkspace = sameHost && state.hostedSleep !== null;
     const previousSelected = sameHost ? selectedId : null;
     hostId = host.hostId;
-    selectedId = null;
+    if (!keepWorkspace) selectedId = null;
     if (!sameHost) endSleep();
     setState((draft) => {
       draft.host = host;
       draft.status = "connecting";
       draft.hostRestart = null;
       draft.memberId = sameHost ? draft.memberId : null;
-      draft.agents = [];
-      draft.agentsLoaded = false;
-      draft.selectedId = null;
+      if (!keepWorkspace) {
+        draft.agents = [];
+        draft.agentsLoaded = false;
+        draft.selectedId = null;
+      }
       if (!sameHost) {
         draft.conversations = {};
         draft.queues = {};

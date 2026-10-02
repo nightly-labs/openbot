@@ -177,6 +177,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostedServers: HostedServerWakeHooks | null;
   /** When each hosted server that starts after a wake request started. */
   readonly #hostedStartAt = new Map<string, number>();
+  /** Hosted servers that did not come online in the start time. Only the user's next wake starts them again. */
+  readonly #hostedStartExpired = new Set<string>();
   #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selectChain = Promise.resolve();
@@ -260,6 +262,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#events.clearReconnectBackoff(serverId);
       this.#hostRestartAway.delete(serverId);
       this.#hostedStartAt.delete(serverId);
+      this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
       void this.#refresh.refreshAgentRoster(serverId).catch(() => undefined);
       this.#emitChanged();
@@ -297,7 +300,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         this.#events.markHostOffline(serverId);
         // A hosted server that another reason stopped starts again only for the selected server with the
         // app in focus. A server that sleeps waits for the user's input.
-        this.#checkHostedServer(serverId, this.#appFocused && serverId === this.#store.activeServerId);
+        this.#checkHostedServer(
+          serverId,
+          !this.#hostedStartExpired.has(serverId) && this.#appFocused && serverId === this.#store.activeServerId,
+        );
       }
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
@@ -734,6 +740,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
    */
   hostedServerStarting(serverId: string): void {
     if (!this.#store.has(serverId) || this.#connections.stateFor(serverId) === "online") return;
+    // Automatic wakes stop after an expired start, so this wake came from the user.
+    this.#hostedStartExpired.delete(serverId);
     this.#hostedStartAt.set(serverId, Date.now());
     this.#events.setHostStarting(serverId, true);
     if (this.#connections.setHostedSleep(serverId, "waking")) this.#emitChanged();
@@ -764,6 +772,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (since === undefined) return false;
     if (Date.now() - since < HOSTED_SERVER_START_MS) return true;
     this.#hostedStartAt.delete(serverId);
+    this.#hostedStartExpired.add(serverId);
     this.#events.setHostStarting(serverId, false);
     if (this.#connections.setHostedSleep(serverId, null)) this.#emitChanged();
     return false;
@@ -771,6 +780,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   #clearServerConnectionState(serverId: string): void {
     this.#hostedStartAt.delete(serverId);
+    this.#hostedStartExpired.delete(serverId);
     this.#events.forget(serverId);
     this.#refresh.forget(serverId);
     this.#connections.forget(serverId);
