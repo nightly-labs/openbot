@@ -38,7 +38,7 @@ const SEARCH_DESCRIPTION_LENGTH = 155;
  * The longest run of whole sentences that a search result shows in full. A first
  * sentence that is already too long is cut at a word and ends with an ellipsis.
  */
-export function searchDescription(text: string): string {
+function searchDescription(text: string): string {
   if (text.length <= SEARCH_DESCRIPTION_LENGTH) return text;
   let kept = "";
   for (const sentence of text.match(/[^.!?]+[.!?]+(\s|$)/g) ?? []) {
