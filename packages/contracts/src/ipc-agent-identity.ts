@@ -14,7 +14,9 @@ export type AvatarHue = (typeof AVATAR_HUES)[number];
 
 // Square brackets are in the set because a provider CLI puts them there: the Claude CLI reports its
 // 1M-context Fable variant as `claude-fable-5-1[1m]`, and every id this guard sees was minted by a
-// CLI OpenBot does not control. Without them the model was unselectable and, worse, unlistable --
+// CLI OpenBot does not control. `=` and `,` are there for the same reason: the Cursor CLI lists its
+// variants as `gpt-5.6-sol[context=272k,reasoning=medium,fast=false]`, and takes that id back whole.
+// Without them the model was unselectable and, worse, unlistable --
 // `isAgentModelOption` refuses the option, and the list decoders on both the IPC and the Team API
 // side fail closed on the whole array with it, so one such id emptied the model picker locally and
 // took a remote server offline entirely. Failing closed is what the contract asks of a malformed
@@ -24,7 +26,9 @@ export type AvatarHue = (typeof AVATAR_HUES)[number];
 // the `/` a provider prefix uses, and nothing downstream builds a filesystem path or a URL out of
 // one -- `/v1/agents/models` takes no model parameter.
 export function isAgentModel(value: unknown): value is AgentModelId {
-  return isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]*$/.test(value);
+  return (
+    isString(value) && value.length > 0 && value.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]*$/.test(value)
+  );
 }
 
 /**

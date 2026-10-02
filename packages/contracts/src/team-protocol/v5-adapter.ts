@@ -325,7 +325,7 @@ export function decodeTeamProtocolV5CurrentHttpResponse(
  * protocol, so a v5 request cannot name it.
  */
 const V5_AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "acp"] as const;
-const V5_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,159}$/u;
+export const V5_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,159}$/u;
 const V5_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 
 /**

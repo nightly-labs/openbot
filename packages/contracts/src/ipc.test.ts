@@ -881,6 +881,10 @@ describe("renderer-to-main boundary guards", () => {
       supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
     };
     expect(isAgentModelOption(model)).toBe(true);
+    // The Cursor CLI lists its variants with settings inside the brackets.
+    expect(
+      isAgentModelOption({ ...model, provider: "cursor", id: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]" }),
+    ).toBe(true);
     expect(isAgentModelOption({ ...model, id: "claude fable 5" })).toBe(false);
     expect(isAgentModelOption({ ...model, id: "" })).toBe(false);
   });

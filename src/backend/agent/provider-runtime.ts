@@ -14,6 +14,7 @@ import type {
 import {
   accountUsageCoversModel,
   agentProviderDescriptor,
+  isAgentModel,
   isAgentProvider,
   isReasoningEffort,
   workspaceAccessEnforced,
@@ -1983,6 +1984,12 @@ export class ProviderRuntime implements ProviderPort {
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
                 if (!id) continue;
+                // An id the contract refuses is dropped alone, for the same reason: the Cursor CLI
+                // once added `=` and `,`, and that emptied the picker for every provider.
+                if (!isAgentModel(id)) {
+                  logger.warn("A provider reported a model id that is not valid.", { provider: client.provider, id });
+                  continue;
+                }
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;

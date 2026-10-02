@@ -458,6 +458,37 @@ describe("TeamApiServer agents", () => {
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
+  // A shipped peer's model list decoder fails closed on the whole array, and no released protocol
+  // knows `=` or `,` in a model id, so such a model must not reach a peer.
+  it("keeps a model id no released protocol knows off the model list", async () => {
+    const option = { name: "Model", description: "", defaultReasoningEffort: "medium" as const };
+    const { start, signIn } = await createTeamApiFixture("unrepresentable-model", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      agents: createAgents({
+        listModels: () => [
+          {
+            ...option,
+            provider: "claude",
+            id: "claude-opus-5[effort=high,fast=false]",
+            supportedReasoningEfforts: ["medium"],
+          },
+          { ...option, provider: "claude", id: "claude-fable-5-1[1m]", supportedReasoningEfforts: ["medium"] },
+        ],
+      }),
+    });
+    const token = await signIn({ protocol: 5, appVersion: "1.0.0" });
+    const response = await fetch(`${base}/v1/agents/models`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: "5",
+        [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      },
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).map((model: { id: string }) => model.id)).toEqual(["claude-fable-5-1[1m]"]);
+  });
+
   it("duplicates an agent through protocol v3 and places it after the source", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
