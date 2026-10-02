@@ -78,7 +78,12 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { CONTEXT_RESET_ITEM_TYPE, isContextResetMarker, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import {
+  agentAutomationAllowed,
+  CONTEXT_RESET_ITEM_TYPE,
+  isContextResetMarker,
+  workspaceAccessEnforced,
+} from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -126,6 +131,7 @@ import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
+import { automationRunCommand } from "./automation-command";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
@@ -968,6 +974,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#routines.test(input);
   }
 
+  /** A run that a local script starts through the automation server. Only for agents that allow it. */
+  async runRoutineFromAutomation(input: TestRoutineInput & { payload: string }): Promise<RoutineRun> {
+    this.#requireAutomationAllowed(input.agentId);
+    if (input.payload.length > INPUT_LIMITS.automationPayload) {
+      throw new Error(sourceText("error.agent.automationPayloadTooLong", { limit: INPUT_LIMITS.automationPayload }));
+    }
+    return this.#routines.runWithPayload(input);
+  }
+
+  /** The command the user copies to run a routine from a local script. */
+  automationRunCommand(input: TestRoutineInput): string {
+    this.#requireAutomationAllowed(input.agentId);
+    if (!this.#routines.list(input.agentId).some((routine) => routine.id === input.routineId)) {
+      throw new Error(sourceText("error.backend.routineGone"));
+    }
+    return automationRunCommand({
+      root: this.#store.automationRoot,
+      agentId: input.agentId,
+      routineId: input.routineId,
+      payload: "",
+      platform: process.platform,
+    });
+  }
+
+  #requireAutomationAllowed(agentId: string): void {
+    const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+    if (!agent || !agentAutomationAllowed(agent)) throw new Error(sourceText("error.agent.automationOff"));
+  }
+
   listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
     return this.#routines.listRuns(input);
   }
@@ -1325,7 +1360,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
       input.access !== undefined ||
-      input.computerUse !== undefined;
+      input.computerUse !== undefined ||
+      input.allowAutomation !== undefined;
     const agent = await this.#store.updateAgent(
       { ...input, ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}) },
       initiatingAgentId,

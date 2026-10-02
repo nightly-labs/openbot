@@ -41,6 +41,7 @@ import {
   decodeAgentModels,
   decodeAgentStatusFromMain,
   decodeAgents,
+  decodeAutomationRunCommand,
   decodeDuplicateAgentResultFromMain,
   decodeHostAnalyticsFromMain,
   decodeMemories,
@@ -659,6 +660,7 @@ const openbotApi: OpenBotDesktopApi = {
       deleteRoutine: decodeVoid,
       testRoutine: decodeRoutineRun,
       listRoutineRuns: decodeRoutineRuns,
+      automationRunCommand: decodeAutomationRunCommand,
     }),
     ...bridgeGroup(IPC_ENDPOINTS.channelMemories, {
       listChannelMemories: decodeChannelMemories,

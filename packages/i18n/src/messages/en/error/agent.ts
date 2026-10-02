@@ -67,6 +67,11 @@ export const messages = defineMessages("error.agent", {
   // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
+  "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",
+  "error.agent.automationOff": "This agent does not allow local scripts to run its routines.",
+  "error.agent.automationPayloadTooLong": "The payload is longer than {limit} characters.",
+  "error.agent.automationRateLimited":
+    "Local scripts ran this agent's routines {limit} times in the last hour. Try again later.",
   "error.agent.workspaceOnlyMacOnly":
     "Workspace only is available for this provider on macOS only. Choose Full access in the agent settings.",
   "error.agent.lowMemory":

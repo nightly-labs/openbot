@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
-import { Button, CirclePause, Clock3, ConfirmDialog, Input, Plus, Switch, Textarea } from "@openbot/ui";
+import { Button, CirclePause, Clock3, ConfirmDialog, Input, Plus, Switch, Textarea, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
@@ -20,6 +20,7 @@ import { type RoutineText, routineScheduleSummary } from "@openbot/ui/features/c
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
+import { writeClipboardText } from "../../clipboard";
 import type { RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
@@ -368,6 +369,19 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
+  async function copyRunCommand(): Promise<void> {
+    const routineId = draft()?.id;
+    const runCommand = props.port.runCommand;
+    if (!routineId || !runCommand) return;
+    setError(null);
+    try {
+      await writeClipboardText(await runCommand(routineId));
+      toast.success(t("routine.settings.runCommandCopied"));
+    } catch (caught) {
+      setError(errorMessage(caught, t("routine.settings.copyRunCommandFailed")));
+    }
+  }
+
   return (
     <div class="agent-routines-settings">
       <header class="settings-panel-header agent-routines-header">
@@ -489,17 +503,24 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     <Show
                       when={dirty()}
                       fallback={
-                        <Button
-                          type="button"
-                          size="sm"
-                          class="agent-routine-test"
-                          disabled={!current().id || testing() || !validDraft(current())}
-                          loading={testing()}
-                          loadingLabel={t("routine.settings.starting")}
-                          onClick={() => void testRun()}
-                        >
-                          {t("routine.settings.testRun")}
-                        </Button>
+                        <>
+                          <Show when={props.port.runCommand && current().id}>
+                            <Button variant="secondary" type="button" size="sm" onClick={() => void copyRunCommand()}>
+                              {t("routine.settings.copyRunCommand")}
+                            </Button>
+                          </Show>
+                          <Button
+                            type="button"
+                            size="sm"
+                            class="agent-routine-test"
+                            disabled={!current().id || testing() || !validDraft(current())}
+                            loading={testing()}
+                            loadingLabel={t("routine.settings.starting")}
+                            onClick={() => void testRun()}
+                          >
+                            {t("routine.settings.testRun")}
+                          </Button>
+                        </>
                       }
                     >
                       <Button

@@ -360,6 +360,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       reasoningEffort: input.reasoningEffort ?? "low",
       access: input.access ?? "full",
       computerUse: input.computerUse ?? true,
+      ...(input.allowAutomation ? { allowAutomation: true } : {}),
       threadId: input.threadId ?? `thread-${id}`,
       workspacePath: input.workspacePath ?? `/mock/OpenBot/Agents/${id}`,
       preview: input.preview ?? "No messages yet",
@@ -1258,6 +1259,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(run);
       },
       listRoutineRuns: async (input) => clone((routineRuns.get(input.routineId) ?? []).slice(0, input.limit)),
+      automationRunCommand: async (input) =>
+        `curl -sS -X POST "$(cat '/mock/automation/url')/v1/agents/${input.agentId}/routines/${input.routineId}/run" -H "Authorization: Bearer $(cat '/mock/automation/token')" -H 'Content-Type: application/json' -d '{"payload":""}'`,
       readConversation: async (agentId) => ({
         ...clone(getSnapshot(agentId)),
         readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },

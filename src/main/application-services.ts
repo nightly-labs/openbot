@@ -72,6 +72,7 @@ import {
 } from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
+import { AutomationServer } from "./automation-server";
 import { BillingDesktopService } from "./billing-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
@@ -243,6 +244,8 @@ const TEARDOWN_ORDER = {
   mcpOAuthRedirect: 105,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
+  // Before the agent service, so no script starts a run while the service stops.
+  automation: 108,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
@@ -874,6 +877,17 @@ export async function createApplicationServices({
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // Listens only while an agent allows local scripts; see `AutomationServer`.
+  const automation = new AutomationServer({
+    root: store.automationRoot,
+    listAgents: () => service.listAgents(),
+    listRoutines: (agentId) => service.listRoutines(agentId),
+    runRoutine: (input) => service.runRoutineFromAutomation(input),
+  });
+  service.on("event", (event) => {
+    if (event.type === "agents-changed") void automation.sync();
+  });
+  teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => automation.stop());
   /*
    * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
    * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
@@ -1490,6 +1504,7 @@ export async function createApplicationServices({
     // failure here must not keep the agents down.
     await computerUseWarmUp.catch(() => undefined);
     await service.initialize();
+    await automation.sync();
   });
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({

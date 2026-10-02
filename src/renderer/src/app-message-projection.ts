@@ -33,6 +33,7 @@ export function toAgentProfile(stored: AgentSummary): AgentProfile {
     reasoningEffort: stored.reasoningEffort,
     access: stored.access,
     computerUse: stored.computerUse,
+    allowAutomation: stored.allowAutomation,
     threadId: stored.threadId,
     workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,

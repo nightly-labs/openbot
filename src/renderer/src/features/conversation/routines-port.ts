@@ -20,10 +20,12 @@ export interface RoutinesPort {
   save: (input: RoutineSaveInput) => Promise<RoutineFields>;
   remove: (routineId: string) => Promise<void>;
   test: (routineId: string) => Promise<void>;
+  /** Only for an agent on this computer that allows local scripts. */
+  runCommand?: (routineId: string) => Promise<string>;
   subscribe: (reload: () => void) => () => void;
 }
 
-export function agentRoutinesPort(agentId: string): RoutinesPort {
+export function agentRoutinesPort(agentId: string, automation = false): RoutinesPort {
   return {
     ownerId: agentId,
     ownerNoun: "agent",
@@ -37,6 +39,9 @@ export function agentRoutinesPort(agentId: string): RoutinesPort {
     test: async (routineId) => {
       await window.openbot.agent.testRoutine({ agentId, routineId });
     },
+    ...(automation
+      ? { runCommand: (routineId: string) => window.openbot.agent.automationRunCommand({ agentId, routineId }) }
+      : {}),
     subscribe: (reload) =>
       window.openbot.agent.onEvent((event) => {
         if (event.type === "routines-changed" && event.agentId === agentId) reload();

@@ -165,6 +165,8 @@ export interface AgentProfile {
   access?: AgentAccess;
   /** Absent means on. Absent for an agent on a remote host too, which does not share it. */
   computerUse?: boolean;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  allowAutomation?: boolean;
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;

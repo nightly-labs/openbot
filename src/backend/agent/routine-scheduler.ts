@@ -251,12 +251,24 @@ export class RoutineScheduler implements RoutineDueSource {
     }
   }
 
-  async test(input: TestRoutineInput): Promise<RoutineRun> {
+  test(input: TestRoutineInput): Promise<RoutineRun> {
+    return this.runWithPayload({ ...input, payload: "" });
+  }
+
+  /**
+   * A manual run. A local script adds `payload` through the automation server; it is stored in the
+   * run's instruction, so a run that recovery sends again after a restart still carries it.
+   */
+  async runWithPayload(input: TestRoutineInput & { payload: string }): Promise<RoutineRun> {
     if (!this.mayDrain(input.agentId)) throw new RoutineInputError(sourceText("error.backend.routineWaitForAgent"));
     this.#conversation.requireKnownAgent(input.agentId);
     const routine = this.#routines.get(input.agentId, input.routineId);
     if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
-    const run = this.#routines.createRun(routine, null, "manual", new Date().toISOString());
+    const payload = input.payload.trim();
+    const instruction = payload
+      ? `${routine.instruction}\n\n--- event from a local script ---\n${payload}`
+      : routine.instruction;
+    const run = this.#routines.createRun({ ...routine, instruction }, null, "manual", new Date().toISOString());
     await this.#enqueueRun(run);
     this.stateChanged(input.agentId);
     return this.#routines.listRuns(input.agentId, input.routineId, 1)[0] ?? run;

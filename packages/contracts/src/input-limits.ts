@@ -30,6 +30,8 @@ export const INPUT_LIMITS = {
   routineName: 80,
   routineInstruction: 100_000,
   routineRunsPage: 100,
+  // The text a local script adds to a routine run through the automation server.
+  automationPayload: 4_000,
   routineCron: 255,
   messageText: 100_000,
   directMessageText: 20_000,

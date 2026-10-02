@@ -223,6 +223,9 @@ export function agentIpcHandlers({
           if (input.computerUse !== undefined) {
             throw new Error(sourceText("error.agent.computerUseLocalOnly"));
           }
+          if (input.allowAutomation !== undefined) {
+            throw new Error(sourceText("error.agent.automationLocalOnly"));
+          }
           return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
             method: "PATCH",
             body: input,

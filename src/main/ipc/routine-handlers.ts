@@ -1,6 +1,7 @@
 // Routines: the scheduled standing instructions attached to one agent.
 
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import { decodeRoutine, decodeRoutineRun, decodeRoutineRuns, decodeRoutines } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
@@ -78,6 +79,12 @@ export function routineIpcHandlers({
             `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
             decodeRoutineRuns,
           ),
+      }),
+      automationRunCommand: scopedHandler(parseTestRoutine, {
+        local: (parsed) => service.automationRunCommand(parsed),
+        remote: () => {
+          throw new Error(sourceText("error.agent.automationLocalOnly"));
+        },
       }),
     },
   };

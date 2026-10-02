@@ -662,6 +662,7 @@ export function installOpenbotStub(): void {
       updateRoutine: notStubbed("agent.updateRoutine"),
       deleteRoutine: notStubbed("agent.deleteRoutine"),
       testRoutine: notStubbed("agent.testRoutine"),
+      automationRunCommand: notStubbed("agent.automationRunCommand"),
       saveMcpServer: notStubbed("agent.saveMcpServer"),
       removeMcpServer: notStubbed("agent.removeMcpServer"),
       setMcpServerEnabled: notStubbed("agent.setMcpServerEnabled"),

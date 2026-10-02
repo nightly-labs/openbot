@@ -334,6 +334,22 @@ Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
 would refuse.
 
+## Local script runs
+
+`src/main/automation-server.ts` is a loopback HTTP listener through which a local script runs a
+routine of an agent that allows it. [docs/automation.md](automation.md) has the routes and the
+commands. The listener runs only while at least one agent has `allowAutomation`, and binds
+`127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
+(folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+
+A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
+kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
+crash. The flag is in `agent_json` and needs no migration; a profile without it is off. Only the user
+changes it, on the computer that runs the agent: the Team API parser and the agent profile tools do
+not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
+on, the developer instructions name the two file paths, never the token.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
@@ -899,7 +915,7 @@ environment values, URLs, or headers, because they can hold secrets. `install_lo
 it they act on the caller. `uninstall_skill` never removes skill files that the user changed.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
-user widens them again, and only the user changes auto-approve and MCP servers. A new agent gets
+user widens them again, and only the user changes auto-approve, MCP servers and local script runs. A new agent gets
 the access and Computer Use limits of the agent that creates it, so a Workspace-only agent cannot
 get around its sandbox through a teammate. There is no creation step for skills or routines in
 the UI.

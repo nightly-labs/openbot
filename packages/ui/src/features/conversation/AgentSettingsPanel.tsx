@@ -10,6 +10,7 @@ import {
   type AgentStatus,
   type AvatarHue,
   type AvatarImageInput,
+  agentAutomationAllowed,
   agentComputerUseEnabled,
   type CustomAgentSummary,
   type CustomProviderSummary,
@@ -80,6 +81,8 @@ export interface AgentSettingsPanelProps {
   accessEditable?: boolean;
   /** Computer Use is local-only too, and no remote host administers it yet. */
   computerUseEditable?: boolean;
+  /** Local scripts reach only the computer that runs the agent, so a remote server hides the control. */
+  automationEditable?: boolean;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[];
@@ -141,6 +144,7 @@ interface AgentSettingsDraft {
   notifications: boolean;
   access: AgentAccess;
   computerUse: boolean;
+  allowAutomation: boolean;
   /** Widening to full access waits here for the confirmation. */
   confirmingFullAccess: boolean;
   runtime: AgentRuntimeSettings;
@@ -181,6 +185,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     notifications: true,
     access: DEFAULT_AGENT_ACCESS,
     computerUse: true,
+    allowAutomation: false,
     confirmingFullAccess: false,
     runtime: untrack(() => ({ ...props.runtimeSettings })),
     saveError: null,
@@ -240,6 +245,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agent.notifications),
           agent.access ?? DEFAULT_AGENT_ACCESS,
           String(agentComputerUseEnabled(agent)),
+          String(agentAutomationAllowed(agent)),
           runtimeSettings.provider,
           runtimeSettings.model,
           runtimeSettings.reasoningEffort,
@@ -274,6 +280,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.notifications = agent.notifications;
           state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
           state.computerUse = agentComputerUseEnabled(agent);
+          state.allowAutomation = agentAutomationAllowed(agent);
           if (agentChanged) state.confirmingFullAccess = false;
           state.runtime.provider = runtimeSettings.provider;
           state.runtime.model = runtimeSettings.model;
@@ -569,6 +576,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     if (!disposed && props.agent.id === agentId && draft.computerUse === next) {
       setDraft((state) => {
         state.computerUse = !next;
+      });
+    }
+  }
+
+  async function saveAllowAutomation(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.allowAutomation = next;
+    });
+    if (await saveAgentPatch({ allowAutomation: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.allowAutomation === next) {
+      setDraft((state) => {
+        state.allowAutomation = !next;
       });
     }
   }
@@ -929,6 +949,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 aria-label={t("agentSettings.computerUse.title")}
                 checked={draft.computerUse}
                 onChange={(next) => void saveComputerUse(next)}
+              />
+            </div>
+          </Show>
+          <Show when={props.automationEditable}>
+            <div class="agent-settings-notifications">
+              <div>
+                <strong>{t("agentSettings.automation.title")}</strong>
+                <span>{t("agentSettings.automation.description")}</span>
+              </div>
+              <Switch
+                size="sm"
+                aria-label={t("agentSettings.automation.title")}
+                checked={draft.allowAutomation}
+                onChange={(next) => void saveAllowAutomation(next)}
               />
             </div>
           </Show>

@@ -30,6 +30,10 @@ export function agentComputerUseEnabled(agent: Pick<AgentSummary, "computerUse">
   return agent.computerUse !== false;
 }
 
+export function agentAutomationAllowed(agent: Pick<AgentSummary, "allowAutomation">): boolean {
+  return agent.allowAutomation === true;
+}
+
 /**
  * Whether this agent runs inside the workspace sandbox now. Every provider enforces it. Codex runs the
  * agent in its `workspace-write` sandbox. Claude runs Bash in its sandbox and asks before a file edit
@@ -75,6 +79,11 @@ export interface AgentSummary {
    * `agentComputerUseEnabled`.
    */
   computerUse?: boolean;
+  /**
+   * Whether a local script can run this agent's routines through the automation server. Local-only,
+   * like `access`. Absent means off; see `agentAutomationAllowed`.
+   */
+  allowAutomation?: boolean;
   threadId: string | null;
   workspacePath: string;
   preview: string;
@@ -104,6 +113,7 @@ export function isAgentSummary(value: unknown): value is AgentSummary {
     isReasoningEffort(value.reasoningEffort) &&
     (value.access === undefined || isAgentAccess(value.access)) &&
     (value.computerUse === undefined || isBoolean(value.computerUse)) &&
+    (value.allowAutomation === undefined || isBoolean(value.allowAutomation)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
     isBoundedString(value.preview, INPUT_LIMITS.messageText) &&
@@ -143,6 +153,7 @@ export interface UpdateAgentInput {
   reasoningEffort?: AgentReasoningEffort;
   access?: AgentAccess;
   computerUse?: boolean;
+  allowAutomation?: boolean;
   avatarSeed?: string;
   avatarHue?: AvatarHue | null;
 }

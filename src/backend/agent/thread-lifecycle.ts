@@ -336,7 +336,12 @@ export class ThreadLifecycle {
         sandbox: codexSandboxMode(agent),
         ...this.#workspaceOnlyParam(agent, client),
         ...this.#computerUseParam(agent, client),
-        developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
+        developerInstructions: developerInstructions(
+          agent,
+          this.#store.sharedRoot,
+          this.#memories.listFor(agent.id),
+          this.#store.automationRoot,
+        ),
         ephemeral: false,
         serviceName: "openbot",
         dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
@@ -565,7 +570,12 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
-      developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
+      developerInstructions: developerInstructions(
+        agent,
+        this.#store.sharedRoot,
+        this.#memories.listFor(agent.id),
+        this.#store.automationRoot,
+      ),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
       ...(await this.codexConfig(
         agent,
