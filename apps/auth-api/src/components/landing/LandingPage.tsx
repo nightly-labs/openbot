@@ -53,7 +53,7 @@ export function LandingPage() {
                 ·
               </span>
               <span class="landing-availability-platform">
-                <PlatformLogo platform="linux" />
+                <PlatformLogo platform="linux" solid />
                 Linux
               </span>
             </p>

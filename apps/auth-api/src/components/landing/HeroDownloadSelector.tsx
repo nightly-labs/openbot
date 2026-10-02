@@ -94,14 +94,14 @@ export function HeroDownloadSelector() {
           when={current().available && current().href}
           fallback={
             <span class="landing-download-primary" data-state="coming-soon" aria-disabled="true">
-              <PlatformLogo platform={platform()} />
+              <PlatformLogo platform={platform()} solid />
               {current().action}
             </span>
           }
         >
           {(href) => (
             <a class="landing-download-primary" href={href()} data-state="available">
-              <PlatformLogo platform={platform()} />
+              <PlatformLogo platform={platform()} solid />
               {current().action}
             </a>
           )}
