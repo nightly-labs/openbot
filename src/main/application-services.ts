@@ -1540,7 +1540,9 @@ export async function createApplicationServices({
     holdRoutines: () => service.holdRoutines(),
     releaseRoutines: () => service.releaseRoutines(),
     relaunch: () => {
-      app.relaunch();
+      // A development build only quits: its supervisor stops the stack, and a relaunched Electron
+      // would run outside it with no renderer server.
+      if (app.isPackaged) app.relaunch();
       app.quit();
     },
     log: (message) => logger.info(message),
