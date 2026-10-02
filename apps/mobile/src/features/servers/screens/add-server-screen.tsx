@@ -1,4 +1,4 @@
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { type InviteLinkOptions, parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
 import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
 import { router } from "expo-router";
@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, View } from "react-native";
 
 import { AppLogo } from "@/features/auth/components/app-logo";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
@@ -19,11 +20,11 @@ import { currentText, useText } from "@/shared/lib/text";
 
 const INVITE_PLACEHOLDER = "https://openbot.run/join?…";
 
-function normalizeInviteUrl(value: string): string | null {
+function normalizeInviteUrl(value: string, options: InviteLinkOptions): string | null {
   const invite = value.trim();
   if (!invite) return null;
   try {
-    parseInviteUrl(invite);
+    parseInviteUrl(invite, options);
     return invite;
   } catch {
     return null;
@@ -50,12 +51,14 @@ export function AddServerScreen({
   const { t, format, errorMessage, sourceText } = useText();
   const [foreground, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { addRemoteServer, servers, teamDirectory } = useMobileWorkspace();
+  const { session } = useMobileSession();
+  const inviteLinks = { selfHostedApiOrigin: selfHostedApiOrigin(session?.apiUrl) };
   const [joinedId, setJoinedId] = useState<string | null>(null);
   const joinedServer = servers.find((server) => server.id === joinedId);
   const [inviteLink, setInviteLink] = useState(initialInvite);
   // A new object repeats a failed preview for the same link; an unchanged link keeps the result.
   const [request, setRequest] = useState(() => {
-    const url = normalizeInviteUrl(initialInvite);
+    const url = normalizeInviteUrl(initialInvite, inviteLinks);
     return url ? { url } : null;
   });
   const reviewedInvite = request?.url ?? null;
@@ -99,7 +102,7 @@ export function AddServerScreen({
   // separate review step before the server identity is shown.
   function changeLink(value: string): void {
     setInviteLink(value);
-    const url = normalizeInviteUrl(value);
+    const url = normalizeInviteUrl(value, inviteLinks);
     setRequest((current) => (url === null ? null : current?.url === url ? current : { url }));
     if (url === null) setError(null);
   }

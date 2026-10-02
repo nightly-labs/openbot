@@ -476,7 +476,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!this.running) throw new Error("ACP client is not running.");
     switch (method) {
       case "initialize":
-        await this.#ensureInitialized();
+        // The caller's timeout covers the first model discovery too: a CLI that was just installed
+        // can take minutes to answer both.
+        await this.#ensureInitialized(timeoutMs);
         return decoder({});
       case "account/read": {
         if (!this.#signedIn) return decoder({ account: null, requiresOpenaiAuth: false });
@@ -564,9 +566,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  async #ensureInitialized(): Promise<void> {
+  async #ensureInitialized(timeoutMs = this.#requestTimeoutMs): Promise<void> {
     if (this.#initialized) return this.#initialized;
-    this.#initialized = this.#initialize();
+    this.#initialized = this.#initialize(timeoutMs);
     return this.#initialized;
   }
 
@@ -584,7 +586,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  async #initialize(): Promise<void> {
+  async #initialize(timeoutMs: number): Promise<void> {
     const connection = this.#requireConnection();
     this.#initialization = await withTimeout(
       connection.initialize({
@@ -592,12 +594,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: OPENBOT_ACP_CLIENT_INFO,
       }),
-      this.#requestTimeoutMs,
+      timeoutMs,
       "ACP initialization timed out.",
     );
     try {
       await this.options.authenticate?.(connection, this.#initialization);
-      this.#models = await this.#discoverModels();
+      this.#models = await this.#discoverModels(timeoutMs);
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }

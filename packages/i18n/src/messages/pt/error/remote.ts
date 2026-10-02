@@ -124,6 +124,8 @@ export const messages = {
   "error.remote.pairedIdentityChanged":
     "A identidade do computador pareado está ausente ou mudou. Leia um novo código desse computador.",
   "error.remote.permanentInviteNoEmail": "Convites permanentes não podem ser enviados por e-mail.",
+  "error.remote.selfHostedInviteNoEmail":
+    "Um convite de um serviço de conta auto-hospedado não pode ser enviado por e-mail. Copie o link.",
   "error.remote.inviteOtherService": "Este convite pertence a outro serviço do OpenBot.",
   "error.remote.inviteFingerprintMismatch":
     "A identidade do computador anfitrião do convite não corresponde à sua impressão digital.",

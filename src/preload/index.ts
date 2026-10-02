@@ -49,6 +49,7 @@ import {
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeRoutine,
+  decodeRoutineCalendar,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -661,6 +662,7 @@ const openbotApi: OpenBotDesktopApi = {
       testRoutine: decodeRoutineRun,
       listRoutineRuns: decodeRoutineRuns,
       automationRunCommand: decodeAutomationRunCommand,
+      routineCalendar: decodeRoutineCalendar,
     }),
     ...bridgeGroup(IPC_ENDPOINTS.channelMemories, {
       listChannelMemories: decodeChannelMemories,

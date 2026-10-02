@@ -62,6 +62,7 @@ export const messages = {
   "onboarding.next.downloading": "{provider} est toujours en cours de téléchargement.",
   "onboarding.next.finishing": "{provider} est toujours en cours de configuration.",
   "onboarding.next.downloadError": "{provider} n’a pas pu être téléchargé. Relancez le téléchargement pour continuer.",
+  "onboarding.next.downloadErrorReason": "{provider} n’a pas pu être configuré : {reason}",
   "onboarding.next.notDownloaded": "Téléchargez {provider} pour continuer.",
   "onboarding.next.connecting": "{provider} est en cours de connexion.",
   "onboarding.next.connect": "Connectez {provider} pour continuer.",

@@ -235,6 +235,8 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   Routine,
+  RoutineCalendar,
+  RoutineCalendarInput,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -765,6 +767,8 @@ export const IPC_ENDPOINTS = {
     listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
     /** The shell command a local script uses to run the routine. It names the token file, not the token. */
     automationRunCommand: scopedRequest<TestRoutineInput, string>()("agent:automation-run-command"),
+    // Every routine of the host, of agents and channels, with its runs in a range.
+    routineCalendar: scopedRequest<RoutineCalendarInput, RoutineCalendar>()("agent:routine-calendar"),
   },
   channelMemories: {
     listChannelMemories: scopedRequest<string, ChannelMemory[]>()("agent:channel-memories:list"),

@@ -88,6 +88,14 @@ import { workspaceWritableRoots } from "./workspace-sandbox";
 const logger = createOpenBotLogger("provider-runtime");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+/**
+ * How long the first start of a CLI that was just installed may take. The Gemini runtime unpacks
+ * itself on its first run, and an antivirus scan of the unpacked files can take minutes on a slow
+ * computer. The request timeout failed that start after a good download, the install was rolled
+ * back, and each retry downloaded and failed again. Only this start waits so long: a launch waits
+ * for every provider, and one CLI that hangs would hold chat back for all of them.
+ */
+const INSTALLED_CLI_START_TIMEOUT_MS = 180_000;
 /** How long a provider CLI stays running with nothing to do before its process is stopped. */
 export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
 /**
@@ -1088,7 +1096,7 @@ export class ProviderRuntime implements ProviderPort {
     const cli = this.#cli.get(provider);
     if (!cli) throw new Error(sourceText("error.provider.cliNotReady", { provider: providerLabel(provider) }));
     const disposals = this.#disposals;
-    const { client } = await this.#createAuthenticatedProviderClient(provider, cli, confinement);
+    const { client } = await this.#createAuthenticatedProviderClient(provider, cli, { confinement });
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       await client.stop().catch(() => undefined);
       throw new Error(sourceText("error.provider.stoppedBeforeAgentProcess", { provider: providerLabel(provider) }));
@@ -1349,7 +1357,7 @@ export class ProviderRuntime implements ProviderPort {
   async #createAuthenticatedProviderClient(
     provider: AgentProvider,
     cli: AgentCliInfo,
-    confinement?: ProcessConfinement,
+    { confinement, startTimeoutMs }: { confinement?: ProcessConfinement; startTimeoutMs?: number } = {},
   ): Promise<{ client: AgentClient; account: NonNullable<AccountReadResult["account"]> }> {
     const driver = requireProviderDriver(provider);
     const client = this.#clientFactory
@@ -1365,6 +1373,7 @@ export class ProviderRuntime implements ProviderPort {
           capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
         },
         decodeRecordResponse,
+        startTimeoutMs,
       );
       client.notify("initialized");
       const account = await client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
@@ -1541,14 +1550,20 @@ export class ProviderRuntime implements ProviderPort {
       this.#cli.delete(provider);
       // Connecting the replaced CLI is not a start either: the other providers are running through
       // it, and `onProvidersReady` would settle their live deliveries. See below.
-      await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
+      await this.#connect("starting", [provider], {
+        preserveCheckErrors: true,
+        notifyReady: false,
+        startTimeoutMs: INSTALLED_CLI_START_TIMEOUT_MS,
+      });
       const status = this.status().providers?.find((row) => row.id === provider);
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         throw new Error(status?.message ?? sourceText("error.provider.cliActivateFailed"));
       }
       return;
     }
-    const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
+    const candidate = await this.#createAuthenticatedProviderClient(provider, cli, {
+      startTimeoutMs: INSTALLED_CLI_START_TIMEOUT_MS,
+    });
     // Not a start: `onProvidersReady` is restart recovery, and it settles every unresolved delivery,
     // including the live ones of the other providers - a turn still running would be recorded as
     // interrupted, which `markTerminal` then refuses to correct. `onProviderResumed` schedules the
@@ -1653,7 +1668,13 @@ export class ProviderRuntime implements ProviderPort {
   async #connect(
     phase: "starting" | "restarting",
     requestedProviders: readonly AgentProvider[],
-    options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean; notifyReady?: boolean } = {},
+    options: {
+      preserveCheckErrors?: boolean;
+      refreshRuntimeInBackground?: boolean;
+      notifyReady?: boolean;
+      /** How long `initialize` may take, the request timeout when not set. */
+      startTimeoutMs?: number;
+    } = {},
   ): Promise<void> {
     const disposals = this.#disposals;
     const disposed = () => this.#hooks.isStopping() || disposals !== this.#disposals;
@@ -1712,6 +1733,7 @@ export class ProviderRuntime implements ProviderPort {
               capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
             },
             decodeRecordResponse,
+            options.startTimeoutMs,
           );
           client.notify("initialized");
           const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult, 5_000);

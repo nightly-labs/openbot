@@ -103,3 +103,5 @@ a second session receives `host_busy` without interrupting the first.
 
 See [the issue #325 deployment procedure](../docs/remote-session-deployment.md) for the production evidence,
 a Signal-only update, rollback commands, and the required desktop/mobile checks.
+
+To run Signal with your own account service, see [Self-hosted remote access](../docs/self-hosting.md).

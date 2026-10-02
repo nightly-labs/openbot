@@ -794,35 +794,34 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
+  function resetPanelsForAgent(agentId: string | undefined, panel: string | undefined): void {
+    const previousAgentId = lastPanelAgentId;
+    lastPanelAgentId = agentId;
+    clearRoutineSettingsRequest();
+    resources.filePreviewRequestGeneration += 1;
+    const preview = untrack(sidebarFilePreview);
+    if (preview && preview.ownerAgentId !== agentId) {
+      setSidebarFilePreview(null);
+      setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
+    }
+    if (
+      !previousAgentId ||
+      !agentId ||
+      (panel !== "settings" && panel !== "profile" && panel !== "file-preview" && panel !== "files")
+    )
+      return;
+    setRightPanels((current) => ({ ...current, [agentId]: "none" }));
+  }
+
+  // One effect, so a settings request that selects the agent opens its panel after the agent change
+  // closes the old one. As two effects, either order was possible.
   createEffect(
     () => {
       const agentId = props.agent?.id;
-      return { agentId, panel: agentId ? rightPanels()[agentId] : undefined };
+      return { agentId, panel: agentId ? rightPanels()[agentId] : undefined, request: props.settingsRequest };
     },
-    ({ agentId, panel }) => {
-      if (agentId === lastPanelAgentId) return;
-      const previousAgentId = lastPanelAgentId;
-      lastPanelAgentId = agentId;
-      clearRoutineSettingsRequest();
-      resources.filePreviewRequestGeneration += 1;
-      const preview = untrack(sidebarFilePreview);
-      if (preview && preview.ownerAgentId !== agentId) {
-        setSidebarFilePreview(null);
-        setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
-      }
-      if (
-        !previousAgentId ||
-        !agentId ||
-        (panel !== "settings" && panel !== "profile" && panel !== "file-preview" && panel !== "files")
-      )
-        return;
-      setRightPanels((current) => ({ ...current, [agentId]: "none" }));
-    },
-  );
-
-  createEffect(
-    () => ({ request: props.settingsRequest, agentId: props.agent?.id }),
-    ({ request, agentId }) => {
+    ({ agentId, panel, request }) => {
+      if (agentId !== lastPanelAgentId) resetPanelsForAgent(agentId, panel);
       if (!request || agentId !== request.agentId || request.nonce === lastHandledSettingsRequestNonce) return;
       lastHandledSettingsRequestNonce = request.nonce;
       if (request.routine) openRoutineSettings(request.routine);

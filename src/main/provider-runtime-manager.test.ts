@@ -873,8 +873,9 @@ describe("ProviderRuntimeManager", () => {
     const fixture = grokFixture();
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
     await manager.initialize();
-    // One more than the commit's passes, which used to read each refusal as a sibling's install.
-    heldStage.renames = 3;
+    // More than the 15 moves that three passes of `renameIfVacant` try: a scan can hold the stage for
+    // longer than one wait.
+    heldStage.renames = 16;
 
     await manager.downloadAndWait("grok");
 
@@ -885,7 +886,7 @@ describe("ProviderRuntimeManager", () => {
   it("reports a stage held open, not another instance, when the wait runs out", async () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();
-    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads"), heldStageWaitMs: 0 });
     await manager.initialize();
     heldStage.renames = Number.POSITIVE_INFINITY;
 
@@ -1490,6 +1491,7 @@ interface SiblingOptions {
   updateRuntime?: ProviderRuntimeManagerOptions["updateRuntime"];
   /** Counts what was asked for, to tell a skipped transfer from a repeated one. */
   onFetch?: (url: string) => void;
+  heldStageWaitMs?: number;
 }
 
 /** A manager on a store it shares with another, with a profile download directory of its own. */
@@ -1505,6 +1507,7 @@ function siblingManager(
     architecture: "arm64",
     lock: fixture.lock,
     updateRuntime: options.updateRuntime,
+    heldStageWaitMs: options.heldStageWaitMs,
     fetchImpl: async (input) => {
       const url = String(input);
       options.onFetch?.(url);

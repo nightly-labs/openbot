@@ -63,6 +63,7 @@ export const messages = {
   "onboarding.next.downloading": "{provider} hâlâ indiriliyor.",
   "onboarding.next.finishing": "{provider} kurulumu hâlâ tamamlanıyor.",
   "onboarding.next.downloadError": "{provider} indirilemedi. Devam etmek için indirmeyi tekrar deneyin.",
+  "onboarding.next.downloadErrorReason": "{provider} kurulamadı: {reason}",
   "onboarding.next.notDownloaded": "Devam etmek için {provider} indirin.",
   "onboarding.next.connecting": "{provider} bağlanıyor.",
   "onboarding.next.connect": "Devam etmek için {provider} bağlayın.",

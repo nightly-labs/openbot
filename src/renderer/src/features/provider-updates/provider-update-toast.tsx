@@ -9,7 +9,7 @@ import {
 } from "@openbot/ui/features/provider-updates/provider-update";
 import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createRoot, createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createRoot, createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
 
 /**
  * The provider update, as one notification the user acts on and then watches.
@@ -163,6 +163,18 @@ function ProviderUpdateActionLabel(props: { presentation: ProviderUpdatePresenta
   );
 }
 
+function samePresentation(a: ProviderUpdatePresentation, b: ProviderUpdatePresentation): boolean {
+  return (
+    a.updatable === b.updatable &&
+    a.busy === b.busy &&
+    a.failed === b.failed &&
+    a.actionLabel === b.actionLabel &&
+    a.title === b.title &&
+    a.detail === b.detail &&
+    a.progress === b.progress
+  );
+}
+
 /** The notification open for one provider, and the three things about it that still move. */
 interface LiveProviderUpdateToast {
   present: (presentation: ProviderUpdatePresentation) => void;
@@ -217,7 +229,16 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
   if (open) return open;
 
   const parts = createRoot((dispose) => {
-    const [current, setCurrent] = createSignal(presentation);
+    // Main pushes one snapshot for every percent of every download, and each one is presented again
+    // for every update in flight. A presentation that says what is on screen already changes nothing.
+    const [current, setCurrent] = createSignal(presentation, { equals: samePresentation });
+    // What changes the height of the toast: the lines it shows, not the percentage on one of them.
+    // "Setting up" keeps the title of the download before it and loses the percentage, so the words
+    // of the title alone are not enough.
+    const layout = createMemo(() => {
+      const { title, detail, busy, failed, progress, actionLabel } = current();
+      return JSON.stringify([title, detail, busy, failed, progress === null, actionLabel ?? null]);
+    });
     // Whether the failure's sentence is cut off, and whether the user opened it. Both change the
     // height of the toast, so they live here, where the title can read them.
     const [clamped, setClamped] = createSignal(false);
@@ -249,13 +270,18 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
       offeredVersion: () => offered,
       // The title is the one thing given as a function. Sonner re-measures the toast whenever the
       // title or the description changes, and the other two are elements that keep their identity
-      // for the whole flow, so this read of the signal is what keeps the recorded height honest.
-      // Opening or cutting off the failure's sentence changes the height without changing the
-      // title's words, so the title reads those two as well.
+      // for the whole flow, so these reads are what keep the recorded height honest. Opening or
+      // cutting off the failure's sentence changes the height without changing the title's words,
+      // so the title reads those two as well.
+      //
+      // It does not read the percentage. A measurement sets the toast's height to `auto` for a
+      // moment, which stops the height transition of the stack, and a download measured on every
+      // percent made concurrent updates jump and spend the CPU on layout.
       title: () => {
         clamped();
         expanded();
-        return current().title;
+        layout();
+        return untrack(current).title;
       },
       icon: providerIcon(provider),
       description: (

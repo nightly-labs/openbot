@@ -124,6 +124,8 @@ export const messages = {
   "error.remote.pairedIdentityChanged":
     "L’identité de l’ordinateur associé est absente ou a changé. Scannez un nouveau code depuis cet ordinateur.",
   "error.remote.permanentInviteNoEmail": "Les invitations permanentes ne peuvent pas être envoyées par e-mail.",
+  "error.remote.selfHostedInviteNoEmail":
+    "Une invitation d'un service de compte auto-hébergé ne peut pas être envoyée par e-mail. Copiez le lien.",
   "error.remote.inviteOtherService": "Cette invitation appartient à un autre service OpenBot.",
   "error.remote.inviteFingerprintMismatch": "L’identité de l’hôte de l’invitation ne correspond pas à son empreinte.",
   "error.remote.inviteHostKeyMissing": "La clé de l’hôte de l’invitation est absente.",

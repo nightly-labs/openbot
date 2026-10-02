@@ -20,6 +20,7 @@ import {
   isAgentStatus,
   isAgentSummary,
   isRoutine,
+  isRoutineCalendar,
   isRoutineRun,
   isSharedTable,
   isSidebarLayoutSnapshot,
@@ -36,6 +37,7 @@ export const decodeRoutines = guardedListDecoder(isRoutine, "routine list respon
 export const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run response");
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine history response");
 export const decodeAutomationRunCommand = guardedDecoder(isString, "run command response");
+export const decodeRoutineCalendar = guardedDecoder(isRoutineCalendar, "routine calendar response");
 
 /** A reply carrying nothing but the provider and a status, so an unexpected field cannot slip in. */
 export function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {

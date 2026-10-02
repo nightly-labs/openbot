@@ -122,6 +122,8 @@ export const messages = {
   "error.remote.pairedIdentityChanged":
     "ペアリングしたデスクトップの ID がないか、変わっています。そのデスクトップで新しいコードをスキャンしてください。",
   "error.remote.permanentInviteNoEmail": "永続的な招待はメールで送信できません。",
+  "error.remote.selfHostedInviteNoEmail":
+    "セルフホストのアカウントサービスの招待はメールで送信できません。リンクをコピーしてください。",
   "error.remote.inviteOtherService": "この招待は別の OpenBot サービスのものです。",
   "error.remote.inviteFingerprintMismatch": "招待のホストの ID がフィンガープリントと一致しません。",
   "error.remote.inviteHostKeyMissing": "招待のホストキーがありません。",

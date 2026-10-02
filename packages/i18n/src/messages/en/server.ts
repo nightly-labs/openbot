@@ -128,6 +128,7 @@ export const messages = defineMessages("server", {
   "server.rail.mute": "Mute server",
   "server.rail.notificationSettings": "Notification settings",
   "server.rail.usage": "Usage",
+  "server.rail.schedule": "Schedule",
   "server.rail.settings": "Server settings",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",

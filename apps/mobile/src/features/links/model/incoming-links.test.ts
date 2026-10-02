@@ -88,6 +88,14 @@ describe("incoming mobile links", () => {
     expect(readIncomingLink(requestId(redirectIncomingLink(url)))).toEqual({ kind: "invalid" });
   });
 
+  it("routes a self-hosted invitation only through the app scheme", () => {
+    const selfHosted = { ...payload, apiUrl: "https://api.example.com/" };
+    const options = { selfHostedApiOrigin: "https://api.example.com" };
+    const url = createOpenBotInviteUrl(selfHosted, options);
+    expect(parseIncomingLink(url)).toEqual({ kind: "invite", url });
+    expect(parseIncomingLink(url.replace("openbot://join", "https://openbot.run/join"))).toEqual({ kind: "invalid" });
+  });
+
   it.each([
     "openbot://join?invite=bad",
     "https://openbot.run.evil.test/join",

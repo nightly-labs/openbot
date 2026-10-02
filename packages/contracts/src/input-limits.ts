@@ -32,6 +32,8 @@ export const INPUT_LIMITS = {
   routineRunsPage: 100,
   // The text a local script adds to a routine run through the automation server.
   automationPayload: 4_000,
+  // Six weeks: the longest range the routine calendar reads, with room for a month view.
+  routineCalendarDays: 42,
   routineCron: 255,
   messageText: 100_000,
   directMessageText: 20_000,
