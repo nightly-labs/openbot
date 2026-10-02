@@ -157,7 +157,7 @@
     "src/renderer/src/features/conversation/ConversationComposer.tsx": 2,
     "src/renderer/src/features/conversation/ConversationHeader.tsx": 2,
     "src/renderer/src/features/conversation/ConversationPanels.tsx": 4,
-    "src/renderer/src/features/conversation/ConversationTimeline.tsx": 5,
+    "src/renderer/src/features/conversation/ConversationTimeline.tsx": 4,
     "src/renderer/src/features/conversation/ConversationView.tsx": 1,
     "src/renderer/src/features/conversation/direct-messages-context.tsx": 2,
     "src/renderer/src/features/conversation/LocalSkillsLibrary.tsx": 2,
