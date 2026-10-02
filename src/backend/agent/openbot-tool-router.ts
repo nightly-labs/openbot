@@ -670,7 +670,8 @@ export class OpenBotToolRouter {
         status: "completed",
         createdAt: new Date().toISOString(),
         itemType: marketplaceSuggestionItemType({ appId: args.app }),
-        text: args.app,
+        // The card reads the app from the item type. A client without the card shows this line.
+        text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
       });
       const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
         appId: args.app,

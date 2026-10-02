@@ -31,7 +31,8 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
   const { t } = useText();
   const plugin = createMemo(() => MARKETPLACE_PLUGINS.find((candidate) => candidate.slug === props.appId));
   const github = () => props.appId === GITHUB_MARKETPLACE_APP_ID;
-  const githubStatus = createGitHubStatus(untrack(github));
+  // Only the desktop app of the computer that runs OpenBot has this connection, and `window.openbot`.
+  const githubStatus = createGitHubStatus(untrack(() => github() && props.localServer));
   const state = (): MarketplaceSuggestionState => {
     if (!github()) return "available";
     const status = githubStatus();
