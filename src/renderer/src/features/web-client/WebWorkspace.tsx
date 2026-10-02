@@ -57,6 +57,8 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Loading, lazy, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { startActionSounds } from "../../action-sounds";
+import { actionToast } from "../../action-toast";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
@@ -73,6 +75,7 @@ import {
 } from "../../WorkspaceOverlayViews";
 import type { CreationPreference } from "../agents/agent-creation-model";
 import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
+import { createAgentEventSounds } from "../agents/agent-event-sounds";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
@@ -506,6 +509,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     window.removeEventListener("pointerdown", unlockCompletionSound, true);
     window.removeEventListener("keydown", unlockCompletionSound, true);
   });
+  startActionSounds();
+  const playAgentEventSound = createAgentEventSounds();
   onCleanup(watchWebTabFocus());
   onCleanup(workspace.onHostNotice(notify));
   onCleanup(
@@ -513,6 +518,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const hostId = workspace.state.host?.hostId;
       if (hostId && (event.type === "turn-completed" || event.type === "prompt" || event.type === "approval"))
         notify(hostId, event, workspace.state.agents);
+      playAgentEventSound(event);
       // As on desktop: the host sends a new reading when a provider reports usage.
       if (event.type === "usage-changed" && untrack(usageTargetKey)) {
         usageGeneration += 1;
@@ -1117,7 +1123,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onMarkAllRead={
                   workspace.state.status === "online"
                     ? () => {
-                        void workspace.markAllRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
+                        void workspace.markAllRead().catch(() => actionToast.error(t("chat.unread.markReadFailed")));
                         if (channelsSupported()) void channels.markAllRead();
                       }
                     : undefined

@@ -234,7 +234,13 @@ export function WizardDialog(
               </Dialog.Title>
             }
           />
-          <IconButton class="integration-dialog-close" label={props.closeLabel} variant="ghost" onClick={props.onClose}>
+          <IconButton
+            class="integration-dialog-close"
+            label={props.closeLabel}
+            variant="ghost"
+            data-cuelume-tap="close"
+            onClick={props.onClose}
+          >
             <X />
           </IconButton>
         </Dialog.Content>

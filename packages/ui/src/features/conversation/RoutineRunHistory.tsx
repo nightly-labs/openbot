@@ -49,6 +49,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                       type="button"
                       class="agent-routine-run-row agent-routine-run-link"
                       aria-label={t("routine.history.openRun", { run: label() })}
+                      data-cuelume-tap="navigate"
                       onClick={() => props.onOpenRun?.(messageId())}
                     >
                       {content}

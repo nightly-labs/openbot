@@ -537,7 +537,13 @@ function DisconnectDialog(props: {
           </Button>
           <Show when={props.connection}>
             {(connection) => (
-              <Button type="button" variant="destructive" onClick={() => props.onConfirm(connection().workspaceId)}>
+              <Button
+                type="button"
+                variant="destructive"
+                data-cuelume-tap="close"
+                data-cuelume-emphasis="strong"
+                onClick={() => props.onConfirm(connection().workspaceId)}
+              >
                 <Link2Off aria-hidden="true" />
                 {t("connector.slack.disconnectWorkspace")}
               </Button>

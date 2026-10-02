@@ -21,6 +21,7 @@ import { latestIncomingConversationMessage } from "../conversation/conversation-
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { claimErrorToast, readableAgentError } from "./agent-error-text";
+import { createAgentEventSounds } from "./agent-event-sounds";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
@@ -79,6 +80,7 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout } = useSidebar();
+  const playAgentEventSound = createAgentEventSounds();
   let readRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
@@ -319,6 +321,7 @@ export function AgentEventBridge() {
         return;
       }
       flush(() => handleAgentEvent(event));
+      playAgentEventSound(event);
     });
     return () => {
       readRefresh += 1;

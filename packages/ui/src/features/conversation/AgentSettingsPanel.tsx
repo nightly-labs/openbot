@@ -713,6 +713,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                             : t("agentSettings.avatar.option", { number: index() + 1 })
                         }
                         aria-pressed={!avatarUrl() && draft.avatar.seed === seed ? "true" : "false"}
+                        data-cuelume-tap="select"
                         onClick={() => void selectGeneratedAvatar(seed)}
                       >
                         <AgentAvatar seed={seed} hue={draft.avatar.hue} />
@@ -731,6 +732,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     class={["avatar-color-choice", { "avatar-choice-selected": draft.avatar.hue === null }]}
                     aria-label={t("agentSettings.avatar.autoColor")}
                     aria-pressed={draft.avatar.hue === null ? "true" : "false"}
+                    data-cuelume-tap="select"
                     onClick={() => {
                       setDraft((state) => {
                         state.avatar.hue = null;
@@ -750,6 +752,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         class={["avatar-color-choice", { "avatar-choice-selected": draft.avatar.hue === option.hue }]}
                         aria-label={t("agentSettings.avatar.hueColor", { hue: t(AVATAR_HUE_LABEL[option.hue]) })}
                         aria-pressed={draft.avatar.hue === option.hue ? "true" : "false"}
+                        data-cuelume-tap="select"
                         onClick={() => {
                           setDraft((state) => {
                             state.avatar.hue = option.hue;

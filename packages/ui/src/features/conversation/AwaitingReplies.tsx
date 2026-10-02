@@ -90,6 +90,7 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
               label={t("chat.awaiting.dismiss")}
               variant="ghost"
               size="icon-xs"
+              data-cuelume-tap="close"
               onClick={() => dismiss()()}
             >
               <X aria-hidden="true" />

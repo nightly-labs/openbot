@@ -367,6 +367,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 class="first-agent-color-choice"
                 aria-label={t("agent.setup.colorAutomatic")}
                 aria-pressed={props.value.avatarHue === null ? "true" : "false"}
+                data-cuelume-tap="select"
                 onClick={() => updateDraft({ avatarHue: null })}
               >
                 <span
@@ -383,6 +384,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     class="first-agent-color-choice"
                     aria-label={t("agent.setup.colorOption", { color: t(AVATAR_HUE_LABEL[option.hue]) })}
                     aria-pressed={props.value.avatarHue === option.hue ? "true" : "false"}
+                    data-cuelume-tap="select"
                     onClick={() => updateDraft({ avatarHue: option.hue })}
                   >
                     <span class="first-agent-color-swatch" style={{ background: avatarHueSwatch(option.hue) }} />
@@ -404,6 +406,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     class="first-agent-face-choice"
                     aria-label={t("agent.setup.faceOption", { number: index() + 1 })}
                     aria-pressed={props.value.avatarSeed === seed ? "true" : "false"}
+                    data-cuelume-tap="select"
                     onClick={() => updateDraft({ avatarSeed: seed })}
                   >
                     <AgentAvatar
@@ -512,6 +515,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       data-animation-offset={suggestion.animationOffset}
                       aria-label={`${suggestion.name}. ${suggestion.description}`}
                       aria-pressed={props.value.suggestionId === suggestion.id ? "true" : "false"}
+                      data-cuelume-tap="select"
                       disabled={props.submitting}
                       onClick={() => {
                         if (!suppressSuggestionClick) selectSuggestion(suggestion);

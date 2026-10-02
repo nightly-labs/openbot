@@ -53,6 +53,7 @@ export function ChatSearch(props: ChatSearchProps) {
         class="chat-search-button"
         aria-label={t("chat.search.previous")}
         disabled={props.total === 0}
+        data-cuelume-tap="navigate"
         onClick={props.onPrevious}
       >
         <ChevronUp aria-hidden="true" />
@@ -64,6 +65,7 @@ export function ChatSearch(props: ChatSearchProps) {
         class="chat-search-button"
         aria-label={t("chat.search.next")}
         disabled={props.total === 0}
+        data-cuelume-tap="navigate"
         onClick={props.onNext}
       >
         <ChevronDown aria-hidden="true" />
@@ -74,6 +76,7 @@ export function ChatSearch(props: ChatSearchProps) {
         size="xs"
         class="chat-search-button chat-search-close"
         aria-label={t("chat.search.close")}
+        data-cuelume-tap="close"
         onClick={props.onClose}
       >
         <X aria-hidden="true" />

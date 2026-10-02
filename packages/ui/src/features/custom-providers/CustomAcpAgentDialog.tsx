@@ -166,7 +166,13 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
 
             <header class="custom-provider-header">
               <Show when={props.onBack}>
-                <IconButton label={t("common.back")} variant="ghost" disabled={busy()} onClick={() => props.onBack?.()}>
+                <IconButton
+                  label={t("common.back")}
+                  variant="ghost"
+                  disabled={busy()}
+                  data-cuelume-tap="navigate"
+                  onClick={() => props.onBack?.()}
+                >
                   <ArrowLeft />
                 </IconButton>
               </Show>
@@ -212,6 +218,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                               variant={draft.agentId === preset.id ? "secondary" : "outline"}
                               size="xs"
                               aria-pressed={draft.agentId === preset.id ? "true" : "false"}
+                              data-cuelume-tap="select"
                               disabled={busy()}
                               onClick={() => applyPreset(preset)}
                             >

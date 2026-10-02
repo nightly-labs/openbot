@@ -191,6 +191,8 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                     loading={phase() === "removing"}
                     loadingLabel={t("common.removing")}
                     disabled={busy()}
+                    data-cuelume-tap="close"
+                    data-cuelume-emphasis="strong"
                     onClick={() => void remove()}
                   >
                     {t("provider.openCodeKey.remove")}

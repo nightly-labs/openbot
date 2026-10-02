@@ -19,7 +19,10 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
   return (
     <ContextMenu.Portal>
       <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.agentMenu.label")}>
-        <ContextMenu.Item onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}>
+        <ContextMenu.Item
+          data-cuelume-tap="toggle"
+          onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}
+        >
           <Show when={menuProps.pinned} fallback={<Pin class="agent-context-icon size-4" aria-hidden="true" />}>
             <PinOff class="agent-context-icon size-4" aria-hidden="true" />
           </Show>

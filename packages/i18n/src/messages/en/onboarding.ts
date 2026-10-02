@@ -78,6 +78,8 @@ export const messages = defineMessages("onboarding", {
   "onboarding.meet.addToPrompt": "Add to prompt",
   "onboarding.meet.sendMessage": "Send message",
   "onboarding.computer.title": "OpenBot might control your computer",
+  "onboarding.sounds.title": "Pick your sounds",
+  "onboarding.sounds.description": "Short sounds confirm what you do, such as sending a message.",
   "onboarding.jobs.title": "Give each agent a job",
   "onboarding.jobs.description": "Start with focused agents, then build the team around your work.",
   "onboarding.jobs.example": "Example agent jobs",

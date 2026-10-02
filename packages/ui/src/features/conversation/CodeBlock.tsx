@@ -165,6 +165,7 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
           size="xs"
           class="message-code-copy"
           aria-label={copied() ? t("chat.code.copied") : t("chat.code.copy")}
+          data-cuelume-tap="success"
           onClick={() => void copy()}
         >
           <span class="message-code-copy-icons" aria-hidden="true">

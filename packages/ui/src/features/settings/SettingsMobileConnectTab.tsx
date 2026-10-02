@@ -253,6 +253,8 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                               loading={props.store.state.devices.revokingSessionId === device.sessionId}
                               loadingLabel={t("settings.disconnect.pending")}
                               disabled={!props.canRevokeDevice}
+                              data-cuelume-tap="close"
+                              data-cuelume-emphasis="strong"
                               aria-label={t("settings.mobileConnect.devices.disconnectLabel", { name: device.name })}
                               onClick={() => void props.store.revokeDevice(device)}
                             >

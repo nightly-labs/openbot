@@ -527,6 +527,7 @@ export function QueuePanel(props: QueuePanelProps) {
                         type="button"
                         class="agent-queue-icon-button agent-queue-delete"
                         disabled={delivery.status !== "queued"}
+                        data-cuelume-tap="close"
                         aria-describedby={actionTooltipId}
                         aria-label={t("queue.item.deleteLabel", { position: delivery.position ?? "" })}
                         onPointerEnter={(event) =>

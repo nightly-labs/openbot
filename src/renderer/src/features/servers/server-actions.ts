@@ -1,7 +1,7 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
 import { useText } from "@openbot/ui/text";
+import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { useUsage } from "../usage/usage-context";
 import { useServerSelection } from "./server-selection";
@@ -38,7 +38,7 @@ export function useServerActions() {
   }
 
   function selectFailed(error: unknown): void {
-    toast.error(t("server.select.failedTitle"), {
+    actionToast.error(t("server.select.failedTitle"), {
       description: errorMessage(error, t("server.select.failedDescription")),
     });
   }

@@ -11,6 +11,7 @@ import {
   useContext,
 } from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
+import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
 import { conversationRuntime } from "./conversation-runtime";
@@ -536,12 +537,14 @@ export function createConversationViewScope(props: ConversationProps) {
   }
 
   onSettled(() => {
+    const importSounds = createAttachmentImportSounds();
     const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
       if (event.type === "started") {
         const target = currentTarget();
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
+          importSounds.started();
         }
         setAttachmentBusy(true);
         setScopedComposerError(null);
@@ -550,6 +553,7 @@ export function createConversationViewScope(props: ConversationProps) {
         resources.importTargetAgents.delete(event.requestId);
         setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
+          importSounds.finished("error");
           setConversationErrors((current) => ({
             ...current,
             [composerDraftKey(target)]: event.message,
@@ -558,6 +562,9 @@ export function createConversationViewScope(props: ConversationProps) {
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
+          // A cancelled import completes with no attachments.
+          if (event.attachments.length > 0) importSounds.finished("success");
+          else importSounds.dispose();
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
             setAttachmentBusy(resources.importTargetAgents.size > 0);
@@ -663,6 +670,7 @@ export function createConversationViewScope(props: ConversationProps) {
       scrollResizeObserver?.disconnect();
       scrollResizeObserver = undefined;
       unsubscribeImport();
+      importSounds.dispose();
       keyboardTarget.removeEventListener("keydown", escapeListener);
       keyboardWindow.removeEventListener("keydown", closeActiveRemoteBrowserTab);
       keyboardTarget.removeEventListener("keydown", chatSearchListener);

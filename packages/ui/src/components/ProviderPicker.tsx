@@ -649,6 +649,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             size="xs"
             class="provider-picker-refresh provider-picker-more"
             aria-haspopup="dialog"
+            data-cuelume-tap="open"
             ref={(element: HTMLButtonElement) => {
               moreButton = element;
             }}

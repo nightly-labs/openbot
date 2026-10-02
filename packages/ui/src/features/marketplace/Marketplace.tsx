@@ -44,6 +44,7 @@ function Crumbs(props: { scope: MarketplaceScope }) {
               type="button"
               variant="ghost"
               class="marketplace-crumb-parent"
+              data-cuelume-tap="navigate"
               onClick={() => props.scope.nav.backTo(index())}
             >
               {title(view)}
@@ -124,7 +125,12 @@ function MarketplaceWindow(props: MarketplaceProps) {
       <header class="skills-marketplace-topbar">
         <Crumbs scope={scope} />
         <div class="skills-marketplace-topbar-actions">
-          <IconButton label={t("marketplace.close")} variant="ghost" onClick={() => props.onOpenChange(false)}>
+          <IconButton
+            label={t("marketplace.close")}
+            variant="ghost"
+            data-cuelume-tap="close"
+            onClick={() => props.onOpenChange(false)}
+          >
             <X />
           </IconButton>
         </div>

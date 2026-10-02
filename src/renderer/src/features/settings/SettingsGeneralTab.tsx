@@ -21,7 +21,9 @@ import {
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
+import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSignal, Show } from "solid-js";
+import { replayActionSoundChoice } from "../../action-sounds";
 import { useI18n } from "../../i18n-context";
 import { useLogoColorChoice } from "../../logo-color";
 
@@ -43,6 +45,7 @@ interface SettingsGeneralTabProps {
   /** The dialog element the Select popovers portal into, captured when the tab was created. */
   selectMount: HTMLElement | undefined;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
+  onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
   turboModePending?: boolean;
   /** Shows one desktop notification now. Absent where there is no operating system to show it. */
   onTestNotification?: () => void | Promise<void>;
@@ -228,6 +231,21 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.taskSound.title")}
             description={i18n.t("settings.taskSound.description")}
           />
+          <Item class="settings-modal-row settings-sound-theme-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.soundFeedback.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.soundFeedback.description")}</ItemDescription>
+            </ItemContent>
+            <SoundThemePicker
+              value={props.value.soundFeedback ? props.value.soundTheme : "off"}
+              onChange={(value) =>
+                props.onUpdateSettings(
+                  value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
+                )
+              }
+              onReplay={replayActionSoundChoice}
+            />
+          </Item>
         </ItemGroup>
       </SettingsSection>
 

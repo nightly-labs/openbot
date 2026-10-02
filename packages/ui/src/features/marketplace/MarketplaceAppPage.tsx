@@ -256,7 +256,14 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
             <Button type="button" variant="outline" disabled={busy()} onClick={() => setConfirm(false)}>
               {t("marketplace.app.remove.keep")}
             </Button>
-            <Button type="button" variant="destructive" loading={busy()} onClick={remove}>
+            <Button
+              type="button"
+              variant="destructive"
+              loading={busy()}
+              data-cuelume-tap="close"
+              data-cuelume-emphasis="strong"
+              onClick={remove}
+            >
               {t("marketplace.app.remove.action")}
             </Button>
           </>

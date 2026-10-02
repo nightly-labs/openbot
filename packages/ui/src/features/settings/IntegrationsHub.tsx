@@ -70,6 +70,7 @@ function HubRow(props: { row: IntegrationsHubRow }) {
         variant="ghost"
         class="integrations-hub-hitarea"
         aria-label={t("connector.hub.open", { name: props.row.name })}
+        data-cuelume-tap="navigate"
         onClick={() => props.row.onOpen()}
       />
       <ItemMedia>

@@ -1,5 +1,4 @@
 import type { AgentImportPreview, AgentImportResult, OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import {
   type AgentImportPhase,
   type AgentImportSetup,
@@ -7,6 +6,7 @@ import {
 } from "@openbot/ui/features/import/AgentImportView";
 import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled } from "solid-js";
+import { actionToast } from "../../action-toast";
 
 /** The way into Grok Bot this viewer chose last, so a user who set up the skill starts there. */
 const SETUP_STORAGE_KEY = "openbot.agent-import.setup";
@@ -89,7 +89,7 @@ export function ServerImportPanel(props: ServerImportOptions & { serverId: strin
     try {
       await calls.saveSkill();
     } catch (error) {
-      toast.error(t("server.import.skillSaveFailed"), {
+      actionToast.error(t("server.import.skillSaveFailed"), {
         description: errorMessage(error, t("server.import.tryAgain")),
       });
     }

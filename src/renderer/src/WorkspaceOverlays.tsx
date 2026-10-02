@@ -1,9 +1,9 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
+import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
@@ -409,7 +409,7 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
       },
       (error: unknown) => {
         const text = currentText();
-        toast.error(text.t("server.select.failedTitle"), {
+        actionToast.error(text.t("server.select.failedTitle"), {
           description: text.errorMessage(error, text.t("server.select.failedDescription")),
         });
         openServerSettings(server.id, null, "providers");

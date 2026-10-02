@@ -126,6 +126,7 @@ export function TaskListHeader(props: TaskListHeaderProps) {
       class="task-list-header"
       aria-expanded={props.open ? "true" : "false"}
       aria-controls={props.panelId}
+      data-cuelume-tap={props.open ? "close" : "open"}
       onClick={() => props.onToggle()}
     >
       <span class="task-list-summary-glyph" aria-hidden="true">

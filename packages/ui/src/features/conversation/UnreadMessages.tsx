@@ -17,6 +17,7 @@ export function UnreadMessagesBanner(props: {
         class="unread-messages-jump"
         type="button"
         aria-label={t("chat.newMessages.jump", { count: props.count })}
+        data-cuelume-tap="navigate"
         onClick={props.onJumpToUnread}
       >
         {label()}

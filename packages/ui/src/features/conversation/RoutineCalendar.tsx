@@ -204,7 +204,12 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
           <div class="routine-planner-identity">
             <Show when={props.onBack}>
               {(back) => (
-                <IconButton variant="ghost" label={t("common.back")} onClick={() => back()()}>
+                <IconButton
+                  variant="ghost"
+                  label={t("common.back")}
+                  data-cuelume-tap="navigate"
+                  onClick={() => back()()}
+                >
                   <ArrowLeft />
                 </IconButton>
               )}
@@ -228,6 +233,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
             <IconButton
               variant="ghost"
               label={t(state.view === "week" ? "routine.calendar.previousWeek" : "routine.calendar.previousDay")}
+              data-cuelume-tap="navigate"
               onClick={() => step(-1)}
             >
               <ChevronLeft aria-hidden="true" />
@@ -236,6 +242,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
               variant="outline"
               size="sm"
               disabled={visibleDays().includes(today())}
+              data-cuelume-tap="navigate"
               onClick={() => moveFrom(today())}
             >
               {t("routine.calendar.today")}
@@ -243,6 +250,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
             <IconButton
               variant="ghost"
               label={t(state.view === "week" ? "routine.calendar.nextWeek" : "routine.calendar.nextDay")}
+              data-cuelume-tap="navigate"
               onClick={() => step(1)}
             >
               <ChevronRight aria-hidden="true" />
@@ -344,6 +352,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                             size="xs"
                             class="routine-planner-day-button"
                             aria-label={t("routine.calendar.openDay", { day: longDay(day) })}
+                            data-cuelume-tap="navigate"
                             onClick={() => moveFrom(day, "day")}
                           >
                             <span>{dayText(day, { weekday: "short" })}</span>
@@ -385,6 +394,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                               count: dayEntries().length,
                               day: longDay(day),
                             })}
+                            data-cuelume-tap="navigate"
                             onClick={() => moveFrom(day, "day")}
                           >
                             {t("routine.calendar.more", { count: hidden() })}
@@ -514,6 +524,7 @@ function RoutineCalendarEntry(props: RoutineCalendarEntryProps) {
               variant="ghost"
               class="routine-planner-agent"
               label={t("routine.calendar.openAgent", { name: agent.name })}
+              data-cuelume-tap="navigate"
               onClick={() => props.onOpenAgent(agent.id)}
             >
               <AgentAvatar agent={agent} class="routine-planner-avatar" />

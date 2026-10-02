@@ -235,6 +235,7 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   label={props.closeLabel ?? t("settings.dialog.close")}
                   tooltip={props.closeLabel ?? t("settings.dialog.close")}
                   variant="ghost"
+                  data-cuelume-tap="close"
                   onClick={() => requestOpenChange(false)}
                 >
                   <X />

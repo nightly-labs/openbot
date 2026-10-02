@@ -308,6 +308,8 @@ export function ServerRail(props: ServerRailProps) {
             type="button"
             class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
             aria-label={t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}
+            data-cuelume-open=""
+            data-cuelume-emphasis="subtle"
             onClick={props.onAdd}
           >
             <span class="server-rail-monogram">+</span>
@@ -369,6 +371,7 @@ function ServerRailButton(
             aria-label={buttonLabel()}
             aria-pressed={props.server.active ? "true" : "false"}
             aria-keyshortcuts={props.onMove ? "Shift+F10 Alt+ArrowUp Alt+ArrowDown" : "Shift+F10"}
+            data-cuelume-navigate=""
             onClick={() => props.onSelect(props.server.id)}
             onContextMenu={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
               trigger = event.currentTarget;

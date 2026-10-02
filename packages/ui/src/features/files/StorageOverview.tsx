@@ -108,6 +108,7 @@ export function StorageOverview(props: StorageOverviewProps) {
               size="icon-sm"
               class="storage-subview-back"
               aria-label={t("files.storage.back")}
+              data-cuelume-tap="navigate"
               onClick={() => setShowFiles(false)}
             >
               <SettingsBackIcon />
@@ -214,6 +215,7 @@ export function StorageOverview(props: StorageOverviewProps) {
                         name: row.agent?.name ?? t("files.storage.removedAgent"),
                         size: format.fileSize(row.bytes),
                       })}
+                      data-cuelume-tap="navigate"
                       onClick={() => props.onOpenAgent(row.agentId)}
                     >
                       <AgentAvatar
@@ -263,6 +265,7 @@ export function StorageOverview(props: StorageOverviewProps) {
                       variant="ghost"
                       class="storage-row"
                       aria-label={t("files.storage.rowLabel", { name: chat.title, size: format.fileSize(chat.bytes) })}
+                      data-cuelume-tap="navigate"
                       onClick={() => props.onOpenConversation(chat.id)}
                     >
                       <span class="storage-row-copy">
@@ -290,7 +293,13 @@ export function StorageOverview(props: StorageOverviewProps) {
             </h3>
             <ul class="storage-rows">
               <li>
-                <Button type="button" variant="ghost" class="storage-row" onClick={() => setShowFiles(true)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  class="storage-row"
+                  data-cuelume-tap="navigate"
+                  onClick={() => setShowFiles(true)}
+                >
                   <span class="storage-row-copy">
                     <span class="storage-row-title">{t("files.storage.allFiles")}</span>
                     <span class="storage-row-meta">{t("files.storage.allFilesDescription")}</span>

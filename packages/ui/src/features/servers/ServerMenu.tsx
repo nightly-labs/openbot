@@ -182,6 +182,7 @@ export function ServerMenu(props: ServerMenuProps) {
                       class="server-menu-row"
                       aria-label={[server().name, ...serverStatusLabels(server(), t)].join(", ")}
                       aria-current={server().active ? "true" : undefined}
+                      data-cuelume-navigate=""
                       onClick={() => selectServer(server())}
                       ref={(row) => selectOnKey(row, server)}
                     >

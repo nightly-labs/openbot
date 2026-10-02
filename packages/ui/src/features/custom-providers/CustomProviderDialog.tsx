@@ -235,7 +235,13 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
 
             <header class="custom-provider-header">
               <Show when={props.onBack}>
-                <IconButton label={t("common.back")} variant="ghost" disabled={busy()} onClick={() => props.onBack?.()}>
+                <IconButton
+                  label={t("common.back")}
+                  variant="ghost"
+                  disabled={busy()}
+                  data-cuelume-tap="navigate"
+                  onClick={() => props.onBack?.()}
+                >
                   <ArrowLeft />
                 </IconButton>
               </Show>

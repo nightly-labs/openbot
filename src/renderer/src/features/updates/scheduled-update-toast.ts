@@ -2,6 +2,7 @@ import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { type Accessor, createEffect, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
 
 const TOAST_ID = "scheduled-app-update";
 
@@ -41,7 +42,7 @@ export function createScheduledUpdateToast(options: {
           onClick: () => {
             options.cancel().catch((error: unknown) => {
               const text = currentText();
-              toast.error(text.errorMessage(error, text.t("update.scheduled.cancelFailed")));
+              actionToast.error(text.errorMessage(error, text.t("update.scheduled.cancelFailed")));
             });
           },
         },

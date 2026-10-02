@@ -31,7 +31,6 @@ import {
   Sparkles,
   Tabs,
   Text,
-  toast,
   UsersRound,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -43,6 +42,7 @@ import {
 } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { ConnectorsPanel } from "../connectors/ConnectorsPanel";
 import type { GitHubConnectorController } from "../connectors/github-connector";
 import type { SlackConnectorController } from "../connectors/slack-connector";
@@ -226,7 +226,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       await action();
       return true;
     } catch (error) {
-      toast.error(t("server.settings.actionFailedTitle"), {
+      actionToast.error(t("server.settings.actionFailedTitle"), {
         description: errorMessage(error, t("server.settings.actionFailed")),
       });
       return false;
@@ -245,7 +245,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     busy,
     run,
     showCopyError() {
-      toast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
+      actionToast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
     },
   };
   const general = createServerGeneralSection(host, { onSetUpDesktop: () => setSection("desktop") });

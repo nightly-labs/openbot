@@ -100,6 +100,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(within(providers).getByRole("radio", { name: /Claude.*Connected/ }));
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await fireEvent.click(screen.getByRole("button", { name: "Open OpenBot" }));
     expect(window.openbot.saveSetup).toHaveBeenCalledWith({ preferredProvider: "claude", preferredModel: null });
     expect(await screen.findByRole("heading", { name: "Chief" })).toBeInTheDocument();

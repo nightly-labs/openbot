@@ -1,11 +1,11 @@
 import type { SlackOverview } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type {
   SlackOrchestratorChoice,
   SlackOrchestratorModels,
 } from "@openbot/ui/features/settings/SlackIntegrationPanel";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { type SlackConnectorPort, slackConnectorPort } from "./slack-connector-port";
 
 /** How often the Slack page reads the connections while it shows: a connection changes on its own. */
@@ -62,7 +62,7 @@ export function createSlackConnector(
     void action()
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
-        toast.error(t("connector.slack.actionFailed"), {
+        actionToast.error(t("connector.slack.actionFailed"), {
           description: errorMessage(error, t("connector.slack.actionFailed")),
         });
       })

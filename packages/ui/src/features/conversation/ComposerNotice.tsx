@@ -61,6 +61,7 @@ export function ComposerNotice(props: {
             size="sm"
             class="composer-notice-dismiss"
             aria-label={t("composer.notice.dismiss")}
+            data-cuelume-tap="close"
             onClick={() => dismiss()()}
           >
             <CloseIcon />

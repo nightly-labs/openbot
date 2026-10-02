@@ -124,6 +124,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
                       variant="ghost"
                       class="storage-row"
                       aria-label={t("files.storage.rowLabel", { name: chat.title, size: format.fileSize(chat.bytes) })}
+                      data-cuelume-tap="navigate"
                       onClick={() => props.onOpenConversation(chat.id)}
                     >
                       <span class="storage-row-copy">

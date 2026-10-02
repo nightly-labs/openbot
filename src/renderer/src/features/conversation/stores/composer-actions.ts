@@ -2,6 +2,7 @@ import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
+import { playActionSound } from "../../../action-sounds";
 import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
@@ -518,6 +519,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.clearConversationError(target);
       if (submittedSnapshot) deps.clearSubmittedDraft(target, submittedSnapshot);
       else deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: EMPTY_DRAFT }));
+    } else {
+      playActionSound("error");
     }
     return sent;
   }

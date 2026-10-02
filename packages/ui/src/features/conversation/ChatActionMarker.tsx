@@ -149,6 +149,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                     ? t("chat.marker.hideRoutineHistory")
                     : t("chat.marker.showRoutineHistory")
               }
+              data-cuelume-tap={historyExpanded() ? "close" : "open"}
               onClick={toggleHistory}
             >
               <ChevronDown aria-hidden="true" />
@@ -349,6 +350,7 @@ function AgentButton(props: {
           class="chat-action-target"
           style={agentTargetStyle(agent())}
           aria-label={t("chat.marker.openChat", { name: agent().name })}
+          data-cuelume-tap="navigate"
           onClick={() => props.onSelectAgent(agent().id)}
         >
           <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
