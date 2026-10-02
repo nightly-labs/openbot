@@ -1,9 +1,15 @@
-import type { GitHubConnectorStatus } from "@openbot/contracts/ipc";
+import type { GitHubConnectorStatus, OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
 import { Button, ChevronLeft } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
-import { GitHubMark, type IntegrationStatus, SlackMark } from "@openbot/ui/features/settings/IntegrationLayout";
+import {
+  GitHubMark,
+  type IntegrationStatus,
+  OnePasswordMark,
+  SlackMark,
+} from "@openbot/ui/features/settings/IntegrationLayout";
 import { IntegrationsHub, type IntegrationsHubRow } from "@openbot/ui/features/settings/IntegrationsHub";
+import { OnePasswordConnectorPanel } from "@openbot/ui/features/settings/OnePasswordConnectorPanel";
 import {
   SlackIntegrationPanel,
   slackIntegrationState,
@@ -12,9 +18,10 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import { type GitHubConnectorController, githubPanelProps } from "./github-connector";
+import { type OnePasswordConnectorController, onePasswordPanelProps } from "./onepassword-connector";
 import type { SlackConnectorController } from "./slack-connector";
 
-type View = "hub" | "github" | "slack";
+type View = "hub" | "github" | "onepassword" | "slack";
 
 const GITHUB_STATUS = {
   disconnected: { status: "idle", label: "connector.github.statusNotSetUp" },
@@ -23,12 +30,20 @@ const GITHUB_STATUS = {
   expired: { status: "attention", label: "connector.github.statusExpired" },
 } as const satisfies Record<GitHubConnectorStatus["state"], { status: IntegrationStatus; label: string }>;
 
+const ONEPASSWORD_STATUS = {
+  disconnected: { status: "idle", label: "connector.onePassword.statusNotSetUp" },
+  connecting: { status: "idle", label: "connector.onePassword.statusConnecting" },
+  "choose-account": { status: "idle", label: "connector.onePassword.statusConnecting" },
+  connected: { status: "connected", label: "connector.onePassword.statusConnected" },
+} as const satisfies Record<OnePasswordConnectorStatus["state"], { status: IntegrationStatus; label: string }>;
+
 /**
  * Server settings > Connectors: the list of this computer's integrations, and the page of the one
  * the user opens. Each integration is passed only when this computer has it.
  */
 export function ConnectorsPanel(props: {
   github?: GitHubConnectorController | undefined;
+  onePassword?: OnePasswordConnectorController | undefined;
   slack?: SlackConnectorController | undefined;
   agents: AgentProfile[];
 }) {
@@ -53,6 +68,22 @@ export function ConnectorsPanel(props: {
             ? t("connector.github.expiredTitle")
             : t("connector.github.description"),
       onOpen: () => setView("github"),
+    };
+  };
+  const onePasswordRow = (onePassword: OnePasswordConnectorController): IntegrationsHubRow => {
+    const status = onePassword.status();
+    const header = ONEPASSWORD_STATUS[status.state];
+    return {
+      id: "onepassword",
+      name: t("connector.onePassword.title"),
+      logo: <OnePasswordMark />,
+      status: header.status,
+      statusLabel: t(header.label),
+      summary:
+        status.state === "connected" && status.loginCount !== null
+          ? t("connector.onePassword.loginCount", { count: status.loginCount })
+          : t("connector.onePassword.description"),
+      onOpen: () => setView("onepassword"),
     };
   };
   const slackRow = (slack: SlackConnectorController): IntegrationsHubRow => {
@@ -83,6 +114,7 @@ export function ConnectorsPanel(props: {
     const list: IntegrationsHubRow[] = [];
     if (props.slack) list.push(slackRow(props.slack));
     if (props.github) list.push(githubRow(props.github));
+    if (props.onePassword) list.push(onePasswordRow(props.onePassword));
     return list;
   };
 
@@ -100,6 +132,14 @@ export function ConnectorsPanel(props: {
           <div class="integrations-hub">
             <Back />
             <GitHubConnectorPanel {...githubPanelProps(github())} />
+          </div>
+        )}
+      </Match>
+      <Match when={view() === "onepassword" && props.onePassword}>
+        {(onePassword) => (
+          <div class="integrations-hub">
+            <Back />
+            <OnePasswordConnectorPanel {...onePasswordPanelProps(onePassword())} />
           </div>
         )}
       </Match>

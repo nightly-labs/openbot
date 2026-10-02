@@ -7,6 +7,7 @@ import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent
 import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
 import type { GitHubConnectorController } from "./features/connectors/github-connector";
+import type { OnePasswordConnectorController } from "./features/connectors/onepassword-connector";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
@@ -68,6 +69,8 @@ export function MarketplaceOverlay(props: {
   onPluginSlugConsumed: () => void;
   /** This computer's GitHub connection. Absent in the web client and on a joined server. */
   githubConnector?: GitHubConnectorController | undefined;
+  /** This computer's 1Password connection. Absent in the web client and on a joined server. */
+  onePasswordConnector?: OnePasswordConnectorController | undefined;
   /** What the dialog calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }) {
@@ -99,6 +102,7 @@ export function MarketplaceOverlay(props: {
           open={true}
           calls={props.calls}
           githubConnector={props.githubConnector}
+          onePasswordConnector={props.onePasswordConnector}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}

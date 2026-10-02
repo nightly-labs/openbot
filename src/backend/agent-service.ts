@@ -134,6 +134,7 @@ import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
 import { MessagingThreads } from "./messaging/messaging-threads";
+import type { PasswordVault } from "./password-vault";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -215,6 +216,8 @@ export interface AgentServiceOptions {
    * for the same reason as `computerUseMcpServer`: the user connects and disconnects while OpenBot runs.
    */
   githubConnector?: GitHubConnectorSource | null;
+  /** The 1Password vault the user shared with OpenBot, or `null`. The browser fills logins from it. */
+  passwordVault?: PasswordVault | null;
   /**
    * The memory of a hosted server, or `null` on each other computer. With it, no new turn starts
    * while memory is low, and only a fixed number of turns run at the same time.
@@ -494,6 +497,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
+      passwordVault: options.passwordVault,
     });
     this.#duplication = new DuplicationGate({
       store,
@@ -575,6 +579,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpAuthorization: (config) => this.#mcp.authorization(config),
       ...(credentials.agentEnvironment ? { agentEnvironment: credentials.agentEnvironment } : {}),
+      passwordVaultConnected: () => options.passwordVault?.connected() ?? false,
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),

@@ -39,6 +39,7 @@
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
 @import "@openbot/ui/features/settings/integration-layout.css";
 @import "@openbot/ui/features/settings/github-connector.css";
+@import "@openbot/ui/features/settings/onepassword-connector.css";
 @import "@openbot/ui/features/settings/slack-integration.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "./features/computer-use/computer-use.css";

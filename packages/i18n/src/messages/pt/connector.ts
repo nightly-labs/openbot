@@ -130,4 +130,51 @@ export const messages = {
   "connector.slack.removeEffectKept": "As conversas e o Orquestrador do Slack continuam no OpenBot.",
   "connector.slack.keep": "Manter conectado",
   "connector.slack.close": "Fechar",
+  "connector.onePassword.title": "1Password",
+  "connector.onePassword.description":
+    "Compartilhe um cofre dedicado do 1Password com o OpenBot por meio de uma conta de serviço, para que os agentes possam entrar em sites no navegador do OpenBot.",
+  "connector.onePassword.howItWorks":
+    "A conexão cria um cofre “Shared with OpenBot” na sua conta do 1Password e uma conta de serviço que só consegue ler esse cofre. O OpenBot preenche os logins salvos no navegador deste computador, então só os itens que você mover para esse cofre são compartilhados. Os agentes nunca veem uma senha.",
+  "connector.onePassword.connect": "Conectar o 1Password",
+  "connector.onePassword.setupTitle": "Configuração",
+  "connector.onePassword.stepCliTitle": "Instalar a CLI do 1Password",
+  "connector.onePassword.stepCliChecking": "Procurando a CLI do 1Password neste computador",
+  "connector.onePassword.stepCliInstalling": "Baixando a CLI do 1Password do 1Password",
+  "connector.onePassword.stepCliReady": "A versão {version} está instalada.",
+  "connector.onePassword.stepCliMissing":
+    "O OpenBot baixa a CLI do 1Password para uma pasta própria. Não é preciso senha de administrador.",
+  "connector.onePassword.stepCliManual":
+    "O OpenBot não consegue instalá-la neste computador. Instale-a pelo 1Password e volte a esta página.",
+  "connector.onePassword.installCli": "Instalar",
+  "connector.onePassword.stepAppTitle": "Ativar a integração com a CLI",
+  "connector.onePassword.stepAppDescription":
+    "No app do 1Password, abra Ajustes > Desenvolvedor e ative “Integrar com a CLI do 1Password”.",
+  "connector.onePassword.stepAppReady": "O app do 1Password permite que a CLI crie o cofre compartilhado.",
+  "connector.onePassword.openApp": "Abrir o 1Password",
+  "connector.onePassword.checkAgain": "Verificar de novo",
+  "connector.onePassword.stepVaultTitle": "Criar o cofre compartilhado",
+  "connector.onePassword.stepVaultDescription":
+    "O OpenBot cria o cofre “Shared with OpenBot” e uma conta de serviço que só consegue lê-lo. O 1Password pede sua aprovação.",
+  "connector.onePassword.useToken": "Usar um token de conta de serviço",
+  "connector.onePassword.tokenLabel": "Token da conta de serviço",
+  "connector.onePassword.tokenPlaceholder": "ops_…",
+  "connector.onePassword.connectWithToken": "Conectar",
+  "connector.onePassword.approveInApp": "Aprove o pedido no app do 1Password",
+  "connector.onePassword.cancel": "Cancelar",
+  "connector.onePassword.chooseAccountTitle": "Escolha uma conta",
+  "connector.onePassword.chooseAccountDescription": "O OpenBot cria o cofre compartilhado na conta que você escolher.",
+  "connector.onePassword.useAccount": "Usar esta conta",
+  "connector.onePassword.vaultTitle": "Cofre compartilhado",
+  "connector.onePassword.vaultDescription":
+    "Mova um login para este cofre no 1Password para que os agentes possam usá-lo. Remova-o para parar.",
+  "connector.onePassword.loginsLoading": "Lendo os logins do 1Password",
+  "connector.onePassword.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.onePassword.disconnect": "Desconectar",
+  "connector.onePassword.disconnectTitle": "Desconectar o 1Password",
+  "connector.onePassword.disconnectSummary":
+    "O OpenBot esquece o token. O cofre e a conta de serviço continuam no 1Password; remova-os lá se não precisar mais deles.",
+  "connector.onePassword.actionFailed": "O OpenBot não conseguiu alterar a conexão com o 1Password.",
+  "connector.onePassword.statusConnected": "Conectado",
+  "connector.onePassword.statusConnecting": "Conectando",
+  "connector.onePassword.statusNotSetUp": "Não configurado",
 } as const satisfies PartialTranslation<typeof source>;

@@ -57,6 +57,7 @@ import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
+import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -253,6 +254,7 @@ const {
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardOnePasswordConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -412,6 +414,7 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   githubConnector,
+  onePasswordConnector,
   billing,
   hostedServers,
   customProviderChanges,
@@ -465,6 +468,7 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
     ...hostedSiteIpcHandlers({ hostedSites, remoteServers, getMainWindow, translate: language.translate }),
     ...githubConnectorIpcHandlers({ githubConnector }),
+    ...onePasswordConnectorIpcHandlers({ onePasswordConnector }),
     ...billingIpcHandlers({ billing }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
@@ -852,6 +856,7 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);

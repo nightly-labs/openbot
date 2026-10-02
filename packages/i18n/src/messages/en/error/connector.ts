@@ -12,4 +12,18 @@ export const messages = defineMessages("error.connector", {
   "error.connector.githubExpired": "The GitHub connection expired. Connect GitHub again.",
   "error.connector.githubFileUnreadable": "The GitHub connection file is unreadable.",
   "error.connector.githubFileTooLarge": "The GitHub connection file is too large.",
+  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
+  "error.connector.onePasswordCliMissing":
+    "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
+  "error.connector.onePasswordCliInstallFailed":
+    "OpenBot could not install the 1Password CLI. Check the connection to the internet, then try again.",
+  "error.connector.onePasswordCliSignedOut":
+    "The 1Password CLI is not signed in. Turn on its integration in the 1Password app, then connect again.",
+  "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
+  "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
+  "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
+  "error.connector.onePasswordNoVault":
+    "The service account cannot read a vault. Give it access to a vault, then try again.",
+  "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
+  "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
 });

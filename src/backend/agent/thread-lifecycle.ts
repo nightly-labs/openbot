@@ -92,6 +92,8 @@ export interface ThreadLifecycleOptions {
    * the built-in GitHub connection. Claude and the ACP clients read the same source at spawn.
    */
   agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
+  /** Whether a password vault is connected, read at each start and resume of a session. */
+  passwordVaultConnected?: () => boolean;
 }
 
 /**
@@ -115,6 +117,7 @@ export class ThreadLifecycle {
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
   readonly #agentEnvironment: () => Readonly<Record<string, string>>;
+  readonly #passwordVaultConnected: () => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
   /**
@@ -138,6 +141,7 @@ export class ThreadLifecycle {
     this.#mcpToolRuntimes = options.mcpToolRuntimes;
     this.#mcpAuthorization = options.mcpAuthorization;
     this.#agentEnvironment = options.agentEnvironment ?? (() => ({}));
+    this.#passwordVaultConnected = options.passwordVaultConnected ?? (() => false);
   }
 
   /**
@@ -336,7 +340,7 @@ export class ThreadLifecycle {
         sandbox: codexSandboxMode(agent),
         ...this.#workspaceOnlyParam(agent, client),
         ...this.#computerUseParam(agent, client),
-        developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
+        developerInstructions: this.#instructions(agent),
         ephemeral: false,
         serviceName: "openbot",
         dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
@@ -549,6 +553,13 @@ export class ThreadLifecycle {
     }
   }
 
+  /** The developer instructions of a session start or resume, with what is connected now. */
+  #instructions(agent: AgentSummary): string {
+    return developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id), {
+      passwordVault: this.#passwordVaultConnected(),
+    });
+  }
+
   /**
    * What an existing provider session is addressed with. Read by `resumeThread` and by boot
    * recovery, which reads a session before any turn resumes it: a client that has to load the
@@ -565,7 +576,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
-      developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
+      developerInstructions: this.#instructions(agent),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
       ...(await this.codexConfig(
         agent,

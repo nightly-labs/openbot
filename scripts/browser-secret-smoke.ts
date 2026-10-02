@@ -18,6 +18,14 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         : `
       <label>Password<input id="password" type="password"></label>
       <label>Code<input id="code" inputmode="numeric"></label>
+      ${
+        url.pathname === "/login"
+          ? `<form method="get" action="/search"><label>Search password<input id="get-password" type="password"></label></form>
+      <form action="/search"><label>Default password<input id="default-password" type="password"></label></form>
+      <form method="post" action="/search"><label>Override password<input id="override-password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
+      <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>`
+          : ""
+      }
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
       <button id="submit" disabled onclick="${url.pathname === "/native-submit" ? "if (!event.isTrusted) return; " : ""}${url.pathname === "/same-page" ? "history.replaceState({}, '', '/complete')" : "location.href='/complete'"}">Sign in</button>
       <script>
@@ -60,6 +68,10 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       };
       try {
         const handoff = await browser.prepareSecret(params);
+        // Only a real password field may take a vault password with no card; the digit boxes do not
+        // ask for a one-time code, and an email or SMS code never comes from the vault.
+        if (handoff.vaultFillable !== (method === "password"))
+          throw new Error(`The ${method} fields were classified wrongly for a vault fill.`);
         for (const tool of ["snapshot", "screenshot"]) {
           const capture = await browser.handleDynamicTool({ ...params, tool, arguments: { tabId: tab.id } });
           if (capture.success) throw new Error("Agent capture was not blocked while awaiting consent.");
@@ -76,6 +88,38 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await browser.snapshot(tab.id);
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await browser.close(tab.id);
+      }
+    }
+    // A field built for something else must not take a vault password: its value can reach a URL.
+    // A password field in a POST form may.
+    for (const [selector, fillable] of [
+      ["#code", false],
+      ["#get-password", false],
+      ["#default-password", false],
+      ["#override-password", false],
+      ["#post-password", true],
+    ] as const) {
+      const tab = await browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent");
+      try {
+        const handoff = await browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: `vault-${selector}`,
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector }],
+            submission: "enter",
+          },
+        });
+        handoff.cancel();
+        if (handoff.vaultFillable !== fillable)
+          throw new Error(`${selector} was classified wrongly for a vault password.`);
       } finally {
         await browser.close(tab.id);
       }

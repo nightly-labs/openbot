@@ -210,7 +210,9 @@ export class OpenBotToolRouter {
               request.id,
               request.params.tool === "upload_files"
                 ? await this.#browserUploads.uploadFiles(agentId, params)
-                : await this.#browser.handleDynamicTool(params),
+                : request.params.tool === "list_logins"
+                  ? await this.#attention.listVaultLogins(params)
+                  : await this.#browser.handleDynamicTool(params),
             );
             return;
           }

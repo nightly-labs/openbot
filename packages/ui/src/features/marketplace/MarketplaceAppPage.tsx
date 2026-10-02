@@ -17,6 +17,7 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { GitHubConnectorPanel } from "../settings/GitHubConnectorPanel";
 import { DangerZone, DetailHeader, WizardDialog } from "../settings/IntegrationLayout";
+import { OnePasswordConnectorPanel } from "../settings/OnePasswordConnectorPanel";
 import { AppAction } from "./MarketplaceCards";
 import { AppMark, TryCard } from "./MarketplaceParts";
 import { CATEGORY_LABELS } from "./marketplace-listing";
@@ -121,64 +122,13 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
           </ItemGroup>
         </SettingsSection>
       </Show>
-      <SettingsSection title={t("plugin.section.information")}>
-        {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row. */}
-        <dl class="marketplace-props marketplace-info">
-          <dt>
-            <Text as="span" variant="caption" tone="muted">
-              {t("plugin.info.developer")}
-            </Text>
-          </dt>
-          <dd>
-            <Text as="span" variant="body-sm">
-              {plugin().creatorName}
-            </Text>
-          </dd>
-          <dt>
-            <Text as="span" variant="caption" tone="muted">
-              {t("plugin.info.category")}
-            </Text>
-          </dt>
-          <dd>
-            <Text as="span" variant="body-sm">
-              {t(CATEGORY_LABELS[plugin().category])}
-            </Text>
-          </dd>
-          <dt>
-            <Text as="span" variant="caption" tone="muted">
-              {t("plugin.info.version")}
-            </Text>
-          </dt>
-          <dd>
-            <Text as="span" variant="body-sm">
-              {plugin().version}
-            </Text>
-          </dd>
-          <For each={links()}>
-            {(link) => (
-              <>
-                <dt>
-                  <Text as="span" variant="caption" tone="muted">
-                    {link.label}
-                  </Text>
-                </dt>
-                <dd>
-                  <Button
-                    type="button"
-                    variant="link"
-                    class="marketplace-link"
-                    aria-label={`${link.label}: ${link.text}`}
-                    onClick={() => model().openUrl(link.url)}
-                  >
-                    {link.text}
-                    <ExternalLink aria-hidden="true" />
-                  </Button>
-                </dd>
-              </>
-            )}
-          </For>
-        </dl>
-      </SettingsSection>
+      <AppInformation
+        developer={plugin().creatorName}
+        category={t(CATEGORY_LABELS[plugin().category])}
+        version={plugin().version}
+        links={links()}
+        onOpenUrl={(url) => model().openUrl(url)}
+      />
       <Show when={props.app.status !== "idle" && model().canConnectApps()}>
         <DangerZone
           title={t("marketplace.app.disconnect.title")}
@@ -191,6 +141,97 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
     </>
   );
 }
+
+interface AppInformationLink {
+  label: string;
+  url: string;
+  /** The visible host and path. */
+  text: string;
+}
+
+/** Who makes an app, its category and version, and its links. */
+function AppInformation(props: {
+  developer: string;
+  category: string;
+  version?: string | undefined;
+  links: readonly AppInformationLink[];
+  onOpenUrl: (url: string) => void;
+}) {
+  const { t } = useText();
+  return (
+    <SettingsSection title={t("plugin.section.information")}>
+      {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row. */}
+      <dl class="marketplace-props marketplace-info">
+        <dt>
+          <Text as="span" variant="caption" tone="muted">
+            {t("plugin.info.developer")}
+          </Text>
+        </dt>
+        <dd>
+          <Text as="span" variant="body-sm">
+            {props.developer}
+          </Text>
+        </dd>
+        <dt>
+          <Text as="span" variant="caption" tone="muted">
+            {t("plugin.info.category")}
+          </Text>
+        </dt>
+        <dd>
+          <Text as="span" variant="body-sm">
+            {props.category}
+          </Text>
+        </dd>
+        <Show when={props.version}>
+          {(version) => (
+            <>
+              <dt>
+                <Text as="span" variant="caption" tone="muted">
+                  {t("plugin.info.version")}
+                </Text>
+              </dt>
+              <dd>
+                <Text as="span" variant="body-sm">
+                  {version()}
+                </Text>
+              </dd>
+            </>
+          )}
+        </Show>
+        <For each={props.links}>
+          {(link) => (
+            <>
+              <dt>
+                <Text as="span" variant="caption" tone="muted">
+                  {link.label}
+                </Text>
+              </dt>
+              <dd>
+                <Button
+                  type="button"
+                  variant="link"
+                  class="marketplace-link"
+                  aria-label={`${link.label}: ${link.text}`}
+                  onClick={() => props.onOpenUrl(link.url)}
+                >
+                  {link.text}
+                  <ExternalLink aria-hidden="true" />
+                </Button>
+              </dd>
+            </>
+          )}
+        </For>
+      </dl>
+    </SettingsSection>
+  );
+}
+
+/** The publisher's pages, shown in the 1Password page's information. */
+const ONEPASSWORD_LINKS = [
+  { label: "plugin.link.website", url: "https://1password.com" },
+  { label: "plugin.link.privacyPolicy", url: "https://1password.com/legal/privacy" },
+  { label: "plugin.link.terms", url: "https://1password.com/legal/terms-of-service" },
+] as const;
 
 /** An MCP server that the user added, and that no catalog app claims. */
 function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
@@ -275,6 +316,7 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
       .apps()
       .find((entry) => entry.id === props.id);
   const github = () => (app()?.kind === "github" ? model().github : undefined);
+  const onePassword = () => (app()?.kind === "onepassword" ? model().onePassword : undefined);
   const plugin = () => {
     const current = app();
     return current?.kind === "plugin" ? current : undefined;
@@ -309,6 +351,37 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
                 onOpenVerification={() => current().onOpenVerification()}
                 onOpenInstall={() => current().onOpenInstall()}
               />
+            );
+          }}
+        </Match>
+        <Match when={onePassword()}>
+          {(panel) => {
+            const current = () => panel()();
+            return (
+              <>
+                <OnePasswordConnectorPanel
+                  status={current().status}
+                  busy={current().busy}
+                  onWatchSetup={() => current().onWatchSetup()}
+                  onCheckSetup={() => current().onCheckSetup()}
+                  onInstallCli={() => current().onInstallCli()}
+                  onOpenApp={() => current().onOpenApp()}
+                  onConnect={(accountId) => current().onConnect(accountId)}
+                  onConnectWithToken={(token) => current().onConnectWithToken(token)}
+                  onCancel={() => current().onCancel()}
+                  onDisconnect={() => current().onDisconnect()}
+                />
+                <AppInformation
+                  developer={t("connector.onePassword.title")}
+                  category={t("marketplace.app.onePasswordCategory")}
+                  links={ONEPASSWORD_LINKS.map((link) => ({
+                    label: t(link.label),
+                    url: link.url,
+                    text: pluginLinkText(link.url),
+                  }))}
+                  onOpenUrl={(url) => model().openUrl(url)}
+                />
+              </>
             );
           }}
         </Match>

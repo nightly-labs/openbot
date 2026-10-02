@@ -159,6 +159,11 @@ export function AppAction(props: {
       model().github?.().onConnect();
       return;
     }
+    /* 1Password can ask for an account or a token. Its page owns those choices. */
+    if (app.kind === "onepassword") {
+      props.scope.nav.go({ kind: "app", id: app.id });
+      return;
+    }
     void model()
       .connectApp(app)
       .then((connected) => {

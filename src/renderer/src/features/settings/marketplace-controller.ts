@@ -33,6 +33,7 @@ import { createEffect, createMemo, createSignal, createStore, onCleanup, untrack
 import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import { type GitHubConnectorController, githubPanelProps } from "../connectors/github-connector";
+import { type OnePasswordConnectorController, onePasswordPanelProps } from "../connectors/onepassword-connector";
 import { desktopMarketplaceCalls, type MarketplaceCalls } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import { agentHomeCache, marketplaceErrorMessage, skillHomeCache } from "./marketplace-shared";
@@ -66,6 +67,8 @@ export interface MarketplaceControllerProps {
   onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   /** This computer's GitHub connection, when it can have one. */
   githubConnector?: GitHubConnectorController | undefined;
+  /** This computer's 1Password connection. Absent on a joined server. */
+  onePasswordConnector?: OnePasswordConnectorController | undefined;
   /** What the Marketplace calls. Absent: this computer's bridge. */
   calls?: MarketplaceCalls | undefined;
 }
@@ -341,6 +344,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const connector = props.githubConnector;
     return connector ? githubPanelProps(connector) : undefined;
   });
+  const onePasswordPanel = createMemo(() => {
+    const connector = props.onePasswordConnector;
+    return connector ? onePasswordPanelProps(connector) : undefined;
+  });
 
   const apps = createMemo((): MarketplaceApp[] => {
     const plugins = props.plugins ?? [];
@@ -356,6 +363,18 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
               tagline: t("marketplace.app.githubTagline"),
               category: "coding",
               status: githubState === "connected" ? "connected" : githubState === "expired" ? "attention" : "idle",
+            } satisfies MarketplaceApp,
+          ]
+        : []),
+      ...(props.onePasswordConnector
+        ? [
+            {
+              kind: "onepassword",
+              id: "onepassword",
+              name: t("connector.onePassword.title"),
+              tagline: t("marketplace.app.onePasswordTagline"),
+              category: "productivity",
+              status: props.onePasswordConnector.status().state === "connected" ? "connected" : "idle",
             } satisfies MarketplaceApp,
           ]
         : []),
@@ -674,6 +693,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     disconnectApp: (app) => {
       if (app.kind === "plugin") setUninstalling(app.plugin);
       if (app.kind === "github") props.githubConnector?.disconnect();
+      if (app.kind === "onepassword") props.onePasswordConnector?.disconnect();
     },
     removeServer,
     get runPrompt() {
@@ -685,6 +705,10 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     openUrl: openPluginUrl,
     get github() {
       const panel = githubPanel();
+      return panel ? () => panel : undefined;
+    },
+    get onePassword() {
+      const panel = onePasswordPanel();
       return panel ? () => panel : undefined;
     },
 
