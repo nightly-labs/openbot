@@ -60,8 +60,14 @@ export const messages = defineMessages("chat", {
   "chat.marker.skill.revised": "Revised skill",
   "chat.marker.skill.installed": "Installed skill",
   "chat.marker.messageGroup": { one: "{count} message with", other: "{count} messages with" },
-  "chat.marker.showMessages": { one: "Show {count} message", other: "Show {count} messages" },
-  "chat.marker.hideMessages": { one: "Hide {count} message", other: "Hide {count} messages" },
+  "chat.marker.showMessages": {
+    one: "Show {count} message with {agents}",
+    other: "Show {count} messages with {agents}",
+  },
+  "chat.marker.hideMessages": {
+    one: "Hide {count} message with {agents}",
+    other: "Hide {count} messages with {agents}",
+  },
   "chat.marker.groupMessages": "Messages with agents",
   "chat.marker.messaged": "Messaged",
   "chat.marker.messageFrom": "Message from",

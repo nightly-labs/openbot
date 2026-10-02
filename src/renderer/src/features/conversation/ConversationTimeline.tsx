@@ -15,6 +15,7 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { planItems, planTitle } from "../../app-message-projection";
+import { groupedMessageIds } from "./agent-message-timeline";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
@@ -347,6 +348,7 @@ export function ConversationTimeline() {
                       </Show>
                       <article
                         data-chat-search-message={message()?.id}
+                        data-chat-search-group={groupedMessageIds(message())}
                         class={{ "chat-action-entry-animated": animateEntrance }}
                       >
                         <Show when={message()?.actionMarker ?? initialActionMarker}>

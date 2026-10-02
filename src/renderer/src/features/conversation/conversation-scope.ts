@@ -688,8 +688,10 @@ export function createConversationViewScope(props: ConversationProps) {
     ({ request, agentId, loaded }) => {
       if (!request || request.agentId !== agentId || !loaded || request.nonce === lastHandledMessageFocusNonce) return;
       requestAnimationFrame(() => {
+        // A message in a group of agent messages has no row of its own, so the group row is the target.
+        const messageId = CSS.escape(request.messageId);
         const target = scrollElement?.querySelector<HTMLElement>(
-          `[data-chat-search-message="${CSS.escape(request.messageId)}"]`,
+          `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
         );
         if (!target) return;
         lastHandledMessageFocusNonce = request.nonce;

@@ -20,7 +20,7 @@ import {
   X,
 } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
-import { createSignal, createUniqueId, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import type {
   AgentProfile,
@@ -136,6 +136,14 @@ function AgentMessageGroupMarker(props: {
     if (ids.length !== 1) return t("chat.marker.agentCount", { count: ids.length });
     return agents()[0]?.name ?? t("chat.marker.unavailableAgent");
   };
+  // A message that joins the group has no row of its own to announce it. The live text is empty when
+  // the row mounts, so a group drawn from history or by a scroll stays silent.
+  const mountedCount = untrack(() => props.group.messages.length);
+  const joinedMessage = () => {
+    const newest = props.group.messages.at(-1);
+    if (props.group.messages.length <= mountedCount || !newest) return "";
+    return markerAccessibleLabel(newest.marker, props.agents, t);
+  };
   return (
     <Marker
       class="chat-action-marker chat-action-marker-agent-message chat-action-marker-agent-message-group"
@@ -153,11 +161,10 @@ function AgentMessageGroupMarker(props: {
             style={agentTargetsStyle(agents())}
             aria-expanded={expanded() ? "true" : "false"}
             aria-controls={listId}
-            aria-label={
-              expanded()
-                ? t("chat.marker.hideMessages", { count: props.group.messages.length })
-                : t("chat.marker.showMessages", { count: props.group.messages.length })
-            }
+            aria-label={t(expanded() ? "chat.marker.hideMessages" : "chat.marker.showMessages", {
+              count: props.group.messages.length,
+              agents: agentsLabel(),
+            })}
             data-cuelume-tap={expanded() ? "close" : "open"}
             onClick={toggle}
           >
@@ -187,11 +194,11 @@ function AgentMessageGroupMarker(props: {
                 class="chat-action-history chat-action-group-list"
                 aria-label={t("chat.marker.groupMessages")}
               >
-                <For each={props.group.messages}>
+                <For each={props.group.messages} keyed={(entry) => entry.id}>
                   {(entry) => (
                     <li class="chat-action-history-entry">
                       <SingleChatActionMarker
-                        marker={entry.marker}
+                        marker={entry().marker}
                         agents={props.agents}
                         onSelectAgent={props.onSelectAgent}
                       />
@@ -203,6 +210,11 @@ function AgentMessageGroupMarker(props: {
           </div>
         </Show>
       </div>
+      <Show when={!props.announce}>
+        <span class="sr-only" role="status" aria-live="polite">
+          {joinedMessage()}
+        </span>
+      </Show>
     </Marker>
   );
 }

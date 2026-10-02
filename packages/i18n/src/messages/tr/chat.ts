@@ -63,8 +63,11 @@ export const messages = {
   "chat.marker.skill.revised": "Beceri revize edildi",
   "chat.marker.skill.installed": "Beceri yüklendi",
   "chat.marker.messageGroup": { one: "{count} mesaj:", other: "{count} mesaj:" },
-  "chat.marker.showMessages": { one: "{count} mesajı göster", other: "{count} mesajı göster" },
-  "chat.marker.hideMessages": { one: "{count} mesajı gizle", other: "{count} mesajı gizle" },
+  "chat.marker.showMessages": {
+    one: "{agents} ile {count} mesajı göster",
+    other: "{agents} ile {count} mesajı göster",
+  },
+  "chat.marker.hideMessages": { one: "{agents} ile {count} mesajı gizle", other: "{agents} ile {count} mesajı gizle" },
   "chat.marker.groupMessages": "Ajanlarla mesajlar",
   "chat.marker.messaged": "Mesaj gönderildi",
   "chat.marker.messageFrom": "Şuradan mesaj:",

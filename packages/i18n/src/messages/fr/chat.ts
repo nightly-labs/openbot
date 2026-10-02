@@ -60,8 +60,14 @@ export const messages = {
   "chat.marker.skill.revised": "Compétence révisée",
   "chat.marker.skill.installed": "Compétence installée",
   "chat.marker.messageGroup": { one: "{count} message avec", other: "{count} messages avec" },
-  "chat.marker.showMessages": { one: "Afficher {count} message", other: "Afficher {count} messages" },
-  "chat.marker.hideMessages": { one: "Masquer {count} message", other: "Masquer {count} messages" },
+  "chat.marker.showMessages": {
+    one: "Afficher {count} message avec {agents}",
+    other: "Afficher {count} messages avec {agents}",
+  },
+  "chat.marker.hideMessages": {
+    one: "Masquer {count} message avec {agents}",
+    other: "Masquer {count} messages avec {agents}",
+  },
   "chat.marker.groupMessages": "Messages avec les agents",
   "chat.marker.messaged": "Message envoyé à",
   "chat.marker.messageFrom": "Message de",
