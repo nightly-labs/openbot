@@ -89,8 +89,10 @@ function project(
       result[field] = null;
       continue;
     }
+    // A channel led by a hidden agent stays visible without a lead: the channel codec refuses a lead
+    // that is not one of the members, and the hidden member is gone from the list.
     const visible =
-      field === "typingAgentId" && typeof child === "string" && hiddenIds.has(child)
+      (field === "typingAgentId" || field === "leadAgentId") && typeof child === "string" && hiddenIds.has(child)
         ? null
         : project(child, hiddenIds, protocol, field);
     if (visible === null && child !== null && ["snapshot", "page", "approval", "request"].includes(field)) return null;

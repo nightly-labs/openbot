@@ -1,8 +1,9 @@
-import { decodeChannelPage } from "@openbot/contracts/ipc";
+import { type AgentSummary, decodeChannelPage, isAgentSummary } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
+import agentFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 import { stores } from "../backend/agent-service-test-harness";
 import { ChannelService } from "../backend/channel-service";
-import { createTeamApiFixture, stopTeamApiFixtures } from "./team-api-server-test-harness";
+import { createAgents, createTeamApiFixture, stopTeamApiFixtures } from "./team-api-server-test-harness";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -112,5 +113,109 @@ describe("Team API channel access", () => {
     expect(await compatibility.json()).toMatchObject({
       capabilities: expect.not.arrayContaining(["channel-chats-v1"]),
     });
+  });
+
+  it("shows a channel led by a hidden agent, and a save from that peer keeps the hidden agent", async () => {
+    const source = agentFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");
+    const chief: AgentSummary = { ...source, id: "chief", provider: "codex", model: "gpt-5.6-luna" };
+    // A custom ACP agent is hidden before protocol 5, and a Cursor agent from every protocol.
+    for (const [hiddenAgent, protocol, capabilities] of [
+      [{ ...source, id: "agent-acp", provider: "acp", model: "custom/opus" }, "4", "opencode"],
+      [{ ...source, id: "agent-cursor", provider: "cursor", model: "auto" }, "5", "opencode,local-providers"],
+    ] as const) {
+      const agents: AgentSummary[] = [chief, hiddenAgent];
+      const fixture = await createTeamApiFixture(`channels-${hiddenAgent.provider}`, { configure: true });
+      const data = stores(fixture.root);
+      await data.store.initialize();
+      await data.mailbox.initialize();
+      const channels = new ChannelService(data.store.database, data.mailbox, {
+        agents: () => agents,
+        generate: async () => "",
+        schedule: () => undefined,
+        interrupt: async () => undefined,
+        busy: () => false,
+        changed: () => undefined,
+        error: () => undefined,
+      });
+      cleanups.push(async () => {
+        await channels.stop();
+        data.store.database.close();
+      });
+      const draft = { title: "", instructions: "", leadAgentId: hiddenAgent.id };
+      await channels.command(
+        {
+          type: "save",
+          operationId: "shared",
+          channelId: "shared",
+          draft: { ...draft, name: "Shared", members: [{ agentId: chief.id }, { agentId: hiddenAgent.id }] },
+        },
+        { id: "owner", name: "Owner" },
+      );
+      await channels.command(
+        {
+          type: "save",
+          operationId: "alone",
+          channelId: "alone",
+          draft: { ...draft, name: "Alone", members: [{ agentId: hiddenAgent.id }] },
+        },
+        { id: "owner", name: "Owner" },
+      );
+      const { base } = await fixture.start({ channels, agents: createAgents({ listAgents: () => agents }) });
+      const headers = {
+        Authorization: `Bearer ${await fixture.signIn()}`,
+        "OpenBot-Protocol-Version": protocol,
+        "OpenBot-Capabilities": `${capabilities},channel-chats-v1`,
+        "Content-Type": "application/json",
+      };
+
+      const list = await fetch(`${base}/v1/channels`, { headers });
+      expect(list.status).toBe(200);
+      expect(await list.json()).toMatchObject([
+        { id: "shared", members: [{ agentId: chief.id }], leadAgentId: null },
+        { id: "alone", members: [], leadAgentId: null },
+      ]);
+      const read = await fetch(`${base}/v1/channels/read`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ channelId: "alone" }),
+      });
+      expect(read.status).toBe(200);
+
+      // The settings panel of that peer saves the whole draft it sees: the hidden lead is not in it.
+      const save = await fetch(`${base}/v1/channels/commands`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          type: "save",
+          operationId: "rename",
+          channelId: "shared",
+          update: true,
+          draft: { ...draft, name: "Renamed", members: [{ agentId: chief.id }], leadAgentId: null },
+        }),
+      });
+      expect(save.status).toBe(200);
+      expect(channels.store.get("shared")).toMatchObject({
+        name: "Renamed",
+        members: [{ agentId: chief.id }, { agentId: hiddenAgent.id }],
+        leadAgentId: hiddenAgent.id,
+      });
+      // A lead that the peer picks itself still wins.
+      await fetch(`${base}/v1/channels/commands`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          type: "save",
+          operationId: "lead",
+          channelId: "shared",
+          update: true,
+          draft: { ...draft, name: "Renamed", members: [{ agentId: chief.id }], leadAgentId: chief.id },
+        }),
+      });
+      expect(channels.store.get("shared")).toMatchObject({
+        members: [{ agentId: chief.id }, { agentId: hiddenAgent.id }],
+        leadAgentId: chief.id,
+      });
+    }
   });
 });
