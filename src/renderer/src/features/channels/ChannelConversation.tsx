@@ -87,7 +87,7 @@ export interface ChannelConversationProps {
 
 export function ChannelConversation(props: ChannelConversationProps) {
   const channels = useChannels();
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   const runtime = () => channels.port();
   const agentList = channels.agents;
   const isOwnMessage = (authorId: string) => props.isOwnMessage(authorId);
@@ -96,11 +96,18 @@ export function ChannelConversation(props: ChannelConversationProps) {
    * Memories and routines live here rather than in `ChannelEditor`, because the routines view
    * covers the whole panel - its own header replaces the panel header, the way the agent settings
    * panel does it.
+   *
+   * A count that could not be read is unknown, not zero. The settings row then shows no count
+   * rather than a false `0 saved`, and the error names the failure. A count the host did read is
+   * zero, and the row says so.
    */
   const [panel, setPanel] = createStore<{
-    memories: { open: boolean; count: number };
-    routines: { open: boolean; count: number };
-  }>({ memories: { open: false, count: 0 }, routines: { open: false, count: 0 } });
+    memories: { open: boolean; count: number | null; error: string | null };
+    routines: { open: boolean; count: number | null; error: string | null };
+  }>({
+    memories: { open: false, count: null, error: null },
+    routines: { open: false, count: null, error: null },
+  });
   const resetPanel = () => {
     setPanel((state) => {
       state.memories.open = false;
@@ -134,14 +141,21 @@ export function ChannelConversation(props: ChannelConversationProps) {
     () => memoriesPort(),
     (port) => {
       if (!port) return;
-      const load = () => {
-        void port.list().then((entries) => {
+      // The host can refuse this read, and the modal that lists the same memories reports its own
+      // failure. This count feeds a row that opens before the modal does, so it reports it too.
+      const load = async () => {
+        try {
+          const entries = await port.list();
           setPanel((state) => {
-            state.memories.count = entries.length;
+            Object.assign(state.memories, { count: entries.length, error: null });
           });
-        });
+        } catch (caught) {
+          setPanel((state) => {
+            Object.assign(state.memories, { count: null, error: errorMessage(caught, t("memory.loadFailed")) });
+          });
+        }
       };
-      load();
+      void load();
       onCleanup(port.subscribe(load));
     },
   );
@@ -149,14 +163,22 @@ export function ChannelConversation(props: ChannelConversationProps) {
     () => routinesPort(),
     (port) => {
       if (!port) return;
-      const load = () => {
-        void port.list().then((entries) => {
+      const load = async () => {
+        try {
+          const entries = await port.list();
           setPanel((state) => {
-            state.routines.count = entries.length;
+            Object.assign(state.routines, { count: entries.length, error: null });
           });
-        });
+        } catch (caught) {
+          setPanel((state) => {
+            Object.assign(state.routines, {
+              count: null,
+              error: errorMessage(caught, t("routine.settings.loadFailed")),
+            });
+          });
+        }
       };
-      load();
+      void load();
       onCleanup(port.subscribe(load));
     },
   );
@@ -188,8 +210,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
       resetPanel();
       setCopyError(null);
       setPanel((state) => {
-        state.memories.count = 0;
-        state.routines.count = 0;
+        Object.assign(state.memories, { count: null, error: null });
+        Object.assign(state.routines, { count: null, error: null });
       });
       setComposer((state) => {
         Object.assign(state, { text: "", reply: null, attachments: [] });
@@ -591,6 +613,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
         </p>
       </Show>
       <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
+      <Show when={panel.memories.error}>{(message) => <p role="alert">{message()}</p>}</Show>
+      <Show when={panel.routines.error}>{(message) => <p role="alert">{message()}</p>}</Show>
 
       <Show when={channels.state.page} fallback={<p>{t("channel.conversation.loading")}</p>}>
         {(page) => (
