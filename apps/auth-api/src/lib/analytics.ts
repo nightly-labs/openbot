@@ -80,11 +80,11 @@ type LandingDestination =
   | "claude";
 
 type CollectionIndexRoute = ContentCollection["indexRoute"];
+type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
 /**
  * The screens a report may name. Article paths carry the slug so one article can be told from
  * another, and `safeScreenPath` keeps the set closed at runtime as well as in the type.
  */
-type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
 export type LandingScreenPath =
   | "/"
   | "/join"
@@ -153,7 +153,7 @@ function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
   };
 }
 
-/** The download route each platform uses, reversed so a click can name the platform it asked for. */
+/** The download routes of each platform, reversed so a click can name the platform it asked for. */
 const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [OPENBOT_DOWNLOAD_LINKS.macos, "macos"],
   [OPENBOT_DOWNLOAD_LINKS.windows, "windows"],

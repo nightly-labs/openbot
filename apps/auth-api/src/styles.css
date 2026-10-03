@@ -8642,6 +8642,23 @@ a {
   }
 }
 
+/* Named transitions outrank the global reduced-motion rule, so the hover lift stops here. */
+@media (prefers-reduced-motion: reduce) {
+  .download-installer-button,
+  .download-system-card,
+  .download-system-card-arrow,
+  .download-hub-card-link-icon {
+    transition: none;
+  }
+
+  .download-installer-button:hover,
+  .download-system-card:hover,
+  .download-system-card:hover .download-system-card-arrow,
+  .download-hub-card-link:hover .download-hub-card-link-icon {
+    transform: none;
+  }
+}
+
 @media (max-width: 960px) {
   .download-hub-cards {
     grid-template-columns: minmax(0, 1fr);

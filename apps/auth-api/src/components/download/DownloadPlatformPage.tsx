@@ -1,6 +1,6 @@
 import { PlatformLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
-import { For, onSettled, Show } from "solid-js";
+import { createTrackedEffect, For, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { type DownloadPageContent, type DownloadStep, downloadPagePath } from "../../lib/download-pages";
 import { DOWNLOAD_PLATFORM_ORDER } from "../../lib/download-platforms";
@@ -18,7 +18,12 @@ export interface DownloadPlatformPageProps {
 // installers and the spec sheet. Under it, each topic is one row: the heading on the left and the
 // text on the right, as plain lists, so a crawler reads what a visitor reads.
 export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
-  onSettled(() => landingAnalytics.start(document, window.location.hostname, downloadPagePath(props.page.platform)));
+  // Tracked rather than mounted once: a card under "Other systems" stays on this route and only
+  // changes the parameter. The effect disposes the previous page's listener before it starts the new one.
+  createTrackedEffect(() => {
+    const path = downloadPagePath(props.page.platform);
+    return landingAnalytics.start(document, window.location.hostname, path);
+  });
 
   const otherPlatforms = () => DOWNLOAD_PLATFORM_ORDER.filter((platform) => platform !== props.page.platform);
 

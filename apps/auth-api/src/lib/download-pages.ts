@@ -46,7 +46,7 @@ export interface DownloadPageSection {
 
 export interface DownloadPageContent {
   platform: DownloadPlatform;
-  /** The name a reader uses for the system, which the title and the breadcrumb show. */
+  /** The name a reader uses for the system, which the headings and the breadcrumb show. */
   name: string;
   title: string;
   description: string;
