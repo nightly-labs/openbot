@@ -5,7 +5,7 @@ import { DOWNLOAD_PLATFORM_ORDER } from "../../lib/download-platforms";
 
 // In `loader` for the reason given in routes/news/$slug.tsx: an unknown system is a real not-found
 // response, not a 200 with an error card.
-export function loadDownloadPage(platform: string): DownloadPageContent {
+function loadDownloadPage(platform: string): DownloadPageContent {
   const known = DOWNLOAD_PLATFORM_ORDER.find((candidate) => candidate === platform);
   if (!known) throw notFound();
   return DOWNLOAD_PAGES[known];

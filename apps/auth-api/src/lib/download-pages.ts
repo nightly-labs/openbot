@@ -28,7 +28,7 @@ export interface DownloadInstaller {
 }
 
 /** One line of the spec sheet: what the computer needs, or what the download is. */
-export interface DownloadSpec {
+interface DownloadSpec {
   label: string;
   value: string;
 }
@@ -39,7 +39,7 @@ export interface DownloadStep {
   code?: string;
 }
 
-export interface DownloadPageSection {
+interface DownloadPageSection {
   title: string;
   steps: readonly DownloadStep[];
 }
