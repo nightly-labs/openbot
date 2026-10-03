@@ -50,7 +50,7 @@ export function SideMark(props: { mark?: RivalMarkName | undefined; class: strin
   return (
     <Show
       when={props.mark}
-      fallback={<AppLogo variant="production" animation={props.blink ? "blink" : undefined} class={props.class} />}
+      fallback={<AppLogo variant="production" animation={props.blink ? "blink" : "none"} class={props.class} />}
     >
       {(mark) => <RivalMark name={mark()} class={`${props.class} compare-mark-rival`} />}
     </Show>
