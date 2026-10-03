@@ -97,7 +97,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
       },
       { text: "Open the DMG and drag OpenBot to the Applications folder." },
       {
-        text: "Open OpenBot from Applications. The app is signed and notarized by Apple, so macOS only asks you once to confirm that you want to open an app from the internet.",
+        text: "Open OpenBot from Applications. The app is signed by its developer and notarized by Apple, so macOS only asks you once to confirm that you want to open an app from the internet.",
       },
       CONNECT_STEP,
     ],

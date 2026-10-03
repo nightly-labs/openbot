@@ -104,7 +104,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, `/download`, a `/download/<os>` page, a collection index, or a published article path, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
-| `landing_link_clicked` | Which public resources are useful? | Allowlisted public link clicked |
+| `landing_link_clicked` | Which public resources are useful? | Allowlisted public link clicked. From the release with the download pages, the Download link in the content-page header reports `destination: download_page`, not `download_section` |
 | `landing_download_selected` | Does the offered platform match the one taken? | The hero reports its detected platform once, then each manual change; `detected` separates the two |
 | `content_article_opened` | Which news article or guide does a reader choose, and from where? | A link to a published article was clicked; `placement` separates an index card from the related row |
 | `content_article_read` | Is an article read or abandoned? | The body reached `start`, `half`, or `end` in the viewport, at most once each per view. It measures position, not attention, and never elapsed time |
