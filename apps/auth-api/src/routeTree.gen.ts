@@ -24,9 +24,8 @@ import { Route as BillingReturnRouteImport } from './routes/billing/return'
 import { Route as CompareIndexRouteImport } from './routes/compare/index'
 import { Route as CompareSlugRouteImport } from './routes/compare/$slug'
 import { Route as CompareRssDotxmlRouteImport } from './routes/compare/rss[.]xml'
-import { Route as DownloadLinuxRouteImport } from './routes/download/linux'
-import { Route as DownloadMacosRouteImport } from './routes/download/macos'
-import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
+import { Route as DownloadIndexRouteImport } from './routes/download/index'
+import { Route as DownloadPlatformRouteImport } from './routes/download/$platform'
 import { Route as GuidesIndexRouteImport } from './routes/guides/index'
 import { Route as GuidesSlugRouteImport } from './routes/guides/$slug'
 import { Route as GuidesRssDotxmlRouteImport } from './routes/guides/rss[.]xml'
@@ -41,6 +40,7 @@ import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
+import { Route as DownloadPlatformLatestRouteImport } from './routes/download/$platform_/latest'
 import { Route as NewsOgOpenbotVsGrokbotDotpngRouteImport } from './routes/news/og/openbot-vs-grokbot[.]png'
 import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug'
 import { Route as V1AgentTemplatesIndexRouteImport } from './routes/v1/agent-templates/index'
@@ -199,19 +199,14 @@ const CompareRssDotxmlRoute = CompareRssDotxmlRouteImport.update({
   path: '/compare/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DownloadLinuxRoute = DownloadLinuxRouteImport.update({
-  id: '/download/linux',
-  path: '/download/linux',
+const DownloadIndexRoute = DownloadIndexRouteImport.update({
+  id: '/download/',
+  path: '/download/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DownloadMacosRoute = DownloadMacosRouteImport.update({
-  id: '/download/macos',
-  path: '/download/macos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DownloadWindowsRoute = DownloadWindowsRouteImport.update({
-  id: '/download/windows',
-  path: '/download/windows',
+const DownloadPlatformRoute = DownloadPlatformRouteImport.update({
+  id: '/download/$platform',
+  path: '/download/$platform',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GuidesIndexRoute = GuidesIndexRouteImport.update({
@@ -282,6 +277,11 @@ const V1MeRoute = V1MeRouteImport.update({
 const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
   id: '/api/browser/$',
   path: '/api/browser/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadPlatformLatestRoute = DownloadPlatformLatestRouteImport.update({
+  id: '/download/$platform_/latest',
+  path: '/download/$platform/latest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewsOgOpenbotVsGrokbotDotpngRoute =
@@ -740,9 +740,7 @@ export interface FileRoutesByFullPath {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
-  '/download/linux': typeof DownloadLinuxRoute
-  '/download/macos': typeof DownloadMacosRoute
-  '/download/windows': typeof DownloadWindowsRoute
+  '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
@@ -754,10 +752,12 @@ export interface FileRoutesByFullPath {
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
+  '/download/': typeof DownloadIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
@@ -855,9 +855,7 @@ export interface FileRoutesByTo {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
-  '/download/linux': typeof DownloadLinuxRoute
-  '/download/macos': typeof DownloadMacosRoute
-  '/download/windows': typeof DownloadWindowsRoute
+  '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
@@ -869,10 +867,12 @@ export interface FileRoutesByTo {
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare': typeof CompareIndexRoute
+  '/download': typeof DownloadIndexRoute
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
@@ -971,9 +971,7 @@ export interface FileRoutesById {
   '/billing/return': typeof BillingReturnRoute
   '/compare/$slug': typeof CompareSlugRoute
   '/compare/rss.xml': typeof CompareRssDotxmlRoute
-  '/download/linux': typeof DownloadLinuxRoute
-  '/download/macos': typeof DownloadMacosRoute
-  '/download/windows': typeof DownloadWindowsRoute
+  '/download/$platform': typeof DownloadPlatformRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/rss.xml': typeof GuidesRssDotxmlRoute
   '/health/live': typeof HealthLiveRoute
@@ -985,10 +983,12 @@ export interface FileRoutesById {
   '/slack/connect': typeof SlackConnectRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/compare/': typeof CompareIndexRoute
+  '/download/': typeof DownloadIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/download/$platform_/latest': typeof DownloadPlatformLatestRoute
   '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
@@ -1088,9 +1088,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
-    | '/download/linux'
-    | '/download/macos'
-    | '/download/windows'
+    | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
     | '/health/live'
@@ -1102,10 +1100,12 @@ export interface FileRouteTypes {
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
+    | '/download/'
     | '/guides/'
     | '/news/'
     | '/plugins/'
     | '/api/browser/$'
+    | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
@@ -1203,9 +1203,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
-    | '/download/linux'
-    | '/download/macos'
-    | '/download/windows'
+    | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
     | '/health/live'
@@ -1217,10 +1215,12 @@ export interface FileRouteTypes {
     | '/slack/connect'
     | '/v1/me'
     | '/compare'
+    | '/download'
     | '/guides'
     | '/news'
     | '/plugins'
     | '/api/browser/$'
+    | '/download/$platform/latest'
     | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
@@ -1318,9 +1318,7 @@ export interface FileRouteTypes {
     | '/billing/return'
     | '/compare/$slug'
     | '/compare/rss.xml'
-    | '/download/linux'
-    | '/download/macos'
-    | '/download/windows'
+    | '/download/$platform'
     | '/guides/$slug'
     | '/guides/rss.xml'
     | '/health/live'
@@ -1332,10 +1330,12 @@ export interface FileRouteTypes {
     | '/slack/connect'
     | '/v1/me'
     | '/compare/'
+    | '/download/'
     | '/guides/'
     | '/news/'
     | '/plugins/'
     | '/api/browser/$'
+    | '/download/$platform_/latest'
     | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
@@ -1434,9 +1434,7 @@ export interface RootRouteChildren {
   BillingReturnRoute: typeof BillingReturnRoute
   CompareSlugRoute: typeof CompareSlugRoute
   CompareRssDotxmlRoute: typeof CompareRssDotxmlRoute
-  DownloadLinuxRoute: typeof DownloadLinuxRoute
-  DownloadMacosRoute: typeof DownloadMacosRoute
-  DownloadWindowsRoute: typeof DownloadWindowsRoute
+  DownloadPlatformRoute: typeof DownloadPlatformRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesRssDotxmlRoute: typeof GuidesRssDotxmlRoute
   HealthLiveRoute: typeof HealthLiveRoute
@@ -1448,10 +1446,12 @@ export interface RootRouteChildren {
   SlackConnectRoute: typeof SlackConnectRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   CompareIndexRoute: typeof CompareIndexRoute
+  DownloadIndexRoute: typeof DownloadIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   PluginsIndexRoute: typeof PluginsIndexRoute
   ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
+  DownloadPlatformLatestRoute: typeof DownloadPlatformLatestRoute
   NewsOgOpenbotVsGrokbotDotpngRoute: typeof NewsOgOpenbotVsGrokbotDotpngRoute
   PluginsIconSlugRoute: typeof PluginsIconSlugRoute
   V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
@@ -1626,25 +1626,18 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof CompareRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/download/linux': {
-      id: '/download/linux'
-      path: '/download/linux'
-      fullPath: '/download/linux'
-      preLoaderRoute: typeof DownloadLinuxRouteImport
+    '/download/': {
+      id: '/download/'
+      path: '/download'
+      fullPath: '/download/'
+      preLoaderRoute: typeof DownloadIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/download/macos': {
-      id: '/download/macos'
-      path: '/download/macos'
-      fullPath: '/download/macos'
-      preLoaderRoute: typeof DownloadMacosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/download/windows': {
-      id: '/download/windows'
-      path: '/download/windows'
-      fullPath: '/download/windows'
-      preLoaderRoute: typeof DownloadWindowsRouteImport
+    '/download/$platform': {
+      id: '/download/$platform'
+      path: '/download/$platform'
+      fullPath: '/download/$platform'
+      preLoaderRoute: typeof DownloadPlatformRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guides/': {
@@ -1743,6 +1736,13 @@ declare module '@tanstack/solid-router' {
       path: '/api/browser/$'
       fullPath: '/api/browser/$'
       preLoaderRoute: typeof ApiBrowserSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download/$platform_/latest': {
+      id: '/download/$platform_/latest'
+      path: '/download/$platform/latest'
+      fullPath: '/download/$platform/latest'
+      preLoaderRoute: typeof DownloadPlatformLatestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/news/og/openbot-vs-grokbot.png': {
@@ -2457,9 +2457,7 @@ const rootRouteChildren: RootRouteChildren = {
   BillingReturnRoute: BillingReturnRoute,
   CompareSlugRoute: CompareSlugRoute,
   CompareRssDotxmlRoute: CompareRssDotxmlRoute,
-  DownloadLinuxRoute: DownloadLinuxRoute,
-  DownloadMacosRoute: DownloadMacosRoute,
-  DownloadWindowsRoute: DownloadWindowsRoute,
+  DownloadPlatformRoute: DownloadPlatformRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesRssDotxmlRoute: GuidesRssDotxmlRoute,
   HealthLiveRoute: HealthLiveRoute,
@@ -2471,10 +2469,12 @@ const rootRouteChildren: RootRouteChildren = {
   SlackConnectRoute: SlackConnectRoute,
   V1MeRoute: V1MeRouteWithChildren,
   CompareIndexRoute: CompareIndexRoute,
+  DownloadIndexRoute: DownloadIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   PluginsIndexRoute: PluginsIndexRoute,
   ApiBrowserSplatRoute: ApiBrowserSplatRoute,
+  DownloadPlatformLatestRoute: DownloadPlatformLatestRoute,
   NewsOgOpenbotVsGrokbotDotpngRoute: NewsOgOpenbotVsGrokbotDotpngRoute,
   PluginsIconSlugRoute: PluginsIconSlugRoute,
   V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,

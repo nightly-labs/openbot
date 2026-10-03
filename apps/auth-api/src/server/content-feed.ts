@@ -13,6 +13,8 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../lib/content-collection";
+import { DOWNLOAD_PAGES_UPDATED_AT, downloadPageUrl } from "../lib/download-pages";
+import { DOWNLOAD_PLATFORM_ORDER } from "../lib/download-platforms";
 import { PLUGINS_UPDATED_AT, pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
 
@@ -52,6 +54,11 @@ function latestSiteModifiedAt(): string {
 export function contentSitemapXml(): string {
   const entries = [
     { loc: OPENBOT_SITE_URL, lastmod: latestSiteModifiedAt() },
+    { loc: downloadPageUrl("hub"), lastmod: DOWNLOAD_PAGES_UPDATED_AT },
+    ...DOWNLOAD_PLATFORM_ORDER.map((platform) => ({
+      loc: downloadPageUrl(platform),
+      lastmod: DOWNLOAD_PAGES_UPDATED_AT,
+    })),
     ...CONTENT_COLLECTIONS.flatMap((collection) => [
       { loc: collectionIndexUrl(collection), lastmod: latestModifiedAt(collection) },
       ...collection.articles.map((article) => ({

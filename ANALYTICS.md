@@ -101,7 +101,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `reaction_action` | Are reactions used? | Reaction operation completed |
 | `maintenance_action` | Can accounts export data and diagnostics? | Export reported a saved artifact |
 | `hosted_site_action` | Can accounts publish, replace, and delete Hosted Sites? | A terminal Hosted Site operation result; site metadata is never sent |
-| `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, a collection index, or a published article path, with allowlisted campaign tags and no hash |
+| `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, `/download`, a `/download/<os>` page, a collection index, or a published article path, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
 | `landing_link_clicked` | Which public resources are useful? | Allowlisted public link clicked |

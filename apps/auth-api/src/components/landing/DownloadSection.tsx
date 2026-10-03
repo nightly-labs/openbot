@@ -1,6 +1,7 @@
 import { PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
-import { Show } from "solid-js";
-import { DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
+import { Link } from "@tanstack/solid-router";
+import { For, Show } from "solid-js";
+import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
@@ -82,7 +83,7 @@ export function DownloadSection() {
             />
           </a>
 
-          {/* The hero selector already offers Linux and /download/linux resolves an AppImage, so the
+          {/* The hero selector already offers Linux and /download/linux/latest resolves an AppImage, so the
               card is the same link the other two are. A non-clickable card here contradicted both. */}
           <a
             class="landing-download-card"
@@ -100,6 +101,19 @@ export function DownloadSection() {
             />
           </a>
         </div>
+
+        {/* The cards start the download, so the pages that explain each installer get their own
+            links. They are also how a crawler finds those pages from the home page. */}
+        <p class="landing-download-pages">
+          System requirements and install steps:
+          <For each={DOWNLOAD_PLATFORM_ORDER}>
+            {(platform) => (
+              <Link to="/download/$platform" params={{ platform }}>
+                {DOWNLOAD_PLATFORMS[platform].label}
+              </Link>
+            )}
+          </For>
+        </p>
       </div>
     </section>
   );

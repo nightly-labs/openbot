@@ -4,6 +4,7 @@
 // from the root route instead of as an import here.
 
 import { LANDING_FAQ_STRUCTURED_DATA } from "./landing-faq";
+import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS } from "./landing-links";
 
 export const OPENBOT_SITE_URL = "https://openbot.run/";
 export const OPENBOT_SITE_TITLE = "OpenBot: Run a team of AI agents on your computer";
@@ -42,7 +43,7 @@ export function siteUrlForPage(pageUrl: URL): string {
   return OPENBOT_PRODUCTION_HOSTS.has(pageUrl.hostname) ? OPENBOT_SITE_URL : `${pageUrl.origin}/`;
 }
 
-const OPENBOT_SOFTWARE_APPLICATION = {
+export const OPENBOT_SOFTWARE_APPLICATION = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "OpenBot",
@@ -51,12 +52,15 @@ const OPENBOT_SOFTWARE_APPLICATION = {
   description: OPENBOT_SITE_DESCRIPTION,
   applicationCategory: "DeveloperApplication",
   applicationSubCategory: "AI agent app",
-  operatingSystem: ["macOS 13 or later (Apple silicon or Intel)", "Windows 10 or later", "Linux"],
+  operatingSystem: ["macOS 13 or later (Apple silicon or Intel)", "Windows 10 or later (x64)", "Linux (x64 or arm64)"],
+  // The installers themselves: schema.org's `downloadUrl` is the file, not a page about it.
   downloadUrl: [
-    `${OPENBOT_SITE_URL}download/macos`,
-    `${OPENBOT_SITE_URL}download/windows`,
-    `${OPENBOT_SITE_URL}download/linux`,
-  ],
+    OPENBOT_DOWNLOAD_LINKS.macos,
+    OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
+    OPENBOT_DOWNLOAD_LINKS.windows,
+    OPENBOT_DOWNLOAD_LINKS.linux,
+    OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux,
+  ].map((path) => new URL(path, OPENBOT_SITE_URL).toString()),
   // What people ask an assistant for. Keep it to what the released app does.
   featureList: [
     "Runs Codex, Claude Code, Gemini (Antigravity), Grok and OpenCode agents",
