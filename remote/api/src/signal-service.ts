@@ -469,7 +469,14 @@ export class SignalService {
       }
       this.#pruneReplayCache();
       if (usedInitialTicket && this.#usedTicketIds.has(claims.jti)) throw new Error("Ticket was already used.");
-      if (message.peer !== "ingress" && this.#userConnectionCount(claims.userId) >= this.#maximumConnectionsPerUser) {
+      // A reconnect of the same logical session replaces its old socket below, so that socket does not
+      // count. A phone that changes network keeps a half-open socket until the idle timeout.
+      const replaced =
+        message.peer === "client" ? this.#connectionForSession(claims.hostId, claims.sessionId)?.client.id : undefined;
+      if (
+        message.peer !== "ingress" &&
+        this.#userConnectionCount(claims.userId, replaced) >= this.#maximumConnectionsPerUser
+      ) {
         this.#fail(socket, "rate_limited", "Too many active remote connections.", 1008);
         return;
       }
@@ -715,10 +722,10 @@ export class SignalService {
     return Boolean(connection && (connection.client.id === peer.socket.id || connection.host.id === peer.socket.id));
   }
 
-  #userConnectionCount(userId: string): number {
+  #userConnectionCount(userId: string, exceptSocketId?: string): number {
     let total = 0;
     for (const peer of this.#peers.values()) {
-      if (peer.peer !== "ingress" && peer.claims.userId === userId) total += 1;
+      if (peer.peer !== "ingress" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
     }
     return total;
   }
