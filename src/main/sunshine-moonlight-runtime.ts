@@ -448,6 +448,16 @@ export class SunshineMoonlightRuntime {
     return port;
   }
 
+  // A stop that interrupts the start is not a start failure. A process that has already ended names
+  // the stage, because a pairing call to a Sunshine that has exited fails too.
+  #failStart(stage: RemoteRuntimeStartStage): (error: unknown) => never {
+    return (error) => {
+      if (this.#stopRequested) throw error;
+      const ended = childEnded(this.#sunshine) ? "sunshine" : childEnded(this.#moonlight) ? "moonlight" : null;
+      throw new RemoteRuntimeStartError(ended ?? stage, error);
+    };
+  }
+
   #throwIfStopRequested(): void {
     if (this.#stopRequested) throw new Error(sourceText("error.backend.remoteDesktopStoppedWhileStarting"));
   }
@@ -480,9 +490,7 @@ export class SunshineMoonlightRuntime {
       }
       await this.#writeIceHelper();
       await this.#setSunshineCredentials();
-      await this.#startSunshineWithRetry().catch((error: unknown) => {
-        throw new RemoteRuntimeStartError("sunshine", error);
-      });
+      await this.#startSunshineWithRetry().catch(this.#failStart("sunshine"));
       await this.#writeMoonlightConfig();
       const displays = await this.#getSunshineDisplays();
       if (!this.#selectedDisplayId || !displays.some((display) => display.id === this.#selectedDisplayId)) {
@@ -498,14 +506,15 @@ export class SunshineMoonlightRuntime {
           headers: { [this.#moonlightHeader]: moonlightSlotUser(1) },
         },
         this.#moonlight,
-      ).catch((error: unknown) => {
-        throw new RemoteRuntimeStartError("moonlight", error);
-      });
+      ).catch(this.#failStart("moonlight"));
       this.#options.onDiagnostic?.("moonlight", "OpenBot: Moonlight Web is ready.\n");
-      const paired = await this.#bootstrapMoonlight(moonlightPort).catch((error: unknown) => {
-        throw new RemoteRuntimeStartError("pairing", error);
-      });
+      const paired = await this.#bootstrapMoonlight(moonlightPort).catch(this.#failStart("pairing"));
       this.#throwIfStopRequested();
+      // #watchExit ignores an exit while #state is null, so a process that ended during pairing is
+      // found here. Nothing is awaited between this check and #state, so a later exit is watched.
+      if (childEnded(this.#sunshine) || childEnded(this.#moonlight)) {
+        this.#failStart("pairing")(new Error("A remote desktop process exited during pairing."));
+      }
       this.#state = {
         baseUrl: `http://127.0.0.1:${moonlightPort}`,
         authHeader: this.#moonlightHeader,

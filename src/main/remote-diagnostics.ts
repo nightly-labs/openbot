@@ -85,13 +85,15 @@ async function writeDiagnostic(directory: string, path: string, clean: string): 
 
 interface ManagedChildProcess {
   exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
   killed: boolean;
   kill(signal?: NodeJS.Signals): boolean;
   once(event: string, listener: (...args: unknown[]) => unknown): unknown;
 }
 
 export async function stopRemoteProcess(child: ManagedChildProcess, graceMs = 2_000): Promise<void> {
-  if (child.exitCode !== null || child.killed) return;
+  // A child that a signal ended has no exit code, and its exit event has already fired.
+  if (child.exitCode !== null || child.signalCode !== null || child.killed) return;
   await new Promise<void>((resolve) => {
     let complete = false;
     const finish = () => {

@@ -806,7 +806,7 @@ export class RemoteScreenGateway {
     const cause = error instanceof RemoteRuntimeStartError ? error.cause : error;
     this.#options.onDiagnostic?.(
       stage === "sunshine" ? "sunshine" : "moonlight",
-      `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${cause instanceof Error ? cause.message : String(cause)}\n`,
+      `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${describeCause(cause)}\n`,
     );
     return new RemoteScreenError(
       503,
@@ -917,6 +917,20 @@ export class RemoteScreenError extends Error {
 
 // Sunshine captures and sends input through X11 only. Under Wayland, X11 reaches only the windows
 // of XWayland clients, so the stream would show an empty screen.
+// The runtime wraps a cause, such as "Sunshine did not start on a reserved port family", around the
+// reason it did not start: an exit, or no answer.
+function describeCause(cause: unknown): string {
+  const parts: string[] = [];
+  for (
+    let next = cause;
+    next !== undefined && parts.length < 3;
+    next = next instanceof Error ? next.cause : undefined
+  ) {
+    parts.push(next instanceof Error ? next.message : String(next));
+  }
+  return parts.join(": ");
+}
+
 function isX11Session(environment: Readonly<Record<string, string | undefined>>): boolean {
   return Boolean(environment.DISPLAY) && !environment.WAYLAND_DISPLAY && environment.XDG_SESSION_TYPE !== "wayland";
 }
@@ -930,7 +944,7 @@ function sendViewer(
   const sessionPath = TEAM_API_ROUTES.remoteScreen.session(sessionId);
   const hostId = runtime.hostIds[streamerSlot - 1] ?? runtime.hostId;
   const target = `${sessionPath}/moonlight/stream.html?hostId=${hostId}&appId=${runtime.desktopAppId}`;
-  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";parent.postMessage(${JSON.stringify({ source: "openbot-moonlight", type: "viewer-state", sessionId, state: "error" })},"*");throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;
+  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";const refused=()=>parent.postMessage(${JSON.stringify({ source: "openbot-moonlight", type: "viewer-state", sessionId, state: "error" })},"*");document.readyState==="complete"?refused():addEventListener("load",refused);throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;
   response.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy":
