@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search results – Gearbox</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #222; background: #fafafa; }
+  header { background: #13294b; color: #fff; }
+  .bar { max-width: 1120px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 24px; }
+  .logo { font-weight: 800; font-size: 22px; color: #ffcc33; text-decoration: none; }
+  nav a { color: #dfe6f3; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  form.search { display: flex; flex: 1; max-width: 420px; }
+  form.search input { flex: 1; padding: 8px 10px; font-size: 14px; border: 0; border-radius: 4px 0 0 4px; }
+  form.search button { padding: 0 14px; border: 0; border-radius: 0 4px 4px 0; background: #ffcc33; font-weight: 700; cursor: pointer; }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 200px 1fr; gap: 28px; }
+  aside h3 { font-size: 14px; margin: 18px 0 8px; }
+  aside label { display: block; font-size: 14px; margin: 5px 0; }
+  .list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .item { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; display: flex; gap: 14px; }
+  .thumb { width: 72px; height: 72px; flex: none; }
+  .item a.name { font-weight: 600; color: #13294b; text-decoration: none; font-size: 16px; }
+  .item a.name:hover { text-decoration: underline; }
+  .price { font-weight: 700; margin: 6px 0; }
+  .stars { color: #d49a00; font-size: 13px; }
+  .item button { margin-top: 6px; background: none; border: 1px solid #c9d1dd; border-radius: 4px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+  .summary { grid-column: 1 / -1; color: #555; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+  footer { background: #13294b; color: #b9c5da; padding: 28px 24px; font-size: 13px; margin-top: 40px; text-align: center; }
+  footer a { color: #b9c5da; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="shop.html">Gearbox</a>
+    <form class="search" id="search-form" role="search">
+      <label for="q" style="position:absolute;left:-9999px">Search products</label>
+      <input id="q" name="q" type="search">
+      <button type="submit">Search</button>
+    </form>
+    <nav aria-label="Main">
+      <a href="shop.html">Home</a>
+      <a href="#">Deals</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right">
+      <a href="#">Account</a>
+      <a href="#">Cart (0)</a>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="summary">
+    <span id="summary">Results</span>
+    <span><label for="sort">Sort by</label>
+      <select id="sort"><option>Best match</option><option>Price: low to high</option><option>Price: high to low</option><option>Customer rating</option></select></span>
+  </div>
+  <aside aria-label="Refine results">
+    <h3>Brand</h3>
+    <label><input type="checkbox"> Orbit</label>
+    <label><input type="checkbox"> Pulse</label>
+    <label><input type="checkbox"> Halo</label>
+    <h3>Connection</h3>
+    <label><input type="checkbox"> Wireless</label>
+    <label><input type="checkbox"> Wired</label>
+    <label><input type="checkbox"> Bluetooth</label>
+  </aside>
+  <section class="list" id="list" aria-label="Products"></section>
+</main>
+<footer><a href="#">Shipping</a><a href="#">Returns</a><a href="#">Privacy</a><a href="#">Contact</a><br><br>© 2026 Gearbox Inc.</footer>
+<script>
+  const products = [
+    { sku: "orbit-keyboard", name: "Orbit Wireless Keyboard", price: 49, rating: 4.4, reviews: 812, words: "orbit wireless keyboard bluetooth" },
+    { sku: "orbit-mouse", name: "Orbit Wireless Mouse", price: 29, rating: 4.6, reviews: 1294, words: "orbit wireless mouse bluetooth" },
+    { sku: "orbit-combo", name: "Orbit Wireless Keyboard and Mouse Combo", price: 69, rating: 4.3, reviews: 402, words: "orbit wireless keyboard mouse combo" },
+    { sku: "pulse-gaming-mouse", name: "Pulse Gaming Mouse (Wired)", price: 39, rating: 4.5, reviews: 2210, words: "pulse gaming mouse wired rgb" },
+    { sku: "orbit-mouse-pad", name: "Orbit Mouse Pad XL", price: 15, rating: 4.7, reviews: 530, words: "orbit mouse pad desk mat" },
+    { sku: "nimbus-travel-mouse", name: "Nimbus Travel Mouse – Wireless, Silent", price: 24, rating: 4.1, reviews: 188, words: "nimbus travel wireless mouse silent" },
+    { sku: "arc-usb-c-hub", name: "Arc USB-C Hub 7-in-1", price: 45, rating: 4.2, reviews: 976, words: "arc usb-c hub adapter" },
+    { sku: "halo-headset", name: "Halo Wireless Headset", price: 89, rating: 4.4, reviews: 640, words: "halo wireless headset audio" },
+  ];
+  const query = new URLSearchParams(location.search).get("q") || "";
+  document.getElementById("q").value = query;
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const scored = products.map((p, i) => ({ p, i, s: terms.filter((t) => p.words.includes(t)).length }));
+  scored.sort((a, b) => b.s - a.s || a.i - b.i);
+  document.getElementById("summary").textContent = products.length + " results for “" + query + "”";
+  const list = document.getElementById("list");
+  for (const { p } of scored) {
+    const el = document.createElement("article");
+    el.className = "item";
+    el.innerHTML =
+      '<svg class="thumb" viewBox="0 0 72 72" aria-hidden="true"><rect width="72" height="72" rx="8" fill="#eef2f8"/><ellipse cx="36" cy="38" rx="14" ry="20" fill="#9fb3d1"/></svg>' +
+      '<div><a class="name" href="shop-product.html?sku=' + p.sku + '">' + p.name + '</a>' +
+      '<div class="price">$' + p.price.toFixed(2) + '</div>' +
+      '<div class="stars">★ ' + p.rating + ' (' + p.reviews.toLocaleString("en-US") + ' reviews)</div>' +
+      '<button type="button">Compare</button></div>';
+    list.appendChild(el);
+  }
+  document.getElementById("search-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const q = document.getElementById("q").value.trim();
+    if (!q) return;
+    report("search", { query: q });
+    setTimeout(() => { location.href = "shop-results.html?q=" + encodeURIComponent(q); }, 120);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podsumowanie zamówienia – Herbaciarnia Liść</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #23261f; background: #f5f6f0; }
+  header { background: #2f4a22; color: #fff; }
+  .bar { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 21px; color: #d9f2a6; text-decoration: none; }
+  nav a { color: #e1ead8; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  .steps { max-width: 1060px; margin: 20px auto 0; padding: 0 24px; display: flex; gap: 10px; font-size: 14px; color: #6b7065; list-style: none; }
+  .steps li[aria-current] { color: #2f4a22; font-weight: 700; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 24px 40px; }
+  .card { background: #fff; border: 1px solid #dfe3d6; border-radius: 10px; padding: 24px; margin-bottom: 16px; }
+  .line { display: flex; justify-content: space-between; margin: 8px 0; }
+  .total { border-top: 1px solid #dfe3d6; padding-top: 10px; font-weight: 700; font-size: 18px; }
+  .terms { font-size: 14px; }
+  .buttons { display: flex; justify-content: space-between; margin-top: 18px; }
+  .pay { background: #c2410c; color: #fff; border: 0; border-radius: 6px; padding: 13px 28px; font-size: 17px; font-weight: 700; cursor: pointer; }
+  .back { background: #fff; border: 1px solid #c9cfbd; border-radius: 6px; padding: 12px 18px; font-size: 15px; cursor: pointer; }
+  .status { margin-top: 12px; font-weight: 600; }
+  footer { background: #2f4a22; color: #cfdcc6; text-align: center; font-size: 13px; padding: 24px; }
+  footer a { color: #cfdcc6; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Herbaciarnia Liść</a>
+    <nav aria-label="Menu główne">
+      <a href="#">Strona główna</a>
+      <a href="#">Herbaty</a>
+      <a href="#">Akcesoria</a>
+      <a href="#">Promocje</a>
+      <a href="#">Pomoc</a>
+    </nav>
+    <div class="right"><a href="#">Moje konto</a><a href="#">Koszyk (3)</a></div>
+  </div>
+</header>
+<ol class="steps" aria-label="Etapy zamówienia">
+  <li>1. Koszyk ›</li>
+  <li>2. Dane ›</li>
+  <li>3. Dostawa ›</li>
+  <li aria-current="step">4. Podsumowanie</li>
+</ol>
+<main>
+  <h1>Podsumowanie zamówienia</h1>
+  <section class="card" aria-labelledby="h-products">
+    <h2 id="h-products" style="font-size:17px;margin-top:0">Produkty</h2>
+    <div class="line"><span>Sencha Kagoshima 100 g</span><span>54,00 zł</span></div>
+    <div class="line"><span>Earl Grey Kwiatowy 100 g</span><span>32,00 zł</span></div>
+    <div class="line"><span>Czajniczek żeliwny 0,6 l</span><span>31,01 zł</span></div>
+  </section>
+  <section class="card" aria-labelledby="h-delivery">
+    <h2 id="h-delivery" style="font-size:17px;margin-top:0">Dostawa i płatność</h2>
+    <div class="line"><span>Dostawa</span><span id="delivery-name"></span></div>
+    <div class="line"><span>Adres odbioru</span><span id="delivery-address"></span></div>
+    <div class="line"><span>Płatność</span><span>BLIK</span></div>
+    <div class="line total"><span>Do zapłaty</span><span id="total"></span></div>
+  </section>
+  <section class="card">
+    <label class="terms"><input type="checkbox" id="terms" checked> Akceptuję <a href="#">regulamin sklepu</a> i <a href="#">politykę prywatności</a>.</label>
+    <div class="buttons">
+      <button type="button" class="back" id="back">Wróć</button>
+      <button type="button" class="pay" id="pay">Zapłać</button>
+    </div>
+    <div class="status" id="status" role="status"></div>
+  </section>
+</main>
+<footer><a href="#">Regulamin</a><a href="#">Polityka prywatności</a><a href="#">Zwroty i reklamacje</a><a href="#">Kontakt</a><br><br>© 2026 Herbaciarnia Liść</footer>
+<script>
+  const NAMES = { kurier: "Kurier DPD", paczkomat: "Paczkomat InPost", odbior: "Odbiór osobisty" };
+  const LOCKERS = { KRA01M: "KRA01M – ul. Długa 5, Kraków", KRA14N: "KRA14N – ul. Karmelicka 30, Kraków", KRA22A: "KRA22A – al. Słowackiego 12, Kraków" };
+  let state = { option: "kurier", locker: "", total: 132 };
+  try { state = JSON.parse(sessionStorage.getItem("lisc-delivery")) || state; } catch (_) {}
+  const fmt = (n) => Number(n).toFixed(2).replace(".", ",") + " zł";
+  document.getElementById("delivery-name").textContent = NAMES[state.option] || state.option;
+  document.getElementById("delivery-address").textContent =
+    state.option === "paczkomat" ? (LOCKERS[state.locker] || state.locker)
+    : state.option === "odbior" ? "ul. Floriańska 14, Kraków" : "ul. Szewska 3/7, 31-009 Kraków";
+  document.getElementById("total").textContent = fmt(state.total);
+  document.getElementById("pay").textContent = "Zapłać " + fmt(state.total);
+  report("summary_viewed", { option: state.option });
+  document.getElementById("pay").addEventListener("click", () => {
+    report("pay", { total: Number(state.total).toFixed(2), option: state.option });
+    document.getElementById("status").textContent = "Przekierowujemy do płatności BLIK…";
+  });
+  document.getElementById("back").addEventListener("click", () => { location.href = "sklep-dostawa.html"; });
+</script>
+</body>
+</html>

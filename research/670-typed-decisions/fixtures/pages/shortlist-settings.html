@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><title>Security & privacy settings</title></head><body>
+<main><h1>Settings</h1><div id="switches"></div><button type="button">Save changes</button></main>
+<script>
+  const names = ["Email notifications", "Push notifications", "SMS alerts", "Weekly digest", "Product updates", "Marketing emails", "Dark mode", "Compact layout", "Show online status", "Read receipts", "Autoplay videos", "High contrast", "Reduce motion", "Two-factor authentication", "Login alerts", "Remember this device", "Public profile", "Search engine indexing", "Personalized ads", "Usage analytics", "Crash reports", "Beta features", "Keyboard shortcuts", "Sound effects", "Auto-update"];
+  for (const n of names) { const label = document.createElement("label"); const input = document.createElement("input"); input.type = "checkbox"; input.setAttribute("role", "switch"); label.append(input, " " + n); document.querySelector("#switches").append(label); }
+</script>
+<script src="site.js"></script></body></html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gearbox – Computer accessories</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #222; background: #fafafa; }
+  header { background: #13294b; color: #fff; }
+  .bar { max-width: 1120px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 24px; }
+  .logo { font-weight: 800; font-size: 22px; color: #ffcc33; text-decoration: none; }
+  nav a { color: #dfe6f3; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  .hero { background: linear-gradient(120deg, #1d3d6e, #2a5aa0); color: #fff; padding: 56px 24px; }
+  .hero .inner { max-width: 760px; margin: 0 auto; text-align: center; }
+  .hero h1 { margin: 0 0 10px; font-size: 32px; }
+  form.search { display: flex; margin-top: 22px; }
+  form.search input { flex: 1; padding: 13px 14px; font-size: 16px; border: 0; border-radius: 6px 0 0 6px; }
+  form.search button { padding: 0 22px; font-size: 16px; border: 0; border-radius: 0 6px 6px 0; background: #ffcc33; font-weight: 700; cursor: pointer; }
+  .chips { margin-top: 14px; font-size: 14px; }
+  .chips button { background: rgba(255,255,255,.15); color: #fff; border: 0; border-radius: 14px; padding: 5px 12px; margin: 3px; cursor: pointer; }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+  .cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cats a { display: block; background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 22px; color: #13294b; text-decoration: none; font-weight: 600; }
+  .promo { margin-top: 28px; background: #fff7dd; border: 1px solid #f2dc92; padding: 16px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .promo button { background: #13294b; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  footer { background: #13294b; color: #b9c5da; padding: 28px 24px; font-size: 13px; margin-top: 40px; }
+  footer .bar { justify-content: space-between; }
+  footer a { color: #b9c5da; margin-left: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="shop.html">Gearbox</a>
+    <nav aria-label="Main">
+      <a href="shop.html">Home</a>
+      <a href="#">Products</a>
+      <a href="#">Deals</a>
+      <a href="#">Business</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right">
+      <a href="#">Account</a>
+      <a href="#">Orders</a>
+      <a href="#">Cart (0)</a>
+    </div>
+  </div>
+</header>
+<section class="hero">
+  <div class="inner">
+    <h1>Desk gear that just works</h1>
+    <p>Free delivery on orders over $50. 30-day returns.</p>
+    <form class="search" id="search-form" role="search">
+      <label for="q" style="position:absolute;left:-9999px">Search products</label>
+      <input id="q" name="q" type="search" placeholder="Search mice, keyboards, hubs…">
+      <button type="submit">Search</button>
+    </form>
+    <div class="chips">Popular:
+      <button type="button" data-q="usb-c hub">USB-C hub</button>
+      <button type="button" data-q="headset">Headset</button>
+      <button type="button" data-q="webcam">Webcam</button>
+    </div>
+  </div>
+</section>
+<main>
+  <h2>Shop by category</h2>
+  <div class="cats">
+    <a href="#">Mice</a>
+    <a href="#">Keyboards</a>
+    <a href="#">Audio</a>
+    <a href="#">Cables &amp; hubs</a>
+  </div>
+  <div class="promo">
+    <span><b>Back to school:</b> 15% off selected keyboards until October 5.</span>
+    <button type="button">See the offer</button>
+  </div>
+</main>
+<footer>
+  <div class="bar">
+    <span>© 2026 Gearbox Inc.</span>
+    <span><a href="#">Shipping</a><a href="#">Returns</a><a href="#">Privacy</a><a href="#">Contact</a></span>
+  </div>
+</footer>
+<script>
+  function go(query) {
+    report("search", { query });
+    setTimeout(() => { location.href = "shop-results.html?q=" + encodeURIComponent(query); }, 120);
+  }
+  document.getElementById("search-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const query = document.getElementById("q").value.trim();
+    if (query) go(query);
+  });
+  for (const chip of document.querySelectorAll("[data-q]")) {
+    chip.addEventListener("click", () => go(chip.dataset.q));
+  }
+</script>
+</body>
+</html>

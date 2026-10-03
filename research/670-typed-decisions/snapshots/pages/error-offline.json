@@ -1,0 +1,34 @@
+{
+  "title": "example.org",
+  "url": "https://fixtures.test/error-offline.html",
+  "loading": false,
+  "text": "This site can't be reached example.org took too long to respond. Try: checking the connection, checking the proxy and the firewall. ERR_CONNECTION_TIMED_OUT Reload Details",
+  "elements": [
+    {
+      "role": "button",
+      "name": "Reload",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Details",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

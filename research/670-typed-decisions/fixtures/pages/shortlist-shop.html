@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><title>Headphones – SoundShop</title></head><body>
+<main><h1>Headphones</h1><aside aria-label="Filters"><label><input type="checkbox"> Wireless</label><label><input type="checkbox"> Noise cancelling</label><label><input type="checkbox"> Over-ear</label><label><input type="checkbox"> In-ear</label><label><input type="checkbox"> Under $100</label></aside>
+<label>Sort by <select><option>Featured</option><option>Price: low to high</option><option>Price: high to low</option><option>Newest</option></select></label>
+<ul id="products"></ul><nav aria-label="Pages"><a href="#">Previous</a> <a href="#">Next</a></nav></main>
+<script>
+  const brands = ["Sonic", "Aria", "Pulse", "Echo", "Nova", "Wave"]; const kinds = ["ANC 300", "Studio", "Sport", "Lite", "Pro X", "Air", "Bass+", "Travel", "Kids", "Max"];
+  for (let i = 0; i < 60; i++) { const li = document.createElement("li"); const a = document.createElement("a"); a.href = "#"; a.textContent = brands[i % 6] + " " + kinds[i % 10] + " $" + (39 + ((i * 37) % 260)); li.append(a); document.querySelector("#products").append(li); }
+</script>
+<script src="site.js"></script></body></html>

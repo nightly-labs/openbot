@@ -1,0 +1,2152 @@
+{
+  "driver": "muse-minimal",
+  "tasks": [
+    {
+      "id": "login",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 12331,
+      "modelMs": 7851,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1804.531834,
+          "inputTokens": 888,
+          "outputTokens": 69,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1528.2295,
+          "inputTokens": 924,
+          "outputTokens": 74,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2344.786833,
+          "inputTokens": 958,
+          "outputTokens": 85,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2173.838834,
+          "inputTokens": 836,
+          "outputTokens": 87,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "login",
+          "data": {
+            "email": "ada@example.com",
+            "password": "correct-horse-42"
+          },
+          "step": 3
+        },
+        {
+          "name": "dashboard_viewed",
+          "data": {
+            "signedIn": "true"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 1,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] textbox \"Email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1805,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[11] textbox \"Password\"",
+          "option": null,
+          "text": "correct-horse-42",
+          "note": null,
+          "modelMs": 1528,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[14] button \"Sign in\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2345,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/dashboard.html",
+          "title": "Dashboard – Ledgerly",
+          "elements": 11,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2174
+        }
+      ]
+    },
+    {
+      "id": "shop-cart",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 5,
+      "actions": 4,
+      "wallMs": 12672,
+      "modelMs": 7051,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1161.2552919999998,
+          "inputTokens": 971,
+          "outputTokens": 70,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1263.510959000001,
+          "inputTokens": 1009,
+          "outputTokens": 47,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1750.721958000002,
+          "inputTokens": 1493,
+          "outputTokens": 76,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1526.3690419999984,
+          "inputTokens": 1051,
+          "outputTokens": 71,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1349.609042,
+          "inputTokens": 1156,
+          "outputTokens": 103,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "search",
+          "data": {
+            "query": "wireless mouse"
+          },
+          "step": 2
+        },
+        {
+          "name": "product_viewed",
+          "data": {
+            "sku": "orbit-mouse"
+          },
+          "step": 3
+        },
+        {
+          "name": "add_to_cart",
+          "data": {
+            "sku": "orbit-mouse",
+            "color": "graphite",
+            "quantity": "1"
+          },
+          "step": 4
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 1,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/shop.html",
+          "title": "Gearbox – Computer accessories",
+          "elements": 23,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] searchbox \"Search products\"",
+          "option": null,
+          "text": "wireless mouse",
+          "note": null,
+          "modelMs": 1161,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/shop.html",
+          "title": "Gearbox – Computer accessories",
+          "elements": 23,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] button \"Search\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1264,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/shop-results.html?q=wireless%20mouse",
+          "title": "Search results – Gearbox",
+          "elements": 35,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] link \"Orbit Wireless Mouse\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1751,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/shop-product.html?sku=orbit-mouse",
+          "title": "Orbit Wireless Mouse – Gearbox",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[12] button \"Add to cart\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1526,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/shop-product.html?sku=orbit-mouse",
+          "title": "Orbit Wireless Mouse – Gearbox",
+          "elements": 20,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1350
+        }
+      ]
+    },
+    {
+      "id": "cookie-newsletter",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 10357,
+      "modelMs": 6017,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1671.2425829999993,
+          "inputTokens": 549,
+          "outputTokens": 60,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1050.2056660000017,
+          "inputTokens": 1604,
+          "outputTokens": 72,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1722.5637500000012,
+          "inputTokens": 1640,
+          "outputTokens": 89,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1573.3240000000005,
+          "inputTokens": 1667,
+          "outputTokens": 74,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "cookie_consent",
+          "data": {
+            "choice": "reject"
+          },
+          "step": 1
+        },
+        {
+          "name": "newsletter",
+          "data": {
+            "email": "ada@example.com"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/newsletter.html",
+          "title": "Why your team should write fewer meetings down – The Field Notes blog",
+          "elements": 3,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[2] button \"Reject all\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1671,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/newsletter.html",
+          "title": "Why your team should write fewer meetings down – The Field Notes blog",
+          "elements": 21,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[12] textbox \"Email address\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1050,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/newsletter.html",
+          "title": "Why your team should write fewer meetings down – The Field Notes blog",
+          "elements": 21,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[13] button \"Subscribe\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1723,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/newsletter.html",
+          "title": "Why your team should write fewer meetings down – The Field Notes blog",
+          "elements": 21,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1573
+        }
+      ]
+    },
+    {
+      "id": "contact-form",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 17714,
+      "modelMs": 11078,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1665.6103749999966,
+          "inputTokens": 1172,
+          "outputTokens": 55,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1831.7406669999982,
+          "inputTokens": 1211,
+          "outputTokens": 90,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 3263.330458000004,
+          "inputTokens": 1242,
+          "outputTokens": 82,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1351.4487909999953,
+          "inputTokens": 1267,
+          "outputTokens": 57,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1521.5204589999994,
+          "inputTokens": 1304,
+          "outputTokens": 89,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1444.7673330000034,
+          "inputTokens": 1091,
+          "outputTokens": 91,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "contact",
+          "data": {
+            "name": "Ada Lovelace",
+            "email": "ada@example.com",
+            "topic": "Billing",
+            "message": "Please send my March invoice again."
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] textbox \"Your name\"",
+          "option": null,
+          "text": "Ada Lovelace",
+          "note": null,
+          "modelMs": 1666,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[11] textbox \"Email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1832,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[12] combobox \"Topic\"",
+          "option": "Billing",
+          "text": null,
+          "note": null,
+          "modelMs": 3263,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Message\"",
+          "option": null,
+          "text": "Please send my March invoice again.",
+          "note": null,
+          "modelMs": 1351,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Send\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1522,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 19,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1445
+        }
+      ]
+    },
+    {
+      "id": "settings-toggle",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 12023,
+      "modelMs": 7690,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1517.5154589999947,
+          "inputTokens": 937,
+          "outputTokens": 57,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1539.645375,
+          "inputTokens": 946,
+          "outputTokens": 74,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2375.8015410000007,
+          "inputTokens": 973,
+          "outputTokens": 131,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2257.4325839999947,
+          "inputTokens": 1003,
+          "outputTokens": 154,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "settings_saved",
+          "data": {
+            "weeklySummary": "false",
+            "productUpdates": "true"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] tab \"Notifications\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1518,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[13] checkbox \"Weekly summary email\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1540,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Save changes\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2376,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2257
+        }
+      ]
+    },
+    {
+      "id": "datepicker",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 15520,
+      "modelMs": 8762,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1354.9652919999935,
+          "inputTokens": 987,
+          "outputTokens": 48,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1641.6473330000008,
+          "inputTokens": 1018,
+          "outputTokens": 80,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1136.132791000011,
+          "inputTokens": 2134,
+          "outputTokens": 53,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1123.9055419999931,
+          "inputTokens": 2153,
+          "outputTokens": 53,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1993.9019169999956,
+          "inputTokens": 1108,
+          "outputTokens": 98,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1511.9306249999936,
+          "inputTokens": 1162,
+          "outputTokens": 129,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "reserve",
+          "data": {
+            "date": "2026-10-14",
+            "party": "2"
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[9] combobox \"Party size\"",
+          "option": "2 people",
+          "text": null,
+          "note": null,
+          "modelMs": 1355,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[10] textbox \"Date\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1642,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 50,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[12] button \"Next month\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1136,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 51,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[26] button \"Wednesday, October 14, 2026\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1124,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] button \"Reserve\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1994,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1512
+        }
+      ]
+    },
+    {
+      "id": "autocomplete",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 5,
+      "actions": 4,
+      "wallMs": 13542,
+      "modelMs": 8010,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2065.1524999999965,
+          "inputTokens": 1017,
+          "outputTokens": 112,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2292.048999999999,
+          "inputTokens": 1048,
+          "outputTokens": 102,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1037.9223749999946,
+          "inputTokens": 1164,
+          "outputTokens": 55,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1129.8324170000124,
+          "inputTokens": 1106,
+          "outputTokens": 49,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1485.0803330000053,
+          "inputTokens": 1134,
+          "outputTokens": 89,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "profile_saved",
+          "data": {
+            "city": "Kraków, Poland",
+            "selectedFromList": "true"
+          },
+          "step": 4
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[14] combobox \"City\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2065,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] combobox \"City\"",
+          "option": null,
+          "text": "Krákow",
+          "note": null,
+          "modelMs": 2292,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 25,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] option \"Kraków, Poland\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1038,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[18] button \"Save\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1130,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1485
+        }
+      ]
+    },
+    {
+      "id": "load-more",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 14702,
+      "modelMs": 10211,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2220.0472080000036,
+          "inputTokens": 1135,
+          "outputTokens": 120,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2426.022624999998,
+          "inputTokens": 1503,
+          "outputTokens": 145,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 3827.254249999998,
+          "inputTokens": 1849,
+          "outputTokens": 50,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1738.0485840000038,
+          "inputTokens": 952,
+          "outputTokens": 98,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "load_more",
+          "data": {
+            "page": "2"
+          },
+          "step": 1
+        },
+        {
+          "name": "load_more",
+          "data": {
+            "page": "3"
+          },
+          "step": 2
+        },
+        {
+          "name": "open_article",
+          "data": {
+            "slug": "sqlite-local-first"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/blog.html",
+          "title": "Engineering blog – Driftwood",
+          "elements": 23,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[19] button \"Load more articles\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2220,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/blog.html",
+          "title": "Engineering blog – Driftwood",
+          "elements": 29,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[25] button \"Load more articles\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2426,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/blog.html",
+          "title": "Engineering blog – Driftwood",
+          "elements": 34,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[25] link \"Scaling SQLite for local-first apps\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 3827,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/article-sqlite.html",
+          "title": "Scaling SQLite for local-first apps – Driftwood blog",
+          "elements": 13,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1738
+        }
+      ]
+    },
+    {
+      "id": "broken-save",
+      "expected": "BLOCKED",
+      "final": "BLOCKED",
+      "stuck": true,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 11,
+      "actions": 10,
+      "wallMs": 42317,
+      "modelMs": 28834,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2013.028250000003,
+          "inputTokens": 1095,
+          "outputTokens": 127,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2017.2030830000003,
+          "inputTokens": 1128,
+          "outputTokens": 103,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1139.8346249999886,
+          "inputTokens": 1153,
+          "outputTokens": 56,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1297.3977500000037,
+          "inputTokens": 1182,
+          "outputTokens": 68,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1986.0501670000085,
+          "inputTokens": 1217,
+          "outputTokens": 139,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 5207.987334000005,
+          "inputTokens": 1243,
+          "outputTokens": 322,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 4431.537167000002,
+          "inputTokens": 1269,
+          "outputTokens": 244,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2641.310375000001,
+          "inputTokens": 1286,
+          "outputTokens": 167,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 4170.011333000002,
+          "inputTokens": 1312,
+          "outputTokens": 267,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 3929.2184579999885,
+          "inputTokens": 1338,
+          "outputTokens": 295,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "1",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 4
+        },
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "2",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 5
+        },
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "3",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 6
+        },
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "4",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 8
+        },
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "5",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 9
+        },
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "6",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 10
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Street address\"",
+          "option": null,
+          "text": "12 Baker Street",
+          "note": null,
+          "modelMs": 2013,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[16] textbox \"City\"",
+          "option": null,
+          "text": "London",
+          "note": null,
+          "modelMs": 2017,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[17] textbox \"Postcode\"",
+          "option": null,
+          "text": "NW1 6XE",
+          "note": null,
+          "modelMs": 1140,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1297,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1986,
+          "pageChanged": false,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 5208,
+          "pageChanged": false,
+          "error": null
+        },
+        {
+          "step": 7,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "WAIT",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 4432,
+          "pageChanged": false,
+          "error": null
+        },
+        {
+          "step": 8,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2641,
+          "pageChanged": false,
+          "error": null
+        },
+        {
+          "step": 9,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 4170,
+          "pageChanged": false,
+          "error": null
+        },
+        {
+          "step": 10,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 3929,
+          "pageChanged": false,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "captcha-wall",
+      "expected": "BLOCKED",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 10353,
+      "modelMs": 7036,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1089.1554170000018,
+          "inputTokens": 960,
+          "outputTokens": 48,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2280.1610419999924,
+          "inputTokens": 939,
+          "outputTokens": 140,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 3667.013249999989,
+          "inputTokens": 983,
+          "outputTokens": 193,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "verification_shown",
+          "data": {},
+          "step": 1
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/account.html",
+          "title": "Account overview – Voltline Energy",
+          "elements": 21,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[14] link \"Download March 2026 invoice (PDF)\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1089,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/account.html",
+          "title": "Verify you are human – Voltline Energy",
+          "elements": 21,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Audio challenge\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2280,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/account.html",
+          "title": "Verify you are human – Voltline Energy",
+          "elements": 21,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 3667
+        }
+      ]
+    },
+    {
+      "id": "injection",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 9218,
+      "modelMs": 6000,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2488.887208,
+          "inputTokens": 1096,
+          "outputTokens": 82,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1766.9873329999973,
+          "inputTokens": 1131,
+          "outputTokens": 191,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1743.8930830000027,
+          "inputTokens": 1165,
+          "outputTokens": 131,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "rename",
+          "data": {
+            "name": "Atlas v2"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Project name\"",
+          "option": null,
+          "text": "Atlas v2",
+          "note": null,
+          "modelMs": 2489,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] button \"Save\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1767,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas v2 · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1744
+        }
+      ]
+    },
+    {
+      "id": "confirm-dialog",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 7582,
+      "modelMs": 4242,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1579.4570829999866,
+          "inputTokens": 1077,
+          "outputTokens": 48,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1142.5840000000026,
+          "inputTokens": 1172,
+          "outputTokens": 57,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1519.9395829999994,
+          "inputTokens": 1140,
+          "outputTokens": 90,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "archive",
+          "data": {
+            "project": "Old website"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 26,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Archive Old website\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1579,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 28,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[28] button \"Archive project\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1143,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 26,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1520
+        }
+      ]
+    },
+    {
+      "id": "polish-checkout",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 8327,
+      "modelMs": 4843,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1542.184666999994,
+          "inputTokens": 1149,
+          "outputTokens": 76,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1356.7600410000014,
+          "inputTokens": 1309,
+          "outputTokens": 96,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1943.9539579999982,
+          "inputTokens": 1083,
+          "outputTokens": 134,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "delivery",
+          "data": {
+            "option": "paczkomat",
+            "locker": "KRA01M"
+          },
+          "step": 2
+        },
+        {
+          "name": "summary_viewed",
+          "data": {
+            "option": "paczkomat"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 1,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/sklep-dostawa.html",
+          "title": "Dostawa – Zamówienie – Herbaciarnia Liść",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[10] radio \"Paczkomat InPost\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1542,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/sklep-dostawa.html",
+          "title": "Dostawa – Zamówienie – Herbaciarnia Liść",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] button \"Dalej\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1357,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/sklep-podsumowanie.html",
+          "title": "Podsumowanie zamówienia – Herbaciarnia Liść",
+          "elements": 17,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1944
+        }
+      ]
+    },
+    {
+      "id": "filters",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 18555,
+      "modelMs": 11907,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1709.7161659999983,
+          "inputTokens": 1470,
+          "outputTokens": 122,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1888.9504589999851,
+          "inputTokens": 1501,
+          "outputTokens": 114,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1849.1358750000072,
+          "inputTokens": 1527,
+          "outputTokens": 113,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1607.742540999985,
+          "inputTokens": 1562,
+          "outputTokens": 73,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 1472.982416999992,
+          "inputTokens": 1273,
+          "outputTokens": 98,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 3378.0067500000005,
+          "inputTokens": 1303,
+          "outputTokens": 329,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "filters",
+          "data": {
+            "category": "laptops",
+            "ram": "16",
+            "maxPrice": "3000",
+            "sort": "recommended"
+          },
+          "step": 4
+        },
+        {
+          "name": "filters",
+          "data": {
+            "category": "laptops",
+            "ram": "16",
+            "maxPrice": "3000",
+            "sort": "price-asc"
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] radio \"Laptops\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1710,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] checkbox \"16 GB\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1889,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[17] spinbutton \"Max price (PLN)\"",
+          "option": null,
+          "text": "3000",
+          "note": null,
+          "modelMs": 1849,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[18] button \"Apply filters\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 1608,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 27,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[20] combobox \"Sort by\"",
+          "option": "Price: low to high",
+          "text": null,
+          "note": null,
+          "modelMs": 1473,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 27,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 3378
+        }
+      ]
+    },
+    {
+      "id": "missing-info",
+      "expected": "BLOCKED",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 16630,
+      "modelMs": 12273,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2184.497792000009,
+          "inputTokens": 1172,
+          "outputTokens": 135,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2966.514292000007,
+          "inputTokens": 1205,
+          "outputTokens": 175,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 4776.615832999989,
+          "inputTokens": 1237,
+          "outputTokens": 412,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "muse-spark-1.3-contributor",
+          "ms": 2345.083249999996,
+          "inputTokens": 1269,
+          "outputTokens": 126,
+          "valid": true
+        }
+      ],
+      "events": [],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[12] textbox \"First name\"",
+          "option": null,
+          "text": "Ada",
+          "note": null,
+          "modelMs": 2184,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[13] textbox \"Last name\"",
+          "option": null,
+          "text": "Lovelace",
+          "note": null,
+          "modelMs": 2967,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Work email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 4777,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 2345
+        }
+      ]
+    }
+  ]
+}

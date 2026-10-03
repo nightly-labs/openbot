@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><head><title>Acme – Home</title></head><body>
+<main><h1>Acme analytics</h1><p>Understand your users in minutes.</p><a id="pricing" href="action-pricing.html">See pricing</a></main>
+<script>
+  if (new URLSearchParams(location.search).get("mode") === "blocked") document.querySelector("#pricing").onclick = (event) => event.preventDefault();
+</script>
+<script src="site.js"></script></body></html>

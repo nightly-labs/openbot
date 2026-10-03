@@ -1,0 +1,58 @@
+{
+  "title": "Before you continue",
+  "url": "https://fixtures.test/captcha-checkbox.html",
+  "loading": false,
+  "text": "Before you continue Our systems have detected unusual traffic from your computer network. Please confirm that you are not a robot. I'm not a robot reCAPTCHA · Privacy · Terms Submit",
+  "elements": [
+    {
+      "role": "checkbox",
+      "name": " I'm not a robot",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Privacy",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Terms",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Submit",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

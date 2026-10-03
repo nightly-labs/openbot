@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><head><title>Contact us – Helpdesk</title></head><body>
+<main><h1>Contact us</h1><form><label>Name <input name="name"></label><label>Email <input name="email" type="email"></label><label>Message <textarea name="message"></textarea></label>
+<button type="button" id="send">Send message</button></form><p role="status" id="status"></p></main>
+<script>
+  const mode = new URLSearchParams(location.search).get("mode");
+  document.querySelector("#send").onclick = () => {
+    const email = document.querySelector("[name=email]").value;
+    const status = document.querySelector("#status");
+    if (!email.includes("@")) status.textContent = "Please enter a valid email address.";
+    else if (mode === "broken") status.textContent = "Sorry, we could not send your message. Please try again later.";
+    else { document.querySelector("form").remove(); status.textContent = "Thanks! Your message has been sent. We will reply within one business day."; }
+  };
+</script>
+<script src="site.js"></script></body></html>

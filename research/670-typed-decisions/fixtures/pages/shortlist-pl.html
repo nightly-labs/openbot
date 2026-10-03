@@ -1,0 +1,7 @@
+<!doctype html><html lang="pl"><head><title>Sklep sportowy – Rowery</title></head><body>
+<main><h1>Rowery</h1><nav aria-label="Kategorie" id="cat"></nav><a href="#">Koszyk (2)</a> <a href="#">Moje konto</a> <a href="#">Lista życzeń</a></main>
+<script>
+  const cats = ["Rowery górskie", "Rowery szosowe", "Rowery miejskie", "Rowery elektryczne", "Rowery dziecięce", "Kaski", "Oświetlenie", "Zapięcia", "Pompki", "Bidony", "Sakwy", "Siodełka", "Opony", "Dętki", "Łańcuchy", "Hamulce", "Pedały", "Rękawiczki", "Odzież", "Buty", "Promocje", "Nowości", "Outlet"];
+  for (const c of cats) { const a = document.createElement("a"); a.href = "#"; a.textContent = c; document.querySelector("#cat").append(a, " "); }
+</script>
+<script src="site.js"></script></body></html>
