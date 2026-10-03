@@ -158,8 +158,9 @@ export interface AutomationSnapshot {
 const SENSITIVE_CONTROL_NAME = /one[\s-]?time|passcode|password|\botp\b|secret|token|credential|api[\s_-]?key/iu;
 
 // One node of Playwright's aria YAML: indentation, role, quoted accessible
-// name, and either an inline value after the colon or an indented subtree.
-const NAMED_NODE = /^(\s*)- ([a-z]+) "((?:[^"\\]|\\.)*)"(?::(.*))?$/u;
+// name, states such as ` [disabled]`, and either an inline value after the
+// colon or an indented subtree. A disabled OTP group is still sensitive.
+const NAMED_NODE = /^(\s*)- ([a-z]+) "((?:[^"\\]|\\.)*)"((?: \[[^\]]*\])*)(?::(.*))?$/u;
 
 export function redactSensitiveSnapshotValues(yaml: string): string {
   const lines: string[] = [];
@@ -183,19 +184,19 @@ export function redactSensitiveSnapshotValues(yaml: string): string {
     const match = NAMED_NODE.exec(line);
     const name = match?.[3];
     if (match && name !== undefined && SENSITIVE_CONTROL_NAME.test(name)) {
-      const inline = match[4]?.trim() ?? "";
+      const inline = match[5]?.trim() ?? "";
       sensitiveIndents.push(indent);
       // The role and the name stay: an agent still has to see that the control
       // exists to aim `type` at it. Only what was entered goes.
       replaced = inline !== "";
-      lines.push(inline === "" ? line : `${match[1]}- ${match[2]} "${name}": [redacted]`);
+      lines.push(inline === "" ? line : `${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
       continue;
     }
-    if (match && sensitiveIndents.length > 0 && (match[4]?.trim() ?? "") !== "") {
+    if (match && sensitiveIndents.length > 0 && (match[5]?.trim() ?? "") !== "") {
       // A named control inside a sensitive subtree keeps its name, which an
       // agent navigates by, but not its value: `OtpInput` names its native
       // input for the digit count, and that input holds the code.
-      lines.push(`${match[1]}- ${match[2]} "${name}": [redacted]`);
+      lines.push(`${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
       continue;
     }
     if (sensitiveIndents.length === 0 || match) {

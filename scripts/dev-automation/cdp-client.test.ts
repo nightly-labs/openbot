@@ -189,6 +189,23 @@ describe("redactSensitiveSnapshotValues", () => {
     );
   });
 
+  it("keeps the code out while the OTP group is disabled", () => {
+    // Playwright writes states after the name. The group is disabled while
+    // the code is verified, and the code is complete at that time.
+    const yaml = [
+      '- group "One-time code entry" [disabled]:',
+      '  - textbox "One-time code" [disabled]: ABCDEFGH',
+      "  - text: ABCDEFGH",
+    ].join("\n");
+    expect(redactSensitiveSnapshotValues(yaml)).toBe(
+      [
+        '- group "One-time code entry" [disabled]:',
+        '  - textbox "One-time code" [disabled]: [redacted]',
+        '  - text: "[redacted]"',
+      ].join("\n"),
+    );
+  });
+
   it("leaves a control the developer needs to read alone, and keeps an empty one honest", () => {
     const yaml = [
       '- textbox "New memory":',

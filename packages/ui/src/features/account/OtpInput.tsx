@@ -155,12 +155,16 @@ export function OtpInput(props: OtpInputProps) {
       backspace();
     } else {
       // Autofill, a suggestion, or IME text: the inserted text can be the full
-      // code, with its hyphen. Otherwise the field value is the code.
+      // code, with its hyphen. Otherwise the field value is the code. The field
+      // does not show empty slots, so text that adds no code character, such
+      // as a hyphen, must not move the characters after an empty slot.
       const inserted = sanitize(event.data ?? "");
       const value = inserted.length === length() ? inserted : sanitize(event.currentTarget.value);
-      const next = toSlots(value);
-      commit(next);
-      setActive(firstEmptySlot(next));
+      if (value !== slots().join("")) {
+        const next = toSlots(value);
+        commit(next);
+        setActive(firstEmptySlot(next));
+      }
     }
     // The field can hold text that the code drops, such as a hyphen or a
     // ninth character, and then the slots do not change to start the effect.
