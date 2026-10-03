@@ -4877,9 +4877,10 @@ a {
   }
 }
 
-/* A heading that a section link opens sits clear of the top edge. */
+/* A heading or a roundup entry that a link opens sits clear of the top edge. */
 .post-article-body h2,
-.compare-article h2 {
+.compare-article h2,
+.compare-roundup-list > li {
   scroll-margin-top: 32px;
 }
 

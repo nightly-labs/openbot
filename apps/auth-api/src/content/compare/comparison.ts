@@ -155,6 +155,11 @@ export function comparisonFaqStructuredData(page: Pick<ComparePage, "faq">) {
   };
 }
 
+/** The id of an app's entry on a roundup page. Each app has its own mark. */
+export function roundupAppAnchor(app: RoundupApp): string {
+  return `app-${app.mark}`;
+}
+
 /**
  * schema.org `ItemList` of a roundup, in the order the page shows. No rating or
  * review: OpenBot is on the list, and a maker does not review its own app.

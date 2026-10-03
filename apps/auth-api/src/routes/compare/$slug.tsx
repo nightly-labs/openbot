@@ -2,7 +2,11 @@ import { createFileRoute, notFound } from "@tanstack/solid-router";
 import { Show } from "solid-js";
 import { CompareArticlePage } from "../../components/compare/CompareArticlePage";
 import { COMPARISONS } from "../../content/compare";
-import { comparisonFaqStructuredData, roundupItemListStructuredData } from "../../content/compare/comparison";
+import {
+  comparisonFaqStructuredData,
+  roundupAppAnchor,
+  roundupItemListStructuredData,
+} from "../../content/compare/comparison";
 import { COMPARE_COLLECTION } from "../../lib/compare";
 import { articleUrl, type CollectionArticle, findArticle } from "../../lib/content-collection";
 import { articleHead } from "../../lib/content-metadata";
@@ -23,14 +27,15 @@ export const Route = createFileRoute("/compare/$slug")({
     const page = COMPARISONS[loaderData.slug];
     if (!page) return head;
     const siteUrl = match.context.siteUrl;
-    // Each app in a roundup points to its first comparison, and OpenBot to the home page.
+    // Each app in a roundup points to its own entry on the page, so no two items share
+    // a URL. OpenBot points to the home page.
+    const pageUrl = articleUrl(COMPARE_COLLECTION, loaderData.slug, siteUrl);
     const itemList =
       page.kind === "roundup"
         ? [
-            roundupItemListStructuredData(page, loaderData.title, (app) => {
-              const [slug] = app.comparisons;
-              return slug ? articleUrl(COMPARE_COLLECTION, slug, siteUrl) : new URL("/", siteUrl).toString();
-            }),
+            roundupItemListStructuredData(page, loaderData.title, (app) =>
+              app.mark === "openbot" ? new URL("/", siteUrl).toString() : `${pageUrl}#${roundupAppAnchor(app)}`,
+            ),
           ]
         : [];
     return {

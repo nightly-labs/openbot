@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
-import type { RoundupApp, RoundupComparison } from "../../content/compare/comparison";
+import { type RoundupApp, type RoundupComparison, roundupAppAnchor } from "../../content/compare/comparison";
 import {
   type CollectionArticle,
   type ContentCollection,
@@ -98,7 +98,7 @@ export function RoundupPage(props: RoundupPageProps) {
         <ol class="compare-roundup-list">
           <For each={props.roundup.apps}>
             {(app, index) => (
-              <li class="compare-card" style={{ "--compare-index": index() }}>
+              <li id={roundupAppAnchor(app)} class="compare-card" style={{ "--compare-index": index() }}>
                 <h3 class="compare-card-title">
                   <span class="compare-roundup-rank">{index() + 1}.</span>
                   <SideLabel side={app.mark} name={app.name} mark={appMark(app)} />
