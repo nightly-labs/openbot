@@ -13,6 +13,8 @@ export const messages = {
   "remoteDesktop.disconnect": "Bağlantıyı kes",
   "remoteDesktop.viewerTitle": "Sunshine uzak masaüstü",
   "remoteDesktop.viewerLoadFailed": "Moonlight görüntüleyicisi yüklenemedi.",
+  "remoteDesktop.streamNotReady":
+    "Ana bilgisayar akışı başlatmadı. Sunshine ana bilgisayarda durmuş olabilir. Yeniden deneyin.",
   "remoteDesktop.hostOfflineTitle": "Ana makine çevrim dışı",
   "remoteDesktop.hostOfflineMessage": "Masaüstünü açmadan önce ana makineye yeniden bağlanın.",
   "remoteDesktop.openFailed": "Masaüstü açılamadı",

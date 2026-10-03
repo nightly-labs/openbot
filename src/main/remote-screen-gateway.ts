@@ -20,6 +20,8 @@ import { z } from "zod";
 import { recordRestartActivity } from "../backend/restart-activity";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import {
+  RemoteRuntimeStartError,
+  type RemoteRuntimeStartStage,
   SunshineApiError,
   SunshineMoonlightRuntime,
   type SunshineMoonlightRuntimeState,
@@ -32,6 +34,11 @@ const VIEWER_COOKIE = "openbotRemoteViewer";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
+const RUNTIME_START_FAILURE = {
+  sunshine: "error.remote.sunshineStartFailed",
+  moonlight: "error.remote.moonlightStartFailed",
+  pairing: "error.remote.pairingFailed",
+} as const satisfies Record<RemoteRuntimeStartStage, string>;
 const viewerGrantSchema = z.object({ grant: z.string().min(1).max(256) });
 const viewerStateSchema = z.object({
   source: z.literal("openbot-moonlight"),
@@ -388,7 +395,9 @@ export class RemoteScreenGateway {
     }
     if (this.#testSessionId)
       throw new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive"));
-    await this.#ensureRuntime();
+    await this.#ensureRuntime().catch((error: unknown) => {
+      throw this.#runtimeStartRefusal(error);
+    });
     if (this.#testSessionId)
       throw new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive"));
     // The runtime starts and answers either way, so this is the only place the refusal can become a
@@ -763,24 +772,54 @@ export class RemoteScreenGateway {
     if (this.#runtimeState) return this.#runtimeState;
     const paths = this.#options.runtimePaths;
     if (!paths || this.#linuxWithoutX11) throw new Error(sourceText("error.remote.runtimeUnavailable"));
-    this.#runtime ??= this.#options.createRuntime({
-      paths,
-      stateDirectory: this.#options.runtimeStateDirectory,
-      platform: this.#options.platform,
-      credentials: await this.#options.getRuntimeCredentials(),
-      getDisplays: () => this.#options.getDisplays?.() ?? [],
-      getIceServers: async () => {
-        // Loopback tests need no account or Signal service. Keep remote ICE configuration
-        // whenever a remote session shares this runtime.
-        if (this.#sessions.size > 0 && [...this.#sessions.keys()].every((id) => this.#localTestServers.has(id)))
-          return [];
-        return this.#options.getIceServers();
-      },
-      onDiagnostic: this.#options.onDiagnostic,
-    });
+    if (!this.#runtime) {
+      const runtime: RemoteScreenRuntime = this.#options.createRuntime({
+        paths,
+        stateDirectory: this.#options.runtimeStateDirectory,
+        platform: this.#options.platform,
+        credentials: await this.#options.getRuntimeCredentials(),
+        getDisplays: () => this.#options.getDisplays?.() ?? [],
+        getIceServers: async () => {
+          // Loopback tests need no account or Signal service. Keep remote ICE configuration
+          // whenever a remote session shares this runtime.
+          if (this.#sessions.size > 0 && [...this.#sessions.keys()].every((id) => this.#localTestServers.has(id)))
+            return [];
+          return this.#options.getIceServers();
+        },
+        onDiagnostic: this.#options.onDiagnostic,
+        onExit: () => {
+          if (this.#runtime === runtime) void this.#runtimeExited();
+        },
+      });
+      this.#runtime = runtime;
+    }
     this.#runtimeState = await this.#runtime.start();
     this.#selectedDisplayId = this.#runtimeState.selectedDisplayId;
     return this.#runtimeState;
+  }
+
+  // A start failure is the host's answer to the member, so it names the part that failed. The cause
+  // can hold local paths and ports, so it goes to the host's diagnostics only.
+  #runtimeStartRefusal(error: unknown): RemoteScreenError {
+    if (error instanceof RemoteScreenError) return error;
+    const stage = error instanceof RemoteRuntimeStartError ? error.stage : null;
+    const cause = error instanceof RemoteRuntimeStartError ? error.cause : error;
+    this.#options.onDiagnostic?.(
+      stage === "sunshine" ? "sunshine" : "moonlight",
+      `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${cause instanceof Error ? cause.message : String(cause)}\n`,
+    );
+    return new RemoteScreenError(
+      503,
+      "host_unavailable",
+      sourceText(stage ? RUNTIME_START_FAILURE[stage] : "error.remote.runtimeStartFailed"),
+    );
+  }
+
+  // The runtime's processes are gone, so no session it served can stream again. End them and stop
+  // what is left of it; the next session starts a new runtime, and a start that fails names its reason.
+  async #runtimeExited(): Promise<void> {
+    await Promise.all([...this.#sessions.keys()].map((id) => this.closeSession(id, "connection_failed")));
+    await this.#stopRuntime();
   }
 
   #reportScreenRecordingDenied(denied: boolean): void {
@@ -891,7 +930,7 @@ function sendViewer(
   const sessionPath = TEAM_API_ROUTES.remoteScreen.session(sessionId);
   const hostId = runtime.hostIds[streamerSlot - 1] ?? runtime.hostId;
   const target = `${sessionPath}/moonlight/stream.html?hostId=${hostId}&appId=${runtime.desktopAppId}`;
-  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;
+  const html = `<!doctype html><meta charset="utf-8"><title>OpenBot Moonlight Remote</title><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#090b0c;color:#fff;font:14px system-ui}main{display:grid;place-items:center;height:100%}</style><main>Connecting…</main><script type="module">const grant=new URL(location.href).hash.slice(1);history.replaceState(null,"",location.pathname);const response=await fetch(${JSON.stringify(`${sessionPath}/authorize`)},{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant})});if(!response.ok){document.querySelector("main").textContent="Remote access expired";parent.postMessage(${JSON.stringify({ source: "openbot-moonlight", type: "viewer-state", sessionId, state: "error" })},"*");throw new Error("grant rejected")}location.replace(${JSON.stringify(target)});</script>`;
   response.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy":
