@@ -34,8 +34,8 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       icon: "cpu",
       topic: "Models",
-      a: "OpenAI models only: GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna.",
-      b: "Claude models only: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
+      a: "OpenAI models: GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GPT-6 Luna.",
+      b: "Claude models: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
     },
     {
       icon: "laptop",
@@ -116,8 +116,8 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      a: "Codex runs OpenAI's models only. GPT-6 Astra is the strongest, and OpenAI recommends GPT-6.1 Sol for hard coding work. Plus is $20 a month, Pro is $100, $200 or $500, and Business is $20 a seat billed yearly. Free and Go get GPT-6 Luna in the desktop app as it rolls out, but no cloud tasks. Limits reset every five hours, and weekly caps can apply. An API key works too, at API prices, but you lose cloud features like GitHub review.",
-      b: "Claude Code runs Claude's models only, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have a weekly cap that Claude and Claude Code share. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      a: "Codex is built for OpenAI's models: GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna. OpenAI recommends GPT-6.1 Sol for hard coding work. Plus is $20 a month, Pro is $100, $200 or $500, and Business is $20 a seat billed yearly. Free and Go get GPT-6 Luna in the desktop app as it rolls out, but no cloud tasks. Limits reset every five hours, and weekly caps can apply. An API key works too, at API prices, but you lose cloud features like GitHub review.",
+      b: "Claude Code is built for Claude's models, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have a weekly cap that Claude and Claude Code share. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
     },
     {
       title: "Where the work happens",

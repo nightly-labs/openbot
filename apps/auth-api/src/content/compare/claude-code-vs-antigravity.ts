@@ -36,7 +36,7 @@ export const CLAUDE_CODE_VS_ANTIGRAVITY: MatchupComparison = {
     {
       icon: "cpu",
       topic: "Models",
-      a: "Claude models only: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
+      a: "Claude models: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
       b: "Gemini 3.8 Flash is the default, with other Gemini models. Claude Sonnet 5.5 and Opus 5.5 on Pro and Ultra.",
       better: "b",
     },
@@ -142,7 +142,7 @@ export const CLAUDE_CODE_VS_ANTIGRAVITY: MatchupComparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      a: "Claude Code runs Claude's models only, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      a: "Claude Code is built for Claude's models, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
       b: "Antigravity uses Gemini 3.8 Flash for local agents by default. Gemini 3.7 Flash, 3.6 Flash and 3.1 Pro are on every plan, and Claude Sonnet 5.5 and Opus 5.5 come with paid Pro and Ultra. The free plan has weekly limits. Google AI Pro is $19.99 a month and AI Ultra is $99.99 or $199.99 in the US. Limits reset every five hours, up to a weekly cap, and your own API key can't raise them. Two model families for one price is hard to beat.",
       better: "b",
     },

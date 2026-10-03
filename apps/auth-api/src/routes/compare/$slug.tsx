@@ -53,8 +53,10 @@ export const Route = createFileRoute("/compare/$slug")({
 function ComparisonRoute() {
   const article = Route.useLoaderData();
   return (
-    <Show when={COMPARISONS[article().slug]}>
-      {(page) => <CompareArticlePage collection={COMPARE_COLLECTION} article={article()} page={page()} />}
+    // Keyed: a link from one comparison to another keeps this route mounted, and
+    // CompareArticlePage picks its layout once, so each page gets a fresh tree.
+    <Show when={COMPARISONS[article().slug]} keyed>
+      {(page) => <CompareArticlePage collection={COMPARE_COLLECTION} article={article()} page={page} />}
     </Show>
   );
 }

@@ -33,7 +33,7 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
       icon: "cpu",
       topic: "Models",
       a: "Cursor's own models, such as Grok 4.7 and Composer 2.5, and models from Anthropic, OpenAI, Google and Meta.",
-      b: "Claude models only: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
+      b: "Claude models: Opus 5.5 is the default, with Sonnet, Haiku and Fable models.",
       better: "a",
     },
     {
@@ -94,7 +94,7 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
     {
       title: "Models and the plans you pay for",
       a: "Cursor's own pool has Grok 4.7, 4.6 and 4.5 and Composer 2.5, and Cursor calls Grok 4.7 its flagship. Claude, GPT, Gemini and Muse models are there too, at API prices. Hobby is free, Pro is $20 a month, Pro+ $60 and Ultra $200, and Teams is $40 or $120 a user. Each plan includes some usage, and anything past it is billed at API prices. Your own keys from OpenAI, Anthropic, Google, Azure OpenAI and Amazon Bedrock work for chat models. If you want to switch models freely, Cursor wins.",
-      b: "Claude Code runs Claude's models only, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have weekly caps too. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      b: "Claude Code is built for Claude's models, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have weekly caps too. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
       better: "a",
     },
     {

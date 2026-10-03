@@ -32,7 +32,7 @@ export const BEST_AI_AGENT_APPS: RoundupComparison = {
       comparisons: ["codex-vs-claude-code", "claude-code-vs-antigravity", "cursor-vs-claude-code"],
       bestFor: "Claude's models in your terminal and your IDE.",
       runsOn: "Your computer, or cloud sessions at Anthropic.",
-      models: "Claude models only.",
+      models: "Claude models.",
       price: "Claude Pro from $17 a month billed yearly. Max $100 or $200.",
       summary:
         "Anthropic's coding agent works in the terminal, VS Code, JetBrains IDEs, a desktop app and the web. Cloud sessions run in VMs that Anthropic manages, and you can follow them from the Claude phone app. It has the top score on the Artificial Analysis Coding Agent Index, 68, though that run costs $14.19 a task. It also works with an Anthropic API key, Bedrock, Google Cloud and Microsoft Foundry.",
@@ -43,7 +43,7 @@ export const BEST_AI_AGENT_APPS: RoundupComparison = {
       comparisons: ["codex-vs-claude-code"],
       bestFor: "OpenAI's models, with a sandbox that is on by default.",
       runsOn: "Your computer, or cloud tasks at OpenAI.",
-      models: "OpenAI models only.",
+      models: "OpenAI models.",
       price: "ChatGPT Plus $20 a month. Pro $100, $200 or $500.",
       summary:
         "OpenAI's coding agent works in a command line, the ChatGPT desktop app, and VS Code, Cursor and Windsurf. The sandbox is on from the first run, and the command line is open source under Apache-2.0. Cloud tasks run in VMs that OpenAI manages. It's the cheap one on the benchmark: 63 for $1.04 a task with GPT-6.1 Sol.",
@@ -210,7 +210,7 @@ export const BEST_AI_AGENT_APPS: RoundupComparison = {
     {
       question: "Which AI agent apps are free?",
       answer:
-        "OpenBot is free for noncommercial use, and OpenClaw and Hermes Agent are free under the MIT License. With all three, you still pay your model provider. Cursor, Antigravity, Devin, Manus and Muse have free plans. Claude Code, Codex, Claude Cowork and ChatGPT dots need a paid plan.",
+        "OpenBot is free for noncommercial use, and OpenClaw and Hermes Agent are free under the MIT License. With all three, you still pay your model provider. Cursor, Antigravity, Devin, Manus and Muse have free plans. Codex comes with ChatGPT Free and Go, but only with GPT-6 Luna in the desktop app and no cloud tasks. Claude Code, Claude Cowork and ChatGPT dots need a paid plan.",
     },
     {
       question: "Which AI agents run on my own computer?",
