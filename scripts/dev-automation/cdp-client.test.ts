@@ -166,14 +166,14 @@ describe("redactSensitiveSnapshotValues", () => {
   });
 
   it("keeps the code out when it reaches the tree as loose characters instead of a value", () => {
-    // The real `OtpInput` shape: it clears the native input on every keystroke
-    // and rebuilds the code as visible characters, so the code arrives as text
-    // under the group rather than as the value of the control. The control
-    // itself has to survive - an agent needs it to aim `type` - while every
-    // character under the group goes.
+    // The real `OtpInput` shape: the code arrives as visible characters under
+    // the group, and as the value of a native input that the browser secret
+    // card names only for its digit count. The control itself has to survive -
+    // an agent needs it to aim `type` - while its value and every character
+    // under the group go.
     const yaml = [
       '- group "One-time code entry":',
-      '  - textbox "One-time code"',
+      '  - textbox "6-digit code": "481"',
       '  - text: "4"',
       '  - text: "8"',
       '  - text: "1"',
@@ -182,7 +182,7 @@ describe("redactSensitiveSnapshotValues", () => {
     expect(redactSensitiveSnapshotValues(yaml)).toBe(
       [
         '- group "One-time code entry":',
-        '  - textbox "One-time code"',
+        '  - textbox "6-digit code": [redacted]',
         '  - text: "[redacted]"',
         "- paragraph: Check your inbox",
       ].join("\n"),

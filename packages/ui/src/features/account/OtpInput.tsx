@@ -1,7 +1,7 @@
 import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts/validation";
 import { Input } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, flush, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
@@ -35,6 +35,7 @@ export function OtpInput(props: OtpInputProps) {
   const [focused, setFocused] = createSignal(false);
   let inputElement: HTMLInputElement | undefined;
   let slotsElement: HTMLDivElement | undefined;
+  let composing = false;
 
   const status = () => props.status ?? "idle";
   const disabled = () => Boolean(props.disabled || status() === "verifying" || status() === "success");
@@ -62,6 +63,15 @@ export function OtpInput(props: OtpInputProps) {
       setSlots(next);
       setActive(firstEmptySlot(next));
     },
+  );
+
+  // The native input keeps the code as its value. iOS and Android autofill and
+  // keyboard suggestions read and replace that value, and a soft keyboard that
+  // sends no key name edits it in place. An IME owns the value while it
+  // composes, so the copy waits for `compositionend`.
+  createEffect(
+    () => slots().join(""),
+    () => syncNativeValue(),
   );
 
   createEffect(
@@ -114,6 +124,50 @@ export function OtpInput(props: OtpInputProps) {
     setActive(Math.min(index, length() - 1));
   }
 
+  function syncNativeValue(): void {
+    const value = slots().join("");
+    if (!inputElement || composing || inputElement.value === value) return;
+    inputElement.value = value;
+    inputElement.setSelectionRange(value.length, value.length);
+  }
+
+  function backspace(): void {
+    if (slots()[active()]) {
+      clearSlot(active());
+    } else if (active() > 0) {
+      const previous = active() - 1;
+      clearSlot(previous);
+      setActive(previous);
+    }
+  }
+
+  function handleInput(event: InputEvent & { currentTarget: HTMLInputElement }): void {
+    if (disabled()) {
+      syncNativeValue();
+      return;
+    }
+    // Android keyboards send `Unidentified` keydown events, so one typed
+    // character or a backspace arrives here and edits the active slot.
+    const typed = event.inputType === "insertText" && !event.isComposing ? sanitize(event.data ?? "") : "";
+    if (typed.length === 1) {
+      insert(typed);
+    } else if (event.inputType === "deleteContentBackward") {
+      backspace();
+    } else {
+      // Autofill, a suggestion, or IME text: the inserted text can be the full
+      // code, with its hyphen. Otherwise the field value is the code.
+      const inserted = sanitize(event.data ?? "");
+      const value = inserted.length === length() ? inserted : sanitize(event.currentTarget.value);
+      const next = toSlots(value);
+      commit(next);
+      setActive(firstEmptySlot(next));
+    }
+    // The field can hold text that the code drops, such as a hyphen or a
+    // ninth character, and then the slots do not change to start the effect.
+    flush();
+    syncNativeValue();
+  }
+
   function handleKeyDown(event: KeyboardEvent): void {
     if (disabled()) {
       event.preventDefault();
@@ -128,13 +182,7 @@ export function OtpInput(props: OtpInputProps) {
     }
     if (event.key === "Backspace") {
       event.preventDefault();
-      if (slots()[active()]) {
-        clearSlot(active());
-      } else if (active() > 0) {
-        const previous = active() - 1;
-        clearSlot(previous);
-        setActive(previous);
-      }
+      backspace();
       return;
     }
     if (event.key === "Delete") {
@@ -190,12 +238,11 @@ export function OtpInput(props: OtpInputProps) {
   return (
     <div class="otp-input" data-status={status()}>
       {/*
-        The native input is cleared on every keystroke, so the slot characters
-        below are the only copy of the code in the accessibility tree. Naming
-        this group is what lets both consumers tell what those loose characters
-        are: assistive tech announces the context, and `dev:automation`
-        recognizes the subtree whose text it must not print into an agent
-        transcript.
+        The slot characters below are loose text in the accessibility tree.
+        Naming this group is what lets both consumers tell what they are:
+        assistive tech announces the context, and `dev:automation` recognizes
+        the subtree whose text and control values it must not print into an
+        agent transcript.
       */}
       <fieldset
         class="otp-input-fieldset"
@@ -211,26 +258,21 @@ export function OtpInput(props: OtpInputProps) {
           inputmode={props.numeric ? "numeric" : "text"}
           autocomplete="one-time-code"
           autocapitalize="characters"
+          autocorrect="off"
           spellcheck={false}
-          value=""
           readonly={Boolean(props.disabled || status() === "success")}
-          maxlength={length()}
           aria-label={props.label ?? t("account.otp.label")}
           aria-invalid={status() === "error" ? "true" : undefined}
           aria-describedby={message() ? messageId : undefined}
           autofocus={props.autofocus}
           onBlur={() => setFocused(false)}
           onFocus={() => setFocused(true)}
-          onInput={(event) => {
-            if (disabled()) {
-              event.currentTarget.value = "";
-              return;
-            }
-            const value = sanitize(event.currentTarget.value);
-            if (!value) return;
-            insert(value, 0);
-            event.currentTarget.value = "";
+          onCompositionStart={() => (composing = true)}
+          onCompositionEnd={() => {
+            composing = false;
+            syncNativeValue();
           }}
+          onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={(event) => {
             event.preventDefault();
