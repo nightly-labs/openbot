@@ -7,8 +7,8 @@ import type { LandingIconName } from "../../components/landing/LandingIcon";
 // There are three kinds: OpenBot against one rival, two other products against
 // each other (a matchup), and a roundup of many apps.
 
-export type ComparisonSide = "openbot" | "rival";
-export type MatchupSide = "a" | "b";
+type ComparisonSide = "openbot" | "rival";
+type MatchupSide = "a" | "b";
 
 /** One row of the table: the text of each side, keyed by the side. */
 type ComparisonRow<Side extends string = ComparisonSide> = {
@@ -87,14 +87,8 @@ export const BENCHMARK_SOURCES: readonly ComparisonSource[] = [
   { label: "Artificial Analysis coding agent methodology", url: BENCHMARK_METHOD_URL },
 ];
 
-/** The coding agents that the benchmark chart draws, in the order it draws them. */
-export const BENCHMARK_AGENTS = [
-  "claude-code",
-  "codex",
-  "devin",
-  "antigravity",
-] as const satisfies readonly RivalMarkName[];
-export type BenchmarkAgent = (typeof BENCHMARK_AGENTS)[number];
+/** The coding agents that the benchmark chart has a colour for (`styles.css`). */
+type BenchmarkAgent = Extract<RivalMarkName, "claude-code" | "codex" | "devin" | "antigravity">;
 
 /** One agent and model on the Artificial Analysis Coding Agent Index. */
 export interface BenchmarkRow {
@@ -125,7 +119,7 @@ export interface Benchmark {
   checkedAt: string;
 }
 
-export interface MatchupProduct {
+interface MatchupProduct {
   /** The product's own spelling. */
   name: string;
   mark: RivalMarkName;
