@@ -97,26 +97,19 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(stored, snapshot([]), "claude").messages).toEqual([delivered]);
   });
 
-  it("removes an imported Claude compaction summary and the answer copy it opened, but no only copy", () => {
+  it("removes imported Claude compaction summaries and interrupt markers, and keeps every answer", () => {
     const summary = "This session is being continued from a previous conversation that ran out of context.";
-    const original = message("turn-1:assistant", "assistant", "Done.", "agentMessage");
-    const kept = [message("user-1", "user", "Plan it"), original];
-    const inSummaryTurn = (id: string, author: ConversationMessage["author"], text: string): ConversationMessage => ({
-      ...message(id, author, text, author === "assistant" ? "agentMessage" : undefined),
-      turnId: "summary-1",
-    });
+    const kept = [
+      message("user-1", "user", "Plan it"),
+      message("turn-1:assistant", "assistant", "Done.", "agentMessage"),
+      { ...message("copy-1", "assistant", "Done.", "agentMessage"), turnId: "summary-1" },
+    ];
     const stored = snapshot([
+      { ...message("summary-1", "user", `${summary}\n\nSummary: ...`), turnId: "summary-1" },
       ...kept,
-      inSummaryTurn("summary-1", "user", `${summary}\n\nSummary: ...`),
-      inSummaryTurn("copy-1", "assistant", "Done."),
-      inSummaryTurn("only-copy", "assistant", "Never stored live."),
       message("interrupt-1", "user", "[Request interrupted by user for tool use]"),
     ]);
-    expect(mergeProviderHistory(stored, snapshot([]), "claude").messages.map((item) => item.id)).toEqual([
-      "user-1",
-      "turn-1:assistant",
-      "only-copy",
-    ]);
+    expect(mergeProviderHistory(stored, snapshot([]), "claude").messages).toEqual(kept);
   });
 
   it("finishes an interrupted Claude answer without adding its imported parts", () => {

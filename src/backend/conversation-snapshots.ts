@@ -125,7 +125,7 @@ export function mergeProviderHistory(
   provider?: AgentProviderId,
 ): ConversationSnapshot {
   if (provider === "claude") {
-    const kept = { ...stored, messages: withoutImportedClaudeNotices(stored.messages) };
+    const kept = { ...stored, messages: stored.messages.filter((message) => !isStoredClaudeNotice(message)) };
     return mergeConversationSnapshots(kept, reconcileClaudeHistory(kept, imported));
   }
   const importedIds = new Set(imported.messages.map((message) => message.id));
@@ -278,7 +278,9 @@ export function isClaudeInterruptMarker(text: string): boolean {
   return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
 }
 
-/** A message sent through the mailbox keeps its delivery. An imported notice has none. */
+/* Earlier builds imported Claude's notices as user messages. Nobody sent those. The reply that
+   followed a compaction summary stays: no stored field proves which live answer it repeats.
+   A message sent through the mailbox keeps its delivery. An imported notice has none. */
 function isStoredClaudeNotice(message: ConversationMessage): boolean {
   return (
     message.author === "user" &&
@@ -286,27 +288,6 @@ function isStoredClaudeNotice(message: ConversationMessage): boolean {
     (isClaudeTaskNotification(message.text) ||
       isClaudeInterruptMarker(message.text) ||
       isClaudeCompactionSummary(message.text))
-  );
-}
-
-/* Earlier builds imported Claude's notices as user messages, and restored the reply after a compaction
-   summary in a new turn, beside the copy the live turn stored. A copy goes only when another stored
-   answer holds its text, so an answer that only the import holds stays. */
-function withoutImportedClaudeNotices(messages: ConversationMessage[]): ConversationMessage[] {
-  const summaryTurns = new Set(
-    messages
-      .filter((message) => isStoredClaudeNotice(message) && isClaudeCompactionSummary(message.text) && message.turnId)
-      .map((message) => message.turnId),
-  );
-  const answers = new Set(
-    messages
-      .filter((message) => message.author === "assistant" && message.text && !summaryTurns.has(message.turnId))
-      .map((message) => message.text),
-  );
-  return messages.filter(
-    (message) =>
-      !isStoredClaudeNotice(message) &&
-      !(message.author === "assistant" && summaryTurns.has(message.turnId) && answers.has(message.text)),
   );
 }
 
