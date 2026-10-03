@@ -182,9 +182,10 @@ function isRivalMarkName(slug: string): slug is RivalMarkName {
 }
 
 /**
- * Every comparison, labelled "OpenBot vs …": each title starts with that, and
- * the part after the colon is too long for a card. Each slug is also the name
- * of the compared product's mark.
+ * Every OpenBot comparison, labelled "OpenBot vs …": each title starts with
+ * that, and the part after the colon is too long for a card. The slug of each is
+ * also the name of the compared product's mark. A matchup or the roundup has a
+ * slug that names no mark, so it is not in this list.
  */
 export const LANDING_COMPARISON_LINKS: readonly LandingComparisonLink[] = COMPARE_COLLECTION.articles.flatMap(
   (article) =>

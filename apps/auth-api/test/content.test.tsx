@@ -3,8 +3,8 @@ import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CompareArticlePage } from "../src/components/compare/CompareArticlePage";
 import { CompareIndexPage } from "../src/components/compare/CompareIndexPage";
-import { ComparisonPage } from "../src/components/compare/ComparisonPage";
 import { ArticleGradient } from "../src/components/content/ArticleGradient";
 import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia";
 import { ArticlePage } from "../src/components/content/ArticlePage";
@@ -194,17 +194,18 @@ describe("Compare", () => {
   // for, so a comparison must not render as a title with nothing under it.
   it("shows the title, the table and the questions of every comparison", () => {
     for (const article of COMPARE_COLLECTION.articles) {
-      const comparison = COMPARISONS[article.slug];
-      if (!comparison) throw new Error(`${article.slug} must have comparison data.`);
-      renderPage(() => <ComparisonPage collection={COMPARE_COLLECTION} article={article} comparison={comparison} />);
+      const page = COMPARISONS[article.slug];
+      if (!page) throw new Error(`${article.slug} must have comparison data.`);
+      renderPage(() => <CompareArticlePage collection={COMPARE_COLLECTION} article={article} page={page} />);
 
       expect(screen.getByRole("heading", { level: 1, name: article.title })).toBeInTheDocument();
       const body = within(screen.getByRole("article"));
       const table = body.getByRole("table");
-      for (const row of comparison.rows) {
-        expect(within(table).getByRole("rowheader", { name: row.topic })).toBeInTheDocument();
+      const rowHeaders = page.kind === "roundup" ? page.apps.map((app) => app.name) : page.rows.map((row) => row.topic);
+      for (const name of rowHeaders) {
+        expect(within(table).getByRole("rowheader", { name })).toBeInTheDocument();
       }
-      for (const entry of comparison.faq) {
+      for (const entry of page.faq) {
         expect(body.getByText(entry.question)).toBeInTheDocument();
       }
 

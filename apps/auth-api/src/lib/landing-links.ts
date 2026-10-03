@@ -90,6 +90,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "OpenBot vs Manus", external: false, to: "/compare/$slug", slug: "manus" },
       { label: "OpenBot vs Claude Cowork", external: false, to: "/compare/$slug", slug: "claude-cowork" },
       { label: "OpenBot vs Devin", external: false, to: "/compare/$slug", slug: "devin" },
+      { label: "Best AI agent apps", external: false, to: "/compare/$slug", slug: "best-ai-agent-apps" },
       { label: "All comparisons", external: false, to: "/compare" },
     ],
   },

@@ -4894,13 +4894,15 @@ a {
    its own lilac and the rival's is a quiet grey, so OpenBot is the side the eye
    goes to. Where one side is better, the page marks it in green
    (`--openbot-success`), with a check and a word, never with colour alone.
+   A page that compares two other apps (sides "a" and "b") gives both sides the
+   same quiet accent: it takes no side.
    ------------------------------------------------------------------------- */
 
 .compare-page [data-side="openbot"] {
   --compare-accent: var(--openbot-logo-production);
 }
 
-.compare-page [data-side="rival"] {
+.compare-page :is([data-side="rival"], [data-side="a"], [data-side="b"]) {
   --compare-accent: var(--openbot-text-muted);
 }
 
@@ -5016,7 +5018,7 @@ a {
   animation: compare-mark-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards;
 }
 
-.compare-mark[data-side="rival"] {
+.compare-mark:last-child {
   --compare-from: 10px;
 }
 
@@ -5148,6 +5150,18 @@ a {
   border: 1px solid var(--openbot-border);
   border-radius: 14px;
   background: var(--openbot-bg-surface);
+}
+
+/* On a page about two other apps, their two plans lead the grid. */
+.compare-plan[data-highlighted] {
+  border-color: color-mix(in srgb, var(--openbot-logo-production) 34%, var(--openbot-border));
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--openbot-logo-production) 10%, var(--openbot-transparent)),
+      var(--openbot-transparent) 62%
+    ),
+    var(--openbot-bg-surface);
 }
 
 .compare-plan-logo-frame {
@@ -5581,11 +5595,77 @@ a {
   color: var(--openbot-text-dim);
 }
 
+/* The roundup: a wide table with one row per app, then a card per app with the
+   comparisons that include it. */
+.compare-roundup-disclosure {
+  max-width: 62ch;
+  margin: 12px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-roundup-table {
+  min-width: 880px;
+}
+
+.compare-roundup-table thead th:first-child {
+  width: 16%;
+}
+
+.compare-roundup-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 20px);
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-roundup-rank {
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.compare-roundup-best {
+  margin: 10px 0 0;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.compare-roundup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-roundup-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--openbot-logo-production);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.compare-roundup-link-icon {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--openbot-duration-normal) ease;
+}
+
 /* Scroll reveals. The heading leads; the parts under it follow in reading order,
    and the table rows and questions sweep in one by one. */
 .compare-section[data-revealed="false"] > *,
 .compare-section[data-revealed="false"] .compare-table tbody tr,
 .compare-section[data-revealed="false"] .compare-plan,
+.compare-section[data-revealed="false"] .compare-roundup-list > li,
 .compare-section[data-revealed="false"] .compare-faq-item {
   opacity: 0;
 }
@@ -5609,6 +5689,7 @@ a {
 
 .compare-section[data-revealed="true"] .compare-table tbody tr,
 .compare-section[data-revealed="true"] .compare-plan,
+.compare-section[data-revealed="true"] .compare-roundup-list > li,
 .compare-section[data-revealed="true"] .compare-faq-item {
   animation: landing-download-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(160ms + var(--compare-index, 0) * 70ms);
@@ -5694,6 +5775,32 @@ a {
 .compare-marks-small .compare-mark-logo {
   width: clamp(32px, 3.4vw, 44px);
   height: clamp(32px, 3.4vw, 44px);
+}
+
+/* A roundup puts every app's mark on the plate, in two rows, with no names and
+   no "vs". The marks fade in where they are. */
+.compare-mark-row {
+  grid-template-columns: repeat(7, auto);
+  gap: clamp(10px, 1.6vw, 20px);
+}
+
+.compare-mark-row .compare-mark {
+  --compare-from: 0px;
+  min-width: 0;
+}
+
+.compare-mark-row .compare-mark-logo {
+  width: clamp(26px, 3.2vw, 44px);
+  height: clamp(26px, 3.2vw, 44px);
+}
+
+.compare-mark-row.compare-marks-small {
+  gap: clamp(8px, 1vw, 12px);
+}
+
+.compare-mark-row.compare-marks-small .compare-mark-logo {
+  width: clamp(20px, 2vw, 26px);
+  height: clamp(20px, 2vw, 26px);
 }
 
 .compare-index-copy {
@@ -5837,6 +5944,34 @@ a {
     min-width: 0;
     gap: 8px;
   }
+
+  /* Five columns do not fit as stacked cells: the roundup table keeps its
+     columns and scrolls in its frame. */
+  .compare-roundup-table,
+  .compare-roundup-table :is(thead, tbody, tr) {
+    display: revert;
+  }
+
+  .compare-roundup-table {
+    min-width: 720px;
+  }
+
+  .compare-roundup-table thead th:first-child {
+    position: static;
+    width: 16%;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    padding: 12px 14px;
+  }
+
+  .compare-roundup-table tbody th {
+    padding-bottom: 12px;
+  }
+
+  .compare-roundup-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -5848,6 +5983,10 @@ a {
 
   .compare-faq-question:hover .compare-faq-chevron {
     color: var(--openbot-text-primary);
+  }
+
+  .compare-roundup-links a:hover .compare-roundup-link-icon {
+    transform: translateX(2px);
   }
 
   .compare-index-card:hover .compare-index-card-arrow {
@@ -5870,6 +6009,7 @@ a {
   .compare-section[data-revealed] .compare-pair > :nth-child(n),
   .compare-section[data-revealed] .compare-table tbody tr,
   .compare-section[data-revealed] .compare-plan,
+  .compare-section[data-revealed] .compare-roundup-list > li,
   .compare-section[data-revealed] .compare-faq-item,
   .compare-index-grid[data-revealed] .compare-index-card,
   .compare-index-grid[data-revealed] .compare-index-card :is(.post-gradient, .compare-marks),
@@ -5880,6 +6020,7 @@ a {
 
   .compare-faq-item::details-content,
   .compare-faq-chevron,
+  .compare-roundup-link-icon,
   .compare-index-card-arrow {
     transition: none;
   }
