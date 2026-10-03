@@ -73,7 +73,7 @@ export function SystemCard(props: { platform: DownloadPlatform }) {
       to="/download/$platform"
       params={{ platform: props.platform }}
     >
-      <PlatformLogo platform={props.platform} solid class="download-system-card-logo" />
+      <PlatformLogo platform={props.platform} class="download-system-card-logo" />
       <span class="download-system-card-copy">
         <span class="download-system-card-name">{page().heading}</span>
         <span class="download-system-card-detail">
