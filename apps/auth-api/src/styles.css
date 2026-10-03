@@ -5661,6 +5661,123 @@ a {
   transition: transform var(--openbot-duration-normal) ease;
 }
 
+/* The benchmark chart: a table with a bar in each cell. Each agent has its own
+   colour, and the rows keep this order, so each pair of neighbours stays apart for
+   colour-blind readers. Checked with the dataviz palette check, dark mode, on
+   --openbot-bg-canvas: "#d95926,#3987e5,#199e70,#9085e9". Blue next to violet fails,
+   so do not reorder. Text stays in the text colours; only the bars are coloured. */
+.compare-bench-table tr[data-agent="claude-code"] {
+  --compare-bench-fill: var(--openbot-chart-storage-files);
+}
+
+.compare-bench-table tr[data-agent="codex"] {
+  --compare-bench-fill: var(--openbot-chart-storage-workspaces);
+}
+
+.compare-bench-table tr[data-agent="devin"] {
+  --compare-bench-fill: var(--openbot-chart-storage-chats);
+}
+
+.compare-bench-table tr[data-agent="antigravity"] {
+  --compare-bench-fill: var(--openbot-chart-storage-downloads);
+}
+
+.compare-bench-takeaway {
+  max-width: 62ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.4vw, 18px);
+  line-height: 1.6;
+}
+
+.compare-bench-table {
+  min-width: 680px;
+}
+
+.compare-bench-table thead th:first-child {
+  width: 34%;
+}
+
+.compare-bench-table td,
+.compare-bench-table th {
+  vertical-align: middle;
+}
+
+.compare-bench-hint {
+  display: block;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.compare-bench-agent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.compare-bench-agent .compare-table-logo {
+  flex: none;
+  margin-top: 1px;
+  color: var(--openbot-text-primary);
+}
+
+.compare-bench-name {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+}
+
+.compare-bench-model,
+.compare-bench-note {
+  display: block;
+  color: var(--openbot-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.compare-bench-note {
+  color: var(--openbot-text-dim);
+}
+
+/* The bar starts square at zero and ends round at its value; the value sits after
+   it. The track is the cell, so bars in one column share one scale. */
+.compare-bench-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-bench-bar {
+  flex: none;
+  width: calc(var(--compare-bench-share) * (100% - 64px));
+  min-width: 2px;
+  height: 14px;
+  border-radius: 0 4px 4px 0;
+  background: var(--compare-bench-fill);
+}
+
+.compare-bench-value {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compare-bench-credit {
+  max-width: 68ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-bench-credit a {
+  color: var(--openbot-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Scroll reveals. The heading leads; the parts under it follow in reading order,
    and the table rows and questions sweep in one by one. */
 .compare-section[data-revealed="false"] > *,
@@ -5913,7 +6030,7 @@ a {
 
   .compare-table tr {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: var(--compare-table-columns, repeat(2, minmax(0, 1fr)));
   }
 
   /* Out of the grid but still in the table, so the brand headers keep their
@@ -5944,6 +6061,26 @@ a {
   .compare-mark {
     min-width: 0;
     gap: 8px;
+  }
+
+  /* The benchmark has three measures: one column each, under the agent. Each
+     header stays over its column, and the bar goes under the value. */
+  .compare-bench-table {
+    --compare-table-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .compare-bench-table thead th {
+    font-size: 13px;
+  }
+
+  .compare-bench-cell {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .compare-bench-bar {
+    width: calc(var(--compare-bench-share) * 100%);
   }
 
   /* Five columns do not fit as stacked cells: the roundup table keeps its

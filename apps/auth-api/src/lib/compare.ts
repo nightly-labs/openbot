@@ -24,7 +24,7 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       slug: "best-ai-agent-apps",
       title: "Best AI Agent Apps in 2026: 13 Apps Compared",
       description:
-        "The best AI agent apps in 2026: OpenBot, Claude Code, Codex, Cursor, Antigravity, Devin, Manus and more, with where they run, models and price.",
+        "13 AI agent apps compared: OpenBot, Claude Code, Codex, Cursor, Antigravity, Devin, Manus and more. Where they run, models, price and benchmark scores.",
       publishedAt: "2026-10-03",
       updatedAt: "2026-10-03",
       author: NEWS_AUTHOR,
@@ -33,7 +33,7 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       slug: "codex-vs-claude-code",
       title: "Codex vs Claude Code: Which Coding Agent to Use",
       description:
-        "Codex vs Claude Code: models, plans, sandbox, cloud work and data, compared from official sources. Or run both as one team in OpenBot.",
+        "Codex vs Claude Code: benchmark scores, cost per task, plans, sandboxes and privacy, from official sources. Or run both as one team in OpenBot.",
       publishedAt: "2026-10-03",
       updatedAt: "2026-10-03",
       author: NEWS_AUTHOR,
@@ -42,7 +42,7 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       slug: "claude-code-vs-antigravity",
       title: "Claude Code vs Antigravity: Claude or Gemini Agent",
       description:
-        "Claude Code vs Google Antigravity: models, plans, apps and data, compared from official sources. Or run both as one team in OpenBot.",
+        "Claude Code vs Google Antigravity: benchmark scores, cost per task, plans, apps and privacy, from official sources. Or run both in OpenBot.",
       publishedAt: "2026-10-03",
       updatedAt: "2026-10-03",
       author: NEWS_AUTHOR,
@@ -51,7 +51,7 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
       slug: "cursor-vs-claude-code",
       title: "Cursor vs Claude Code: Editor or Terminal Agent",
       description:
-        "Cursor vs Claude Code: models, plans, cloud agents and data, compared from official sources. Or run both as one team in OpenBot.",
+        "Cursor vs Claude Code: an editor with many models, or Claude's agent in your terminal. Plans, cloud agents and privacy, from official sources.",
       publishedAt: "2026-10-03",
       updatedAt: "2026-10-03",
       author: NEWS_AUTHOR,

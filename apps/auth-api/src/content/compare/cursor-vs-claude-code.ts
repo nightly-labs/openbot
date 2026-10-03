@@ -1,10 +1,11 @@
-import type { MatchupComparison } from "./comparison";
+import { BENCHMARK_SOURCES, type MatchupComparison } from "./comparison";
 
 // Every statement about Cursor here is taken from cursor.com, the Cursor documentation
 // and help center, and Cursor's terms. Every statement about Claude Code is taken from
 // code.claude.com, claude.com and the Claude help center. Each page used is in
-// `sources`. Where they state nothing, the text says so. Check them again, and move
-// `checkedAt`, whenever this file changes. SpaceX acquired Cursor on 14 August 2026.
+// `sources`. The Artificial Analysis Coding Agent Index does not test Cursor, so this
+// page has no benchmark chart. Where the sources state nothing, the text says so.
+// Check them again, and move `checkedAt`, whenever this file changes. SpaceX acquired Cursor on 14 August 2026.
 
 const CURSOR_DOCS = "https://cursor.com/docs";
 const CLAUDE_CODE_DOCS = "https://code.claude.com/docs/en";
@@ -16,16 +17,16 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
     { name: "Claude Code", mark: "claude-code", provider: "claude" },
   ],
   answer:
-    "Choose Cursor if you want a full code editor with agents in it, and models from many providers in one plan. Choose Claude Code if you want Claude's agent in the terminal and the IDE that you already use, with your Claude plan. Both run agents on your computer and in the cloud, and both cost $20 a month at the entry level.",
+    "Pick Cursor if you want an editor with agents built in and models from several labs on one bill. Pick Claude Code if you want Claude's agent in the terminal and editor you already use. Both start at $20 a month, and both run agents on your computer or in the cloud.",
   chooseA: [
-    "You want an editor, built from VS Code, with agents, completions and review in it.",
-    "You want Grok, Claude, GPT, Gemini and Cursor's own models in one plan.",
-    "You want Bugbot to review pull requests on GitHub, GitLab, Bitbucket or Azure DevOps.",
+    "You want a full editor, built from VS Code, with agents, completions and review in one place.",
+    "Grok, Claude, GPT, Gemini and Cursor's own models on one plan sounds good.",
+    "Bugbot should review your pull requests on GitHub, GitLab, Bitbucket or Azure DevOps.",
   ],
   chooseB: [
-    "You already pay for Claude Pro, Max, Team or Enterprise.",
-    "You want to keep your terminal and your editor, such as VS Code or a JetBrains IDE.",
-    "You want Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry at work.",
+    "You already pay for Claude.",
+    "You're happy with your terminal and editor, VS Code or JetBrains, and don't want to switch.",
+    "Your company buys Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry.",
   ],
   rows: [
     {
@@ -86,62 +87,67 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
     },
   ],
   intro:
-    "Cursor is an AI code editor from Anysphere, which SpaceX acquired in August 2026. Claude Code is Anthropic's coding agent for the terminal, the IDE, the desktop and the web. Both run agents that edit files and run commands, on your computer or in the cloud, and both read AGENTS.md-style rules, MCP servers, hooks and skills. The main difference is the shape of the tool: Cursor is the editor itself, with many models, and Claude Code is an agent that plugs into the tools that you already use, with Claude's models.",
+    "Cursor is an AI code editor from Anysphere, which SpaceX bought in August 2026. Claude Code is Anthropic's coding agent for the terminal, the IDE, the desktop and the web. Both run agents that edit files and run commands, locally or in the cloud, and both read AGENTS.md-style rules, MCP servers, hooks and skills. The difference is the shape of the tool. Cursor is the editor, with many models. Claude Code plugs into the tools you already have, with Claude's models.",
   bothInOpenBot:
-    "OpenBot runs Cursor CLI and Claude Code on your computer, each signed in with your own plan: Cursor CLI with your Cursor plan or a Cursor API key, and Claude Code with your Claude plan. Give each agent its own job. They hand work to each other in a shared channel, and you follow them from your phone. If you move an agent from one to the other, it keeps its role, workspace and conversation.",
+    "OpenBot runs Cursor CLI and Claude Code on your computer, each signed in with your own plan: Cursor CLI with your Cursor plan or a Cursor API key, Claude Code with Claude. Give each one a job. They pass work to each other in a shared channel, and you can follow along from your phone. Move an agent from one to the other and it keeps its role, workspace and conversation.",
   sections: [
     {
       title: "Models and the plans you pay for",
-      a: "Cursor's own pool has Grok 4.7, 4.6 and 4.5 and Composer 2.5, and Cursor calls Grok 4.7 its flagship model. It also offers Claude, GPT, Gemini and Muse models at API prices. Hobby is free, Pro costs $20 a month, Pro+ $60 and Ultra $200, and Teams $40 or $120 a user. Each plan includes usage, and use beyond it is billed at API prices. Your own keys from OpenAI, Anthropic, Google, Azure OpenAI and Amazon Bedrock work for chat models.",
-      b: "Claude Code uses Claude's models, with Opus 5.5 as the default on paid plans. Pro costs $20 a month, or $17 billed yearly, Max $100 or $200, and Team seats $25, or $20 billed yearly. The free Claude plan does not include Claude Code. Limits reset every five hours, and paid plans also have weekly limits. Claude Code also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      a: "Cursor's own pool has Grok 4.7, 4.6 and 4.5 and Composer 2.5, and Cursor calls Grok 4.7 its flagship. Claude, GPT, Gemini and Muse models are there too, at API prices. Hobby is free, Pro is $20 a month, Pro+ $60 and Ultra $200, and Teams is $40 or $120 a user. Each plan includes some usage, and anything past it is billed at API prices. Your own keys from OpenAI, Anthropic, Google, Azure OpenAI and Amazon Bedrock work for chat models. If you want to switch models freely, Cursor wins.",
+      b: "Claude Code runs Claude's models only, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have weekly caps too. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
       better: "a",
     },
     {
       title: "Editor or agent",
-      a: "Cursor is a code editor, built as a fork of VS Code, with extensions from Open VSX. The Agents Window runs agents next to the editor, on your computer, in worktrees, over SSH or in the cloud. The Cursor CLI, `agent`, runs the same agent in a terminal, and can hand a task to a cloud agent.",
-      b: "Claude Code started in the terminal, and it does not replace your editor. Its extension works in VS Code and its forks, Cursor included, and its plugin works in JetBrains IDEs. The desktop app runs parallel sessions, local, in the cloud or over SSH, and the web app runs at claude.ai/code.",
+      a: "Cursor is a code editor, a fork of VS Code, with extensions from Open VSX. The Agents Window runs agents next to the editor: locally, in worktrees, over SSH or in the cloud. The Cursor CLI, `agent`, runs the same agent in a terminal and can hand a task off to a cloud agent.",
+      b: "Claude Code started in the terminal, and it doesn't replace your editor. Its extension works in VS Code and its forks, Cursor included, and its plugin works in JetBrains IDEs. The desktop app runs parallel sessions, locally, in the cloud or over SSH, and the web app lives at claude.ai/code.",
     },
     {
       title: "Parallel work and teams",
-      a: "The Agents Window runs agents in parallel, each in its own Git worktree if you want. Cloud agents run in isolated virtual machines, as many as you want at the same time, and you start them from Slack, Microsoft Teams, Linear, Jira or a GitHub comment. Projects, in beta since September 2026, lets a coordinator agent give work to other agents.",
-      b: "Claude Code has subagents, each with its own context, and background sessions with `claude agents`. Git worktrees keep parallel work apart, and each cloud session runs on its own. Agent teams, where several Claude Code sessions work together, are experimental and off by default. You can start work from GitHub with @claude, and from Slack.",
+      a: "The Agents Window runs agents in parallel, each in its own Git worktree if you like. Cloud agents run in isolated VMs, as many as you want at once, and you can start them from Slack, Microsoft Teams, Linear, Jira or a GitHub comment. Projects, in beta since September 2026, lets one coordinator agent hand work to others.",
+      b: "Claude Code has subagents with their own context, and background sessions through `claude agents`. Worktrees keep parallel work apart, and each cloud session runs on its own. Agent teams, where several sessions work together, are still experimental and off by default. You can start work from GitHub with @claude, or from Slack.",
     },
     {
       title: "Data and privacy",
-      a: "With Privacy Mode on, Cursor does not train on your data and has zero data retention agreements with its model providers. With it off, Cursor can store and use your code and prompts to train its models. Privacy Mode is on by default for Enterprise teams; Cursor does not state the default for personal plans. Requests go through Cursor's servers, also with your own API key. Cloud agents are the only feature that stores your code, and Cursor deletes it when the agent completes.",
-      b: "On Free, Pro and Max, Anthropic trains on your data only when you turn the setting on. It keeps the data for 5 years with the setting on, and for 30 days with it off. On Team, Enterprise and the API, Anthropic does not train on your data unless you opt in, and the standard retention is 30 days.",
+      a: "With Privacy Mode on, Cursor doesn't train on your data and has zero data retention deals with its model providers. With it off, Cursor can store your code and prompts and train on them. Privacy Mode is on by default for Enterprise teams. For personal plans, Cursor doesn't say. Requests go through Cursor's servers, even with your own API key. Cloud agents are the only feature that stores your code, and Cursor deletes it when the agent finishes.",
+      b: "On Free, Pro and Max, Anthropic trains on your data only if you turn the setting on. With it on, data is kept for 5 years. With it off, 30 days. Team, Enterprise and the API aren't used for training unless you opt in, and standard retention is 30 days. Here you at least know the default.",
     },
   ],
   faq: [
     {
       question: "Which is better for coding, Cursor or Claude Code?",
       answer:
-        "It depends on how you work. Cursor is a full editor with agents in it and models from many providers. Claude Code is an agent that works in your terminal and plugs into the editor you already use, with Claude's models. Both run agents on your computer and in the cloud.",
+        "Depends how you work. Cursor is a full editor with agents in it and models from many labs. Claude Code is an agent that lives in your terminal and plugs into the editor you already use, with Claude's models. Both run agents locally and in the cloud.",
+    },
+    {
+      question: "Is there a benchmark for Cursor and Claude Code?",
+      answer:
+        "Not one that has both. The Artificial Analysis Coding Agent Index tests Claude Code, which scores up to 68 with Sonnet 5.5 at max effort, but it didn't include Cursor when we checked on 3 October 2026.",
     },
     {
       question: "Can I use Claude Code in Cursor?",
       answer:
-        "Yes. Claude Code's extension installs in Cursor, as in other VS Code forks, and it bundles its own copy of the Claude Code command line. You can also choose Claude models inside Cursor itself, billed through your Cursor plan.",
+        "Yes. Claude Code's extension installs in Cursor like in any VS Code fork, and it bundles its own copy of the Claude Code command line. You can also pick Claude models inside Cursor itself, billed through your Cursor plan.",
     },
     {
       question: "Can I use Cursor and Claude Code together?",
       answer:
-        "Yes. In OpenBot, Cursor CLI and Claude Code are agents in one team, each signed in with your own Cursor or Claude plan. The agents give work to each other in a shared channel on your computer, and you follow them from the OpenBot app on your phone.",
+        "Yes. In OpenBot, Cursor CLI and Claude Code are agents on one team, each signed in with your own Cursor or Claude plan. They hand work to each other in a shared channel on your computer, and you follow them from the OpenBot app on your phone.",
     },
     {
       question: "How much do Cursor and Claude Code cost?",
       answer:
-        "Both start at $20 a month: Cursor Pro, and Claude Pro for Claude Code. Claude Pro is $17 a month if you pay yearly. Cursor also has a free Hobby plan, Pro+ at $60 and Ultra at $200. Claude Max costs $100 or $200. The free Claude plan does not include Claude Code.",
+        "Both start at $20 a month: Cursor Pro, and Claude Pro for Claude Code. Claude Pro drops to $17 a month if you pay yearly. Cursor also has a free Hobby plan, Pro+ at $60 and Ultra at $200. Claude Max is $100 or $200. The free Claude plan doesn't include Claude Code.",
     },
     {
       question: "Who owns Cursor?",
       answer:
-        "SpaceX. Cursor's blog says that SpaceX acquired it on 14 August 2026. Cursor now calls Grok 4.7 its flagship model.",
+        "SpaceX. Cursor's blog says SpaceX acquired it on 14 August 2026. Cursor now calls Grok 4.7 its flagship model.",
     },
     {
       question: "Do Cursor and Claude Code train on my code?",
       answer:
-        "With Cursor, it depends on Privacy Mode: on, no training; off, Cursor can train on your code and prompts. On Claude's personal plans, Anthropic trains only when you turn the setting on. On business plans, Privacy Mode is on by default for Enterprise teams, and Anthropic does not train by default.",
+        "With Cursor, it comes down to Privacy Mode: on means no training, off means Cursor can train on your code and prompts. On Claude's personal plans, Anthropic trains only if you turn the setting on. On business plans, Privacy Mode is on by default for Enterprise teams, and Anthropic doesn't train by default.",
     },
   ],
   sources: [
@@ -176,6 +182,7 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
     { label: "Claude Code data usage", url: `${CLAUDE_CODE_DOCS}/data-usage` },
     { label: "Claude pricing", url: "https://claude.com/pricing" },
     { label: "Claude Code license", url: "https://github.com/anthropics/claude-code/blob/main/LICENSE.md" },
+    ...BENCHMARK_SOURCES,
   ],
   checkedAt: "2026-10-03",
 };

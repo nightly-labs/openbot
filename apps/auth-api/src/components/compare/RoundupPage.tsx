@@ -10,6 +10,7 @@ import {
 import { ArticleGradient } from "../content/ArticleGradient";
 import { LandingIcon } from "../landing/LandingIcon";
 import { CompareArticleFrame } from "./CompareArticleFrame";
+import { CompareBenchmark } from "./CompareBenchmark";
 import { CheckedMeta, CompareFaq, CompareMarkRow, CompareSources, RevealSection, SideLabel } from "./CompareParts";
 
 export interface RoundupPageProps {
@@ -54,7 +55,7 @@ export function RoundupPage(props: RoundupPageProps) {
       <RevealSection class="compare-answer" titleId="compare-answer-title" title="The short answer">
         <p class="compare-answer-text">{props.roundup.answer}</p>
         <p class="compare-roundup-disclosure">
-          We make OpenBot, so it is first on this list. Every other entry links to a comparison with its sources.
+          We make OpenBot, so it's first on the list. Every other entry links to a comparison with its sources.
         </p>
       </RevealSection>
 
@@ -91,6 +92,8 @@ export function RoundupPage(props: RoundupPageProps) {
           </table>
         </div>
       </RevealSection>
+
+      <Show when={props.roundup.benchmark}>{(benchmark) => <CompareBenchmark benchmark={benchmark()} />}</Show>
 
       <p class="compare-intro">{props.roundup.intro}</p>
 

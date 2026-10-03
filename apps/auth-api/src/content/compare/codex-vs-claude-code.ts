@@ -1,11 +1,12 @@
-import type { MatchupComparison } from "./comparison";
+import { BENCHMARK_SOURCES, type MatchupComparison } from "./comparison";
 
 // Every statement about Codex here is taken from OpenAI's Codex documentation
 // (developers.openai.com/codex now redirects to learn.chatgpt.com/docs), the OpenAI
 // help center and the openai/codex repository. Every statement about Claude Code is
 // taken from code.claude.com, claude.com and the Claude help center. Each page used is
-// in `sources`. Where they state nothing, the text says so. Check them again, and move
-// `checkedAt`, whenever this file changes.
+// in `sources`. The benchmark numbers are read by hand from the Artificial Analysis
+// Coding Agent Index. Where the sources state nothing, the text says so. Check them
+// again, and move `checkedAt`, whenever this file changes.
 
 const CODEX_DOCS = "https://learn.chatgpt.com/docs";
 const CLAUDE_CODE_DOCS = "https://code.claude.com/docs/en";
@@ -17,16 +18,17 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     { name: "Claude Code", mark: "claude-code", provider: "claude" },
   ],
   answer:
-    "Choose Codex if you pay for ChatGPT, want OpenAI's GPT-6 models, and want a sandbox that is on from the start. Choose Claude Code if you pay for Claude and want Claude's models in your terminal and IDE. Both run on your computer and in the cloud, and both cost $20 a month at the entry level.",
+    "Pick Codex if you pay for ChatGPT and care what each task costs. Pick Claude Code if you pay for Claude and want the top benchmark score, and can wait for it. Both start at $20 a month, and both run on your computer or in the cloud.",
   chooseA: [
-    "You already pay for ChatGPT Plus, Pro or Business.",
-    "You want the operating-system sandbox on by default, with no network and writes only in the workspace.",
-    "You want an agent whose command line is open source, under Apache-2.0.",
+    "You already pay for ChatGPT.",
+    "Cost per task matters: GPT-6.1 Sol scores 63 on the Artificial Analysis index for about $1 a task.",
+    "The sandbox should be on from the first run, with no network.",
+    "You'd like to read the source. The command line is Apache-2.0.",
   ],
   chooseB: [
-    "You already pay for Claude Pro, Max, Team or Enterprise.",
-    "You want Claude's models, such as Opus 5.5, in your terminal, VS Code or JetBrains IDE.",
-    "You want Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry at work.",
+    "You already pay for Claude.",
+    "You want the best score on the index: 68, with Sonnet 5.5 at max effort.",
+    "Your company buys Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry.",
   ],
   rows: [
     {
@@ -88,30 +90,50 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     },
   ],
   intro:
-    "Codex and Claude Code are the coding agents of OpenAI and Anthropic. Both read your code, edit files and run commands, on your computer or in their maker's cloud. Both read rules from your repository, use MCP servers, skills and hooks, and review pull requests on GitHub. The main difference is the model and the plan: Codex uses OpenAI's models with a ChatGPT plan, and Claude Code uses Claude's models with a Claude plan.",
+    "Codex is OpenAI's coding agent. Claude Code is Anthropic's. They do the same job: read your code, edit files and run commands, on your computer or in their maker's cloud. Both read rules from your repo, use MCP servers, skills and hooks, and review pull requests on GitHub. The real difference is whose models you get, and which subscription you already have.",
   bothInOpenBot:
-    "OpenBot runs Codex and Claude Code on your computer, each signed in with your own plan: Codex with your ChatGPT plan, and Claude Code with your Claude plan. Give each agent its own job. They hand work to each other in a shared channel, and you follow them from your phone. If you move an agent from one to the other, it keeps its role, workspace and conversation.",
+    "OpenBot runs both on your computer, each signed in with your own plan: Codex with ChatGPT, Claude Code with Claude. Give each one a job. They pass work to each other in a shared channel, and you can follow along from your phone. Move an agent from one to the other and it keeps its role, workspace and conversation.",
+  benchmark: {
+    takeaway:
+      "Claude Code with Sonnet 5.5 at max effort has the top score, 68. It's also the slowest and most expensive run here: $14.19 and 87 minutes a task. Codex with GPT-6.1 Sol at xhigh scores 63, the same as Sonnet 5.5 at xhigh, for $1.04 a task instead of $3.33, and in a bit more than half the time.",
+    rows: [
+      {
+        agent: "claude-code",
+        name: "Claude Code",
+        model: "Sonnet 5.5 (max)",
+        score: 68,
+        costUsd: 14.19,
+        minutes: 87.4,
+      },
+      { agent: "claude-code", name: "Claude Code", model: "Opus 5.5 (max)", score: 66, costUsd: 13.04, minutes: 64.5 },
+      { agent: "claude-code", name: "Claude Code", model: "Sonnet 5.5 (xhigh)", score: 63, costUsd: 3.33, minutes: 27 },
+      { agent: "codex", name: "Codex", model: "GPT-6.1 Sol (xhigh)", score: 63, costUsd: 1.04, minutes: 15.5 },
+      { agent: "codex", name: "Codex", model: "GPT-6 Astra (max)", score: 62, costUsd: 7.47, minutes: 29.4 },
+      { agent: "codex", name: "Codex", model: "GPT-6.1 Sol (medium)", score: 61, costUsd: 0.7, minutes: 10.9 },
+    ],
+    checkedAt: "2026-10-03",
+  },
   sections: [
     {
       title: "Models and the plans you pay for",
-      a: "Codex uses OpenAI's models. GPT-6 Astra is the most capable, and GPT-6.1 Sol is the recommended model for complex coding. Plus costs $20 a month, Pro $100, $200 or $500, and Business $20 a user a month billed yearly. Free and Go get GPT-6 Luna in the desktop app, as it rolls out, but not cloud tasks. Usage limits reset every five hours, and weekly limits can also apply. With an API key, you pay API prices, and cloud features such as GitHub review are not available.",
-      b: "Claude Code uses Claude's models, with Opus 5.5 as the default on paid plans. Pro costs $20 a month, or $17 billed yearly, Max $100 or $200, and Team seats $25, or $20 billed yearly. The free Claude plan does not include Claude Code. Limits reset every five hours, and paid plans also have weekly limits that Claude and Claude Code share. Claude Code also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+      a: "Codex runs OpenAI's models only. GPT-6 Astra is the strongest, and OpenAI recommends GPT-6.1 Sol for hard coding work. Plus is $20 a month, Pro is $100, $200 or $500, and Business is $20 a seat billed yearly. Free and Go get GPT-6 Luna in the desktop app as it rolls out, but no cloud tasks. Limits reset every five hours, and weekly caps can apply. An API key works too, at API prices, but you lose cloud features like GitHub review.",
+      b: "Claude Code runs Claude's models only, with Opus 5.5 as the default on paid plans. Pro is $20 a month ($17 billed yearly), Max is $100 or $200, and Team seats are $25 ($20 yearly). The free Claude plan doesn't include Claude Code. Limits reset every five hours, and paid plans have a weekly cap that Claude and Claude Code share. It also works with an Anthropic API key, Amazon Bedrock, Google Cloud and Microsoft Foundry.",
     },
     {
       title: "Where the work happens",
-      a: "Local work runs on your computer, in a sandbox that the operating system enforces: Seatbelt on macOS, bubblewrap on Linux, and a native sandbox on Windows. By default, the network is off and writes stay in the workspace. Cloud tasks run in virtual machines that OpenAI manages, and they keep working while your computer sleeps.",
-      b: "Claude Code runs on your computer by default. Its operating-system sandbox, Seatbelt on macOS and bubblewrap on Linux, is off until you turn it on, and it is not available on native Windows. Cloud sessions run in an isolated virtual machine that Anthropic manages, or in your own environment. Your GitHub credentials never go into that virtual machine.",
+      a: "Codex sandboxes local work from the first run: Seatbelt on macOS, bubblewrap on Linux and a native sandbox on Windows. The network is off and writes stay in the workspace. Cloud tasks run in VMs that OpenAI manages, and they keep going while your laptop sleeps. Of the two, this is the safer default.",
+      b: "Claude Code runs on your computer by default. Its sandbox (Seatbelt on macOS, bubblewrap on Linux) stays off until you turn it on, and native Windows doesn't have one. Cloud sessions run in an isolated VM that Anthropic manages, or in your own environment. Your GitHub credentials never go into that VM.",
       better: "a",
     },
     {
       title: "Parallel work and teams",
-      a: "Codex runs subagents in parallel, and its Ultra reasoning mode uses them. Git worktrees let you run several chats in one project, and each cloud task gets its own workspace. You can start work from GitHub, Slack and Linear, and GitLab is in beta.",
-      b: "Claude Code has subagents, each with its own context, and background sessions with `claude agents`. Git worktrees keep parallel work apart, and each cloud session runs on its own. Agent teams, where several Claude Code sessions work together, are experimental and off by default. You can start work from GitHub with @claude, and from Slack.",
+      a: "Codex runs subagents in parallel, and its Ultra reasoning mode leans on them. Git worktrees let you run several chats in one project, and each cloud task gets its own workspace. You can start work from GitHub, Slack and Linear. GitLab is in beta.",
+      b: "Claude Code has subagents with their own context, and background sessions through `claude agents`. Worktrees keep parallel work apart, and each cloud session runs on its own. Agent teams, where several sessions work together, are still experimental and off by default. You can start work from GitHub with @claude, or from Slack.",
     },
     {
       title: "Data and privacy",
-      a: "On Plus and Pro, OpenAI can use your conversations to improve its models unless you turn training off in ChatGPT's data controls, and these controls apply to Codex. On Business, Enterprise, Edu and the API, OpenAI does not train on your data by default. Enterprise and Edu get controls for data retention and data residency.",
-      b: "On Free, Pro and Max, Anthropic trains on your data only when you turn the setting on. It keeps the data for 5 years with the setting on, and for 30 days with it off. On Team, Enterprise and the API, Anthropic does not train on your data unless you opt in, and the standard retention is 30 days. Enterprise can get zero data retention.",
+      a: "On Plus and Pro, OpenAI can train on your chats unless you turn that off in ChatGPT's data controls, which cover Codex too. Business, Enterprise, Edu and the API aren't used for training by default. Enterprise and Edu also get retention and data-residency controls.",
+      b: "On Free, Pro and Max, Anthropic trains on your data only if you turn the setting on. With it on, data is kept for 5 years. With it off, 30 days. Team, Enterprise and the API aren't used for training unless you opt in, and Enterprise can get zero data retention. Opt-in beats opt-out, so Claude Code takes this one.",
       better: "b",
     },
   ],
@@ -119,32 +141,32 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
     {
       question: "Which is better for coding, Codex or Claude Code?",
       answer:
-        "Neither in every case. Both edit files, run commands, work in parallel and run in the cloud. Codex gives you OpenAI's models and a sandbox that is on by default. Claude Code gives you Claude's models, such as Opus 5.5. The plan that you already pay for is often the deciding point.",
+        "On the Artificial Analysis Coding Agent Index, Claude Code with Sonnet 5.5 at max effort scores highest, 68. Codex with GPT-6.1 Sol at xhigh scores 63 for $1.04 a task, against $14.19 for that Claude run. Past the numbers, the plan you already pay for usually decides it.",
     },
     {
       question: "Can I use Codex and Claude Code together?",
       answer:
-        "Yes. In OpenBot, each one is an agent with its own job, signed in with your own ChatGPT or Claude plan. The agents give work to each other in a shared channel on your computer, and you follow them from the OpenBot app on your phone.",
+        "Yes. In OpenBot, each one is an agent with its own job, signed in with your own ChatGPT or Claude plan. They hand work to each other in a shared channel on your computer, and you follow them from the OpenBot app on your phone.",
     },
     {
       question: "How much do Codex and Claude Code cost?",
       answer:
-        "Both start at $20 a month: ChatGPT Plus for Codex, and Claude Pro for Claude Code. Claude Pro is $17 a month if you pay yearly. Higher limits cost $100 or $200 a month on both, and ChatGPT Pro also has a $500 plan. ChatGPT Free and Go get GPT-6 Luna in the desktop app as it rolls out. The free Claude plan does not include Claude Code.",
+        "Both start at $20 a month: ChatGPT Plus for Codex, Claude Pro for Claude Code. Claude Pro drops to $17 a month if you pay yearly. Higher limits cost $100 or $200 a month on both, and ChatGPT Pro also has a $500 tier. ChatGPT Free and Go get GPT-6 Luna in the desktop app as it rolls out. The free Claude plan doesn't include Claude Code.",
     },
     {
       question: "Is Codex open source? Is Claude Code?",
       answer:
-        "The Codex command line is open source under Apache-2.0, at openai/codex on GitHub. The Codex IDE extension and Codex Cloud are not. Claude Code is proprietary: its repository on GitHub holds plugins, examples and issues, not the source code.",
+        "The Codex command line is, under Apache-2.0, at openai/codex on GitHub. The IDE extension and Codex Cloud aren't. Claude Code is proprietary. Its GitHub repo holds plugins, examples and issues, not the source.",
     },
     {
       question: "Do Codex and Claude Code train on my code?",
       answer:
-        "On personal plans it depends on a setting. On ChatGPT Plus and Pro, OpenAI can use your chats for training unless you turn it off. On Claude Pro and Max, Anthropic trains only when you turn the setting on. On business plans and the API, neither trains on your data by default.",
+        "On personal plans, it comes down to one setting. ChatGPT Plus and Pro train on your chats unless you turn it off. Claude Pro and Max train only if you turn it on. On business plans and the API, neither trains on your data by default.",
     },
     {
       question: "Can I use an API key instead of a plan?",
       answer:
-        "Yes, with both. Codex takes an OpenAI API key in the command line, SDK and IDE extension, at API prices, but cloud tasks need a ChatGPT sign-in. Claude Code takes an Anthropic API key, and also works through Amazon Bedrock, Google Cloud and Microsoft Foundry.",
+        "Yes, with both. Codex takes an OpenAI API key in the command line, SDK and IDE extension, at API prices, but cloud tasks need a ChatGPT sign-in. Claude Code takes an Anthropic API key, and also runs through Amazon Bedrock, Google Cloud and Microsoft Foundry.",
     },
   ],
   sources: [
@@ -181,6 +203,7 @@ export const CODEX_VS_CLAUDE_CODE: MatchupComparison = {
       url: "https://support.claude.com/en/articles/11845131-use-claude-code-with-your-team-or-enterprise-plan",
     },
     { label: "Claude Code license", url: "https://github.com/anthropics/claude-code/blob/main/LICENSE.md" },
+    ...BENCHMARK_SOURCES,
   ],
   checkedAt: "2026-10-03",
 };

@@ -200,7 +200,8 @@ describe("Compare", () => {
 
       expect(screen.getByRole("heading", { level: 1, name: article.title })).toBeInTheDocument();
       const body = within(screen.getByRole("article"));
-      const table = body.getByRole("table");
+      // A page can also have a benchmark table; the comparison table is the one that compares.
+      const table = body.getByRole("table", { name: /compared, as checked on/ });
       const rowHeaders = page.kind === "roundup" ? page.apps.map((app) => app.name) : page.rows.map((row) => row.topic);
       for (const name of rowHeaders) {
         expect(within(table).getByRole("rowheader", { name })).toBeInTheDocument();

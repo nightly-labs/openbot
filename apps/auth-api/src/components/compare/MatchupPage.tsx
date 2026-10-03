@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/solid-router";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import {
   comparisonScore,
   type MatchupComparison,
@@ -10,6 +10,7 @@ import { type CollectionArticle, type ContentCollection, formatArticleDate } fro
 import { ArticleGradient } from "../content/ArticleGradient";
 import { LandingIcon } from "../landing/LandingIcon";
 import { CompareArticleFrame } from "./CompareArticleFrame";
+import { CompareBenchmark } from "./CompareBenchmark";
 import {
   CheckedMeta,
   ChoiceCard,
@@ -32,8 +33,9 @@ export interface MatchupPageProps {
 }
 
 // Two products that OpenBot runs, against each other. The page is neutral: neither
-// side is recommended and neither column is lit. After the table, one section says
-// what the page is for: you do not have to choose, because OpenBot runs both.
+// side is recommended and neither column is lit. After the table come the benchmark
+// numbers, when there are any, and then one section says what the page is for: you
+// do not have to choose, because OpenBot runs both.
 export function MatchupPage(props: MatchupPageProps) {
   const sideA = (): SideProps => ({ side: "a", ...props.matchup.products[0] });
   const sideB = (): SideProps => ({ side: "b", ...props.matchup.products[1] });
@@ -81,7 +83,8 @@ export function MatchupPage(props: MatchupPageProps) {
 
       <RevealSection class="compare-glance" titleId="compare-glance-title" title="At a glance">
         <p class="compare-glance-summary">
-          {sideA().name} is better on {score()[0]} of {topics()} topics, and {sideB().name} on {score()[1]}.
+          {sideA().name} wins {score()[0]} of {topics()} topics, and {sideB().name} wins {score()[1]}.
+          <Show when={score()[0] + score()[1] < topics()}> The rest are a draw.</Show>
         </p>
         <div class="compare-table-frame">
           <table class="compare-table">
@@ -125,7 +128,9 @@ export function MatchupPage(props: MatchupPageProps) {
         </div>
       </RevealSection>
 
-      <RevealSection class="compare-plans" titleId="compare-plans-title" title="You do not have to choose">
+      <Show when={props.matchup.benchmark}>{(benchmark) => <CompareBenchmark benchmark={benchmark()} />}</Show>
+
+      <RevealSection class="compare-plans" titleId="compare-plans-title" title="You don't have to pick one">
         <p class="compare-plans-lead">{props.matchup.bothInOpenBot}</p>
         <ul class="compare-plans-grid">
           <For each={plans()}>

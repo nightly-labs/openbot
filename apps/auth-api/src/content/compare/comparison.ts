@@ -78,6 +78,53 @@ export interface Comparison {
   checkedAt: string;
 }
 
+export const BENCHMARK_URL = "https://artificialanalysis.ai/agents/coding-agents";
+export const BENCHMARK_METHOD_URL = "https://artificialanalysis.ai/methodology/coding-agents-benchmarking";
+
+/** The benchmark pages, for the `sources` of a page that shows the chart. */
+export const BENCHMARK_SOURCES: readonly ComparisonSource[] = [
+  { label: "Artificial Analysis Coding Agent Index", url: BENCHMARK_URL },
+  { label: "Artificial Analysis coding agent methodology", url: BENCHMARK_METHOD_URL },
+];
+
+/** The coding agents that the benchmark chart draws, in the order it draws them. */
+export const BENCHMARK_AGENTS = [
+  "claude-code",
+  "codex",
+  "devin",
+  "antigravity",
+] as const satisfies readonly RivalMarkName[];
+export type BenchmarkAgent = (typeof BENCHMARK_AGENTS)[number];
+
+/** One agent and model on the Artificial Analysis Coding Agent Index. */
+export interface BenchmarkRow {
+  agent: BenchmarkAgent;
+  /** The agent's name, as Artificial Analysis gives it. */
+  name: string;
+  /** The model and effort, as Artificial Analysis gives them. */
+  model: string;
+  /** The index score, rounded as Artificial Analysis shows it. */
+  score: number;
+  /** The average cost of one task, in US dollars, at pay-per-token API prices. */
+  costUsd: number;
+  /** The average wall-clock time of one task, in minutes. */
+  minutes: number;
+  /** A short note under the model, such as "Not public yet". */
+  note?: string;
+}
+
+/**
+ * Numbers from the Artificial Analysis Coding Agent Index, read by hand from
+ * artificialanalysis.ai/agents/coding-agents. The page credits and links them.
+ */
+export interface Benchmark {
+  /** What the numbers say, in one or two sentences. */
+  takeaway: string;
+  rows: readonly BenchmarkRow[];
+  /** `YYYY-MM-DD`: the day the numbers were read. */
+  checkedAt: string;
+}
+
 export interface MatchupProduct {
   /** The product's own spelling. */
   name: string;
@@ -101,6 +148,8 @@ export interface MatchupComparison {
   intro: string;
   /** How OpenBot runs both products, with the plans you have, as one team. */
   bothInOpenBot: string;
+  /** Not given when the benchmark does not test one of the two products. */
+  benchmark?: Benchmark;
   sections: readonly ComparisonSection<MatchupSide>[];
   faq: readonly ComparisonQuestion[];
   sources: readonly ComparisonSource[];
@@ -126,6 +175,7 @@ export interface RoundupComparison {
   answer: string;
   intro: string;
   apps: readonly RoundupApp[];
+  benchmark?: Benchmark;
   faq: readonly ComparisonQuestion[];
   sources: readonly ComparisonSource[];
   checkedAt: string;
