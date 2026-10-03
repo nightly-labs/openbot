@@ -273,6 +273,11 @@ export function isClaudeCompactionSummary(text: string): boolean {
   return text.startsWith("This session is being continued from a previous conversation that ran out of context.");
 }
 
+/** Claude records a slash command that it runs itself, and the command's output, as user entries in these tags. */
+export function isClaudeLocalCommand(text: string): boolean {
+  return /^<(?:command-name|local-command-stdout|local-command-stderr)>/.test(text.trimStart());
+}
+
 /** Claude records a user interrupt as a user entry with this text. */
 export function isClaudeInterruptMarker(text: string): boolean {
   return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
@@ -286,6 +291,7 @@ function isStoredClaudeNotice(message: ConversationMessage): boolean {
     message.author === "user" &&
     !message.delivery &&
     (isClaudeTaskNotification(message.text) ||
+      isClaudeLocalCommand(message.text) ||
       isClaudeInterruptMarker(message.text) ||
       isClaudeCompactionSummary(message.text))
   );

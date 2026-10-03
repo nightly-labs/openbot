@@ -36,7 +36,12 @@ import {
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
-import { isClaudeCompactionSummary, isClaudeInterruptMarker, isClaudeTaskNotification } from "./conversation-snapshots";
+import {
+  isClaudeCompactionSummary,
+  isClaudeInterruptMarker,
+  isClaudeLocalCommand,
+  isClaudeTaskNotification,
+} from "./conversation-snapshots";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -1025,20 +1030,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           continue;
         }
         skippingCompaction = false;
-        // A task notification still opens the turn that answers it, but the user did not write it.
+        /* A task notification or a slash command still opens the turn that answers it. The user did not
+           write that text: the mailbox already holds the command as the user sent it. */
         current = {
           id: message.uuid,
           status: "completed",
-          items: isClaudeTaskNotification(text)
-            ? []
-            : [
-                {
-                  id: message.uuid,
-                  type: "userMessage",
-                  clientId: message.uuid,
-                  content: [{ type: "text", text }],
-                },
-              ],
+          items:
+            isClaudeTaskNotification(text) || isClaudeLocalCommand(text)
+              ? []
+              : [
+                  {
+                    id: message.uuid,
+                    type: "userMessage",
+                    clientId: message.uuid,
+                    content: [{ type: "text", text }],
+                  },
+                ],
         };
         turns.push(current);
         currentThinking = null;

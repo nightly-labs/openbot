@@ -1173,7 +1173,7 @@ fi
     await client.stop();
   });
 
-  it("does not restore a context summary or an interrupt marker as user messages", async () => {
+  it("does not restore a context summary, an interrupt marker, or a local command as user messages", async () => {
     const history: SessionMessage[] = [];
     const { client, threadId } = await createHarness(history);
     const entry = (type: "user" | "assistant", uuid: string, content: string): SessionMessage => ({
@@ -1194,6 +1194,9 @@ fi
       // The answer that follows the summary finishes a turn the app already published live.
       entry("assistant", "continued-answer", "Already shown."),
       entry("user", "interrupt-marker", "[Request interrupted by user]"),
+      // A slash command the user ran, and its output. The mailbox holds the command as the user sent it.
+      entry("user", "command", "<command-name>/compact</command-name>\n<command-message>compact</command-message>"),
+      entry("user", "command-output", "<local-command-stdout>Compacted </local-command-stdout>"),
       entry("user", "next-turn", "Next question."),
       entry("assistant", "next-answer", "Next answer."),
     );
