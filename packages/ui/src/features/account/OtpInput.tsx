@@ -71,7 +71,9 @@ export function OtpInput(props: OtpInputProps) {
   // The native input keeps the code as its value. iOS and Android autofill and
   // keyboard suggestions read and replace that value, and a soft keyboard that
   // sends no key name edits it in place. An IME owns the value while it
-  // composes, so the copy waits for `compositionend`.
+  // composes, so the copy waits for `compositionend`. A masked code is a
+  // browser secret: its field is cleared after each input, so the DOM never
+  // holds it.
   createEffect(
     () => slots().join(""),
     () => syncNativeValue(),
@@ -140,7 +142,7 @@ export function OtpInput(props: OtpInputProps) {
   }
 
   function syncNativeValue(): void {
-    const value = slots().join("");
+    const value = props.masked ? "" : slots().join("");
     if (!inputElement || composing || inputElement.value === value) return;
     inputElement.value = value;
     inputElement.setSelectionRange(value.length, value.length);
@@ -170,17 +172,27 @@ export function OtpInput(props: OtpInputProps) {
       backspace();
     } else {
       // Autofill, a suggestion, or IME text: the inserted text can be the full
-      // code, with its hyphen. Otherwise the field value is the code. The field
-      // does not show empty slots, so text that adds no code character, such
-      // as a hyphen, must not move the characters after an empty slot.
+      // code, with its hyphen.
       const inserted = sanitize(event.data ?? "");
-      const value = inserted.length === length() ? inserted : sanitize(event.currentTarget.value);
-      if (value !== slots().join("")) applyCode(value);
+      if (inserted.length === length()) applyCode(inserted);
+      else applyFieldValue(event.currentTarget.value);
     }
     // The field can hold text that the code drops, such as a hyphen or a
     // ninth character, and then the slots do not change to start the effect.
     flush();
     syncNativeValue();
+  }
+
+  function applyFieldValue(raw: string): void {
+    const value = sanitize(raw);
+    // A masked field holds only the text of this input.
+    if (props.masked) {
+      insert(value, 0);
+      return;
+    }
+    // The field does not show empty slots, so text that adds no code
+    // character, such as a hyphen, must not move the characters after one.
+    if (value !== slots().join("")) applyCode(value);
   }
 
   function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
@@ -189,7 +201,7 @@ export function OtpInput(props: OtpInputProps) {
     completeAfterComposition = false;
     if (!disabled()) {
       const value = sanitize(event.currentTarget.value);
-      if (value !== slots().join("")) applyCode(value);
+      if (value !== slots().join("")) applyFieldValue(value);
       else if (pending && value.length === length()) props.onComplete?.(value);
     }
     flush();
