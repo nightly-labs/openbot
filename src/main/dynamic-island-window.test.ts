@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { EventEmitter } from "node:events";
@@ -362,8 +363,13 @@ describe("dynamic island window geometry", () => {
       preference: DynamicIslandPreference;
       resolve: (preference: DynamicIslandPreference) => void;
     }> = [];
-    vi.spyOn(preferenceStore, "writeDynamicIslandPreference").mockImplementation(
-      async (_path, nextPreference) => new Promise((resolve) => writes.push({ preference: nextPreference, resolve })),
+    vi.spyOn(preferenceStore, "writeDynamicIslandPreference").mockImplementation((_path, nextPreference) =>
+      Effect.promise(
+        () =>
+          new Promise<DynamicIslandPreference>((resolve) => {
+            writes.push({ preference: nextPreference, resolve });
+          }),
+      ),
     );
     const controller = new DynamicIslandWindowController({
       platform: "linux",

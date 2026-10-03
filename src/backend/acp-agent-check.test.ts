@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -55,12 +56,14 @@ afterEach(async () => {
 });
 
 function check(mode: string, timeoutMs = 5_000) {
-  return checkAcpAgent({
-    executable,
-    args: [],
-    env: { MODE: mode, PID_FILE: pidFile, SECRET_VALUE: "sk-check-secret-value" },
-    timeoutMs,
-  });
+  return runTestEffect(
+    checkAcpAgent({
+      executable,
+      args: [],
+      env: { MODE: mode, PID_FILE: pidFile, SECRET_VALUE: "sk-check-secret-value" },
+      timeoutMs,
+    }),
+  );
 }
 
 /** The agent process is gone: a signal 0 to its pid fails. */

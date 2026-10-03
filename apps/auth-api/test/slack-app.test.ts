@@ -1,5 +1,6 @@
 import { createSlackWorkspaceKeyPair, openSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { describe, expect, it, vi } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { SlackAppService } from "../src/server/slack-app";
 import { migratedDatabase, sqliteD1 } from "./sqlite-d1";
 
@@ -18,15 +19,19 @@ describe("OpenBot Slack app install", () => {
     const nonce = "nonce-0123456789abcdef";
 
     await expect(
-      service.authorizeUrl(other, { hostId: "host-1", hostNonce: nonce, hostPublicKey: host.publicKey, redirectUri }),
+      runApiEffect(
+        service.authorizeUrl(other, { hostId: "host-1", hostNonce: nonce, hostPublicKey: host.publicKey, redirectUri }),
+      ),
     ).rejects.toMatchObject({ code: "forbidden" });
     const state = await stateOf(service, owner, "host-1", nonce, host.publicKey);
 
     const [body, signature] = state.split(".");
-    await expect(service.complete({ code: "code", state: `${body}x.${signature}`, redirectUri })).rejects.toThrow();
+    await expect(
+      runApiEffect(service.complete({ code: "code", state: `${body}x.${signature}`, redirectUri })),
+    ).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
 
-    const result = await service.complete({ code: "code", state, redirectUri });
+    const result = await runApiEffect(service.complete({ code: "code", state, redirectUri }));
     expect(JSON.stringify(result)).not.toContain("xoxb");
     expect(result.nonce).toBe(nonce);
     await expect(openSlackWorkspaceGrant(host.privateKey, nonce, result.grant)).resolves.toEqual({
@@ -41,11 +46,13 @@ describe("OpenBot Slack app install", () => {
     ]);
 
     // The same account moves the workspace to its other host.
-    await service.complete({
-      code: "code",
-      state: await stateOf(service, owner, "host-2", nonce, host.publicKey),
-      redirectUri,
-    });
+    await runApiEffect(
+      service.complete({
+        code: "code",
+        state: await stateOf(service, owner, "host-2", nonce, host.publicKey),
+        redirectUri,
+      }),
+    );
     expect(database.prepare("SELECT host_id FROM slack_workspace_routes").all()).toEqual([{ host_id: "host-2" }]);
     // Each link tells Signal to drop the app's older routes, so host-1 cannot keep the workspace.
     expect(revocations(database)).toEqual([
@@ -55,11 +62,13 @@ describe("OpenBot Slack app install", () => {
 
     // Another account cannot take it.
     await expect(
-      service.complete({
-        code: "code",
-        state: await stateOf(service, other, "host-3", nonce, host.publicKey),
-        redirectUri,
-      }),
+      runApiEffect(
+        service.complete({
+          code: "code",
+          state: await stateOf(service, other, "host-3", nonce, host.publicKey),
+          redirectUri,
+        }),
+      ),
     ).rejects.toMatchObject({ code: "slack_workspace_taken" });
     expect(database.prepare("SELECT host_id FROM slack_workspace_routes").all()).toEqual([{ host_id: "host-2" }]);
     expect(revocations(database)).toHaveLength(2);
@@ -69,7 +78,7 @@ describe("OpenBot Slack app install", () => {
     const { service, database } = setup({ is_enterprise_install: true });
     const host = await createSlackWorkspaceKeyPair();
     const state = await stateOf(service, owner, "host-1", "nonce-0123456789abcdef", host.publicKey);
-    await expect(service.complete({ code: "code", state, redirectUri })).rejects.toMatchObject({
+    await expect(runApiEffect(service.complete({ code: "code", state, redirectUri }))).rejects.toMatchObject({
       code: "slack_enterprise_install",
     });
     expect(database.prepare("SELECT team_id FROM slack_workspace_routes").all()).toEqual([]);
@@ -84,7 +93,7 @@ describe("OpenBot Slack app install", () => {
       returnUrl,
     });
     const loopback = "http://127.0.0.1:43123/slack-workspace";
-    await expect(setup().service.authorizeUrl(owner, request(loopback))).rejects.toMatchObject({
+    await expect(runApiEffect(setup().service.authorizeUrl(owner, request(loopback)))).rejects.toMatchObject({
       code: "invalid_slack_request",
     });
     const development = setup({}, "https://tunnel.trycloudflare.com").service;
@@ -92,10 +101,11 @@ describe("OpenBot Slack app install", () => {
       "https://tunnel.trycloudflare.com/v2/slack/callback",
     );
     await expect(
-      development.authorizeUrl(owner, request("https://attacker.example/slack-workspace")),
+      runApiEffect(development.authorizeUrl(owner, request("https://attacker.example/slack-workspace"))),
     ).rejects.toMatchObject({ code: "invalid_slack_request" });
-    const state = new URL(await development.authorizeUrl(owner, request(loopback))).searchParams.get("state") ?? "";
-    await expect(development.complete({ code: "code", state, redirectUri })).resolves.toMatchObject({
+    const state =
+      new URL(await runApiEffect(development.authorizeUrl(owner, request(loopback)))).searchParams.get("state") ?? "";
+    await expect(runApiEffect(development.complete({ code: "code", state, redirectUri }))).resolves.toMatchObject({
       returnUrl: loopback,
     });
   });
@@ -143,7 +153,9 @@ async function stateOf(
   hostNonce: string,
   hostPublicKey: string,
 ): Promise<string> {
-  const url = new URL(await service.authorizeUrl(user, { hostId, hostNonce, hostPublicKey, redirectUri }));
+  const url = new URL(
+    await runApiEffect(service.authorizeUrl(user, { hostId, hostNonce, hostPublicKey, redirectUri })),
+  );
   expect(url.searchParams.get("scope")).toContain("chat:write");
   const state = url.searchParams.get("state");
   if (!state) throw new Error("The authorize URL has no state.");

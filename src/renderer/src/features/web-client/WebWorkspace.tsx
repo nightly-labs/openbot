@@ -19,7 +19,7 @@ import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
-import { readHostAnalytics } from "@openbot/team-client";
+import { readHostAnalytics, runTeamEffect } from "@openbot/team-client";
 import {
   cancelHostUpdate,
   checkHostForUpdate,
@@ -56,6 +56,7 @@ import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import { createEffect, createMemo, createSignal, Loading, lazy, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { startActionSounds } from "../../action-sounds";
 import { actionToast } from "../../action-toast";
@@ -460,7 +461,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const usageCalls: UsagePort = {
     agent: {
       getHostAnalytics: (input, serverId) =>
-        readHostAnalytics(hostRequest(serverId), workspace.state.capabilities, input),
+        runTeamEffect(
+          readHostAnalytics(hostRequest(serverId), workspace.state.capabilities, input).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        ),
       listAgents: () => workspace.runtime.listAgents(),
       onScopedEvent: (listener) =>
         workspace.onHostEvent((event) => {
@@ -605,8 +610,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       return current && agent ? { server: current, agentId: agent.id } : null;
     },
     () => ({
-      getAgentAdminSettings: (agentId, serverId) => getAgentAdminSettings(hostRequest(serverId), agentId),
-      updateAgentAdminSettings: (input, serverId) => updateAgentAdminSettings(hostRequest(serverId), input),
+      getAgentAdminSettings: (agentId, serverId) =>
+        runTeamEffect(
+          getAgentAdminSettings(hostRequest(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      updateAgentAdminSettings: (input, serverId) =>
+        runTeamEffect(
+          updateAgentAdminSettings(hostRequest(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+        ),
     }),
   );
   /** The Team API agent summary has no access, so the agent shows the host's answer. */
@@ -664,11 +675,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     storage: {
       // The host names previews with the desktop `openbot-attachment:` scheme, as it does in chat.
       getUsage: async (input, serverId) => {
-        const usage = await getStorageUsage(hostRequest(serverId), input);
+        const usage = await runTeamEffect(
+          getStorageUsage(hostRequest(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+        );
         return { ...usage, files: usage.files.map((file) => ({ ...file, previewUrl: null })) };
       },
-      deleteFile: (input, serverId) => deleteStoredFile(hostRequest(serverId), input),
-      clear: (input, serverId) => clearStorage(hostRequest(serverId), input),
+      deleteFile: (input, serverId) =>
+        runTeamEffect(deleteStoredFile(hostRequest(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      clear: (input, serverId) =>
+        runTeamEffect(clearStorage(hostRequest(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       // A stored file is an attachment. The browser has no app to open it in, so it downloads.
       openFile: async (input, serverId) => {
         hostRequest(serverId);
@@ -677,8 +692,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
   };
   const hostedSiteCalls: ServerHostedSitesOptions["api"] = {
-    list: async (serverId) => listHostedSites(hostRequest(serverId)),
-    delete: async ({ siteId }, serverId) => deleteHostedSite(hostRequest(serverId), siteId),
+    list: async (serverId) =>
+      runTeamEffect(listHostedSites(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    delete: async ({ siteId }, serverId) =>
+      runTeamEffect(deleteHostedSite(hostRequest(serverId), siteId).pipe(Effect.mapError((error) => error.cause))),
   };
   const agentImportCalls = createWebAgentImportCalls({
     request: hostRequest,
@@ -686,11 +703,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     saveFile,
   });
   const hostUpdateCalls: HostUpdateCalls = {
-    getUpdateStatus: async (serverId) => getHostUpdateStatus(hostRequest(serverId)),
-    checkForUpdate: async (serverId) => checkHostForUpdate(hostRequest(serverId)),
-    startUpdate: async (restart, serverId) => startHostUpdate(hostRequest(serverId), restart),
-    cancelUpdate: async (serverId) => cancelHostUpdate(hostRequest(serverId)),
-    setUpdateSettings: async (settings, serverId) => setHostUpdateSettings(hostRequest(serverId), settings),
+    getUpdateStatus: async (serverId) =>
+      runTeamEffect(getHostUpdateStatus(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    checkForUpdate: async (serverId) =>
+      runTeamEffect(checkHostForUpdate(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    startUpdate: async (restart, serverId) =>
+      runTeamEffect(startHostUpdate(hostRequest(serverId), restart).pipe(Effect.mapError((error) => error.cause))),
+    cancelUpdate: async (serverId) =>
+      runTeamEffect(cancelHostUpdate(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setUpdateSettings: async (settings, serverId) =>
+      runTeamEffect(
+        setHostUpdateSettings(hostRequest(serverId), settings).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   async function openServerSettings(
@@ -909,7 +933,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
       return undefined;
-    return () => clearAgentContext(hostRequest(), agent.id);
+    return () =>
+      Effect.runPromise(clearAgentContext(hostRequest(), agent.id).pipe(Effect.mapError((error) => error.cause)));
   });
   /**
    * As on desktop: an answered prompt stays until its bubble has shown the answers. After that, a

@@ -20,6 +20,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
@@ -98,7 +99,11 @@ export const SEED_FALLBACK_AGENT: SeededAgentModel = {
  */
 async function seededAgentModel(appDataRoot: string): Promise<SeededAgentModel> {
   try {
-    const cli = await resolveOpencodeCli({ bundledExecutable: managedOpencodeExecutable(appDataRoot) });
+    const cli = await Effect.runPromise(
+      resolveOpencodeCli({ bundledExecutable: managedOpencodeExecutable(appDataRoot) }).pipe(
+        Effect.mapError((error) => error.cause),
+      ),
+    );
     const catalog = execFileSync(cli.executable, ["models"], {
       encoding: "utf8",
       timeout: 60_000,
@@ -379,9 +384,9 @@ async function buildSeedProfile(
   scale: SeedScale,
 ): Promise<void> {
   const agentStore = new AgentStore(profilePath, homeDirectory);
-  await agentStore.initialize();
+  await Effect.runPromise(agentStore.initialize().pipe(Effect.mapError((error) => error.cause)));
   const mailbox = new MailboxStore(profilePath, agentStore.sharedRoot, agentStore.database);
-  await mailbox.initialize();
+  await Effect.runPromise(mailbox.initialize().pipe(Effect.mapError((error) => error.cause)));
 
   const clock = createSeedClock();
   try {
@@ -405,10 +410,12 @@ async function buildSeedProfile(
     // No model beside the provider, and the built-in provider: a seeded profile records no choice
     // of the developer's, which is what lets the app apply its own development default to an agent
     // created later. `AgentService` decides that one against the live catalog; this script cannot.
-    await writeSetupState(join(profilePath, SETUP_FILE), {
-      preferredProvider: DEFAULT_AGENT_PROVIDER,
-      preferredModel: null,
-    });
+    await Effect.runPromise(
+      writeSetupState(join(profilePath, SETUP_FILE), {
+        preferredProvider: DEFAULT_AGENT_PROVIDER,
+        preferredModel: null,
+      }).pipe(Effect.mapError((error) => error.cause)),
+    );
     await writeSeedManifest(profilePath, clock, transferDirectories);
   } finally {
     agentStore.database.close();
@@ -554,45 +561,61 @@ async function seedRoutineRun(
   error: string | null = null,
 ): Promise<void> {
   const run = routines.createRun(routine, kind === "scheduled" ? routine.trigger.id : null, kind, scheduledFor);
-  const receipt = await mailbox.enqueue({
-    sender: {
-      kind: "routine",
-      routineId: routine.id,
-      runId: run.id,
-      routineName: routine.name,
-      scheduledFor,
-    },
-    recipientAgentIds: [routine.agentId],
-    text: routine.instruction,
-    idempotencyKey: `dev-seed:routine-run:${run.id}`,
-  });
+  const receipt = await Effect.runPromise(
+    mailbox
+      .enqueue({
+        sender: {
+          kind: "routine",
+          routineId: routine.id,
+          runId: run.id,
+          routineName: routine.name,
+          scheduledFor,
+        },
+        recipientAgentIds: [routine.agentId],
+        text: routine.instruction,
+        idempotencyKey: `dev-seed:routine-run:${run.id}`,
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   const delivery = receipt.deliveries[0];
   if (!delivery) throw new Error("The seeded routine run did not create a delivery.");
   routines.attachDelivery(run.id, delivery.id);
-  await mailbox.markStarting(delivery.id);
-  await mailbox.markRunning(delivery.id, `dev-seed-routine-turn-${run.id}`);
-  await mailbox.markTerminal(delivery.id, status === "succeeded" ? "completed" : "failed", error);
+  await Effect.runPromise(mailbox.markStarting(delivery.id).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(
+    mailbox.markRunning(delivery.id, `dev-seed-routine-turn-${run.id}`).pipe(Effect.mapError((error) => error.cause)),
+  );
+  await Effect.runPromise(
+    mailbox
+      .markTerminal(delivery.id, status === "succeeded" ? "completed" : "failed", error)
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   routines.updateRunStatus(run.id, status, error);
 }
 
 async function seedAgents(agentStore: AgentStore, agentModel: SeededAgentModel): Promise<Map<string, AgentSummary>> {
   const agents = new Map<string, AgentSummary>();
   for (const fixture of AGENTS) {
-    await agentStore.getOrCreate(fixture.id, fixture.name, fixture.title);
-    const agent = await agentStore.updateAgent({
-      agentId: fixture.id,
-      name: fixture.name,
-      title: fixture.title,
-      description: fixture.description,
-      // The provider travels with the model: a record left on the built-in provider while its
-      // model belongs to another one names a model that provider cannot run.
-      provider: agentModel.provider,
-      model: agentModel.model,
-      reasoningEffort: agentModel.reasoningEffort,
-      avatarSeed: fixture.id,
-      avatarHue: fixture.avatarHue,
-    });
-    await agentStore.ensureThreadId(fixture.id);
+    await Effect.runPromise(
+      agentStore.getOrCreate(fixture.id, fixture.name, fixture.title).pipe(Effect.mapError((error) => error.cause)),
+    );
+    const agent = await Effect.runPromise(
+      agentStore
+        .updateAgent({
+          agentId: fixture.id,
+          name: fixture.name,
+          title: fixture.title,
+          description: fixture.description,
+          // The provider travels with the model: a record left on the built-in provider while its
+          // model belongs to another one names a model that provider cannot run.
+          provider: agentModel.provider,
+          model: agentModel.model,
+          reasoningEffort: agentModel.reasoningEffort,
+          avatarSeed: fixture.id,
+          avatarHue: fixture.avatarHue,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(agentStore.ensureThreadId(fixture.id).pipe(Effect.mapError((error) => error.cause)));
     agents.set(fixture.id, agentStore.list().find((candidate) => candidate.id === fixture.id) ?? agent);
   }
   return agents;
@@ -617,11 +640,15 @@ async function seedAttachments(
       | { name: string; mimeType: string; bytes: Uint8Array }
       | { name: string; mimeType: string; sourcePath: string },
   ): Promise<AttachmentSummary> {
-    const attachment = await mailbox.storeGeneratedAttachment({
-      ...input,
-      ownerAgentId: owner.id,
-      ownerThreadId: owner.threadId,
-    });
+    const attachment = await Effect.runPromise(
+      mailbox
+        .storeGeneratedAttachment({
+          ...input,
+          ownerAgentId: owner.id,
+          ownerThreadId: owner.threadId,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     transferDirectories.push(`generated/${attachment.id}`);
     return attachment;
   }
@@ -898,55 +925,92 @@ async function seedConversations(
     // beside it as soon as the transcript changes.
     const request = [...messages].reverse().find((entry) => entry.author === "user" && entry.text.trim());
     if (request)
-      await agentStore.updatePreview(
-        agentId,
-        displayMessageReferences(request.text, request.attachments ?? [], agentNames),
+      await Effect.runPromise(
+        agentStore
+          .updatePreview(agentId, displayMessageReferences(request.text, request.attachments ?? [], agentNames))
+          .pipe(Effect.mapError((error) => error.cause)),
       );
   }
-  await mailbox.setReaction("chief", "chief-assistant-plan", { kind: "user" }, "🎉");
-  await mailbox.setReaction("research", "research-assistant", { kind: "user" }, "✅");
+  await Effect.runPromise(
+    mailbox
+      .setReaction("chief", "chief-assistant-plan", { kind: "user" }, "🎉")
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
+  await Effect.runPromise(
+    mailbox
+      .setReaction("research", "research-assistant", { kind: "user" }, "✅")
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
 }
 
 async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
-  const completed = await mailbox.enqueue({
-    sender: { kind: "agent", agentId: "chief" },
-    recipientAgentIds: ["research", "builder"],
-    text: "Please verify the launch evidence and implementation checklist.",
-    replyToMessageId: "chief-assistant-plan",
-    idempotencyKey: "dev-seed:exchange:completed",
-  });
+  const completed = await Effect.runPromise(
+    mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["research", "builder"],
+        text: "Please verify the launch evidence and implementation checklist.",
+        replyToMessageId: "chief-assistant-plan",
+        idempotencyKey: "dev-seed:exchange:completed",
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   for (const [index, delivery] of completed.deliveries.entries()) {
-    await mailbox.markStarting(delivery.id);
-    await mailbox.markRunning(delivery.id, `dev-seed-turn-completed-${index + 1}`);
-    await mailbox.markTerminal(delivery.id, "completed");
+    await Effect.runPromise(mailbox.markStarting(delivery.id).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(
+      mailbox
+        .markRunning(delivery.id, `dev-seed-turn-completed-${index + 1}`)
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      mailbox.markTerminal(delivery.id, "completed").pipe(Effect.mapError((error) => error.cause)),
+    );
   }
 
   // A teammate passing information on without asking for an answer: the state the marker reads as
   // "Informed" for the sender and "Update from" for the recipient.
-  const notice = await mailbox.enqueue({
-    sender: { kind: "agent", agentId: "builder" },
-    recipientAgentIds: ["chief"],
-    text: "The staging build is live. I am continuing with the checklist; no answer needed.",
-    expectsReply: false,
-    idempotencyKey: "dev-seed:exchange:notice",
-  });
+  const notice = await Effect.runPromise(
+    mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: "builder" },
+        recipientAgentIds: ["chief"],
+        text: "The staging build is live. I am continuing with the checklist; no answer needed.",
+        expectsReply: false,
+        idempotencyKey: "dev-seed:exchange:notice",
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   const noticeDelivery = notice.deliveries[0];
   if (!noticeDelivery) throw new Error("The seeded notice exchange did not create a delivery.");
-  await mailbox.markStarting(noticeDelivery.id);
-  await mailbox.markRunning(noticeDelivery.id, "dev-seed-turn-notice");
-  await mailbox.markTerminal(noticeDelivery.id, "completed");
+  await Effect.runPromise(mailbox.markStarting(noticeDelivery.id).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(
+    mailbox.markRunning(noticeDelivery.id, "dev-seed-turn-notice").pipe(Effect.mapError((error) => error.cause)),
+  );
+  await Effect.runPromise(
+    mailbox.markTerminal(noticeDelivery.id, "completed").pipe(Effect.mapError((error) => error.cause)),
+  );
 
-  const failed = await mailbox.enqueue({
-    sender: { kind: "agent", agentId: "research" },
-    recipientAgentIds: ["launch"],
-    text: "I could not verify the final launch claim. Please keep it out of the release note.",
-    idempotencyKey: "dev-seed:exchange:failed",
-  });
+  const failed = await Effect.runPromise(
+    mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: "research" },
+        recipientAgentIds: ["launch"],
+        text: "I could not verify the final launch claim. Please keep it out of the release note.",
+        idempotencyKey: "dev-seed:exchange:failed",
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   const failedDelivery = failed.deliveries[0];
   if (!failedDelivery) throw new Error("The failed seed exchange did not create a delivery.");
-  await mailbox.markStarting(failedDelivery.id);
-  await mailbox.markRunning(failedDelivery.id, "dev-seed-turn-failed");
-  await mailbox.markTerminal(failedDelivery.id, "failed", "The primary source was not available.");
+  await Effect.runPromise(mailbox.markStarting(failedDelivery.id).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(
+    mailbox.markRunning(failedDelivery.id, "dev-seed-turn-failed").pipe(Effect.mapError((error) => error.cause)),
+  );
+  await Effect.runPromise(
+    mailbox
+      .markTerminal(failedDelivery.id, "failed", "The primary source was not available.")
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
 }
 
 /**
@@ -993,29 +1057,33 @@ async function seedLaunchRoom(
   // transcript, so it has to be owned by the channel thread rather than by the agent's own chat.
   for (const agentId of ["chief", "research", "builder"]) store.context(channelId, agentId);
   const launchThread = store.context(channelId, "launch").threadId;
-  const draft = await mailbox.storeGeneratedAttachment({
-    name: "release-note-draft.md",
-    mimeType: "text/markdown",
-    bytes: bytes(
-      [
-        "# OpenBot 1.0 release note (draft)",
-        "",
-        "## What is new",
-        "- Channels: several agents share one chat and one task list.",
-        "- Routines: a schedule can start work in a channel.",
-        "",
-        "## Evidence",
-        "- Cold start: 1.9 s on the release benchmark. Owner: Builder.",
-        "- Search: 120 ms median on the release benchmark. Owner: Builder.",
-        "",
-        "## Open",
-        "- The retention claim has no primary source. It stays out of this note.",
-        "",
-      ].join("\n"),
-    ),
-    ownerAgentId: "launch",
-    ownerThreadId: launchThread,
-  });
+  const draft = await Effect.runPromise(
+    mailbox
+      .storeGeneratedAttachment({
+        name: "release-note-draft.md",
+        mimeType: "text/markdown",
+        bytes: bytes(
+          [
+            "# OpenBot 1.0 release note (draft)",
+            "",
+            "## What is new",
+            "- Channels: several agents share one chat and one task list.",
+            "- Routines: a schedule can start work in a channel.",
+            "",
+            "## Evidence",
+            "- Cold start: 1.9 s on the release benchmark. Owner: Builder.",
+            "- Search: 120 ms median on the release benchmark. Owner: Builder.",
+            "",
+            "## Open",
+            "- The retention claim has no primary source. It stays out of this note.",
+            "",
+          ].join("\n"),
+        ),
+        ownerAgentId: "launch",
+        ownerThreadId: launchThread,
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   transferDirectories.push(`generated/${draft.id}`);
 
   // The routine exists before the message it fired: the author id of a routine request carries the
@@ -1343,31 +1411,45 @@ function mentionAgent(agents: Map<string, AgentSummary>, agentId: string): strin
 
 async function seedTeam(profilePath: string, agentStore: AgentStore, clock: SeedClock): Promise<void> {
   const team = new TeamStore(join(profilePath, TEAM_FILE), join(profilePath, LEGACY_TEAM_FILE));
-  await team.initialize();
+  await Effect.runPromise(team.initialize().pipe(Effect.mapError((error) => error.cause)));
   const owner = {
     id: "openbot-dev-owner",
     email: "openbot-dev-host@example.com",
     name: "Dev Owner",
     avatarUrl: null,
   };
-  const teamIdentity = await team.configureWithAccount("OpenBot Dev Team", owner);
+  const teamIdentity = await Effect.runPromise(
+    team.configureWithAccount("OpenBot Dev Team", owner).pipe(Effect.mapError((error) => error.cause)),
+  );
   const joined = [];
   for (const member of [
     { id: "openbot-dev-alice", email: "alice@example.com", name: "Alice Chen", role: "admin" as const },
   ]) {
-    const invite = await team.createInvite(member.role, member.email);
+    const invite = await Effect.runPromise(
+      team.createInvite(member.role, member.email).pipe(Effect.mapError((error) => error.cause)),
+    );
     joined.push(
-      await team.acceptInviteWithAccount(invite.token, {
-        id: member.id,
-        email: member.email,
-        name: member.name,
-        avatarUrl: null,
-      }),
+      await Effect.runPromise(
+        team
+          .acceptInviteWithAccount(invite.token, {
+            id: member.id,
+            email: member.email,
+            name: member.name,
+            avatarUrl: null,
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     );
   }
-  await team.createInvite("member", "new-person@example.com");
-  const ownerSession = await team.loginWithAccount(owner);
-  await team.setEnabledOnLaunch(teamIdentity.serverId, true);
+  await Effect.runPromise(
+    team.createInvite("member", "new-person@example.com").pipe(Effect.mapError((error) => error.cause)),
+  );
+  const ownerSession = await Effect.runPromise(
+    team.loginWithAccount(owner).pipe(Effect.mapError((error) => error.cause)),
+  );
+  await Effect.runPromise(
+    team.setEnabledOnLaunch(teamIdentity.serverId, true).pipe(Effect.mapError((error) => error.cause)),
+  );
 
   // The owner and Alice leave the third seat of the default limit to the dev test client.
   const [alice] = joined;

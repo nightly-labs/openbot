@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -31,7 +32,7 @@ describe("McpServerStore", () => {
     database.close();
 
     const reopened = new OpenBotDatabase(database.userDataPath);
-    await reopened.initialize();
+    await runTestEffect(reopened.initialize());
     const [config] = new McpServerStore(reopened).list();
     expect(config).toEqual({ ...saved, id: saved.id });
     expect(config?.args).toEqual(["--database", "./openbot.db", "--verbose"]);
@@ -192,6 +193,6 @@ async function setup(): Promise<{ database: OpenBotDatabase; store: McpServerSto
   const root = await mkdtemp(join(tmpdir(), "openbot-mcp-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await database.initialize();
+  await runTestEffect(database.initialize());
   return { database, store: new McpServerStore(database) };
 }

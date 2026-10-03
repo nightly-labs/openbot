@@ -7,6 +7,8 @@ import { type AgentSummary, agentAutomationAllowed, type Routine, type RoutineRu
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
+import { Effect } from "effect";
+import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { RoutineInputError } from "../backend/routine-schedule";
@@ -29,7 +31,7 @@ export interface AutomationServerOptions {
     agentId: string;
     routineId: string;
     payload: string;
-  }) => Promise<Pick<RoutineRun, "id" | "deliveryId">>;
+  }) => Effect.Effect<Pick<RoutineRun, "id" | "deliveryId">, AgentLifecycleFailed>;
   now?: () => number;
 }
 
@@ -107,9 +109,19 @@ export class AutomationServer {
       // `mkdir` keeps the mode of a folder that already exists.
       if (process.platform !== "win32") await chmod(root, 0o700);
       // The token first: a script that finds the new URL also finds the token that goes with it.
-      await writeFileAtomically(join(root, AUTOMATION_TOKEN_FILE), token);
-      await writeFileAtomically(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`);
-      await writeFileAtomically(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${this.#port}`);
+      await Effect.runPromise(
+        writeFileAtomically(join(root, AUTOMATION_TOKEN_FILE), token).pipe(Effect.mapError((error) => error.cause)),
+      );
+      await Effect.runPromise(
+        writeFileAtomically(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      );
+      await Effect.runPromise(
+        writeFileAtomically(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${this.#port}`).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      );
     } catch (error) {
       // Closed, so that the next `sync` starts again instead of keeping a door nobody can find.
       await this.#close();
@@ -195,7 +207,9 @@ export class AutomationServer {
     this.#runs.set(agentId, [...recent, now]);
     let run: Pick<RoutineRun, "id" | "deliveryId">;
     try {
-      run = await this.#options.runRoutine({ agentId, routineId, payload });
+      run = await Effect.runPromise(
+        this.#options.runRoutine({ agentId, routineId, payload }).pipe(Effect.mapError((error) => error.cause)),
+      );
     } catch (error) {
       this.#releaseSlot(agentId, now);
       // Only a known refusal goes back to the script; another error is logged and gets a 500.

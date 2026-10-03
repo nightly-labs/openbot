@@ -25,6 +25,7 @@ import {
   type RemoteTeamHost,
   type RemoteWorkspacePreferences,
   readAgentAnalytics,
+  runTeamEffect,
 } from "@openbot/team-client";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -40,6 +41,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
+import { Effect } from "effect";
 import { fetch } from "expo/fetch";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -286,30 +288,35 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const directoryRefresh = useMemo(
     () =>
-      createRemoteAccountRefresh(async () => {
-        const generation = ++directoryGeneration.current;
-        setServerDirectoryState("loading");
-        setServerDirectoryError(null);
-        try {
-          const hosts = await directory.listHosts();
+      createRemoteAccountRefresh(() =>
+        Effect.gen(function* () {
+          const generation = ++directoryGeneration.current;
+          setServerDirectoryState("loading");
+          setServerDirectoryError(null);
+          const hosts = yield* directory.listHosts().pipe(
+            Effect.tapError((error) =>
+              Effect.sync(() => {
+                if (generation !== directoryGeneration.current) return;
+                setServerDirectoryState("error");
+                const text = currentText();
+                setServerDirectoryError(
+                  text.errorMessage(error, text.t("mobile.workspace.error.directoryUnavailable")),
+                );
+              }),
+            ),
+          );
           if (generation !== directoryGeneration.current) return;
           installHosts(hosts);
           setServerDirectoryState("ready");
-        } catch (error) {
-          if (generation !== directoryGeneration.current) return;
-          setServerDirectoryState("error");
-          const text = currentText();
-          setServerDirectoryError(text.errorMessage(error, text.t("mobile.workspace.error.directoryUnavailable")));
-          throw error;
-        }
-      }),
+        }),
+      ),
     [directory, installHosts],
   );
-  const refreshHosts = useCallback(() => directoryRefresh.refresh(true), [directoryRefresh]);
+  const refreshHosts = useCallback(() => runTeamEffect(directoryRefresh.refresh(true)), [directoryRefresh]);
   const refreshMemberships = useCallback(() => {
     directoryGeneration.current += 1;
     directoryRefresh.invalidate();
-    return directoryRefresh.refresh(true);
+    return runTeamEffect(directoryRefresh.refresh(true));
   }, [directoryRefresh]);
 
   useEffect(() => {
@@ -470,11 +477,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!context.isCurrent()) return;
       replaceServerAgents(serverId, summaries);
       context.stage = "reads";
-      await readRefresh.refresh(
-        serverId,
-        () => client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
-        applyConversationReads,
-        () => context.isCurrent() && !removedServers.current.has(serverId),
+      await runTeamEffect(
+        readRefresh.refresh(
+          serverId,
+          () =>
+            Effect.tryPromise(() =>
+              client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
+            ),
+          applyConversationReads,
+          () => context.isCurrent() && !removedServers.current.has(serverId),
+        ),
       );
       if (!context.isCurrent()) return;
       context.stage = "conversations";
@@ -516,10 +528,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const wakeHostedServer = useMemo(
     () =>
       createHostedServerWake((hostId) =>
-        fetch(new URL(`/v2/hosting/servers/${encodeURIComponent(hostId)}/wake`, session.apiUrl).toString(), {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.sessionToken}` },
-        }),
+        Effect.tryPromise((signal) =>
+          fetch(new URL(`/v2/hosting/servers/${encodeURIComponent(hostId)}/wake`, session.apiUrl).toString(), {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.sessionToken}` },
+            signal,
+          }),
+        ),
       ),
     [session.apiUrl, session.sessionToken],
   );
@@ -532,7 +547,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const wakeSelectedServer = useCallback(
     (hostId: string) => {
       if (!foregroundRef.current || hostId !== activeServerIdRef.current) return;
-      void wakeHostedServer(hostId).then((waking) => {
+      void runTeamEffect(wakeHostedServer(hostId)).then((waking) => {
         if (!waking || hostId !== activeServerIdRef.current) return;
         clearTimeout(wakeReconnect.current);
         wakeReconnect.current = setTimeout(() => connections.current.get(hostId)?.refresh(), WAKE_RECONNECT_DELAY_MS);
@@ -615,11 +630,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const refreshConversationReads = useCallback(
     async (serverId = activeServerIdRef.current) => {
       if (!serverId) return;
-      await readRefresh.refresh(
-        serverId,
-        () => request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
-        applyConversationReads,
-        () => !removedServers.current.has(serverId),
+      await runTeamEffect(
+        readRefresh.refresh(
+          serverId,
+          () =>
+            Effect.tryPromise(() =>
+              request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
+            ),
+          applyConversationReads,
+          () => !removedServers.current.has(serverId),
+        ),
       );
     },
     [request, readRefresh, applyConversationReads],
@@ -928,8 +948,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, false))),
       conversationStore,
       liveState,
-      respondToBrowserTakeover: (serverId, input) => respondToBrowserTakeover(teamApi(serverId), input),
-      respondToBrowserSecret: (serverId, input) => respondToBrowserSecret(teamApi(serverId), input),
+      respondToBrowserTakeover: (serverId, input) =>
+        Effect.runPromise(
+          respondToBrowserTakeover(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      respondToBrowserSecret: (serverId, input) =>
+        Effect.runPromise(
+          respondToBrowserSecret(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+        ),
       selectServer: (id) => {
         loadGeneration.current += 1;
         conversationStore.cancelRequests();
@@ -939,7 +965,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
         if (!server || server.role === "owner")
           throw new Error(currentText().t("mobile.workspace.error.leaveOwnServer"));
-        await directory.leaveHost(server.id, server.membershipId);
+        await runTeamEffect(directory.leaveHost(server.id, server.membershipId));
         removedServers.current.add(serverId);
         readRefresh.invalidate(serverId);
         directoryGeneration.current += 1;
@@ -976,7 +1002,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           throw new Error(currentText().t("mobile.server.settings.identityNotAllowed"));
         if (!serverCapabilities.current.get(serverId)?.includes(HOST_ADMIN_CAPABILITY))
           throw new Error(currentText().t("mobile.server.settings.identityUnsupported"));
-        await updateHostIdentity(teamApi(serverId), input);
+        await runTeamEffect(updateHostIdentity(teamApi(serverId), input).pipe(Effect.mapError((error) => error.cause)));
         if (input.serverName !== undefined) {
           const serverName = input.serverName;
           setServers((current) =>
@@ -993,7 +1019,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await refreshHosts();
       },
       addRemoteServer: async ({ inviteUrl }) => {
-        const host = await directory.acceptInvite(inviteUrl);
+        const host = await runTeamEffect(directory.acceptInvite(inviteUrl));
         directoryGeneration.current += 1;
         directoryRefresh.invalidate();
         removedServers.current.delete(host.hostId);
@@ -1030,10 +1056,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       loadAgentAnalytics: async (input, serverId) => {
         if (!agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentNotOnHost"));
-        return readAgentAnalytics(
-          (method, path, decode) => request(method, path, decode, undefined, serverId),
-          serverCapabilities.current.get(serverId) ?? [],
-          input,
+        return runTeamEffect(
+          readAgentAnalytics(
+            (method, path, decode) => request(method, path, decode, undefined, serverId),
+            serverCapabilities.current.get(serverId) ?? [],
+            input,
+          ).pipe(Effect.mapError((error) => error.cause)),
         );
       },
       createAgent: async (input: CreateAgentInput) => {
@@ -1088,19 +1116,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
-      deleteAgent: (agentId) => deleteAgent(teamApi(), agentId),
-      interruptTurn: (agentId, turnId, serverId) => interruptAgentTurn(teamApi(serverId), agentId, turnId),
+      deleteAgent: (agentId) =>
+        Effect.runPromise(deleteAgent(teamApi(), agentId).pipe(Effect.mapError((error) => error.cause))),
+      interruptTurn: (agentId, turnId, serverId) =>
+        Effect.runPromise(
+          interruptAgentTurn(teamApi(serverId), agentId, turnId).pipe(Effect.mapError((error) => error.cause)),
+        ),
       loadConversation,
       loadOlderMessages,
       uploadAttachment: async (agentId, input, targetServerId, onProgress) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
-        return uploadAttachmentDraft(teamApi(serverId, onProgress), input);
+        return Effect.runPromise(
+          uploadAttachmentDraft(teamApi(serverId, onProgress), input).pipe(Effect.mapError((error) => error.cause)),
+        );
       },
       discardAttachment: async (agentId, attachmentId, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
-        await discardAttachmentDraft(teamApi(serverId), attachmentId);
+        await Effect.runPromise(
+          discardAttachmentDraft(teamApi(serverId), attachmentId).pipe(Effect.mapError((error) => error.cause)),
+        );
       },
       sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;

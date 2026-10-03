@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { parseHostedSiteUploadRequest, requireIdempotencyKey } from "../../../server/hosted-site-contract";
 import { readJsonObject } from "../../../server/json-body";
 import {
@@ -16,10 +17,10 @@ export const Route = createFileRoute("/v1/sites/")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          const scope = await requestHostedSiteScope(request, user.id);
-          return json(await requestHostedSiteService().list(scope));
+          const scope = await runApiEffect(requestHostedSiteScope(request, user.id));
+          return json(await runApiEffect(requestHostedSiteService().list(scope)));
         } catch (error) {
           return hostedSiteErrorResponse(error);
         }
@@ -27,11 +28,14 @@ export const Route = createFileRoute("/v1/sites/")({
       POST: async ({ request }) => {
         try {
           requireSitePublishingEnabled();
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          const scope = await requestHostedSiteScope(request, user.id);
+          const scope = await runApiEffect(requestHostedSiteScope(request, user.id));
           const input = parseHostedSiteUploadRequest(await readJsonObject(request));
-          return json(await requestHostedSiteService().createUpload(scope, input, requireIdempotencyKey(request)), 201);
+          return json(
+            await runApiEffect(requestHostedSiteService().createUpload(scope, input, requireIdempotencyKey(request))),
+            201,
+          );
         } catch (error) {
           return hostedSiteErrorResponse(error);
         }

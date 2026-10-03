@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+import type { AgentLifecycleFailed } from "../backend/agent-service";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 // Who may manage the host from a joined server. Every admin route answers an owner or admin, never
@@ -57,8 +60,8 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
       "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1, agent-publish-v1",
     "Content-Type": "application/json",
   };
-  const invite = await fixture.store.createInvite("member");
-  const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+  const invite = await Effect.runPromise(fixture.store.createInvite("member"));
+  const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
   const asMember = { ...admin, Authorization: `Bearer ${member.sessionToken}` };
   const post = (path: string, body: unknown, headers: Record<string, string> = admin) =>
     fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
@@ -77,21 +80,23 @@ describe("Team API agent-admin-v1", () => {
     const settings = createAgentAdminSettings({
       agents: {
         listAgents: () => [agent()],
-        updateAgent: async (input) => {
-          if (input.access) access = input.access;
-          return agent();
-        },
+        updateAgent: (input) =>
+          Effect.sync(() => {
+            if (input.access) access = input.access;
+            return agent();
+          }),
       },
       approvalAutomation: {
         current: () => preference,
-        set: async (input) => {
-          if (input.agentId && input.autoApprove !== undefined)
-            preference = {
-              ...preference,
-              autoApproveOverrides: { ...preference.autoApproveOverrides, [input.agentId]: input.autoApprove },
-            };
-          return preference;
-        },
+        set: (input) =>
+          Effect.sync(() => {
+            if (input.agentId && input.autoApprove !== undefined)
+              preference = {
+                ...preference,
+                autoApproveOverrides: { ...preference.autoApproveOverrides, [input.agentId]: input.autoApprove },
+              };
+            return preference;
+          }),
       },
     });
     const { base, admin, asMember, post } = await signedIn("agent-admin", { admin: { agents: settings } });
@@ -146,19 +151,22 @@ describe("Team API skills-admin-v1", () => {
       enabled,
     });
     const skills = {
-      listInstalled: async () => [...installed.values()],
-      install: async (input: { skillId: string }) => {
-        if (input.skillId === "paid") throw new Error("Sign in to the marketplace on the host.");
-        installed.set(input.skillId, skill(input.skillId));
-        return skill(input.skillId);
-      },
-      uninstall: async (input: { skillId: string }) => {
-        installed.delete(input.skillId);
-      },
-      setEnabled: async (input: { skillId: string; enabled: boolean }) => {
-        installed.set(input.skillId, skill(input.skillId, input.enabled));
-        return skill(input.skillId, input.enabled);
-      },
+      listInstalled: () => Effect.sync(() => [...installed.values()]),
+      install: (input: { skillId: string }) =>
+        Effect.sync(() => {
+          if (input.skillId === "paid") throw new Error("Sign in to the marketplace on the host.");
+          installed.set(input.skillId, skill(input.skillId));
+          return skill(input.skillId);
+        }),
+      uninstall: (input: { skillId: string }) =>
+        Effect.sync(() => {
+          installed.delete(input.skillId);
+        }),
+      setEnabled: (input: { skillId: string; enabled: boolean }) =>
+        Effect.sync(() => {
+          installed.set(input.skillId, skill(input.skillId, input.enabled));
+          return skill(input.skillId, input.enabled);
+        }),
     };
     const { base, admin, asMember, post } = await signedIn("skills-admin", { admin: { skills } });
 
@@ -204,10 +212,12 @@ describe("Team API shared-tables-v1", () => {
   it("lets only an admin list and delete shared tables", async () => {
     let tables: SharedTable[] = [{ name: "leads", ownerAgentId: "chief", rowCount: 12 }];
     const sharedTables = {
-      listTables: async () => tables,
-      deleteTable: async ({ name }: { name: string }) => {
-        tables = tables.filter((table) => table.name !== name);
-      },
+      listTables: () => Effect.sync(() => tables),
+      deleteTable: ({ name }: { name: string }) =>
+        Effect.sync(() => {
+          tables = tables.filter((table) => table.name !== name);
+          return undefined;
+        }),
     };
     const { admin, asMember, post } = await signedIn("shared-tables", { admin: { sharedTables } });
 
@@ -226,19 +236,21 @@ describe("Team API agent-install-v1", () => {
   it("lets only an admin add an agent from a listing or a template, by id", async () => {
     const added: string[] = [];
     const marketplaceAgents = {
-      install: async (input: { listingId: string; agentId?: string }) => {
-        if (input.listingId === "withdrawn") throw new Error("This agent is no longer in the marketplace.");
-        // The route adds a new agent only; an id to update must never reach the service.
-        expect(input.agentId).toBeUndefined();
-        added.push(input.listingId);
-        return { agent: { ...CHIEF, id: `from-${input.listingId}`, name: "Researcher" } };
-      },
+      install: (input: { listingId: string; agentId?: string }) =>
+        Effect.sync(() => {
+          if (input.listingId === "withdrawn") throw new Error("This agent is no longer in the marketplace.");
+          // The route adds a new agent only; an id to update must never reach the service.
+          expect(input.agentId).toBeUndefined();
+          added.push(input.listingId);
+          return { agent: { ...CHIEF, id: `from-${input.listingId}`, name: "Researcher" } };
+        }),
     };
     const agentTemplates = {
-      install: async (input: { templateId: string }) => {
-        added.push(input.templateId);
-        return { agent: { ...CHIEF, id: `from-${input.templateId}`, name: "Writer" } };
-      },
+      install: (input: { templateId: string }) =>
+        Effect.sync(() => {
+          added.push(input.templateId);
+          return { agent: { ...CHIEF, id: `from-${input.templateId}`, name: "Writer" } };
+        }),
       ...NO_PUBLISHING,
     };
     const { base, admin, asMember, post } = await signedIn("agent-install", {
@@ -272,13 +284,15 @@ describe("Team API agent-install-v1", () => {
 });
 
 const NO_PUBLISHING = {
-  preview: async (): Promise<AgentTemplatePreview> => {
-    throw new Error("Not published in this test.");
-  },
-  publish: async () => {
-    throw new Error("Not published in this test.");
-  },
-  unpublish: async () => {},
+  preview: (): Effect.Effect<AgentTemplatePreview> =>
+    Effect.sync(() => {
+      throw new Error("Not published in this test.");
+    }),
+  publish: () =>
+    Effect.sync(() => {
+      throw new Error("Not published in this test.");
+    }),
+  unpublish: () => Effect.sync(() => {}),
 };
 
 /** The PNG signature and an IHDR chunk of the share card size: what the host checks of a card. */
@@ -300,44 +314,48 @@ describe("Team API agent-publish-v1", () => {
     const calls: string[] = [];
     const cards: Array<Uint8Array | null> = [];
     const agentTemplates = {
-      install: async () => {
-        throw new Error("Not installed in this test.");
-      },
-      preview: async (agentId: string): Promise<AgentTemplatePreview> => {
-        calls.push(`preview:${agentId}`);
-        return {
-          name: "Chief",
-          title: "Chief of staff",
-          description: `Plan the week. Use ${secret}.`,
-          avatarSeed: "chief",
-          avatarHue: null,
-          skills: [{ kind: "embedded", slug: "brief", name: "Brief", markdown: `# Brief\nToken: ${secret}` }],
-          routines: [
-            {
-              name: "Weekly plan",
-              instruction: `Call the API with ${secret}.`,
-              active: true,
-              schedule: { kind: "daily", time: "09:00" },
-            },
-          ],
-          agentId,
-          avatarUrl: "file:///private/avatars/chief.png",
-          avatarImage: { mimeType: "image/png", bytes: CARD },
-          updatedAt: null,
-          publication,
-          skillsError: null,
-        };
-      },
-      publish: async ({ agentId, card }: PublishAgentTemplateInput) => {
-        if (agentId === "leaky") throw new Error("Remove the API key from the instructions.");
-        if (agentId === "leaky-routine") throw new Error(`Remove the secret from the routine "${secret}".`);
-        calls.push(`publish:${agentId}`);
-        cards.push(card);
-        return publication;
-      },
-      unpublish: async (agentId: string) => {
-        calls.push(`unpublish:${agentId}`);
-      },
+      install: () =>
+        Effect.sync(() => {
+          throw new Error("Not installed in this test.");
+        }),
+      preview: (agentId: string): Effect.Effect<AgentTemplatePreview> =>
+        Effect.sync(() => {
+          calls.push(`preview:${agentId}`);
+          return {
+            name: "Chief",
+            title: "Chief of staff",
+            description: `Plan the week. Use ${secret}.`,
+            avatarSeed: "chief",
+            avatarHue: null,
+            skills: [{ kind: "embedded", slug: "brief", name: "Brief", markdown: `# Brief\nToken: ${secret}` }],
+            routines: [
+              {
+                name: "Weekly plan",
+                instruction: `Call the API with ${secret}.`,
+                active: true,
+                schedule: { kind: "daily", time: "09:00" },
+              },
+            ],
+            agentId,
+            avatarUrl: "file:///private/avatars/chief.png",
+            avatarImage: { mimeType: "image/png", bytes: CARD },
+            updatedAt: null,
+            publication,
+            skillsError: null,
+          };
+        }),
+      publish: ({ agentId, card }: PublishAgentTemplateInput) =>
+        Effect.sync(() => {
+          if (agentId === "leaky") throw new Error("Remove the API key from the instructions.");
+          if (agentId === "leaky-routine") throw new Error(`Remove the secret from the routine "${secret}".`);
+          calls.push(`publish:${agentId}`);
+          cards.push(card);
+          return publication;
+        }),
+      unpublish: (agentId: string) =>
+        Effect.sync(() => {
+          calls.push(`unpublish:${agentId}`);
+        }),
     };
     const { base, admin, asMember, post } = await signedIn("agent-publish", { admin: { agentTemplates } });
     const card = Buffer.from(CARD).toString("base64");
@@ -384,12 +402,13 @@ describe("Team API agent-update-v1", () => {
   it("lets only an admin update an agent from its listing", async () => {
     const updated: Array<{ listingId: string; agentId?: string }> = [];
     const marketplaceAgents = {
-      install: async (input: { listingId: string; agentId?: string }) => {
-        if (input.agentId !== "chief")
-          throw new Error("This local agent was installed from a different marketplace agent.");
-        updated.push({ listingId: input.listingId, agentId: input.agentId });
-        return { agent: { ...CHIEF, name: "Chief v2" } };
-      },
+      install: (input: { listingId: string; agentId?: string }) =>
+        Effect.sync(() => {
+          if (input.agentId !== "chief")
+            throw new Error("This local agent was installed from a different marketplace agent.");
+          updated.push({ listingId: input.listingId, agentId: input.agentId });
+          return { agent: { ...CHIEF, name: "Chief v2" } };
+        }),
     };
     // Update needs only the listing service, so a host without shared templates still offers it.
     const { base, admin, asMember, post } = await signedIn("agent-update", { admin: { marketplaceAgents } });
@@ -436,46 +455,52 @@ describe("Team API providers-v1", () => {
     const submitted: string[] = [];
     const cancelled: string[] = [];
     const service = {
-      startProviderCodeLogin: async (provider: string) =>
-        provider === "claude"
-          ? {
-              kind: "paste" as const,
-              verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
-              expiresAt: 1_790_000_000_000,
-            }
-          : {
-              kind: "code" as const,
-              userCode: "ABCD-1234",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              expiresAt: 1_790_000_000_000,
-            },
+      startProviderCodeLogin: (provider: string) =>
+        Effect.sync(() =>
+          provider === "claude"
+            ? {
+                kind: "paste" as const,
+                verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+                expiresAt: 1_790_000_000_000,
+              }
+            : {
+                kind: "code" as const,
+                userCode: "ABCD-1234",
+                verificationUrl: "https://auth.openai.com/codex/device",
+                expiresAt: 1_790_000_000_000,
+              },
+        ),
       submitProviderCodeLogin: (provider: string, code: string) => {
         // A CLI can quote the code it refused.
         if (code.includes("refused")) throw new Error(`Claude refused ${code}.`);
         submitted.push(`${provider}:${code}`);
         return status;
       },
-      cancelProviderCodeLogin: async (provider: string) => {
-        cancelled.push(provider);
-        return status;
-      },
-      changeProviderCredential: async (provider: string, change: () => Promise<void>) => {
-        // A provider process can quote the key it failed with.
-        if (provider === "grok") throw new Error(`Grok could not start with ${PROVIDER_KEY}.`);
-        await change();
-        return status;
-      },
+      cancelProviderCodeLogin: (provider: string) =>
+        Effect.sync(() => {
+          cancelled.push(provider);
+          return status;
+        }),
+      changeProviderCredential: (provider: string, change: () => Effect.Effect<void, AgentLifecycleFailed>) =>
+        Effect.gen(function* () {
+          // A provider process can quote the key it failed with.
+          if (provider === "grok") throw new Error(`Grok could not start with ${PROVIDER_KEY}.`);
+          yield* change();
+          return status;
+        }),
     };
     const credentials = {
       status: (provider: string) => (keys.has(provider) ? ("saved" as const) : ("missing" as const)),
-      set: async (provider: string, key: string) => {
-        // As the real store does, so every later log line and error can mask the key.
-        registerSecretValue(key);
-        keys.set(provider, key);
-      },
-      clear: async (provider: string) => {
-        keys.delete(provider);
-      },
+      set: (provider: string, key: string) =>
+        Effect.sync(() => {
+          // As the real store does, so every later log line and error can mask the key.
+          registerSecretValue(key);
+          keys.set(provider, key);
+        }),
+      clear: (provider: string) =>
+        Effect.sync(() => {
+          keys.delete(provider);
+        }),
     };
     const idle: ProviderRuntimeStatus = { phase: "ready", progress: 100, message: null, version: "1.0.0" };
     const failed: ProviderRuntimeStatus = {
@@ -500,26 +525,31 @@ describe("Team API providers-v1", () => {
     const downloads: string[] = [];
     const runtimes = {
       getStatus: () => snapshot,
-      download: async (provider: string) => {
-        downloads.push(provider);
-        return snapshot;
-      },
-      cancel: async () => snapshot,
-      checkForUpdates: async () => snapshot,
+      download: (provider: string) =>
+        Effect.sync(() => {
+          downloads.push(provider);
+          return snapshot;
+        }),
+      cancel: () => Effect.sync(() => snapshot),
+      checkForUpdates: () => Effect.sync(() => snapshot),
     };
     let endpoints: CustomProviderSummary[] = [];
     const saved: SaveCustomProviderInput[] = [];
     const customProviders = {
       list: () => endpoints,
-      save: async (input: SaveCustomProviderInput) => {
-        saved.push(input);
-        endpoints = [{ id: input.id, name: input.name, baseUrl: input.baseUrl, hasApiKey: true, models: input.models }];
-        return { providers: endpoints, restart: "restarted" as const };
-      },
-      remove: async () => {
-        endpoints = [];
-        return { providers: endpoints, restart: "restarted" as const };
-      },
+      save: (input: SaveCustomProviderInput) =>
+        Effect.sync(() => {
+          saved.push(input);
+          endpoints = [
+            { id: input.id, name: input.name, baseUrl: input.baseUrl, hasApiKey: true, models: input.models },
+          ];
+          return { providers: endpoints, restart: "restarted" as const };
+        }),
+      remove: () =>
+        Effect.sync(() => {
+          endpoints = [];
+          return { providers: endpoints, restart: "restarted" as const };
+        }),
     };
     const { base, admin, asMember, post } = await signedIn("providers", {
       admin: { providers: { service, credentials, runtimes, customProviders, pasteSignIn: true } },
@@ -654,10 +684,11 @@ describe("Team API host-admin-v1", () => {
   it("lets only an admin change the server name and logo, and checks the image on the host", async () => {
     const changes: UpdateHostIdentityInput[] = [];
     const identity = {
-      updateIdentity: async (input: UpdateHostIdentityInput) => {
-        if (input.serverName === "Signed out") throw new Error("Sign in on the host first.");
-        changes.push(input);
-      },
+      updateIdentity: (input: UpdateHostIdentityInput) =>
+        Effect.sync(() => {
+          if (input.serverName === "Signed out") throw new Error("Sign in on the host first.");
+          changes.push(input);
+        }),
     };
     const { base, admin, asMember, post } = await signedIn("host-admin", { admin: { identity } });
     const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -707,18 +738,23 @@ describe("Team API host-update-v1", () => {
     });
     const update = {
       snapshot,
-      check: snapshot,
+      check: () => Effect.sync(snapshot),
       cancel: snapshot,
-      start: (member: { id: string; name: string }, mode: UpdateRestartMode) => {
-        if (!allowed) throw new RequestedUpdateRefusal("disabled");
-        starts.push({ member: member.name, mode });
-        return snapshot();
-      },
-      changeSettings: async (change: HostUpdateSettingsChange) => {
-        if (!allowed) throw new RequestedUpdateRefusal("disabled");
-        autoInstall = change.autoInstall ?? autoInstall;
-        return snapshot();
-      },
+      start: (member: { id: string; name: string }, mode: UpdateRestartMode) =>
+        Effect.try({
+          try: () => {
+            if (!allowed) throw new RequestedUpdateRefusal("disabled");
+            starts.push({ member: member.name, mode });
+            return snapshot();
+          },
+          catch: (cause) => new RemoteWorkflowError({ cause }),
+        }),
+      changeSettings: (change: HostUpdateSettingsChange) =>
+        Effect.sync(() => {
+          if (!allowed) throw new RequestedUpdateRefusal("disabled");
+          autoInstall = change.autoInstall ?? autoInstall;
+          return snapshot();
+        }),
     };
     const { base, admin, asMember, post } = await signedIn("host-update", { admin: { update } });
 

@@ -3,6 +3,8 @@ import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { redactValue } from "@openbot/logging";
+import { Effect, Semaphore } from "effect";
+import { analyticsIO, runAnalytics } from "./analytics-effects";
 
 /**
  * One timed operation. The name is a fixed string - an IPC channel, a turn origin, a crash origin -
@@ -14,16 +16,6 @@ export interface TraceSpan {
   name: string;
   durationMs: number;
   outcome: string;
-}
-
-/** Counts and durations for one span name, over every line the trace file still holds. */
-export interface TraceSummary {
-  kind: string;
-  name: string;
-  count: number;
-  outcomes: Record<string, number>;
-  p95Ms: number;
-  maxMs: number;
 }
 
 export interface TraceFileOptions {
@@ -55,7 +47,7 @@ export class TraceFile {
   readonly #openTurns = new Map<string, { startedAt: number; origin: string }>();
   #pending: string[] = [];
   #timer: NodeJS.Timeout | null = null;
-  #writes: Promise<void> = Promise.resolve();
+  #writes = Semaphore.makeUnsafe(1);
   #writingLines = 0;
 
   constructor(options: TraceFileOptions) {
@@ -74,11 +66,11 @@ export class TraceFile {
     });
     this.#pending.push(JSON.stringify(line));
     if (this.#pending.length >= MAX_PENDING_LINES) {
-      void this.flush();
+      void runAnalytics(this.flush());
       return;
     }
     if (this.#timer) return;
-    this.#timer = setTimeout(() => void this.flush(), FLUSH_DELAY_MS);
+    this.#timer = setTimeout(() => void runAnalytics(this.flush()), FLUSH_DELAY_MS);
     this.#timer.unref();
   }
 
@@ -104,29 +96,28 @@ export class TraceFile {
     });
   }
 
-  /** Writes the pending lines. The returned promise settles after every earlier write. */
-  flush(): Promise<void> {
+  /** Writes the pending lines and waits for earlier writes. */
+  readonly flush = Effect.fn("TraceFile.flush")(function* (this: TraceFile) {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     const lines = this.#pending;
     this.#pending = [];
-    if (lines.length === 0) return this.#writes;
     this.#writingLines += lines.length;
-    this.#writes = this.#writes
-      .then(() => this.#append(lines))
-      .catch(() => undefined)
-      .then(() => {
-        this.#writingLines -= lines.length;
-      });
-    return this.#writes;
-  }
+    yield* this.#writes.withPermit(lines.length ? this.#append(lines).pipe(Effect.ignore) : Effect.void).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#writingLines -= lines.length;
+        }),
+      ),
+    );
+  }, Effect.uninterruptible);
 
-  async summarize(): Promise<TraceSummary[]> {
-    void this.flush();
-    // The reads join the write chain, so no rotation runs between the read of `.1` and the current file.
-    const files = this.#writes.then(() => Promise.all([`${this.#path}.1`, this.#path].map(readOptional)));
-    this.#writes = files.then(() => undefined);
-    const text = (await files).join("");
+  readonly summarize = Effect.fn("TraceFile.summarize")(function* (this: TraceFile) {
+    yield* this.flush();
+    // Hold the same permit for both files so rotation cannot split the read.
+    const text = (yield* this.#writes.withPermit(
+      Effect.forEach([`${this.#path}.1`, this.#path], readOptional, { concurrency: "unbounded" }),
+    )).join("");
     const groups = new Map<
       string,
       { kind: string; name: string; durations: number[]; outcomes: Record<string, number> }
@@ -153,26 +144,23 @@ export class TraceFile {
         };
       })
       .sort((left, right) => left.kind.localeCompare(right.kind) || left.name.localeCompare(right.name));
-  }
+  });
 
-  async #append(lines: string[]): Promise<void> {
-    await mkdir(this.#directory, { recursive: true });
-    try {
-      if ((await stat(this.#path)).size >= MAX_FILE_BYTES) await rename(this.#path, `${this.#path}.1`);
-    } catch {
-      // No file yet.
-    }
-    await appendFile(this.#path, `${lines.join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
-  }
+  #append = Effect.fn("TraceFile.append")(function* (this: TraceFile, lines: string[]) {
+    yield* analyticsIO(() => mkdir(this.#directory, { recursive: true }));
+    yield* analyticsIO(() => stat(this.#path)).pipe(
+      Effect.flatMap((stats) =>
+        stats.size >= MAX_FILE_BYTES ? analyticsIO(() => rename(this.#path, `${this.#path}.1`)) : Effect.void,
+      ),
+      Effect.catch(() => Effect.void),
+    );
+    yield* analyticsIO(() => appendFile(this.#path, `${lines.join("\n")}\n`, { encoding: "utf8", mode: 0o600 }));
+  });
 }
 
-async function readOptional(path: string): Promise<string> {
-  try {
-    return await readFile(path, "utf8");
-  } catch {
-    return "";
-  }
-}
+const readOptional = Effect.fn("TraceFile.readOptional")((path: string) =>
+  analyticsIO(() => readFile(path, "utf8")).pipe(Effect.catch(() => Effect.succeed(""))),
+);
 
 // A crash can cut the last line short, so a line that does not parse is skipped.
 function parseLine(line: string): TraceSpan | null {

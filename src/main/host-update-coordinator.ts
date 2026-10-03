@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { Deferred, Effect } from "effect";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { restartActivityGeneration } from "../backend/restart-activity";
 import {
@@ -12,6 +13,7 @@ import {
   verifyTenantDirectory,
   writeProtocolJson,
 } from "./host-update-files";
+import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
 import type { RestartReadiness } from "./update-readiness";
 
 interface HostUpdateCoordinatorOptions {
@@ -23,7 +25,7 @@ interface HostUpdateCoordinatorOptions {
   currentVersion: string;
   now?: () => number;
   describeReadiness: () => RestartReadiness;
-  checkHealth: () => Promise<{ ok: boolean; checks: string[] }>;
+  checkHealth: () => Effect.Effect<{ ok: boolean; checks: string[] }, RemoteWorkflowError>;
   setManagedByHost: (managed: boolean) => void;
   setHostState?: (state: HostUpdateState) => void;
   onDiagnostic?: (message: string) => void;
@@ -33,7 +35,7 @@ interface HostUpdateCoordinatorOptions {
 export class HostUpdateCoordinator {
   readonly #options: HostUpdateCoordinatorOptions;
   #timer: ReturnType<typeof setInterval> | null = null;
-  #pending: Promise<void> | null = null;
+  #pending: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   #stopHandler: (() => Promise<void>) | null = null;
   #stopRequested = false;
   #idleSince: number | null = null;
@@ -47,39 +49,51 @@ export class HostUpdateCoordinator {
     if ((this.#options.platform ?? process.platform) !== "darwin") return;
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void this.tick().catch(() =>
+      void runRemoteWorkflow(this.tick()).catch(() =>
         this.#options.onDiagnostic?.("Host status exchange failed. Contact the host administrator."),
       );
     }, HOST_POLL_MS);
     this.#timer.unref();
   }
 
-  async stop(): Promise<void> {
-    if (this.#timer) clearInterval(this.#timer);
-    this.#timer = null;
-    // Do not wait on #pending: the stop handler itself enters application teardown.
+  stop(): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.#timer) clearInterval(this.#timer);
+      this.#timer = null;
+      // The stop handler enters teardown, so waiting on its own tick would deadlock.
+    });
   }
 
   setStopHandler(handler: () => Promise<void>): void {
     this.#stopHandler = handler;
   }
 
-  tick(): Promise<void> {
-    if (this.#pending) return this.#pending;
-    this.#pending = this.#tick().finally(() => {
-      this.#pending = null;
-    });
-    return this.#pending;
-  }
+  readonly tick = Effect.fn("HostCoordinator.tick")(function* (this: HostUpdateCoordinator) {
+    if (this.#pending) return yield* Deferred.await(this.#pending);
+    const pending = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+    this.#pending = pending;
+    yield* this.#exchange().pipe(
+      Effect.onExit((exit) =>
+        Effect.gen({ self: this }, function* () {
+          yield* Deferred.done(pending, exit);
+          this.#pending = null;
+        }),
+      ),
+    );
+  });
 
-  async #tick(): Promise<void> {
+  readonly #exchange = Effect.fn("HostCoordinator.exchange")(function* (
+    this: HostUpdateCoordinator,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
     if ((this.#options.platform ?? process.platform) !== "darwin") {
       this.#options.setManagedByHost(false);
       return;
     }
     const directory = this.#options.directory ?? HOST_MANAGER_DIRECTORY;
     const hostUid = this.#options.hostUid ?? 0;
-    const config = await readHostConfig(directory, hostUid);
+    const config = yield* readHostConfig(directory, hostUid).pipe(
+      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+    );
     const managed = config?.managed === true;
     this.#options.setManagedByHost(managed);
     if (!managed) {
@@ -87,8 +101,12 @@ export class HostUpdateCoordinator {
       return;
     }
     if (!config.tenants.includes(this.#options.uid)) return;
-    const tenantDirectory = await verifyTenantDirectory(directory, this.#options.uid, hostUid);
-    const state = await readOwnedJson(join(directory, "state.json"), hostUid, hostStateSchema);
+    const tenantDirectory = yield* verifyTenantDirectory(directory, this.#options.uid, hostUid).pipe(
+      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+    );
+    const state = yield* readOwnedJson(join(directory, "state.json"), hostUid, hostStateSchema).pipe(
+      Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+    );
     this.#options.setHostState?.(state);
     const now = (this.#options.now ?? Date.now)();
     const activityGeneration = restartActivityGeneration();
@@ -97,8 +115,8 @@ export class HostUpdateCoordinator {
     const readiness = this.#options.describeReadiness();
     if (!readiness.safeToRestart) this.#idleSince = null;
     else this.#idleSince ??= now;
-    const health = await this.#options.checkHealth();
-    await writeProtocolJson(join(tenantDirectory, "status.json"), {
+    const health = yield* this.#options.checkHealth();
+    yield* writeProtocolJson(join(tenantDirectory, "status.json"), {
       uid: this.#options.uid,
       pid: this.#options.pid,
       currentVersion: this.#options.currentVersion,
@@ -107,7 +125,7 @@ export class HostUpdateCoordinator {
       idleSince: this.#idleSince,
       cycle: state.cycle,
       healthy: health.ok,
-    });
+    }).pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
     if (state.phase !== "stopping") {
       this.#stopRequested = false;
       return;
@@ -122,21 +140,28 @@ export class HostUpdateCoordinator {
       !this.#stopHandler
     )
       return;
+    const stopHandler = this.#stopHandler;
     this.#stopRequested = true;
-    try {
-      await this.#stopHandler();
-    } catch (error) {
-      this.#stopRequested = false;
-      throw error;
-    }
-  }
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* remoteCall(() => stopHandler());
+    }).pipe(
+      Effect.catch(({ cause: error }) =>
+        Effect.gen({ self: this }, function* () {
+          this.#stopRequested = false;
+          return yield* new RemoteWorkflowError({ cause: error });
+        }),
+      ),
+    );
+  });
 }
 
 /** Called before tenant services start, so login items cannot start work during replacement. */
-export async function hostAllowsTenantLaunch(): Promise<boolean> {
+export const hostAllowsTenantLaunch = Effect.fn("HostCoordinator.allowsLaunch")(function* () {
   if (process.platform !== "darwin") return true;
-  const config = await readHostConfig();
+  const config = yield* readHostConfig().pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
   if (!config?.managed) return true;
-  const state = await readOwnedJson(join(HOST_MANAGER_DIRECTORY, "state.json"), 0, hostStateSchema);
+  const state = yield* readOwnedJson(join(HOST_MANAGER_DIRECTORY, "state.json"), 0, hostStateSchema).pipe(
+    Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+  );
   return !["stopping", "installing", "failed"].includes(state.phase);
-}
+});

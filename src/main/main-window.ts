@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 /**
  * Every `BrowserWindow` the desktop app opens, the renderer URLs they load, and the application
  * menu. It is the one surface that legitimately keeps a mutable window handle: macOS destroys the
@@ -223,7 +224,7 @@ export function createMainWindowController({
         return;
       }
       event.preventDefault();
-      setImmediate(() => void services.browser.close(tabId).catch(() => undefined));
+      setImmediate(() => void Effect.runPromise(services.browser.close(tabId)).catch(() => undefined));
     });
     window.webContents.on("context-menu", (event, params) => {
       if (inspectElementModifierPressed) {
@@ -263,7 +264,7 @@ export function createMainWindowController({
       const services = getServices();
       if (services) {
         forwardAgentEvent("local", { type: "runtime-snapshot", snapshot: services.service.getRuntimeSnapshot() });
-        services.remoteServers.refreshRuntimeSnapshots();
+        Effect.runFork(services.remoteServers.refreshRuntimeSnapshots());
       }
     });
 
@@ -556,12 +557,16 @@ export function configureApplicationMenu(service: AgentService, updater: UpdateS
           {
             label: translate("menu.stopAllAgents"),
             accelerator: "CommandOrControl+.",
-            click: () => void service.interruptAll(),
+            click: () => {
+              Effect.runFork(service.interruptAll());
+            },
           },
           { type: "separator" },
           {
             label: translate("menu.checkForUpdates"),
-            click: () => void updater.checkForUpdates(),
+            click: () => {
+              Effect.runFork(updater.checkForUpdates());
+            },
           },
           { type: "separator" },
           {

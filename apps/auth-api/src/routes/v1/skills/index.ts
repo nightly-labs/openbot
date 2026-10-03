@@ -1,6 +1,7 @@
 import { isSkillCategory } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readMultipartFormData } from "../../../server/json-body";
 import { normalizeMarketplaceQuery, parseMarketplaceLimit } from "../../../server/marketplace-pagination";
 import {
@@ -27,14 +28,16 @@ export const Route = createFileRoute("/v1/skills/")({
             return apiError(400, "invalid_category", "Unknown skill category.");
           if (sort && sort !== "installs") return apiError(400, "invalid_sort", "Unknown skill sort order.");
           return publicMarketplaceJson(
-            await requestSkillMarketplace().list({
-              query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
-              category,
-              featured: url.searchParams.get("featured") === "true",
-              sort: sort === "installs" ? sort : undefined,
-              cursor: url.searchParams.get("cursor") ?? undefined,
-              limit: parseMarketplaceLimit(url.searchParams.get("limit")),
-            }),
+            await runApiEffect(
+              requestSkillMarketplace().list({
+                query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
+                category,
+                featured: url.searchParams.get("featured") === "true",
+                sort: sort === "installs" ? sort : undefined,
+                cursor: url.searchParams.get("cursor") ?? undefined,
+                limit: parseMarketplaceLimit(url.searchParams.get("limit")),
+              }),
+            ),
           );
         } catch (error) {
           return skillErrorResponse(error);
@@ -42,9 +45,9 @@ export const Route = createFileRoute("/v1/skills/")({
       },
       POST: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await enforceMarketplaceMutationRateLimit("upload", user.id);
+          await runApiEffect(enforceMarketplaceMutationRateLimit("upload", user.id));
           const form = await readMultipartFormData(request, SKILL_SUBMISSION_BODY_LIMIT);
           const showCreatorAvatar = form.get("showCreatorAvatar");
           if (showCreatorAvatar !== null && showCreatorAvatar !== "true" && showCreatorAvatar !== "false")
@@ -58,15 +61,19 @@ export const Route = createFileRoute("/v1/skills/")({
           }
           if (icon !== null && !(icon instanceof File)) return apiError(400, "invalid_icon", "The icon is invalid.");
           return json(
-            await requestSkillMarketplace().submit({
-              user,
-              ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
-              archive: new Uint8Array(await bundle.arrayBuffer()),
-              category,
-              icon:
-                icon instanceof File ? { bytes: new Uint8Array(await icon.arrayBuffer()), mimeType: icon.type } : null,
-              ...(isString(skillId) && skillId ? { skillId } : {}),
-            }),
+            await runApiEffect(
+              requestSkillMarketplace().submit({
+                user,
+                ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
+                archive: new Uint8Array(await bundle.arrayBuffer()),
+                category,
+                icon:
+                  icon instanceof File
+                    ? { bytes: new Uint8Array(await icon.arrayBuffer()), mimeType: icon.type }
+                    : null,
+                ...(isString(skillId) && skillId ? { skillId } : {}),
+              }),
+            ),
             201,
           );
         } catch (error) {

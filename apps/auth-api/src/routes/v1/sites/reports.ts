@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { isSameOriginReportRequest } from "../../../server/hosted-site-report-request";
 import { readRequestBytes } from "../../../server/json-body";
 import {
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/v1/sites/reports")({
             return apiError(403, "invalid_report_origin", "Open the report form on openbot.run.");
           }
           const sourceIp = requestSourceIp(request);
-          await enforceHostedSiteReportRateLimit(sourceIp);
+          await runApiEffect(enforceHostedSiteReportRateLimit(sourceIp));
           const contentType = request.headers.get("Content-Type") ?? "";
           if (!contentType.startsWith("application/x-www-form-urlencoded")) {
             return apiError(400, "invalid_report", "The report form is invalid.");
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/v1/sites/reports")({
           const hostname = form.get("hostname")?.trim().toLowerCase() ?? "";
           const reason = form.get("reason")?.trim().toLowerCase() ?? "";
           const details = form.get("details")?.trim() || null;
-          await requestHostedSiteService().report(hostname, reason, details, sourceIp);
+          await runApiEffect(requestHostedSiteService().report(hostname, reason, details, sourceIp));
           return json({ reported: true }, 201);
         } catch (error) {
           return hostedSiteErrorResponse(error);

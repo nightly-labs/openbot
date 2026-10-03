@@ -10,10 +10,14 @@ import {
   type CreateRoutineInput,
   decodeAgentImportPreview,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { AgentLifecycleFailed } from "../backend/agent-service";
+import { runTestEffect } from "../backend/effect-test-runtime";
 import { AgentImportService } from "./agent-import-service";
 import { LocalSkillLibrary } from "./local-skill-library";
+import { SkillMarketplaceFailure } from "./skill-marketplace-service";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const SKILL = "---\nname: Web brief\ndescription: Write a short cited brief.\n---\nSearch, then cite.";
@@ -90,67 +94,88 @@ beforeEach(async () => {
   service = new AgentImportService(
     {
       listAgents: () => agents,
-      createAgentProfile: async (input) => {
-        const id = `agent-${agents.length + 1}`;
-        const agent: AgentSummary = {
-          id,
-          name: input.name,
-          title: input.title ?? "",
-          description: input.description,
-          provider: "codex",
-          notifications: true,
-          model: "gpt-5.6-luna",
-          reasoningEffort: "medium",
-          threadId: null,
-          workspacePath: join(root, "workspaces", id),
-          preview: "",
-          updatedAt: null,
-          avatarSeed: input.avatarSeed,
-          avatarHue: null,
-          avatarUrl: null,
-        };
-        await mkdir(agent.workspacePath, { recursive: true });
-        agents.push(agent);
-        return agent;
-      },
+      createAgentProfile: (input) =>
+        Effect.tryPromise({
+          try: async () => {
+            const id = `agent-${agents.length + 1}`;
+            const agent: AgentSummary = {
+              id,
+              name: input.name,
+              title: input.title ?? "",
+              description: input.description,
+              provider: "codex",
+              notifications: true,
+              model: "gpt-5.6-luna",
+              reasoningEffort: "medium",
+              threadId: null,
+              workspacePath: join(root, "workspaces", id),
+              preview: "",
+              updatedAt: null,
+              avatarSeed: input.avatarSeed,
+              avatarHue: null,
+              avatarUrl: null,
+            };
+            await mkdir(agent.workspacePath, { recursive: true });
+            agents.push(agent);
+            return agent;
+          },
+          catch: (cause) => new AgentLifecycleFailed({ operation: "import fixture", cause }),
+        }),
       createRoutine: (input) => {
         routines.push(input);
         return { id: `routine-${routines.length}` };
       },
       createMemory: (input) => memories.push(input),
-      setAvatar: async (agentId, image) => {
-        avatars.set(agentId, image);
-        const agent = agents.find((candidate) => candidate.id === agentId);
-        if (!agent) throw new Error("Unknown agent.");
-        return agent;
-      },
-      deleteAgent: async (agentId) => {
-        agents = agents.filter((agent) => agent.id !== agentId);
-      },
+      setAvatar: (agentId, image) =>
+        Effect.tryPromise({
+          try: async () => {
+            avatars.set(agentId, image);
+            const agent = agents.find((candidate) => candidate.id === agentId);
+            if (!agent) throw new Error("Unknown agent.");
+            return agent;
+          },
+          catch: (cause) => new AgentLifecycleFailed({ operation: "import fixture", cause }),
+        }),
+      deleteAgent: (agentId) =>
+        Effect.tryPromise({
+          try: async () => {
+            agents = agents.filter((agent) => agent.id !== agentId);
+          },
+          catch: (cause) => new AgentLifecycleFailed({ operation: "import fixture", cause }),
+        }),
       channels: {
-        command: async (command) => {
-          if (command.type !== "save") throw new Error("Unexpected channel command.");
-          const channel: Channel = {
-            ...command.draft,
-            id: command.channelId,
-            archived: false,
-            revision: 1,
-            createdAt: "2026-09-24T10:00:00.000Z",
-          };
-          channels.push(channel);
-          return channel;
-        },
+        command: (command) =>
+          Effect.sync(() => {
+            if (command.type !== "save") throw new Error("Unexpected channel command.");
+            const channel: Channel = {
+              ...command.draft,
+              id: command.channelId,
+              archived: false,
+              revision: 1,
+              createdAt: "2026-09-24T10:00:00.000Z",
+            };
+            channels.push(channel);
+            return channel;
+          }),
       },
       createChannelMemory: (input) => {
         if (failChannelMemory) throw new Error("A channel can have up to 32 memories.");
         channelMemories.push(input);
       },
       createChannelRoutine: (input) => channelRoutines.push(input),
-      deleteChannel: async (channelId) => {
-        channels = channels.filter((channel) => channel.id !== channelId);
-      },
+      deleteChannel: (channelId) =>
+        Effect.tryPromise({
+          try: async () => {
+            channels = channels.filter((channel) => channel.id !== channelId);
+          },
+          catch: (cause) => new AgentLifecycleFailed({ operation: "import fixture", cause }),
+        }),
     },
-    { library: () => library, installLocal },
+    {
+      library: () => library,
+      installLocal: (input) =>
+        Effect.tryPromise({ try: () => installLocal(input), catch: (cause) => new SkillMarketplaceFailure({ cause }) }),
+    },
     () => ({ id: "local", name: "You" }),
     () => "Europe/Warsaw",
     join(root, "uploads"),
@@ -189,7 +214,7 @@ describe("AgentImportService", () => {
       "export/agents/research/files/notes/plan.md": encode("# Plan"),
     });
 
-    const preview = await service.stage(path);
+    const preview = await runTestEffect(service.stage(path));
     expect(preview.agents).toEqual([
       expect.objectContaining({
         key: "research",
@@ -203,7 +228,7 @@ describe("AgentImportService", () => {
       }),
     ]);
 
-    const result = await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
+    const result = await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(result.skipped).toEqual([]);
     const [agent] = result.agents;
     expect(agent).toMatchObject({ name: "Research", title: "Analyst", description: "You are research." });
@@ -213,7 +238,7 @@ describe("AgentImportService", () => {
     expect(memories).toEqual([{ agentId, text: "The user reports in EUR." }]);
     expect(avatars.get(agentId)).toEqual({ mimeType: "image/png", bytes: PNG });
     expect(await readFile(join(workspace, "imported/notes/plan.md"), "utf8")).toBe("# Plan");
-    const [skill] = await library.list();
+    const [skill] = await runTestEffect(library.list());
     expect(skill).toMatchObject({ name: "Web brief", version: 1 });
     expect(installLocal).toHaveBeenCalledWith({ agentId, skillId: skill?.id, revision: 1 });
     // The copy that was published is not left in the workspace for the agent to find.
@@ -221,16 +246,18 @@ describe("AgentImportService", () => {
   });
 
   it("marks an agent whose name is already on the server, without a warning", async () => {
-    const first = await service.stage(
-      await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) }, "b.zip"),
+    const first = await runTestEffect(
+      service.stage(await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) }, "b.zip")),
     );
     expect(first.agents[0]?.nameExists).toBe(false);
-    await service.apply({ token: first.token, keys: ["research"], channelKeys: [] });
+    await runTestEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
 
-    const again = await service.stage(
-      await exportFile(
-        { "openbot-import.json": manifest([manifestAgent("research"), manifestAgent("sales")]) },
-        "c.zip",
+    const again = await runTestEffect(
+      service.stage(
+        await exportFile(
+          { "openbot-import.json": manifest([manifestAgent("research"), manifestAgent("sales")]) },
+          "c.zip",
+        ),
       ),
     );
     // What the renderer reads: the preload decodes the preview before the review shows it.
@@ -267,7 +294,7 @@ describe("AgentImportService", () => {
       );
 
     it("imports a group chat as a channel with its lead, memories and routines", async () => {
-      const preview = await service.stage(await exportWith([desk()]));
+      const preview = await runTestEffect(service.stage(await exportWith([desk()])));
       expect(decodeAgentImportPreview(preview)?.channels).toEqual([
         {
           key: "desk",
@@ -280,11 +307,13 @@ describe("AgentImportService", () => {
         },
       ]);
 
-      const result = await service.apply({
-        token: preview.token,
-        keys: ["gauff", "iga", "wta"],
-        channelKeys: ["desk"],
-      });
+      const result = await runTestEffect(
+        service.apply({
+          token: preview.token,
+          keys: ["gauff", "iga", "wta"],
+          channelKeys: ["desk"],
+        }),
+      );
       expect(result.skippedChannels).toEqual([]);
       const [channel] = channels;
       expect(result.channels).toEqual([{ id: channel?.id, name: "Tennis desk" }]);
@@ -307,17 +336,23 @@ describe("AgentImportService", () => {
     });
 
     it("imports a channel with the agents that imported, even one, and skips one with none", async () => {
-      const first = await service.stage(await exportWith([desk()], "first.zip"));
-      const result = await service.apply({ token: first.token, keys: ["gauff", "wta"], channelKeys: ["desk"] });
+      const first = await runTestEffect(service.stage(await exportWith([desk()], "first.zip")));
+      const result = await runTestEffect(
+        service.apply({ token: first.token, keys: ["gauff", "wta"], channelKeys: ["desk"] }),
+      );
       expect(agentsOf(channels[0])).toEqual(["Gauff", "Wta"]);
       expect(channels[0]?.leadAgentId).toBeNull();
       expect(result.warnings).toEqual([expect.stringContaining("its lead was not imported")]);
 
       // A group chat with one other agent is still a channel, as OpenBot allows.
-      const second = await service.stage(
-        await exportWith([desk(), desk({ key: "pair", members: ["iga", "wta"], lead: null })], "second.zip"),
+      const second = await runTestEffect(
+        service.stage(
+          await exportWith([desk(), desk({ key: "pair", members: ["iga", "wta"], lead: null })], "second.zip"),
+        ),
       );
-      const alone = await service.apply({ token: second.token, keys: ["gauff"], channelKeys: ["desk", "pair"] });
+      const alone = await runTestEffect(
+        service.apply({ token: second.token, keys: ["gauff"], channelKeys: ["desk", "pair"] }),
+      );
       expect(alone.channels).toEqual([{ id: channels[1]?.id, name: "Tennis desk" }]);
       expect(agentsOf(channels[1])).toEqual(["Gauff"]);
       expect(alone.skippedChannels).toEqual([
@@ -328,12 +363,14 @@ describe("AgentImportService", () => {
 
     it("removes a channel whose step fails and keeps its agents", async () => {
       failChannelMemory = true;
-      const preview = await service.stage(await exportWith([desk()]));
-      const result = await service.apply({
-        token: preview.token,
-        keys: ["gauff", "iga", "wta"],
-        channelKeys: ["desk"],
-      });
+      const preview = await runTestEffect(service.stage(await exportWith([desk()])));
+      const result = await runTestEffect(
+        service.apply({
+          token: preview.token,
+          keys: ["gauff", "iga", "wta"],
+          channelKeys: ["desk"],
+        }),
+      );
       expect(result.agents).toHaveLength(3);
       expect(result.skippedChannels).toEqual([
         { key: "desk", name: "Tennis desk", reason: "A channel can have up to 32 memories." },
@@ -342,12 +379,14 @@ describe("AgentImportService", () => {
     });
 
     it("leaves out members that are not in the export and rejects a repeated key", async () => {
-      const preview = await service.stage(
-        await exportWith([
-          desk({ members: ["gauff", "ghost", "iga"], lead: "ghost" }),
-          desk({ key: "pair", members: ["wta", "ghost"], lead: null }),
-          desk({ key: "empty", members: ["ghost"], lead: null }),
-        ]),
+      const preview = await runTestEffect(
+        service.stage(
+          await exportWith([
+            desk({ members: ["gauff", "ghost", "iga"], lead: "ghost" }),
+            desk({ key: "pair", members: ["wta", "ghost"], lead: null }),
+            desk({ key: "empty", members: ["ghost"], lead: null }),
+          ]),
+        ),
       );
       expect(preview.channels.map((channel) => [channel.key, channel.memberKeys, channel.leadKey])).toEqual([
         ["desk", ["gauff", "iga"], null],
@@ -360,7 +399,7 @@ describe("AgentImportService", () => {
         "Tennis desk: members that are not agents in this export are left out.",
         "Tennis desk: the channel is skipped because none of its agents are in the export.",
       ]);
-      await expect(service.stage(await exportWith([desk(), desk()], "twice.zip"))).rejects.toThrow(
+      await expect(runTestEffect(service.stage(await exportWith([desk(), desk()], "twice.zip")))).rejects.toThrow(
         'Two channels use the key "desk".',
       );
     });
@@ -372,10 +411,12 @@ describe("AgentImportService", () => {
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
     for (const name of ["first.zip", "second.zip"]) {
-      const preview = await service.stage(await exportFile(files, name));
-      expect((await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })).skipped).toEqual([]);
+      const preview = await runTestEffect(service.stage(await exportFile(files, name)));
+      expect(
+        (await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }))).skipped,
+      ).toEqual([]);
     }
-    const skills = await library.list();
+    const skills = await runTestEffect(library.list());
     expect(skills).toHaveLength(1);
     expect(skills[0]?.version).toBe(2);
   });
@@ -395,7 +436,7 @@ describe("AgentImportService", () => {
     ],
   ])("rejects an export with %s", async (_label, extra, message) => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), ...extra });
-    await expect(service.stage(path)).rejects.toThrow(message);
+    await expect(runTestEffect(service.stage(path))).rejects.toThrow(message);
   });
 
   it("imports an export that lists its folders as entries", async () => {
@@ -404,42 +445,44 @@ describe("AgentImportService", () => {
       "agents/research/files/": new Uint8Array(),
       "agents/research/files/plan.md": encode("# Plan"),
     });
-    const preview = await service.stage(path);
-    const result = await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
+    const preview = await runTestEffect(service.stage(path));
+    const result = await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(result.skipped).toEqual([]);
     expect(await readFile(join(result.agents[0]?.workspacePath ?? "", "imported/plan.md"), "utf8")).toBe("# Plan");
   });
 
   it("rejects an export that changed after the preview", async () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
-    const preview = await service.stage(path);
+    const preview = await runTestEffect(service.stage(path));
     await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), "extra.txt": encode("x") });
-    await expect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
-      "changed",
-    );
+    await expect(
+      runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })),
+    ).rejects.toThrow("changed");
     expect(agents).toEqual([]);
   });
 
   it("rejects a manifest it cannot read", async () => {
     const newer = await exportFile({ "openbot-import.json": manifest([manifestAgent("a")], { version: 2 }) }, "v2.zip");
-    await expect(service.stage(newer)).rejects.toThrow("newer export skill");
+    await expect(runTestEffect(service.stage(newer))).rejects.toThrow("newer export skill");
     const long = await exportFile(
       { "openbot-import.json": manifest([manifestAgent("a", { name: "x".repeat(81) })]) },
       "long.zip",
     );
-    await expect(service.stage(long)).rejects.toThrow('Agent "a" has an invalid name.');
+    await expect(runTestEffect(service.stage(long))).rejects.toThrow('Agent "a" has an invalid name.');
     const outside = await exportFile(
       { "openbot-import.json": manifest([manifestAgent("a", { files: "agents/b/files" })]) },
       "outside.zip",
     );
-    await expect(service.stage(outside)).rejects.toThrow('Agent "a" has an invalid files path.');
+    await expect(runTestEffect(service.stage(outside))).rejects.toThrow('Agent "a" has an invalid files path.');
     // Grok Bot still writing the file: the zip ends before its directory.
     const whole = zipSync({ "openbot-import.json": manifest([manifestAgent("a")]) });
     const partial = join(root, "partial.zip");
     await writeFile(partial, whole.subarray(0, Math.floor(whole.length / 2)));
-    await expect(service.stage(partial)).rejects.toThrow("If Grok Bot is still saving it, wait and choose it again.");
+    await expect(runTestEffect(service.stage(partial))).rejects.toThrow(
+      "If Grok Bot is still saving it, wait and choose it again.",
+    );
     const missing = await exportFile({ "notes.txt": encode("x") }, "missing.zip");
-    await expect(service.stage(missing)).rejects.toThrow("must contain openbot-import.json");
+    await expect(runTestEffect(service.stage(missing))).rejects.toThrow("must contain openbot-import.json");
   });
 
   it("skips a routine with an invalid schedule and says so", async () => {
@@ -457,9 +500,9 @@ describe("AgentImportService", () => {
         }),
       ]),
     });
-    const preview = await service.stage(path);
+    const preview = await runTestEffect(service.stage(path));
     expect(preview.warnings).toEqual([expect.stringContaining('routine "Broken" is skipped')]);
-    await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
+    await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(routines).toEqual([
       expect.objectContaining({
         name: "Every half hour",
@@ -478,14 +521,16 @@ describe("AgentImportService", () => {
       "agents/broken/skills/good/SKILL.md": encode(SKILL),
       "agents/broken/skills/bad/SKILL.md": encode("No frontmatter."),
     });
-    const preview = await service.stage(path);
-    const result = await service.apply({ token: preview.token, keys: ["broken", "research"], channelKeys: [] });
+    const preview = await runTestEffect(service.stage(path));
+    const result = await runTestEffect(
+      service.apply({ token: preview.token, keys: ["broken", "research"], channelKeys: [] }),
+    );
     expect(result.agents.map((agent) => agent.name)).toEqual(["Research"]);
     expect(result.skipped).toEqual([
       { key: "broken", name: "Broken", reason: "SKILL.md must begin with YAML frontmatter." },
     ]);
     expect(agents.map((agent) => agent.name)).toEqual(["Research"]);
-    expect(await library.list()).toEqual([]);
+    expect(await runTestEffect(library.list())).toEqual([]);
   });
 
   it("imports every agent when a file is already there, and keeps both copies", async () => {
@@ -495,13 +540,13 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest(keys.map((key) => manifestAgent(key, { files: `agents/${key}/files` }))),
       ...Object.fromEntries(keys.map((key) => [`agents/${key}/files/${template}`, encode(`# ${key}`)])),
     });
-    const preview = await service.stage(path);
+    const preview = await runTestEffect(service.stage(path));
     // On a disk that ignores case, `PULL_REQUEST_TEMPLATE.md` in the same export is this file.
     const existing = join(root, "workspaces", "agent-3", "imported", template);
     await mkdir(join(existing, ".."), { recursive: true });
     await writeFile(existing, "# existing");
 
-    const result = await service.apply({ token: preview.token, keys, channelKeys: [] });
+    const result = await runTestEffect(service.apply({ token: preview.token, keys, channelKeys: [] }));
     expect(result.agents.map((agent) => agent.name)).toEqual(["Research", "Sales", "Marketing", "Support", "Legal"]);
     expect(result.skipped).toEqual([]);
     expect(result.warnings).toEqual([
@@ -516,45 +561,49 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
-    const first = await service.stage(await exportFile(files, "first.zip"));
-    await service.apply({ token: first.token, keys: ["research"], channelKeys: [] });
+    const first = await runTestEffect(service.stage(await exportFile(files, "first.zip")));
+    await runTestEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
     installLocal.mockRejectedValueOnce(new Error("Install failed."));
-    const second = await service.stage(await exportFile(files, "second.zip"));
-    expect((await service.apply({ token: second.token, keys: ["research"], channelKeys: [] })).skipped).toHaveLength(1);
-    expect((await library.list()).map((skill) => skill.version)).toEqual([1]);
+    const second = await runTestEffect(service.stage(await exportFile(files, "second.zip")));
+    expect(
+      (await runTestEffect(service.apply({ token: second.token, keys: ["research"], channelKeys: [] }))).skipped,
+    ).toHaveLength(1);
+    expect((await runTestEffect(library.list())).map((skill) => skill.version)).toEqual([1]);
   });
 
   it("accepts a token once, and not after it is discarded", async () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
-    const used = await service.stage(path);
-    await service.apply({ token: used.token, keys: ["research"], channelKeys: [] });
-    await expect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
-      "no longer open",
-    );
+    const used = await runTestEffect(service.stage(path));
+    await runTestEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] }));
+    await expect(
+      runTestEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] })),
+    ).rejects.toThrow("no longer open");
 
-    const discarded = await service.stage(path);
-    service.discard(discarded.token);
-    await expect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
-      "no longer open",
-    );
+    const discarded = await runTestEffect(service.stage(path));
+    await runTestEffect(service.discard(discarded.token));
+    await expect(
+      runTestEffect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })),
+    ).rejects.toThrow("no longer open");
   });
 
   it("keeps a member's upload to that member and removes its file when it closes", async () => {
     const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
     const uploads = join(root, "uploads");
-    const applied = await service.stageUpload(async () => bytes, "member-a");
+    const applied = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
     const input = { token: applied.token, keys: ["research"], channelKeys: [] };
     // Another member, and the local user, read the token as closed and cannot release it.
-    await expect(service.apply(input, member("member-b"))).rejects.toThrow("no longer open");
-    await expect(service.apply(input)).rejects.toThrow("no longer open");
-    service.discard(applied.token, "member-b");
-    service.discard(applied.token);
+    await expect(runTestEffect(service.apply(input, member("member-b")))).rejects.toThrow("no longer open");
+    await expect(runTestEffect(service.apply(input))).rejects.toThrow("no longer open");
+    await runTestEffect(service.discard(applied.token, "member-b"));
+    await runTestEffect(service.discard(applied.token));
     expect(await readdir(uploads)).toHaveLength(1);
-    expect((await service.apply(input, member("member-a"))).agents.map((agent) => agent.name)).toEqual(["Research"]);
+    expect((await runTestEffect(service.apply(input, member("member-a")))).agents.map((agent) => agent.name)).toEqual([
+      "Research",
+    ]);
     expect(await readdir(uploads)).toEqual([]);
 
-    const discarded = await service.stageUpload(async () => bytes, "member-a");
-    service.discard(discarded.token, "member-a");
+    const discarded = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
+    await runTestEffect(service.discard(discarded.token, "member-a"));
     await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
   });
 
@@ -563,11 +612,11 @@ describe("AgentImportService", () => {
     const uploads = join(root, "uploads");
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const staged = await service.stageUpload(async () => bytes, "member-a");
+      const staged = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
       expect(await readdir(uploads)).toHaveLength(1);
       vi.advanceTimersByTime(30 * 60_000);
       await expect(
-        service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a")),
+        runTestEffect(service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a"))),
       ).rejects.toThrow("no longer open");
     } finally {
       vi.useRealTimers();
@@ -578,9 +627,9 @@ describe("AgentImportService", () => {
   it("refuses a fifth upload before it reads the body", async () => {
     const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
     for (const owner of ["member-a", "member-b", "member-c", "member-d"])
-      await service.stageUpload(async () => bytes, owner);
+      await runTestEffect(service.stageUpload(async () => bytes, owner));
     const read = vi.fn(async () => bytes);
-    await expect(service.stageUpload(read, "member-e")).rejects.toThrow("reading other exports");
+    await expect(runTestEffect(service.stageUpload(read, "member-e"))).rejects.toThrow("reading other exports");
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -589,15 +638,14 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
-    const local = await service.stage(await exportFile(files));
-    await service.apply({ token: local.token, keys: ["research"], channelKeys: [] });
-    const upload = await service.stageUpload(async () => zipSync(files), "member-a");
-    const result = await service.apply(
-      { token: upload.token, keys: ["research"], channelKeys: [] },
-      member("member-a"),
+    const local = await runTestEffect(service.stage(await exportFile(files)));
+    await runTestEffect(service.apply({ token: local.token, keys: ["research"], channelKeys: [] }));
+    const upload = await runTestEffect(service.stageUpload(async () => zipSync(files), "member-a"));
+    const result = await runTestEffect(
+      service.apply({ token: upload.token, keys: ["research"], channelKeys: [] }, member("member-a")),
     );
 
-    const [skill] = await library.list();
+    const [skill] = await runTestEffect(library.list());
     expect(skill?.version).toBe(1);
     expect(installLocal).toHaveBeenLastCalledWith({ agentId: result.agents[0]?.id, skillId: skill?.id, revision: 1 });
     expect(result.warnings).toEqual([expect.stringContaining("already has the skill")]);

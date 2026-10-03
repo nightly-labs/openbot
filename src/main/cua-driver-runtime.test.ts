@@ -4,8 +4,11 @@ import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
+import { runTestEffect } from "../backend/effect-test-runtime";
 import { CuaDriverActionTap } from "./cua-driver-action-tap";
+import { CuaDriverFailure } from "./cua-driver-effects";
 import {
   type CuaDriverCommandAliasInput,
   CuaDriverRuntime,
@@ -58,7 +61,7 @@ async function runtime(overrides: Partial<CuaDriverRuntimeOptions> = {}) {
 describe("CuaDriverRuntime", () => {
   it("serves on a socket in a private directory, never in a world-writable one", async () => {
     const { driver, spawned, socketDirectory } = await runtime();
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(spawned).toHaveLength(1);
     expect(spawned[0]?.command).toBe("/opt/cua/bin/cua-driver");
@@ -74,7 +77,7 @@ describe("CuaDriverRuntime", () => {
     const tooDeep = join(tmpdir(), "cua", "x".repeat(120));
     const { driver, spawned } = await runtime({ endpoint: { kind: "unix-socket", directory: tooDeep } });
 
-    await expect(driver.start()).rejects.toThrow(/103/);
+    await expect(runTestEffect(driver.start())).rejects.toThrow(/103/);
     expect(spawned).toHaveLength(0);
   });
 
@@ -88,13 +91,13 @@ describe("CuaDriverRuntime", () => {
     await chmod(shared, 0o777);
     const { driver, spawned } = await runtime({ endpoint: { kind: "unix-socket", directory: shared } });
 
-    await expect(driver.start()).rejects.toThrow(/open to other users/);
+    await expect(runTestEffect(driver.start())).rejects.toThrow(/open to other users/);
     expect(spawned).toHaveLength(0);
   });
 
   it("marks itself embedded, so macOS holds OpenBot responsible for the grant", async () => {
     const { driver, spawned } = await runtime();
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(spawned[0]?.options.env.CUA_DRIVER_EMBEDDED).toBe("1");
     expect(spawned[0]?.options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
@@ -107,7 +110,7 @@ describe("CuaDriverRuntime", () => {
     vi.stubEnv("CUA_DRIVER_RS_TELEMETRY_ENABLED", "1");
     vi.stubEnv("CUA_DRIVER_RS_UPDATE_CHECK", "1");
     const { driver, spawned } = await runtime();
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(spawned[0]?.options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
     expect(spawned[0]?.options.env.CUA_DRIVER_RS_UPDATE_CHECK).toBe("0");
@@ -121,7 +124,7 @@ describe("CuaDriverRuntime", () => {
 
   it("starts one daemon however many callers ask at once", async () => {
     const { driver, spawned } = await runtime();
-    await Promise.all([driver.start(), driver.start(), driver.start()]);
+    await Promise.all([runTestEffect(driver.start()), runTestEffect(driver.start()), runTestEffect(driver.start())]);
 
     expect(spawned).toHaveLength(1);
   });
@@ -143,9 +146,9 @@ describe("CuaDriverRuntime", () => {
       },
       readPermissions,
     });
-    const first = driver.state();
+    const first = runTestEffect(driver.state());
     await waiting;
-    const second = driver.state();
+    const second = runTestEffect(driver.state());
     // Drain the second caller's continuation while the socket is still unavailable.
     await Promise.resolve();
     await Promise.resolve();
@@ -155,14 +158,14 @@ describe("CuaDriverRuntime", () => {
 
     expect(spawned).toHaveLength(1);
     expect(readPermissions).toHaveBeenCalledTimes(2);
-    await driver.stop();
+    await runTestEffect(driver.stop());
   });
 
   it("offers no MCP entry before the daemon runs, and one with no working directory after", async () => {
     const { driver } = await runtime();
     expect(driver.mcpServerConfig()).toBeNull();
 
-    await driver.start();
+    await runTestEffect(driver.start());
     const config = driver.mcpServerConfig();
 
     // ACP drops a stdio entry that carries a working directory, and Codex accepts none, so an entry
@@ -178,13 +181,11 @@ describe("CuaDriverRuntime", () => {
   it("hands the agents the daemon itself when OpenBot cannot listen, rather than no tools", async () => {
     // A tap that cannot listen, the way a profile that refuses the address would leave it.
     class DeafTap extends CuaDriverActionTap {
-      override listen(): Promise<void> {
-        return Promise.reject(new Error("no such directory"));
-      }
+      override listen = () => Effect.fail(new CuaDriverFailure({ cause: new Error("no such directory") }));
     }
     const { driver } = await runtime({ actionTap: new DeafTap() });
 
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(driver.mcpServerConfig()?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
   });
@@ -202,7 +203,7 @@ describe("CuaDriverRuntime", () => {
         return child;
       },
     });
-    await driver.start();
+    await runTestEffect(driver.start());
     const address = driver.tapAddress();
     expect(address).not.toBe(driver.socketPath());
 
@@ -213,7 +214,7 @@ describe("CuaDriverRuntime", () => {
     await exited;
     await vi.waitFor(() => expect(driver.running()).toBe(false));
 
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(driver.tapAddress()).toBe(address);
     expect(existsSync(address)).toBe(true);
@@ -225,15 +226,15 @@ describe("CuaDriverRuntime", () => {
       });
       client.once("error", reject);
     });
-    await driver.stop();
+    await runTestEffect(driver.stop());
   });
 
   it("stops the daemon it started", async () => {
     const { driver } = await runtime();
-    await driver.start();
+    await runTestEffect(driver.start());
     expect(driver.running()).toBe(true);
 
-    await driver.stop();
+    await runTestEffect(driver.stop());
 
     expect(driver.running()).toBe(false);
     expect(driver.mcpServerConfig()).toBeNull();
@@ -260,25 +261,25 @@ describe("CuaDriverRuntime", () => {
         await writeFile(path, "");
       },
     });
-    await driver.start();
+    await runTestEffect(driver.start());
     const [child] = children;
     assert(child);
     await new Promise<void>((resolve) => child.stdout?.once("data", () => resolve()));
 
     // What the panel does while `warmUp` is putting an ungranted daemon away.
-    await Promise.all([driver.stop(), driver.state()]);
+    await Promise.all([runTestEffect(driver.stop()), runTestEffect(driver.state())]);
 
     expect(children).toHaveLength(2);
     expect(driver.running()).toBe(true);
     // The replacement's socket is still there: the stop it waited for removed the first one only.
     expect(existsSync(join(socketDirectory, "driver.sock"))).toBe(true);
-    await driver.stop();
+    await runTestEffect(driver.stop());
   });
 
   it("reports the driver missing without spawning anything", async () => {
     const { driver, spawned } = await runtime({ executable: null });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "driver-missing" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "driver-missing" });
     expect(spawned).toHaveLength(0);
   });
 
@@ -292,7 +293,7 @@ describe("CuaDriverRuntime", () => {
       waitForSocket: () => new Promise(() => undefined),
     });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "error" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "error" });
     expect(driver.running()).toBe(false);
     expect(driver.mcpServerConfig()).toBeNull();
   });
@@ -303,14 +304,14 @@ describe("CuaDriverRuntime", () => {
     let installed: string | null = null;
     const { driver, spawned } = await runtime({
       executable: null,
-      resolveExecutable: async () => installed,
+      resolveExecutable: () => Effect.sync(() => installed),
     });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "driver-missing" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "driver-missing" });
     expect(spawned).toHaveLength(0);
 
     installed = "/opt/cua/bin/cua-driver";
-    await expect(driver.state()).resolves.toMatchObject({ status: "ready" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "ready" });
     expect(spawned).toHaveLength(1);
   });
 
@@ -321,9 +322,9 @@ describe("CuaDriverRuntime", () => {
     const seen: string[] = [];
     driver.onStateChanged((state) => seen.push(state.status));
 
-    await driver.state();
-    await driver.state();
-    await driver.state();
+    await runTestEffect(driver.state());
+    await runTestEffect(driver.state());
+    await runTestEffect(driver.state());
 
     expect(seen).toEqual(["ready"]);
   });
@@ -346,17 +347,17 @@ describe("CuaDriverRuntime", () => {
       entries += 1;
     });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "permissions-required" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "permissions-required" });
     expect(driver.running()).toBe(true);
     expect(driver.mcpServerForProviders()).toBeNull();
     expect(entries).toBe(0);
 
     granted = true;
-    await expect(driver.state()).resolves.toMatchObject({ status: "ready" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "ready" });
     expect(driver.mcpServerForProviders()).not.toBeNull();
     expect(entries).toBe(1);
 
-    await driver.stop();
+    await runTestEffect(driver.stop());
     expect(entries).toBe(1);
   });
 
@@ -376,7 +377,7 @@ describe("CuaDriverRuntime", () => {
     driver.onMcpServerChanged(() => {
       entries += 1;
     });
-    await driver.state();
+    await runTestEffect(driver.state());
     expect(entries).toBe(1);
 
     // The runtime's own `exit` listener was added first, so it has run by the time this one does.
@@ -399,22 +400,22 @@ describe("CuaDriverRuntime", () => {
       entries += 1;
     });
 
-    await driver.warmUp();
+    await runTestEffect(driver.warmUp());
     expect(driver.running()).toBe(true);
     expect(entries).toBe(0);
 
-    await driver.stop();
-    await driver.start();
+    await runTestEffect(driver.stop());
+    await runTestEffect(driver.start());
     expect(entries).toBe(1);
 
-    await driver.stop();
+    await runTestEffect(driver.stop());
   });
 
   // A remote request and a scheduled task open no window, so waiting for the panel would leave a
   // user who granted the permissions without the tools after every restart.
   it("keeps the daemon at startup for a granted computer, and drops it for one that is not", async () => {
     const granted = await runtime();
-    await granted.driver.warmUp();
+    await runTestEffect(granted.driver.warmUp());
     expect(granted.driver.running()).toBe(true);
     expect(granted.driver.mcpServerForProviders()).not.toBeNull();
 
@@ -424,11 +425,11 @@ describe("CuaDriverRuntime", () => {
         { id: "accessibility", granted: false },
       ],
     });
-    await ungranted.driver.warmUp();
+    await runTestEffect(ungranted.driver.warmUp());
     expect(ungranted.driver.running()).toBe(false);
     expect(ungranted.driver.mcpServerForProviders()).toBeNull();
 
-    await granted.driver.stop();
+    await runTestEffect(granted.driver.stop());
   });
 
   // Windows names a pipe in a kernel namespace rather than a path on disk, so nothing is created,
@@ -438,7 +439,7 @@ describe("CuaDriverRuntime", () => {
       endpoint: { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${"x".repeat(200)}` },
       platform: "win32",
     });
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(spawned).toHaveLength(1);
     expect(spawned[0]?.args).toEqual(["serve", "--socket", driver.socketPath(), "--no-overlay"]);
@@ -457,7 +458,7 @@ describe("CuaDriverRuntime", () => {
       endpoint: { kind: "unix-socket", directory: join(base, fits) },
       platform: "linux",
     });
-    await fitting.driver.start();
+    await runTestEffect(fitting.driver.start());
     expect(fitting.driver.socketPath().length).toBeGreaterThan(103);
     expect(fitting.spawned).toHaveLength(1);
 
@@ -465,7 +466,7 @@ describe("CuaDriverRuntime", () => {
       endpoint: { kind: "unix-socket", directory: join(base, "z".repeat(120)) },
       platform: "linux",
     });
-    await expect(tooDeep.driver.start()).rejects.toThrow(/107/);
+    await expect(runTestEffect(tooDeep.driver.start())).rejects.toThrow(/107/);
     expect(tooDeep.spawned).toHaveLength(0);
   });
 
@@ -475,12 +476,12 @@ describe("CuaDriverRuntime", () => {
   it("turns on the Wayland backend on a Wayland session, and leaves an X11 one alone", async () => {
     vi.stubEnv("XDG_SESSION_TYPE", "wayland");
     const wayland = await runtime({ platform: "linux" });
-    await wayland.driver.start();
+    await runTestEffect(wayland.driver.start());
     expect(wayland.spawned[0]?.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
 
     vi.stubEnv("XDG_SESSION_TYPE", "x11");
     const x11 = await runtime({ platform: "linux" });
-    await x11.driver.start();
+    await runTestEffect(x11.driver.start());
     const [x11Spawn] = x11.spawned;
     assert(x11Spawn);
     expect(x11Spawn.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBeUndefined();
@@ -491,7 +492,7 @@ describe("CuaDriverRuntime", () => {
     vi.stubEnv("XDG_SESSION_TYPE", "wayland");
     vi.stubEnv("CUA_DRIVER_RS_ENABLE_WAYLAND", "0");
     const { driver, spawned } = await runtime({ platform: "linux" });
-    await driver.start();
+    await runTestEffect(driver.start());
 
     expect(spawned[0]?.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("0");
   });
@@ -505,13 +506,13 @@ describe("CuaDriverRuntime", () => {
       readPermissions: async () => [],
     });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "ready", permissions: [] });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "ready", permissions: [] });
   });
 
   it("reports a computer the driver is not published for, without spawning anything", async () => {
     const { driver, spawned } = await runtime({ supported: false, executable: null });
 
-    await expect(driver.state()).resolves.toMatchObject({ status: "unsupported" });
+    await expect(runTestEffect(driver.state())).resolves.toMatchObject({ status: "unsupported" });
     expect(spawned).toHaveLength(0);
   });
 
@@ -535,8 +536,12 @@ describe("CuaDriverRuntime", () => {
     it("keeps the Windows pipe name across restarts, and unguessable outside this profile", async () => {
       const userDataPath = await mkdtemp(join(tmpdir(), "cua-profile-"));
       directories.push(userDataPath);
-      const first = await resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() });
-      const second = await resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() });
+      const first = await runTestEffect(
+        resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() }),
+      );
+      const second = await runTestEffect(
+        resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() }),
+      );
 
       expect(first).toEqual(second);
       expect(first.kind).toBe("windows-pipe");
@@ -546,7 +551,9 @@ describe("CuaDriverRuntime", () => {
       directories.push(other);
       // A second profile on the same computer must not answer on the first one's pipe.
       expect(
-        await resolveCuaDriverEndpoint({ platform: "win32", userDataPath: other, temporaryDirectory: tmpdir() }),
+        await runTestEffect(
+          resolveCuaDriverEndpoint({ platform: "win32", userDataPath: other, temporaryDirectory: tmpdir() }),
+        ),
       ).not.toEqual(first);
     });
 
@@ -556,31 +563,39 @@ describe("CuaDriverRuntime", () => {
       await mkdir(join(userDataPath, "cua-driver"), { recursive: true });
       await writeFile(join(userDataPath, "cua-driver", "pipe-name"), "\\\\.\\pipe\\somebody-else");
 
-      const endpoint = await resolveCuaDriverEndpoint({
-        platform: "win32",
-        userDataPath,
-        temporaryDirectory: tmpdir(),
-      });
+      const endpoint = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "win32",
+          userDataPath,
+          temporaryDirectory: tmpdir(),
+        }),
+      );
       expect(endpoint.kind === "windows-pipe" && endpoint.name).toMatch(/openbot-cua-[0-9a-f-]{36}$/);
     });
 
     it("names the same socket directory for one profile, and a different one for another", async () => {
       const temporaryDirectory = tmpdir();
-      const mine = await resolveCuaDriverEndpoint({
-        platform: "darwin",
-        userDataPath: "/Users/a/Library/OpenBot",
-        temporaryDirectory,
-      });
-      const again = await resolveCuaDriverEndpoint({
-        platform: "darwin",
-        userDataPath: "/Users/a/Library/OpenBot",
-        temporaryDirectory,
-      });
-      const other = await resolveCuaDriverEndpoint({
-        platform: "darwin",
-        userDataPath: "/Users/a/Library/OpenBot-dev",
-        temporaryDirectory,
-      });
+      const mine = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "darwin",
+          userDataPath: "/Users/a/Library/OpenBot",
+          temporaryDirectory,
+        }),
+      );
+      const again = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "darwin",
+          userDataPath: "/Users/a/Library/OpenBot",
+          temporaryDirectory,
+        }),
+      );
+      const other = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "darwin",
+          userDataPath: "/Users/a/Library/OpenBot-dev",
+          temporaryDirectory,
+        }),
+      );
 
       expect(mine).toEqual(again);
       expect(mine).not.toEqual(other);
@@ -589,18 +604,22 @@ describe("CuaDriverRuntime", () => {
 
     // `/tmp` is world-writable on Linux, so another local user can create our directory first.
     it("prefers the login session's runtime directory on Linux", async () => {
-      const onLinux = await resolveCuaDriverEndpoint({
-        platform: "linux",
-        userDataPath: "/home/a/.config/OpenBot",
-        temporaryDirectory: "/tmp",
-        runtimeDirectory: "/run/user/1000",
-      });
-      const noSession = await resolveCuaDriverEndpoint({
-        platform: "linux",
-        userDataPath: "/home/a/.config/OpenBot",
-        temporaryDirectory: "/tmp",
-        runtimeDirectory: "  ",
-      });
+      const onLinux = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "linux",
+          userDataPath: "/home/a/.config/OpenBot",
+          temporaryDirectory: "/tmp",
+          runtimeDirectory: "/run/user/1000",
+        }),
+      );
+      const noSession = await runTestEffect(
+        resolveCuaDriverEndpoint({
+          platform: "linux",
+          userDataPath: "/home/a/.config/OpenBot",
+          temporaryDirectory: "/tmp",
+          runtimeDirectory: "  ",
+        }),
+      );
 
       expect(onLinux.kind === "unix-socket" && onLinux.directory.startsWith("/run/user/1000/")).toBe(true);
       expect(noSession.kind === "unix-socket" && noSession.directory.startsWith("/tmp/")).toBe(true);
@@ -631,12 +650,12 @@ describe("CuaDriverRuntime", () => {
       const alias = join(profile, "cua-driver", "cua-driver");
       const { driver } = await runtime({ commandAlias: alias, executable: process.execPath });
 
-      await driver.start();
+      await runTestEffect(driver.start());
 
       expect(driver.mcpServerConfig()?.command).toBe(alias);
       expect(await realpath(alias)).toBe(await realpath(process.execPath));
 
-      await driver.stop();
+      await runTestEffect(driver.stop());
     });
   });
 });

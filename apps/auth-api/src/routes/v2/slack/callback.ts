@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { requestSlackApp } from "../../../server/request-auth";
 import { SlackAppError } from "../../../server/slack-app";
 
@@ -18,7 +19,9 @@ export const Route = createFileRoute("/v2/slack/callback")({
         }
         try {
           const slack = requestSlackApp();
-          const result = await slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) });
+          const result = await runApiEffect(
+            slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) }),
+          );
           // Development only: the dev app's loopback listener takes the grant, not `openbot://`.
           if (result.returnUrl)
             return redirect(

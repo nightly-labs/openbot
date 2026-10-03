@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -18,10 +19,10 @@ describe("notification permission request", () => {
     const path = await preferencePath();
     const showWelcome = vi.fn();
     const first = await loadedStore(path);
-    await requestNotificationPermission({ platform: "darwin", preference: first, showWelcome });
-    await requestNotificationPermission({ platform: "darwin", preference: first, showWelcome });
+    await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: first, showWelcome }));
+    await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: first, showWelcome }));
     const restarted = await loadedStore(path);
-    await requestNotificationPermission({ platform: "darwin", preference: restarted, showWelcome });
+    await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: restarted, showWelcome }));
     expect(showWelcome).toHaveBeenCalledTimes(1);
   });
 
@@ -31,13 +32,13 @@ describe("notification permission request", () => {
     await writeFile(path, '{"version":1,"desktopNotifications":false}\n');
     const store = await loadedStore(path);
     const showWelcome = vi.fn();
-    await requestNotificationPermission({ platform: "darwin", preference: store, showWelcome });
+    await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: store, showWelcome }));
     expect(showWelcome).not.toHaveBeenCalled();
 
-    await store.set({ desktopNotifications: true });
-    await requestNotificationPermission({ platform: "darwin", preference: store, showWelcome });
+    await Effect.runPromise(store.set({ desktopNotifications: true }).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: store, showWelcome }));
     expect(showWelcome).toHaveBeenCalledTimes(1);
-    await store.set({ desktopNotifications: false });
+    await Effect.runPromise(store.set({ desktopNotifications: false }).pipe(Effect.mapError((error) => error.cause)));
     const restarted = await loadedStore(path);
     expect(restarted.get()).toEqual({ desktopNotifications: false });
     expect(restarted.permissionRequested()).toBe(true);
@@ -46,7 +47,7 @@ describe("notification permission request", () => {
   it("does not show the welcome on systems that do not ask", async () => {
     const store = await loadedStore(await preferencePath());
     const showWelcome = vi.fn();
-    await requestNotificationPermission({ platform: "win32", preference: store, showWelcome });
+    await Effect.runPromise(requestNotificationPermission({ platform: "win32", preference: store, showWelcome }));
     expect(showWelcome).not.toHaveBeenCalled();
   });
 });
@@ -59,6 +60,6 @@ async function preferencePath(): Promise<string> {
 
 async function loadedStore(path: string): Promise<NotificationPreferenceStore> {
   const store = new NotificationPreferenceStore(path);
-  await store.load();
+  await Effect.runPromise(store.load());
   return store;
 }

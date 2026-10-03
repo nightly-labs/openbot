@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { translateFor } from "@openbot/i18n";
+import { Effect } from "effect";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -101,18 +102,21 @@ describe("ZIP attachment IPC", () => {
         resolveSharedFile: vi.fn(),
         resolveLocalWorkspaceFile: vi.fn(),
       },
-      mailbox: { resolveAttachment: async () => ({ path: sourcePath, mimeType: "text/plain", name: "source.txt" }) },
+      mailbox: {
+        resolveAttachment: () => Effect.sync(() => ({ path: sourcePath, mimeType: "text/plain", name: "source.txt" })),
+      },
       remoteServers: {
         supportsCapability: vi.fn(),
         request: vi.fn(),
         downloadSharedFile: vi.fn(),
         downloadWorkspaceFile: vi.fn(),
         uploadAttachment: vi.fn(),
-        downloadAttachment: async (id, serverId) => ({
-          name: id,
-          mimeType: "text/plain",
-          bytes: new TextEncoder().encode(`${serverId}:${id}`),
-        }),
+        downloadAttachment: (id, serverId) =>
+          Effect.sync(() => ({
+            name: id,
+            mimeType: "text/plain",
+            bytes: new TextEncoder().encode(`${serverId}:${id}`),
+          })),
       },
     });
     handlers.agentAttachments.downloadAttachments("download");
@@ -154,7 +158,7 @@ describe("single attachment download", () => {
         resolveSharedFile: vi.fn(),
         resolveLocalWorkspaceFile: vi.fn(),
       },
-      mailbox: { resolveAttachment: async () => resolved },
+      mailbox: { resolveAttachment: () => Effect.sync(() => resolved) },
       remoteServers: {
         supportsCapability: vi.fn(),
         request: vi.fn(),
@@ -194,7 +198,7 @@ describe("single attachment download", () => {
     userData.path = directory;
     const invoke = registerSingle(
       { path: "unused", mimeType: "text/plain", name: "unused" },
-      vi.fn(async () => ({ name: "report.pdf", mimeType: "application/pdf", bytes: new Uint8Array([1]) })),
+      vi.fn(() => Effect.sync(() => ({ name: "report.pdf", mimeType: "application/pdf", bytes: new Uint8Array([1]) }))),
     );
     try {
       await invoke(
@@ -213,12 +217,14 @@ describe("single attachment download", () => {
 
 describe("workspace file links", () => {
   function registerOpen(insideWorkspace: boolean) {
-    const resolveLocalWorkspaceFile = vi.fn(async (_agentId: string, path: string) => ({
-      path: `/resolved${path}`,
-      name: "notes.md",
-      size: 1,
-      insideWorkspace,
-    }));
+    const resolveLocalWorkspaceFile = vi.fn((_agentId: string, path: string) =>
+      Effect.sync(() => ({
+        path: `/resolved${path}`,
+        name: "notes.md",
+        size: 1,
+        insideWorkspace,
+      })),
+    );
     const handlers = attachmentIpcHandlers({
       getMainWindow: () => null,
       translate: translateFor("en"),

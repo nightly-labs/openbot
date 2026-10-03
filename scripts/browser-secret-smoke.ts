@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { webContents } from "electron";
 import type { BrowserHost } from "../src/backend/browser-host";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
@@ -5,7 +6,9 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 /** HTTPS is served inside this isolated session. No credentials or network service are used. */
 export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin: string): Promise<void> {
-  const seed = await browser.open(localOrigin, "secret-thread", "secret-agent");
+  const seed = await Effect.runPromise(
+    browser.open(localOrigin, "secret-thread", "secret-agent").pipe(Effect.mapError((error) => error.cause)),
+  );
   const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
   if (!seedContents) throw new Error("Missing authentication fixture session.");
   const protocol = seedContents.session.protocol;
@@ -25,7 +28,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       document.addEventListener('input', event => { if (${url.pathname === "/component"} && !event.isTrusted) return; ${url.pathname === "/native-submit" ? "setTimeout(() => { document.querySelector('#submit').disabled = false; }, 100);" : "document.querySelector('#submit').disabled = false;"} console.error(event.target.value); document.title = event.target.value; });</script>`;
     return new Response(`<!doctype html><body>${html}</body>`, { headers: { "Content-Type": "text/html" } });
   });
-  await browser.close(seed.id);
+  await Effect.runPromise(browser.close(seed.id).pipe(Effect.mapError((error) => error.cause)));
   try {
     for (const [method, path] of [
       ["password", "login"],
@@ -35,7 +38,11 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       ["password", "component"],
       ["password", "native-submit"],
     ] as const) {
-      const tab = await browser.open(`https://authentication.openbot.test/${path}`, "secret-thread", "secret-agent");
+      const tab = await Effect.runPromise(
+        browser
+          .open(`https://authentication.openbot.test/${path}`, "secret-thread", "secret-agent")
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
       // The submission clicks Sign in; a tab with no frame yet would drop that click.
       const tabContents = webContents.getAllWebContents().find((contents) => contents.getURL() === tab.url);
       if (!tabContents) throw new Error(`Missing ${path} fixture.`);
@@ -59,49 +66,72 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         },
       };
       try {
-        const handoff = await browser.prepareSecret(params);
+        const handoff = await Effect.runPromise(
+          browser.prepareSecret(params).pipe(Effect.mapError((error) => error.cause)),
+        );
         for (const tool of ["snapshot", "screenshot"]) {
-          const capture = await browser.handleDynamicTool({ ...params, tool, arguments: { tabId: tab.id } });
+          const capture = await Effect.runPromise(
+            browser
+              .handleDynamicTool({ ...params, tool, arguments: { tabId: tab.id } })
+              .pipe(Effect.mapError((error) => error.cause)),
+          );
           if (capture.success) throw new Error("Agent capture was not blocked while awaiting consent.");
         }
-        const result = await browser.handleDynamicTool({
-          ...params,
-          tool: "evaluate",
-          arguments: { tabId: tab.id, expression: "document.body.innerText" },
-        });
+        const result = await Effect.runPromise(
+          browser
+            .handleDynamicTool({
+              ...params,
+              tool: "evaluate",
+              arguments: { tabId: tab.id, expression: "document.body.innerText" },
+            })
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
         if (result.success) throw new Error("Authentication evaluation was not blocked.");
         const secret = method === "password" ? "fixture-password-729104" : "729104";
-        if ((await handoff.submit(secret)) !== "submitted")
+        if (
+          (await Effect.runPromise(handoff.submit(secret).pipe(Effect.mapError((error) => error.cause)))) !==
+          "submitted"
+        )
           throw new Error(`Secure ${method} submission did not navigate.`);
-        const snapshot = await browser.snapshot(tab.id);
+        const snapshot = await Effect.runPromise(
+          browser.snapshot(tab.id).pipe(Effect.mapError((error) => error.cause)),
+        );
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
       } finally {
-        await browser.close(tab.id);
+        await Effect.runPromise(browser.close(tab.id).pipe(Effect.mapError((error) => error.cause)));
       }
     }
-    const staleTab = await browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent");
+    const staleTab = await Effect.runPromise(
+      browser
+        .open("https://authentication.openbot.test/login", "secret-thread", "secret-agent")
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     try {
-      const handoff = await browser.prepareSecret({
-        namespace: "openbot_browser",
-        tool: "submit_secret",
-        threadId: "secret-thread",
-        ownerAgentId: "secret-agent",
-        turnId: "secret-turn",
-        callId: "stale",
-        arguments: {
-          tabId: staleTab.id,
-          method: "otp",
-          targets: [{ kind: "css", selector: "#code" }],
-          submission: "on_input",
-        },
-      });
+      const handoff = await Effect.runPromise(
+        browser
+          .prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: "stale",
+            arguments: {
+              tabId: staleTab.id,
+              method: "otp",
+              targets: [{ kind: "css", selector: "#code" }],
+              submission: "on_input",
+            },
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
       if (!contents) throw new Error("Missing stale-target fixture.");
       await contents.executeJavaScript("document.querySelector('#code').name = 'changed'; true");
       let rejected = false;
       try {
-        await handoff.submit("729104");
+        await Effect.runPromise(handoff.submit("729104").pipe(Effect.mapError((error) => error.cause)));
       } catch {
         rejected = true;
       }
@@ -109,7 +139,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       if ((await contents.executeJavaScript("document.querySelector('#code').value")) !== "")
         throw new Error("A changed authentication target received a value.");
     } finally {
-      await browser.close(staleTab.id);
+      await Effect.runPromise(browser.close(staleTab.id).pipe(Effect.mapError((error) => error.cause)));
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

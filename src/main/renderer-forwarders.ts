@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 /**
  * The service events the main process relays to the renderer. They live here rather than in
  * the entry point because every one of them is the same three lines around a different channel, and
@@ -91,10 +92,17 @@ export function createRendererForwarders({
     if (!initialLevel || !Notification.isSupported()) return;
     // Skip the remote agent lookup for an event the level already rules out.
     if (initialLevel === "needs-me" && event.type === "turn-completed") return;
+    const remoteManager = getRemoteServerManager();
     const agents =
       serverId === LOCAL_SERVER_ID
         ? (getAgentService()?.listAgents() ?? [])
-        : ((await getRemoteServerManager()?.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)) ?? []);
+        : remoteManager
+          ? await Effect.runPromise(
+              remoteManager
+                .request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
+                .pipe(Effect.mapError((error) => error.cause)),
+            )
+          : [];
     const level = notifyLevel();
     const content = level ? notificationForAgentEvent(event, agents, getTranslate(), level) : null;
     if (!content) return;

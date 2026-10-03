@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { resolveCodexCli } from "../src/backend/cli";
 import { decodeAccountReadResult, decodeRecordResponse } from "../src/backend/protocol";
@@ -6,20 +7,28 @@ const strict = process.argv.includes("--strict");
 let client: CodexAppServerClient | null = null;
 
 try {
-  const cli = await resolveCodexCli();
+  const cli = await Effect.runPromise(resolveCodexCli().pipe(Effect.mapError((error) => error.cause)));
   client = new CodexAppServerClient(cli.executable, 10_000);
   client.start();
-  await client.request(
-    "initialize",
-    {
-      clientInfo: { name: "openbot_doctor", title: "OpenBot Doctor", version: "0.1.0" },
-      capabilities: { experimentalApi: true },
-    },
-    decodeRecordResponse,
+  await Effect.runPromise(
+    client
+      .request(
+        "initialize",
+        {
+          clientInfo: { name: "openbot_doctor", title: "OpenBot Doctor", version: "0.1.0" },
+          capabilities: { experimentalApi: true },
+        },
+        decodeRecordResponse,
+      )
+      .pipe(Effect.mapError((error) => error.cause)),
   );
   client.notify("initialized");
 
-  const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
+  const account = await Effect.runPromise(
+    client
+      .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   const auth = account.account
     ? {
         type: account.account.type,
@@ -50,5 +59,5 @@ try {
   );
   process.exitCode = 1;
 } finally {
-  if (client) await client.stop();
+  if (client) await Effect.runPromise(client.stop());
 }

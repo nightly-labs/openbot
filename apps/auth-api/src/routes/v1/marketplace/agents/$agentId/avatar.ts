@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import { marketplaceErrorResponse, requestAgentMarketplace } from "../../../../../server/request-auth";
 
 export const Route = createFileRoute("/v1/marketplace/agents/$agentId/avatar")({
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/v1/marketplace/agents/$agentId/avatar")({
     handlers: {
       GET: async ({ params }) => {
         try {
-          const object = await requestAgentMarketplace().avatar(params.agentId);
+          const object = await runApiEffect(requestAgentMarketplace().avatar(params.agentId));
           const headers = new Headers();
           object.writeHttpMetadata(headers);
           headers.set("Cache-Control", "public, max-age=300");

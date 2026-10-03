@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import {
   apiError,
   hostedSiteErrorResponse,
@@ -11,18 +12,20 @@ export const Route = createFileRoute("/v1/sites/admin/$siteId/block")({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
-        if (!(await requireOperationsAdmin(request))) return apiError(401, "unauthorized", "Admin access is required.");
+        if (!(await runApiEffect(requireOperationsAdmin(request))))
+          return apiError(401, "unauthorized", "Admin access is required.");
         try {
-          await requestHostedSiteService().setBlocked(params.siteId, true);
+          await runApiEffect(requestHostedSiteService().setBlocked(params.siteId, true));
           return json({ blocked: true });
         } catch (error) {
           return hostedSiteErrorResponse(error);
         }
       },
       DELETE: async ({ request, params }) => {
-        if (!(await requireOperationsAdmin(request))) return apiError(401, "unauthorized", "Admin access is required.");
+        if (!(await runApiEffect(requireOperationsAdmin(request))))
+          return apiError(401, "unauthorized", "Admin access is required.");
         try {
-          await requestHostedSiteService().setBlocked(params.siteId, false);
+          await runApiEffect(requestHostedSiteService().setBlocked(params.siteId, false));
           return json({ blocked: false });
         } catch (error) {
           return hostedSiteErrorResponse(error);

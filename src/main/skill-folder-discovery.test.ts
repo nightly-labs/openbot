@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { listFolderSkills } from "./skill-folder-discovery";
 
@@ -25,7 +26,9 @@ async function writeSkill(base: string, folder: string, slug: string, content: s
 }
 
 function list(provider: AgentProviderId, exclude: string[] = []) {
-  return listFolderSkills({ provider, workspacePath }, new Set(exclude));
+  return Effect.runPromise(
+    listFolderSkills({ provider, workspacePath }, new Set(exclude)).pipe(Effect.mapError((error) => error.cause)),
+  );
 }
 
 describe("listFolderSkills", () => {

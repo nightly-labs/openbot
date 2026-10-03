@@ -1,3 +1,7 @@
+import { Effect } from "effect";
+import type { BrowserOperationError } from "./browser-effects";
+import { runTestEffect } from "./effect-test-runtime";
+import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 // @vitest-environment node
 
 import { randomUUID } from "node:crypto";
@@ -16,6 +20,7 @@ import { MailboxStore } from "./mailbox-store";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
+  type DynamicToolResult,
   getString,
   type RequestId,
   type ResponseDecoder,
@@ -91,7 +96,7 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
  * have set, and removes the temporary root.
  */
 export async function stopAgentTestFixture(root: string, service: AgentService | null): Promise<void> {
-  await service?.stop();
+  if (service) await runTestEffect(service.stop());
   vi.useRealTimers();
   for (const [name, original] of originalProviderPaths) {
     if (original === undefined) delete process.env[name];
@@ -136,127 +141,141 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
     this.running = true;
   }
 
-  async stop(): Promise<void> {
-    this.running = false;
+  stop(): Effect.Effect<void, ProviderClientOperationError> {
+    return Effect.sync(() => {
+      this.running = false;
+    });
   }
 
-  async releaseThread(externalThreadId: string): Promise<void> {
-    this.releasedThreads.push(externalThreadId);
+  releaseThread(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError> {
+    return Effect.sync(() => {
+      this.releasedThreads.push(externalThreadId);
+    });
   }
 
-  async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>): Promise<T> {
-    this.requests.push({ method, params: structuredClone(params) });
-    await this.requestHook?.(method, this.provider);
-    const delayMs = this.requestDelays[method] ?? 0;
-    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    let result: unknown;
-    if (method === "initialize") result = {};
-    if (method === "account/read") {
-      result = {
-        account: this.accountSignedIn
-          ? {
-              type: this.provider === "codex" ? "chatgpt" : this.provider,
-              email: `${this.provider}@example.com`,
-            }
-          : null,
-        requiresOpenaiAuth: false,
-      };
-    }
-    if (method === "account/login/start") {
-      // The two shapes the real app server answers with: a URL this computer opens, or a code the
-      // user types elsewhere. Which one comes back is decided by what the caller asked for.
-      result =
-        isDynamicRecord(params) && params.type === "chatgptDeviceCode"
-          ? {
-              type: "chatgptDeviceCode",
-              loginId: "login-1",
-              verificationUrl: "https://auth.openai.test/device",
-              userCode: "TEST-CODE",
-            }
-          : { type: "chatgpt", loginId: "login-1", authUrl: "https://auth.openai.test/connect" };
-    }
-    if (method === "account/login/cancel") result = { status: "cancelled" };
-    if (method === "account/rateLimits/read") {
-      result = this.accountRateLimits;
-    }
-    if (method === "model/list") {
-      result = {
-        data:
-          this.provider === "codex"
-            ? [
-                "gpt-reserve",
-                "gpt-6-luna",
-                "gpt-5.6-luna",
-                "gpt-5.6-terra",
-                "gpt-5.6-sol",
-                "gpt-5.5",
-                "gpt-5.4",
-                "gpt-5.4-mini",
-                "gpt-5.3-codex-spark",
-                "codex-auto-review",
-              ].map((model) => ({ model }))
-            : this.provider === "opencode"
-              ? [{ model: "opencode/example-model" }]
-              : this.provider === "grok"
-                ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
-                : ["claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
-      };
-    }
-    if (method === "model/list" && this.modelList) result = this.modelList(params);
-    if (method === "plugin/list") result = { marketplaces: [] };
-    if (method === "config/read") result = this.configRead;
-    if (method === "thread/start") {
-      this.#threadCounter += 1;
-      result = { thread: { id: `${this.sessionIdPrefix ?? this.provider}-session-${this.#threadCounter}` } };
-    }
-    if (method === "thread/resume") {
-      result = { thread: { id: stringParam(params, "threadId") } };
-    }
-    if (method === "thread/read") {
-      result = this.threadRead?.(params) ?? { thread: { id: stringParam(params, "threadId"), turns: [] } };
-    }
-    if (method === "thread/compact/start" || method === "turn/interrupt") result = {};
-    if (method === "turn/steer") {
-      result = { turnId: stringParam(params, "expectedTurnId") };
-    }
-    if (method === "turn/start") {
-      const threadId = stringParam(params, "threadId");
-      const turnId = randomUUID();
-      const itemId = `${turnId}:assistant`;
-      const text = this.output;
-      setTimeout(() => {
-        if (!this.running) return;
-        this.emit("notification", notification("turn/started", { threadId, turn: { id: turnId } }));
-        if (!this.autoComplete) return;
-        this.emit(
-          "notification",
-          notification("item/started", {
-            threadId,
-            turnId,
-            item: { id: itemId, type: "agentMessage", text: "" },
-          }),
-        );
-        this.emit("notification", notification("item/agentMessage/delta", { threadId, turnId, itemId, delta: text }));
-        this.emit(
-          "notification",
-          notification("item/completed", {
-            threadId,
-            turnId,
-            item: { id: itemId, type: "agentMessage", text },
-          }),
-        );
-        this.emit(
-          "notification",
-          notification("turn/completed", {
-            threadId,
-            turn: { id: turnId, status: "completed" },
-          }),
-        );
-      }, 0);
-      result = { turn: { id: turnId, status: "inProgress", items: [] } };
-    }
-    if (result === undefined) throw new Error(`Fake client does not implement ${method}.`);
-    return decoder(result);
+  request<T>(
+    method: string,
+    params: unknown,
+    decoder: ResponseDecoder<T>,
+  ): Effect.Effect<T, ProviderClientOperationError> {
+    return Effect.gen({ self: this }, function* () {
+      this.requests.push({ method, params: structuredClone(params) });
+      const requestHook = this.requestHook;
+      if (requestHook)
+        yield* Effect.tryPromise({ try: () => requestHook(method, this.provider), catch: providerFailure });
+      const delayMs = this.requestDelays[method] ?? 0;
+      if (delayMs > 0) yield* Effect.sleep(delayMs);
+      let result: unknown;
+      if (method === "initialize") result = {};
+      if (method === "account/read") {
+        result = {
+          account: this.accountSignedIn
+            ? {
+                type: this.provider === "codex" ? "chatgpt" : this.provider,
+                email: `${this.provider}@example.com`,
+              }
+            : null,
+          requiresOpenaiAuth: false,
+        };
+      }
+      if (method === "account/login/start") {
+        // The two shapes the real app server answers with: a URL this computer opens, or a code the
+        // user types elsewhere. Which one comes back is decided by what the caller asked for.
+        result =
+          isDynamicRecord(params) && params.type === "chatgptDeviceCode"
+            ? {
+                type: "chatgptDeviceCode",
+                loginId: "login-1",
+                verificationUrl: "https://auth.openai.test/device",
+                userCode: "TEST-CODE",
+              }
+            : { type: "chatgpt", loginId: "login-1", authUrl: "https://auth.openai.test/connect" };
+      }
+      if (method === "account/login/cancel") result = { status: "cancelled" };
+      if (method === "account/rateLimits/read") {
+        result = this.accountRateLimits;
+      }
+      if (method === "model/list") {
+        result = {
+          data:
+            this.provider === "codex"
+              ? [
+                  "gpt-reserve",
+                  "gpt-6-luna",
+                  "gpt-5.6-luna",
+                  "gpt-5.6-terra",
+                  "gpt-5.6-sol",
+                  "gpt-5.5",
+                  "gpt-5.4",
+                  "gpt-5.4-mini",
+                  "gpt-5.3-codex-spark",
+                  "codex-auto-review",
+                ].map((model) => ({ model }))
+              : this.provider === "opencode"
+                ? [{ model: "opencode/example-model" }]
+                : this.provider === "grok"
+                  ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
+                  : ["claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({
+                      model,
+                    })),
+        };
+      }
+      if (method === "model/list" && this.modelList) result = this.modelList(params);
+      if (method === "plugin/list") result = { marketplaces: [] };
+      if (method === "config/read") result = this.configRead;
+      if (method === "thread/start") {
+        this.#threadCounter += 1;
+        result = { thread: { id: `${this.sessionIdPrefix ?? this.provider}-session-${this.#threadCounter}` } };
+      }
+      if (method === "thread/resume") {
+        result = { thread: { id: stringParam(params, "threadId") } };
+      }
+      if (method === "thread/read") {
+        result = this.threadRead?.(params) ?? { thread: { id: stringParam(params, "threadId"), turns: [] } };
+      }
+      if (method === "thread/compact/start" || method === "turn/interrupt") result = {};
+      if (method === "turn/steer") {
+        result = { turnId: stringParam(params, "expectedTurnId") };
+      }
+      if (method === "turn/start") {
+        const threadId = stringParam(params, "threadId");
+        const turnId = randomUUID();
+        const itemId = `${turnId}:assistant`;
+        const text = this.output;
+        setTimeout(() => {
+          if (!this.running) return;
+          this.emit("notification", notification("turn/started", { threadId, turn: { id: turnId } }));
+          if (!this.autoComplete) return;
+          this.emit(
+            "notification",
+            notification("item/started", {
+              threadId,
+              turnId,
+              item: { id: itemId, type: "agentMessage", text: "" },
+            }),
+          );
+          this.emit("notification", notification("item/agentMessage/delta", { threadId, turnId, itemId, delta: text }));
+          this.emit(
+            "notification",
+            notification("item/completed", {
+              threadId,
+              turnId,
+              item: { id: itemId, type: "agentMessage", text },
+            }),
+          );
+          this.emit(
+            "notification",
+            notification("turn/completed", {
+              threadId,
+              turn: { id: turnId, status: "completed" },
+            }),
+          );
+        }, 0);
+        result = { turn: { id: turnId, status: "inProgress", items: [] } };
+      }
+      if (result === undefined) throw new Error(`Fake client does not implement ${method}.`);
+      return decoder(result);
+    }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
   }
 
   notify(): void {}
@@ -391,15 +410,21 @@ export function fakeBrowser(tabs: BrowserTab[] = [], uploadTarget = { inputId: "
     listTabs: () => tabs,
     // Annotated rather than inferred: `=> undefined` would give these properties a return type no
     // block-bodied replacement can satisfy, and replacing one is the whole point of the plain property.
-    beginTakeover: async (_tabId: string): Promise<void> => undefined,
+    beginTakeover: (_tabId: string): Effect.Effect<void, BrowserOperationError> => Effect.void,
     endTakeover: (_tabId: string): void => undefined,
-    close: async (_tabId: string): Promise<void> => undefined,
-    resolveUploadTarget: async (_params: DynamicToolCallParams) => uploadTarget,
-    handleDynamicTool: async (_params: DynamicToolCallParams, hooks?: BrowserUploadHooks) => {
-      hooks?.onUploadTargetResolved?.(uploadTarget.inputId, uploadTarget.documentId);
-      hooks?.onUploadAssigned?.(uploadTarget.inputId, uploadTarget.documentId);
-      return { success: true, contentItems: [] };
-    },
+    close: (_tabId: string): Effect.Effect<void, BrowserOperationError> => Effect.void,
+    resolveUploadTarget: (
+      _params: DynamicToolCallParams,
+    ): Effect.Effect<{ inputId: string; documentId: string }, BrowserOperationError> => Effect.succeed(uploadTarget),
+    handleDynamicTool: (
+      _params: DynamicToolCallParams,
+      hooks?: BrowserUploadHooks,
+    ): Effect.Effect<DynamicToolResult, BrowserOperationError> =>
+      Effect.sync(() => {
+        hooks?.onUploadTargetResolved?.(uploadTarget.inputId, uploadTarget.documentId);
+        hooks?.onUploadAssigned?.(uploadTarget.inputId, uploadTarget.documentId);
+        return { success: true, contentItems: [] };
+      }),
   };
 }
 
@@ -474,7 +499,7 @@ export async function startService(root: string, options: StartServiceOptions = 
       : {}),
     ...serviceOptions,
   });
-  await service.initialize();
+  await runTestEffect(service.initialize());
   return {
     service,
     client,

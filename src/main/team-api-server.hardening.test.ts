@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // What the server refuses: an internal error it will not describe, a rate limit it will not let
@@ -65,7 +66,7 @@ describe("TeamApiServer hardening", () => {
 
   it("rejects WebSocket event frames larger than one KiB", async () => {
     const { store, start } = await createTeamApiFixture("websocket-limit", { configure: true });
-    const login = await store.login("owner", "correct horse battery");
+    const login = await Effect.runPromise(store.login("owner", "correct horse battery"));
     const { port } = await start();
     const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
       "openbot-events",

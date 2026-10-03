@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // What a channel remembers: the notes every member of it carries into a turn.
 
 import { decodeChannelMemories, decodeChannelMemory } from "@openbot/contracts/ipc";
@@ -28,42 +30,62 @@ export function channelMemoryIpcHandlers({
       listChannelMemories: scopedHandler(parseChannelId, {
         local: (channelId) => service.listChannelMemories(channelId),
         remote: (channelId, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
-            method: "POST",
-            body: { channelId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
+                method: "POST",
+                body: { channelId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       createChannelMemory: scopedHandler(parseCreateChannelMemory, {
         local: (parsed) => service.createChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       updateChannelMemory: scopedHandler(parseUpdateChannelMemory, {
         local: (parsed) => service.updateChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       deleteChannelMemory: scopedHandler(parseDeleteChannelMemory, {
         local: (parsed) => service.deleteChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       clearChannelMemories: scopedHandler(parseChannelId, {
         local: (channelId) => service.clearChannelMemories(channelId),
         remote: (channelId, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
-            method: "POST",
-            body: { channelId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
+                method: "POST",
+                body: { channelId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
     },
   };

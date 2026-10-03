@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
+import { Effect } from "effect";
 import { resolveRemoteDesktopRuntime } from "../src/main/remote-desktop-runtime-artifact";
 import { SunshineMoonlightRuntime } from "../src/main/sunshine-moonlight-runtime";
 
@@ -13,13 +14,15 @@ if (process.platform !== "darwin" && process.platform !== "linux") {
   throw new Error("The local runtime smoke test supports macOS and Linux only.");
 }
 
-const paths = await resolveRemoteDesktopRuntime({
-  isPackaged: false,
-  resourcesPath: process.cwd(),
-  sourceRoot: resolve("."),
-  platform: process.platform,
-  architecture: process.arch,
-});
+const paths = await Effect.runPromise(
+  resolveRemoteDesktopRuntime({
+    isPackaged: false,
+    resourcesPath: process.cwd(),
+    sourceRoot: resolve("."),
+    platform: process.platform,
+    architecture: process.arch,
+  }),
+);
 if (!paths) throw new Error("Build or install the remote desktop runtime before the smoke test.");
 const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-remote-runtime-smoke-"));
 const runtime = new SunshineMoonlightRuntime({
@@ -32,12 +35,12 @@ const runtime = new SunshineMoonlightRuntime({
   },
   // The runtime shows only the Sunshine displays that match a local display, as Electron lists them.
   getDisplays: () => [{ id: "1", label: "Primary display", width: 1920, height: 1080, primary: true }],
-  getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+  getIceServers: () => Effect.succeed([{ urls: "stun:127.0.0.1:3478" }]),
   onDiagnostic: (source, message) => process.stderr.write(`[${source}] ${message}`),
 });
 
 try {
-  const state = await runtime.start();
+  const state = await Effect.runPromise(runtime.start().pipe(Effect.mapError((error) => error.cause)));
   if (!state.baseUrl.startsWith("http://127.0.0.1:")) throw new Error("Moonlight Web did not bind to loopback.");
   if (state.hostIds.length !== 4 || !state.hostIds.every(Number.isInteger) || !Number.isInteger(state.desktopAppId)) {
     throw new Error("Moonlight Web did not pair with the Sunshine Desktop application.");
@@ -51,6 +54,6 @@ try {
     `Remote desktop runtime is ready on loopback (hosts ${state.hostIds.join(", ")}, app ${state.desktopAppId}).`,
   );
 } finally {
-  await runtime.stop();
+  await Effect.runPromise(runtime.stop().pipe(Effect.mapError((error) => error.cause)));
   await rm(stateDirectory, { recursive: true, force: true });
 }

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // The embedded browser and its picture-in-picture window.
 
 import { type BrowserDisplayState, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
@@ -57,73 +59,110 @@ export function browserIpcHandlers({
       open: payloadHandler(parseBrowserOpen, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>
-            browser.open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus),
+            Effect.runPromise(
+              browser
+                .open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus)
+                .pipe(Effect.mapError((error) => error.cause)),
+            ),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
-              method: "POST",
-              body: parsed,
-            }),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
+                  method: "POST",
+                  body: parsed,
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       activate: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.activate(tabId),
+          local: () => Effect.runPromise(browser.activate(tabId).pipe(Effect.mapError((error) => error.cause))),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
+                  method: "POST",
+                  body: { tabId },
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       navigate: payloadHandler(parseBrowserNavigate, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>
             "url" in parsed
-              ? browser.loadUrl(parsed.tabId, parsed.url)
-              : browser.navigate(parsed.tabId, parsed.direction),
+              ? Effect.runPromise(
+                  browser.loadUrl(parsed.tabId, parsed.url).pipe(Effect.mapError((error) => error.cause)),
+                )
+              : Effect.runPromise(
+                  browser.navigate(parsed.tabId, parsed.direction).pipe(Effect.mapError((error) => error.cause)),
+                ),
           remote: (serverId) => {
             if (!("url" in parsed)) {
-              return remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
-                method: "POST",
-                body: parsed,
-              });
+              return Effect.runPromise(
+                remoteServers
+                  .request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
+                    method: "POST",
+                    body: parsed,
+                  })
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              );
             }
             // An older host has no route that moves an existing tab to an address. The renderer
             // opens a new tab for it instead, so this stays the error that tells it to.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
-            return remoteServers.request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
-              method: "POST",
-              body: parsed,
-            });
+            return Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
+                  method: "POST",
+                  body: parsed,
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            );
           },
         }),
       ),
       reload: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.reload(tabId),
+          local: () => Effect.runPromise(browser.reload(tabId).pipe(Effect.mapError((error) => error.cause))),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
+                  method: "POST",
+                  body: { tabId },
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       close: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.close(tabId),
+          local: () => Effect.runPromise(browser.close(tabId).pipe(Effect.mapError((error) => error.cause))),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
+                  method: "POST",
+                  body: { tabId },
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       listTabs: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.listTabs(),
-          remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
+          remote: (serverId) =>
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       getDisplayState: handler(() =>
@@ -133,10 +172,18 @@ export function browserIpcHandlers({
             // Without the capability the host can only list tabs, and nothing on that list says
             // which one is in front. The first tab is the guess this route exists to replace.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
-              const tabs = await remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs);
+              const tabs = await Effect.runPromise(
+                remoteServers
+                  .request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              );
               return { tabs, activeTabId: tabs[0]?.id ?? null };
             }
-            return remoteServers.request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState);
+            return Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState)
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            );
           },
         }),
       ),
@@ -144,17 +191,25 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.getControlState(),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState)
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       capturePreview: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.capturePreview(tabId),
+          local: () => Effect.runPromise(browser.capturePreview(tabId).pipe(Effect.mapError((error) => error.cause))),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
-              method: "POST",
-              body: { tabId },
-            }),
+            Effect.runPromise(
+              remoteServers
+                .request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
+                  method: "POST",
+                  body: { tabId },
+                })
+                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            ),
         }),
       ),
       // Visibility is a local placement, not a remote operation, so a host's tab is left alone. The
@@ -163,11 +218,14 @@ export function browserIpcHandlers({
       // at coordinates that mean nothing there, and still showed the remote user nothing.
       // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
-        if (remoteServers.activeServerId === LOCAL_SERVER_ID) browser.setVisible(parsed);
+        if (remoteServers.activeServerId === LOCAL_SERVER_ID)
+          await Effect.runPromise(browser.setVisible(parsed).pipe(Effect.mapError((error) => error.cause)));
       }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => browserView.start(tabId)),
-      stopLiveView: handler(() => browserView.stop()),
+      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) =>
+        Effect.runPromise(browserView.start(tabId).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      stopLiveView: handler(() => Effect.runPromise(browserView.stop().pipe(Effect.mapError((error) => error.cause)))),
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
         browserPictureInPicture.open(bounds),
       ),

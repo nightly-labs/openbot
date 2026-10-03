@@ -1,3 +1,4 @@
+import { remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
 import type { AgentEvent, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
@@ -90,14 +91,15 @@ function setup() {
     getHostAnalytics: () => null,
     getRemoteServerManager: () => ({
       list: () => servers,
-      request: (serverId, _path, decoder) => {
-        const result = request(serverId).then(decoder);
-        lookupSettled = result.then(
-          () => undefined,
-          () => undefined,
-        );
-        return result;
-      },
+      request: (serverId, _path, decoder) =>
+        remoteCall(() => {
+          const result = request(serverId).then(decoder);
+          lookupSettled = result.then(
+            () => undefined,
+            () => undefined,
+          );
+          return result;
+        }),
     }),
     showMainWindow: vi.fn(),
     getTranslate: () => translateFor("en"),

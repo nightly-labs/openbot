@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import {
   apiError,
   json,
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/v1/skills/admin/submissions")({
       GET: async ({ request }) => {
         try {
           return requireSkillsAdmin(request)
-            ? json(await requestSkillMarketplace().pending())
+            ? json(await runApiEffect(requestSkillMarketplace().pending()))
             : apiError(401, "unauthorized", "An admin token is required.");
         } catch (error) {
           return skillErrorResponse(error);

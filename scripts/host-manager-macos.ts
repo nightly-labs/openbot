@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { chmod, lstat, mkdir, readdir, readlink, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { Effect } from "effect";
 import { z } from "zod";
 import type { HostManagerOperations } from "../src/main/host-manager";
 import { HOST_MANAGER_DIRECTORY, verifyHostDirectory } from "../src/main/host-update-files";
@@ -67,7 +68,7 @@ export async function verifyHostPath(path: string): Promise<void> {
     await verifyNoWriteAcl(path);
     return;
   }
-  await verifyHostDirectory(path);
+  await Effect.runPromise(verifyHostDirectory(path).pipe(Effect.mapError((error) => error.cause)));
   for (let part = resolve(path); ; part = dirname(part)) {
     await verifyNoWriteAcl(part);
     if (dirname(part) === part) break;

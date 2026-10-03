@@ -1,3 +1,4 @@
+import { runTestEffect } from "../../effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -41,8 +42,12 @@ describe("SlackWebApi.download", () => {
     roots.push(root);
     const api = new SlackWebApi({ token: TOKEN, origin: slack });
 
-    await expect(api.download(`${foreign}/file`, join(root, "direct"), 1024)).rejects.toThrow("untrusted_file_url");
-    await expect(api.download(`${slack}/file`, join(root, "redirected"), 1024)).rejects.toThrow("untrusted_file_url");
+    await expect(runTestEffect(api.download(`${foreign}/file`, join(root, "direct"), 1024))).rejects.toThrow(
+      "untrusted_file_url",
+    );
+    await expect(runTestEffect(api.download(`${slack}/file`, join(root, "redirected"), 1024))).rejects.toThrow(
+      "untrusted_file_url",
+    );
     expect(seen).toEqual([]);
   });
 
@@ -53,10 +58,10 @@ describe("SlackWebApi.download", () => {
     const api = new SlackWebApi({ token: TOKEN, origin: slack });
     const destination = join(root, "big");
 
-    await expect(api.download(`${slack}/file`, destination, 1024)).rejects.toThrow("too_large");
+    await expect(runTestEffect(api.download(`${slack}/file`, destination, 1024))).rejects.toThrow("too_large");
     await expect(stat(destination)).rejects.toThrow();
 
-    await api.download(`${slack}/file`, destination, 8192);
+    await runTestEffect(api.download(`${slack}/file`, destination, 8192));
     expect((await readFile(destination)).byteLength).toBe(4096);
   });
 });

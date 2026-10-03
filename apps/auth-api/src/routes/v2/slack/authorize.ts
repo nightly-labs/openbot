@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import { apiError, json, requestSlackApp, requestUser, slackAppErrorResponse } from "../../../server/request-auth";
 
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/v2/slack/authorize")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           const body = await readJsonObject(request);
           if (!isString(body.hostId) || !isString(body.hostNonce) || !isString(body.hostPublicKey))
@@ -18,13 +19,15 @@ export const Route = createFileRoute("/v2/slack/authorize")({
           if (body.returnUrl !== undefined && !isString(body.returnUrl))
             return apiError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
           const slack = requestSlackApp();
-          const authorizeUrl = await slack.authorizeUrl(user, {
-            hostId: body.hostId,
-            hostNonce: body.hostNonce,
-            hostPublicKey: body.hostPublicKey,
-            redirectUri: slack.redirectUri(request.url),
-            ...(body.returnUrl ? { returnUrl: body.returnUrl } : {}),
-          });
+          const authorizeUrl = await runApiEffect(
+            slack.authorizeUrl(user, {
+              hostId: body.hostId,
+              hostNonce: body.hostNonce,
+              hostPublicKey: body.hostPublicKey,
+              redirectUri: slack.redirectUri(request.url),
+              ...(body.returnUrl ? { returnUrl: body.returnUrl } : {}),
+            }),
+          );
           return json({ authorizeUrl });
         } catch (error) {
           return slackAppErrorResponse(error);

@@ -3,9 +3,16 @@ import { lstat, mkdir, readlink, realpath, rename, symlink, writeFile } from "no
 import { basename, dirname, join, resolve } from "node:path";
 import type { HookCallbackMatcher, Options, SdkPluginConfig } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Result } from "effect";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
 import { isMissingFileError } from "./file-errors";
 import { isPathInside } from "./path-containment";
+import {
+  type ProviderClientOperationError,
+  providerCall,
+  providerFailure,
+  runProviderClientEffect,
+} from "./provider-client-effects";
 
 /**
  * Workspace only for Claude has two parts, because the Claude sandbox covers Bash and nothing else.
@@ -49,30 +56,32 @@ export const CLAUDE_WORKSPACE_MANAGED_SETTINGS: NonNullable<Options["managedSett
  * `/<name>` still works. The plugin folder is in `stateDirectory`, outside every root the agent can
  * write: a plugin can also start hooks and language servers, which run outside the sandbox.
  */
-export async function claudeWorkspaceSkillPlugin(stateDirectory: string, cwd: string): Promise<SdkPluginConfig> {
+export const claudeWorkspaceSkillPlugin = Effect.fn("ClaudeWorkspace.skillPlugin")(function* (
+  stateDirectory: string,
+  cwd: string,
+): Effect.fn.Return<SdkPluginConfig, ProviderClientOperationError> {
   const directory = join(stateDirectory, "claude-skill-plugins", createHash("sha256").update(cwd).digest("hex"));
-  await mkdir(join(directory, ".claude-plugin"), { recursive: true, mode: 0o700 });
-  await writeFile(join(directory, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "openbot" })}\n`);
+  yield* providerCall(() => mkdir(join(directory, ".claude-plugin"), { recursive: true, mode: 0o700 }));
+  yield* providerCall(() =>
+    writeFile(join(directory, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "openbot" })}\n`),
+  );
   const link = join(directory, "skills");
   const target = join(cwd, ".claude", "skills");
-  if ((await currentLink(link)) !== target) {
+  if ((yield* currentLink(link)) !== target) {
     // A link made aside and renamed over the old one, so a query that starts at the same time never
     // sees the plugin without its skills.
     const staged = `${link}.${randomUUID()}`;
-    await symlink(target, staged, "junction");
-    await rename(staged, link);
+    yield* providerCall(() => symlink(target, staged, "junction"));
+    yield* providerCall(() => rename(staged, link));
   }
   return { type: "local", path: directory };
-}
+});
 
-async function currentLink(path: string): Promise<string | null> {
-  try {
-    return await readlink(path);
-  } catch (error) {
-    if (isMissingFileError(error)) return null;
-    throw error;
-  }
-}
+const currentLink = Effect.fn("ClaudeWorkspace.currentLink")((path: string) =>
+  providerCall(() => readlink(path)).pipe(
+    Effect.catch((error) => (isMissingFileError(error.cause) ? Effect.succeed(null) : Effect.fail(error))),
+  ),
+);
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
@@ -83,7 +92,9 @@ export function claudeWorkspaceHooks(cwd: string, roots: readonly string[]): Non
     hooks: [
       async (input) => {
         if (input.hook_event_name !== "PreToolUse") return {};
-        const target = await claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots);
+        const target = await runProviderClientEffect(
+          claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots),
+        );
         if (!target) return {};
         return {
           hookSpecificOutput: {
@@ -105,25 +116,24 @@ export function claudeWorkspaceHooks(cwd: string, roots: readonly string[]): Non
  * resolved counts as outside. Claude's own settings files in a root count as outside too: Workspace
  * only ignores them, but a Full access session or Claude in a terminal loads them and runs their hooks.
  */
-export async function claudeWriteOutsideRoots(
+export const claudeWriteOutsideRoots = Effect.fn("ClaudeWorkspace.writeOutsideRoots")(function* (
   toolName: string,
   toolInput: unknown,
   cwd: string,
   roots: readonly string[],
-): Promise<string | null> {
+) {
   if (!WRITE_TOOLS.includes(toolName)) return null;
   const path = isDynamicRecord(toolInput) ? writePath(toolInput.file_path ?? toolInput.notebook_path) : null;
-  // A write tool without a path fails in Claude itself; asking first costs nothing.
   if (!path) return "an unknown path";
-  try {
-    const target = await resolveExisting(resolve(cwd, path));
+  return yield* Effect.gen(function* () {
+    const target = yield* resolveExisting(resolve(cwd, path));
     if (isClaudeSettingsFile(target)) return path;
-    const realRoots = await Promise.all(writableRoots(roots).map((root) => resolveExisting(resolve(root))));
+    const realRoots = yield* Effect.forEach(writableRoots(roots), (root) => resolveExisting(resolve(root)), {
+      concurrency: "unbounded",
+    });
     return realRoots.some((root) => isPathInside(root, target)) ? null : path;
-  } catch {
-    return path;
-  }
-}
+  }).pipe(Effect.catch(() => Effect.succeed(path)));
+});
 
 function writableRoots(roots: readonly string[]): string[] {
   return [...roots, ...workspaceTemporaryPaths()];
@@ -145,20 +155,21 @@ const MAX_LINKS = 40;
  * does, and a link to a file that does not exist through the link's target. It throws for any other
  * error and for a loop of links.
  */
-async function resolveExisting(path: string, links = 0): Promise<string> {
-  try {
-    return await realpath(path);
-  } catch (error) {
-    if (!isMissingFileError(error)) throw error;
-  }
-  let isLink: boolean;
-  try {
-    isLink = (await lstat(path)).isSymbolicLink();
-  } catch (error) {
-    if (!isMissingFileError(error)) throw error;
+const resolveExisting = Effect.fn("ClaudeWorkspace.resolveExisting")(function* (
+  path: string,
+  links = 0,
+): Effect.fn.Return<string, ProviderClientOperationError> {
+  const real = yield* Effect.result(providerCall(() => realpath(path)));
+  if (Result.isSuccess(real)) return real.success;
+  if (!isMissingFileError(real.failure.cause)) return yield* real.failure;
+  const info = yield* Effect.result(providerCall(() => lstat(path)));
+  if (Result.isFailure(info)) {
+    if (!isMissingFileError(info.failure.cause)) return yield* info.failure;
     const parent = dirname(path);
-    return parent === path ? path : resolve(await resolveExisting(parent, links), basename(path));
+    return parent === path ? path : resolve(yield* resolveExisting(parent, links), basename(path));
   }
-  if (!isLink || links >= MAX_LINKS) throw new Error(`Cannot resolve ${path}.`);
-  return resolveExisting(resolve(dirname(path), await readlink(path)), links + 1);
-}
+  if (!info.success.isSymbolicLink() || links >= MAX_LINKS)
+    return yield* providerFailure(new Error(`Cannot resolve ${path}.`));
+  const target = yield* providerCall(() => readlink(path));
+  return yield* resolveExisting(resolve(dirname(path), target), links + 1);
+});

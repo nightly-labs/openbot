@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import {
   apiError,
   hostedServerErrorResponse,
@@ -12,9 +13,9 @@ export const Route = createFileRoute("/v2/hosting/servers/$serverId/status")({
     handlers: {
       GET: async ({ request, params }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json(await requestHostedServerService().status(user, params.serverId));
+          return json(await runApiEffect(requestHostedServerService().status(user, params.serverId)));
         } catch (error) {
           return hostedServerErrorResponse(error);
         }

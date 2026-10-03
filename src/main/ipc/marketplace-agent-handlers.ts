@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The agent marketplace: browsing, submitting and installing a published agent.
 
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
@@ -14,12 +15,24 @@ export function marketplaceAgentIpcHandlers({
 }: MarketplaceAgentIpcDependencies): Pick<IpcGroupHandlers, "marketplaceAgents"> {
   return {
     marketplaceAgents: {
-      list: payloadHandler(nullishPayload(parseMarketplaceAgentQuery), (query) => marketplaceAgents.list(query)),
-      get: payloadHandler(stringPayload("agentId"), (agentId) => marketplaceAgents.get(agentId)),
-      listMine: handler(() => marketplaceAgents.listMine()),
-      preview: payloadHandler(stringPayload("agentId"), (agentId) => marketplaceAgents.preview(agentId)),
-      submit: payloadHandler(parseSubmitMarketplaceAgent, (submission) => marketplaceAgents.submit(submission)),
-      install: payloadHandler(parseInstallMarketplaceAgent, (installation) => marketplaceAgents.install(installation)),
+      list: payloadHandler(nullishPayload(parseMarketplaceAgentQuery), (query) =>
+        Effect.runPromise(marketplaceAgents.list(query).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      get: payloadHandler(stringPayload("agentId"), (agentId) =>
+        Effect.runPromise(marketplaceAgents.get(agentId).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      listMine: handler(() =>
+        Effect.runPromise(marketplaceAgents.listMine().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      preview: payloadHandler(stringPayload("agentId"), (agentId) =>
+        Effect.runPromise(marketplaceAgents.preview(agentId).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      submit: payloadHandler(parseSubmitMarketplaceAgent, (submission) =>
+        Effect.runPromise(marketplaceAgents.submit(submission).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      install: payloadHandler(parseInstallMarketplaceAgent, (installation) =>
+        Effect.runPromise(marketplaceAgents.install(installation).pipe(Effect.mapError((error) => error.cause))),
+      ),
     },
   };
 }

@@ -5,6 +5,7 @@ import {
   AGENT_IMPORT_UPLOAD_BYTES,
 } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import type { TeamApiAgentImport } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -33,7 +34,7 @@ export async function routeAgentImport(
     throw new HttpError(400, sourceText("error.team.agentImportUnsupported"));
 
   if (route === AGENT_IMPORT_ROUTES.discard) {
-    agentImport.discard(stringField(await readJson(request), "token"), member.id);
+    await Effect.runPromise(agentImport.discard(stringField(await readJson(request), "token"), member.id));
     return json(200, {});
   }
   if (route === AGENT_IMPORT_ROUTES.stage) {
@@ -43,7 +44,13 @@ export async function routeAgentImport(
           throw new HttpError(413, sourceText("error.import.remoteZipTooLarge"));
         throw error;
       });
-    return json(200, await answer(() => agentImport.stageUpload(read, member.id), 400));
+    return json(
+      200,
+      await answer(
+        () => Effect.runPromise(agentImport.stageUpload(read, member.id).pipe(Effect.mapError((error) => error.cause))),
+        400,
+      ),
+    );
   }
   // `readJson` has already run the body through the agent-import wire codec.
   const body = await readJson(request);
@@ -56,13 +63,17 @@ export async function routeAgentImport(
   }
   const result = await answer(
     () =>
-      agentImport.apply(input, {
-        owner: member.id,
-        actor: { id: member.id, name: member.name ?? "Team member" },
-        // The service checks the zone and uses the host's own when it is not valid.
-        ...(typeof body.timezone === "string" ? { timezone: body.timezone } : {}),
-        reviseSkills: member.role !== "member",
-      }),
+      Effect.runPromise(
+        agentImport
+          .apply(input, {
+            owner: member.id,
+            actor: { id: member.id, name: member.name ?? "Team member" },
+            // The service checks the zone and uses the host's own when it is not valid.
+            ...(typeof body.timezone === "string" ? { timezone: body.timezone } : {}),
+            reviseSkills: member.role !== "member",
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     409,
   );
   return json(200, {

@@ -3,6 +3,7 @@ import {
   QueueEditRejectedError,
   TEAM_QUEUE_EDIT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { Effect } from "effect";
 import { HttpError } from "./http-error";
 // One agent's outgoing queue, and the ways a member can change their mind about it.
 //
@@ -44,7 +45,11 @@ export async function routeAgentQueue(
     try {
       return json(
         200,
-        await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request)), memberSender(member)),
+        await Effect.runPromise(
+          agents
+            .editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request)), memberSender(member))
+            .pipe(Effect.mapError((error) => error.cause)),
+        ),
       );
     } catch (error) {
       if (error instanceof QueueEditRejectedError) throw new HttpError(409, error.message);
@@ -61,43 +66,61 @@ export async function routeAgentQueue(
   }
   if (method === "POST" && action === "queue/cancel") {
     const body = await readJson(request);
-    await agents.cancelQueuedMessage(agentId, stringField(body, "deliveryId"));
+    await Effect.runPromise(
+      agents
+        .cancelQueuedMessage(agentId, stringField(body, "deliveryId"))
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && action === "queue/steer") {
     const body = await readJson(request);
-    await agents.steerQueuedMessage({
-      agentId,
-      deliveryId: stringField(body, "deliveryId"),
-      expectedTurnId: stringField(body, "expectedTurnId"),
-    } satisfies SteerQueuedMessageInput);
+    await Effect.runPromise(
+      agents
+        .steerQueuedMessage({
+          agentId,
+          deliveryId: stringField(body, "deliveryId"),
+          expectedTurnId: stringField(body, "expectedTurnId"),
+        } satisfies SteerQueuedMessageInput)
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && action === "queue/update") {
     const body = await readJson(request);
-    await agents.updateQueuedMessage(
-      {
-        agentId,
-        deliveryId: stringField(body, "deliveryId"),
-        text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-        keepAttachmentIds: stringArray(body, "keepAttachmentIds"),
-        attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-      } satisfies UpdateQueuedMessageInput,
-      memberSender(member),
+    await Effect.runPromise(
+      agents
+        .updateQueuedMessage(
+          {
+            agentId,
+            deliveryId: stringField(body, "deliveryId"),
+            text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+            keepAttachmentIds: stringArray(body, "keepAttachmentIds"),
+            attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+          } satisfies UpdateQueuedMessageInput,
+          memberSender(member),
+        )
+        .pipe(Effect.mapError((error) => error.cause)),
     );
     return empty(204);
   }
   if (method === "POST" && action === "queue/reorder") {
     const body = await readJson(request);
-    await agents.reorderQueue({
-      agentId,
-      deliveryIds: stringArray(body, "deliveryIds", INPUT_LIMITS.messageRecipients),
-    } satisfies ReorderQueueInput);
+    await Effect.runPromise(
+      agents
+        .reorderQueue({
+          agentId,
+          deliveryIds: stringArray(body, "deliveryIds", INPUT_LIMITS.messageRecipients),
+        } satisfies ReorderQueueInput)
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && action === "interrupt") {
     const body = await readJson(request);
-    await agents.interrupt(agentId, stringField(body, "turnId"));
+    await Effect.runPromise(
+      agents.interrupt(agentId, stringField(body, "turnId")).pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
 

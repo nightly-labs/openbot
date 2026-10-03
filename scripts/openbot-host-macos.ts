@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { chmod, chown, lstat, mkdir, open, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
+import { Effect } from "effect";
 import { z } from "zod";
 import { isMissingFileError } from "../src/backend/file-errors";
 import {
@@ -73,7 +74,9 @@ async function verifyInstallation(): Promise<void> {
       join(ROOT, name),
     ]);
   }
-  await readOwnedJson(join(ROOT, "host-release.json"), 0, hostReleaseSchema);
+  await Effect.runPromise(
+    readOwnedJson(join(ROOT, "host-release.json"), 0, hostReleaseSchema).pipe(Effect.mapError((error) => error.cause)),
+  );
   for (const path of [HOST_AGENT_PLIST, HOST_DAEMON_PLIST]) await hostCommand("/usr/bin/plutil", ["-lint", path]);
   if (
     (await hostCommand("/usr/bin/plutil", ["-extract", "UserName", "raw", HOST_DAEMON_PLIST])) !== "root" ||
@@ -90,7 +93,9 @@ async function verifyInstallation(): Promise<void> {
 async function verifyApplication(): Promise<void> {
   await verifySharedAppParent();
   const installed = await macHostOperations().installedVersion();
-  const release = await readOwnedJson(join(ROOT, "host-release.json"), 0, hostReleaseSchema);
+  const release = await Effect.runPromise(
+    readOwnedJson(join(ROOT, "host-release.json"), 0, hostReleaseSchema).pipe(Effect.mapError((error) => error.cause)),
+  );
   if (isNewerRelease(release.version, installed))
     throw new Error("Install the matching or a newer OpenBot application first.");
 }
@@ -213,7 +218,7 @@ export function macHostAdminOperations(): HostAdminOperations {
     inspectTenant,
     verifyIsolation,
     readConfig: async () => {
-      const config = await readHostConfig();
+      const config = await Effect.runPromise(readHostConfig().pipe(Effect.mapError((error) => error.cause)));
       if (config) await verifyNoWriteAcl(join(ROOT, "config.json"));
       return config;
     },
@@ -301,8 +306,10 @@ export function macHostAdminOperations(): HostAdminOperations {
     bundleProcesses,
     readState: async () => {
       try {
-        await verifyHostDirectory(ROOT);
-        return await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);
+        await Effect.runPromise(verifyHostDirectory(ROOT).pipe(Effect.mapError((error) => error.cause)));
+        return await Effect.runPromise(
+          readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema).pipe(Effect.mapError((error) => error.cause)),
+        );
       } catch (error) {
         if (isMissingFileError(error)) return null;
         throw error;
@@ -311,8 +318,14 @@ export function macHostAdminOperations(): HostAdminOperations {
     readTenantStatus: async (uid) => {
       // A logged-out, stopped or malformed tenant is a normal reading, not a command failure.
       try {
-        const directory = await verifyTenantDirectory(ROOT, uid);
-        const status = await readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema);
+        const directory = await Effect.runPromise(
+          verifyTenantDirectory(ROOT, uid).pipe(Effect.mapError((error) => error.cause)),
+        );
+        const status = await Effect.runPromise(
+          readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        );
         // The host ignores a report that claims another UID. Never show it as that tenant's state.
         return status.uid === uid ? status : null;
       } catch {
@@ -321,7 +334,9 @@ export function macHostAdminOperations(): HostAdminOperations {
     },
     verifyState: async () => {
       await verifyHostPath(ROOT);
-      await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);
+      await Effect.runPromise(
+        readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema).pipe(Effect.mapError((error) => error.cause)),
+      );
       await verifyNoWriteAcl(join(ROOT, "state.json"));
     },
     verifyDaemon: async () => {

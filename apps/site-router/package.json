@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@openbot/contracts": "workspace:*"
+    "@openbot/contracts": "workspace:*",
+    "effect": "catalog:"
   },
   "scripts": {
     "cf:typegen": "wrangler types",

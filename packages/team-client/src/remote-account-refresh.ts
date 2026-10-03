@@ -1,12 +1,14 @@
+import { Deferred, Effect } from "effect";
+import { runTeamEffect } from "./effect-boundary";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "./remote-directory";
 
 const ACCOUNT_RETRY_INTERVAL_MS = 60_000;
 
 /** One endpoint per account: absolute freshness, shared requests, and no background polling. */
-export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date.now) {
+export function createRemoteAccountRefresh<E>(load: () => Effect.Effect<void, E>, now = Date.now) {
   let active = false;
   let disposed = false;
-  let pending: Promise<void> | null = null;
+  let pending: Deferred.Deferred<void, E> | null = null;
   let dueAt = Number.NEGATIVE_INFINITY;
   let revision = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -19,40 +21,41 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
   function schedule() {
     cancelTimer();
     if (!active || disposed || pending) return;
-    timer = setTimeout(() => void refresh().catch(() => undefined), Math.max(0, dueAt - now()));
+    timer = setTimeout(() => void runTeamEffect(refresh()).catch(() => undefined), Math.max(0, dueAt - now()));
   }
 
-  function refresh(force = false): Promise<void> {
-    if (disposed) return Promise.resolve();
-    if (pending) return pending;
-    if (!active || (!force && now() < dueAt)) return Promise.resolve();
+  const refresh = Effect.fn("RemoteAccountRefresh.refresh")(function* (force = false) {
+    if (disposed) return;
+    if (pending) return yield* Deferred.await(pending);
+    if (!active || (!force && now() < dueAt)) return;
     cancelTimer();
     const startedRevision = revision;
-    let started = false;
-    const operation = Promise.resolve()
-      .then(() => {
-        if (!active || disposed) return;
-        started = true;
-        return load();
-      })
-      .then(
-        () => {
-          if (!started) return;
-          dueAt = revision === startedRevision ? now() + REMOTE_ACCOUNT_CHECK_INTERVAL_MS : now();
-        },
-        (error: unknown) => {
-          // A failed request is not a fresh account check. Bound retries independently of freshness.
-          dueAt = now() + ACCOUNT_RETRY_INTERVAL_MS;
-          throw error;
-        },
-      )
-      .finally(() => {
-        pending = null;
-        schedule();
-      });
+    const operation = Deferred.makeUnsafe<void, E>();
     pending = operation;
-    return operation;
-  }
+    return yield* Effect.gen(function* () {
+      // Foreground work can be cancelled by immediate background entry.
+      yield* Effect.callback<void>((resume) => {
+        queueMicrotask(() => resume(Effect.void));
+      });
+      if (!active || disposed) return;
+      yield* load().pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            dueAt = now() + ACCOUNT_RETRY_INTERVAL_MS;
+          }),
+        ),
+      );
+      dueAt = revision === startedRevision ? now() + REMOTE_ACCOUNT_CHECK_INTERVAL_MS : now();
+    }).pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* () {
+          yield* Deferred.done(operation, exit);
+          pending = null;
+          schedule();
+        }),
+      ),
+    );
+  });
 
   return {
     refresh,
@@ -66,7 +69,7 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
       active = value;
       cancelTimer();
       if (active) {
-        void refresh().catch(() => undefined);
+        void runTeamEffect(refresh()).catch(() => undefined);
         schedule();
       }
     },

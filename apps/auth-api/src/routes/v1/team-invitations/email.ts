@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import {
   apiError,
@@ -18,14 +19,16 @@ export const Route = createFileRoute("/v1/team-invitations/email")({
           const token = bearerToken(request);
           if (!token) return apiError(401, "unauthorized", "Sign in is required.");
           const auth = requestAuthService();
-          const user = await auth.authenticate(token);
+          const user = await runApiEffect(auth.authenticate(token));
           if (!user) return apiError(401, "unauthorized", "The session is invalid.");
           const body = await readJsonObject(request);
-          await sendTeamInviteEmail(
-            { auth, delivery: requestTeamInviteEmailDelivery },
-            user,
-            body,
-            requestSourceIp(request),
+          await runApiEffect(
+            sendTeamInviteEmail(
+              { auth, delivery: requestTeamInviteEmailDelivery },
+              user,
+              body,
+              requestSourceIp(request),
+            ),
           );
           return new Response(null, { status: 204 });
         } catch (error) {

@@ -30,6 +30,7 @@ import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runti
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { Effect, Result } from "effect";
 import {
   AttachmentFiles,
   type ExportedAttachmentFile,
@@ -39,6 +40,7 @@ import {
   type StoredGeneratedAttachment,
   toAttachmentSummary,
 } from "./attachment-files";
+import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
@@ -187,73 +189,115 @@ export class MailboxStore {
     this.#database = database;
   }
 
-  async initialize(): Promise<void> {
-    await Promise.all([mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 }), this.#files.initialize()]);
-    await this.#database.initialize();
-    const stored = this.#database.readMailboxState();
-    if (stored !== null && stored !== undefined) {
-      const persisted = toCurrentMailboxState(stored);
-      if (!persisted || !isStoredState(persisted)) throw new Error("Stored mailbox projection is invalid.");
-      this.#state = normalizeStoredState(persisted);
-    } else {
-      this.#state = normalizeStoredState(await this.#readState());
-      await this.#database.backupLegacyFile(this.#statePath);
-      await this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1");
-    }
-    const activeEdits = new Set(
-      this.#state.deliveries
-        .filter((delivery) => delivery.status === "queued" && delivery.editId)
-        .map((delivery) => delivery.editId),
-    );
-    const retainedDrafts = this.#state.drafts.filter(
-      (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
-    );
-    if (retainedDrafts.length !== this.#state.drafts.length) {
-      this.#state.drafts = retainedDrafts;
-      await this.#persist("mailbox.drafts-cleared");
-    }
-    await this.#files.resetDrafts(retainedDrafts.map((draft) => draft.id));
-    await this.#drainFileDeletionOutbox();
-  }
-
-  async prepareAttachments(paths: string[]): Promise<DraftAttachment[]> {
-    return this.prepareImportedAttachments(paths, []);
-  }
-
-  async prepareImportedAttachments(paths: string[], data: AttachmentDataInput[]): Promise<DraftAttachment[]> {
-    if (paths.length + data.length === 0) return [];
-    if (paths.length + data.length > MAX_ATTACHMENTS) {
-      throw new Error(sourceText("error.attachment.tooMany", { limit: MAX_ATTACHMENTS }));
-    }
-    if (this.#state.drafts.length + paths.length + data.length > INPUT_LIMITS.draftAttachments) {
-      throw new Error(sourceText("error.backend.draftAttachmentLimit", { limit: INPUT_LIMITS.draftAttachments }));
-    }
-    const prepared = await this.#files.prepareDrafts(paths, data);
-    this.#state.drafts.push(...prepared);
+  initialize = Effect.fn("MailboxStore.initialize")(function* (
+    this: MailboxStore,
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      await this.#persist("attachments.prepared");
-      return prepared.map(toAttachmentSummary);
-    } catch (error) {
-      const preparedIds = new Set(prepared.map((draft) => draft.id));
-      this.#state.drafts = this.#state.drafts.filter((draft) => !preparedIds.has(draft.id));
-      await this.#files.removeAttachmentDirectories(prepared.map((draft) => draft.path));
-      throw error;
+      yield* Effect.all(
+        [
+          storedIO(() => mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 })),
+          this.#files.initialize().pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause }))),
+        ],
+        { concurrency: "unbounded" },
+      );
+      yield* this.#database.initialize();
+      const stored = this.#database.readMailboxState();
+      if (stored !== null && stored !== undefined) {
+        const persisted = toCurrentMailboxState(stored);
+        if (!persisted || !isStoredState(persisted)) throw new Error("Stored mailbox projection is invalid.");
+        this.#state = normalizeStoredState(persisted);
+      } else {
+        this.#state = normalizeStoredState(yield* this.#readStateEffect());
+        yield* this.#database.backupLegacyFile(this.#statePath);
+        this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1");
+      }
+      const activeEdits = new Set(
+        this.#state.deliveries
+          .filter((delivery) => delivery.status === "queued" && delivery.editId)
+          .map((delivery) => delivery.editId),
+      );
+      const retainedDrafts = this.#state.drafts.filter(
+        (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
+      );
+      if (retainedDrafts.length !== this.#state.drafts.length) {
+        this.#state.drafts = retainedDrafts;
+        this.#persist("mailbox.drafts-cleared");
+      }
+      yield* this.#files
+        .resetDrafts(retainedDrafts.map((draft) => draft.id))
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible).bind(this);
 
-  async discardDraft(id: string): Promise<void> {
-    const index = this.#state.drafts.findIndex((draft) => draft.id === id);
-    if (index < 0) return;
-    const [draft] = this.#state.drafts.splice(index, 1);
-    if (!draft) return;
+  prepareAttachments = Effect.fn("MailboxStore.prepareAttachments")(function* (
+    this: MailboxStore,
+    paths: string[],
+  ): Effect.fn.Return<DraftAttachment[], StoredStateFailure> {
     try {
-      await this.#persist("attachment-draft.discarded");
-    } catch (error) {
-      this.#state.drafts.splice(index, 0, draft);
-      throw error;
+      return yield* this.prepareImportedAttachments(paths, []);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#files.removeAttachmentDirectories([draft.path]);
-  }
+  }, Effect.uninterruptible).bind(this);
+
+  prepareImportedAttachments = Effect.fn("MailboxStore.prepareImportedAttachments")(function* (
+    this: MailboxStore,
+    paths: string[],
+    data: AttachmentDataInput[],
+  ): Effect.fn.Return<DraftAttachment[], StoredStateFailure> {
+    try {
+      if (paths.length + data.length === 0) return [];
+      if (paths.length + data.length > MAX_ATTACHMENTS) {
+        throw new Error(sourceText("error.attachment.tooMany", { limit: MAX_ATTACHMENTS }));
+      }
+      if (this.#state.drafts.length + paths.length + data.length > INPUT_LIMITS.draftAttachments) {
+        throw new Error(sourceText("error.backend.draftAttachmentLimit", { limit: INPUT_LIMITS.draftAttachments }));
+      }
+      const prepared = yield* this.#files
+        .prepareDrafts(paths, data)
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      this.#state.drafts.push(...prepared);
+      try {
+        this.#persist("attachments.prepared");
+        return prepared.map(toAttachmentSummary);
+      } catch (error) {
+        const preparedIds = new Set(prepared.map((draft) => draft.id));
+        this.#state.drafts = this.#state.drafts.filter((draft) => !preparedIds.has(draft.id));
+        yield* this.#files
+          .removeAttachmentDirectories(prepared.map((draft) => draft.path))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw error;
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  discardDraft = Effect.fn("MailboxStore.discardDraft")(function* (
+    this: MailboxStore,
+    id: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const index = this.#state.drafts.findIndex((draft) => draft.id === id);
+      if (index < 0) return;
+      const [draft] = this.#state.drafts.splice(index, 1);
+      if (!draft) return;
+      try {
+        this.#persist("attachment-draft.discarded");
+      } catch (error) {
+        this.#state.drafts.splice(index, 0, draft);
+        throw error;
+      }
+      yield* this.#files
+        .removeAttachmentDirectories([draft.path])
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   blockAgentDeliveries(agentId: string): () => void {
     return this.#deliveryGate.block(agentId);
@@ -320,113 +364,121 @@ export class MailboxStore {
       .map((delivery) => this.#context(delivery));
   }
 
-  async enqueue(input: EnqueueInput): Promise<QueuedMessageReceipt> {
-    if (input.idempotencyKey) {
-      const existingMessageId = this.#state.idempotency[input.idempotencyKey];
-      if (existingMessageId) return this.#receipt(existingMessageId);
-    }
-
-    const recipients = [...new Set(input.recipientAgentIds)];
-    const validateRecipients = this.prepareDelivery(recipients);
-    if (recipients.length === 0) throw new Error(sourceText("error.backend.recipientRequired"));
-    if (recipients.length > INPUT_LIMITS.messageRecipients) {
-      throw new Error(sourceText("error.backend.recipientLimit", { limit: INPUT_LIMITS.messageRecipients }));
-    }
-    if (recipients.some((id) => !id || id.length > INPUT_LIMITS.identifier)) {
-      throw new Error("A message recipient is invalid.");
-    }
-    if (input.idempotencyKey !== undefined && input.idempotencyKey.length > INPUT_LIMITS.identifier) {
-      throw new Error("The idempotency key is too long.");
-    }
-
-    const text = input.text.trim();
-    if (text.length > INPUT_LIMITS.messageText) throw new Error(sourceText("error.agent.messageTooLong"));
-
-    const drafts = (input.draftIds ?? []).map((id) => {
-      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
-      if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
-      return draft;
-    });
-    if (drafts.length !== new Set(input.draftIds ?? []).size) {
-      throw new Error("Duplicate attachment draft.");
-    }
-    const sourcePaths = [...drafts.map((draft) => draft.path), ...(input.sourcePaths ?? [])];
-    if (!text && sourcePaths.length === 0) throw new Error(sourceText("error.backend.messageEmpty"));
-    if (sourcePaths.length > MAX_ATTACHMENTS) {
-      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
-    }
-
-    const createdAt = new Date().toISOString();
-    const messageId = randomUUID();
-    const attachments = await this.#files.commitMessageTransfer(
-      messageId,
-      input.sender,
-      recipients,
-      messageId,
-      createdAt,
-      sourcePaths,
-    );
+  enqueue = Effect.fn("MailboxStore.enqueue")(function* (
+    this: MailboxStore,
+    input: EnqueueInput,
+  ): Effect.fn.Return<QueuedMessageReceipt, StoredStateFailure> {
     try {
-      validateRecipients();
-    } catch (error) {
-      await this.#files.remove(this.#files.transferRoot(messageId));
-      throw error;
-    }
-    const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
-    const messaging = input.messaging ?? this.#answerReturn(input, recipients);
-    const message: StoredMessage = {
-      channelId: input.channelId,
-      ...(messaging ? { messaging } : {}),
-      ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
-      id: messageId,
-      sender: input.sender,
-      ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
-      text: rewriteAttachmentReferences(text, (reference) => {
-        const attachment = committedByDraftId.get(reference.attachmentId);
-        return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
-      }),
-      attachments,
-      replyToMessageId: input.replyToMessageId ?? null,
-      ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
-      createdAt,
-    };
-    const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
-      id: randomUUID(),
-      messageId,
-      recipientAgentId,
-      queueOrder: this.#nextQueueOrder(recipientAgentId),
-      status: "queued",
-      turnId: null,
-      error: null,
-      createdAt,
-    }));
-
-    this.#state.messages.push(message);
-    recordRestartActivity();
-    this.#state.deliveries.push(...deliveries);
-    if (input.idempotencyKey) this.#state.idempotency[input.idempotencyKey] = messageId;
-    this.#state.drafts = this.#state.drafts.filter((draft) => !(input.draftIds ?? []).includes(draft.id));
-    try {
-      await this.#persist();
-    } catch (error) {
-      const deliveryIds = new Set(deliveries.map((delivery) => delivery.id));
-      this.#state.messages = this.#state.messages.filter((candidate) => candidate.id !== messageId);
-      this.#state.deliveries = this.#state.deliveries.filter((candidate) => !deliveryIds.has(candidate.id));
-      if (input.idempotencyKey && this.#state.idempotency[input.idempotencyKey] === messageId) {
-        delete this.#state.idempotency[input.idempotencyKey];
+      if (input.idempotencyKey) {
+        const existingMessageId = this.#state.idempotency[input.idempotencyKey];
+        if (existingMessageId) return this.#receipt(existingMessageId);
       }
-      for (const draft of drafts) {
-        if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
-          this.#state.drafts.push(draft);
+
+      const recipients = [...new Set(input.recipientAgentIds)];
+      const validateRecipients = this.prepareDelivery(recipients);
+      if (recipients.length === 0) throw new Error(sourceText("error.backend.recipientRequired"));
+      if (recipients.length > INPUT_LIMITS.messageRecipients) {
+        throw new Error(sourceText("error.backend.recipientLimit", { limit: INPUT_LIMITS.messageRecipients }));
+      }
+      if (recipients.some((id) => !id || id.length > INPUT_LIMITS.identifier)) {
+        throw new Error("A message recipient is invalid.");
+      }
+      if (input.idempotencyKey !== undefined && input.idempotencyKey.length > INPUT_LIMITS.identifier) {
+        throw new Error("The idempotency key is too long.");
+      }
+
+      const text = input.text.trim();
+      if (text.length > INPUT_LIMITS.messageText) throw new Error(sourceText("error.agent.messageTooLong"));
+
+      const drafts = (input.draftIds ?? []).map((id) => {
+        const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+        if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+        if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
+        return draft;
+      });
+      if (drafts.length !== new Set(input.draftIds ?? []).size) {
+        throw new Error("Duplicate attachment draft.");
+      }
+      const sourcePaths = [...drafts.map((draft) => draft.path), ...(input.sourcePaths ?? [])];
+      if (!text && sourcePaths.length === 0) throw new Error(sourceText("error.backend.messageEmpty"));
+      if (sourcePaths.length > MAX_ATTACHMENTS) {
+        throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
+      }
+
+      const createdAt = new Date().toISOString();
+      const messageId = randomUUID();
+      const attachments = yield* this.#files
+        .commitMessageTransfer(messageId, input.sender, recipients, messageId, createdAt, sourcePaths)
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      try {
+        validateRecipients();
+      } catch (error) {
+        yield* this.#files
+          .remove(this.#files.transferRoot(messageId))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw error;
+      }
+      const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
+      const messaging = input.messaging ?? this.#answerReturn(input, recipients);
+      const message: StoredMessage = {
+        channelId: input.channelId,
+        ...(messaging ? { messaging } : {}),
+        ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
+        id: messageId,
+        sender: input.sender,
+        ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
+        text: rewriteAttachmentReferences(text, (reference) => {
+          const attachment = committedByDraftId.get(reference.attachmentId);
+          return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+        }),
+        attachments,
+        replyToMessageId: input.replyToMessageId ?? null,
+        ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
+        createdAt,
+      };
+      const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
+        id: randomUUID(),
+        messageId,
+        recipientAgentId,
+        queueOrder: this.#nextQueueOrder(recipientAgentId),
+        status: "queued",
+        turnId: null,
+        error: null,
+        createdAt,
+      }));
+
+      this.#state.messages.push(message);
+      recordRestartActivity();
+      this.#state.deliveries.push(...deliveries);
+      if (input.idempotencyKey) this.#state.idempotency[input.idempotencyKey] = messageId;
+      this.#state.drafts = this.#state.drafts.filter((draft) => !(input.draftIds ?? []).includes(draft.id));
+      try {
+        this.#persist();
+      } catch (error) {
+        const deliveryIds = new Set(deliveries.map((delivery) => delivery.id));
+        this.#state.messages = this.#state.messages.filter((candidate) => candidate.id !== messageId);
+        this.#state.deliveries = this.#state.deliveries.filter((candidate) => !deliveryIds.has(candidate.id));
+        if (input.idempotencyKey && this.#state.idempotency[input.idempotencyKey] === messageId) {
+          delete this.#state.idempotency[input.idempotencyKey];
         }
+        for (const draft of drafts) {
+          if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
+            this.#state.drafts.push(draft);
+          }
+        }
+        yield* this.#files
+          .remove(this.#files.transferRoot(messageId))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw error;
       }
-      await this.#files.remove(this.#files.transferRoot(messageId));
-      throw error;
+      yield* this.#files
+        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      return this.#receipt(messageId);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
-    return this.#receipt(messageId);
-  }
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Commits the uploads of one channel request before any member holds it. A channel dispatches
@@ -435,59 +487,73 @@ export class MailboxStore {
    * keeps durable references, every later dispatch re-sends the stored copies, and the files leave
    * with the channel through `deleteChannelData`.
    */
-  async commitChannelAttachments(input: {
-    channelId: string;
-    messageId: string;
-    text: string;
-    draftIds: string[];
-  }): Promise<{ text: string; attachments: AttachmentSummary[] }> {
-    const ids = new Set(input.draftIds);
-    if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
-    const drafts = input.draftIds.map((id) => {
-      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
-      if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
-      return draft;
-    });
-    if (drafts.length > MAX_ATTACHMENTS)
-      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
-    const sender: StoredMessage["sender"] = { kind: "user" };
-    const createdAt = new Date().toISOString();
-    const attachments = await this.#files.commitMessageTransfer(
-      input.messageId,
-      sender,
-      [],
-      input.messageId,
-      createdAt,
-      drafts.map((draft) => draft.path),
-    );
-    const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
-    const message: StoredMessage = {
-      channelId: input.channelId,
-      id: input.messageId,
-      sender,
-      text: rewriteAttachmentReferences(input.text, (reference) => {
-        const attachment = committedByDraftId.get(reference.attachmentId);
-        return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
-      }),
-      attachments,
-      replyToMessageId: null,
-      createdAt,
-    };
-    this.#state.messages.push(message);
-    this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+
+  commitChannelAttachments = Effect.fn("MailboxStore.commitChannelAttachments")(function* (
+    this: MailboxStore,
+    input: {
+      channelId: string;
+      messageId: string;
+      text: string;
+      draftIds: string[];
+    },
+  ): Effect.fn.Return<{ text: string; attachments: AttachmentSummary[] }, StoredStateFailure> {
     try {
-      await this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
-    } catch (error) {
-      this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
-      for (const draft of drafts)
-        if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) this.#state.drafts.push(draft);
-      await this.#files.remove(this.#files.transferRoot(input.messageId));
-      throw error;
+      const ids = new Set(input.draftIds);
+      if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
+      const drafts = input.draftIds.map((id) => {
+        const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+        if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+        if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
+        return draft;
+      });
+      if (drafts.length > MAX_ATTACHMENTS)
+        throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
+      const sender: StoredMessage["sender"] = { kind: "user" };
+      const createdAt = new Date().toISOString();
+      const attachments = yield* this.#files
+        .commitMessageTransfer(
+          input.messageId,
+          sender,
+          [],
+          input.messageId,
+          createdAt,
+          drafts.map((draft) => draft.path),
+        )
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      const committedByDraftId = new Map(drafts.map((draft, index) => [draft.id, attachments[index]] as const));
+      const message: StoredMessage = {
+        channelId: input.channelId,
+        id: input.messageId,
+        sender,
+        text: rewriteAttachmentReferences(input.text, (reference) => {
+          const attachment = committedByDraftId.get(reference.attachmentId);
+          return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+        }),
+        attachments,
+        replyToMessageId: null,
+        createdAt,
+      };
+      this.#state.messages.push(message);
+      this.#state.drafts = this.#state.drafts.filter((draft) => !ids.has(draft.id));
+      try {
+        this.#persist("channel.attachments-committed", `mailbox:channel-attachments:${input.messageId}`);
+      } catch (error) {
+        this.#state.messages = this.#state.messages.filter((candidate) => candidate !== message);
+        for (const draft of drafts)
+          if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) this.#state.drafts.push(draft);
+        yield* this.#files
+          .remove(this.#files.transferRoot(input.messageId))
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw error;
+      }
+      yield* this.#files
+        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
-    return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
-  }
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * A delivery held for editing stays listed, marked `editing`, and keeps its position. Hiding it
@@ -712,38 +778,45 @@ export class MailboxStore {
     return result;
   }
 
-  async setReaction(
+  setReaction = Effect.fn("MailboxStore.setReaction")(function* (
+    this: MailboxStore,
     agentId: string,
     messageId: string,
     actor: ConversationReactionActor,
     emoji: MessageReaction | null,
-  ): Promise<void> {
-    const index = this.#state.reactions.findIndex(
-      (reaction) =>
-        reaction.agentId === agentId && reaction.messageId === messageId && reactionActorsEqual(reaction.actor, actor),
-    );
-    if (emoji === null) {
-      if (index < 0) return;
-      this.#state.reactions.splice(index, 1);
-    } else if (index >= 0) {
-      this.#state.reactions[index] = {
-        agentId,
-        messageId,
-        emoji,
-        actor,
-        updatedAt: new Date().toISOString(),
-      };
-    } else {
-      this.#state.reactions.push({
-        agentId,
-        messageId,
-        emoji,
-        actor,
-        updatedAt: new Date().toISOString(),
-      });
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const index = this.#state.reactions.findIndex(
+        (reaction) =>
+          reaction.agentId === agentId &&
+          reaction.messageId === messageId &&
+          reactionActorsEqual(reaction.actor, actor),
+      );
+      if (emoji === null) {
+        if (index < 0) return;
+        this.#state.reactions.splice(index, 1);
+      } else if (index >= 0) {
+        this.#state.reactions[index] = {
+          agentId,
+          messageId,
+          emoji,
+          actor,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        this.#state.reactions.push({
+          agentId,
+          messageId,
+          emoji,
+          actor,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      this.#persist("reaction.updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#persist("reaction.updated");
-  }
+  }, Effect.uninterruptible).bind(this);
 
   #sourceTurnId(messageId: string): string | undefined {
     const key = Object.entries(this.#state.idempotency).find(([, value]) => value === messageId)?.[0];
@@ -901,107 +974,125 @@ export class MailboxStore {
    * channel and leave with it, through `deleteChannelData`. `channelThreadIds` names the threads
    * the channels hold, because a generated file records the thread it was made in.
    */
-  async deleteAgentData(agentId: string, channelThreadIds: readonly string[] = []): Promise<void> {
-    const previous = structuredClone(this.#state);
-    const removedMessageIds = new Set<string>();
-    const channelThreads = new Set(channelThreadIds);
-    const removedGenerated = this.#state.generatedAttachments.filter(
-      (attachment) =>
-        attachment.ownerAgentId === agentId &&
-        !(attachment.ownerThreadId && channelThreads.has(attachment.ownerThreadId)),
-    );
-    const removedTransferRoots = new Set<string>();
-    this.#state.deliveries = this.#state.deliveries.filter((delivery) => delivery.recipientAgentId !== agentId);
-    const remainingMessageIds = new Set(this.#state.deliveries.map((delivery) => delivery.messageId));
-    this.#state.messages = this.#state.messages.filter((message) => {
-      const keep = remainingMessageIds.has(message.id) || message.channelId !== undefined;
-      if (!keep) removedMessageIds.add(message.id);
-      if (!keep) {
+
+  deleteAgentData = Effect.fn("MailboxStore.deleteAgentData")(function* (
+    this: MailboxStore,
+    agentId: string,
+    channelThreadIds: readonly string[] = [],
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const previous = structuredClone(this.#state);
+      const removedMessageIds = new Set<string>();
+      const channelThreads = new Set(channelThreadIds);
+      const removedGenerated = this.#state.generatedAttachments.filter(
+        (attachment) =>
+          attachment.ownerAgentId === agentId &&
+          !(attachment.ownerThreadId && channelThreads.has(attachment.ownerThreadId)),
+      );
+      const removedTransferRoots = new Set<string>();
+      this.#state.deliveries = this.#state.deliveries.filter((delivery) => delivery.recipientAgentId !== agentId);
+      const remainingMessageIds = new Set(this.#state.deliveries.map((delivery) => delivery.messageId));
+      this.#state.messages = this.#state.messages.filter((message) => {
+        const keep = remainingMessageIds.has(message.id) || message.channelId !== undefined;
+        if (!keep) removedMessageIds.add(message.id);
+        if (!keep) {
+          for (const attachment of message.attachments) {
+            const transferRoot = this.#files.transferRootForPath(attachment.path);
+            if (transferRoot) removedTransferRoots.add(transferRoot);
+          }
+        }
+        return keep;
+      });
+      for (const messageId of removedMessageIds) removedTransferRoots.add(this.#files.transferRoot(messageId));
+      this.#state.pausedAgentIds = this.#state.pausedAgentIds.filter((id) => id !== agentId);
+      this.#state.reactions = this.#state.reactions.filter(
+        (reaction) => reaction.agentId !== agentId && !removedMessageIds.has(reaction.messageId),
+      );
+      this.#state.idempotency = Object.fromEntries(
+        Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
+      );
+      this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+        (attachment) => !removedGenerated.includes(attachment),
+      );
+      try {
+        this.#persist(
+          "mailbox.agent-data-deleted",
+          `mailbox:hard-delete:${randomUUID()}`,
+          [
+            ...removedTransferRoots,
+            ...removedGenerated
+              .map((attachment) => this.#files.generatedRootForPath(attachment.path))
+              .filter((path): path is string => path !== null),
+          ],
+          true,
+        );
+      } catch (error) {
+        this.#state = previous;
+        throw error;
+      }
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /** Removes messages, deliveries, reactions and attachments that belong to a channel. */
+
+  deleteChannelData = Effect.fn("MailboxStore.deleteChannelData")(function* (
+    this: MailboxStore,
+    channelId: string,
+    threadIds: readonly string[] = [],
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const previous = structuredClone(this.#state);
+      const removedMessageIds = new Set(
+        this.#state.messages.filter((message) => message.channelId === channelId).map((message) => message.id),
+      );
+      const removedThreadIds = new Set(threadIds);
+      const removedTransferRoots = new Set<string>();
+      for (const message of this.#state.messages) {
+        if (!removedMessageIds.has(message.id)) continue;
+        removedTransferRoots.add(this.#files.transferRoot(message.id));
         for (const attachment of message.attachments) {
           const transferRoot = this.#files.transferRootForPath(attachment.path);
           if (transferRoot) removedTransferRoots.add(transferRoot);
         }
       }
-      return keep;
-    });
-    for (const messageId of removedMessageIds) removedTransferRoots.add(this.#files.transferRoot(messageId));
-    this.#state.pausedAgentIds = this.#state.pausedAgentIds.filter((id) => id !== agentId);
-    this.#state.reactions = this.#state.reactions.filter(
-      (reaction) => reaction.agentId !== agentId && !removedMessageIds.has(reaction.messageId),
-    );
-    this.#state.idempotency = Object.fromEntries(
-      Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
-    );
-    this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
-      (attachment) => !removedGenerated.includes(attachment),
-    );
-    try {
-      await this.#persist(
-        "mailbox.agent-data-deleted",
-        `mailbox:hard-delete:${randomUUID()}`,
-        [
-          ...removedTransferRoots,
-          ...removedGenerated
-            .map((attachment) => this.#files.generatedRootForPath(attachment.path))
-            .filter((path): path is string => path !== null),
-        ],
-        true,
+      const removedGenerated = this.#state.generatedAttachments.filter(
+        (attachment) =>
+          attachment.ownerThreadId !== undefined &&
+          attachment.ownerThreadId !== null &&
+          removedThreadIds.has(attachment.ownerThreadId),
       );
-    } catch (error) {
-      this.#state = previous;
-      throw error;
-    }
-    await this.#drainFileDeletionOutbox();
-  }
-
-  /** Removes messages, deliveries, reactions and attachments that belong to a channel. */
-  async deleteChannelData(channelId: string, threadIds: readonly string[] = []): Promise<void> {
-    const previous = structuredClone(this.#state);
-    const removedMessageIds = new Set(
-      this.#state.messages.filter((message) => message.channelId === channelId).map((message) => message.id),
-    );
-    const removedThreadIds = new Set(threadIds);
-    const removedTransferRoots = new Set<string>();
-    for (const message of this.#state.messages) {
-      if (!removedMessageIds.has(message.id)) continue;
-      removedTransferRoots.add(this.#files.transferRoot(message.id));
-      for (const attachment of message.attachments) {
-        const transferRoot = this.#files.transferRootForPath(attachment.path);
-        if (transferRoot) removedTransferRoots.add(transferRoot);
+      this.#state.messages = this.#state.messages.filter((message) => message.channelId !== channelId);
+      this.#state.deliveries = this.#state.deliveries.filter((delivery) => !removedMessageIds.has(delivery.messageId));
+      this.#state.reactions = this.#state.reactions.filter((reaction) => !removedMessageIds.has(reaction.messageId));
+      this.#state.idempotency = Object.fromEntries(
+        Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
+      );
+      this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+        (attachment) => !removedGenerated.includes(attachment),
+      );
+      for (const attachment of removedGenerated) {
+        const generatedRoot = this.#files.generatedRootForPath(attachment.path);
+        if (generatedRoot) removedTransferRoots.add(generatedRoot);
       }
+      try {
+        this.#persist(
+          "mailbox.channel-data-deleted",
+          `mailbox:channel-delete:${randomUUID()}`,
+          [...removedTransferRoots],
+          true,
+        );
+      } catch (error) {
+        this.#state = previous;
+        throw error;
+      }
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    const removedGenerated = this.#state.generatedAttachments.filter(
-      (attachment) =>
-        attachment.ownerThreadId !== undefined &&
-        attachment.ownerThreadId !== null &&
-        removedThreadIds.has(attachment.ownerThreadId),
-    );
-    this.#state.messages = this.#state.messages.filter((message) => message.channelId !== channelId);
-    this.#state.deliveries = this.#state.deliveries.filter((delivery) => !removedMessageIds.has(delivery.messageId));
-    this.#state.reactions = this.#state.reactions.filter((reaction) => !removedMessageIds.has(reaction.messageId));
-    this.#state.idempotency = Object.fromEntries(
-      Object.entries(this.#state.idempotency).filter(([, messageId]) => !removedMessageIds.has(messageId)),
-    );
-    this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
-      (attachment) => !removedGenerated.includes(attachment),
-    );
-    for (const attachment of removedGenerated) {
-      const generatedRoot = this.#files.generatedRootForPath(attachment.path);
-      if (generatedRoot) removedTransferRoots.add(generatedRoot);
-    }
-    try {
-      await this.#persist(
-        "mailbox.channel-data-deleted",
-        `mailbox:channel-delete:${randomUUID()}`,
-        [...removedTransferRoots],
-        true,
-      );
-    } catch (error) {
-      this.#state = previous;
-      throw error;
-    }
-    await this.#drainFileDeletionOutbox();
-  }
+  }, Effect.uninterruptible).bind(this);
 
   chainOriginAgentId(messageId: string): string | null {
     const visited = new Set<string>();
@@ -1039,36 +1130,64 @@ export class MailboxStore {
     });
   }
 
-  async markStarting(deliveryId: string): Promise<void> {
-    this.#assertQueueNotEditing(deliveryId);
-    await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null });
-  }
+  markStarting = Effect.fn("MailboxStore.markStarting")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#assertQueueNotEditing(deliveryId);
+      yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
-  async markRunning(deliveryId: string, turnId: string): Promise<void> {
-    await this.#updateDelivery(deliveryId, ["starting", "running"], {
-      status: "running",
-      turnId,
-      error: null,
-    });
-  }
+  markRunning = Effect.fn("MailboxStore.markRunning")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+        status: "running",
+        turnId,
+        error: null,
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
-  async markTerminal(
+  markTerminal = Effect.fn("MailboxStore.markTerminal")(function* (
+    this: MailboxStore,
     deliveryId: string,
     status: Extract<QueueDeliveryStatus, "completed" | "failed" | "interrupted">,
     error: string | null = null,
-  ): Promise<void> {
-    // Redacted here, not at the call site: this text is written to the database and read back by
-    // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
-    // a custom endpoint can carry that endpoint's API key or a header value.
-    await this.#updateDelivery(deliveryId, ["starting", "running"], {
-      status,
-      error: error === null ? null : redactText(error),
-    });
-  }
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      // Redacted here, not at the call site: this text is written to the database and read back by
+      // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
+      // a custom endpoint can carry that endpoint's API key or a header value.
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+        status,
+        error: error === null ? null : redactText(error),
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
-  async cancel(agentId: string, deliveryId: string): Promise<void> {
-    this.cancelNow(agentId, deliveryId);
-  }
+  cancel = Effect.fn("MailboxStore.cancel")(function* (
+    this: MailboxStore,
+    agentId: string,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.cancelNow(agentId, deliveryId);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   cancelNow(agentId: string, deliveryId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
@@ -1203,7 +1322,7 @@ export class MailboxStore {
     if (this.#queueUpdates.has(deliveryId)) throw new Error(sourceText("error.backend.messageBeingSaved"));
   }
 
-  async updateQueuedMessage(
+  updateQueuedMessage(
     agentId: string,
     deliveryId: string,
     text: string,
@@ -1211,17 +1330,30 @@ export class MailboxStore {
     attachmentDraftIds: string[],
     editId?: string,
     sender?: ConversationMessageSender,
-  ): Promise<void> {
-    this.#assertQueueNotUpdating(deliveryId);
-    this.#queueUpdates.add(deliveryId);
-    try {
-      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId, sender);
-    } finally {
-      this.#queueUpdates.delete(deliveryId);
-    }
+  ) {
+    return Effect.gen({ self: this }, function* () {
+      yield* storedSync(() => this.#assertQueueNotUpdating(deliveryId));
+      this.#queueUpdates.add(deliveryId);
+      yield* this.#updateQueuedMessageEffect(
+        agentId,
+        deliveryId,
+        text,
+        keepAttachmentIds,
+        attachmentDraftIds,
+        editId,
+        sender,
+      ).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#queueUpdates.delete(deliveryId);
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 
-  async #updateQueuedMessage(
+  #updateQueuedMessageEffect = Effect.fn("MailboxStore.updateQueuedMessage")(function* (
+    this: MailboxStore,
     agentId: string,
     deliveryId: string,
     text: string,
@@ -1229,176 +1361,228 @@ export class MailboxStore {
     attachmentDraftIds: string[],
     editId: string | undefined,
     sender: ConversationMessageSender | undefined,
-  ): Promise<void> {
-    const delivery = this.#state.deliveries.find(
-      (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
-    );
-    if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
-    if (delivery.status !== "queued") throw new Error(sourceText("error.backend.editQueuedOnly"));
-    if (delivery.editId !== editId) throw new Error(sourceText("error.backend.editedOnOtherDevice"));
-
-    const message = this.#requireMessage(delivery.messageId);
-    const keepIds = new Set(keepAttachmentIds);
-    if (keepIds.size !== keepAttachmentIds.length) throw new Error("Duplicate attachments.");
-    if (keepAttachmentIds.some((id) => !message.attachments.some((item) => item.id === id))) {
-      throw new Error(sourceText("error.backend.attachmentNotInMessage"));
-    }
-
-    const draftIds = new Set(attachmentDraftIds);
-    if (draftIds.size !== attachmentDraftIds.length) throw new Error("Duplicate attachment drafts.");
-    const drafts = attachmentDraftIds.map((id) => {
-      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
-      if (draft.ownerEditId && draft.ownerEditId !== editId)
-        throw new Error(sourceText("error.backend.attachmentInOtherEdit"));
-      return draft;
-    });
-    if (keepAttachmentIds.length + drafts.length > MAX_ATTACHMENTS) {
-      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
-    }
-
-    const normalizedText = text.trim();
-    if (!normalizedText && keepAttachmentIds.length === 0 && drafts.length === 0) {
-      throw new Error(sourceText("error.backend.messageEmpty"));
-    }
-
-    const previous = structuredClone(message);
-    const previousOutcomes = delivery.finishedEditOutcomes ? { ...delivery.finishedEditOutcomes } : undefined;
-    const oldAttachmentPaths = message.attachments
-      .filter((attachment) => !keepIds.has(attachment.id))
-      .map((attachment) => attachment.path);
-    const draftAttachmentPaths = drafts.map((draft) => draft.path);
-    let newAttachmentPaths: string[] = [];
-    let releasedOwned: StoredDraft[] = [];
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const keptAttachments = keepAttachmentIds.flatMap((id) =>
-        message.attachments.filter((attachment) => attachment.id === id),
+      const delivery = this.#state.deliveries.find(
+        (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
       );
-      const committedDrafts = draftAttachmentPaths.length
-        ? await this.#files.commitMessageTransfer(
-            `${message.id}-edit-${randomUUID()}`,
-            message.sender,
-            this.#state.deliveries
-              .filter((candidate) => candidate.messageId === message.id)
-              .map((candidate) => candidate.recipientAgentId),
-            message.id,
-            new Date().toISOString(),
-            draftAttachmentPaths,
-          )
-        : [];
-      const replacementAttachments = [...keptAttachments, ...committedDrafts];
-      const replacementByReferenceId = new Map([
-        ...keptAttachments.map((attachment) => [attachment.id, attachment] as const),
-        ...drafts.map((draft, index) => [draft.id, committedDrafts[index]] as const),
-      ]);
-      newAttachmentPaths = replacementAttachments
-        .filter((attachment) => !message.attachments.some((item) => item.id === attachment.id))
-        .map((attachment) => attachment.path);
-      message.text = rewriteAttachmentReferences(normalizedText, (reference) => {
-        const attachment = replacementByReferenceId.get(reference.attachmentId);
-        return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+      if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
+      if (delivery.status !== "queued") throw new Error(sourceText("error.backend.editQueuedOnly"));
+      if (delivery.editId !== editId) throw new Error(sourceText("error.backend.editedOnOtherDevice"));
+
+      const message = this.#requireMessage(delivery.messageId);
+      const keepIds = new Set(keepAttachmentIds);
+      if (keepIds.size !== keepAttachmentIds.length) throw new Error("Duplicate attachments.");
+      if (keepAttachmentIds.some((id) => !message.attachments.some((item) => item.id === id))) {
+        throw new Error(sourceText("error.backend.attachmentNotInMessage"));
+      }
+
+      const draftIds = new Set(attachmentDraftIds);
+      if (draftIds.size !== attachmentDraftIds.length) throw new Error("Duplicate attachment drafts.");
+      const drafts = attachmentDraftIds.map((id) => {
+        const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+        if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+        if (draft.ownerEditId && draft.ownerEditId !== editId)
+          throw new Error(sourceText("error.backend.attachmentInOtherEdit"));
+        return draft;
       });
-      message.attachments = replacementAttachments;
-      // The saved text is the editor's, so the editor is its sender. A member can edit another
-      // member's queued message, and the first name must not stay on words that person did not write.
-      if (message.sender.kind === "user") setSenderMember(message, sender);
-      if (editId) {
-        delete delivery.editId;
-        recordFinishedQueueEdit(delivery, editId, {
-          action: "save",
-          saveHash: queueSaveHash(text, keepAttachmentIds, attachmentDraftIds),
-        });
+      if (keepAttachmentIds.length + drafts.length > MAX_ATTACHMENTS) {
+        throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
       }
-      this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
-      if (editId) {
-        // A durable composer backup retained for this edit is no longer owned by it:
-        // a save discards the backup, a cancel restores it, and in both cases the
-        // remaining drafts return to normal lifetime instead of staying edit-owned.
-        releasedOwned = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
-        for (const draft of releasedOwned) delete draft.ownerEditId;
+
+      const normalizedText = text.trim();
+      if (!normalizedText && keepAttachmentIds.length === 0 && drafts.length === 0) {
+        throw new Error(sourceText("error.backend.messageEmpty"));
       }
-      await this.#persist(
-        "message.updated",
-        `mailbox:message-updated:${deliveryId}:${randomUUID()}`,
-        oldAttachmentPaths,
-      );
-    } catch (error) {
-      message.text = previous.text;
-      message.attachments = previous.attachments;
-      setSenderMember(message, previous.senderMember);
-      if (editId) {
-        delivery.editId = editId;
-        if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
-        else delete delivery.finishedEditOutcomes;
-        for (const draft of releasedOwned) draft.ownerEditId = editId;
-      }
-      for (const draft of drafts) {
-        if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
-          this.#state.drafts.push(draft);
+
+      const previous = structuredClone(message);
+      const previousOutcomes = delivery.finishedEditOutcomes ? { ...delivery.finishedEditOutcomes } : undefined;
+      const oldAttachmentPaths = message.attachments
+        .filter((attachment) => !keepIds.has(attachment.id))
+        .map((attachment) => attachment.path);
+      const draftAttachmentPaths = drafts.map((draft) => draft.path);
+      let newAttachmentPaths: string[] = [];
+      let releasedOwned: StoredDraft[] = [];
+      {
+        const updated = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              const keptAttachments = keepAttachmentIds.flatMap((id) =>
+                message.attachments.filter((attachment) => attachment.id === id),
+              );
+              const committedDrafts = draftAttachmentPaths.length
+                ? yield* this.#files
+                    .commitMessageTransfer(
+                      `${message.id}-edit-${randomUUID()}`,
+                      message.sender,
+                      this.#state.deliveries
+                        .filter((candidate) => candidate.messageId === message.id)
+                        .map((candidate) => candidate.recipientAgentId),
+                      message.id,
+                      new Date().toISOString(),
+                      draftAttachmentPaths,
+                    )
+                    .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })))
+                : [];
+              const replacementAttachments = [...keptAttachments, ...committedDrafts];
+              const replacementByReferenceId = new Map([
+                ...keptAttachments.map((attachment) => [attachment.id, attachment] as const),
+                ...drafts.map((draft, index) => [draft.id, committedDrafts[index]] as const),
+              ]);
+              newAttachmentPaths = replacementAttachments
+                .filter((attachment) => !message.attachments.some((item) => item.id === attachment.id))
+                .map((attachment) => attachment.path);
+              message.text = rewriteAttachmentReferences(normalizedText, (reference) => {
+                const attachment = replacementByReferenceId.get(reference.attachmentId);
+                return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
+              });
+              message.attachments = replacementAttachments;
+              // The saved text is the editor's, so the editor is its sender. A member can edit another
+              // member's queued message, and the first name must not stay on words that person did not write.
+              if (message.sender.kind === "user") setSenderMember(message, sender);
+              if (editId) {
+                delete delivery.editId;
+                recordFinishedQueueEdit(delivery, editId, {
+                  action: "save",
+                  saveHash: queueSaveHash(text, keepAttachmentIds, attachmentDraftIds),
+                });
+              }
+              this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
+              if (editId) {
+                // A durable composer backup retained for this edit is no longer owned by it:
+                // a save discards the backup, a cancel restores it, and in both cases the
+                // remaining drafts return to normal lifetime instead of staying edit-owned.
+                releasedOwned = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
+                for (const draft of releasedOwned) delete draft.ownerEditId;
+              }
+              this.#persist(
+                "message.updated",
+                `mailbox:message-updated:${deliveryId}:${randomUUID()}`,
+                oldAttachmentPaths,
+              );
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(updated)) {
+          const error = updated.failure.cause;
+          message.text = previous.text;
+          message.attachments = previous.attachments;
+          setSenderMember(message, previous.senderMember);
+          if (editId) {
+            delivery.editId = editId;
+            if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
+            else delete delivery.finishedEditOutcomes;
+            for (const draft of releasedOwned) draft.ownerEditId = editId;
+          }
+          for (const draft of drafts) {
+            if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
+              this.#state.drafts.push(draft);
+            }
+          }
+          yield* this.#files
+            .removeAttachmentDirectories(newAttachmentPaths)
+            .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+          throw error;
         }
       }
-      await this.#files.removeAttachmentDirectories(newAttachmentPaths);
-      throw error;
+      yield* this.#files
+        .removeAttachmentDirectories(drafts.map((draft) => draft.path))
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#files.removeAttachmentDirectories(drafts.map((draft) => draft.path));
-    await this.#drainFileDeletionOutbox();
-  }
+  }, Effect.uninterruptible);
 
   /**
    * A held delivery keeps its place. `listQueue` reports it now, so a caller may send its id with
    * the rest; both that list and one without it are accepted, and neither moves the held message.
    */
-  async reorderQueue(agentId: string, deliveryIds: string[]): Promise<void> {
-    const allQueued = this.#state.deliveries.filter(
-      (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
-    );
-    const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
-    const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
-    const queued = allQueued.filter((delivery) => !delivery.editId);
-    const expected = new Set(queued.map((delivery) => delivery.id));
-    if (
-      requested.length !== queued.length ||
-      new Set(requested).size !== requested.length ||
-      requested.some((deliveryId) => !expected.has(deliveryId))
-    ) {
-      throw new Error(sourceText("error.backend.queueOrderStale"));
-    }
-    let nextVisible = 0;
-    const orderedIds = [...allQueued]
-      .sort(compareQueueOrder)
-      .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
-    const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
-    for (const delivery of allQueued) {
-      delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
-    }
-    await this.#persist("queue.reordered");
-  }
 
-  async markSteering(deliveryId: string, turnId: string): Promise<void> {
-    this.#assertQueueNotEditing(deliveryId);
-    await this.#updateDelivery(deliveryId, ["queued"], {
-      status: "starting",
-      turnId,
-      error: null,
-    });
-  }
+  reorderQueue = Effect.fn("MailboxStore.reorderQueue")(function* (
+    this: MailboxStore,
+    agentId: string,
+    deliveryIds: string[],
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const allQueued = this.#state.deliveries.filter(
+        (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
+      );
+      const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
+      const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
+      const queued = allQueued.filter((delivery) => !delivery.editId);
+      const expected = new Set(queued.map((delivery) => delivery.id));
+      if (
+        requested.length !== queued.length ||
+        new Set(requested).size !== requested.length ||
+        requested.some((deliveryId) => !expected.has(deliveryId))
+      ) {
+        throw new Error(sourceText("error.backend.queueOrderStale"));
+      }
+      let nextVisible = 0;
+      const orderedIds = [...allQueued]
+        .sort(compareQueueOrder)
+        .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
+      const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
+      for (const delivery of allQueued) {
+        delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
+      }
+      this.#persist("queue.reordered");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
-  async restoreQueued(deliveryId: string): Promise<void> {
-    await this.#updateDelivery(deliveryId, ["starting"], {
-      status: "queued",
-      turnId: null,
-      error: null,
-    });
-  }
+  markSteering = Effect.fn("MailboxStore.markSteering")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      this.#assertQueueNotEditing(deliveryId);
+      yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
+        status: "starting",
+        turnId,
+        error: null,
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  restoreQueued = Effect.fn("MailboxStore.restoreQueued")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting"], {
+        status: "queued",
+        turnId: null,
+        error: null,
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   /** A delivery whose turn the provider refused before any work, back at its place in the queue. */
-  async requeueRefused(deliveryId: string): Promise<void> {
-    await this.#updateDelivery(deliveryId, ["starting", "running"], {
-      status: "queued",
-      turnId: null,
-      error: null,
-    });
-  }
+
+  requeueRefused = Effect.fn("MailboxStore.requeueRefused")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+        status: "queued",
+        turnId: null,
+        error: null,
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Both guards that ask this - agent deletion and the provider switch - have to see a channel
@@ -1421,24 +1605,52 @@ export class MailboxStore {
       .map((delivery) => this.#context(delivery));
   }
 
-  async recoverAsInterrupted(deliveryId: string, reason: string): Promise<void> {
-    await this.#updateDelivery(deliveryId, ["starting", "running"], {
-      status: "interrupted",
-      error: redactText(reason),
-    });
-  }
-
-  async resolveAttachment(id: string): Promise<{ path: string; mimeType: string; name: string } | null> {
-    const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-    if (draft) return this.#files.resolveDraft(draft);
-    for (const message of this.#state.messages) {
-      const attachment = message.attachments.find((candidate) => candidate.id === id);
-      if (attachment) return attachment.deletedAt ? null : this.#files.resolveTransfer(attachment);
+  recoverAsInterrupted = Effect.fn("MailboxStore.recoverAsInterrupted")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    reason: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+        status: "interrupted",
+        error: redactText(reason),
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    const generated = this.#state.generatedAttachments.find((candidate) => candidate.id === id);
-    if (generated) return generated.deletedAt ? null : this.#files.resolveTransfer(generated);
-    return null;
-  }
+  }, Effect.uninterruptible).bind(this);
+
+  resolveAttachment = Effect.fn("MailboxStore.resolveAttachment")(function* (
+    this: MailboxStore,
+    id: string,
+  ): Effect.fn.Return<{ path: string; mimeType: string; name: string } | null, StoredStateFailure> {
+    try {
+      const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+      if (draft)
+        return yield* this.#files
+          .resolveDraft(draft)
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      for (const message of this.#state.messages) {
+        const attachment = message.attachments.find((candidate) => candidate.id === id);
+        if (attachment)
+          return attachment.deletedAt
+            ? null
+            : yield* this.#files
+                .resolveTransfer(attachment)
+                .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      }
+      const generated = this.#state.generatedAttachments.find((candidate) => candidate.id === id);
+      if (generated)
+        return generated.deletedAt
+          ? null
+          : yield* this.#files
+              .resolveTransfer(generated)
+              .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      return null;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   /** Every sent and generated file that the user has not deleted, from the in-memory state. */
   listStoredFiles(): MailboxStoredFile[] {
@@ -1481,32 +1693,45 @@ export class MailboxStore {
    * marker. The file is removed through the deletion outbox, and only when it resolves inside the
    * Transfers folder and no other record that is not deleted uses the same path.
    */
-  async deleteStoredFile(fileId: string): Promise<void> {
-    // The path checks wait, so they run before the state changes. Then no other write can save the
-    // markers without their outbox entry, and a failed save restores a copy that has all other changes.
-    const managedPaths = new Map<string, string | null>();
-    for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
-      managedPaths.set(path, await this.#files.managedTransferFile(path));
-    }
-    const records = this.#fileRecords();
-    const targets = this.#undeletedFileRecords(fileId);
-    const previous = structuredClone(this.#state);
-    const deletedAt = new Date().toISOString();
-    for (const target of targets) target.deletedAt = deletedAt;
-    const inUse = new Set(records.filter((record) => !record.deletedAt).map((record) => record.path));
-    const deletions: string[] = [];
-    for (const path of new Set(targets.map((target) => target.path))) {
-      const managed = inUse.has(path) ? null : managedPaths.get(path);
-      if (managed) deletions.push(managed);
-    }
+
+  deleteStoredFile = Effect.fn("MailboxStore.deleteStoredFile")(function* (
+    this: MailboxStore,
+    fileId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      this.#persist("mailbox.file-deleted", `mailbox:file-deleted:${randomUUID()}`, deletions);
-    } catch (error) {
-      this.#state = previous;
-      throw error;
+      // The path checks wait, so they run before the state changes. Then no other write can save the
+      // markers without their outbox entry, and a failed save restores a copy that has all other changes.
+      const managedPaths = new Map<string, string | null>();
+      for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
+        managedPaths.set(
+          path,
+          yield* this.#files
+            .managedTransferFile(path)
+            .pipe(Effect.mapError((failure) => new StoredStateFailure({ cause: failure.cause }))),
+        );
+      }
+      const records = this.#fileRecords();
+      const targets = this.#undeletedFileRecords(fileId);
+      const previous = structuredClone(this.#state);
+      const deletedAt = new Date().toISOString();
+      for (const target of targets) target.deletedAt = deletedAt;
+      const inUse = new Set(records.filter((record) => !record.deletedAt).map((record) => record.path));
+      const deletions: string[] = [];
+      for (const path of new Set(targets.map((target) => target.path))) {
+        const managed = inUse.has(path) ? null : managedPaths.get(path);
+        if (managed) deletions.push(managed);
+      }
+      try {
+        this.#persist("mailbox.file-deleted", `mailbox:file-deleted:${randomUUID()}`, deletions);
+      } catch (error) {
+        this.#state = previous;
+        throw error;
+      }
+      yield* this.#drainFileDeletionOutboxEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#drainFileDeletionOutbox();
-  }
+  }, Effect.uninterruptible).bind(this);
 
   #fileRecords(): StoredAttachment[] {
     return [...this.#state.messages.flatMap((message) => message.attachments), ...this.#state.generatedAttachments];
@@ -1518,25 +1743,43 @@ export class MailboxStore {
     return targets;
   }
 
-  async verifyDeliveryAttachments(deliveryId: string): Promise<void> {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    if (!delivery) throw new Error(`Unknown delivery: ${deliveryId}`);
-    const message = this.#requireMessage(delivery.messageId);
-    for (const attachment of message.attachments) {
-      const resolved = await this.#files.resolveTransfer(attachment);
-      if (!resolved) throw new Error(sourceText("error.backend.managedAttachmentChanged", { name: attachment.name }));
+  verifyDeliveryAttachments = Effect.fn("MailboxStore.verifyDeliveryAttachments")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      if (!delivery) throw new Error(`Unknown delivery: ${deliveryId}`);
+      const message = this.#requireMessage(delivery.messageId);
+      for (const attachment of message.attachments) {
+        const resolved = yield* this.#files
+          .resolveTransfer(attachment)
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        if (!resolved) throw new Error(sourceText("error.backend.managedAttachmentChanged", { name: attachment.name }));
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible).bind(this);
 
-  async stageGeneratedAttachments(input: {
-    sources: GeneratedAttachmentSource[];
-    ownerAgentId?: string;
-    ownerThreadId?: string | null;
-  }): Promise<AttachmentSummary[]> {
-    const attachments = await this.#files.stageGenerated(input);
-    for (const attachment of attachments) this.#stagedGeneratedAttachments.set(attachment.id, attachment);
-    return attachments.map(toAttachmentSummary);
-  }
+  stageGeneratedAttachments = Effect.fn("MailboxStore.stageGeneratedAttachments")(function* (
+    this: MailboxStore,
+    input: {
+      sources: GeneratedAttachmentSource[];
+      ownerAgentId?: string;
+      ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<AttachmentSummary[], StoredStateFailure> {
+    try {
+      const attachments = yield* this.#files
+        .stageGenerated(input)
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      for (const attachment of attachments) this.#stagedGeneratedAttachments.set(attachment.id, attachment);
+      return attachments.map(toAttachmentSummary);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   persistGeneratedAttachmentsWithConversation(
     snapshot: ConversationSnapshot,
@@ -1565,56 +1808,86 @@ export class MailboxStore {
     return persisted;
   }
 
-  async discardStagedGeneratedAttachments(attachmentIds: string[]): Promise<void> {
-    const ids = new Set(attachmentIds);
-    const removed = attachmentIds.flatMap((id) => {
-      const attachment = this.#stagedGeneratedAttachments.get(id);
-      return attachment ? [attachment] : [];
-    });
-    if (removed.length === 0) return;
-
-    for (const id of ids) this.#stagedGeneratedAttachments.delete(id);
-    await this.#files.discardGenerated(removed);
-  }
-
-  async storeGeneratedAttachment(input: {
-    sourcePath?: string;
-    bytes?: Uint8Array;
-    name?: string;
-    mimeType?: string;
-    ownerAgentId?: string;
-    ownerThreadId?: string | null;
-  }): Promise<AttachmentSummary> {
-    const attachment = await this.#files.storeGenerated(input);
-    this.#state.generatedAttachments.push(attachment);
+  discardStagedGeneratedAttachments = Effect.fn("MailboxStore.discardStagedGeneratedAttachments")(function* (
+    this: MailboxStore,
+    attachmentIds: string[],
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      await this.#persist("attachment.generated");
-      return toAttachmentSummary(attachment);
-    } catch (error) {
-      this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
-        (candidate) => candidate.id !== attachment.id,
-      );
-      await this.#files.removeAttachmentDirectories([attachment.path]);
-      throw error;
-    }
-  }
+      const ids = new Set(attachmentIds);
+      const removed = attachmentIds.flatMap((id) => {
+        const attachment = this.#stagedGeneratedAttachments.get(id);
+        return attachment ? [attachment] : [];
+      });
+      if (removed.length === 0) return;
 
-  async listExportAttachments(): Promise<ExportedAttachmentFile[]> {
-    const files: ExportedAttachmentFile[] = [];
-    for (const [index, message] of this.#state.messages.entries()) {
-      for (const attachment of message.attachments) {
+      for (const id of ids) this.#stagedGeneratedAttachments.delete(id);
+      yield* this.#files
+        .discardGenerated(removed)
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
+    this: MailboxStore,
+    input: {
+      sourcePath?: string;
+      bytes?: Uint8Array;
+      name?: string;
+      mimeType?: string;
+      ownerAgentId?: string;
+      ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<AttachmentSummary, StoredStateFailure> {
+    try {
+      const attachment = yield* this.#files
+        .storeGenerated(input)
+        .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+      this.#state.generatedAttachments.push(attachment);
+      try {
+        this.#persist("attachment.generated");
+        return toAttachmentSummary(attachment);
+      } catch (error) {
+        this.#state.generatedAttachments = this.#state.generatedAttachments.filter(
+          (candidate) => candidate.id !== attachment.id,
+        );
+        yield* this.#files
+          .removeAttachmentDirectories([attachment.path])
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+        throw error;
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  listExportAttachments = Effect.fn("MailboxStore.listExportAttachments")(function* (
+    this: MailboxStore,
+  ): Effect.fn.Return<ExportedAttachmentFile[], StoredStateFailure> {
+    try {
+      const files: ExportedAttachmentFile[] = [];
+      for (const [index, message] of this.#state.messages.entries()) {
+        for (const attachment of message.attachments) {
+          if (attachment.deletedAt) continue;
+          const file = yield* this.#files
+            .exportAttachment(attachment, { id: message.id, index })
+            .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+          if (file) files.push(file);
+        }
+      }
+      for (const attachment of this.#state.generatedAttachments) {
         if (attachment.deletedAt) continue;
-        const file = await this.#files.exportAttachment(attachment, { id: message.id, index });
+        const file = yield* this.#files
+          .exportAttachment(attachment)
+          .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
         if (file) files.push(file);
       }
+      return files;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    for (const attachment of this.#state.generatedAttachments) {
-      if (attachment.deletedAt) continue;
-      const file = await this.#files.exportAttachment(attachment);
-      if (file) files.push(file);
-    }
-    return files;
-  }
+  }, Effect.uninterruptible).bind(this);
 
   #context(delivery: StoredDelivery): DeliveryContext {
     const message = this.#requireMessage(delivery.messageId);
@@ -1685,13 +1958,22 @@ export class MailboxStore {
     };
   }
 
-  async #updateDelivery(id: string, allowed: QueueDeliveryStatus[], patch: Partial<StoredDelivery>): Promise<void> {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === id);
-    if (!delivery) throw new Error(`Unknown delivery: ${id}`);
-    if (!allowed.includes(delivery.status)) return;
-    Object.assign(delivery, patch);
-    await this.#persist("delivery.updated");
-  }
+  #updateDeliveryEffect = Effect.fn("MailboxStore.updateDelivery")(function* (
+    this: MailboxStore,
+    id: string,
+    allowed: QueueDeliveryStatus[],
+    patch: Partial<StoredDelivery>,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === id);
+      if (!delivery) throw new Error(`Unknown delivery: ${id}`);
+      if (!allowed.includes(delivery.status)) return;
+      Object.assign(delivery, patch);
+      this.#persist("delivery.updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible);
 
   #requireMessage(id: string): StoredMessage {
     const message = this.#state.messages.find((candidate) => candidate.id === id);
@@ -1699,18 +1981,21 @@ export class MailboxStore {
     return message;
   }
 
-  async #readState(): Promise<StoredState> {
-    try {
-      const value = toCurrentMailboxState(JSON.parse(await readFile(this.#statePath, "utf8")));
-      if (!value || !isStoredState(value)) {
-        throw new Error(sourceText("error.backend.mailboxStateCorrupt"));
-      }
-      return value;
-    } catch (error) {
+  #readStateEffect = Effect.fn("MailboxStore.readState")(function* (
+    this: MailboxStore,
+  ): Effect.fn.Return<StoredState, StoredStateFailure> {
+    const loaded = yield* Effect.result(storedIO(() => readFile(this.#statePath, "utf8")));
+    if (Result.isFailure(loaded)) {
+      const error = loaded.failure.cause;
       if (isRecord(error) && error.code === "ENOENT") return structuredClone(EMPTY_STATE);
-      throw error;
+      return yield* loaded.failure;
     }
-  }
+    return yield* storedSync(() => {
+      const value = toCurrentMailboxState(JSON.parse(loaded.success));
+      if (!value || !isStoredState(value)) throw new Error(sourceText("error.backend.mailboxStateCorrupt"));
+      return value;
+    });
+  });
 
   #persist(
     eventType = "mailbox.updated",
@@ -1721,16 +2006,23 @@ export class MailboxStore {
     this.#database.replaceMailboxState(commandId, this.#state, eventType, fileDeletions, rebaseHistory);
   }
 
-  async #drainFileDeletionOutbox(): Promise<void> {
-    for (const item of this.#database.pendingFileDeletions()) {
-      try {
-        await this.#files.remove(item.path);
-        this.#database.completeFileDeletion(item.id);
-      } catch (error) {
-        this.#database.failFileDeletion(item.id, error instanceof Error ? error.message : String(error));
+  #drainFileDeletionOutboxEffect = Effect.fn("MailboxStore.drainFileDeletionOutbox")(function* (this: MailboxStore) {
+    const pending = yield* storedSync(() => this.#database.pendingFileDeletions());
+    for (const item of pending) {
+      const removed = yield* Effect.result(
+        Effect.gen({ self: this }, function* () {
+          yield* this.#files.remove(item.path).pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+          yield* storedSync(() => this.#database.completeFileDeletion(item.id));
+        }),
+      );
+      if (Result.isFailure(removed)) {
+        const error = removed.failure.cause;
+        yield* storedSync(() =>
+          this.#database.failFileDeletion(item.id, error instanceof Error ? error.message : String(error)),
+        );
       }
     }
-  }
+  }, Effect.uninterruptible);
 }
 
 function normalizeStoredState(value: StoredState): StoredState {

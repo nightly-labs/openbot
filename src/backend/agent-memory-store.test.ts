@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -78,12 +79,12 @@ describe("AgentMemoryStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-memory-restart-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runTestEffect(database.initialize());
     new AgentMemoryStore(database).createManual("chief", "Use metric units.");
     database.close();
 
     const reopened = new OpenBotDatabase(root);
-    await reopened.initialize();
+    await runTestEffect(reopened.initialize());
     expect(new AgentMemoryStore(reopened).list("chief").map((memory) => memory.text)).toEqual(["Use metric units."]);
     reopened.close();
   });
@@ -140,12 +141,12 @@ describe("AgentMemoryStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-memory-delete-agent-"));
     roots.push(root);
     const agentStore = new AgentStore(join(root, "data"), join(root, "home"));
-    await agentStore.initialize();
-    const agent = await agentStore.getOrCreate("chief");
+    await runTestEffect(agentStore.initialize());
+    const agent = await runTestEffect(agentStore.getOrCreate("chief"));
     const memories = new AgentMemoryStore(agentStore.database);
     const created = memories.createManual(agent.id, "Remove this with the agent.");
 
-    await agentStore.deleteAgent(agent.id);
+    await runTestEffect(agentStore.deleteAgent(agent.id));
 
     expect(memories.list(agent.id)).toEqual([]);
     expect(
@@ -161,6 +162,6 @@ async function setup(): Promise<{ database: OpenBotDatabase; memories: AgentMemo
   const root = await mkdtemp(join(tmpdir(), "openbot-memory-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await database.initialize();
+  await runTestEffect(database.initialize());
   return { database, memories: new AgentMemoryStore(database) };
 }

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Channel routines: a standing instruction that fires into the channel on a schedule.
 
 import {
@@ -35,50 +37,75 @@ export function channelRoutineIpcHandlers({
       listChannelRoutines: scopedHandler(parseChannelId, {
         local: (channelId) => service.listChannelRoutines(channelId),
         remote: (channelId, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routines, decodeChannelRoutines, {
-            method: "POST",
-            body: { channelId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routines, decodeChannelRoutines, {
+                method: "POST",
+                body: { channelId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       createChannelRoutine: scopedHandler(parseCreateChannelRoutine, {
         local: (parsed) => service.createChannelRoutine(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routineCreate, decodeChannelRoutine, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       updateChannelRoutine: scopedHandler(parseUpdateChannelRoutine, {
         local: (parsed) => service.updateChannelRoutine(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routineUpdate, decodeChannelRoutine, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       deleteChannelRoutine: scopedHandler(parseDeleteChannelRoutine, {
         local: (parsed) => service.deleteChannelRoutine(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routineDelete, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routineDelete, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       testChannelRoutine: scopedHandler(parseTestChannelRoutine, {
-        local: (parsed) => service.testChannelRoutine(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.testChannelRoutine(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routineTest, decodeChannelRoutineRun, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       listChannelRoutineRuns: scopedHandler(parseListChannelRoutineRuns, {
         local: (parsed) => service.listChannelRoutineRuns(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.routineRuns, decodeChannelRoutineRuns, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
     },
   };

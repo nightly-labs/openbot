@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -22,7 +23,7 @@ describe("ConversationReadStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-conversation-read-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runTestEffect(database.initialize());
     database.connection
       .prepare(
         `INSERT INTO projection_threads (
@@ -66,7 +67,7 @@ describe("ConversationReadStore", () => {
     database.close();
 
     const restoredDatabase = new OpenBotDatabase(root);
-    await restoredDatabase.initialize();
+    await runTestEffect(restoredDatabase.initialize());
     const restored = new ConversationReadStore(restoredDatabase);
     expect(restored.readState("member-a", third).throughMessageId).toBe("message-2");
     // Mark-unread is an explicit reset, distinct from a stale read acknowledgement.
@@ -80,7 +81,7 @@ describe("ConversationReadStore", () => {
     expect(restored.readState("member-owner", third).throughMessageId).toBe("message-2");
     restoredDatabase.close();
     const reopenedDatabase = new OpenBotDatabase(root);
-    await reopenedDatabase.initialize();
+    await runTestEffect(reopenedDatabase.initialize());
     expect(new ConversationReadStore(reopenedDatabase).readState("member-a", third)).toMatchObject({
       unreadCount: 3,
       throughMessageId: null,
@@ -92,7 +93,7 @@ describe("ConversationReadStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-conversation-read-filter-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runTestEffect(database.initialize());
     database.connection
       .prepare(
         `INSERT INTO projection_threads (
@@ -217,7 +218,7 @@ describe("ConversationReadStore", () => {
     legacy.close();
 
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runTestEffect(database.initialize());
     const reads = new ConversationReadStore(database);
     const legacySnapshot = snapshot([message("legacy-answer", "assistant")]);
     expect(reads.readState("member-new", legacySnapshot)).toEqual({

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SITE_PLUGINS } from "../src/lib/plugins";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { pluginIconResponse } from "../src/server/plugin-icon";
 
 afterEach(() => {
@@ -27,7 +28,7 @@ describe("plugin icon route", () => {
   it("fetches the address the catalog holds for the listing", async () => {
     const fetched = stubFetch(png());
 
-    const response = await pluginIconResponse(plugin.slug, null);
+    const response = await runApiEffect(pluginIconResponse(plugin.slug, null));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
@@ -40,7 +41,7 @@ describe("plugin icon route", () => {
   it("fetches nothing for a slug the catalog does not hold", async () => {
     const fetched = stubFetch(png());
 
-    const response = await pluginIconResponse("https://example.com/private", null);
+    const response = await runApiEffect(pluginIconResponse("https://example.com/private", null));
 
     expect(response.status).toBe(404);
     expect(fetched).toEqual([]);
@@ -51,7 +52,7 @@ describe("plugin icon route", () => {
   it("refuses to serve an icon that answers as SVG", async () => {
     stubFetch(new Response("<svg onload='alert(1)' />", { headers: { "Content-Type": "image/svg+xml" } }));
 
-    const response = await pluginIconResponse(plugin.slug, null);
+    const response = await runApiEffect(pluginIconResponse(plugin.slug, null));
 
     expect(response.status).toBe(404);
   });
@@ -59,7 +60,7 @@ describe("plugin icon route", () => {
   it("answers 404 when the developer's server does not", async () => {
     stubFetch(new Response("nope", { status: 500, headers: { "Content-Type": "text/plain" } }));
 
-    const response = await pluginIconResponse(plugin.slug, null);
+    const response = await runApiEffect(pluginIconResponse(plugin.slug, null));
 
     expect(response.status).toBe(404);
   });
@@ -70,10 +71,10 @@ describe("plugin icon route", () => {
     if (!app?.iconUrl) throw new Error("The first listing must hold an app with an icon.");
     const fetched = stubFetch(png());
 
-    expect((await pluginIconResponse(plugin.slug, app.id)).status).toBe(200);
+    expect((await runApiEffect(pluginIconResponse(plugin.slug, app.id))).status).toBe(200);
     expect(fetched).toEqual([app.iconUrl]);
 
-    expect((await pluginIconResponse(plugin.slug, "not-an-app")).status).toBe(404);
+    expect((await runApiEffect(pluginIconResponse(plugin.slug, "not-an-app"))).status).toBe(404);
     expect(fetched).toHaveLength(1);
   });
 });

@@ -3,6 +3,7 @@ import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/tea
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
+import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
   type RemoteFileUpload,
@@ -137,9 +138,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           scrollEnabled: false,
           style: { flex: 0, height: 1, width: 1 },
         }}
-        endSession={(sessionId) => directory.endSession(sessionId)}
+        endSession={(sessionId) => runTeamEffect(directory.endSession(sessionId))}
         getBootstrap={(hostId, clientPublicKey, existingSessionId) =>
-          directory.createBootstrap(hostId, clientPublicKey, existingSessionId)
+          runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, existingSessionId))
         }
         onCommandResult={handleCommandResult}
         onUploadProgress={async ({ commandId, sent, total }: RemoteUploadProgress) =>

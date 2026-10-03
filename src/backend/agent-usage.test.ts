@@ -6,6 +6,7 @@ import { type AgentAnalyticsInput, parseAgentAnalyticsInput, type UsageTokens } 
 import { afterEach, describe, expect, it } from "vitest";
 import { collectProviderUsage } from "./agent/usage-collection";
 import { recordUsageMessage, type UsageSample } from "./database/agent-usage";
+import { runTestEffect } from "./effect-test-runtime";
 import { OpenBotDatabase } from "./openbot-database";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
@@ -37,7 +38,7 @@ async function database() {
   const root = await mkdtemp(join(tmpdir(), "openbot-usage-"));
   roots.push(root);
   const db = new OpenBotDatabase(root);
-  await db.initialize();
+  await runTestEffect(db.initialize());
   databases.push(db);
   return db;
 }
@@ -156,7 +157,7 @@ describe("local agent usage", () => {
     db.usage.record(sample);
     db.usage.record(sample);
     db.close();
-    await db.initialize();
+    await runTestEffect(db.initialize());
     db.usage.record({ ...sample, tokens: { ...tokens, uncachedInput: 140, output: 70 } });
     db.usage.record({ ...sample, tokens: { ...tokens, uncachedInput: 120, output: 60 } });
     const result = db.usage.read(range);

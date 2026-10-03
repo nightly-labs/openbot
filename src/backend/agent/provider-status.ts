@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentProviderStatus } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
+import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
 
@@ -55,25 +56,45 @@ export function providerFailureStatus(
   return { state: "error", version: version ?? null, message };
 }
 
-export function waitForSuccessfulProcess(
+export class ProviderProcessFailed extends Schema.TaggedError<ProviderProcessFailed>()("ProviderProcessFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+export const waitForSuccessfulProcess = Effect.fnUntraced(function* (
   child: ChildProcess,
   timeoutMs: number,
   description = "Provider login",
-): Promise<void> {
-  return new Promise((resolveProcess, reject) => {
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`${description} timed out.`));
-    }, timeoutMs);
-    timer.unref?.();
-    child.once("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.once("exit", (code, signal) => {
-      clearTimeout(timer);
-      if (code === 0 && signal === null) resolveProcess();
-      else reject(new Error(`${description} stopped with ${signal ?? `code ${String(code)}`}.`));
-    });
-  });
-}
+) {
+  return yield* Effect.callback<void, ProviderProcessFailed>((resume) => {
+    let settled = false;
+    const cleanup = () => {
+      child.off("error", failed);
+      child.off("exit", exited);
+    };
+    const finish = (effect: Effect.Effect<void, ProviderProcessFailed>) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resume(effect);
+    };
+    const failed = (cause: Error) => finish(Effect.fail(new ProviderProcessFailed({ cause })));
+    const exited = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (code === 0 && signal === null) finish(Effect.void);
+      else failed(new Error(`${description} stopped with ${signal ?? `code ${String(code)}`}.`));
+    };
+    child.once("error", failed);
+    child.once("exit", exited);
+    // The login child can exit before this Effect is scheduled.
+    if (child.exitCode !== null || child.signalCode !== null) exited(child.exitCode, child.signalCode);
+    return Effect.sync(cleanup);
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: timeoutMs,
+      orElse: () =>
+        Effect.gen(function* () {
+          yield* Effect.sync(() => child.kill("SIGTERM"));
+          return yield* new ProviderProcessFailed({ cause: new Error(`${description} timed out.`) });
+        }),
+    }),
+  );
+});

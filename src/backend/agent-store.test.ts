@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { randomUUID } from "node:crypto";
@@ -33,7 +34,7 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
 
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
     expect(store.list()).toEqual([]);
   });
@@ -45,9 +46,9 @@ describe("AgentStore", () => {
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
 
-    await store.initialize();
-    const chief = await store.getOrCreate("chief");
-    const sales = await store.getOrCreate("sales-outbound");
+    await runTestEffect(store.initialize());
+    const chief = await runTestEffect(store.getOrCreate("chief"));
+    const sales = await runTestEffect(store.getOrCreate("sales-outbound"));
 
     expect(chief.workspacePath).toBe(join(home, "OpenBot", "Agents", "chief"));
     expect(chief.description).toBe("");
@@ -65,10 +66,10 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
     await writeFile(join(agent.workspacePath, "notes.md"), "kept");
-    const chief = await store.getOrCreate("chief");
+    const chief = await runTestEffect(store.getOrCreate("chief"));
     await writeFile(join(chief.workspacePath, "notes.md"), "kept too");
 
     // The disk a pre-rename build left behind: the workspace under `OpenBot/Bots/bot-<uuid>`, beside an
@@ -100,7 +101,7 @@ describe("AgentStore", () => {
     await writeFile(join(legacyAvatar, "avatar.png"), "uploaded");
 
     const reconciled = new AgentStore(userData, home);
-    await reconciled.initialize();
+    await runTestEffect(reconciled.initialize());
 
     expect(await readFile(join(agent.workspacePath, "notes.md"), "utf8")).toBe("kept");
     expect(await readFile(join(home, "OpenBot", "Agents", chief.id, "notes.md"), "utf8")).toBe("kept too");
@@ -118,7 +119,7 @@ describe("AgentStore", () => {
     // is what the database and every open conversation point at, so the leftover never lands on top of it.
     await mkdir(legacyWorkspace, { recursive: true });
     await writeFile(join(legacyWorkspace, "notes.md"), "stale");
-    await new AgentStore(userData, home).initialize();
+    await runTestEffect(new AgentStore(userData, home).initialize());
 
     expect(await readFile(join(agent.workspacePath, "notes.md"), "utf8")).toBe("kept");
 
@@ -134,7 +135,7 @@ describe("AgentStore", () => {
       .run(legacyChiefWorkspace, chief.id);
 
     const ambiguous = new AgentStore(userData, home);
-    await ambiguous.initialize();
+    await runTestEffect(ambiguous.initialize());
 
     expect(ambiguous.list().find((entry) => entry.id === chief.id)?.workspacePath).toBe(legacyChiefWorkspace);
 
@@ -142,13 +143,13 @@ describe("AgentStore", () => {
     // strands the file `avatarUrl` names: `resolveAvatar` looks for it under the new id alone, so the upload
     // the user made falls back to a drawn face. The one file the URL names comes across on its own.
     const image = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    await ambiguous.setAvatar(agent.id, { mimeType: "image/png", bytes: image });
+    await runTestEffect(ambiguous.setAvatar(agent.id, { mimeType: "image/png", bytes: image }));
     const uploadedPath = ambiguous.resolveAvatar(agent.id)?.path ?? "";
     await mkdir(legacyAvatar, { recursive: true });
     await rename(uploadedPath, join(legacyAvatar, basename(uploadedPath)));
 
     const adopted = new AgentStore(userData, home);
-    await adopted.initialize();
+    await runTestEffect(adopted.initialize());
 
     await expect(readFile(adopted.resolveAvatar(agent.id)?.path ?? "")).resolves.toEqual(Buffer.from(image));
   });
@@ -158,17 +159,17 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const userData = join(root, "user-data");
     const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
-    await store.getOrCreate("chief");
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.getOrCreate("chief"));
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
     // Derived from the agent id, not minted at random. Both conversation read paths call `getOrCreate`,
     // so reading a chat whose roster row is gone rebuilds the agent with no thread and arrives here --
     // and a random id would file it against an empty thread while the user's own thread, with every
     // message in it, stays on disk addressable by nothing.
     expect(threadId).toBe("openbot-thread-chief");
     const restored = new AgentStore(userData, join(root, "home"));
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     await expect(readFile(join(userData, "bots.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
@@ -186,9 +187,9 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    await store.getOrCreate("chief");
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
     store.database.appendConversationMessage({
       agentId: "chief",
       threadId,
@@ -203,11 +204,11 @@ describe("AgentStore", () => {
       eventType: "turn.started",
     });
     store.restoreThreadIdentity("chief", null, null);
-    await store.updatePreview("chief", "stranded");
+    await runTestEffect(store.updatePreview("chief", "stranded"));
     expect(store.list().find((agent) => agent.id === "chief")?.threadId).toBeNull();
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
 
     expect(restored.list().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
     expect(restored.database.readConversationPage("chief", threadId).messages).toEqual([
@@ -221,8 +222,8 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const channelThreadId = "openbot-thread-channel-chief";
     const now = "2026-09-01T12:00:00.000Z";
     store.database.connection
@@ -240,7 +241,7 @@ describe("AgentStore", () => {
       .run("channel-1", agent.id, channelThreadId);
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
 
     expect(restored.list().find((candidate) => candidate.id === agent.id)?.threadId).toBeNull();
     expect(restored.database.unclaimedThreads()).toEqual([]);
@@ -252,10 +253,10 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("sales-outbound");
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("sales-outbound"));
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
     store.database.appendConversationMessage({
       agentId: "chief",
       threadId,
@@ -279,7 +280,7 @@ describe("AgentStore", () => {
     store.database.connection.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run("chief");
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
 
     expect(restored.list().map((agent) => agent.id)).toEqual(["sales-outbound", "chief"]);
     expect(restored.list().find((agent) => agent.id === "sales-outbound")?.model).toBe("gpt-6-luna");
@@ -292,7 +293,7 @@ describe("AgentStore", () => {
     // third launch reads them out of the projection with no replay at all.
     restored.database.connection.exec("DELETE FROM projection_agents");
     const rebuilt = new AgentStore(userData, home);
-    await rebuilt.initialize();
+    await runTestEffect(rebuilt.initialize());
 
     expect(
       rebuilt
@@ -301,7 +302,7 @@ describe("AgentStore", () => {
         .sort(),
     ).toEqual(["chief", "sales-outbound"]);
     const reopened = new AgentStore(userData, home);
-    await reopened.initialize();
+    await runTestEffect(reopened.initialize());
     expect(
       reopened
         .list()
@@ -316,8 +317,8 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
 
     store.setMarketplaceSource(agent.id, {
       listingId: "market-planner",
@@ -328,7 +329,7 @@ describe("AgentStore", () => {
     });
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().find((candidate) => candidate.id === agent.id)?.marketplaceSource).toEqual({
       listingId: "market-planner",
       versionId: "market-planner-v2",
@@ -344,12 +345,12 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
-    await store.updateAgent({ agentId: agent.id, allowAutomation: true });
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
+    await runTestEffect(store.updateAgent({ agentId: agent.id, allowAutomation: true }));
     const allowAutomation = async () => {
       const reopened = new AgentStore(userData, home);
-      await reopened.initialize();
+      await runTestEffect(reopened.initialize());
       return reopened.list().find((candidate) => candidate.id === agent.id)?.allowAutomation;
     };
     const setStored = (sql: string, ...values: string[]) =>
@@ -395,7 +396,7 @@ describe("AgentStore", () => {
     await writeFile(statePath, `${JSON.stringify(legacy, null, 2)}\n`);
 
     const restored = new AgentStore(userData, join(root, "home"));
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
 
     expect(restored.list().find((agent) => agent.id === "chief")).toMatchObject({
       avatarSeed: "chief",
@@ -443,7 +444,7 @@ describe("AgentStore", () => {
     const source = `${JSON.stringify(legacy, null, 2)}\n`;
     await writeFile(statePath, source);
     const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
     expect(store.list()).toMatchObject([{ id: "writer", model: "claude-sonnet-5", threadId: null, avatarHue: 215 }]);
     await expect(readFile(statePath, "utf8")).resolves.toBe(source);
@@ -468,7 +469,7 @@ describe("AgentStore", () => {
     await writeFile(statePath, source);
 
     const store = new AgentStore(userData, join(root, "home"));
-    await expect(store.initialize()).rejects.toThrow("old role field");
+    await expect(runTestEffect(store.initialize())).rejects.toThrow("old role field");
     await expect(readFile(statePath, "utf8")).resolves.toBe(source);
   });
 
@@ -478,17 +479,19 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    await store.getOrCreate("chief");
-    await store.updateAgent({
-      agentId: "chief",
-      provider: "claude",
-      model: "claude-fable-5-1",
-      reasoningEffort: "high",
-      avatarSeed: "chief:picked",
-      avatarHue: 30,
-    });
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(
+      store.updateAgent({
+        agentId: "chief",
+        provider: "claude",
+        model: "claude-fable-5-1",
+        reasoningEffort: "high",
+        avatarSeed: "chief:picked",
+        avatarHue: 30,
+      }),
+    );
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
     const workspacePath = store.list().find((agent) => agent.id === "chief")?.workspacePath;
 
     // Values a released build stored and a later one cannot read: a model id the provider CLI renamed
@@ -504,7 +507,7 @@ describe("AgentStore", () => {
       .run("claude fable 5.1 (1m)", "ultra", "Chief Seed", 7, "root", "chief");
 
     const repaired = new AgentStore(userData, home);
-    await repaired.initialize();
+    await runTestEffect(repaired.initialize());
 
     // The identity survives: same agent, same thread, same workspace, and the chat is still readable.
     expect(repaired.list().find((agent) => agent.id === "chief")).toMatchObject({
@@ -540,9 +543,9 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    await store.getOrCreate("chief");
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
     store.database.connection
       .prepare(
         "UPDATE projection_agents SET agent_json = json_set(agent_json, '$.workspacePath', ?) WHERE agent_id = ?",
@@ -552,7 +555,7 @@ describe("AgentStore", () => {
     const blocked = new AgentStore(userData, home);
     // The field is the diagnosis a support report can carry; the value is a path from the user's home
     // directory, and this message reaches a dialog, the log and any diagnostics export.
-    await expect(blocked.initialize()).rejects.toThrow(
+    await expect(runTestEffect(blocked.initialize())).rejects.toThrow(
       'Stored agent profile chief has an unreadable "workspacePath" value',
     );
 
@@ -566,23 +569,23 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const userData = join(root, "user-data");
     const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
-    const chief = await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    const chief = await runTestEffect(store.getOrCreate("chief"));
 
     // `AgentService` passes ids straight out of `listModels()`, so the value here is a provider CLI's,
     // not a user's. Stored, it made the *next* launch the failure. The provider must also stay unchanged
     // when validation of the later model field fails.
     await expect(
-      store.updateAgent({ agentId: "chief", provider: "claude", model: "claude fable 5.1 (1m)" }),
+      runTestEffect(store.updateAgent({ agentId: "chief", provider: "claude", model: "claude fable 5.1 (1m)" })),
     ).rejects.toThrow("Invalid agent model.");
     expect(store.list().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "codex",
       model: chief.model,
     });
-    await expect(store.updateAgent({ agentId: "chief", model: "claude fable 5.1 (1m)" })).rejects.toThrow(
-      "Invalid agent model.",
-    );
-    await expect(store.updateAgent({ agentId: "chief", avatarSeed: "Chief Seed" })).rejects.toThrow(
+    await expect(
+      runTestEffect(store.updateAgent({ agentId: "chief", model: "claude fable 5.1 (1m)" })),
+    ).rejects.toThrow("Invalid agent model.");
+    await expect(runTestEffect(store.updateAgent({ agentId: "chief", avatarSeed: "Chief Seed" }))).rejects.toThrow(
       "Invalid avatar seed.",
     );
 
@@ -599,19 +602,23 @@ describe("AgentStore", () => {
       temporaryRoots.push(root);
       const userData = join(root, "user-data");
       const store = new AgentStore(userData, join(root, "home"));
-      await store.initialize();
+      await runTestEffect(store.initialize());
 
-      const first = await store.createAgent({
-        ...AGENT_PROFILE_INPUT,
-        name: "First Agent",
-        avatarSeed: "setup:first",
-        description,
-      });
-      const second = await store.createAgent({
-        ...AGENT_PROFILE_INPUT,
-        name: "Second Agent",
-        avatarSeed: "setup:second",
-      });
+      const first = await runTestEffect(
+        store.createAgent({
+          ...AGENT_PROFILE_INPUT,
+          name: "First Agent",
+          avatarSeed: "setup:first",
+          description,
+        }),
+      );
+      const second = await runTestEffect(
+        store.createAgent({
+          ...AGENT_PROFILE_INPUT,
+          name: "Second Agent",
+          avatarSeed: "setup:second",
+        }),
+      );
 
       expect(first.id).not.toBe(second.id);
       expect(first.name).toBe("First Agent");
@@ -626,7 +633,7 @@ describe("AgentStore", () => {
       ).toEqual([second.id, first.id]);
 
       const reloaded = new AgentStore(userData, join(root, "home"));
-      await reloaded.initialize();
+      await runTestEffect(reloaded.initialize());
       expect(reloaded.list().find((agent) => agent.id === first.id)?.description).toBe(description.trim());
       expect(
         reloaded
@@ -643,21 +650,23 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief", "Research", "Research lead");
-    await store.updateAgent({
-      agentId: source.id,
-      description: "Finds primary sources.",
-      notifications: false,
-      provider: "claude",
-      model: "claude-opus-5",
-      reasoningEffort: "high",
-      access: "workspace",
-      avatarSeed: "research:avatar",
-      avatarHue: 215,
-    });
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief", "Research", "Research lead"));
+    await runTestEffect(
+      store.updateAgent({
+        agentId: source.id,
+        description: "Finds primary sources.",
+        notifications: false,
+        provider: "claude",
+        model: "claude-opus-5",
+        reasoningEffort: "high",
+        access: "workspace",
+        avatarSeed: "research:avatar",
+        avatarHue: 215,
+      }),
+    );
     const image = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    await store.setAvatar(source.id, { mimeType: "image/png", bytes: image });
+    await runTestEffect(store.setAvatar(source.id, { mimeType: "image/png", bytes: image }));
     await mkdir(join(source.workspacePath, "skills", "research"), { recursive: true });
     await writeFile(join(source.workspacePath, "skills", "research", "SKILL.md"), "Use primary sources.\n");
     await writeFile(join(source.workspacePath, "skills.lock"), "research@1\n");
@@ -672,10 +681,10 @@ describe("AgentStore", () => {
 
     const firstOperationId = randomUUID();
     const secondOperationId = randomUUID();
-    const duplicate = await store.duplicateAgent(source.id, firstOperationId);
-    const secondDuplicate = await store.duplicateAgent(source.id, secondOperationId);
-    await store.commitAgentDuplication(duplicate.id, firstOperationId, source.id, EMPTY_LAYOUT);
-    await store.commitAgentDuplication(secondDuplicate.id, secondOperationId, source.id, EMPTY_LAYOUT);
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id, firstOperationId));
+    const secondDuplicate = await runTestEffect(store.duplicateAgent(source.id, secondOperationId));
+    await runTestEffect(store.commitAgentDuplication(duplicate.id, firstOperationId, source.id, EMPTY_LAYOUT));
+    await runTestEffect(store.commitAgentDuplication(secondDuplicate.id, secondOperationId, source.id, EMPTY_LAYOUT));
 
     expect(duplicate).toMatchObject({
       name: "Research copy",
@@ -718,7 +727,7 @@ describe("AgentStore", () => {
     await expect(readFile(join(source.workspacePath, "skills.lock"), "utf8")).resolves.toBe("research@1\n");
 
     const reloaded = new AgentStore(userData, home);
-    await reloaded.initialize();
+    await runTestEffect(reloaded.initialize());
     expect(reloaded.list().map((agent) => agent.id)).toEqual(
       expect.arrayContaining([source.id, duplicate.id, secondDuplicate.id]),
     );
@@ -730,13 +739,13 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief"));
     await writeFile(join(source.workspacePath, "note.txt"), "source\n");
-    const duplicate = await store.duplicateAgent(source.id);
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id));
 
     const recovered = new AgentStore(userData, home);
-    await recovered.initialize();
+    await runTestEffect(recovered.initialize());
 
     expect(recovered.list().map((agent) => agent.id)).toEqual([source.id]);
     await expect(readFile(join(duplicate.workspacePath, "note.txt"), "utf8")).rejects.toMatchObject({
@@ -751,9 +760,9 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief");
-    const duplicate = await store.duplicateAgent(source.id);
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief"));
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id));
 
     // The build that crashed mid-copy was a pre-rename one, so it named the marker after the duplicate's
     // old id and copied the workspace under the old root; migration v13 has since renamed the agent.
@@ -772,7 +781,7 @@ describe("AgentStore", () => {
     );
 
     const recovered = new AgentStore(userData, home);
-    await recovered.initialize();
+    await runTestEffect(recovered.initialize());
 
     expect(recovered.list().map((agent) => agent.id)).toEqual([source.id]);
     await expect(readdir(legacyWorkspace)).rejects.toMatchObject({ code: "ENOENT" });
@@ -786,10 +795,10 @@ describe("AgentStore", () => {
     const home = join(root, "home");
     const operationId = randomUUID();
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const source = await store.createAgent(AGENT_PROFILE_INPUT);
-    const duplicate = await store.duplicateAgent(source.id, operationId);
-    await store.commitAgentDuplication(duplicate.id, operationId, source.id, EMPTY_LAYOUT);
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id, operationId));
+    await runTestEffect(store.commitAgentDuplication(duplicate.id, operationId, source.id, EMPTY_LAYOUT));
     await writeFile(join(duplicate.workspacePath, "note.txt"), "duplicate\n");
 
     // The crash that stranded this marker happened before the rename, so every id in it is spelled the
@@ -803,7 +812,7 @@ describe("AgentStore", () => {
     );
 
     const recovered = new AgentStore(userData, home);
-    await recovered.initialize();
+    await runTestEffect(recovered.initialize());
 
     expect(recovered.list().map((agent) => agent.id)).toEqual(expect.arrayContaining([source.id, duplicate.id]));
     await expect(readFile(join(duplicate.workspacePath, "note.txt"), "utf8")).resolves.toBe("duplicate\n");
@@ -817,11 +826,13 @@ describe("AgentStore", () => {
     const home = join(root, "home");
     const operationId = randomUUID();
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief");
-    const duplicate = await store.duplicateAgent(source.id, operationId);
-    const committed = await store.commitAgentDuplication(duplicate.id, operationId, source.id, EMPTY_LAYOUT);
-    const currentAgent = await store.updateAgent({ agentId: duplicate.id, title: "Current title" });
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief"));
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id, operationId));
+    const committed = await runTestEffect(
+      store.commitAgentDuplication(duplicate.id, operationId, source.id, EMPTY_LAYOUT),
+    );
+    const currentAgent = await runTestEffect(store.updateAgent({ agentId: duplicate.id, title: "Current title" }));
 
     // A receipt a released build stamped spells these two keys `sourceBotId` and `bot`; migration v13
     // rewrote id values but never key names, so the row survives the upgrade in this shape. Reading only
@@ -835,12 +846,12 @@ describe("AgentStore", () => {
       );
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
 
     expect(restored.committedAgentDuplication(operationId, source.id)).toEqual({ ...committed, agent: currentAgent });
     expect(restored.list().filter((agent) => agent.name === duplicate.name)).toHaveLength(1);
 
-    await restored.deleteAgent(duplicate.id);
+    await runTestEffect(restored.deleteAgent(duplicate.id));
 
     expect(restored.committedAgentDuplication(operationId, source.id)).toBeNull();
   });
@@ -850,14 +861,14 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const home = join(root, "home");
     const store = new AgentStore(join(root, "user-data"), home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief"));
     await writeFile(join(source.workspacePath, "note.txt"), "keep\n");
     vi.spyOn(store.database, "replaceAgents").mockImplementationOnce(() => {
       throw new Error("database unavailable");
     });
 
-    await expect(store.duplicateAgent(source.id)).rejects.toThrow("database unavailable");
+    await expect(runTestEffect(store.duplicateAgent(source.id))).rejects.toThrow("database unavailable");
 
     expect(store.list().map((agent) => agent.id)).toEqual([source.id]);
     expect(await readdir(join(home, "OpenBot", "Agents"))).toEqual([source.id]);
@@ -868,18 +879,18 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-duplicate-preview-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    const source = await store.getOrCreate("chief", "Research", "Research lead");
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief", "Research", "Research lead"));
     await writeFile(join(source.workspacePath, "note.txt"), "keep\n");
     const resolveAvatar = store.resolveAvatar.bind(store);
     vi.spyOn(store, "resolveAvatar").mockImplementationOnce((agentId) => {
       // A message landing mid-copy moves `preview`, `updatedAt` and `threadId`. Copying a real
       // workspace takes seconds, so this window is wide enough to hit in ordinary use.
-      void store.updatePreview(source.id, "Where are we on the sources?");
+      void runTestEffect(store.updatePreview(source.id, "Where are we on the sources?"));
       return resolveAvatar(agentId);
     });
 
-    const duplicate = await store.duplicateAgent(source.id);
+    const duplicate = await runTestEffect(store.duplicateAgent(source.id));
 
     expect(duplicate).toMatchObject({ name: "Research copy", preview: "No messages yet", threadId: null });
     await expect(readFile(join(duplicate.workspacePath, "note.txt"), "utf8")).resolves.toBe("keep\n");
@@ -890,15 +901,17 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const home = join(root, "home");
     const store = new AgentStore(join(root, "user-data"), home);
-    await store.initialize();
-    const source = await store.getOrCreate("chief", "Research", "Research lead");
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief", "Research", "Research lead"));
     const resolveAvatar = store.resolveAvatar.bind(store);
     vi.spyOn(store, "resolveAvatar").mockImplementationOnce((agentId) => {
-      void store.updateAgent({ agentId: source.id, description: "Finds primary sources." });
+      void runTestEffect(store.updateAgent({ agentId: source.id, description: "Finds primary sources." }));
       return resolveAvatar(agentId);
     });
 
-    await expect(store.duplicateAgent(source.id)).rejects.toThrow("changed while it was being duplicated");
+    await expect(runTestEffect(store.duplicateAgent(source.id))).rejects.toThrow(
+      "changed while it was being duplicated",
+    );
 
     expect(store.list().map((agent) => agent.id)).toEqual([source.id]);
     expect(await readdir(join(home, "OpenBot", "Agents"))).toEqual([source.id]);
@@ -908,13 +921,13 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-duplicate-limit-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    const source = await store.getOrCreate("agent-0");
+    await runTestEffect(store.initialize());
+    const source = await runTestEffect(store.getOrCreate("agent-0"));
     for (let index = 1; index < INPUT_LIMITS.agents; index += 1) {
-      await store.getOrCreate(`agent-${index}`);
+      await runTestEffect(store.getOrCreate(`agent-${index}`));
     }
 
-    await expect(store.duplicateAgent(source.id)).rejects.toThrow(`up to ${INPUT_LIMITS.agents} agents`);
+    await expect(runTestEffect(store.duplicateAgent(source.id))).rejects.toThrow(`up to ${INPUT_LIMITS.agents} agents`);
     expect(store.list()).toHaveLength(INPUT_LIMITS.agents);
   });
 
@@ -922,13 +935,19 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
-    await expect(store.createAgent({ ...AGENT_PROFILE_INPUT, name: " " })).rejects.toThrow("Agent name is required.");
+    await expect(runTestEffect(store.createAgent({ ...AGENT_PROFILE_INPUT, name: " " }))).rejects.toThrow(
+      "Agent name is required.",
+    );
     await expect(
-      store.createAgent({ ...AGENT_PROFILE_INPUT, description: "x".repeat(INPUT_LIMITS.agentDescription + 1) }),
+      runTestEffect(
+        store.createAgent({ ...AGENT_PROFILE_INPUT, description: "x".repeat(INPUT_LIMITS.agentDescription + 1) }),
+      ),
     ).rejects.toThrow("Agent description is too long.");
-    await expect(store.createAgent({ ...AGENT_PROFILE_INPUT, avatarSeed: "" })).rejects.toThrow("Invalid avatar seed.");
+    await expect(runTestEffect(store.createAgent({ ...AGENT_PROFILE_INPUT, avatarSeed: "" }))).rejects.toThrow(
+      "Invalid avatar seed.",
+    );
     expect(store.list()).toEqual([]);
   });
 
@@ -936,9 +955,9 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "data"), join(root, "home"));
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
-    await expect(store.getOrCreate("../outside")).rejects.toThrow("Invalid agent id");
+    await expect(runTestEffect(store.getOrCreate("../outside"))).rejects.toThrow("Invalid agent id");
   });
 
   it("fails closed instead of overwriting agent state from a newer version", async () => {
@@ -951,7 +970,7 @@ describe("AgentStore", () => {
     await writeFile(statePath, unsupported);
 
     const store = new AgentStore(userData, join(root, "home"));
-    await expect(store.initialize()).rejects.toThrow("refusing to overwrite");
+    await expect(runTestEffect(store.initialize())).rejects.toThrow("refusing to overwrite");
     await expect(readFile(statePath, "utf8")).resolves.toBe(unsupported);
   });
 
@@ -960,23 +979,25 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const userData = join(root, "user-data");
     const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
-    await store.getOrCreate("chief");
-    await store.updateAgent({
-      agentId: "chief",
-      name: "Coordinator",
-      title: "Operations lead",
-      description: "Keeps the team aligned",
-      notifications: false,
-      model: "gpt-5.6-sol",
-      reasoningEffort: "high",
-      access: "workspace",
-      avatarSeed: "chief:avatar:2:4",
-      avatarHue: 215,
-    });
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(
+      store.updateAgent({
+        agentId: "chief",
+        name: "Coordinator",
+        title: "Operations lead",
+        description: "Keeps the team aligned",
+        notifications: false,
+        model: "gpt-5.6-sol",
+        reasoningEffort: "high",
+        access: "workspace",
+        avatarSeed: "chief:avatar:2:4",
+        avatarHue: 215,
+      }),
+    );
     const restored = new AgentStore(userData, join(root, "home"));
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().find((agent) => agent.id === "chief")).toMatchObject({
       name: "Coordinator",
       title: "Operations lead",
@@ -996,16 +1017,16 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    expect((await store.getOrCreate("chief")).access).toBe("full");
-    await store.updateAgent({ agentId: "chief", access: "workspace" });
+    await runTestEffect(store.initialize());
+    expect((await runTestEffect(store.getOrCreate("chief"))).access).toBe("full");
+    await runTestEffect(store.updateAgent({ agentId: "chief", access: "workspace" }));
     // A profile an older release wrote has no access key.
     store.database.connection
       .prepare("UPDATE projection_agents SET agent_json = json_remove(agent_json, '$.access') WHERE agent_id = ?")
       .run("chief");
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().find((agent) => agent.id === "chief")?.access).toBe("full");
   });
 
@@ -1014,21 +1035,21 @@ describe("AgentStore", () => {
     temporaryRoots.push(root);
     const userData = join(root, "user-data");
     const store = new AgentStore(userData, join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
     const image = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-    const updated = await store.setAvatar("chief", { mimeType: "image/png", bytes: image });
+    const updated = await runTestEffect(store.setAvatar("chief", { mimeType: "image/png", bytes: image }));
     expect(updated.avatarUrl).toMatch(/^openbot-avatar:\/\/agent\/chief\?v=/u);
     const storedAvatar = store.resolveAvatar("chief");
     expect(storedAvatar?.mimeType).toBe("image/png");
     await expect(readFile(storedAvatar?.path ?? "")).resolves.toEqual(Buffer.from(image));
 
     const restored = new AgentStore(userData, join(root, "home"));
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().find((agent) => agent.id === "chief")?.avatarUrl).toBe(updated.avatarUrl);
     const restoredPath = restored.resolveAvatar("chief")?.path ?? "";
-    await restored.setAvatar("chief", null);
+    await runTestEffect(restored.setAvatar("chief", null));
     expect(restored.list().find((agent) => agent.id === "chief")?.avatarUrl).toBeNull();
     await expect(readFile(restoredPath)).rejects.toMatchObject({ code: "ENOENT" });
   });
@@ -1037,16 +1058,16 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
     const image = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const original = await store.setAvatar("chief", { mimeType: "image/png", bytes: image });
+    const original = await runTestEffect(store.setAvatar("chief", { mimeType: "image/png", bytes: image }));
     const originalAvatar = store.resolveAvatar("chief");
     vi.spyOn(store.database, "replaceAgents").mockImplementation(() => {
       throw new Error("database unavailable");
     });
 
-    await expect(store.setAvatar("chief", { mimeType: "image/png", bytes: image })).rejects.toThrow(
+    await expect(runTestEffect(store.setAvatar("chief", { mimeType: "image/png", bytes: image }))).rejects.toThrow(
       "database unavailable",
     );
     expect(store.list().find((agent) => agent.id === "chief")).toMatchObject({
@@ -1055,7 +1076,7 @@ describe("AgentStore", () => {
     });
     await expect(readFile(originalAvatar?.path ?? "")).resolves.toEqual(Buffer.from(image));
 
-    await expect(store.setAvatar("chief", null)).rejects.toThrow("database unavailable");
+    await expect(runTestEffect(store.setAvatar("chief", null))).rejects.toThrow("database unavailable");
     expect(store.list().find((agent) => agent.id === "chief")?.avatarUrl).toBe(original.avatarUrl);
     await expect(readFile(originalAvatar?.path ?? "")).resolves.toEqual(Buffer.from(image));
   });
@@ -1064,17 +1085,19 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
 
-    await expect(store.updateAgent({ agentId: "chief", name: "x".repeat(INPUT_LIMITS.agentName + 1) })).rejects.toThrow(
-      "Agent name is too long",
-    );
     await expect(
-      store.updateAgent({
-        agentId: "chief",
-        description: "x".repeat(INPUT_LIMITS.agentDescription + 1),
-      }),
+      runTestEffect(store.updateAgent({ agentId: "chief", name: "x".repeat(INPUT_LIMITS.agentName + 1) })),
+    ).rejects.toThrow("Agent name is too long");
+    await expect(
+      runTestEffect(
+        store.updateAgent({
+          agentId: "chief",
+          description: "x".repeat(INPUT_LIMITS.agentDescription + 1),
+        }),
+      ),
     ).rejects.toThrow("Agent description is too long");
     expect(store.list().find((agent) => agent.id === "chief")).toMatchObject({
       name: "Chief",
@@ -1086,14 +1109,18 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
-    const threadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    const threadId = await runTestEffect(store.ensureThreadId("chief"));
 
-    const claude = await store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" });
+    const claude = await runTestEffect(
+      store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }),
+    );
     expect(claude.threadId).toBe(threadId);
 
-    const opus = await store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-opus-5" });
+    const opus = await runTestEffect(
+      store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-opus-5" }),
+    );
     expect(opus.threadId).toBe(threadId);
   });
 
@@ -1101,16 +1128,16 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
-    const publicThreadId = await store.ensureThreadId("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    const publicThreadId = await runTestEffect(store.ensureThreadId("chief"));
     store.bindProviderSession("chief", "codex-native-1");
     store.database.deactivateProviderSessions(publicThreadId);
 
-    await store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" });
+    await runTestEffect(store.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
     store.bindProviderSession("chief", "claude-native-1");
     store.database.deactivateProviderSessions(publicThreadId);
-    await store.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" });
+    await runTestEffect(store.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }));
     expect(store.activeProviderSession("chief")).toBeNull();
     store.bindProviderSession("chief", "codex-native-2");
 
@@ -1129,23 +1156,23 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
     const marker = join(userData, "agent-duplications", `${agent.id}.pending`);
     // A directory at the marker path makes unlink fail after workspace removal.
     await mkdir(marker, { recursive: true });
-    await expect(store.deleteAgent(agent.id)).rejects.toThrow();
+    await expect(runTestEffect(store.deleteAgent(agent.id))).rejects.toThrow();
     expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list().map((entry) => entry.id)).toEqual([agent.id]);
     await rm(marker, { recursive: true });
-    await restored.deleteAgent(agent.id);
+    await runTestEffect(restored.deleteAgent(agent.id));
     // Older releases could leave managed files after removing the record.
     await mkdir(agent.workspacePath, { recursive: true });
     await writeFile(join(agent.workspacePath, "leftover.txt"), "owned data");
-    await restored.deleteAgent(agent.id);
+    await runTestEffect(restored.deleteAgent(agent.id));
     expect(restored.list()).toEqual([]);
     await expect(readdir(agent.workspacePath)).rejects.toMatchObject({ code: "ENOENT" });
   });
@@ -1154,14 +1181,14 @@ describe("AgentStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);
     const store = new AgentStore(join(root, "user-data"), join(root, "home"));
-    await store.initialize();
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    await runTestEffect(store.initialize());
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
     vi.spyOn(store.database, "hardDeleteAgent").mockImplementationOnce(() => {
       throw new Error("Database write failed");
     });
-    await expect(store.deleteAgent(agent.id)).rejects.toThrow("Database write failed");
+    await expect(runTestEffect(store.deleteAgent(agent.id))).rejects.toThrow("Database write failed");
     expect(store.list().map((entry) => entry.id)).toEqual([agent.id]);
-    await store.deleteAgent(agent.id);
+    await runTestEffect(store.deleteAgent(agent.id));
     expect(store.list()).toEqual([]);
   });
 
@@ -1171,23 +1198,23 @@ describe("AgentStore", () => {
     const userData = join(root, "user-data");
     const home = join(root, "home");
     const store = new AgentStore(userData, home);
-    await store.initialize();
+    await runTestEffect(store.initialize());
 
-    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    const agent = await runTestEffect(store.createAgent(AGENT_PROFILE_INPUT));
     await writeFile(join(agent.workspacePath, "generated.txt"), "workspace data");
 
     // Deleting an agent also clears the directories a pre-rename build would have given it, and that name
     // is derived from this id's own spelling. `bot-<uuid>` is a valid id in its own right, so a second
     // agent can be sitting under exactly that derived name -- and these are recursive deletes.
     const sibling = `bot-${agent.id.slice("agent-".length)}`;
-    await store.getOrCreate(sibling);
+    await runTestEffect(store.getOrCreate(sibling));
     const siblingLegacyWorkspace = join(home, "OpenBot", "Bots", sibling);
     await mkdir(siblingLegacyWorkspace, { recursive: true });
     await writeFile(join(siblingLegacyWorkspace, "notes.md"), "sibling data");
     await mkdir(join(userData, "avatars", sibling), { recursive: true });
     await writeFile(join(userData, "avatars", sibling, "avatar.png"), "sibling face");
 
-    await store.deleteAgent(agent.id);
+    await runTestEffect(store.deleteAgent(agent.id));
     expect(store.list().map((entry) => entry.id)).toEqual([sibling]);
     await expect(readFile(join(agent.workspacePath, "generated.txt"))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(join(siblingLegacyWorkspace, "notes.md"), "utf8")).resolves.toBe("sibling data");
@@ -1196,11 +1223,11 @@ describe("AgentStore", () => {
     // A legacy import keeps the id it read and the `~/OpenBot/Bots/<id>` workspace that came with it, so
     // for that agent the pre-rename root is where its files actually are. Deleting only the derived
     // directory would report success and leave the workspace on disk.
-    await store.deleteAgent(sibling);
+    await runTestEffect(store.deleteAgent(sibling));
     await expect(readFile(join(siblingLegacyWorkspace, "notes.md"))).rejects.toMatchObject({ code: "ENOENT" });
 
     const restored = new AgentStore(userData, home);
-    await restored.initialize();
+    await runTestEffect(restored.initialize());
     expect(restored.list()).toEqual([]);
   });
 });

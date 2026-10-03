@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The one GitHub connection of this computer: sign in with a device code, list the repositories it
 // reaches, and sign out.
 
@@ -22,12 +23,22 @@ export function githubConnectorIpcHandlers({
   return {
     githubConnector: {
       status: handler(() => githubConnector.status()),
-      connect: handler(() => githubConnector.connect()),
+      connect: handler(() =>
+        Effect.runPromise(githubConnector.connect().pipe(Effect.mapError((error) => error.cause))),
+      ),
       cancel: handler(() => githubConnector.cancel()),
-      disconnect: handler(() => githubConnector.disconnect()),
-      repositories: handler(() => githubConnector.repositories()),
-      openVerification: handler(() => githubConnector.openVerification()),
-      openInstall: handler(() => githubConnector.openInstall()),
+      disconnect: handler(() =>
+        Effect.runPromise(githubConnector.disconnect().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      repositories: handler(() =>
+        Effect.runPromise(githubConnector.repositories().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      openVerification: handler(() =>
+        Effect.runPromise(githubConnector.openVerification().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      openInstall: handler(() =>
+        Effect.runPromise(githubConnector.openInstall().pipe(Effect.mapError((error) => error.cause))),
+      ),
     },
   };
 }

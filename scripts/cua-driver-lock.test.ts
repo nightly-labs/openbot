@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { resolveCuaDriver } from "../src/main/cua-driver-artifact";
@@ -75,15 +76,17 @@ describe("the packaged driver layout", () => {
       await mkdir(dirname(installed), { recursive: true });
       await writeFile(installed, "", { mode: 0o755 });
 
-      const found = await resolveCuaDriver({
-        isPackaged: false,
-        resourcesPath: join(sourceRoot, "resources"),
-        sourceRoot,
-        platform,
-        architecture,
-        homeDirectory: join(sourceRoot, "home"),
-        pathVariable: null,
-      });
+      const found = await Effect.runPromise(
+        resolveCuaDriver({
+          isPackaged: false,
+          resourcesPath: join(sourceRoot, "resources"),
+          sourceRoot,
+          platform,
+          architecture,
+          homeDirectory: join(sourceRoot, "home"),
+          pathVariable: null,
+        }),
+      );
       expect(found).toBe(installed);
     }
   });
@@ -105,15 +108,17 @@ describe("the packaged driver layout", () => {
       const installed = join(resourcesPath, "cua-driver", platform, architecture, executable);
       await mkdir(dirname(installed), { recursive: true });
       await writeFile(installed, "", { mode: 0o755 });
-      const found = await resolveCuaDriver({
-        isPackaged: true,
-        resourcesPath,
-        sourceRoot: resourcesPath,
-        platform,
-        architecture,
-        homeDirectory: join(resourcesPath, "home"),
-        pathVariable: null,
-      });
+      const found = await Effect.runPromise(
+        resolveCuaDriver({
+          isPackaged: true,
+          resourcesPath,
+          sourceRoot: resourcesPath,
+          platform,
+          architecture,
+          homeDirectory: join(resourcesPath, "home"),
+          pathVariable: null,
+        }),
+      );
       expect(found).toBe(installed);
     }
   });

@@ -17,7 +17,9 @@ import {
 } from "@openbot/contracts/team-protocol/providers-v3";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText, registerSecretValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
+import { AgentLifecycleFailed } from "../../backend/agent-service";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
@@ -63,16 +65,25 @@ export async function routeProviders(
         if (id !== "codex")
           throw new Error(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName(id) }));
         // The admin types the code in their own browser; nothing it is traded for comes back.
-        return json(200, await service.startProviderCodeLogin(id));
+        return json(
+          200,
+          await Effect.runPromise(service.startProviderCodeLogin(id).pipe(Effect.mapError((error) => error.cause))),
+        );
       }
       case PROVIDERS_ADMIN_ROUTES.codeLoginCancel: {
         // A v1 client never started a Claude or Grok sign-in, so it cannot cancel one either.
         const id = parsed(provider, body);
-        if (id === "codex") await service.cancelProviderCodeLogin(id);
+        if (id === "codex")
+          await Effect.runPromise(service.cancelProviderCodeLogin(id).pipe(Effect.mapError((error) => error.cause)));
         return json(200, {});
       }
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginStart:
-        return json(200, await service.startProviderCodeLogin(parsed(signInProvider, body)));
+        return json(
+          200,
+          await Effect.runPromise(
+            service.startProviderCodeLogin(parsed(signInProvider, body)).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        );
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit: {
         // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
         const input = parsed(codeSubmitInput, body);
@@ -80,43 +91,119 @@ export async function routeProviders(
         return json(200, {});
       }
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginCancel:
-        await service.cancelProviderCodeLogin(parsed(signInProvider, body));
+        await Effect.runPromise(
+          service.cancelProviderCodeLogin(parsed(signInProvider, body)).pipe(Effect.mapError((error) => error.cause)),
+        );
         return json(200, {});
       case PROVIDERS_ADMIN_ROUTES.apiKeyState:
         return json(200, { status: credentials.status(parsed(provider, body)) });
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {
         const input = parsed(wireApiKeyInput, body);
         // The same step as the local handler: the key and the process that uses it change together.
-        await service.changeProviderCredential(input.provider, () => credentials.set(input.provider, input.key));
+        await Effect.runPromise(
+          service
+            .changeProviderCredential(input.provider, () =>
+              credentials
+                .set(input.provider, input.key)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
+                  ),
+                ),
+            )
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
         return json(200, {});
       }
       case PROVIDERS_ADMIN_ROUTES.apiKeyClear: {
         const id = parsed(provider, body);
-        await service.changeProviderCredential(id, () => credentials.clear(id));
+        await Effect.runPromise(
+          service
+            .changeProviderCredential(id, () =>
+              credentials
+                .clear(id)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
+                  ),
+                ),
+            )
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
         return json(200, {});
       }
       case PROVIDERS_ADMIN_ROUTES.runtimesStatus:
         return json(200, wireSnapshot(runtimes.getStatus()));
       case PROVIDERS_ADMIN_ROUTES.runtimesDownload:
-        return json(200, wireSnapshot(await runtimes.download(parsed(managedProvider, body))));
+        return json(
+          200,
+          wireSnapshot(
+            await Effect.runPromise(
+              runtimes.download(parsed(managedProvider, body)).pipe(Effect.mapError((error) => error.cause)),
+            ),
+          ),
+        );
       case PROVIDERS_ADMIN_ROUTES.runtimesCancel:
-        return json(200, wireSnapshot(await runtimes.cancel(parsed(managedProvider, body))));
+        return json(
+          200,
+          wireSnapshot(
+            await Effect.runPromise(
+              runtimes.cancel(parsed(managedProvider, body)).pipe(Effect.mapError((error) => error.cause)),
+            ),
+          ),
+        );
       case PROVIDERS_ADMIN_ROUTES.runtimesCheck:
-        return json(200, wireSnapshot(await runtimes.checkForUpdates()));
+        return json(
+          200,
+          wireSnapshot(
+            await Effect.runPromise(runtimes.checkForUpdates().pipe(Effect.mapError((error) => error.cause))),
+          ),
+        );
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus:
         return json(200, wireSnapshotV2(runtimes.getStatus()));
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesDownload:
-        return json(200, wireSnapshotV2(await runtimes.download(parsed(managedProviderV2, body))));
+        return json(
+          200,
+          wireSnapshotV2(
+            await Effect.runPromise(
+              runtimes.download(parsed(managedProviderV2, body)).pipe(Effect.mapError((error) => error.cause)),
+            ),
+          ),
+        );
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCancel:
-        return json(200, wireSnapshotV2(await runtimes.cancel(parsed(managedProviderV2, body))));
+        return json(
+          200,
+          wireSnapshotV2(
+            await Effect.runPromise(
+              runtimes.cancel(parsed(managedProviderV2, body)).pipe(Effect.mapError((error) => error.cause)),
+            ),
+          ),
+        );
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCheck:
-        return json(200, wireSnapshotV2(await runtimes.checkForUpdates()));
+        return json(
+          200,
+          wireSnapshotV2(
+            await Effect.runPromise(runtimes.checkForUpdates().pipe(Effect.mapError((error) => error.cause))),
+          ),
+        );
       case PROVIDERS_ADMIN_ROUTES.customList:
         return json(200, customProviders.list());
       case PROVIDERS_ADMIN_ROUTES.customSave:
-        return json(200, await customProviders.save(parsed(parseSaveCustomProvider, body)));
+        return json(
+          200,
+          await Effect.runPromise(
+            customProviders.save(parsed(parseSaveCustomProvider, body)).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        );
       default:
-        return json(200, await customProviders.remove(parsed(parseDeleteCustomProvider, body).id));
+        return json(
+          200,
+          await Effect.runPromise(
+            customProviders
+              .remove(parsed(parseDeleteCustomProvider, body).id)
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
+        );
     }
   } catch (error) {
     if (error instanceof HttpError) throw error;

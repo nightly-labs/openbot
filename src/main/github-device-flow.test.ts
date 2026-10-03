@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GITHUB_ACCESS_TOKEN_URL,
@@ -50,12 +51,14 @@ describe("GitHub device flow", () => {
       { error: "authorization_pending" },
       TOKEN,
     );
-    const token = pollGitHubDeviceToken({
-      clientId: "Iv1.client",
-      fetch,
-      device: DEVICE,
-      signal: new AbortController().signal,
-    });
+    const token = Effect.runPromise(
+      pollGitHubDeviceToken({
+        clientId: "Iv1.client",
+        fetch,
+        device: DEVICE,
+        signal: new AbortController().signal,
+      }).pipe(Effect.mapError((error) => error.cause)),
+    );
     await vi.runAllTimersAsync();
 
     await expect(token).resolves.toEqual({
@@ -74,12 +77,14 @@ describe("GitHub device flow", () => {
     ["device_flow_disabled", "device_flow_disabled"],
   ])("stops when GitHub answers %s", async (error, failure) => {
     const { fetch, requests } = github({ error });
-    const token = pollGitHubDeviceToken({
-      clientId: "Iv1.client",
-      fetch,
-      device: DEVICE,
-      signal: new AbortController().signal,
-    });
+    const token = Effect.runPromise(
+      pollGitHubDeviceToken({
+        clientId: "Iv1.client",
+        fetch,
+        device: DEVICE,
+        signal: new AbortController().signal,
+      }).pipe(Effect.mapError((error) => error.cause)),
+    );
     const settled = expect(token).rejects.toMatchObject({ failure });
     await vi.runAllTimersAsync();
     await settled;
@@ -93,12 +98,14 @@ describe("GitHub device flow", () => {
       if (failures-- > 0) throw new TypeError("fetch failed");
       return answer(url, init);
     };
-    const token = pollGitHubDeviceToken({
-      clientId: "Iv1.client",
-      fetch,
-      device: DEVICE,
-      signal: new AbortController().signal,
-    });
+    const token = Effect.runPromise(
+      pollGitHubDeviceToken({
+        clientId: "Iv1.client",
+        fetch,
+        device: DEVICE,
+        signal: new AbortController().signal,
+      }).pipe(Effect.mapError((error) => error.cause)),
+    );
     await vi.runAllTimersAsync();
 
     await expect(token).resolves.toMatchObject({ accessToken: "ghu_access" });
@@ -108,7 +115,11 @@ describe("GitHub device flow", () => {
   it("stops asking when the sign-in is cancelled", async () => {
     const { fetch, requests } = github({ error: "authorization_pending" });
     const controller = new AbortController();
-    const token = pollGitHubDeviceToken({ clientId: "Iv1.client", fetch, device: DEVICE, signal: controller.signal });
+    const token = Effect.runPromise(
+      pollGitHubDeviceToken({ clientId: "Iv1.client", fetch, device: DEVICE, signal: controller.signal }).pipe(
+        Effect.mapError((error) => error.cause),
+      ),
+    );
     const settled = expect(token).rejects.toBe("cancelled");
     await vi.advanceTimersByTimeAsync(5_000);
     controller.abort("cancelled");
@@ -119,12 +130,16 @@ describe("GitHub device flow", () => {
 
   it("refreshes with the Client ID only", async () => {
     const { fetch, requests } = github(TOKEN);
-    await expect(refreshGitHubToken({ clientId: "Iv1.client", fetch, refreshToken: "ghr_old" })).resolves.toMatchObject(
-      {
-        accessToken: "ghu_access",
-        refreshToken: "ghr_refresh",
-      },
-    );
+    await expect(
+      Effect.runPromise(
+        refreshGitHubToken({ clientId: "Iv1.client", fetch, refreshToken: "ghr_old" }).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      accessToken: "ghu_access",
+      refreshToken: "ghr_refresh",
+    });
     expect(Object.fromEntries(requests[0]?.form ?? [])).toEqual({
       client_id: "Iv1.client",
       grant_type: "refresh_token",

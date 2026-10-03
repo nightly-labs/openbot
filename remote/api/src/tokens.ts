@@ -4,6 +4,7 @@ import {
   SLACK_ROUTE_TEAMS_LIMIT,
   type SlackRouteTeam,
 } from "@openbot/contracts/signal-protocol/slack-route";
+import { Effect, Result, Schema } from "effect";
 import {
   createLocalJWKSet,
   createRemoteJWKSet,
@@ -25,7 +26,6 @@ import {
   type RemoteTicketClaims,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
-import type { SlackRoute } from "./signal-service";
 
 // The resume token is this service's own, minted and verified here and never seen by the account
 // API, so its audience stays local while the ticket's comes from the shared contract.
@@ -63,6 +63,17 @@ const slackRouteClaimsSchema = z.object({
 });
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
+export class RemoteTokenError extends Schema.TaggedError<RemoteTokenError>()("RemoteTokenError", {
+  message: Schema.String,
+}) {}
+
+const tokenError = (error: unknown) =>
+  new RemoteTokenError({
+    message: error instanceof Error ? error.message : "Remote token operation failed.",
+  });
+const tokenCall = <A>(operation: () => Promise<A>) => Effect.tryPromise({ try: operation, catch: tokenError });
+const tokenDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: tokenError });
+
 export class RemoteTokenService {
   readonly #ticketKey: JWTVerifyGetKey;
   readonly #remoteTicketKey: RemoteJWKSet | null;
@@ -71,8 +82,8 @@ export class RemoteTokenService {
   readonly #turnHost: string;
   readonly #turnPort: number;
   readonly #turnTlsPort: number;
-  readonly #validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean>;
-  readonly #validateSlackRoute: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
+  readonly #validateResumeClaims: (claims: RemoteTicketClaims) => Effect.Effect<boolean, RemoteTokenError>;
+  readonly #validateSlackRoute: (hostId: string, teams: SlackRouteTeam[]) => Effect.Effect<string[], RemoteTokenError>;
   readonly #trustedResumeTokens = new Map<
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
@@ -83,11 +94,12 @@ export class RemoteTokenService {
       RemoteApiConfig,
       "ticketJwks" | "ticketJwksUrl" | "sessionSecret" | "turnSecret" | "turnHost" | "turnPort" | "turnTlsPort"
     >,
-    validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean> = async () => false,
+    validateResumeClaims: (claims: RemoteTicketClaims) => Effect.Effect<boolean, RemoteTokenError> = () =>
+      Effect.succeed(false),
     options: {
       fetch?: FetchImplementation;
       // Asks the account service which links of a route are current. Without it, none is.
-      validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
+      validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Effect.Effect<string[], RemoteTokenError>;
     } = {},
   ) {
     if (config.ticketJwks) {
@@ -107,95 +119,113 @@ export class RemoteTokenService {
     this.#turnPort = config.turnPort;
     this.#turnTlsPort = config.turnTlsPort;
     this.#validateResumeClaims = validateResumeClaims;
-    this.#validateSlackRoute = options.validateSlackRoute ?? (async () => []);
+    this.#validateSlackRoute = options.validateSlackRoute ?? (() => Effect.succeed([]));
   }
 
-  async initialize(): Promise<void> {
-    if (!this.#remoteTicketKey) return;
-    await this.#remoteTicketKey.reload();
-    const jwks = this.#remoteTicketKey.jwks();
-    if (!jwks) throw new Error("Ticket JWKS did not load.");
-    parseJwks(JSON.stringify(jwks));
-  }
+  readonly initialize = Effect.fn("RemoteTokens.initialize")(() =>
+    Effect.gen({ self: this }, function* () {
+      const key = this.#remoteTicketKey;
+      if (!key) return;
+      yield* tokenCall(() => key.reload());
+      const jwks = key.jwks();
+      if (!jwks) return yield* new RemoteTokenError({ message: "Ticket JWKS did not load." });
+      yield* tokenDecode(() => parseJwks(JSON.stringify(jwks)));
+    }),
+  );
 
-  async verifyTicket(token: string, now = new Date()): Promise<RemoteTicketClaims> {
-    const { payload } = await jwtVerify(token, this.#ticketKey, {
-      audience: REMOTE_TICKET_AUDIENCE,
-      algorithms: ["ES256"],
-      currentDate: now,
-    });
-    return decodeTicketClaims(payload, now);
-  }
+  readonly verifyTicket = Effect.fn("RemoteTokens.verifyTicket")((token: string, now = new Date()) =>
+    Effect.gen({ self: this }, function* () {
+      const { payload } = yield* tokenCall(() =>
+        jwtVerify(token, this.#ticketKey, {
+          audience: REMOTE_TICKET_AUDIENCE,
+          algorithms: ["ES256"],
+          currentDate: now,
+        }),
+      );
+      return yield* tokenDecode(() => decodeTicketClaims(payload, now));
+    }),
+  );
 
-  /**
-   * The Slack workspaces that a route ticket links to `hostId`. Throws for a ticket that is expired,
-   * signed with another key, or minted for another host.
-   */
-  async verifySlackRoute(token: string, hostId: string, now = new Date()): Promise<SlackRoute> {
-    const { payload } = await jwtVerify(token, this.#ticketKey, {
-      audience: SLACK_ROUTE_AUDIENCE,
-      algorithms: ["ES256"],
-      requiredClaims: ["exp"],
-      currentDate: now,
-    });
-    const claims = slackRouteClaimsSchema.parse(payload);
-    if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
-    return { teams: claims.teams };
-  }
+  readonly verifySlackRoute = Effect.fn("RemoteTokens.verifySlackRoute")(
+    (token: string, hostId: string, now = new Date()) =>
+      Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#ticketKey, {
+            audience: SLACK_ROUTE_AUDIENCE,
+            algorithms: ["ES256"],
+            requiredClaims: ["exp"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => slackRouteClaimsSchema.parse(payload));
+        if (claims.hid !== hostId)
+          return yield* new RemoteTokenError({ message: "The Slack route belongs to another host." });
+        return { teams: claims.teams };
+      }),
+  );
 
-  validateSlackRoute(hostId: string, teams: SlackRouteTeam[]): Promise<string[]> {
-    return this.#validateSlackRoute(hostId, teams);
-  }
+  readonly validateSlackRoute = Effect.fn("RemoteTokens.validateSlackRoute")(
+    (hostId: string, teams: SlackRouteTeam[]) => this.#validateSlackRoute(hostId, teams),
+  );
 
-  validateClaims(claims: RemoteTicketClaims): Promise<boolean> {
-    return this.#validateResumeClaims(claims);
-  }
+  readonly validateClaims = Effect.fn("RemoteTokens.validateClaims")((claims: RemoteTicketClaims) =>
+    this.#validateResumeClaims(claims),
+  );
 
-  async verifyResumeToken(token: string, now = new Date()): Promise<RemoteTicketClaims> {
-    const nowSeconds = Math.floor(now.getTime() / 1_000);
-    this.#pruneTrustedResumeTokens(nowSeconds);
-    try {
-      const { payload } = await jwtVerify(token, this.#sessionSecret, {
-        audience: RESUME_AUDIENCE,
-        algorithms: ["HS256"],
-        currentDate: now,
-      });
-      const claims = decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now);
-      if (this.#trustedResumeTokens.has(claims.jti)) return claims;
-      if (!(await this.#validateResumeClaims(claims))) throw new Error("The remote session is not active.");
-      this.#trustResumeToken(claims);
-      return claims;
-    } catch (error) {
-      const claims = await this.#verifyStaleResumeToken(token, now).catch(() => null);
-      if (!claims || !(await this.#validateResumeClaims(claims))) throw error;
-      return claims;
-    }
-  }
+  readonly verifyResumeToken = Effect.fn("RemoteTokens.verifyResumeToken")((token: string, now = new Date()) =>
+    Effect.gen({ self: this }, function* () {
+      this.#pruneTrustedResumeTokens(Math.floor(now.getTime() / 1_000));
+      const current = yield* Effect.gen({ self: this }, function* () {
+        const { payload } = yield* tokenCall(() =>
+          jwtVerify(token, this.#sessionSecret, {
+            audience: RESUME_AUDIENCE,
+            algorithms: ["HS256"],
+            currentDate: now,
+          }),
+        );
+        const claims = yield* tokenDecode(() => decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now));
+        if (this.#trustedResumeTokens.has(claims.jti)) return claims;
+        if (!(yield* this.validateClaims(claims)))
+          return yield* new RemoteTokenError({ message: "The remote session is not active." });
+        this.#trustResumeToken(claims);
+        return claims;
+      }).pipe(Effect.result);
+      if (Result.isSuccess(current)) return current.success;
+      const stale = yield* this.#verifyStaleResumeToken(token, now).pipe(Effect.result);
+      if (Result.isFailure(stale) || !(yield* this.validateClaims(stale.success))) return yield* current.failure;
+      return stale.success;
+    }),
+  );
 
-  async issueResumeToken(claims: RemoteTicketClaims, nowSeconds = Math.floor(Date.now() / 1_000)): Promise<string> {
-    const jti = crypto.randomUUID();
-    const expiresAt = Math.min(claims.sessionExpiresAt, nowSeconds + RESUME_TTL_SECONDS);
-    const token = await new SignJWT({
-      sessionId: claims.sessionId,
-      hostId: claims.hostId,
-      userId: claims.userId,
-      membershipId: claims.membershipId,
-      role: claims.role,
-      authEpoch: claims.authEpoch,
-      protocolMinimum: claims.protocolMinimum,
-      protocolMaximum: claims.protocolMaximum,
-      sessionExpiresAt: claims.sessionExpiresAt,
-      ...(claims.clientPublicKey ? { clientPublicKey: claims.clientPublicKey } : {}),
-    })
-      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-      .setJti(jti)
-      .setIssuedAt(nowSeconds)
-      .setAudience(RESUME_AUDIENCE)
-      .setExpirationTime(expiresAt)
-      .sign(this.#sessionSecret);
-    this.#trustResumeToken({ ...claims, jti, iat: nowSeconds, exp: expiresAt });
-    return token;
-  }
+  readonly issueResumeToken = Effect.fn("RemoteTokens.issueResumeToken")(
+    (claims: RemoteTicketClaims, nowSeconds = Math.floor(Date.now() / 1_000)) =>
+      Effect.gen({ self: this }, function* () {
+        const jti = crypto.randomUUID();
+        const expiresAt = Math.min(claims.sessionExpiresAt, nowSeconds + RESUME_TTL_SECONDS);
+        const token = yield* tokenCall(() =>
+          new SignJWT({
+            sessionId: claims.sessionId,
+            hostId: claims.hostId,
+            userId: claims.userId,
+            membershipId: claims.membershipId,
+            role: claims.role,
+            authEpoch: claims.authEpoch,
+            protocolMinimum: claims.protocolMinimum,
+            protocolMaximum: claims.protocolMaximum,
+            sessionExpiresAt: claims.sessionExpiresAt,
+            ...(claims.clientPublicKey ? { clientPublicKey: claims.clientPublicKey } : {}),
+          })
+            .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+            .setJti(jti)
+            .setIssuedAt(nowSeconds)
+            .setAudience(RESUME_AUDIENCE)
+            .setExpirationTime(expiresAt)
+            .sign(this.#sessionSecret),
+        );
+        this.#trustResumeToken({ ...claims, jti, iat: nowSeconds, exp: expiresAt });
+        return token;
+      }),
+  );
 
   revokeHost(hostId: string, authEpoch: number): void {
     for (const [jti, token] of this.#trustedResumeTokens) {
@@ -230,23 +260,27 @@ export class RemoteTokenService {
     }
   }
 
-  async #verifyStaleResumeToken(token: string, now: Date): Promise<RemoteTicketClaims> {
-    const untrusted = decodeJwt(token);
-    const expiresAt = z.number().int().safe().parse(untrusted.exp);
-    const nowSeconds = Math.floor(now.getTime() / 1_000);
-    if (expiresAt >= nowSeconds || nowSeconds - expiresAt > MAXIMUM_STALE_RESUME_SECONDS) {
-      throw new Error("The resume token cannot be renewed.");
-    }
-    const { payload } = await jwtVerify(token, this.#sessionSecret, {
-      audience: RESUME_AUDIENCE,
-      algorithms: ["HS256"],
-      currentDate: new Date((expiresAt - 1) * 1_000),
-    });
-    const claims = decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now);
-    if (claims.iat > nowSeconds || claims.exp <= claims.iat)
-      throw new Error("The resume token timestamps are invalid.");
-    return claims;
-  }
+  readonly #verifyStaleResumeToken = Effect.fn("RemoteTokens.verifyStaleResumeToken")((token: string, now: Date) =>
+    Effect.gen({ self: this }, function* () {
+      const expiresAt = yield* tokenDecode(() => z.number().int().safe().parse(decodeJwt(token).exp));
+      const nowSeconds = Math.floor(now.getTime() / 1_000);
+      if (expiresAt >= nowSeconds || nowSeconds - expiresAt > MAXIMUM_STALE_RESUME_SECONDS) {
+        return yield* new RemoteTokenError({ message: "The resume token cannot be renewed." });
+      }
+      const { payload } = yield* tokenCall(() =>
+        jwtVerify(token, this.#sessionSecret, {
+          audience: RESUME_AUDIENCE,
+          algorithms: ["HS256"],
+          currentDate: new Date((expiresAt - 1) * 1_000),
+        }),
+      );
+      const claims = yield* tokenDecode(() => decodeTicketClaims({ ...payload, aud: REMOTE_TICKET_AUDIENCE }, now));
+      if (claims.iat > nowSeconds || claims.exp <= claims.iat) {
+        return yield* new RemoteTokenError({ message: "The resume token timestamps are invalid." });
+      }
+      return claims;
+    }),
+  );
 
   iceServers(claims: RemoteTicketClaims, nowSeconds = Math.floor(Date.now() / 1_000)): IceServer[] {
     const expiration = Math.min(claims.sessionExpiresAt, nowSeconds + SIGNAL_TURN_CREDENTIAL_TTL_SECONDS);

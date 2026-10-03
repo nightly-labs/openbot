@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // Scaled data for `bun run dev:seed --scale=...` and `bun run dev:bench`. The
 // showcase seed holds four short conversations, which says nothing about a
 // profile after months of use. This adds agents with long histories, busy
@@ -257,29 +258,41 @@ export async function seedScale(options: ScaledSeedOptions): Promise<void> {
   for (let index = 0; index < scale.agents; index += 1) {
     const agentId = scaleAgentId(index);
     const name = `Scale ${index + 1}`;
-    await agentStore.getOrCreate(agentId, name, "Benchmark agent");
-    await agentStore.updateAgent({
-      agentId,
-      name,
-      title: "Benchmark agent",
-      description: "Holds a long, generated conversation for resource benchmarks.",
-      provider: agentModel.provider,
-      model: agentModel.model,
-      reasoningEffort: agentModel.reasoningEffort,
-      avatarSeed: agentId,
-      avatarHue: AVATAR_HUES[index % AVATAR_HUES.length] ?? null,
-    });
-    const threadId = await agentStore.ensureThreadId(agentId);
+    await Effect.runPromise(
+      agentStore.getOrCreate(agentId, name, "Benchmark agent").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      agentStore
+        .updateAgent({
+          agentId,
+          name,
+          title: "Benchmark agent",
+          description: "Holds a long, generated conversation for resource benchmarks.",
+          provider: agentModel.provider,
+          model: agentModel.model,
+          reasoningEffort: agentModel.reasoningEffort,
+          avatarSeed: agentId,
+          avatarHue: AVATAR_HUES[index % AVATAR_HUES.length] ?? null,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    const threadId = await Effect.runPromise(
+      agentStore.ensureThreadId(agentId).pipe(Effect.mapError((error) => error.cause)),
+    );
     const messages = scaledMessages(agentId, scale.messages, now);
     if (index === 0) {
       for (let image = 0; image < scale.attachments; image += 1) {
-        const attachment: AttachmentSummary = await mailbox.storeGeneratedAttachment({
-          name: `scale-image-${image + 1}.png`,
-          mimeType: "image/png",
-          bytes: largePng(2_400, 1_600, image + 1),
-          ownerAgentId: agentId,
-          ownerThreadId: threadId,
-        });
+        const attachment: AttachmentSummary = await Effect.runPromise(
+          mailbox
+            .storeGeneratedAttachment({
+              name: `scale-image-${image + 1}.png`,
+              mimeType: "image/png",
+              bytes: largePng(2_400, 1_600, image + 1),
+              ownerAgentId: agentId,
+              ownerThreadId: threadId,
+            })
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
         transferDirectories.push(`generated/${attachment.id}`);
         messages.push({
           id: `${agentId}-image-${image}`,

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // Reading and writing one agent's conversation, as one member sees it.
 //
 // Everything here is filtered by what the client said it understands. A marker type a released
@@ -44,16 +45,22 @@ export async function routeAgentConversation(
   const { method, url, request, member, protocol, capabilities, json, empty } = context;
 
   if (method === "GET" && action === "conversation") {
-    const conversation = await agents.readConversationFor(agentId, member.id);
+    const conversation = await Effect.runPromise(
+      agents.readConversationFor(agentId, member.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     return json(200, conversationForCapabilities(conversation, capabilities));
   }
   if (method === "GET" && action === "conversation-page") {
-    const page = await agents.readConversationPageFor(
-      agentId,
-      member.id,
-      pageAnchor(url),
-      pageLimit(url),
-      markerExclusionsForCapabilities(capabilities),
+    const page = await Effect.runPromise(
+      agents
+        .readConversationPageFor(
+          agentId,
+          member.id,
+          pageAnchor(url),
+          pageLimit(url),
+          markerExclusionsForCapabilities(capabilities),
+        )
+        .pipe(Effect.mapError((error) => error.cause)),
     );
     return json(200, page);
   }
@@ -65,17 +72,26 @@ export async function routeAgentConversation(
       throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
-    return json(200, await agents.markConversationUnread(agentId, member.id));
+    return json(
+      200,
+      await Effect.runPromise(
+        agents.markConversationUnread(agentId, member.id).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    );
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
     return json(
       200,
-      await agents.markConversationRead(
-        agentId,
-        member.id,
-        nullableString(body, "throughMessageId"),
-        markerExclusionsForCapabilities(capabilities),
+      await Effect.runPromise(
+        agents
+          .markConversationRead(
+            agentId,
+            member.id,
+            nullableString(body, "throughMessageId"),
+            markerExclusionsForCapabilities(capabilities),
+          )
+          .pipe(Effect.mapError((error) => error.cause)),
       ),
     );
   }
@@ -83,14 +99,18 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     return json(
       202,
-      await agents.sendMessage(
-        {
-          agentId,
-          text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-          attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-          replyToMessageId: nullableString(body, "replyToMessageId"),
-        },
-        memberSender(member),
+      await Effect.runPromise(
+        agents
+          .sendMessage(
+            {
+              agentId,
+              text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+              attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+              replyToMessageId: nullableString(body, "replyToMessageId"),
+            },
+            memberSender(member),
+          )
+          .pipe(Effect.mapError((error) => error.cause)),
       ),
     );
   }
@@ -99,11 +119,15 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     const emoji = body.emoji;
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
-    await agents.setMessageReaction({
-      agentId,
-      messageId: stringField(body, "messageId"),
-      emoji,
-    });
+    await Effect.runPromise(
+      agents
+        .setMessageReaction({
+          agentId,
+          messageId: stringField(body, "messageId"),
+          emoji,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   return "unmatched";

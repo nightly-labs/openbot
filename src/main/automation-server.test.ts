@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -30,7 +31,9 @@ async function startServer(overrides: Partial<AutomationServerOptions> = {}) {
   const agents: { id: string; name: string; allowAutomation?: boolean }[] = [
     { id: "agent-1", name: "Ada", allowAutomation: true },
   ];
-  const runRoutine = vi.fn<AutomationServerOptions["runRoutine"]>(async () => ({ id: "run-1", deliveryId: "d-1" }));
+  const runRoutine = vi.fn<AutomationServerOptions["runRoutine"]>(() =>
+    Effect.succeed({ id: "run-1", deliveryId: "d-1" }),
+  );
   const server = new AutomationServer({
     root,
     listAgents: () => agents,

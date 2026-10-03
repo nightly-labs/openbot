@@ -7,6 +7,7 @@ import {
   HOST_UPDATE_WAIT_REASONS,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { RequestedUpdateRefusal } from "../requested-update";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -32,14 +33,34 @@ export async function routeHostUpdate(
   requireAdmin(member);
   try {
     if (url.pathname === HOST_UPDATE_ROUTES.status) return json(200, wireSnapshot(update.snapshot()));
-    if (url.pathname === HOST_UPDATE_ROUTES.check) return json(200, wireSnapshot(update.check()));
+    if (url.pathname === HOST_UPDATE_ROUTES.check)
+      return json(
+        200,
+        wireSnapshot(await Effect.runPromise(update.check().pipe(Effect.mapError((error) => error.cause)))),
+      );
     if (url.pathname === HOST_UPDATE_ROUTES.cancel) return json(200, wireSnapshot(update.cancel()));
     const body = await readJson(request);
     if (url.pathname === HOST_UPDATE_ROUTES.settings)
-      return json(200, wireSnapshot(await update.changeSettings(settingsChange(body.autoDownload, body.autoInstall))));
+      return json(
+        200,
+        wireSnapshot(
+          await Effect.runPromise(
+            update
+              .changeSettings(settingsChange(body.autoDownload, body.autoInstall))
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
+        ),
+      );
     const mode = restartMode(body.restart);
     const name = (member.name ?? member.username).slice(0, 128);
-    return json(200, wireSnapshot(update.start({ id: member.id, name }, mode)));
+    return json(
+      200,
+      wireSnapshot(
+        await Effect.runPromise(
+          update.start({ id: member.id, name }, mode).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      ),
+    );
   } catch (error) {
     if (error instanceof RequestedUpdateRefusal)
       throw new HttpError(error.reason === "disabled" ? 403 : 409, error.message);

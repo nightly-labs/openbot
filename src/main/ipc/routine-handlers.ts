@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Routines: the scheduled standing instructions attached to one agent, and the calendar of every
 // routine of a host.
 
@@ -48,53 +50,73 @@ export function routineIpcHandlers({
       listRoutines: scopedHandler(parseAgentId, {
         local: (agentId) => service.listRoutines(agentId),
         remote: (agentId, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(
-            serverId,
-            TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
-            decodeRoutine,
-            {
-              method: "PATCH",
-              body: parsed,
-            },
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
+                method: "PATCH",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
           ),
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
-        local: (parsed) => service.deleteRoutine(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.deleteRoutine(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeVoid, {
-            method: "DELETE",
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeVoid, {
+                method: "DELETE",
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       testRoutine: scopedHandler(parseTestRoutine, {
-        local: (parsed) => service.testRoutine(parsed),
+        local: (parsed) => Effect.runPromise(service.testRoutine(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(
-            serverId,
-            TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
-            decodeRoutineRun,
-            { method: "POST" },
+          Effect.runPromise(
+            remoteServers
+              .request(
+                serverId,
+                TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
+                decodeRoutineRun,
+                { method: "POST" },
+              )
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
           ),
       }),
       listRoutineRuns: scopedHandler(parseListRoutineRuns, {
         local: (parsed) => service.listRoutineRuns(parsed),
         remote: (parsed, serverId) =>
-          remoteServers.request(
-            serverId,
-            `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
-            decodeRoutineRuns,
+          Effect.runPromise(
+            remoteServers
+              .request(
+                serverId,
+                `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
+                decodeRoutineRuns,
+              )
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
           ),
       }),
       automationRunCommand: scopedHandler(parseTestRoutine, {
@@ -111,49 +133,65 @@ export function routineIpcHandlers({
   };
 }
 
-function calendar(input: { from: string; to: string }, source: RoutineCalendarSource) {
-  return buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source);
+function calendar(input: { from: string; to: string }, source: RoutineCalendarSource<RemoteWorkflowError>) {
+  return Effect.runPromise(
+    buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source).pipe(
+      Effect.mapError((error) => error.cause),
+    ),
+  );
 }
 
-function localCalendarSource(service: AgentService): RoutineCalendarSource {
+function localCalendarSource(service: AgentService): RoutineCalendarSource<RemoteWorkflowError> {
   return {
-    owners: async () => {
-      const archived = service.channels.store.archivedIds();
-      return [
-        ...service.listAgents().map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
-        ...service.channels.store
-          .ids()
-          .filter((channelId) => !archived.has(channelId))
-          .map((channelId): RoutineCalendarOwner => ({ kind: "channel", channelId })),
-      ];
-    },
-    routines: async (owner) =>
-      owner.kind === "agent" ? service.listRoutines(owner.agentId) : service.listChannelRoutines(owner.channelId),
-    runs: async (owner, routineId, limit) =>
-      owner.kind === "agent"
-        ? service.listRoutineRuns({ agentId: owner.agentId, routineId, limit })
-        : service.listChannelRoutineRuns({ channelId: owner.channelId, routineId, limit }),
+    owners: () =>
+      Effect.sync(() => {
+        const archived = service.channels.store.archivedIds();
+        return [
+          ...service.listAgents().map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
+          ...service.channels.store
+            .ids()
+            .filter((channelId) => !archived.has(channelId))
+            .map((channelId): RoutineCalendarOwner => ({ kind: "channel", channelId })),
+        ];
+      }),
+    routines: (owner) =>
+      Effect.sync(() =>
+        owner.kind === "agent" ? service.listRoutines(owner.agentId) : service.listChannelRoutines(owner.channelId),
+      ),
+    runs: (owner, routineId, limit) =>
+      Effect.sync(() =>
+        owner.kind === "agent"
+          ? service.listRoutineRuns({ agentId: owner.agentId, routineId, limit })
+          : service.listChannelRoutineRuns({ channelId: owner.channelId, routineId, limit }),
+      ),
   };
 }
 
 /** A remote host answers through the routes its routine settings already use, so no new route is needed. */
-function remoteCalendarSource(remoteServers: RemoteServerManager, serverId: string): RoutineCalendarSource {
+function remoteCalendarSource(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+): RoutineCalendarSource<RemoteWorkflowError> {
   return {
-    owners: async () => {
-      // A host from before channels rejects the channel routes; its agents still have routines.
-      const [agents, channels] = await Promise.all([
-        remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
-        remoteServers.supportsCapability(serverId, CHANNEL_CHATS_CAPABILITY)
-          ? remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)
-          : [],
-      ]);
-      return [
-        ...agents.map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
-        ...channels
-          .filter((channel) => !channel.archived)
-          .map((channel): RoutineCalendarOwner => ({ kind: "channel", channelId: channel.id })),
-      ];
-    },
+    owners: () =>
+      Effect.gen(function* () {
+        // A host from before channels rejects the channel routes; its agents still have routines.
+        const [agents, channels] = yield* Effect.all(
+          [
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+            remoteServers.supportsCapability(serverId, CHANNEL_CHATS_CAPABILITY)
+              ? remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)
+              : Effect.succeed([]),
+          ],
+          { concurrency: "unbounded" },
+        );
+        return [
+          ...agents.map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
+          ...channels
+            .filter((channel) => !channel.archived)
+            .map((channel): RoutineCalendarOwner => ({ kind: "channel", channelId: channel.id })),
+        ];
+      }),
     routines: (owner) =>
       owner.kind === "agent"
         ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(owner.agentId), decodeRoutines)

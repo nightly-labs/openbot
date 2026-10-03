@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
@@ -30,7 +32,7 @@ async function trap(folder: string, name: string): Promise<string> {
 
 /** The real lookup in the given folders only, so this computer's own PATH does not change the result. */
 const foldersOnly: typeof resolveAgentCommand = (command, options = {}) =>
-  options.searchPath ? resolveAgentCommand(command, options) : Promise.resolve(null);
+  options.searchPath ? resolveAgentCommand(command, options) : Effect.succeed(null);
 
 describe("scanAcpAgents", () => {
   it("finds only preset names in the listed folders, starts nothing, and suggests a free id", async () => {
@@ -39,13 +41,15 @@ describe("scanAcpAgents", () => {
     await trap(bin, "evil-agent");
     await trap(join(root, "home", "tools"), "qwen");
 
-    const rows = await scanAcpAgents({
-      folders: [bin, "~/tools"],
-      home: join(root, "home"),
-      platform: "darwin",
-      takenIds: new Set(["goose"]),
-      resolve: foldersOnly,
-    });
+    const rows = await runTestEffect(
+      scanAcpAgents({
+        folders: [bin, "~/tools"],
+        home: join(root, "home"),
+        platform: "darwin",
+        takenIds: new Set(["goose"]),
+        resolve: foldersOnly,
+      }),
+    );
 
     expect(rows).toEqual([
       { id: "goose-2", name: "Goose", command: goose, args: ["acp"] },
@@ -55,12 +59,14 @@ describe("scanAcpAgents", () => {
   });
 
   it("finds nothing after its time", async () => {
-    const rows = await scanAcpAgents({
-      folders: [],
-      takenIds: new Set(),
-      timeoutMs: 10,
-      resolve: () => new Promise(() => undefined),
-    });
+    const rows = await runTestEffect(
+      scanAcpAgents({
+        folders: [],
+        takenIds: new Set(),
+        timeoutMs: 10,
+        resolve: () => Effect.never,
+      }),
+    );
     expect(rows).toEqual([]);
   });
 });

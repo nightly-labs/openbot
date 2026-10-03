@@ -1,3 +1,4 @@
+import { runDesktopEffect } from "./remote-desktop-effects";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -19,7 +20,9 @@ async function logOf(chunks: Array<string | Buffer>): Promise<string> {
   roots.push(root);
   const stream = new PassThrough();
   const writes: Promise<void>[] = [];
-  forwardDiagnosticLines(stream, (text) => writes.push(appendRemoteDiagnosticLog(root, "sunshine", text)));
+  forwardDiagnosticLines(stream, (text) =>
+    writes.push(runDesktopEffect(appendRemoteDiagnosticLog(root, "sunshine", text))),
+  );
   const ended = new Promise((resolve) => stream.once("end", resolve));
   for (const chunk of chunks) stream.write(chunk);
   stream.end();

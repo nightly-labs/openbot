@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // One agent's routines: the standing instructions that run on a schedule.
 //
 // The bodies are parsed by the same `parseCreateRoutine` / `parseUpdateRoutine` the IPC handlers
@@ -40,11 +41,18 @@ export async function routeAgentRoutines(
       return json(200, agents.updateRoutine(parseUpdateRoutine({ ...body, agentId, routineId })));
     }
     if (method === "DELETE" && !routineAction) {
-      await agents.deleteRoutine({ agentId, routineId });
+      await Effect.runPromise(
+        agents.deleteRoutine({ agentId, routineId }).pipe(Effect.mapError((error) => error.cause)),
+      );
       return empty(204);
     }
     if (method === "POST" && routineAction === "test") {
-      return json(201, await agents.testRoutine({ agentId, routineId }));
+      return json(
+        201,
+        await Effect.runPromise(
+          agents.testRoutine({ agentId, routineId }).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      );
     }
     if (method === "GET" && routineAction === "runs") {
       const rawLimit = url.searchParams.get("limit");

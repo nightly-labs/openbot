@@ -1,3 +1,4 @@
+import { Effect, Semaphore } from "effect";
 // App identity, first-run setup, the analytics preference, external links and the data and
 // diagnostics exports.
 
@@ -93,7 +94,7 @@ export function appIpcHandlers({
   trace,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
-  let analyticsPreferenceWrite: Promise<unknown> = Promise.resolve();
+  const analyticsPreferenceWrites = Semaphore.makeUnsafe(1);
   return {
     app: {
       getAppInfo: handler((): AppInfo => {
@@ -103,26 +104,43 @@ export function appIpcHandlers({
         }
         return { name: app.getName(), version: app.getVersion(), platform, variant: appVariant };
       }),
-      getSetupState: handler(() => readSetupState(setupFile)),
-      getAnalyticsPreference: handler(() => readAnalyticsPreference(analyticsPreferenceFile)),
+      getSetupState: handler(() =>
+        Effect.runPromise(readSetupState(setupFile).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      getAnalyticsPreference: handler(() => Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile))),
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) => {
-        const write = analyticsPreferenceWrite.then(async () => {
-          const preference = await writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled);
-          setAnalyticsTrackingEnabled(preference.enabled);
-          return preference;
-        });
-        analyticsPreferenceWrite = write.catch(() => undefined);
-        return write;
+        return Effect.runPromise(
+          analyticsPreferenceWrites
+            .withPermit(
+              writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled).pipe(
+                Effect.tap((preference) => Effect.sync(() => setAnalyticsTrackingEnabled(preference.enabled))),
+                Effect.uninterruptible,
+              ),
+            )
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
-      setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) => approvalAutomation.set(parsed)),
+      setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) =>
+        Effect.runPromise(approvalAutomation.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+      ),
       getAppLanguagePreference: handler(() => language.preference),
-      setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) => language.set(parsed)),
+      setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) =>
+        Effect.runPromise(language.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+      ),
       getAppLogoColorPreference: handler(() => logoColor.preference),
-      setAppLogoColorPreference: payloadHandler(parseAppLogoColorPreference, (parsed) => logoColor.set(parsed)),
+      setAppLogoColorPreference: payloadHandler(parseAppLogoColorPreference, (parsed) =>
+        Effect.runPromise(logoColor.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+      ),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
-        const state = await writeSetupState(setupFile, input);
-        await service.setPreferredProvider(input.preferredProvider, input.preferredModel);
+        const state = await Effect.runPromise(
+          writeSetupState(setupFile, input).pipe(Effect.mapError((error) => error.cause)),
+        );
+        await Effect.runPromise(
+          service
+            .setPreferredProvider(input.preferredProvider, input.preferredModel)
+            .pipe(Effect.mapError((error) => error.cause)),
+        );
         await initializeAgent();
         return state;
       }),
@@ -139,17 +157,23 @@ export function appIpcHandlers({
     },
     maintenance: {
       exportData: handler(() =>
-        exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }),
+        Effect.runPromise(
+          exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        ),
       ),
       exportDiagnostics: handler(() =>
-        exportDiagnostics({
-          service,
-          browser,
-          updater,
-          trace,
-          parentWindow: getMainWindow(),
-          translate: language.translate,
-        }),
+        Effect.runPromise(
+          exportDiagnostics({
+            service,
+            browser,
+            updater,
+            trace,
+            parentWindow: getMainWindow(),
+            translate: language.translate,
+          }).pipe(Effect.mapError((error) => error.cause)),
+        ),
       ),
     },
   };

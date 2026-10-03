@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { runRemoteWorkflow } from "./remote-service-effects";
 // @vitest-environment node
 
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -14,20 +16,20 @@ describe("BrowserViewClient", () => {
   // message listener, it is uncaught in the main process, and the live view never ends cleanly.
   it("ends the view and releases the host session when a frame is invalid", async () => {
     const { last } = stubEventSockets();
-    const closeBrowserViewSession = vi.fn(() => Promise.resolve());
+    const closeBrowserViewSession = vi.fn(() => Effect.void);
     const onEvent = vi.fn();
     const client = new BrowserViewClient({
       servers: {
         activeServerId: "host-1",
         supportsCapability: (_serverId, capability) => capability === TEAM_BROWSER_VIEW_CAPABILITY,
         openBrowserViewStream: () =>
-          Promise.resolve({ sessionId: "view-1", url: "ws://127.0.0.1:1/stream", protocols: [] }),
+          Effect.succeed({ sessionId: "view-1", url: "ws://127.0.0.1:1/stream", protocols: [] }),
         closeBrowserViewSession,
       },
       onEvent,
     });
 
-    await client.start("tab-1");
+    await runRemoteWorkflow(client.start("tab-1"));
     last()?.dispatchEvent(new MessageEvent("message", { data: new ArrayBuffer(4) }));
 
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "stopped" })));

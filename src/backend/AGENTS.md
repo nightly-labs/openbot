@@ -99,9 +99,9 @@ excuse.
 `agent-data/agent-database-host.ts` is the entry of a separate process, and the only file here that
 touches the agents' shared SQLite files. Two rules keep it that way.
 
-**Its runtime imports are limited to `node:*`.** Every repository reference in it is an `import
-type`, which both the bundler and Node's type stripping erase. That gives it a standalone chunk with
-no Electron and no `openbot.db` facade behind it, and it lets a test spawn the `.ts` source under a
+**Its runtime imports are limited to `node:*` and `effect`.** Every repository reference in it is an `import
+type`, which both the bundler and Node's type stripping erase. The Effect v4 migration explicitly permits Effect; no other runtime dependency is allowed.
+This keeps Electron and the `openbot.db` facade out of the host, and it lets a test spawn the `.ts` source under a
 real `node` and drive the true host instead of a fake.
 
 **Its isolation is the process, not a thread.** `sqlite3_step` never returns to JavaScript, so a

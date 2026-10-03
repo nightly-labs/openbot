@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 import { OPENBOT_LINKS } from "../lib/landing-links";
 
 export type AvailableDownloadPlatform = "linux" | "macos" | "windows";
@@ -61,31 +62,39 @@ function fallbackToReleases(platform: AvailableDownloadPlatform, reason: string)
   return redirect(OPENBOT_LINKS.releases);
 }
 
-export async function latestDownloadResponse(
+class DownloadManifestError extends Schema.TaggedError<DownloadManifestError>()("DownloadManifestError", {}) {}
+
+const latestDownload = Effect.fn("LatestDownload.resolve")(function* (
+  platform: AvailableDownloadPlatform,
+  fetcher: typeof fetch,
+  macArchitecture: MacDownloadArchitecture,
+) {
+  const config = DOWNLOAD_MANIFESTS[platform];
+  const manifestUrl = `${RELEASES_BASE_URL}/latest/download/${config.manifest}`;
+  const response = yield* Effect.tryPromise({
+    try: (signal) =>
+      fetcher(manifestUrl, {
+        headers: { accept: "text/yaml, text/plain" },
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+      }),
+    catch: () => new DownloadManifestError({}),
+  });
+  if (!response.ok) return fallbackToReleases(platform, `manifest status ${response.status}`);
+  const manifest = yield* Effect.tryPromise({
+    try: () => response.text(),
+    catch: () => new DownloadManifestError({}),
+  });
+  const installer = findInstaller(manifest, config.extension, platform === "macos" ? macArchitecture : undefined);
+  if (!installer) return fallbackToReleases(platform, `no ${config.extension} asset in the manifest`);
+  return redirect(`${RELEASES_BASE_URL}/latest/download/${encodeURIComponent(installer)}`);
+});
+
+export function latestDownloadResponse(
   platform: AvailableDownloadPlatform,
   fetcher: typeof fetch = fetch,
   macArchitecture: MacDownloadArchitecture = "arm64",
-): Promise<Response> {
-  const config = DOWNLOAD_MANIFESTS[platform];
-  const manifestUrl = `${RELEASES_BASE_URL}/latest/download/${config.manifest}`;
-
-  try {
-    const response = await fetcher(manifestUrl, {
-      headers: { accept: "text/yaml, text/plain" },
-      // A slow release host must not hold the Worker request open; the releases page is the answer.
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) return fallbackToReleases(platform, `manifest status ${response.status}`);
-
-    const installer = findInstaller(
-      await response.text(),
-      config.extension,
-      platform === "macos" ? macArchitecture : undefined,
-    );
-    if (!installer) return fallbackToReleases(platform, `no ${config.extension} asset in the manifest`);
-
-    return redirect(`${RELEASES_BASE_URL}/latest/download/${encodeURIComponent(installer)}`);
-  } catch {
-    return fallbackToReleases(platform, "the manifest request failed");
-  }
+) {
+  return latestDownload(platform, fetcher, macArchitecture).pipe(
+    Effect.catch(() => Effect.sync(() => fallbackToReleases(platform, "the manifest request failed"))),
+  );
 }

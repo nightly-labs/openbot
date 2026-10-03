@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
@@ -64,16 +65,16 @@ describe("development state seed", () => {
       channelRoutines: 2,
       channelRoutineRuns: 2,
     });
-    await expect(readSetupState(join(profilePath, "openbot-setup-v2.json"))).resolves.toEqual({
+    await expect(Effect.runPromise(readSetupState(join(profilePath, "openbot-setup-v2.json")))).resolves.toEqual({
       completed: true,
       preferredProvider: "codex",
       preferredModel: null,
     });
 
     const agents = new AgentStore(profilePath, homeDirectory);
-    await agents.initialize();
+    await Effect.runPromise(agents.initialize().pipe(Effect.mapError((error) => error.cause)));
     const mailbox = new MailboxStore(profilePath, agents.sharedRoot, agents.database);
-    await mailbox.initialize();
+    await Effect.runPromise(mailbox.initialize().pipe(Effect.mapError((error) => error.cause)));
     const summaries = agents.list();
     expect(summaries).toHaveLength(4);
     expect(summaries.every((agent) => agent.threadId !== null)).toBe(true);
@@ -141,7 +142,9 @@ describe("development state seed", () => {
       "trust-boundary.svg",
     ]);
     for (const attachment of attachments.values()) {
-      const resolved = await mailbox.resolveAttachment(attachment.id);
+      const resolved = await Effect.runPromise(
+        mailbox.resolveAttachment(attachment.id).pipe(Effect.mapError((error) => error.cause)),
+      );
       expect(resolved).not.toBeNull();
       await expect(stat(resolved?.path ?? "")).resolves.toBeDefined();
     }
@@ -208,7 +211,7 @@ describe("development state seed", () => {
       join(profilePath, "openbot-team-server-v2.json"),
       join(profilePath, "openbot-team-server-v1.json"),
     );
-    await team.initialize();
+    await Effect.runPromise(team.initialize().pipe(Effect.mapError((error) => error.cause)));
     const members = team.listMembers();
     const owner = members.find((member) => member.role === "owner");
     expect(owner?.email).toBe("openbot-dev-host@example.com");
@@ -250,7 +253,9 @@ describe("development state seed", () => {
     // The channel file lives in a channel execution thread, so it stays with the shared transcript.
     expect(channels.contextThreads("channel-launch-room")).toHaveLength(4);
     for (const attachment of channelAttachments) {
-      const resolved = await mailbox.resolveAttachment(attachment.id);
+      const resolved = await Effect.runPromise(
+        mailbox.resolveAttachment(attachment.id).pipe(Effect.mapError((error) => error.cause)),
+      );
       await expect(stat(resolved?.path ?? "")).resolves.toBeDefined();
       expect(
         new Set(channelMessages.flatMap((message) => [...attachmentReferenceIds(message.message.text)])),
@@ -331,7 +336,7 @@ describe("development state seed", () => {
 
     const profilePath = join(appDataRoot, developmentUserDataName("app"));
     const agents = new AgentStore(profilePath, homeDirectory);
-    await agents.initialize();
+    await Effect.runPromise(agents.initialize().pipe(Effect.mapError((error) => error.cause)));
     const scaled = agents.list().find((agent) => agent.id === "scale-001");
     const messages = scaled ? agents.database.readConversation(scaled.id, scaled.threadId).messages : [];
     expect(messages).toHaveLength(11);

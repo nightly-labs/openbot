@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Access, auto-approve and skills of one agent, and adding an agent from the marketplace or a
 // shared template. On a joined server they belong to the host, so the request goes there, and the
 // host answers only an owner or admin.
@@ -36,7 +38,12 @@ import { requireString } from "./validation";
 
 interface AgentAdminRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
-  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
 interface AgentAdminIpcDependencies {
@@ -66,28 +73,44 @@ export function agentAdminIpcHandlers({
   function remote(serverId: string, path: string, body: unknown): Promise<AgentAdminSettings> {
     if (!remoteServers.supportsCapability(serverId, AGENT_ADMIN_CAPABILITY))
       throw new Error(sourceText("error.agent.settingsLocalOnly"));
-    return remoteServers.request(serverId, path, decodeAgentAdminSettings, { method: "POST", body });
+    return Effect.runPromise(
+      remoteServers
+        .request(serverId, path, decodeAgentAdminSettings, { method: "POST", body })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
   }
 
   function remoteSkills<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, SKILLS_ADMIN_CAPABILITY))
       throw new Error(sourceText("error.agent.skillsLocalOnly"));
-    return remoteServers.request(serverId, path, decoder, { method: "POST", body });
+    return Effect.runPromise(
+      remoteServers
+        .request(serverId, path, decoder, { method: "POST", body })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
   }
 
   function remoteAdd(serverId: string, path: string, body: unknown): Promise<AddedAgent> {
     if (!remoteServers.supportsCapability(serverId, AGENT_INSTALL_CAPABILITY))
       throw new Error(sourceText("error.agent.addLocalOnly"));
-    return remoteServers.request(serverId, path, decodeHostAddedAgent, { method: "POST", body });
+    return Effect.runPromise(
+      remoteServers
+        .request(serverId, path, decodeHostAddedAgent, { method: "POST", body })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
   }
 
   function remoteUpdate(serverId: string, body: unknown): Promise<AddedAgent> {
     if (!remoteServers.supportsCapability(serverId, AGENT_UPDATE_CAPABILITY))
       throw new Error(sourceText("error.agent.joinedServerUpdate"));
-    return remoteServers.request(serverId, AGENT_UPDATE_ROUTES.marketplace, decodeHostAddedAgent, {
-      method: "POST",
-      body,
-    });
+    return Effect.runPromise(
+      remoteServers
+        .request(serverId, AGENT_UPDATE_ROUTES.marketplace, decodeHostAddedAgent, {
+          method: "POST",
+          body,
+        })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
   }
 
   return {
@@ -97,30 +120,34 @@ export function agentAdminIpcHandlers({
         remote: (agentId, serverId) => remote(serverId, AGENT_ADMIN_ROUTES.settings, { agentId }),
       }),
       updateAgentAdminSettings: scopedHandler(parseUpdateAgentAdminSettingsInput, {
-        local: (input) => settings.update(input),
+        local: (input) => Effect.runPromise(settings.update(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) => remote(serverId, AGENT_ADMIN_ROUTES.update, input),
       }),
       listAgentSkills: scopedHandler((value) => requireString(value, "agentId"), {
-        local: (agentId) => skills.listInstalled(agentId),
+        local: (agentId) =>
+          Effect.runPromise(skills.listInstalled(agentId).pipe(Effect.mapError((error) => error.cause))),
         remote: (agentId, serverId) =>
           remoteSkills(serverId, SKILLS_ADMIN_ROUTES.list, { agentId }, decodeInstalledSkills),
       }),
       installAgentSkill: scopedHandler(parseInstallSkill, {
-        local: (input) => skills.install(input),
+        local: (input) => Effect.runPromise(skills.install(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) =>
           remoteSkills(serverId, SKILLS_ADMIN_ROUTES.install, input, decodeRemoteInstalledSkill),
       }),
       uninstallAgentSkill: scopedHandler(parseUninstallSkill, {
-        local: (input) => skills.uninstall(input),
+        local: (input) => Effect.runPromise(skills.uninstall(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) => remoteSkills(serverId, SKILLS_ADMIN_ROUTES.uninstall, input, acceptEmpty),
       }),
       setAgentSkillEnabled: scopedHandler(parseSetEnabledSkill, {
-        local: (input) => skills.setEnabled(input),
+        local: (input) => Effect.runPromise(skills.setEnabled(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) =>
           remoteSkills(serverId, SKILLS_ADMIN_ROUTES.setEnabled, input, decodeRemoteInstalledSkill),
       }),
       addMarketplaceAgent: scopedHandler(parseInstallMarketplaceAgent, {
-        local: async (input) => addedAgent(await marketplaceAgents.install(input)),
+        local: async (input) =>
+          addedAgent(
+            await Effect.runPromise(marketplaceAgents.install(input).pipe(Effect.mapError((error) => error.cause))),
+          ),
         // agent-install-v1 only adds a new agent, so an update goes to its own route: dropping the id
         // would add a copy instead of updating.
         remote: (input, serverId) =>
@@ -129,7 +156,10 @@ export function agentAdminIpcHandlers({
             : remoteUpdate(serverId, input),
       }),
       addTemplateAgent: scopedHandler(parseInstallAgentTemplate, {
-        local: async (input) => addedAgent(await agentTemplates.install(input)),
+        local: async (input) =>
+          addedAgent(
+            await Effect.runPromise(agentTemplates.install(input).pipe(Effect.mapError((error) => error.cause))),
+          ),
         remote: (input, serverId) => remoteAdd(serverId, AGENT_INSTALL_ROUTES.template, input),
       }),
     },

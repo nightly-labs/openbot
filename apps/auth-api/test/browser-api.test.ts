@@ -1,7 +1,9 @@
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { AuthServiceError } from "../src/server/auth-service";
 import { type BrowserApiServices, browserSessionToken, handleBrowserApi } from "../src/server/browser-api";
 import { sha256 } from "../src/server/crypto";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { HostedSiteInputError } from "../src/server/hosted-site-contract";
 import { RemoteControlPlaneError } from "../src/server/remote-control-plane";
 
@@ -42,37 +44,41 @@ const avatars: R2Bucket = {
 function setup() {
   const billing = {
     getState: vi.fn(),
-    createPortal: vi.fn().mockResolvedValue("https://billing.stripe.com/p/session/portal"),
+    createPortal: vi.fn().mockReturnValue(Effect.succeed("https://billing.stripe.com/p/session/portal")),
   };
   const services: BrowserApiServices = {
     auth: {
-      startEmailSignIn: vi.fn().mockResolvedValue({ challengeId: "challenge", expiresAt: 100, resendAt: 50 }),
-      verifyEmailCode: vi.fn().mockResolvedValue({ sessionToken: token, user }),
-      authenticate: vi.fn().mockResolvedValue(user),
-      enforceTeamInviteRateLimit: vi.fn().mockResolvedValue(undefined),
-      updateName: vi.fn().mockResolvedValue({ ...user, name: "One" }),
-      updateAvatar: vi.fn().mockImplementation(async (_token, avatarUrl) => ({ ...user, avatarUrl })),
-      listAccountSessions: vi.fn().mockResolvedValue([]),
-      revokeAccountSession: vi.fn().mockResolvedValue(undefined),
+      startEmailSignIn: vi
+        .fn()
+        .mockReturnValue(Effect.succeed({ challengeId: "challenge", expiresAt: 100, resendAt: 50 })),
+      verifyEmailCode: vi.fn().mockReturnValue(Effect.succeed({ sessionToken: token, user })),
+      authenticate: vi.fn().mockReturnValue(Effect.succeed(user)),
+      enforceTeamInviteRateLimit: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+      updateName: vi.fn().mockReturnValue(Effect.succeed({ ...user, name: "One" })),
+      updateAvatar: vi.fn().mockImplementation((_token, avatarUrl) => Effect.succeed({ ...user, avatarUrl })),
+      listAccountSessions: vi.fn().mockReturnValue(Effect.succeed([])),
+      revokeAccountSession: vi.fn().mockReturnValue(Effect.succeed(undefined)),
     },
     avatarBucket: () => avatars,
     hostedSites: () => ({ list: vi.fn(), delete: vi.fn() }),
     remote: {
-      listHosts: vi.fn().mockResolvedValue([]),
-      startSession: vi.fn().mockResolvedValue({ sessionId: "session", hostId: "host", expiresAt: 100 }),
-      issueSessionTicket: vi.fn().mockResolvedValue({ ticket: "short-ticket" }),
-      endSession: vi.fn().mockResolvedValue(undefined),
-      endAccountSession: vi.fn().mockResolvedValue(undefined),
+      listHosts: vi.fn().mockReturnValue(Effect.succeed([])),
+      startSession: vi.fn().mockReturnValue(Effect.succeed({ sessionId: "session", hostId: "host", expiresAt: 100 })),
+      issueSessionTicket: vi.fn().mockReturnValue(Effect.succeed({ ticket: "short-ticket" })),
+      endSession: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+      endAccountSession: vi.fn().mockReturnValue(Effect.succeed(undefined)),
       previewInvite: vi.fn(),
       acceptInvite: vi.fn(),
-      listMembers: vi.fn().mockResolvedValue([]),
-      listInvites: vi.fn().mockResolvedValue([]),
-      createInvite: vi.fn().mockResolvedValue({ inviteId: "invite", token: "invite-token" }),
-      revokeInvite: vi.fn().mockResolvedValue(undefined),
-      changeMembership: vi.fn().mockResolvedValue(undefined),
-      hostAsset: vi.fn().mockResolvedValue({ logoKey: logoVersion }),
+      listMembers: vi.fn().mockReturnValue(Effect.succeed([])),
+      listInvites: vi.fn().mockReturnValue(Effect.succeed([])),
+      createInvite: vi.fn().mockReturnValue(Effect.succeed({ inviteId: "invite", token: "invite-token" })),
+      revokeInvite: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+      changeMembership: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+      hostAsset: vi.fn().mockReturnValue(Effect.succeed({ logoKey: logoVersion })),
     },
-    hostLogo: vi.fn().mockResolvedValue(new Response("logo", { headers: { "Content-Type": "image/png" } })),
+    hostLogo: vi
+      .fn()
+      .mockReturnValue(Effect.succeed(new Response("logo", { headers: { "Content-Type": "image/png" } }))),
     billing: () => billing,
     hosting: () => ({
       list: vi.fn(),
@@ -83,7 +89,7 @@ function setup() {
       status: vi.fn(),
       wake: vi.fn(),
     }),
-    inviteEmailDelivery: () => ({ send: vi.fn().mockResolvedValue(undefined) }),
+    inviteEmailDelivery: () => ({ send: vi.fn().mockReturnValue(Effect.succeed(undefined)) }),
     signalUrl: () => "wss://signal.example.test",
     sourceIp: () => "127.0.0.1",
     errorResponse: (error) =>
@@ -151,7 +157,7 @@ describe("browser account boundary", () => {
   it("requires cookie authentication and refuses revoked sessions", async () => {
     const services = setup();
     expect((await handleBrowserApi(request("session"), services)).status).toBe(401);
-    vi.mocked(services.auth.authenticate).mockResolvedValue(null);
+    vi.mocked(services.auth.authenticate).mockReturnValue(Effect.succeed(null));
     expect(
       (await handleBrowserApi(request("session", { cookie: `__Host-openbot-web=${token}` }), services)).status,
     ).toBe(401);
@@ -160,7 +166,7 @@ describe("browser account boundary", () => {
     const services = setup();
     const cookie = `__Host-openbot-web=${token}`;
     await handleBrowserApi(request("v2/remote/sessions/", { cookie, body: { hostId: "host" } }), services);
-    expect(services.remote.startSession).toHaveBeenCalledWith(user.id, "host", await sha256(token));
+    expect(services.remote.startSession).toHaveBeenCalledWith(user.id, "host", await runApiEffect(sha256(token)));
     await handleBrowserApi(
       request("v2/remote/sessions/session/ticket", { cookie, body: { clientPublicKey: "client-key" } }),
       services,
@@ -169,12 +175,12 @@ describe("browser account boundary", () => {
       user.id,
       "session",
       "client-key",
-      await sha256(token),
+      await runApiEffect(sha256(token)),
     );
     await handleBrowserApi(request("v2/remote/sessions/session/end", { cookie, body: {} }), services);
-    expect(services.remote.endSession).toHaveBeenCalledWith(user.id, "session", await sha256(token));
+    expect(services.remote.endSession).toHaveBeenCalledWith(user.id, "session", await runApiEffect(sha256(token)));
     const response = await handleBrowserApi(request("logout", { cookie, body: {} }), services);
-    expect(services.remote.endAccountSession).toHaveBeenCalledWith(user.id, await sha256(token));
+    expect(services.remote.endAccountSession).toHaveBeenCalledWith(user.id, await runApiEffect(sha256(token)));
     expect(response.headers.get("Set-Cookie")).toContain("Max-Age=0");
   });
   it("does not proxy arbitrary account or host operations", async () => {
@@ -187,8 +193,8 @@ describe("browser account boundary", () => {
   });
   it.each([400, 410, 429])("preserves email verification failure %s without setting a cookie", async (status) => {
     const services = setup();
-    vi.mocked(services.auth.verifyEmailCode).mockRejectedValue(
-      new AuthServiceError(status, "invalid_code", "Invalid code."),
+    vi.mocked(services.auth.verifyEmailCode).mockReturnValue(
+      Effect.fail(new AuthServiceError(status, "invalid_code", "Invalid code.")),
     );
     const response = await handleBrowserApi(
       request("email/verify", { body: { challengeId: "x", code: "wrong" } }),
@@ -264,8 +270,8 @@ describe("browser account boundary", () => {
     });
     it("keeps the control plane refusal for a member", async () => {
       const services = setup();
-      vi.mocked(services.remote.changeMembership).mockRejectedValue(
-        new RemoteControlPlaneError(403, "remote_forbidden", "Only an owner or admin can do this."),
+      vi.mocked(services.remote.changeMembership).mockReturnValue(
+        Effect.fail(new RemoteControlPlaneError(403, "remote_forbidden", "Only an owner or admin can do this.")),
       );
       const response = await handleBrowserApi(
         request("v2/remote/hosts/host/members/membership", { method: "DELETE", cookie }),
@@ -287,7 +293,7 @@ describe("browser account boundary", () => {
     });
     it("sends an invitation email only for a canonical invite link", async () => {
       const services = setup();
-      const send = vi.fn().mockResolvedValue(undefined);
+      const send = vi.fn().mockReturnValue(Effect.succeed(undefined));
       services.inviteEmailDelivery = () => ({ send });
       const refused = await handleBrowserApi(
         request("v1/team-invitations/email", {
@@ -335,8 +341,8 @@ describe("browser account boundary", () => {
     });
     it("keeps the control plane refusal for a reader who is not a member", async () => {
       const services = setup();
-      vi.mocked(services.remote.hostAsset).mockRejectedValue(
-        new RemoteControlPlaneError(403, "remote_forbidden", "You are not a member of this host."),
+      vi.mocked(services.remote.hostAsset).mockReturnValue(
+        Effect.fail(new RemoteControlPlaneError(403, "remote_forbidden", "You are not a member of this host.")),
       );
       expect((await handleBrowserApi(request(path, { cookie }), services)).status).toBe(403);
       expect(services.hostLogo).not.toHaveBeenCalled();
@@ -422,7 +428,7 @@ describe("browser account boundary", () => {
 
       // Avatar object keys take a UUID account ID.
       const accountId = "4c7e2a91-3b5d-4f8e-a1c2-6d9e0f1a2b3c";
-      vi.mocked(services.auth.authenticate).mockResolvedValue({ ...user, id: accountId });
+      vi.mocked(services.auth.authenticate).mockReturnValue(Effect.succeed({ ...user, id: accountId }));
       const uploaded = await handleBrowserApi(avatarUpload(), services);
       expect(uploaded.status).toBe(200);
       expect(services.auth.updateAvatar).toHaveBeenCalledWith(
@@ -503,8 +509,8 @@ describe("browser account boundary", () => {
     function withSites() {
       const services = setup();
       const hostedSites = {
-        list: vi.fn().mockResolvedValue({ sites: [], limit: 1, used: 0 }),
-        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockReturnValue(Effect.succeed({ sites: [], limit: 1, used: 0 })),
+        delete: vi.fn().mockReturnValue(Effect.succeed(undefined)),
       };
       services.hostedSites = () => hostedSites;
       return { services, hostedSites };
@@ -540,7 +546,9 @@ describe("browser account boundary", () => {
       expect(await invalidKey.json()).toMatchObject({ error: { code: "invalid_idempotency_key" } });
       expect(hostedSites.delete).not.toHaveBeenCalled();
 
-      hostedSites.delete.mockRejectedValue(new HostedSiteInputError(409, "site_not_found", "The site was not found."));
+      hostedSites.delete.mockReturnValue(
+        Effect.fail(new HostedSiteInputError(409, "site_not_found", "The site was not found.")),
+      );
       const missing = await handleBrowserApi(deleteSite(), services);
       expect(missing.status).toBe(409);
       expect(await missing.json()).toMatchObject({ error: { code: "site_not_found" } });

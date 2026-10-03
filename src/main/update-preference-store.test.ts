@@ -1,3 +1,4 @@
+import { runTestEffect } from "../backend/effect-test-runtime";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
@@ -15,7 +16,7 @@ afterEach(async () => {
 describe("update preference store", () => {
   it("downloads updates automatically when no preference exists", async () => {
     const root = await temporaryRoot();
-    await expect(readUpdatePreference(join(root, "update.json"))).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(join(root, "update.json")))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
       autoInstall: false,
@@ -26,7 +27,7 @@ describe("update preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, '{"version":1,"autoDownload":"yes"}\n');
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
       autoInstall: false,
@@ -37,7 +38,7 @@ describe("update preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, "{ truncated");
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
       autoInstall: false,
@@ -51,14 +52,14 @@ describe("update preference store", () => {
     // Concurrent toggles each rename their own temporary file, so without serialization the earlier
     // write could land last and persist the value the user just turned off.
     const results = await Promise.all([
-      writeUpdatePreference(path, { autoDownload: true }),
-      writeUpdatePreference(path, { autoDownload: false }),
-      writeUpdatePreference(path, { autoDownload: true }),
-      writeUpdatePreference(path, { autoDownload: false }),
+      runTestEffect(writeUpdatePreference(path, { autoDownload: true })),
+      runTestEffect(writeUpdatePreference(path, { autoDownload: false })),
+      runTestEffect(writeUpdatePreference(path, { autoDownload: true })),
+      runTestEffect(writeUpdatePreference(path, { autoDownload: false })),
     ]);
 
     expect(results.at(-1)).toEqual({ autoDownload: false, allowRemoteUpdates: true, autoInstall: false });
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: false,
       allowRemoteUpdates: true,
       autoInstall: false,
@@ -70,13 +71,13 @@ describe("update preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, '{"version":1,"autoDownload":false}\n');
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: false,
       allowRemoteUpdates: true,
       autoInstall: false,
     });
-    await writeUpdatePreference(path, { allowRemoteUpdates: false });
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await runTestEffect(writeUpdatePreference(path, { allowRemoteUpdates: false }));
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: false,
       allowRemoteUpdates: false,
       autoInstall: false,
@@ -86,13 +87,13 @@ describe("update preference store", () => {
   it("persists an opt-in over a stored opt-out", async () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
-    await writeUpdatePreference(path, { autoDownload: false });
-    await expect(writeUpdatePreference(path, { autoDownload: true })).resolves.toEqual({
+    await runTestEffect(writeUpdatePreference(path, { autoDownload: false }));
+    await expect(runTestEffect(writeUpdatePreference(path, { autoDownload: true }))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
       autoInstall: false,
     });
-    await expect(readUpdatePreference(path)).resolves.toEqual({
+    await expect(runTestEffect(readUpdatePreference(path))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
       autoInstall: false,

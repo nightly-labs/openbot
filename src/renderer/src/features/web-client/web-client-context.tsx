@@ -19,6 +19,7 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
+import { runTeamEffect } from "@openbot/team-client";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
@@ -577,8 +578,8 @@ export function createWebWorkspace(
    */
   function hostUnavailable(id: string): void {
     const starting = state.hostedSleep === "waking";
-    void (starting ? hostedServer.wake(id) : Promise.resolve(false)).then(async (waking) => {
-      const availability = waking ? "waking" : await hostedServer.unavailable(id);
+    void (starting ? runTeamEffect(hostedServer.wake(id)) : Promise.resolve(false)).then(async (waking) => {
+      const availability = waking ? "waking" : await runTeamEffect(hostedServer.unavailable(id));
       if (disposed || hostId !== id || state.status === "online") return;
       // The 5-minute recheck can find that the server does not sleep now, so input does not wake it.
       if (availability !== "sleeping") stopWaitingForInput?.();
@@ -600,7 +601,7 @@ export function createWebWorkspace(
       stopWaitingForInput?.();
       if (disposed || hostId !== id || state.status === "online") return;
       setHostedSleep("waking");
-      void hostedServer.wakeForInput(id).then((waking) => {
+      void runTeamEffect(hostedServer.wakeForInput(id)).then((waking) => {
         if (disposed || hostId !== id || state.status === "online") return;
         if (waking) reconnectAfterWake(id);
         else {

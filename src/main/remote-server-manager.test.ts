@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+import { authCall, CentralAuthOperationError } from "./central-auth-effects";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -76,49 +79,52 @@ describe("remote server links", () => {
     const hostId = "00000000-0000-4000-8000-000000000000";
     const acceptInvite = vi.fn();
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [],
-      startSession: async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 }),
-      issueTicket: async () => ({
-        ticket: "ticket",
-        expiresAt: Date.now() + 60_000,
-        signalUrl: "wss://signal.openbot.run/v1/signal",
-      }),
-      endSession: async () => undefined,
-      createInvite: async () => ({
-        inviteId: "invite-1",
-        token: "t".repeat(43),
-        expiresAt: Date.now() + 60_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite-1",
-        hostId,
-        hostName: "Studio Mac",
-        role: "member" as const,
-        expiresAt: Date.now() + 60_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: "trusted-host-public-key",
-      }),
+      listHosts: () => authCall(async () => []),
+      startSession: () => authCall(async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 })),
+      issueTicket: () =>
+        authCall(async () => ({
+          ticket: "ticket",
+          expiresAt: Date.now() + 60_000,
+          signalUrl: "wss://signal.openbot.run/v1/signal",
+        })),
+      endSession: () => authCall(async () => undefined),
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          token: "t".repeat(43),
+          expiresAt: Date.now() + 60_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          hostId,
+          hostName: "Studio Mac",
+          role: "member" as const,
+          expiresAt: Date.now() + 60_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: "trusted-host-public-key",
+        })),
       acceptInvite,
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(directory, "transfers"),
     });
     const manager = new RemoteServerManager(
       statePath,
       { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
-      { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com" },
+      { createTeamAuthTicket: () => authCall(async () => "ticket"), getEmail: () => "person@example.com" },
       { webrtcTransport: transport },
     );
     const inviteUrl = new URL("https://openbot.run/join");
@@ -127,11 +133,17 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("fingerprint", fingerprint("attacker-public-key"));
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
-      await manager.initialize();
-      await expect(manager.join({ inviteUrl: inviteUrl.toString() })).rejects.toThrow("identity");
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await expect(
+        Effect.runPromise(
+          manager
+            .join({ inviteUrl: inviteUrl.toString() })
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).rejects.toThrow("identity");
       expect(acceptInvite).not.toHaveBeenCalled();
     } finally {
-      await manager.stop();
+      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -144,7 +156,7 @@ describe("remote server links", () => {
     const manager = new RemoteServerManager(
       join(directory, "servers.json"),
       { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
-      { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com" },
+      { createTeamAuthTicket: () => authCall(async () => "ticket"), getEmail: () => "person@example.com" },
       { webrtcTransport: transport, selfHostedApiOrigin: "https://api.example.com" },
     );
     const inviteUrl = new URL("https://openbot.run/join");
@@ -153,14 +165,20 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("fingerprint", "a".repeat(43));
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       const input = { inviteUrl: inviteUrl.toString() };
-      await expect(manager.previewInvite(input)).rejects.toThrow("another OpenBot service");
-      await expect(manager.join(input)).rejects.toThrow("another OpenBot service");
+      await expect(
+        Effect.runPromise(
+          manager.previewInvite(input).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).rejects.toThrow("another OpenBot service");
+      await expect(
+        Effect.runPromise(manager.join(input).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
+      ).rejects.toThrow("another OpenBot service");
       expect(previewInvite).not.toHaveBeenCalled();
       expect(acceptInvite).not.toHaveBeenCalled();
     } finally {
-      await manager.stop();
+      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -192,59 +210,62 @@ describe("remote server links", () => {
       }),
     );
     const bridge = new TeamWebRtcBridge();
-    const disconnect = vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    const disconnect = vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [],
-      startSession: async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 }),
-      issueTicket: async () => ({
-        ticket: "ticket",
-        expiresAt: Date.now() + 60_000,
-        signalUrl: "wss://signal.openbot.run/v1/signal",
-      }),
-      endSession: async () => undefined,
-      createInvite: async () => ({
-        inviteId: "invite-1",
-        token: "token",
-        expiresAt: Date.now() + 60_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite-1",
-        hostId,
-        hostName: "Revoked host",
-        role: "member",
-        expiresAt: Date.now() + 60_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: "trusted-host-public-key",
-      }),
-      acceptInvite: async () => ({ hostId, membershipId: "membership-1", role: "member" }),
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      listHosts: () => authCall(async () => []),
+      startSession: () => authCall(async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 })),
+      issueTicket: () =>
+        authCall(async () => ({
+          ticket: "ticket",
+          expiresAt: Date.now() + 60_000,
+          signalUrl: "wss://signal.openbot.run/v1/signal",
+        })),
+      endSession: () => authCall(async () => undefined),
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          token: "token",
+          expiresAt: Date.now() + 60_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          hostId,
+          hostName: "Revoked host",
+          role: "member",
+          expiresAt: Date.now() + 60_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: "trusted-host-public-key",
+        })),
+      acceptInvite: () => authCall(async () => ({ hostId, membershipId: "membership-1", role: "member" })),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(directory, "transfers"),
     });
     const manager = new RemoteServerManager(
       statePath,
       { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
-      { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com" },
+      { createTeamAuthTicket: () => authCall(async () => "ticket"), getEmail: () => "person@example.com" },
       { webrtcTransport: transport },
     );
 
     try {
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       expect(disconnect).toHaveBeenCalledWith(hostId);
       expect(manager.list().map((server) => server.id)).toEqual(["local"]);
       expect(manager.activeServerId).toBe("local");
     } finally {
-      await manager.stop();
+      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -257,15 +278,19 @@ describe("remote server links", () => {
     // No routes: reaching the dev host over HTTP at all fails the test by name.
     const team = stubTeamFetch();
 
-    const summary = await fixture.manager.connectDevelopmentServer({
-      serverId: hostId,
-      serverName: "OpenBot Local Dev Host",
-      apiUrl: "http://localhost:63762",
-      fingerprint: "fingerprint",
-      publicKey: "public-key",
-      username: "openbot-dev-client",
-      sessionToken: "development-token",
-    });
+    const summary = await Effect.runPromise(
+      fixture.manager
+        .connectDevelopmentServer({
+          serverId: hostId,
+          serverName: "OpenBot Local Dev Host",
+          apiUrl: "http://localhost:63762",
+          fingerprint: "fingerprint",
+          publicKey: "public-key",
+          username: "openbot-dev-client",
+          sessionToken: "development-token",
+        })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
 
     expect(team.calls).toEqual([]);
     expect(summary).toMatchObject({ id: hostId, apiUrl: null });
@@ -314,44 +339,50 @@ describe("remote server links", () => {
       };
     });
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
-    const removeMember = vi.fn(async (hostId: string) => {
-      hosts = hosts.filter((host) => host.hostId !== hostId);
-    });
-    const revokeInvite = vi.fn(async () => undefined);
-    const sendTeamInviteEmail = vi.fn(async () => undefined);
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    const removeMember = vi.fn((hostId: string) =>
+      authCall(async () => {
+        hosts = hosts.filter((host) => host.hostId !== hostId);
+      }),
+    );
+    const revokeInvite = vi.fn(() => authCall(async () => undefined));
+    const sendTeamInviteEmail = vi.fn(() => authCall(async () => undefined));
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => hosts,
-      startSession: async (hostId) => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 }),
-      issueTicket: async () => ({ ticket: "ticket", expiresAt: Date.now() + 60_000, signalUrl: "wss://signal" }),
-      endSession: async () => undefined,
-      createInvite: async () => ({
-        inviteId: "invite-1",
-        token: "t".repeat(43),
-        expiresAt: Date.now() + 60_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => {
-        throw new Error("Unexpected invite preview.");
-      },
-      acceptInvite: async () => {
-        throw new Error("Unexpected invite acceptance.");
-      },
+      listHosts: () => authCall(async () => hosts),
+      startSession: (hostId) =>
+        authCall(async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 })),
+      issueTicket: () =>
+        authCall(async () => ({ ticket: "ticket", expiresAt: Date.now() + 60_000, signalUrl: "wss://signal" })),
+      endSession: () => authCall(async () => undefined),
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          token: "t".repeat(43),
+          expiresAt: Date.now() + 60_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => {
+          throw new Error("Unexpected invite preview.");
+        }),
+      acceptInvite: () =>
+        authCall(async () => {
+          throw new Error("Unexpected invite acceptance.");
+        }),
       revokeInvite,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
       removeMember,
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(directory, "transfers"),
     });
-    const request = vi
-      .spyOn(transport, "request")
-      .mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
+    const request = vi.spyOn(transport, "request").mockImplementation((_hostId, path) =>
+      remoteCall(async (): Promise<TeamProtocolV2Json> => {
         if (path === "/v1/agents") return [];
         if (path === "/v1/compatibility") {
           return {
@@ -371,12 +402,13 @@ describe("remote server links", () => {
           activeSessions: 0,
           maxSessions: 1,
         } satisfies TeamProtocolV2Json;
-      });
+      }),
+    );
     const manager = new RemoteServerManager(
       statePath,
       { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
       {
-        createTeamAuthTicket: async () => "ticket",
+        createTeamAuthTicket: () => authCall(async () => "ticket"),
         getEmail: () => "person@example.com",
         sendTeamInviteEmail,
       },
@@ -384,7 +416,7 @@ describe("remote server links", () => {
     );
 
     try {
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       expect(
         manager
           .list()
@@ -405,28 +437,48 @@ describe("remote server links", () => {
       expect(request).toHaveBeenCalledWith(betaId, "/v1/remote-screen/capabilities", {
         preserveSemanticTags: true,
       });
-      const invite = await manager.createInvite(betaId, { role: "member", email: "friend@example.com" });
+      const invite = await Effect.runPromise(
+        manager
+          .createInvite(betaId, { role: "member", email: "friend@example.com" })
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       expect(sendTeamInviteEmail).toHaveBeenCalledWith({
         email: "friend@example.com",
         serverName: "Beta",
         inviteUrl: invite.inviteUrl,
         role: "member",
       });
-      sendTeamInviteEmail.mockRejectedValueOnce(new Error("SMTP unavailable"));
-      await expect(manager.createInvite(betaId, { role: "member", email: "failed@example.com" })).rejects.toThrow(
-        "SMTP unavailable",
+      sendTeamInviteEmail.mockReturnValueOnce(
+        Effect.fail(new CentralAuthOperationError({ cause: new Error("SMTP unavailable") })),
       );
+      await expect(
+        Effect.runPromise(
+          manager
+            .createInvite(betaId, { role: "member", email: "failed@example.com" })
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).rejects.toThrow("SMTP unavailable");
       expect(revokeInvite).toHaveBeenCalledWith("invite-1");
-      await manager.remove(alphaId);
+      await Effect.runPromise(
+        manager.remove(alphaId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       expect(removeMember).toHaveBeenCalledWith(alphaId, `${alphaId}-member`);
-      await manager.syncRemoteHosts();
+      await Effect.runPromise(
+        manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       expect(manager.list().some((server) => server.id === alphaId)).toBe(false);
-      await manager.remove(gammaId);
-      await manager.syncRemoteHosts();
+      await Effect.runPromise(
+        manager.remove(gammaId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
+      await Effect.runPromise(
+        manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
       expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
-      const directoryChanged = vi.fn(() => manager.syncRemoteHosts());
+      const directoryChanged = vi.fn(() =>
+        Effect.runPromise(manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
+      );
       manager.on("directoryInvalidated", directoryChanged);
       hosts = hosts.filter((host) => host.hostId !== betaId);
       transport.emit("error", betaId, "session_revoked", "The remote session was revoked.");
@@ -440,7 +492,7 @@ describe("remote server links", () => {
       await directoryChanged.mock.results[0]?.value;
       expect(manager.activeServerId).toBe("local");
     } finally {
-      await manager.stop();
+      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -473,71 +525,82 @@ describe("remote server links", () => {
       }),
     );
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [
-        {
-          hostId,
-          name: "Viewer host",
-          logoKey: null,
-          devicePublicKey: publicKey,
-          authEpoch: 1,
-          membershipId: "member-1",
-          role: "member",
-        },
-      ],
-      startSession: async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 }),
-      issueTicket: async () => ({
-        ticket: "ticket",
-        expiresAt: Date.now() + 60_000,
-        signalUrl: "wss://signal.openbot.run/v1/signal",
-      }),
-      endSession: async () => undefined,
-      createInvite: async () => ({
-        inviteId: "invite-1",
-        token: "token",
-        expiresAt: Date.now() + 60_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => {
-        throw new Error("Unexpected invite preview.");
-      },
-      acceptInvite: async () => {
-        throw new Error("Unexpected invite acceptance.");
-      },
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      listHosts: () =>
+        authCall(async () => [
+          {
+            hostId,
+            name: "Viewer host",
+            logoKey: null,
+            devicePublicKey: publicKey,
+            authEpoch: 1,
+            membershipId: "member-1",
+            role: "member",
+          },
+        ]),
+      startSession: () => authCall(async () => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 })),
+      issueTicket: () =>
+        authCall(async () => ({
+          ticket: "ticket",
+          expiresAt: Date.now() + 60_000,
+          signalUrl: "wss://signal.openbot.run/v1/signal",
+        })),
+      endSession: () => authCall(async () => undefined),
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite-1",
+          token: "token",
+          expiresAt: Date.now() + 60_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => {
+          throw new Error("Unexpected invite preview.");
+        }),
+      acceptInvite: () =>
+        authCall(async () => {
+          throw new Error("Unexpected invite acceptance.");
+        }),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "person-1",
       controlPlaneUrl: "https://api.openbot.run",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(directory, "transfers"),
     });
     const requestResponse = vi
       .spyOn(transport, "requestResponse")
-      .mockResolvedValueOnce({ status: 204, body: {} })
-      .mockRejectedValueOnce(new TeamWebRtcRequestError(401, "session_expired", "Viewer grant expired."));
+      .mockReturnValueOnce(Effect.succeed({ status: 204, body: {} }))
+      .mockReturnValueOnce(
+        Effect.fail(
+          new RemoteWorkflowError({
+            cause: new TeamWebRtcRequestError(401, "session_expired", "Viewer grant expired."),
+          }),
+        ),
+      );
     const manager = new RemoteServerManager(
       statePath,
       { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
-      { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com" },
+      { createTeamAuthTicket: () => authCall(async () => "ticket"), getEmail: () => "person@example.com" },
       { webrtcTransport: transport },
     );
 
     try {
-      await manager.initialize();
-      const authorization = await manager.fetchRemoteViewerResource(
-        hostId,
-        "/v1/remote-screen/sessions/desktop-1/authorize",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: new TextEncoder().encode(JSON.stringify({ grant: "viewer-grant" })),
-        },
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      const authorization = await Effect.runPromise(
+        manager
+          .fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: new TextEncoder().encode(JSON.stringify({ grant: "viewer-grant" })),
+          })
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
       );
       expect(authorization.status).toBe(204);
       expect(requestResponse).toHaveBeenNthCalledWith(1, hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
@@ -548,15 +611,19 @@ describe("remote server links", () => {
       });
 
       await expect(
-        manager.fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: new TextEncoder().encode(JSON.stringify({ grant: "expired" })),
-        }),
+        Effect.runPromise(
+          manager
+            .fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: new TextEncoder().encode(JSON.stringify({ grant: "expired" })),
+            })
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
       ).rejects.toThrow("Viewer grant expired.");
       expect(manager.list().find((server) => server.id === hostId)?.issue).toBeNull();
     } finally {
-      await manager.stop();
+      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -593,23 +660,29 @@ describe("remote server order", () => {
         decrypt: (value) => value.toString(),
       },
       {
-        createTeamAuthTicket: async () => "ticket",
+        createTeamAuthTicket: () => authCall(async () => "ticket"),
         getEmail: () => "person@example.com",
       },
     );
 
     try {
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rename(directory, unavailableDirectory);
-      await expect(manager.select("server-1")).rejects.toThrow();
+      await expect(
+        Effect.runPromise(
+          manager.select("server-1").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).rejects.toThrow();
       expect(manager.activeServerId).toBe("local");
       await rename(unavailableDirectory, directory);
 
-      await expect(manager.select("local")).resolves.toBeDefined();
+      await expect(
+        Effect.runPromise(manager.select("local").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
+      ).resolves.toBeDefined();
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.activeServerId).toBe("local");
     } finally {
-      manager.stop();
+      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
       await rm(directory, { recursive: true, force: true });
       await rm(unavailableDirectory, { recursive: true, force: true });
     }
@@ -644,19 +717,25 @@ describe("remote server order", () => {
           decrypt: (value) => value.toString(),
         },
         {
-          createTeamAuthTicket: async () => "ticket",
+          createTeamAuthTicket: () => authCall(async () => "ticket"),
           getEmail: () => "person@example.com",
         },
       );
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
 
-      const reordered = await manager.reorder(["server-2", "server-1"]);
+      const reordered = await Effect.runPromise(
+        manager.reorder(["server-2", "server-1"]).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       expect(reordered.map((server) => server.id)).toEqual(["local", "server-2", "server-1"]);
       expect(reordered.find((server) => server.id === "server-1")?.active).toBe(true);
 
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.servers.map((server: { id: string }) => server.id)).toEqual(["server-2", "server-1"]);
-      await expect(manager.reorder(["server-1"])).rejects.toThrow("incomplete");
+      await expect(
+        Effect.runPromise(
+          manager.reorder(["server-1"]).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).rejects.toThrow("incomplete");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -717,23 +796,35 @@ describe("remote server order", () => {
           decrypt: (value) => value.toString(),
         },
         {
-          createTeamAuthTicket: async () => "ticket",
+          createTeamAuthTicket: () => authCall(async () => "ticket"),
           getEmail: () => "person@example.com",
         },
       );
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
 
-      await expect(manager.downloadSharedFile("~/OpenBot/Shared/report.csv", serverId)).resolves.toEqual({
+      await expect(
+        Effect.runPromise(
+          manager
+            .downloadSharedFile("~/OpenBot/Shared/report.csv", serverId)
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).resolves.toEqual({
         bytes,
         name: "report.csv",
       });
       // A name that is not valid percent-encoding does not fail a download that has its bytes.
-      await expect(manager.downloadWorkspaceFile("chief", "app/page.tsx", serverId)).resolves.toEqual({
+      await expect(
+        Effect.runPromise(
+          manager
+            .downloadWorkspaceFile("chief", "app/page.tsx", serverId)
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).resolves.toEqual({
         bytes,
         name: "page.tsx",
       });
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      manager.stop();
+      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -753,12 +844,18 @@ describe("remote connection failures", () => {
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("http-protocol")], appVersion: "0.4.0" });
 
-    fixture.manager.startEventConnections();
+    Effect.runPromise(
+      fixture.manager.startEventConnections().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
     await waitForServer(fixture, { state: "online" });
 
-    await expect(fixture.manager.request("http-protocol", "/v1/agents", (value) => value)).rejects.toThrow(
-      "could not safely use",
-    );
+    await expect(
+      Effect.runPromise(
+        fixture.manager
+          .request("http-protocol", "/v1/agents", (value) => value)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
+    ).rejects.toThrow("could not safely use");
 
     expect(sockets[0]?.close).toHaveBeenCalledWith(1000, "Client stopped");
     expect(fixture.server()).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
@@ -781,10 +878,12 @@ describe("remote connection failures", () => {
       },
     ]);
     const disconnect = vi.spyOn(transport, "disconnect");
-    vi.spyOn(transport, "request").mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
-      if (path !== "/v1/compatibility") return { malformed: true };
-      return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
-    });
+    vi.spyOn(transport, "request").mockImplementation((_hostId, path) =>
+      remoteCall(async (): Promise<TeamProtocolV2Json> => {
+        if (path !== "/v1/compatibility") return { malformed: true };
+        return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+      }),
+    );
     const fixture = await createRemoteManager({
       servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
       appVersion: "0.4.0",
@@ -792,9 +891,13 @@ describe("remote connection failures", () => {
     });
 
     await expect(
-      fixture.manager.request(hostId, "/v1/agents", () => {
-        throw new Error("Unexpected agent payload.");
-      }),
+      Effect.runPromise(
+        fixture.manager
+          .request(hostId, "/v1/agents", () => {
+            throw new Error("Unexpected agent payload.");
+          })
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
     ).rejects.toThrow("could not safely use");
 
     await vi.waitFor(() => expect(disconnect).toHaveBeenCalledWith(hostId));
@@ -806,8 +909,10 @@ describe("remote connection failures", () => {
 
     // Retrying by hand is the act the suspension was waiting for. A host still suspended after it
     // reads every later disconnect as the old failure and never reconnects on its own again.
-    vi.spyOn(transport, "connect").mockResolvedValue(undefined);
-    await fixture.manager.retryConnection(hostId);
+    vi.spyOn(transport, "connect").mockReturnValue(Effect.succeed(undefined));
+    await Effect.runPromise(
+      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
     transport.emit("disconnected", hostId);
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
   });
@@ -825,28 +930,38 @@ describe("remote connection failures", () => {
         role: "member",
       },
     ]);
-    vi.spyOn(transport, "request").mockImplementation(async (_hostId, path): Promise<TeamProtocolV2Json> => {
-      if (path === "/v1/compatibility")
-        return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
-      return [];
-    });
+    vi.spyOn(transport, "request").mockImplementation((_hostId, path) =>
+      remoteCall(async (): Promise<TeamProtocolV2Json> => {
+        if (path === "/v1/compatibility")
+          return { appVersion: "0.4.0", protocol: { minimum: 2, maximum: 2 }, capabilities: [] };
+        return [];
+      }),
+    );
     const fixture = await createRemoteManager({
       servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
       appVersion: "0.4.0",
       managerOptions: { webrtcTransport: transport },
     });
     await expect(
-      fixture.manager.request(hostId, "/v1/agents", () => {
-        throw new Error("Old invalid payload.");
-      }),
+      Effect.runPromise(
+        fixture.manager
+          .request(hostId, "/v1/agents", () => {
+            throw new Error("Old invalid payload.");
+          })
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
     ).rejects.toThrow("could not safely use");
     const roster = vi.fn();
     fixture.manager.on("agent", roster);
     const disconnect = vi.spyOn(transport, "disconnect");
-    vi.spyOn(transport, "connect").mockImplementation(async () => {
-      transport.emit("connected", hostId);
-    });
-    await fixture.manager.retryConnection(hostId);
+    vi.spyOn(transport, "connect").mockImplementation(() =>
+      remoteCall(async () => {
+        transport.emit("connected", hostId);
+      }),
+    );
+    await Effect.runPromise(
+      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
     await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(hostId, { type: "agents-changed", agents: [] }));
     expect(fixture.server(hostId)).toMatchObject({ state: "online", issue: null });
     expect(disconnect).not.toHaveBeenCalled();
@@ -869,7 +984,7 @@ describe("remote connection failures", () => {
         role: "member",
       },
     ]);
-    vi.spyOn(transport, "connect").mockResolvedValue(undefined);
+    vi.spyOn(transport, "connect").mockReturnValue(Effect.succeed(undefined));
     vi.spyOn(transport, "isConnected").mockReturnValue(true);
     const fixture = await createRemoteManager({
       servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
@@ -877,7 +992,9 @@ describe("remote connection failures", () => {
       managerOptions: { webrtcTransport: transport },
     });
 
-    await fixture.manager.retryConnection(hostId);
+    await Effect.runPromise(
+      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
 
     expect(fixture.server(hostId)).toMatchObject({ state: "online" });
   });
@@ -932,9 +1049,13 @@ describe("remote connection failures", () => {
       appVersion: "0.4.0",
     });
 
-    fixture.manager.startEventConnections();
+    Effect.runPromise(
+      fixture.manager.startEventConnections().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
     await waitForServer(fixture, { state: "online" });
-    const signedIn = fixture.manager.login({ serverId });
+    const signedIn = Effect.runPromise(
+      fixture.manager.login({ serverId }).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
 
     // The probe is in flight, and the stream has already restarted on the new token: a second socket
     // exists. That order is the whole point -- the restart cannot come after the answer below.
@@ -1020,18 +1141,24 @@ describe("remote control capability discovery", () => {
           decrypt: (value) => value.toString(),
         },
         {
-          createTeamAuthTicket: async () => "account-ticket",
+          createTeamAuthTicket: () => authCall(async () => "account-ticket"),
           getEmail: () => "member@example.com",
         },
       );
-      await manager.initialize();
+      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
 
-      await expect(manager.join({ inviteUrl: inviteUrl.toString() })).resolves.toMatchObject({
+      await expect(
+        Effect.runPromise(
+          manager
+            .join({ inviteUrl: inviteUrl.toString() })
+            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        ),
+      ).resolves.toMatchObject({
         id: serverId,
         remoteDesktopAvailable: false,
         state: "online",
       });
-      manager.stop();
+      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -1064,9 +1191,17 @@ describe("leaving a remote server", () => {
       appVersion: "0.4.0",
     });
     // A request negotiates the protocol first, as the app does before the user can open settings.
-    for (const id of servers) await fixture.manager.request(id, "/v1/agents", (value) => value);
+    for (const id of servers)
+      await Effect.runPromise(
+        fixture.manager
+          .request(id, "/v1/agents", (value) => value)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
 
-    for (const id of servers) await fixture.manager.remove(id);
+    for (const id of servers)
+      await Effect.runPromise(
+        fixture.manager.remove(id).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
 
     const sent = (path: string) =>
       teamFetch.requests(path).map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]);

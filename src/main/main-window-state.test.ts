@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -116,12 +118,12 @@ describe("main window state", () => {
     const path = join(root, "state.json");
     const bounds = { x: 25, y: 30, width: 1200, height: 820 };
 
-    await writeMainWindowBounds(path, bounds);
-    await expect(readMainWindowBounds(path)).resolves.toEqual(bounds);
+    await Effect.runPromise(writeMainWindowBounds(path, bounds));
+    await expect(Effect.runPromise(readMainWindowBounds(path))).resolves.toEqual(bounds);
     expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ version: 1, ...bounds });
 
     await writeFile(path, '{"version":1,"x":"bad"}\n');
-    await expect(readMainWindowBounds(path)).resolves.toBeNull();
+    await expect(Effect.runPromise(readMainWindowBounds(path))).resolves.toBeNull();
   });
 });
 
@@ -145,13 +147,17 @@ describe("main window bounds recorder", () => {
    * one write, and how often it wrote is not observable from the saved file - one write and three
    * writes leave the same bytes behind.
    */
-  function recordWrites(): { written: Rectangle[]; writeBounds: (bounds: Rectangle) => Promise<void> } {
+  function recordWrites(): {
+    written: Rectangle[];
+    writeBounds: (bounds: Rectangle) => Effect.Effect<void, RemoteWorkflowError>;
+  } {
     const written: Rectangle[] = [];
     return {
       written,
-      writeBounds: async (bounds) => {
-        written.push(bounds);
-      },
+      writeBounds: (bounds) =>
+        Effect.sync(() => {
+          written.push(bounds);
+        }),
     };
   }
 
@@ -159,7 +165,7 @@ describe("main window bounds recorder", () => {
     const { written, writeBounds } = recordWrites();
     const recorder = createMainWindowBoundsRecorder({
       getMainWindow: () => null,
-      readBounds: async () => null,
+      readBounds: () => Effect.succeed(null),
       writeBounds,
       reportError: () => undefined,
     });
@@ -200,7 +206,7 @@ describe("main window bounds recorder", () => {
     const { written, writeBounds } = recordWrites();
     const recorder = createMainWindowBoundsRecorder({
       getMainWindow: () => ({ isDestroyed: () => false, getNormalBounds: () => quitting }),
-      readBounds: async () => null,
+      readBounds: () => Effect.succeed(null),
       writeBounds,
       reportError: () => undefined,
     });
@@ -222,11 +228,11 @@ describe("main window bounds recorder", () => {
     let firstWrite = true;
     const recorder = createMainWindowBoundsRecorder({
       getMainWindow: () => null,
-      readBounds: async () => null,
+      readBounds: () => Effect.succeed(null),
       writeBounds: (bounds) => {
         if (!firstWrite) return writeBounds(bounds);
         firstWrite = false;
-        return Promise.reject(new Error("disk full"));
+        return Effect.fail(new RemoteWorkflowError({ cause: new Error("disk full") }));
       },
       reportError: (message) => {
         reported.push(message);

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The local Whisper model and dictation.
 
 import type { VoiceModelStatus, VoiceTranscriptionResult } from "@openbot/contracts/ipc";
@@ -12,11 +13,18 @@ export interface VoiceIpcDependencies {
 export function voiceIpcHandlers({ voice }: VoiceIpcDependencies): Pick<IpcGroupHandlers, "voice"> {
   return {
     voice: {
-      getModelStatus: handler((): Promise<VoiceModelStatus> => voice.getModelStatus()),
-      prepareModel: handler((): Promise<VoiceModelStatus> => voice.prepareModel()),
+      getModelStatus: handler(
+        (): Promise<VoiceModelStatus> =>
+          Effect.runPromise(voice.getModelStatus().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      prepareModel: handler(
+        (): Promise<VoiceModelStatus> =>
+          Effect.runPromise(voice.prepareModel().pipe(Effect.mapError((error) => error.cause))),
+      ),
       transcribe: payloadHandler(
         parseVoiceTranscription,
-        (transcription): Promise<VoiceTranscriptionResult> => voice.transcribe(transcription.audio),
+        (transcription): Promise<VoiceTranscriptionResult> =>
+          Effect.runPromise(voice.transcribe(transcription.audio).pipe(Effect.mapError((error) => error.cause))),
       ),
     },
   };

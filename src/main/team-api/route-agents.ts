@@ -6,6 +6,7 @@ import {
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { hiddenProviderAgentIds, isPeerHiddenProvider } from "./provider-visibility";
 // Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
 //
@@ -117,10 +118,21 @@ export async function routeAgents(
     if (url.pathname === TEAM_API_ROUTES.agents.generateProfile) {
       return json(
         200,
-        await agents.generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections),
+        await Effect.runPromise(
+          agents
+            .generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections)
+            .pipe(Effect.mapError((error) => error.cause)),
+        ),
       );
     }
-    return json(200, await agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout, memberSender(member)));
+    return json(
+      200,
+      await Effect.runPromise(
+        agents
+          .saveProfile(parseSaveAgentProfile(body), sidebarLayout, memberSender(member))
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.messages.search) {
     const query = url.searchParams.get("q") ?? "";
@@ -149,11 +161,13 @@ export async function routeAgents(
     const action = parseSidebarLayoutAction(await readJson(request));
     if ("agentId" in action) requireVisible(action.agentId);
     if ("beforeAgentId" in action) requireVisible(action.beforeAgentId);
-    const layout = await sidebarLayout.mutate(action, agents.sidebarChatIds());
+    const layout = await Effect.runPromise(
+      sidebarLayout.mutate(action, agents.sidebarChatIds()).pipe(Effect.mapError((error) => error.cause)),
+    );
     return json(200, layout);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {
-    return json(200, await agents.getUsage());
+    return json(200, await Effect.runPromise(agents.getUsage().pipe(Effect.mapError((error) => error.cause))));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
     // Only ids the shipped peers accept: their model list decoders fail closed on the whole array, and
@@ -173,7 +187,14 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await agents.createAgent(input, undefined, undefined, memberSender(member)));
+    return json(
+      201,
+      await Effect.runPromise(
+        agents
+          .createAgent(input, undefined, undefined, memberSender(member))
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    );
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
@@ -194,15 +215,25 @@ export async function routeAgents(
       return json(200, agents.getAnalytics(input));
     }
     if (method === "GET" && action === "usage") {
-      return json(200, await agents.getUsage(agentId));
+      return json(200, await Effect.runPromise(agents.getUsage(agentId).pipe(Effect.mapError((error) => error.cause))));
     }
     if (method === "GET" && action === "skills") {
-      return json(200, (await skills?.listInstalledForChatTags(agentId)) ?? []);
+      return json(
+        200,
+        skills
+          ? await Effect.runPromise(
+              skills.listInstalledForChatTags(agentId).pipe(Effect.mapError((error) => error.cause)),
+            )
+          : [],
+      );
     }
     if (method === "PATCH" && !action) {
       const input = agentUpdate(await readJson(request), agentId);
       if (input.provider !== undefined) requireVisibleProvider({ provider: input.provider });
-      return json(200, await agents.updateAgent(input));
+      return json(
+        200,
+        await Effect.runPromise(agents.updateAgent(input).pipe(Effect.mapError((error) => error.cause))),
+      );
     }
     if (method === "POST" && action === "duplicate") {
       const body = await readJson(request);
@@ -210,8 +241,8 @@ export async function routeAgents(
     }
     if (method === "DELETE" && !action) {
       if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
-      await agents.deleteAgent(agentId);
-      await sidebarLayout.removeAgent(agentId);
+      await Effect.runPromise(agents.deleteAgent(agentId).pipe(Effect.mapError((error) => error.cause)));
+      await Effect.runPromise(sidebarLayout.removeAgent(agentId).pipe(Effect.mapError((error) => error.cause)));
       return empty(204);
     }
     if (action === "avatar") {
@@ -221,10 +252,18 @@ export async function routeAgents(
           throw new HttpError(415, sourceText("error.team.avatarType"));
         }
         const bytes = await readBinary(request, AVATAR_IMAGE_LIMITS.storedBytes);
-        return json(200, await agents.setAvatar(agentId, { mimeType, bytes }));
+        return json(
+          200,
+          await Effect.runPromise(
+            agents.setAvatar(agentId, { mimeType, bytes }).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        );
       }
       if (method === "DELETE") {
-        return json(200, await agents.setAvatar(agentId, null));
+        return json(
+          200,
+          await Effect.runPromise(agents.setAvatar(agentId, null).pipe(Effect.mapError((error) => error.cause))),
+        );
       }
       if (method === "GET") {
         const avatar = agents.resolveAvatar(agentId);
@@ -252,32 +291,48 @@ export async function routeAgents(
 
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.prompt) {
     const body = await readJson(request);
-    await agents.respondToPrompt({
-      requestId: promptRequestId(body.requestId),
-      answers: promptAnswers(body.answers),
-    });
+    await Effect.runPromise(
+      agents
+        .respondToPrompt({
+          requestId: promptRequestId(body.requestId),
+          answers: promptAnswers(body.answers),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.approval) {
     const body = await readJson(request);
-    await agents.respondToApproval({
-      requestId: promptRequestId(body.requestId),
-      decision: approvalDecision(body.decision),
-    });
+    await Effect.runPromise(
+      agents
+        .respondToApproval({
+          requestId: promptRequestId(body.requestId),
+          decision: approvalDecision(body.decision),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === BROWSER_SECRET_RESPONSE_PATH) {
     if (!capabilities.has("browser-secret-handoff"))
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
-    await agents.respondToBrowserSecret(parseBrowserSecretResponse(await readJson(request)));
+    await Effect.runPromise(
+      agents
+        .respondToBrowserSecret(parseBrowserSecretResponse(await readJson(request)))
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.browserTakeover) {
     const body = await readJson(request);
-    await agents.respondToBrowserTakeover({
-      requestId: promptRequestId(body.requestId),
-      decision: browserTakeoverDecision(body.decision),
-    });
+    await Effect.runPromise(
+      agents
+        .respondToBrowserTakeover({
+          requestId: promptRequestId(body.requestId),
+          decision: browserTakeoverDecision(body.decision),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
 

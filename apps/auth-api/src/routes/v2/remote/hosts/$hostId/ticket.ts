@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../../server/json-body";
 import {
   apiError,
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
           if (!isString(body.machineToken))
             return apiError(400, "invalid_remote_request", "The host credential is invalid.");
           return json({
-            ...(await requestRemoteControlPlane().issueHostTicket(params.hostId, body.machineToken)),
+            ...(await runApiEffect(requestRemoteControlPlane().issueHostTicket(params.hostId, body.machineToken))),
             signalUrl: requestRemoteSignalUrl(),
           });
         } catch (error) {

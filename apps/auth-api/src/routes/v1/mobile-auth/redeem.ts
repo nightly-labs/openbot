@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import { apiError, authErrorResponse, json, requestAuthService, requestSourceIp } from "../../../server/request-auth";
 
@@ -17,10 +18,12 @@ export const Route = createFileRoute("/v1/mobile-auth/redeem")({
           ) {
             return apiError(400, "invalid_mobile_ticket", "The Mobile Connect code is invalid.");
           }
-          const session = await requestAuthService().redeemMobileAuthTicket(
-            body.ticket,
-            { id: body.deviceId, name: body.deviceName, platform: body.platform },
-            requestSourceIp(request),
+          const session = await runApiEffect(
+            requestAuthService().redeemMobileAuthTicket(
+              body.ticket,
+              { id: body.deviceId, name: body.deviceName, platform: body.platform },
+              requestSourceIp(request),
+            ),
           );
           return session
             ? json(session)

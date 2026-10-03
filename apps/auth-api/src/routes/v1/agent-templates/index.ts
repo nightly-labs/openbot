@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readMultipartFormData } from "../../../server/json-body";
 import {
   apiError,
@@ -17,9 +18,9 @@ export const Route = createFileRoute("/v1/agent-templates/")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await enforceMarketplaceMutationRateLimit("upload", user.id);
+          await runApiEffect(enforceMarketplaceMutationRateLimit("upload", user.id));
           const form = await readMultipartFormData(request, TEMPLATE_BODY_LIMIT);
           const snapshotText = form.get("snapshot");
           const avatar = form.get("avatar");
@@ -36,16 +37,18 @@ export const Route = createFileRoute("/v1/agent-templates/")({
             return apiError(400, "invalid_template", "Invalid agent template.");
           }
           return json(
-            await requestAgentTemplates().publish({
-              user,
-              sourceAgentId: form.get("sourceAgentId"),
-              snapshot,
-              avatar:
-                avatar instanceof File
-                  ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
-                  : null,
-              card: card instanceof File ? new Uint8Array(await card.arrayBuffer()) : null,
-            }),
+            await runApiEffect(
+              requestAgentTemplates().publish({
+                user,
+                sourceAgentId: form.get("sourceAgentId"),
+                snapshot,
+                avatar:
+                  avatar instanceof File
+                    ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
+                    : null,
+                card: card instanceof File ? new Uint8Array(await card.arrayBuffer()) : null,
+              }),
+            ),
             201,
           );
         } catch (error) {

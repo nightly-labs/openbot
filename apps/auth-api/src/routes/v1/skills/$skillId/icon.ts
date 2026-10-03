@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { requestSkillMarketplace, skillErrorResponse } from "../../../../server/request-auth";
 
 export const Route = createFileRoute("/v1/skills/$skillId/icon")({
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/v1/skills/$skillId/icon")({
     handlers: {
       GET: async ({ params }) => {
         try {
-          const object = await requestSkillMarketplace().icon(params.skillId);
+          const object = await runApiEffect(requestSkillMarketplace().icon(params.skillId));
           return object
             ? new Response(object.body, {
                 headers: {

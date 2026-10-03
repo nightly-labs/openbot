@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
@@ -48,7 +49,7 @@ describe("VoiceModelService", () => {
     const fetchMock = vi.fn(async () => new Response());
     const service = serviceFor(path, data, fetchMock);
 
-    expect(await service.prepare()).toEqual({ phase: "ready", progress: 100, message: null });
+    expect(await Effect.runPromise(service.prepare())).toEqual({ phase: "ready", progress: 100, message: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -60,9 +61,9 @@ describe("VoiceModelService", () => {
     const progress: Array<number | null> = [];
     service.on("status", (status) => progress.push(status.progress));
 
-    const first = service.prepare();
-    const second = service.prepare();
-    expect(first).toBe(second);
+    const first = Effect.runPromise(service.prepare());
+    const second = Effect.runPromise(service.prepare());
+    await expect(second).resolves.toEqual({ phase: "ready", progress: 100, message: null });
     await expect(first).resolves.toEqual({ phase: "ready", progress: 100, message: null });
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(await readFile(path)).toEqual(Buffer.from(data));
@@ -81,13 +82,13 @@ describe("VoiceModelService", () => {
       .mockResolvedValueOnce(new Response(expected));
     const service = serviceFor(path, expected, fetchMock);
 
-    await expect(service.prepare()).resolves.toMatchObject({ phase: "error" });
+    await expect(Effect.runPromise(service.prepare())).resolves.toMatchObject({ phase: "error" });
     expect(existsSync(path)).toBe(false);
     expect(existsSync(`${path}.part`)).toBe(false);
-    await expect(service.prepare()).resolves.toMatchObject({ phase: "error" });
+    await expect(Effect.runPromise(service.prepare())).resolves.toMatchObject({ phase: "error" });
     expect(existsSync(path)).toBe(false);
     expect(existsSync(`${path}.part`)).toBe(false);
-    await expect(service.prepare()).resolves.toMatchObject({ phase: "ready" });
+    await expect(Effect.runPromise(service.prepare())).resolves.toMatchObject({ phase: "ready" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -103,9 +104,9 @@ describe("VoiceModelService", () => {
         }),
     );
     const service = serviceFor(path, expected, fetchMock);
-    const preparation = service.prepare();
+    const preparation = Effect.runPromise(service.prepare());
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    service.shutdown();
+    await Effect.runPromise(service.shutdown());
 
     await expect(preparation).resolves.toEqual({
       phase: "error",

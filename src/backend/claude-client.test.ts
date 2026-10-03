@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdtemp, readlink, rm, writeFile } from "node:fs/promises";
@@ -106,7 +107,9 @@ describe("ClaudeAgentClient", () => {
     client.start();
 
     await expect(
-      client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+      runTestEffect(
+        client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+      ),
     ).resolves.toMatchObject({
       rateLimits: {
         primary: { usedPercent: 12, windowDurationMins: 300 },
@@ -114,11 +117,13 @@ describe("ClaudeAgentClient", () => {
       },
     });
     await expect(
-      client.request("account/rateLimits/read", { model: "claude-haiku-4-5" }, decodeAccountRateLimitsReadResult),
+      runTestEffect(
+        client.request("account/rateLimits/read", { model: "claude-haiku-4-5" }, decodeAccountRateLimitsReadResult),
+      ),
     ).resolves.toMatchObject({
       rateLimits: { secondary: { usedPercent: 34, windowDurationMins: 10_080 } },
     });
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("starts no MCP server to list models or read usage", async () => {
@@ -129,12 +134,14 @@ describe("ClaudeAgentClient", () => {
     });
     client.start();
 
-    await client.request("model/list", {}, decodeModelListResponse);
-    await client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult);
+    await runTestEffect(client.request("model/list", {}, decodeModelListResponse));
+    await runTestEffect(
+      client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+    );
 
     expect(probes).toHaveLength(2);
     for (const options of probes) expect(options).toMatchObject({ mcpServers: {}, strictMcpConfig: true });
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("times out usage discovery and closes its query", async () => {
@@ -143,10 +150,12 @@ describe("ClaudeAgentClient", () => {
     client.start();
 
     await expect(
-      client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+      runTestEffect(
+        client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult),
+      ),
     ).rejects.toThrow("Claude request timed out: account/rateLimits/read");
     expect(query.closed).toBe(true);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restores one stable reasoning item for a multi-phase turn", async () => {
@@ -192,7 +201,7 @@ describe("ClaudeAgentClient", () => {
     );
     client.start();
 
-    const result = await client.request("thread/read", { threadId: "thread-1" }, decodeThreadResponse);
+    const result = await runTestEffect(client.request("thread/read", { threadId: "thread-1" }, decodeThreadResponse));
 
     expect(result.thread.turns?.[0]?.items).toEqual([
       expect.objectContaining({ type: "userMessage" }),
@@ -204,7 +213,7 @@ describe("ClaudeAgentClient", () => {
       },
       { id: "answer", type: "agentMessage", text: "Use option A." },
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("streams a Claude SDK turn through the App Server event contract", async () => {
@@ -264,28 +273,32 @@ fi
     client.on("notification", (notification) => notifications.push(notification));
     client.start();
 
-    await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toMatchObject({
+    await expect(runTestEffect(client.request("account/read", {}, decodeAccountReadResult))).resolves.toMatchObject({
       account: { type: "claude", email: "claude@example.com", planType: "max" },
     });
-    const thread = await client.request(
-      "thread/start",
-      {
-        cwd: root,
-        model: "claude-sonnet-5",
-        developerInstructions: "Be concise.",
-        runtimeWorkspaceRoots: [root, sharedRoot],
-      },
-      decodeThreadResponse,
+    const thread = await runTestEffect(
+      client.request(
+        "thread/start",
+        {
+          cwd: root,
+          model: "claude-sonnet-5",
+          developerInstructions: "Be concise.",
+          runtimeWorkspaceRoots: [root, sharedRoot],
+        },
+        decodeThreadResponse,
+      ),
     );
     const deliveryId = "8bf58506-96a8-4d96-837c-3ab807b79d1f";
-    await client.request(
-      "turn/start",
-      {
-        threadId: thread.thread.id,
-        clientUserMessageId: deliveryId,
-        input: [{ type: "text", text: "Hello" }],
-      },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: thread.thread.id,
+          clientUserMessageId: deliveryId,
+          input: [{ type: "text", text: "Hello" }],
+        },
+        decodeTurnResponse,
+      ),
     );
 
     if (prompt === null) throw new Error("Claude prompt was not initialized.");
@@ -407,7 +420,7 @@ fi
         }),
       ]),
     );
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("separates streamed reasoning phases the same way as restored history", async () => {
@@ -434,7 +447,7 @@ fi
     );
     expect(streamed).toBe("Check the inputs.\nCompare the options.");
     expect(getString(getRecord(completed?.params, "item"), "text")).toBe(streamed);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("discovers each model's supported reasoning efforts from the Claude SDK", async () => {
@@ -473,7 +486,7 @@ fi
     const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.251" }, () => query);
     client.start();
 
-    await expect(client.request("model/list", {}, decodeModelListResponse)).resolves.toEqual({
+    await expect(runTestEffect(client.request("model/list", {}, decodeModelListResponse))).resolves.toEqual({
       data: [
         {
           model: "claude-opus-5",
@@ -530,20 +543,22 @@ fi
     });
     client.start();
 
-    await client.request("model/list", {}, decodeModelListResponse);
-    await expect(client.request("model/list", {}, decodeModelListResponse, 10)).rejects.toThrow(
+    await runTestEffect(client.request("model/list", {}, decodeModelListResponse));
+    await expect(runTestEffect(client.request("model/list", {}, decodeModelListResponse, 10))).rejects.toThrow(
       "Claude request timed out: model/list",
     );
-    await client.request(
-      "thread/start",
-      { cwd: process.cwd(), model: "claude-fable-5", effort: "medium" },
-      decodeThreadResponse,
+    await runTestEffect(
+      client.request(
+        "thread/start",
+        { cwd: process.cwd(), model: "claude-fable-5", effort: "medium" },
+        decodeThreadResponse,
+      ),
     );
 
     expect(runtimeOptions).toMatchObject({ model: "fable" });
     expect(runtimeOptions).not.toHaveProperty("effort");
     expect(timeoutQuery.closed).toBe(true);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("uses alias-only discovery values for Claude SDK model selection", async () => {
@@ -569,25 +584,27 @@ fi
     });
     client.start();
 
-    await expect(client.request("model/list", {}, decodeModelListResponse)).resolves.toEqual({
+    await expect(runTestEffect(client.request("model/list", {}, decodeModelListResponse))).resolves.toEqual({
       data: [expect.objectContaining({ model: "sonnet" })],
     });
-    await client.request("thread/start", { cwd: root, model: "sonnet", effort: "medium" }, decodeThreadResponse);
+    await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "sonnet", effort: "medium" }, decodeThreadResponse),
+    );
     expect(initialOptions).toMatchObject({ model: "sonnet" });
 
-    const switchingThread = await client.request(
-      "thread/start",
-      { cwd: root, model: "claude-opus-5", effort: "medium" },
-      decodeThreadResponse,
+    const switchingThread = await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "claude-opus-5", effort: "medium" }, decodeThreadResponse),
     );
-    await client.request(
-      "turn/start",
-      { threadId: switchingThread.thread.id, model: "sonnet", effort: "medium", input: [] },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        { threadId: switchingThread.thread.id, model: "sonnet", effort: "medium", input: [] },
+        decodeTurnResponse,
+      ),
     );
     expect(switchingQuery.models).toEqual(["sonnet"]);
 
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("keeps neutral UI effort for unsupported models without sending effort to Claude", async () => {
@@ -623,7 +640,7 @@ fi
     });
     client.start();
 
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runTestEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(models.data).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -634,60 +651,60 @@ fi
       ]),
     );
 
-    const unsupportedThread = await client.request(
-      "thread/start",
-      { cwd: root, model: "claude-haiku-5", effort: "medium" },
-      decodeThreadResponse,
+    const unsupportedThread = await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "claude-haiku-5", effort: "medium" }, decodeThreadResponse),
     );
     expect(runtimeOptions[0]).not.toHaveProperty("effort");
-    await client.request(
-      "turn/start",
-      { threadId: unsupportedThread.thread.id, model: "claude-haiku-5", effort: "high", input: [] },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        { threadId: unsupportedThread.thread.id, model: "claude-haiku-5", effort: "high", input: [] },
+        decodeTurnResponse,
+      ),
     );
     expect(unsupportedQuery.flagSettings).toEqual([]);
 
-    const switchingThread = await client.request(
-      "thread/start",
-      { cwd: root, model: "claude-haiku-5", effort: "medium" },
-      decodeThreadResponse,
+    const switchingThread = await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "claude-haiku-5", effort: "medium" }, decodeThreadResponse),
     );
-    await client.request(
-      "turn/start",
-      { threadId: switchingThread.thread.id, model: "claude-sonnet-5", effort: "high", input: [] },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        { threadId: switchingThread.thread.id, model: "claude-sonnet-5", effort: "high", input: [] },
+        decodeTurnResponse,
+      ),
     );
     expect(switchingQuery.models).toEqual(["sonnet"]);
     expect(switchingQuery.flagSettings).toEqual([{ effortLevel: "low" }]);
 
-    const effortChangingThread = await client.request(
-      "thread/start",
-      { cwd: root, model: "claude-sonnet-5", effort: "high" },
-      decodeThreadResponse,
+    const effortChangingThread = await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "claude-sonnet-5", effort: "high" }, decodeThreadResponse),
     );
     expect(runtimeOptions[2]).toMatchObject({ effort: "low" });
-    await client.request(
-      "turn/start",
-      { threadId: effortChangingThread.thread.id, model: "claude-sonnet-5", effort: "max", input: [] },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        { threadId: effortChangingThread.thread.id, model: "claude-sonnet-5", effort: "max", input: [] },
+        decodeTurnResponse,
+      ),
     );
     expect(effortChangingQuery.models).toEqual([]);
     expect(effortChangingQuery.flagSettings).toEqual([{ effortLevel: "max" }]);
 
-    const clearingThread = await client.request(
-      "thread/start",
-      { cwd: root, model: "claude-sonnet-5", effort: "medium" },
-      decodeThreadResponse,
+    const clearingThread = await runTestEffect(
+      client.request("thread/start", { cwd: root, model: "claude-sonnet-5", effort: "medium" }, decodeThreadResponse),
     );
-    await client.request(
-      "turn/start",
-      { threadId: clearingThread.thread.id, model: "claude-haiku-5", effort: "medium", input: [] },
-      decodeTurnResponse,
+    await runTestEffect(
+      client.request(
+        "turn/start",
+        { threadId: clearingThread.thread.id, model: "claude-haiku-5", effort: "medium", input: [] },
+        decodeTurnResponse,
+      ),
     );
     expect(clearingQuery.models).toEqual(["haiku"]);
     expect(clearingQuery.flagSettings).toEqual([{ effortLevel: null }]);
 
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restarts an inactive session when resumed with updated memory instructions", async () => {
@@ -708,15 +725,17 @@ fi
       developerInstructions: "<agent_memories>[]</agent_memories>",
       runtimeWorkspaceRoots: [root],
     };
-    const thread = await client.request("thread/start", config, decodeThreadResponse);
-    await client.request(
-      "thread/resume",
-      {
-        ...config,
-        threadId: thread.thread.id,
-        developerInstructions: '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
-      },
-      decodeThreadResponse,
+    const thread = await runTestEffect(client.request("thread/start", config, decodeThreadResponse));
+    await runTestEffect(
+      client.request(
+        "thread/resume",
+        {
+          ...config,
+          threadId: thread.thread.id,
+          developerInstructions: '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
+        },
+        decodeThreadResponse,
+      ),
     );
 
     expect(instructions).toEqual([
@@ -726,7 +745,7 @@ fi
     // A CLI that records the first prompt would send it again on resume and drop the new text.
     const off = { "system-prompt-snapshot": "off" };
     expect(snapshots).toEqual([off, off]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("closes an idle thread's process and resumes the same session on the next turn", async () => {
@@ -740,10 +759,12 @@ fi
     client.start();
     vi.useFakeTimers();
     try {
-      const thread = await client.request(
-        "thread/start",
-        { cwd: root, model: "claude-sonnet-5", developerInstructions: "Be concise.", runtimeWorkspaceRoots: [root] },
-        decodeThreadResponse,
+      const thread = await runTestEffect(
+        client.request(
+          "thread/start",
+          { cwd: root, model: "claude-sonnet-5", developerInstructions: "Be concise.", runtimeWorkspaceRoots: [root] },
+          decodeThreadResponse,
+        ),
       );
       const threadId = thread.thread.id;
 
@@ -759,7 +780,7 @@ fi
     } finally {
       vi.useRealTimers();
     }
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("keeps only the most recently idle thread processes and resumes a released one", async () => {
@@ -777,10 +798,12 @@ fi
     client.start();
     const threadIds: string[] = [];
     for (let index = 0; index <= CLAUDE_IDLE_THREAD_LIMIT; index += 1) {
-      const thread = await client.request(
-        "thread/start",
-        { cwd: root, model: "claude-sonnet-5", runtimeWorkspaceRoots: [root] },
-        decodeThreadResponse,
+      const thread = await runTestEffect(
+        client.request(
+          "thread/start",
+          { cwd: root, model: "claude-sonnet-5", runtimeWorkspaceRoots: [root] },
+          decodeThreadResponse,
+        ),
       );
       threadIds.push(thread.thread.id);
     }
@@ -799,7 +822,7 @@ fi
     expect(spawned.at(-1)?.options).toMatchObject({ resume: threadIds[0] });
     // The thread in a turn is not idle, so the others keep their processes.
     expect(spawned.slice(1, -1).map((one) => one.query.closed)).toEqual(Array(CLAUDE_IDLE_THREAD_LIMIT).fill(false));
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("uses a complete assistant message when Claude omits stream deltas", async () => {
@@ -815,7 +838,7 @@ fi
     expect(answerText(notifications)).toBe("Visible without a refresh");
     expect(narrationTexts(notifications)).toEqual([]);
     expect(JSON.stringify(notifications)).not.toContain("Hidden child response");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("steers a second user message into the active Claude runtime", async () => {
@@ -827,15 +850,17 @@ fi
     expect(first.value).toMatchObject({ uuid: turnId, message: { content: "Hello" } });
 
     await expect(
-      client.request(
-        "turn/steer",
-        {
-          threadId,
-          expectedTurnId: turnId,
-          clientUserMessageId: "55555555-5555-4555-8555-555555555555",
-          input: [{ type: "text", text: "Also check the queue." }],
-        },
-        decodeRecordResponse,
+      runTestEffect(
+        client.request(
+          "turn/steer",
+          {
+            threadId,
+            expectedTurnId: turnId,
+            clientUserMessageId: "55555555-5555-4555-8555-555555555555",
+            input: [{ type: "text", text: "Also check the queue." }],
+          },
+          decodeRecordResponse,
+        ),
       ),
     ).resolves.toEqual({ turnId });
     const steered = await iterator.next();
@@ -843,7 +868,7 @@ fi
       uuid: "55555555-5555-4555-8555-555555555555",
       message: { content: "Also check the queue." },
     });
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("adds only the missing suffix from a complete assistant message", async () => {
@@ -859,7 +884,7 @@ fi
     // The suffix is added to the held buffer, so the answer reads once rather than as "HelHello".
     expect(answerText(notifications)).toBe("Hello");
     expect(narrationTexts(notifications)).toEqual([]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it.each([["Only one answer."], ["Before I prepare the plan, choose a setup.", "Here is the detailed setup plan."]])(
@@ -924,13 +949,15 @@ fi
       const store = new AgentStore(join(root, "data"), join(root, "home"));
       const database = store.database;
       try {
-        await store.initialize();
-        const agent = await store.createAgent({
-          name: "History test",
-          description: "Synthetic duplication diagnosis",
-          avatarSeed: "setup:planning",
-          avatarHue: 215,
-        });
+        await runTestEffect(store.initialize());
+        const agent = await runTestEffect(
+          store.createAgent({
+            name: "History test",
+            description: "Synthetic duplication diagnosis",
+            avatarSeed: "setup:planning",
+            avatarHue: 215,
+          }),
+        );
         const publicThreadId = store.ensureThreadIdNow(agent.id);
         const live = {
           agentId: agent.id,
@@ -948,7 +975,7 @@ fi
           ],
         };
         database.persistConversation(live, "test.live-completed");
-        const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+        const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
         const imported = snapshotFromThread(agent.id, restored.thread, () => null);
         imported.threadId = publicThreadId;
         const merged = mergeProviderHistory(database.readConversation(agent.id, publicThreadId), imported, "claude");
@@ -964,7 +991,7 @@ fi
         expect(thinking.map((message) => message.text)).toEqual(narration);
       } finally {
         database.close();
-        await client.stop();
+        await runTestEffect(client.stop());
       }
     },
   );
@@ -980,7 +1007,7 @@ fi
 
     expect(answerText(notifications)).toBe("Streamed only.");
     expect(narrationTexts(notifications)).toEqual([]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("keeps the answer when a message fills in the rest of a thinking block", async () => {
@@ -998,7 +1025,7 @@ fi
 
     expect(narrationTexts(notifications)).toEqual([]);
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("closes a step at a thinking block a message carries with no deltas of its own", async () => {
@@ -1026,7 +1053,7 @@ fi
     // The break between the two blocks goes with the part that ends, so the answer reads clean.
     expect(narrationTexts(notifications)).toEqual(["Let me weigh it.\n"]);
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("closes the step once when a message repeats a thinking block its deltas announced", async () => {
@@ -1055,7 +1082,7 @@ fi
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
     expect(narrationTexts(notifications)).toEqual(["Let me weigh it."]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("closes a step for each thinking block a turn begins", async () => {
@@ -1074,7 +1101,7 @@ fi
 
     expect(narrationTexts(notifications)).toEqual(["Plan.", "Then this."]);
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("corrects narration a thinking boundary already published", async () => {
@@ -1092,7 +1119,7 @@ fi
 
     expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("corrects published narration without taking the answer into it", async () => {
@@ -1110,7 +1137,7 @@ fi
 
     expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("does not repeat the answer when the correction arrives in its own message", async () => {
@@ -1129,7 +1156,7 @@ fi
 
     expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restores text a message placed before its thinking as commentary", async () => {
@@ -1161,7 +1188,7 @@ fi
       },
     );
 
-    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
     const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
     expect(items.filter((item) => item.type === "agentMessage" && !item.phase).map((item) => item.text)).toEqual([
       "Done.",
@@ -1170,7 +1197,7 @@ fi
       "Let me weigh it.\n",
       "Weighing it.",
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("does not restore a context summary, an interrupt marker, or a local command as user messages", async () => {
@@ -1201,13 +1228,13 @@ fi
       entry("assistant", "next-answer", "Next answer."),
     );
 
-    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
     const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
     expect(items.map((item) => [item.type, item.type === "userMessage" ? item.content : item.text])).toEqual([
       ["userMessage", [{ type: "text", text: "Next question." }]],
       ["agentMessage", "Next answer."],
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restores a turn whose last text gave way to thinking as commentary", async () => {
@@ -1242,12 +1269,12 @@ fi
       },
     );
 
-    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
     const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
     expect(items.filter((item) => item.id === "restored-narration").map((item) => [item.id, item.phase])).toEqual([
       ["restored-narration", "commentary"],
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("corrects narration before publishing it, so the answer still lands", async () => {
@@ -1266,7 +1293,7 @@ fi
 
     expect(narrationTexts(notifications)).toEqual(["Plan."]);
     expect(answerText(notifications)).toBe("Done.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("corrects an answer the stream truncated after narration was published", async () => {
@@ -1286,7 +1313,7 @@ fi
 
     expect(narrationTexts(notifications)).toEqual(["Plan."]);
     expect(answerText(notifications)).toBe("Hello");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("keeps narration out of the answer when Claude omits stream deltas", async () => {
@@ -1303,7 +1330,7 @@ fi
 
     expect(narrationTexts(notifications)).toEqual(["Let me read the file."]);
     expect(answerText(notifications)).toBe("The file sets the timeout.");
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restores a turn whose last text introduced a tool call as commentary", async () => {
@@ -1338,12 +1365,12 @@ fi
       },
     );
 
-    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
     const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
     expect(items.filter((item) => item.type === "agentMessage").map((item) => [item.id, item.phase])).toEqual([
       ["restored-narration", "commentary"],
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("keeps the text before a tool call out of the answer bubble", async () => {
@@ -1366,7 +1393,7 @@ fi
       type: "agentMessage",
       text: "The file sets the timeout.",
     });
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("restores a turn's earlier answers as commentary", async () => {
@@ -1400,13 +1427,13 @@ fi
       },
     );
 
-    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const restored = await runTestEffect(client.request("thread/read", { threadId }, decodeThreadResponse));
     const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
     expect(items.filter((item) => item.type === "agentMessage").map((item) => [item.id, item.phase])).toEqual([
       ["restored-narration", "commentary"],
       ["restored-answer", undefined],
     ]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 
   it("does not duplicate a fully streamed assistant message", async () => {
@@ -1421,7 +1448,7 @@ fi
 
     expect(answerText(notifications)).toBe("Hello");
     expect(narrationTexts(notifications)).toEqual([]);
-    await client.stop();
+    await runTestEffect(client.stop());
   });
 });
 
@@ -1447,29 +1474,33 @@ async function createHarness(history?: SessionMessage[]): Promise<{
   const notifications: Array<{ method: string; params: unknown }> = [];
   client.on("notification", (notification) => notifications.push(notification));
   client.start();
-  const thread = await client.request(
-    "thread/start",
-    {
-      cwd: root,
-      model: "claude-sonnet-5",
-      developerInstructions: "Be concise.",
-      runtimeWorkspaceRoots: [root],
-    },
-    decodeThreadResponse,
+  const thread = await runTestEffect(
+    client.request(
+      "thread/start",
+      {
+        cwd: root,
+        model: "claude-sonnet-5",
+        developerInstructions: "Be concise.",
+        runtimeWorkspaceRoots: [root],
+      },
+      decodeThreadResponse,
+    ),
   );
   if (!prompt) throw new Error("Claude prompt was not initialized.");
   return { client, notifications, output, prompt, threadId: thread.thread.id };
 }
 
 function startTurn(client: ClaudeAgentClient, threadId: string, turnId: string) {
-  return client.request(
-    "turn/start",
-    {
-      threadId,
-      clientUserMessageId: turnId,
-      input: [{ type: "text", text: "Hello" }],
-    },
-    decodeTurnResponse,
+  return runTestEffect(
+    client.request(
+      "turn/start",
+      {
+        threadId,
+        clientUserMessageId: turnId,
+        input: [{ type: "text", text: "Hello" }],
+      },
+      decodeTurnResponse,
+    ),
   );
 }
 
@@ -1695,7 +1726,7 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
   );
   client.start();
   try {
-    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    await runTestEffect(client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse));
     const started = spawned.at(-1);
     const servers = isDynamicRecord(started?.mcpServers) ? started.mcpServers : {};
     expect(servers.Filesystem).toMatchObject({ type: "stdio", command: "/bin/echo", args: ["ready"] });
@@ -1710,7 +1741,7 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
     expect(started?.strictMcpConfig).toBe(true);
     expect(started?.settingSources).toEqual(["user", "project", "local"]);
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
 });
 
@@ -1737,7 +1768,7 @@ it("keeps the workspace settings out of a Workspace only thread and still loads 
   );
   client.start();
   try {
-    await client.request("thread/start", { cwd, workspaceOnly: true }, decodeThreadResponse);
+    await runTestEffect(client.request("thread/start", { cwd, workspaceOnly: true }, decodeThreadResponse));
     const started = spawned.at(-1);
     expect(started?.settingSources).toEqual(["user"]);
     expect(started?.managedSettings).toEqual({ allowManagedHooksOnly: true });
@@ -1746,7 +1777,7 @@ it("keeps the workspace settings out of a Workspace only thread and still loads 
     expect(isPathInside(join(root, "provider-state"), pluginPath)).toBe(true);
     expect(await readlink(join(pluginPath, "skills"))).toBe(join(cwd, ".claude", "skills"));
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -1773,7 +1804,7 @@ it("reports an MCP server whose command this machine does not have", async () =>
   );
   client.start();
   try {
-    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    await runTestEffect(client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse));
     expect(reportMcpDrops).toHaveBeenCalledWith("claude", [
       { name: "Missing", reason: "command_not_found", detail: "Command not found: openbot-not-a-real-command" },
     ]);
@@ -1782,7 +1813,7 @@ it("reports an MCP server whose command this machine does not have", async () =>
     // The one that resolves still goes: a bad server must not take a good one with it.
     expect(isDynamicRecord(servers) ? servers.Filesystem : null).toMatchObject({ command: "/bin/echo" });
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
 });
 
@@ -1806,19 +1837,19 @@ it("launches an MCP server with this user's own PATH, and lets a configured valu
   );
   client.start();
   try {
-    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    await runTestEffect(client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse));
     const servers = isDynamicRecord(spawned.at(-1)?.mcpServers) ? spawned.at(-1)?.mcpServers : {};
     const environment = (name: string): DynamicRecord => {
       const server = isDynamicRecord(servers) ? servers[name] : null;
       const env = isDynamicRecord(server) ? server.env : null;
       return isDynamicRecord(env) ? env : {};
     };
-    const path = await loginShellPath();
+    const path = await runTestEffect(loginShellPath());
     expect(path).toBeTruthy();
     expect(environment("Filesystem").PATH).toBe(path);
     expect(environment("Own path").PATH).toBe("/only/here");
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
 });
 
@@ -1842,16 +1873,16 @@ it("closes the query of a released thread, with the MCP servers it started, and 
   );
   client.start();
   try {
-    const released = await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
-    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    const released = await runTestEffect(client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse));
+    await runTestEffect(client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse));
 
-    await client.releaseThread(released.thread.id);
+    await runTestEffect(client.releaseThread(released.thread.id));
 
     // The query owns the MCP servers of its thread, so this close is what ends those processes.
     expect(spawned[0]?.closed).toBe(true);
     expect(spawned[1]?.closed).toBe(false);
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
 });
 
@@ -1870,14 +1901,16 @@ it("gives a profile-generation thread no MCP servers at all", async () => {
   );
   client.start();
   try {
-    await client.request(
-      "thread/start",
-      { cwd: process.cwd(), profileGeneration: true, persistSession: false },
-      decodeThreadResponse,
+    await runTestEffect(
+      client.request(
+        "thread/start",
+        { cwd: process.cwd(), profileGeneration: true, persistSession: false },
+        decodeThreadResponse,
+      ),
     );
     expect(options).toMatchObject({ mcpServers: {} });
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
 });
 
@@ -1909,10 +1942,12 @@ it("disables tools, project settings and session persistence for profile generat
   });
   client.start();
   try {
-    await client.request(
-      "thread/start",
-      { cwd: process.cwd(), profileGeneration: true, persistSession: false },
-      decodeThreadResponse,
+    await runTestEffect(
+      client.request(
+        "thread/start",
+        { cwd: process.cwd(), profileGeneration: true, persistSession: false },
+        decodeThreadResponse,
+      ),
     );
     expect(options).toMatchObject({ tools: [], settingSources: [], mcpServers: {}, persistSession: false });
     expect(canUseTool).toBeDefined();
@@ -1924,7 +1959,7 @@ it("disables tools, project settings and session persistence for profile generat
       ),
     ).toMatchObject({ behavior: "deny" });
   } finally {
-    await client.stop();
+    await runTestEffect(client.stop());
   }
   expect(query.closed).toBe(true);
 });

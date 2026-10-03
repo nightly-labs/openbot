@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
@@ -36,22 +37,24 @@ describe("resolveAgentCommand", () => {
       "goose\nid",
       " goose",
     ]) {
-      await expect(resolveAgentCommand(command, { searchPath: [root] }), command).rejects.toThrow();
+      await expect(runTestEffect(resolveAgentCommand(command, { searchPath: [root] })), command).rejects.toThrow();
     }
     await expect(stat(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("finds a bare name in the given folders, and a path in the home folder", async () => {
     const goose = await executable("goose");
-    expect(await resolveAgentCommand("goose", { searchPath: ["relative/bin", root], platform: "darwin" })).toBe(goose);
-    expect(await resolveAgentCommand("~/goose", { home: root, platform: "darwin" })).toBe(goose);
-    expect(await resolveAgentCommand(goose, { platform: "darwin" })).toBe(goose);
-    expect(await resolveAgentCommand("qwen", { searchPath: [root], platform: "darwin" })).toBeNull();
+    expect(
+      await runTestEffect(resolveAgentCommand("goose", { searchPath: ["relative/bin", root], platform: "darwin" })),
+    ).toBe(goose);
+    expect(await runTestEffect(resolveAgentCommand("~/goose", { home: root, platform: "darwin" }))).toBe(goose);
+    expect(await runTestEffect(resolveAgentCommand(goose, { platform: "darwin" }))).toBe(goose);
+    expect(await runTestEffect(resolveAgentCommand("qwen", { searchPath: [root], platform: "darwin" }))).toBeNull();
   });
 
   it("does not take a file that cannot run", async () => {
     await writeFile(join(root, "notes"), "text");
-    expect(await resolveAgentCommand("notes", { searchPath: [root], platform: "darwin" })).toBeNull();
+    expect(await runTestEffect(resolveAgentCommand("notes", { searchPath: [root], platform: "darwin" }))).toBeNull();
   });
 });
 

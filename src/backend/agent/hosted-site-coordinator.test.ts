@@ -4,6 +4,7 @@ import {
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -16,6 +17,8 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import { runTestEffect } from "../effect-test-runtime";
+import { HostedSiteOperationFailed } from "./hosted-site-coordinator";
 
 let root: string;
 let service: AgentService | null = null;
@@ -50,10 +53,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         serverId: null,
       };
       const hostedSites = {
-        list: vi.fn(async () => ({ sites: [site], limit: 1, used: 1 })),
-        publish: vi.fn(async () => site),
-        replace: vi.fn(async () => site),
-        delete: vi.fn(async () => undefined),
+        list: vi.fn(() => Effect.succeed({ sites: [site], limit: 1, used: 1 })),
+        publish: vi.fn(() => Effect.succeed(site)),
+        replace: vi.fn(() => Effect.succeed(site)),
+        delete: vi.fn(() => Effect.void),
       };
       let granted = true;
       let turbo = false;
@@ -70,9 +73,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       });
       const events: AgentEvent[] = [];
       service.on("event", (event) => events.push(event));
-      await service.initialize();
-      const agent = await store.getOrCreate("chief");
-      await service.sendMessage({ agentId: agent.id, text: "Change my site." });
+      await runTestEffect(service.initialize());
+      const agent = await runTestEffect(store.getOrCreate("chief"));
+      await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Change my site." }));
       await waitFor(() => events.some((event) => event.type === "turn-started"));
       const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
       const turnId = events.find((event) => event.type === "turn-started")?.turnId;
@@ -98,7 +101,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         events.some((event) => event.type === "approval" && event.approval.requestId === "declined-site"),
       );
       expect(hostedSites[action]).not.toHaveBeenCalled();
-      await service.respondToApproval({ requestId: "declined-site", decision: "decline" });
+      await runTestEffect(service.respondToApproval({ requestId: "declined-site", decision: "decline" }));
       expect(hostedSites[action]).not.toHaveBeenCalled();
       // Turbo overrides even a disabled per-agent preference.
       turbo = true;
@@ -114,7 +117,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       expect(events.some((event) => event.type === "approval")).toBe(false);
       expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
       expect(
-        (await service.readConversation(agent.id)).messages
+        (await runTestEffect(service.readConversation(agent.id))).messages
           .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
           .filter((event) => event.status !== "cancelled"),
       ).toEqual([
@@ -132,7 +135,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       await waitFor(() => events.some((event) => event.type === "approval"));
       expect(hostedSites[action]).toHaveBeenCalledTimes(1);
       expect(client.responses.some((response) => response.id === "manual-site")).toBe(false);
-      await service.respondToApproval({ requestId: "manual-site", decision: "accept" });
+      await runTestEffect(service.respondToApproval({ requestId: "manual-site", decision: "accept" }));
       await waitFor(() => client.responses.some((response) => response.id === "manual-site"));
       expect(hostedSites[action]).toHaveBeenCalledTimes(2);
     },
@@ -156,10 +159,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(async () => hostedSite),
-      replace: vi.fn(async () => hostedSite),
-      delete: vi.fn(async () => undefined),
+      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+      publish: vi.fn(() => Effect.succeed(hostedSite)),
+      replace: vi.fn(() => Effect.succeed(hostedSite)),
+      delete: vi.fn(() => Effect.void),
     };
     service = createTestService({
       store,
@@ -170,14 +173,14 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      prepareAgentWorkspace: async () => undefined,
+      prepareAgentWorkspace: () => Effect.void,
       hostedSites,
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: agent.id, text: "Publish my site." });
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -239,15 +242,17 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       }
       return appendConversationMessage(input);
     });
-    const accepted = service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" });
-    await expect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })).rejects.toThrow(
-      "no longer active",
+    const accepted = runTestEffect(
+      service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" }),
     );
+    await expect(
+      runTestEffect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })),
+    ).rejects.toThrow("no longer active");
     await accepted;
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(openBotToolPayload(client.responses[0]?.result)).toMatchObject({ id: "site-1", status: "active" });
     expect(
-      (await service.readConversation(agent.id)).messages.flatMap(
+      (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
         (message) => hostedSiteConversationEvent(message) ?? [],
       ),
     ).toEqual([
@@ -279,7 +284,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
     failRunningAppend = true;
-    await service.respondToApproval({ requestId: "publish-site-persistence-failure", decision: "accept" });
+    await runTestEffect(
+      service.respondToApproval({ requestId: "publish-site-persistence-failure", decision: "accept" }),
+    );
     failRunningAppend = false;
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(client.errors.at(-1)).toMatchObject({
@@ -303,13 +310,13 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     expect(events.findLast((event) => event.type === "approval")).toMatchObject({
       approval: { reason: `Delete ${hostedSite.hostname} from openbot.site.` },
     });
-    await service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" });
+    await runTestEffect(service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" }));
     expect(hostedSites.delete).not.toHaveBeenCalled();
     expect(client.errors.at(-1)).toMatchObject({
       id: "delete-site-approval",
       error: { message: "The user declined this hosted site change." },
     });
-    const markers = (await service.readConversation(agent.id)).messages.flatMap(
+    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
@@ -317,7 +324,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       { action: "publish", status: "succeeded" },
       { action: "delete", status: "cancelled" },
     ]);
-    expect((await service.readConversationPageFor(agent.id, "member-1")).readState?.unreadCount).toBe(0);
+    expect((await runTestEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(0);
     expect(service.searchConversationMessages(hostedSite.title, agent.id).total).toBe(0);
   });
 
@@ -339,12 +346,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(async () => hostedSite),
-      replace: vi.fn(async () => {
-        throw new Error("Upload failed.");
-      }),
-      delete: vi.fn(async () => undefined),
+      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+      publish: vi.fn(() => Effect.succeed(hostedSite)),
+      replace: vi.fn(() => Effect.fail(new HostedSiteOperationFailed({ cause: new Error("Upload failed.") }))),
+      delete: vi.fn(() => Effect.void),
     };
     service = createTestService({
       store,
@@ -355,14 +360,14 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      prepareAgentWorkspace: async () => undefined,
+      prepareAgentWorkspace: () => Effect.void,
       hostedSites,
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: agent.id, text: "Update and remove my site." });
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Update and remove my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -387,7 +392,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await service.respondToApproval({ requestId: "replace-site-approval", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "replace-site-approval", decision: "accept" }));
     expect(hostedSites.replace).toHaveBeenCalledTimes(1);
     expect(client.errors.at(-1)).toMatchObject({
       id: "replace-site-approval",
@@ -407,10 +412,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await service.respondToApproval({ requestId: "delete-site-success", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "delete-site-success", decision: "accept" }));
     expect(hostedSites.delete).toHaveBeenCalledTimes(1);
 
-    const markers = (await service.readConversation(agent.id)).messages.flatMap(
+    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
@@ -440,10 +445,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(async () => hostedSite),
-      replace: vi.fn(async () => hostedSite),
-      delete: vi.fn(async () => undefined),
+      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+      publish: vi.fn(() => Effect.succeed(hostedSite)),
+      replace: vi.fn(() => Effect.succeed(hostedSite)),
+      delete: vi.fn(() => Effect.void),
     };
     service = createTestService({
       store,
@@ -454,14 +459,14 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      prepareAgentWorkspace: async () => undefined,
+      prepareAgentWorkspace: () => Effect.void,
       hostedSites,
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: agent.id, text: "Publish my site." });
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -495,12 +500,12 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     const pendingSpy = vi.spyOn(store.database, "recordPendingHostedSiteTerminalEvent").mockImplementation(() => {
       throw new Error("The terminal outbox is temporarily unavailable.");
     });
-    await service.respondToApproval({ requestId: "publish-site-durable-result", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "publish-site-durable-result", decision: "accept" }));
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(client.responses).toHaveLength(0);
     expect(
-      (await service.readConversation(agent.id)).messages
+      (await runTestEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running"]);
@@ -514,13 +519,13 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     ]);
 
     appendSpy.mockRestore();
-    await service.stop();
+    await runTestEffect(service.stop());
     service = createTestService({ store, mailbox });
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(
-      (await service.readConversation(agent.id)).messages
+      (await runTestEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running", "succeeded"]);
@@ -546,10 +551,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(async () => hostedSite),
-      replace: vi.fn(async () => hostedSite),
-      delete: vi.fn(async () => undefined),
+      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+      publish: vi.fn(() => Effect.succeed(hostedSite)),
+      replace: vi.fn(() => Effect.succeed(hostedSite)),
+      delete: vi.fn(() => Effect.void),
     };
     service = createTestService({
       store,
@@ -560,14 +565,14 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      prepareAgentWorkspace: async () => undefined,
+      prepareAgentWorkspace: () => Effect.void,
       hostedSites,
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: agent.id, text: "Delete my old site." });
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Delete my old site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -587,10 +592,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await service.respondToApproval({ requestId: "delete-legacy-site", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "delete-legacy-site", decision: "accept" }));
 
     expect(hostedSites.delete).toHaveBeenCalledTimes(1);
-    const markers = (await service.readConversation(agent.id)).messages.flatMap(
+    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map((marker) => marker.status)).toEqual(["running", "succeeded"]);
@@ -605,8 +610,8 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
   it("interrupts an unfinished hosted site marker after restart", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const threadId = store.ensureThreadIdNow(agent.id);
     const details = { siteId: null, title: "Restarted deploy", hostname: null, url: null };
     store.database.appendConversationMessage({
@@ -634,10 +639,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       event: { action: "publish", status: "running", operationId: "operation-restart", ...details },
     });
 
-    await service.stop();
+    await runTestEffect(service.stop());
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const markers = (await service.readConversation(agent.id)).messages.flatMap(
+    await runTestEffect(service.initialize());
+    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map((marker) => marker.status)).toEqual(["running", "interrupted"]);
@@ -662,10 +667,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       serverId: null,
     };
     const hostedSites = {
-      list: vi.fn(async () => ({ sites: [hostedSite], limit: 1, used: 1 })),
-      publish: vi.fn(async () => hostedSite),
-      replace: vi.fn(async () => hostedSite),
-      delete: vi.fn(async () => undefined),
+      list: vi.fn(() => Effect.succeed({ sites: [hostedSite], limit: 1, used: 1 })),
+      publish: vi.fn(() => Effect.succeed(hostedSite)),
+      replace: vi.fn(() => Effect.succeed(hostedSite)),
+      delete: vi.fn(() => Effect.void),
     };
     service = createTestService({
       store,
@@ -676,14 +681,14 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      prepareAgentWorkspace: async () => undefined,
+      prepareAgentWorkspace: () => Effect.void,
       hostedSites,
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: agent.id, text: "Publish my site." });
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -708,11 +713,11 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
     client.responseError = new Error("The provider connection closed.");
-    await service.respondToApproval({ requestId: "publish-site-response-failure", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "publish-site-response-failure", decision: "accept" }));
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(
-      (await service.readConversation(agent.id)).messages
+      (await runTestEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running", "succeeded"]);

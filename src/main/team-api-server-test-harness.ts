@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // The fixtures the `team-api-server.*` tests share: a temporary team file, a server built over it,
@@ -203,9 +204,9 @@ export async function createTeamApiFixture(
   const root = await mkdtemp(join(tmpdir(), `openbot-team-api-${slug}-`));
   roots.push(root);
   const store = new TeamStore(join(root, "team.json"));
-  await store.initialize();
+  await Effect.runPromise(store.initialize());
   if (settings.configure) {
-    await store.configure(FIXTURE_OWNER.team, FIXTURE_OWNER.username, FIXTURE_OWNER.password);
+    await Effect.runPromise(store.configure(FIXTURE_OWNER.team, FIXTURE_OWNER.username, FIXTURE_OWNER.password));
   }
   let started: StartedTeamApi | null = null;
   let stopped = false;

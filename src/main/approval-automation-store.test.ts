@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -15,7 +16,11 @@ afterEach(async () => {
 describe("approval automation store", () => {
   it("enables ordinary auto-approval when no preference exists", async () => {
     const root = await temporaryRoot();
-    await expect(readApprovalAutomation(join(root, "automation.json"), [])).resolves.toEqual({
+    await expect(
+      Effect.runPromise(
+        readApprovalAutomation(join(root, "automation.json"), []).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toEqual({
       turbo: false,
       defaultAutoApprove: true,
       autoApproveOverrides: {},
@@ -28,7 +33,9 @@ describe("approval automation store", () => {
     const path = join(root, "openbot-approval-automation-v2.json");
     const legacy = JSON.stringify({ version: 1, turbo: true, autoApproveAgentIds: ["agent-1"] });
     await writeFile(legacyPath, legacy);
-    const initial = await readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath);
+    const initial = await Effect.runPromise(
+      readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath).pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(initial).toEqual({
       turbo: true,
       defaultAutoApprove: true,
@@ -36,11 +43,19 @@ describe("approval automation store", () => {
     });
     expect(await readFile(legacyPath, "utf8")).toBe(legacy);
     const changed = { ...initial, turbo: false, autoApproveOverrides: { "agent-1": false, "agent-2": false } };
-    await writeApprovalAutomation(path, changed);
-    await expect(readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath)).resolves.toEqual(changed);
+    await Effect.runPromise(writeApprovalAutomation(path, changed).pipe(Effect.mapError((error) => error.cause)));
+    await expect(
+      Effect.runPromise(
+        readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toEqual(changed);
     expect(await readFile(legacyPath, "utf8")).toBe(legacy);
     await writeFile(path, "{");
-    await expect(readApprovalAutomation(path, ["agent-1"], legacyPath)).resolves.toEqual({
+    await expect(
+      Effect.runPromise(
+        readApprovalAutomation(path, ["agent-1"], legacyPath).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toEqual({
       turbo: false,
       defaultAutoApprove: false,
       autoApproveOverrides: {},
@@ -59,7 +74,9 @@ describe("approval automation store", () => {
     const root = await temporaryRoot();
     const path = join(root, "automation.json");
     await writeFile(path, `${contents}\n`);
-    await expect(readApprovalAutomation(path, [])).resolves.toEqual({
+    await expect(
+      Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual({
       turbo: false,
       defaultAutoApprove: false,
       autoApproveOverrides: {},
@@ -69,7 +86,9 @@ describe("approval automation store", () => {
   it.each([false, true])("preserves version 1 choices with Turbo %s and enables future agents", async (turbo) => {
     const path = join(await temporaryRoot(), "automation.json");
     await writeFile(path, JSON.stringify({ version: 1, turbo, autoApproveAgentIds: ["agent-1"] }));
-    const migrated = await readApprovalAutomation(path, ["agent-1", "agent-2"]);
+    const migrated = await Effect.runPromise(
+      readApprovalAutomation(path, ["agent-1", "agent-2"]).pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(migrated).toEqual({
       turbo,
       defaultAutoApprove: true,
@@ -79,10 +98,12 @@ describe("approval automation store", () => {
     const agents = ["agent-1", "agent-2", "new-agent"];
     const automation = new ApprovalAutomation({
       path,
-      initial: await readApprovalAutomation(path, agents),
+      initial: await Effect.runPromise(
+        readApprovalAutomation(path, agents).pipe(Effect.mapError((error) => error.cause)),
+      ),
       knownAgentIds: () => agents,
     });
-    await automation.set({ turbo: false });
+    await Effect.runPromise(automation.set({ turbo: false }).pipe(Effect.mapError((error) => error.cause)));
     expect(automation.autoApproves("agent-1")).toBe(true);
     expect(automation.autoApproves("agent-2")).toBe(false);
     expect(automation.autoApproves("new-agent")).toBe(true);
@@ -97,7 +118,7 @@ describe("approval automation store", () => {
     await writeFile(path, JSON.stringify({ version: 2, ...preference }));
     const automation = new ApprovalAutomation({
       path,
-      initial: await readApprovalAutomation(path, []),
+      initial: await Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
       knownAgentIds: () => ["agent-1"],
     });
     expect(automation.autoApproves("agent-1")).toBe(false);
@@ -106,11 +127,13 @@ describe("approval automation store", () => {
 
   it("leaves no temporary file behind", async () => {
     const root = await temporaryRoot();
-    await writeApprovalAutomation(join(root, "automation.json"), {
-      turbo: false,
-      defaultAutoApprove: false,
-      autoApproveOverrides: {},
-    });
+    await Effect.runPromise(
+      writeApprovalAutomation(join(root, "automation.json"), {
+        turbo: false,
+        defaultAutoApprove: false,
+        autoApproveOverrides: {},
+      }).pipe(Effect.mapError((error) => error.cause)),
+    );
     await expect(entries(root)).resolves.toEqual(["automation.json"]);
   });
 });
@@ -121,27 +144,31 @@ describe("ApprovalAutomation", () => {
     const agents = ["agent-1"];
     const automation = new ApprovalAutomation({
       path,
-      initial: await readApprovalAutomation(path, []),
+      initial: await Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
       knownAgentIds: () => agents,
     });
     expect(automation.autoApproves("agent-1")).toBe(true);
     expect(automation.autoApproves("unknown-agent")).toBe(false);
     agents.push("agent-2");
     expect(automation.autoApproves("agent-2")).toBe(true);
-    await automation.set({ agentId: "agent-1", autoApprove: false });
+    await Effect.runPromise(
+      automation.set({ agentId: "agent-1", autoApprove: false }).pipe(Effect.mapError((error) => error.cause)),
+    );
     const restarted = new ApprovalAutomation({
       path,
-      initial: await readApprovalAutomation(path, []),
+      initial: await Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
       knownAgentIds: () => agents,
     });
     expect(restarted.autoApproves("agent-1")).toBe(false);
-    await restarted.set({ turbo: true });
+    await Effect.runPromise(restarted.set({ turbo: true }).pipe(Effect.mapError((error) => error.cause)));
     expect(restarted.turboEnabled()).toBe(true);
     expect(restarted.autoApproves("agent-1")).toBe(true);
-    await restarted.set({ turbo: false });
+    await Effect.runPromise(restarted.set({ turbo: false }).pipe(Effect.mapError((error) => error.cause)));
     expect(restarted.autoApproves("agent-1")).toBe(false);
     expect(restarted.autoApproves("agent-2")).toBe(true);
-    await restarted.set({ agentId: "agent-1", autoApprove: true });
+    await Effect.runPromise(
+      restarted.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(restarted.autoApproves("agent-1")).toBe(true);
   });
 
@@ -151,15 +178,27 @@ describe("ApprovalAutomation", () => {
       initial: { turbo: false, defaultAutoApprove: true, autoApproveOverrides: {} },
       knownAgentIds: () => ["agent-1"],
     });
-    await expect(automation.set({ agentId: "agent-1", autoApprove: false })).rejects.toThrow();
+    await expect(
+      Effect.runPromise(
+        automation.set({ agentId: "agent-1", autoApprove: false }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow();
     expect(automation.autoApproves("agent-1")).toBe(true);
   });
 
   it("grants and revokes one agent without touching the others", async () => {
     const automation = await open(["agent-1", "agent-2"]);
-    await automation.set({ agentId: "agent-1", autoApprove: true });
-    await automation.set({ agentId: "agent-2", autoApprove: true });
-    await expect(automation.set({ agentId: "agent-1", autoApprove: false })).resolves.toEqual({
+    await Effect.runPromise(
+      automation.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      automation.set({ agentId: "agent-2", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+    );
+    await expect(
+      Effect.runPromise(
+        automation.set({ agentId: "agent-1", autoApprove: false }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toEqual({
       turbo: false,
       defaultAutoApprove: false,
       autoApproveOverrides: { "agent-1": false, "agent-2": true },
@@ -170,10 +209,12 @@ describe("ApprovalAutomation", () => {
 
   it("covers every agent while turbo is on, and returns each to its own grant afterwards", async () => {
     const automation = await open(["agent-1", "agent-2"]);
-    await automation.set({ agentId: "agent-1", autoApprove: true });
-    await automation.set({ turbo: true });
+    await Effect.runPromise(
+      automation.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(automation.set({ turbo: true }).pipe(Effect.mapError((error) => error.cause)));
     expect(automation.autoApproves("agent-2")).toBe(true);
-    await automation.set({ turbo: false });
+    await Effect.runPromise(automation.set({ turbo: false }).pipe(Effect.mapError((error) => error.cause)));
     expect(automation.autoApproves("agent-1")).toBe(true);
     expect(automation.autoApproves("agent-2")).toBe(false);
   });
@@ -187,11 +228,15 @@ describe("ApprovalAutomation", () => {
       initial: { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} },
       knownAgentIds: () => agents,
     });
-    await automation.set({ agentId: "agent-1", autoApprove: true });
+    await Effect.runPromise(
+      automation.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+    );
     agents.delete("agent-1");
     expect(automation.current()).toEqual({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} });
-    await automation.set({ turbo: true });
-    await expect(readApprovalAutomation(path, [])).resolves.toEqual({
+    await Effect.runPromise(automation.set({ turbo: true }).pipe(Effect.mapError((error) => error.cause)));
+    await expect(
+      Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual({
       turbo: true,
       defaultAutoApprove: false,
       autoApproveOverrides: {},
@@ -202,7 +247,10 @@ describe("ApprovalAutomation", () => {
   // value the user turned off last.
   it("persists concurrent writes in order", async () => {
     const automation = await open(["agent-1"]);
-    const [, last] = await Promise.all([automation.set({ turbo: true }), automation.set({ turbo: false })]);
+    const [, last] = await Promise.all([
+      Effect.runPromise(automation.set({ turbo: true }).pipe(Effect.mapError((error) => error.cause))),
+      Effect.runPromise(automation.set({ turbo: false }).pipe(Effect.mapError((error) => error.cause))),
+    ]);
     expect(last).toEqual({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} });
     expect(automation.autoApproves("agent-1")).toBe(false);
   });
@@ -215,26 +263,38 @@ describe("ApprovalAutomation", () => {
       initial: { turbo: false, defaultAutoApprove: false, autoApproveOverrides: { "agent-2": true } },
       knownAgentIds: () => agents,
     });
-    const pendingGrant = automation.set({ agentId: "agent-1", autoApprove: true });
-    const deletion = automation.deleteAgent("agent-1", async () => {
-      expect(automation.autoApproves("agent-1")).toBe(false);
-      await expect(readApprovalAutomation(path, [])).resolves.toEqual({
-        turbo: false,
-        defaultAutoApprove: false,
-        autoApproveOverrides: { "agent-1": false, "agent-2": true },
-      });
-      agents.delete("agent-1");
-    });
-    await expect(automation.set({ agentId: "agent-1", autoApprove: true })).rejects.toThrow(
-      "Cannot grant approval while the agent is being deleted.",
+    const pendingGrant = Effect.runPromise(
+      automation.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
     );
+    const deletion = Effect.runPromise(
+      automation
+        .deleteAgent("agent-1", () =>
+          Effect.promise(async () => {
+            expect(automation.autoApproves("agent-1")).toBe(false);
+            await expect(
+              Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
+            ).resolves.toEqual({
+              turbo: false,
+              defaultAutoApprove: false,
+              autoApproveOverrides: { "agent-1": false, "agent-2": true },
+            });
+            agents.delete("agent-1");
+          }),
+        )
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    await expect(
+      Effect.runPromise(
+        automation.set({ agentId: "agent-1", autoApprove: true }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("Cannot grant approval while the agent is being deleted.");
     await Promise.all([pendingGrant, deletion]);
     agents.add("agent-1");
     expect(automation.autoApproves("agent-1")).toBe(false);
     expect(automation.autoApproves("agent-2")).toBe(true);
     const reloaded = new ApprovalAutomation({
       path,
-      initial: await readApprovalAutomation(path, []),
+      initial: await Effect.runPromise(readApprovalAutomation(path, []).pipe(Effect.mapError((error) => error.cause))),
       knownAgentIds: () => agents,
     });
     expect(reloaded.autoApproves("agent-1")).toBe(false);
@@ -246,8 +306,10 @@ describe("ApprovalAutomation", () => {
       initial: { turbo: false, defaultAutoApprove: false, autoApproveOverrides: { "agent-1": true } },
       knownAgentIds: () => ["agent-1"],
     });
-    const remove = vi.fn(async () => undefined);
-    await expect(automation.deleteAgent("agent-1", remove)).rejects.toThrow();
+    const remove = vi.fn(() => Effect.void);
+    await expect(
+      Effect.runPromise(automation.deleteAgent("agent-1", remove).pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow();
     expect(remove).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Attachments, and the shared and workspace files an agent can open or preview.
 // Every path here crosses to the local filesystem, so the parsers are the boundary.
 
@@ -79,7 +81,10 @@ export function attachmentIpcHandlers({
   return {
     attachmentImports: {
       importAttachments: scopedHandler(parseImportAttachments, {
-        local: (parsed) => service.prepareImportedAttachments(parsed.paths, parsed.data),
+        local: (parsed) =>
+          Effect.runPromise(
+            service.prepareImportedAttachments(parsed.paths, parsed.data).pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
       }),
     },
@@ -111,14 +116,22 @@ export function attachmentIpcHandlers({
           : await dialog.showOpenDialog(options);
         if (result.canceled) return [];
         return routeToServer(serverId, {
-          local: () => service.prepareAttachments(result.filePaths),
+          local: () =>
+            Effect.runPromise(
+              service.prepareAttachments(result.filePaths).pipe(Effect.mapError((error) => error.cause)),
+            ),
           remote: (target) => uploadRemotePaths(remoteServers, target, result.filePaths),
         });
       }),
       discardDraftAttachment: scopedHandler(parseAttachmentId, {
-        local: (attachmentId) => service.discardDraftAttachment(attachmentId),
+        local: (attachmentId) =>
+          Effect.runPromise(service.discardDraftAttachment(attachmentId).pipe(Effect.mapError((error) => error.cause))),
         remote: (attachmentId, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.attachment(attachmentId), decodeVoid, { method: "DELETE" }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.attachment(attachmentId), decodeVoid, { method: "DELETE" })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       downloadAttachments: payloadHandler(agentRequest(parseDownloadAttachments), async (scoped) => {
         const parsed = scoped.payload;
@@ -128,13 +141,22 @@ export function attachmentIpcHandlers({
           (item) =>
             routeToServer(scoped.serverId, {
               local: async () => {
-                const attachment = await mailbox.resolveAttachment(item.id);
+                const attachment = await Effect.runPromise(
+                  mailbox.resolveAttachment(item.id).pipe(Effect.mapError((error) => error.cause)),
+                );
                 if (!attachment) throw new Error(sourceText("error.attachment.notFound"));
                 if ((await stat(attachment.path)).size > ATTACHMENT_LIMITS.fileBytes)
                   throw new Error(sourceText("error.attachment.fileTooLarge"));
                 return readFile(attachment.path);
               },
-              remote: async (serverId) => (await remoteServers.downloadAttachment(item.id, serverId)).bytes,
+              remote: async (serverId) =>
+                (
+                  await Effect.runPromise(
+                    remoteServers
+                      .downloadAttachment(item.id, serverId)
+                      .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+                  )
+                ).bytes,
             }),
         );
       }),
@@ -143,25 +165,39 @@ export function attachmentIpcHandlers({
       ),
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
-          const sharedFile = await service.resolveSharedFile(parsed.path);
+          const sharedFile = await Effect.runPromise(
+            service.resolveSharedFile(parsed.path).pipe(Effect.mapError((error) => error.cause)),
+          );
           await openPath(sharedFile.path);
         },
         remote: async (parsed, serverId) => {
-          const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
+          const downloaded = await Effect.runPromise(
+            remoteServers
+              .downloadSharedFile(parsed.path, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
           const target = await cacheRemoteFile("remote-shared-files", `${serverId}:${parsed.path}`, downloaded);
           await openPath(target);
         },
       }),
       openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
-          const workspaceFile = await service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path);
+          const workspaceFile = await Effect.runPromise(
+            service
+              .resolveLocalWorkspaceFile(parsed.agentId, parsed.path)
+              .pipe(Effect.mapError((error) => error.cause)),
+          );
           // A file outside the workspace can be anything on the computer, including a program, so it is
           // shown in the file manager rather than run.
           if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
           else shell.showItemInFolder(workspaceFile.path);
         },
         remote: async (parsed, serverId) => {
-          const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
+          const downloaded = await Effect.runPromise(
+            remoteServers
+              .downloadWorkspaceFile(parsed.agentId, parsed.path, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
           const key = `${serverId}:${parsed.agentId}:${parsed.path}`;
           const target = await cacheRemoteFile("remote-workspace-files", key, downloaded);
           await openPath(target);
@@ -169,21 +205,43 @@ export function attachmentIpcHandlers({
       }),
       previewSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
-          const sharedFile = await service.resolveSharedFile(parsed.path);
-          return localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size);
+          const sharedFile = await Effect.runPromise(
+            service.resolveSharedFile(parsed.path).pipe(Effect.mapError((error) => error.cause)),
+          );
+          return Effect.runPromise(
+            localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size).pipe(
+              Effect.mapError((error) => error.cause),
+            ),
+          );
         },
         remote: async (parsed, serverId) => {
-          const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
+          const downloaded = await Effect.runPromise(
+            remoteServers
+              .downloadSharedFile(parsed.path, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
           return filePreviewFromBytes(downloaded.name, downloaded.bytes);
         },
       }),
       previewWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
-          const workspaceFile = await service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path);
-          return localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size);
+          const workspaceFile = await Effect.runPromise(
+            service
+              .resolveLocalWorkspaceFile(parsed.agentId, parsed.path)
+              .pipe(Effect.mapError((error) => error.cause)),
+          );
+          return Effect.runPromise(
+            localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size).pipe(
+              Effect.mapError((error) => error.cause),
+            ),
+          );
         },
         remote: async (parsed, serverId) => {
-          const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
+          const downloaded = await Effect.runPromise(
+            remoteServers
+              .downloadWorkspaceFile(parsed.agentId, parsed.path, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
           return filePreviewFromBytes(downloaded.name, downloaded.bytes);
         },
       }),
@@ -207,7 +265,9 @@ export function openAttachmentForServer(
 ): Promise<void> {
   return routeToServer<void>(serverId, {
     local: async () => {
-      const attachment = await mailbox.resolveAttachment(input.attachmentId);
+      const attachment = await Effect.runPromise(
+        mailbox.resolveAttachment(input.attachmentId).pipe(Effect.mapError((error) => error.cause)),
+      );
       if (!attachment) throw new Error(sourceText("error.attachment.unavailable"));
       if (input.action === "download") {
         const safeId = basename(input.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
@@ -224,7 +284,11 @@ export function openAttachmentForServer(
       await openPath(attachment.path);
     },
     remote: async (target) => {
-      const downloaded = await remoteServers.downloadAttachment(input.attachmentId, target);
+      const downloaded = await Effect.runPromise(
+        remoteServers
+          .downloadAttachment(input.attachmentId, target)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      );
       const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
       if (input.action === "download") {
         const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);
@@ -311,7 +375,13 @@ async function uploadRemotePaths(
     throw new Error(sourceText("error.attachment.totalTooLarge"));
   }
   return Promise.all(
-    files.map((file) => remoteServers.uploadAttachment(file.name, mimeTypeForName(file.name), file.bytes, serverId)),
+    files.map((file) =>
+      Effect.runPromise(
+        remoteServers
+          .uploadAttachment(file.name, mimeTypeForName(file.name), file.bytes, serverId)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
+    ),
   );
 }
 
@@ -350,7 +420,13 @@ async function uploadRemoteImports(
     throw new Error(sourceText("error.attachment.totalTooLarge"));
   }
   return Promise.all(
-    files.map((file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId)),
+    files.map((file) =>
+      Effect.runPromise(
+        remoteServers
+          .uploadAttachment(file.name, file.mimeType, file.bytes, serverId)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
+    ),
   );
 }
 

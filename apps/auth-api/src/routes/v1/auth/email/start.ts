@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import {
   apiError,
@@ -20,7 +21,9 @@ export const Route = createFileRoute("/v1/auth/email/start")({
           }
           const idempotencyKey = request.headers.get("Idempotency-Key") ?? undefined;
           return json(
-            await requestAuthService().startEmailSignIn(body.email, requestSourceIp(request), idempotencyKey),
+            await runApiEffect(
+              requestAuthService().startEmailSignIn(body.email, requestSourceIp(request), idempotencyKey),
+            ),
           );
         } catch (error) {
           if (error instanceof SyntaxError) {

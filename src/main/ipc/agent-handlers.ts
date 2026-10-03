@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
@@ -118,14 +120,23 @@ export function agentIpcHandlers({
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
-        remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
+        remote: (serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
         local: (input) => service.getHostAnalytics(input),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "host-analytics")
-            ? remoteServers.request(serverId, `${TEAM_API_ROUTES.analytics}?${hostAnalyticsQuery(input)}`, (value) =>
-                assertHostAnalyticsScope(decodeHostAnalyticsFromHost(value), input),
+            ? Effect.runPromise(
+                remoteServers
+                  .request(serverId, `${TEAM_API_ROUTES.analytics}?${hostAnalyticsQuery(input)}`, (value) =>
+                    assertHostAnalyticsScope(decodeHostAnalyticsFromHost(value), input),
+                  )
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
               )
             : null,
       }),
@@ -133,115 +144,208 @@ export function agentIpcHandlers({
         local: (input) => service.getAnalytics(input),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "agent-analytics")
-            ? remoteServers.request(
-                serverId,
-                `${TEAM_API_ROUTES.agent.analytics(input.agentId)}?${analyticsQuery(input)}`,
-                (value) => assertAnalyticsScope(decodeAgentAnalyticsFromHost(value), input),
+            ? Effect.runPromise(
+                remoteServers
+                  .request(
+                    serverId,
+                    `${TEAM_API_ROUTES.agent.analytics(input.agentId)}?${analyticsQuery(input)}`,
+                    (value) => assertAnalyticsScope(decodeAgentAnalyticsFromHost(value), input),
+                  )
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
               )
             : null,
       }),
       getUsage: scopedHandler(parseOptionalAgentId, {
-        local: (agentId) => service.getUsage(agentId),
+        local: (agentId) => Effect.runPromise(service.getUsage(agentId).pipe(Effect.mapError((error) => error.cause))),
         remote: (agentId, serverId) =>
           agentId
             ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
+              ? Effect.runPromise(
+                  remoteServers
+                    .request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
+                    .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+                )
               : { limits: [] }
-            : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
+            : Effect.runPromise(
+                remoteServers
+                  .request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost)
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              ),
       }),
       listModels: scopedQueryHandler({
         local: () => logRejectedModels(service.listModels(), "local"),
         remote: (serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
-            decodeAgentModelOptions(logRejectedModels(value, "remote")),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
+                decodeAgentModelOptions(logRejectedModels(value, "remote")),
+              )
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
           ),
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
-        remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+        remote: (serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
-        local: (agentId) => skills.listInstalledForChatTags(agentId),
+        local: (agentId) =>
+          Effect.runPromise(skills.listInstalledForChatTags(agentId).pipe(Effect.mapError((error) => error.cause))),
         // A server too old to know the endpoint would answer 404, so ask its advertised capabilities first.
         remote: (agentId, serverId) =>
           remoteServers
             .list()
             .find((server) => server.id === serverId)
             ?.compatibility?.capabilities.includes("installed-skills")
-            ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkillsFromHost)
+            ? Effect.runPromise(
+                remoteServers
+                  .request(serverId, TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkillsFromHost)
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              )
             : Promise.resolve([]),
       }),
       listChannels: scopedQueryHandler({
         // The reader here is the host user of this computer, so messages they wrote before they
         // signed in are their own.
         local: () => service.channels.store.list(host.channelActor().id, true),
-        remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
+        remote: (serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       readChannel: scopedHandler(parseChannelRead, {
         local: (input) => service.channels.store.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
-        local: (input) => service.channels.command(input, host.channelActor()),
+        local: (input) =>
+          Effect.runPromise(
+            service.channels.command(input, host.channelActor()).pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       deleteChannel: scopedHandler(parseChannelId, {
-        local: (channelId) => service.deleteChannel(channelId),
+        local: (channelId) =>
+          Effect.runPromise(service.deleteChannel(channelId).pipe(Effect.mapError((error) => error.cause))),
         remote: async (channelId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CHANNEL_DELETE_CAPABILITY))
             throw new Error(sourceText("error.backend.channelDeleteUnsupported"));
-          await remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
-            method: "POST",
-            body: { channelId },
-          });
+          await Effect.runPromise(
+            remoteServers
+              .request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
+                method: "POST",
+                body: { channelId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       mutateSidebarLayout: scopedHandler(parseSidebarLayoutAction, {
-        local: (action) => sidebarLayout.mutate(action, service.sidebarChatIds()),
+        local: (action) =>
+          Effect.runPromise(
+            sidebarLayout.mutate(action, service.sidebarChatIds()).pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (action, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
-            method: "POST",
-            body: action,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
+                method: "POST",
+                body: action,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       generateProfile: scopedHandler(parseGenerateAgentProfile, {
-        local: (input) => service.generateProfile(input, sidebarLayout.getSnapshot().sections),
+        local: (input) =>
+          Effect.runPromise(
+            service
+              .generateProfile(input, sidebarLayout.getSnapshot().sections)
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
-            method: "POST",
-            body: input,
-            timeoutMs: 150_000,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
+                method: "POST",
+                body: input,
+                timeoutMs: 150_000,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
-        local: (input) => service.saveProfile(input, sidebarLayout, host.conversationSender()),
+        local: (input) =>
+          Effect.runPromise(
+            service
+              .saveProfile(input, sidebarLayout, host.conversationSender())
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-            method: "POST",
-            body: input,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+                method: "POST",
+                body: input,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => service.createAgent(parsed, undefined, undefined, host.conversationSender()),
+        local: (parsed) =>
+          Effect.runPromise(
+            service
+              .createAgent(parsed, undefined, undefined, host.conversationSender())
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       duplicateAgent: scopedHandler(parseAgentId, {
-        local: (agentId) => duplicateAgentIntoLayout(service, sidebarLayout, agentId),
-        remote: (agentId, serverId) => remoteServers.duplicateAgent(agentId, serverId),
+        local: (agentId) =>
+          Effect.runPromise(
+            duplicateAgentIntoLayout(service, sidebarLayout, agentId).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        remote: (agentId, serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .duplicateAgent(agentId, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
-        local: (input) => service.updateAgent(input),
+        local: (input) => Effect.runPromise(service.updateAgent(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) => {
           // The Team API does not carry access, and a team member must not be able to widen it.
           if (input.access !== undefined) {
@@ -253,44 +357,73 @@ export function agentIpcHandlers({
           if (input.allowAutomation !== undefined) {
             throw new Error(sourceText("error.agent.automationLocalOnly"));
           }
-          return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-            method: "PATCH",
-            body: input,
-          });
+          return Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+                method: "PATCH",
+                body: input,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       setAvatar: scopedHandler(parseSetAgentAvatar, {
-        local: (parsed) => service.setAvatar(parsed.agentId, parsed.image),
-        remote: (parsed, serverId) => remoteServers.setAgentAvatar(parsed.agentId, parsed.image, serverId),
+        local: (parsed) =>
+          Effect.runPromise(
+            service.setAvatar(parsed.agentId, parsed.image).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        remote: (parsed, serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .setAgentAvatar(parsed.agentId, parsed.image, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       deleteAgent: scopedHandler(parseAgentId, {
         local: async (agentId) => {
-          await service.deleteAgent(agentId);
-          await sidebarLayout.removeAgent(agentId);
+          await Effect.runPromise(service.deleteAgent(agentId).pipe(Effect.mapError((error) => error.cause)));
+          await Effect.runPromise(sidebarLayout.removeAgent(agentId).pipe(Effect.mapError((error) => error.cause)));
         },
         remote: async (agentId, serverId) => {
-          await remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(agentId), decodeVoid, { method: "DELETE" });
+          await Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.one(agentId), decodeVoid, { method: "DELETE" })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       readConversation: scopedHandler(parseAgentId, {
-        local: (agentId) => host.readAgentConversation(agentId),
-        remote: (agentId, serverId) => remoteServers.readAgentConversation(agentId, serverId),
+        local: (agentId) =>
+          Effect.runPromise(host.readAgentConversation(agentId).pipe(Effect.mapError((error) => error.cause))),
+        remote: (agentId, serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .readAgentConversation(agentId, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       readConversationPage: scopedHandler(parseReadConversationPage, {
-        local: (parsed) => host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit),
+        local: (parsed) =>
+          Effect.runPromise(
+            host
+              .readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit)
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) =>
-          remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+          Effect.runPromise(
+            remoteServers
+              .readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       searchConversationMessages: scopedHandler(parseSearchConversationMessages, {
         local: (parsed) =>
           host.searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit),
         remote: (parsed, serverId) =>
-          remoteServers.searchAgentConversationMessages(
-            parsed.query,
-            parsed.agentId,
-            parsed.cursor,
-            parsed.limit,
-            serverId,
+          Effect.runPromise(
+            remoteServers
+              .searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
           ),
       }),
       searchConversationFiles: payloadHandler(parseSearchConversationFiles, (parsed) =>
@@ -298,134 +431,234 @@ export function agentIpcHandlers({
       ),
       listConversationReads: scopedQueryHandler({
         local: () => host.listAgentConversationReads(),
-        remote: (serverId) => remoteServers.listAgentConversationReads(serverId),
+        remote: (serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .listAgentConversationReads(serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       markConversationRead: scopedHandler(parseMarkConversationRead, {
-        local: (parsed) => host.markAgentConversationRead(parsed),
-        remote: (parsed, serverId) => remoteServers.markAgentConversationRead(parsed, serverId),
+        local: (parsed) =>
+          Effect.runPromise(host.markAgentConversationRead(parsed).pipe(Effect.mapError((error) => error.cause))),
+        remote: (parsed, serverId) =>
+          Effect.runPromise(
+            remoteServers
+              .markAgentConversationRead(parsed, serverId)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       sendMessage: scopedHandler(parseSendMessage, {
-        local: (input) => service.sendMessage(input, host.conversationSender()),
+        local: (input) =>
+          Effect.runPromise(
+            service.sendMessage(input, host.conversationSender()).pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
-            method: "POST",
-            body: input,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
+                method: "POST",
+                body: input,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       setMessageReaction: scopedHandler(parseMessageReaction, {
-        local: (parsed) => service.setMessageReaction(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.setMessageReaction(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       listQueue: scopedHandler(parseAgentId, {
         local: (agentId) => service.listQueue(agentId),
         remote: (agentId, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot)
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       acknowledgeFailedTurn: scopedHandler(parseAcknowledgeFailedTurn, {
         local: (parsed) => service.acknowledgeFailedTurn(parsed.agentId, parsed.turnId),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { turnId: parsed.turnId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: { turnId: parsed.turnId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       cancelQueuedMessage: scopedHandler(parseCancelQueuedMessage, {
-        local: (parsed) => service.cancelQueuedMessage(parsed.agentId, parsed.deliveryId),
+        local: (parsed) =>
+          Effect.runPromise(
+            service
+              .cancelQueuedMessage(parsed.agentId, parsed.deliveryId)
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueCancel(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryId: parsed.deliveryId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queueCancel(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: { deliveryId: parsed.deliveryId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       steerQueuedMessage: scopedHandler(parseSteerQueuedMessage, {
-        local: (parsed) => service.steerQueuedMessage(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.steerQueuedMessage(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       editQueuedMessage: scopedHandler(parseQueueEdit, {
-        local: ({ agentId, ...input }) => service.editQueuedMessage(agentId, input, host.conversationSender()),
+        local: ({ agentId, ...input }) =>
+          Effect.runPromise(
+            service
+              .editQueuedMessage(agentId, input, host.conversationSender())
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: ({ agentId, ...input }, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
-            method: "POST",
-            body: { ...input },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
+                method: "POST",
+                body: { ...input },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       updateQueuedMessage: scopedHandler(parseUpdateQueuedMessage, {
-        local: (parsed) => service.updateQueuedMessage(parsed, host.conversationSender()),
+        local: (parsed) =>
+          Effect.runPromise(
+            service
+              .updateQueuedMessage(parsed, host.conversationSender())
+              .pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueUpdate(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: {
-              deliveryId: parsed.deliveryId,
-              text: parsed.text,
-              keepAttachmentIds: parsed.keepAttachmentIds,
-              attachmentDraftIds: parsed.attachmentDraftIds,
-            },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queueUpdate(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: {
+                  deliveryId: parsed.deliveryId,
+                  text: parsed.text,
+                  keepAttachmentIds: parsed.keepAttachmentIds,
+                  attachmentDraftIds: parsed.attachmentDraftIds,
+                },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       reorderQueue: scopedHandler(parseReorderQueue, {
-        local: (parsed) => service.reorderQueue(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.reorderQueue(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryIds: parsed.deliveryIds },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: { deliveryIds: parsed.deliveryIds },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       interrupt: scopedHandler(parseInterrupt, {
-        local: (parsed) => service.interrupt(parsed.agentId, parsed.turnId),
+        local: (parsed) =>
+          Effect.runPromise(
+            service.interrupt(parsed.agentId, parsed.turnId).pipe(Effect.mapError((error) => error.cause)),
+          ),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.interrupt(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { turnId: parsed.turnId },
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.agent.interrupt(parsed.agentId), decodeVoid, {
+                method: "POST",
+                body: { turnId: parsed.turnId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       clearContext: scopedHandler(parseAgentId, {
-        local: (agentId) => service.clearAgentContext(agentId),
+        local: (agentId) =>
+          Effect.runPromise(service.clearAgentContext(agentId).pipe(Effect.mapError((error) => error.cause))),
         remote: async (agentId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CONTEXT_RESET_CAPABILITY))
             throw new Error(sourceText("error.team.contextResetUnsupported"));
           // The context-reset-v1 codec has already checked the empty reply.
-          await remoteServers.request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
-            method: "POST",
-            body: { agentId },
-          });
+          await Effect.runPromise(
+            remoteServers
+              .request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
+                method: "POST",
+                body: { agentId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => service.respondToPrompt(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.respondToPrompt(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       respondToApproval: scopedHandler(parseApprovalResponse, {
-        local: (parsed) => service.respondToApproval(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.respondToApproval(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.approval, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.respond.approval, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       respondToBrowserSecret: scopedHandler(parseBrowserSecretResponse, {
-        local: (parsed) => service.respondToBrowserSecret(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.respondToBrowserSecret(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
       respondToBrowserTakeover: scopedHandler(parseBrowserTakeoverResponse, {
-        local: (parsed) => service.respondToBrowserTakeover(parsed),
+        local: (parsed) =>
+          Effect.runPromise(service.respondToBrowserTakeover(parsed).pipe(Effect.mapError((error) => error.cause))),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.browserTakeover, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          Effect.runPromise(
+            remoteServers
+              .request(serverId, TEAM_API_ROUTES.respond.browserTakeover, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          ),
       }),
     },
   };

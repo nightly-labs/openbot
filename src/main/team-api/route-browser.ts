@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The embedded browser, driven from a remote client: its tabs, and who is holding the wheel.
 //
 // Every handler forwards straight to `BrowserHost`. The validation here is only about the wire -
@@ -41,17 +42,21 @@ export async function routeBrowser(
     if (!isBoolean(focus)) throw new HttpError(400, "focus must be a boolean.");
     return json(
       201,
-      await browser.open(
-        stringField(body, "url", false, INPUT_LIMITS.browserUrl),
-        nullableString(body, "ownerThreadId"),
-        nullableString(body, "ownerAgentId"),
-        focus,
+      await Effect.runPromise(
+        browser
+          .open(
+            stringField(body, "url", false, INPUT_LIMITS.browserUrl),
+            nullableString(body, "ownerThreadId"),
+            nullableString(body, "ownerAgentId"),
+            focus,
+          )
+          .pipe(Effect.mapError((error) => error.cause)),
       ),
     );
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.activate) {
     const body = await readJson(request);
-    await browser.activate(stringField(body, "tabId"));
+    await Effect.runPromise(browser.activate(stringField(body, "tabId")).pipe(Effect.mapError((error) => error.cause)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.navigate) {
@@ -60,37 +65,52 @@ export async function routeBrowser(
     if (direction !== "back" && direction !== "forward") {
       throw new HttpError(400, "Invalid browser navigation direction.");
     }
-    await browser.navigate(stringField(body, "tabId"), direction);
+    await Effect.runPromise(
+      browser.navigate(stringField(body, "tabId"), direction).pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   // Behind `browser-navigation`: the released navigate route carries a direction only, so a client
   // without it opens a new tab for an address instead of moving the one the user is looking at.
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.load) {
     const body = await readJson(request);
-    await browser.loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl));
+    await Effect.runPromise(
+      browser
+        .loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl))
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.reload) {
     const body = await readJson(request);
-    await browser.reload(stringField(body, "tabId"));
+    await Effect.runPromise(browser.reload(stringField(body, "tabId")).pipe(Effect.mapError((error) => error.cause)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.close) {
     const body = await readJson(request);
-    await browser.close(stringField(body, "tabId"));
+    await Effect.runPromise(browser.close(stringField(body, "tabId")).pipe(Effect.mapError((error) => error.cause)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.preview) {
     const body = await readJson(request);
-    return json(200, await browser.capturePreview(stringField(body, "tabId")));
+    return json(
+      200,
+      await Effect.runPromise(
+        browser.capturePreview(stringField(body, "tabId")).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    );
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.visible) {
     const body = await readJson(request);
     if (!isBoolean(body.visible)) throw new HttpError(400, "visible is required.");
-    await browser.setVisible({
-      visible: body.visible,
-      bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
-    });
+    await Effect.runPromise(
+      browser
+        .setVisible({
+          visible: body.visible,
+          bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     return empty(204);
   }
 
@@ -112,7 +132,13 @@ export async function routeBrowser(
   const viewSessionMatch = /^\/v1\/browser\/view\/sessions\/([^/]+)$/u.exec(url.pathname);
   if (method === "DELETE" && viewSessionMatch) {
     if (!browserView) throw new HttpError(404, sourceText("error.team.browserViewUnavailable"));
-    if (!(await browserView.closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id))) {
+    if (
+      !(await Effect.runPromise(
+        browserView
+          .closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id)
+          .pipe(Effect.mapError((error) => error.cause)),
+      ))
+    ) {
       throw new HttpError(404, sourceText("error.team.browserSessionNotFound"));
     }
     return empty(204);

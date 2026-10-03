@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { listManagedSkillsForChat, ManagedSkillService } from "./managed-skill-service";
 
@@ -17,11 +18,13 @@ describe("managed site hosting skill", () => {
     roots.push(root);
     const workspace = join(root, "workspace");
     await mkdir(workspace);
-    await expect(listManagedSkillsForChat(agent(workspace))).resolves.toEqual([]);
+    await expect(Effect.runPromise(listManagedSkillsForChat(agent(workspace)))).resolves.toEqual([]);
     const source = join(process.cwd(), "resources/managed-skills/openbot-skill-creator/SKILL.md");
-    await new ManagedSkillService(source, undefined, undefined, "openbot-skill-creator").syncAgent(agent(workspace));
+    await Effect.runPromise(
+      new ManagedSkillService(source, undefined, undefined, "openbot-skill-creator").syncAgent(agent(workspace)),
+    );
     for (const provider of ["codex", "claude"] as const) {
-      await expect(listManagedSkillsForChat({ ...agent(workspace), provider })).resolves.toEqual([
+      await expect(Effect.runPromise(listManagedSkillsForChat({ ...agent(workspace), provider }))).resolves.toEqual([
         expect.objectContaining({ skillId: "openbot-skill-creator", origin: "managed", enabled: true }),
       ]);
     }
@@ -42,7 +45,7 @@ describe("managed site hosting skill", () => {
     await mkdir(workspacePath);
     const managedAgent = agent(workspacePath);
 
-    await new ManagedSkillService(source).syncAgent(managedAgent);
+    await Effect.runPromise(new ManagedSkillService(source).syncAgent(managedAgent));
 
     await expect(
       readFile(join(workspacePath, ".agents", "skills", "openbot-site-hosting", "SKILL.md"), "utf8"),
@@ -53,7 +56,7 @@ describe("managed site hosting skill", () => {
 
     const updated = content.replace("Rules", "Updated rules");
     await writeFile(source, updated);
-    await new ManagedSkillService(source).syncAgent(managedAgent);
+    await Effect.runPromise(new ManagedSkillService(source).syncAgent(managedAgent));
     await expect(
       readFile(join(workspacePath, ".agents", "skills", "openbot-site-hosting", "SKILL.md"), "utf8"),
     ).resolves.toBe(updated);
@@ -72,7 +75,9 @@ describe("managed site hosting skill", () => {
     await writeFile(userTarget, userContent);
     const collisions: string[] = [];
 
-    await new ManagedSkillService(source, (target) => collisions.push(target)).syncAgent(agent(workspacePath));
+    await Effect.runPromise(
+      new ManagedSkillService(source, (target) => collisions.push(target)).syncAgent(agent(workspacePath)),
+    );
 
     await expect(readFile(userTarget, "utf8")).resolves.toBe(userContent);
     await expect(
@@ -99,7 +104,9 @@ describe("managed site hosting skill", () => {
       (target) => failures.push(target),
     );
 
-    await expect(service.syncAll([agent(blockedWorkspace), agent(healthyWorkspace)])).resolves.toBeUndefined();
+    await expect(
+      Effect.runPromise(service.syncAll([agent(blockedWorkspace), agent(healthyWorkspace)])),
+    ).resolves.toBeUndefined();
 
     await expect(
       readFile(join(blockedWorkspace, ".claude", "skills", "openbot-site-hosting", "SKILL.md"), "utf8"),
@@ -127,11 +134,13 @@ describe("managed site hosting skill", () => {
     await symlink(outside, join(workspacePath, ".agents", "skills", "openbot-site-hosting"));
     const failures: string[] = [];
 
-    await new ManagedSkillService(
-      source,
-      () => undefined,
-      (target) => failures.push(target),
-    ).syncAgent(agent(workspacePath));
+    await Effect.runPromise(
+      new ManagedSkillService(
+        source,
+        () => undefined,
+        (target) => failures.push(target),
+      ).syncAgent(agent(workspacePath)),
+    );
 
     await expect(readFile(join(outside, "SKILL.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",

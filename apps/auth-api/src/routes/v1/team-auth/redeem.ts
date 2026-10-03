@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import { apiError, authErrorResponse, json, requestAuthService, requestSourceIp } from "../../../server/request-auth";
 
@@ -12,10 +13,8 @@ export const Route = createFileRoute("/v1/team-auth/redeem")({
           if (!isString(body.ticket) || !isString(body.serverId)) {
             return apiError(400, "invalid_team_ticket", "The team ticket is invalid.");
           }
-          const user = await requestAuthService().redeemTeamAuthTicket(
-            body.ticket,
-            body.serverId,
-            requestSourceIp(request),
+          const user = await runApiEffect(
+            requestAuthService().redeemTeamAuthTicket(body.ticket, body.serverId, requestSourceIp(request)),
           );
           return user ? json(user) : apiError(401, "invalid_team_ticket", "The team ticket is invalid or expired.");
         } catch (error) {

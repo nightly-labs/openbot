@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../../server/json-body";
 import { readLiveActivityRelayPush } from "../../../../../server/live-activity-relay";
 import {
@@ -23,13 +24,13 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/live-activity")({
             return apiError(400, "invalid_remote_request", "The host credential is invalid.");
           const push = readLiveActivityRelayPush(body);
           if (!push) return apiError(400, "invalid_live_activity", "The Live Activity update is invalid.");
-          await requestRemoteControlPlane().authenticateHost(params.hostId, body.machineToken);
+          await runApiEffect(requestRemoteControlPlane().authenticateHost(params.hostId, body.machineToken));
           const relay = requestLiveActivityRelay();
           if (!relay) return apiError(503, "live_activity_unavailable", "Live Activity updates are not available.");
-          if (!(await relay.allow(params.hostId))) {
+          if (!(await runApiEffect(relay.allow(params.hostId)))) {
             return apiError(429, "rate_limited", "Too many Live Activity updates.");
           }
-          switch (await relay.sender.send(push)) {
+          switch (await runApiEffect(relay.sender.send(push))) {
             case "sent":
               return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
             case "gone":

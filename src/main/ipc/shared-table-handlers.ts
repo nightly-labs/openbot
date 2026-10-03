@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // The tables agents create for themselves, in `~/OpenBot/Shared/Data/agent-data.db`.
 //
 // Neither call takes an agent: every agent shares every table, and the user's delete is not
@@ -22,7 +24,12 @@ const acceptEmpty = (): undefined => undefined;
 
 interface SharedTableRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
-  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
 interface SharedTableIpcDependencies {
@@ -37,26 +44,34 @@ export function sharedTableIpcHandlers({
   return {
     sharedTables: {
       listTables: scopedQueryHandler({
-        local: () => service.listTables(),
+        local: () => Effect.runPromise(service.listTables().pipe(Effect.mapError((error) => error.cause))),
         // A host without the capability is answered with an empty list, as `listInstalledSkills`
         // does. The UI hides the row there and for a member, so an empty list is never shown as fact.
         remote: (serverId): Promise<SharedTable[]> | SharedTable[] =>
           remoteServers.supportsCapability(serverId, SHARED_TABLES_CAPABILITY)
-            ? remoteServers.request(serverId, SHARED_TABLES_ROUTES.list, decodeRemoteTables, {
-                method: "POST",
-                body: {},
-              })
+            ? Effect.runPromise(
+                remoteServers
+                  .request(serverId, SHARED_TABLES_ROUTES.list, decodeRemoteTables, {
+                    method: "POST",
+                    body: {},
+                  })
+                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              )
             : [],
       }),
       deleteTable: scopedHandler(parseDeleteSharedTable, {
-        local: (input) => service.deleteTable(input),
+        local: (input) => Effect.runPromise(service.deleteTable(input).pipe(Effect.mapError((error) => error.cause))),
         remote: (input, serverId) => {
           if (!remoteServers.supportsCapability(serverId, SHARED_TABLES_CAPABILITY))
             throw new Error(sourceText("error.backend.sharedDataLocalOnly"));
-          return remoteServers.request(serverId, SHARED_TABLES_ROUTES.delete, acceptEmpty, {
-            method: "POST",
-            body: input,
-          });
+          return Effect.runPromise(
+            remoteServers
+              .request(serverId, SHARED_TABLES_ROUTES.delete, acceptEmpty, {
+                method: "POST",
+                body: input,
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
     },

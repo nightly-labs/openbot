@@ -1,6 +1,9 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { AgentTemplateService } from "./agent-template-service";
+import { authDecode, type CentralAuthOperationError } from "./central-auth-effects";
+import { SkillMarketplaceFailure } from "./skill-marketplace-service";
 
 const agent: AgentSummary = {
   id: "agent-writer",
@@ -28,34 +31,40 @@ function service(
   const requests: Array<{ path: string; method: string | undefined }> = [];
   const auth = {
     // The raw Worker answer goes through the service's own decoder, as a real response does.
-    async requestAuthorized<T>(path: string, init: RequestInit, decode: (value: unknown) => T): Promise<T> {
-      requests.push({ path, method: init.method });
-      if (options.published && path === "/v1/agent-templates/mine")
-        return decode([
-          { id: "Ab3_-xYz0123456789abcd", sourceAgentId: agent.id, updatedAt: "2026-09-25T09:00:00.000Z" },
-        ]);
-      if (options.published && init.method === "DELETE") return decode({ deleted: true });
-      if (options.published && path === "/v1/agent-templates/Ab3_-xYz0123456789abcd")
-        return decode({
-          id: "Ab3_-xYz0123456789abcd",
-          name: "Writer",
-          title: "",
-          description: "Now does something else.",
-          avatarSeed: "agent-writer",
-          avatarHue: null,
-          avatarUrl: null,
-          cardUrl: null,
-          creatorName: "Sam Rivera",
-          updatedAt: "2026-09-25T10:00:00.000Z",
-          skills: [],
-          routines: [],
-        });
-      throw new Error("No request is expected.");
+    requestAuthorized<T>(
+      path: string,
+      init: RequestInit,
+      decode: (value: unknown) => T,
+    ): Effect.Effect<T, CentralAuthOperationError> {
+      return authDecode(() => {
+        requests.push({ path, method: init.method });
+        if (options.published && path === "/v1/agent-templates/mine")
+          return decode([
+            { id: "Ab3_-xYz0123456789abcd", sourceAgentId: agent.id, updatedAt: "2026-09-25T09:00:00.000Z" },
+          ]);
+        if (options.published && init.method === "DELETE") return decode({ deleted: true });
+        if (options.published && path === "/v1/agent-templates/Ab3_-xYz0123456789abcd")
+          return decode({
+            id: "Ab3_-xYz0123456789abcd",
+            name: "Writer",
+            title: "",
+            description: "Now does something else.",
+            avatarSeed: "agent-writer",
+            avatarHue: null,
+            avatarUrl: null,
+            cardUrl: null,
+            creatorName: "Sam Rivera",
+            updatedAt: "2026-09-25T10:00:00.000Z",
+            skills: [],
+            routines: [],
+          });
+        throw new Error("No request is expected.");
+      });
     },
-    downloadAuthorized: vi.fn(async () => new Uint8Array()),
+    downloadAuthorized: vi.fn(() => Effect.sync(() => new Uint8Array())),
     resolveApiUrl: (path: string) => new URL(path, "https://api.openbot.run").toString(),
   };
-  const createAgentProfile = vi.fn(async () => agent);
+  const createAgentProfile = vi.fn(() => Effect.sync(() => agent));
   const templates = new AgentTemplateService(
     auth,
     {
@@ -64,20 +73,24 @@ function service(
       resolveAvatar: () =>
         options.avatarUnreadable ? { path: "/nonexistent/openbot-avatar.png", mimeType: "image/png" as const } : null,
       createAgentProfile,
-      setAvatar: vi.fn(async () => agent),
+      setAvatar: vi.fn(() => Effect.sync(() => agent)),
       createRoutine: vi.fn(() => ({ id: "routine" })),
-      deleteAgent: vi.fn(async () => undefined),
+      deleteAgent: vi.fn(() => Effect.sync(() => undefined)),
     },
     {
-      listTemplateSkills: async () => {
-        if (options.skillsFail) throw new Error("Notes has local changes or needs repair before publishing.");
-        return [{ kind: "embedded", slug: "notes", name: "Notes", markdown }];
-      },
-      installVersion: vi.fn(async () => undefined),
+      listTemplateSkills: () =>
+        Effect.try({
+          try: () => {
+            if (options.skillsFail) throw new Error("Notes has local changes or needs repair before publishing.");
+            return [{ kind: "embedded" as const, slug: "notes", name: "Notes", markdown }];
+          },
+          catch: (cause) => new SkillMarketplaceFailure({ cause }),
+        }),
+      installVersion: vi.fn(() => Effect.sync(() => undefined)),
       library: () => {
         throw new Error("No library access is expected.");
       },
-      installLocal: vi.fn(async () => undefined),
+      installLocal: vi.fn(() => Effect.sync(() => undefined)),
     },
   );
   return { templates, requests, createAgentProfile };
@@ -92,9 +105,11 @@ describe("publishing an agent template", () => {
       service("Drafts product writing.", "---\nname: Notes\ndescription: x\n---\nBearer abcdefghijk"),
     ],
   ])("refuses a secret in %s and sends nothing", async (field, { templates, requests }) => {
-    await expect(templates.publish({ agentId: agent.id, card: null })).rejects.toThrow(
-      `Remove the secret or email address from ${field} before publishing.`,
-    );
+    await expect(
+      Effect.runPromise(
+        templates.publish({ agentId: agent.id, card: null }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow(`Remove the secret or email address from ${field} before publishing.`);
     expect(requests).toEqual([]);
   });
 });
@@ -107,13 +122,17 @@ describe("a published agent with a skill that cannot be published", () => {
       skillsFail: true,
     });
 
-    const preview = await templates.preview(agent.id);
+    const preview = await Effect.runPromise(templates.preview(agent.id).pipe(Effect.mapError((error) => error.cause)));
     expect(preview.publication?.templateId).toBe("Ab3_-xYz0123456789abcd");
     expect(preview.skillsError).toBe("Notes has local changes or needs repair before publishing.");
 
-    await templates.unpublish(agent.id);
+    await Effect.runPromise(templates.unpublish(agent.id).pipe(Effect.mapError((error) => error.cause)));
     expect(requests).toContainEqual({ path: "/v1/agent-templates/Ab3_-xYz0123456789abcd", method: "DELETE" });
-    await expect(templates.publish({ agentId: agent.id, card: null })).rejects.toThrow("local changes");
+    await expect(
+      Effect.runPromise(
+        templates.publish({ agentId: agent.id, card: null }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("local changes");
   });
 });
 
@@ -123,7 +142,7 @@ describe("a published agent whose avatar file cannot be read", () => {
   it("still previews as published, without the avatar", async () => {
     const { templates } = service("Drafts product writing.", undefined, { published: true, avatarUnreadable: true });
 
-    const preview = await templates.preview(agent.id);
+    const preview = await Effect.runPromise(templates.preview(agent.id).pipe(Effect.mapError((error) => error.cause)));
     expect(preview.publication?.templateId).toBe("Ab3_-xYz0123456789abcd");
     expect(preview.avatarImage).toBeNull();
   });
@@ -135,11 +154,15 @@ describe("installing an agent template", () => {
     const { templates, createAgentProfile } = service("Drafts product writing.", undefined, { published: true });
 
     await expect(
-      templates.install({
-        templateId: "Ab3_-xYz0123456789abcd",
-        timezone: "Europe/Warsaw",
-        expectedUpdatedAt: "2026-09-25T09:00:00.000Z",
-      }),
+      Effect.runPromise(
+        templates
+          .install({
+            templateId: "Ab3_-xYz0123456789abcd",
+            timezone: "Europe/Warsaw",
+            expectedUpdatedAt: "2026-09-25T09:00:00.000Z",
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).rejects.toThrow("This agent changed after you opened it.");
     expect(createAgentProfile).not.toHaveBeenCalled();
   });

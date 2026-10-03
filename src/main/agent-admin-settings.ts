@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 // Access and auto-approve of one agent, as this computer holds them. The local IPC handlers and the
 // `agent-admin-v1` host routes share this, so a remote admin changes the same state as the local
 // window does, through the same writers.
@@ -20,7 +21,7 @@ export interface AgentAdminSettingsDependencies {
 
 export interface AgentAdminSettingsService {
   read(agentId: string): AgentAdminSettings;
-  update(input: UpdateAgentAdminSettingsInput): Promise<AgentAdminSettings>;
+  update(input: UpdateAgentAdminSettingsInput): Effect.Effect<AgentAdminSettings, AgentSettingsFailure>;
 }
 
 export class AgentNotFoundError extends Error {}
@@ -44,11 +45,29 @@ export function createAgentAdminSettings({
   }
   return {
     read: (agentId) => settings(requireAgent(agentId)),
-    async update({ agentId, access, autoApprove }) {
-      let agent = requireAgent(agentId);
-      if (access !== undefined) agent = await agents.updateAgent({ agentId, access });
-      if (autoApprove !== undefined) await approvalAutomation.set({ agentId, autoApprove });
-      return settings(agent);
+    update(input) {
+      return update(input);
     },
   };
+  function update({ agentId, access, autoApprove }: UpdateAgentAdminSettingsInput) {
+    return Effect.fn("AgentAdminSettings.update")(function* () {
+      let agent = yield* Effect.try({
+        try: () => requireAgent(agentId),
+        catch: (cause) => new AgentSettingsFailure({ cause }),
+      });
+      if (access !== undefined)
+        agent = yield* agents
+          .updateAgent({ agentId, access })
+          .pipe(Effect.mapError((error) => new AgentSettingsFailure({ cause: error.cause })));
+      if (autoApprove !== undefined)
+        yield* approvalAutomation
+          .set({ agentId, autoApprove })
+          .pipe(Effect.mapError((error) => new AgentSettingsFailure({ cause: error.cause })));
+      return settings(agent);
+    })().pipe(Effect.uninterruptible);
+  }
 }
+
+class AgentSettingsFailure extends Schema.TaggedError<AgentSettingsFailure>()("AgentSettingsFailure", {
+  cause: Schema.Defect(),
+}) {}

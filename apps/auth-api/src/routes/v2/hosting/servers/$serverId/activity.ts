@@ -1,5 +1,6 @@
 import { parseHostedServerActivityReport } from "@openbot/contracts/hosted-servers";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import { JsonBodyError, readJsonObject } from "../../../../../server/json-body";
 import {
   apiError,
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/v2/hosting/servers/$serverId/activity")({
             : null;
           const report = parseHostedServerActivityReport(body);
           if (!report) return apiError(400, "invalid_request", "The activity report is not valid.");
-          await requestHostedServerService().reportActivity(token, params.serverId, report);
+          await runApiEffect(requestHostedServerService().reportActivity(token, params.serverId, report));
           return new Response(null, { status: 204 });
         } catch (error) {
           if (error instanceof JsonBodyError) return apiError(error.status, error.code, error.message);

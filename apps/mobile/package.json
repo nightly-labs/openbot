@@ -26,6 +26,7 @@
     "@shopify/react-native-skia": "2.6.2",
     "@speed-highlight/core": "catalog:",
     "@tanstack/react-query": "^5.102.8",
+    "effect": "catalog:",
     "expo": "~57.0.24",
     "expo-application": "~57.0.3",
     "expo-blur": "~57.0.3",

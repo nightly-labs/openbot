@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // OpenBot servers that the account server runs for the signed-in account.
 
 import {
@@ -20,17 +21,22 @@ export function hostedServerIpcHandlers({
 }: HostedServerIpcDependencies): Pick<IpcGroupHandlers, "hostedServers"> {
   return {
     hostedServers: {
-      list: handler(() => hostedServers.list()),
-      plans: handler(() => hostedServers.plans()),
-      create: payloadHandler(parseCreate, (input) => hostedServers.create(input)),
+      list: handler(() => Effect.runPromise(hostedServers.list().pipe(Effect.mapError((error) => error.cause)))),
+      plans: handler(() => Effect.runPromise(hostedServers.plans().pipe(Effect.mapError((error) => error.cause)))),
+      create: payloadHandler(parseCreate, (input) =>
+        Effect.runPromise(hostedServers.create(input).pipe(Effect.mapError((error) => error.cause))),
+      ),
       openCheckout: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) => hostedServers.openCheckout(serverId),
+        (serverId) =>
+          Effect.runPromise(hostedServers.openCheckout(serverId).pipe(Effect.mapError((error) => error.cause))),
       ),
-      delete: payloadHandler(parseDelete, (input) => hostedServers.delete(input)),
+      delete: payloadHandler(parseDelete, (input) =>
+        Effect.runPromise(hostedServers.delete(input).pipe(Effect.mapError((error) => error.cause))),
+      ),
       wake: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) => hostedServers.wake(serverId),
+        (serverId) => Effect.runPromise(hostedServers.wake(serverId).pipe(Effect.mapError((error) => error.cause))),
       ),
     },
   };

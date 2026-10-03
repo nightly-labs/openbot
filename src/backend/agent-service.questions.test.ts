@@ -14,6 +14,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { runTestEffect } from "./effect-test-runtime";
 
 function ownedTab(id: string, ownerThreadId: string, ownerAgentId: string): BrowserTab {
   return { id, title: "Sign in", url: "https://example.com/login", loading: false, ownerThreadId, ownerAgentId };
@@ -62,8 +63,8 @@ describe.sequential("AgentService: questions", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Ask only one question" });
+    await runTestEffect(service.initialize());
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask only one question" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -86,7 +87,7 @@ describe.sequential("AgentService: questions", () => {
       },
     });
     await waitFor(() => events.some((event) => event.type === "prompt"));
-    await service.respondToPrompt({ requestId: "question-only-call", answers: { scope: ["Small"] } });
+    await runTestEffect(service.respondToPrompt({ requestId: "question-only-call", answers: { scope: ["Small"] } }));
     const previewBeforeCompletion = service.listAgents().find((agent) => agent.id === "chief")?.preview;
 
     client.emit(
@@ -118,15 +119,17 @@ describe.sequential("AgentService: questions", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Ask from Codex" });
-    await service.setPreferredProvider("claude");
-    const claudeAgent = await service.createAgent({
-      ...CREATE_AGENT_INPUT,
-      name: "Claude Prompt Agent",
-      avatarSeed: "setup:claude-prompt",
-    });
-    await service.sendMessage({ agentId: claudeAgent.id, text: "Ask from Claude" });
+    await runTestEffect(service.initialize());
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask from Codex" }));
+    await runTestEffect(service.setPreferredProvider("claude"));
+    const claudeAgent = await runTestEffect(
+      service.createAgent({
+        ...CREATE_AGENT_INPUT,
+        name: "Claude Prompt Agent",
+        avatarSeed: "setup:claude-prompt",
+      }),
+    );
+    await runTestEffect(service.sendMessage({ agentId: claudeAgent.id, text: "Ask from Claude" }));
     await waitFor(() => events.filter((event) => event.type === "turn-started").length === 2);
 
     const codexClient = clients.get("codex");
@@ -202,19 +205,21 @@ describe.sequential("AgentService: questions", () => {
       "claude-provider-takeover",
     ]);
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runTestEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "codex-provider-prompt",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "expired" });
     expect(
-      (await service.readConversation(claudeAgent.id)).messages.find(
+      (await runTestEffect(service.readConversation(claudeAgent.id))).messages.find(
         (message) => message.questionPrompt?.requestId === "claude-provider-prompt",
       )?.questionPrompt?.resolution,
     ).toBeNull();
 
-    await service.respondToPrompt({ requestId: "claude-provider-prompt", answers: { claude: ["Still active"] } });
+    await runTestEffect(
+      service.respondToPrompt({ requestId: "claude-provider-prompt", answers: { claude: ["Still active"] } }),
+    );
     expect(claudeClient.responses.find((response) => response.id === "claude-provider-prompt")).toBeDefined();
-    await service.respondToApproval({ requestId: "claude-provider-approval", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "claude-provider-approval", decision: "accept" }));
     expect(claudeClient.responses.find((response) => response.id === "claude-provider-approval")).toEqual({
       id: "claude-provider-approval",
       result: { decision: "accept" },
@@ -238,8 +243,8 @@ describe.sequential("AgentService: questions", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Ask before the sign-out" });
+    await runTestEffect(service.initialize());
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask before the sign-out" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -275,7 +280,7 @@ describe.sequential("AgentService: questions", () => {
     );
 
     client.accountSignedIn = false;
-    await service.refreshProviders();
+    await runTestEffect(service.refreshProviders());
     expect(client.running).toBe(false);
     expect(events).toContainEqual({
       type: "browser-takeover-resolved",
@@ -292,12 +297,12 @@ describe.sequential("AgentService: questions", () => {
       ["approval", "signed-out-approval"],
     ]);
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runTestEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "signed-out-prompt",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "expired" });
-    await expect(service.respondToApproval({ requestId: "signed-out-approval", decision: "accept" })).rejects.toThrow(
-      "This approval is no longer active.",
-    );
+    await expect(
+      runTestEffect(service.respondToApproval({ requestId: "signed-out-approval", decision: "accept" })),
+    ).rejects.toThrow("This approval is no longer active.");
   });
 });

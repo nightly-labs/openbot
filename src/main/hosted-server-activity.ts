@@ -1,4 +1,6 @@
 import type { HostedServerActivityReport } from "@openbot/contracts/hosted-servers";
+import { Deferred, Effect } from "effect";
+import { type RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
 
 /**
  * A hosted server tells the Worker that it is in use (a client works with it or an agent works) and
@@ -23,7 +25,7 @@ export interface HostedServerActivityOptions {
   inUse: () => boolean;
   /** The next routine run in milliseconds since the epoch, or null for none. */
   nextRunAt: () => number | null;
-  report: (path: string, report: HostedServerActivityReport) => Promise<unknown>;
+  report: (path: string, report: HostedServerActivityReport) => Effect.Effect<unknown, RemoteWorkflowError>;
   onError: (message: string, error: unknown) => void;
   now?: () => number;
 }
@@ -31,7 +33,7 @@ export interface HostedServerActivityOptions {
 export class HostedServerActivity {
   readonly #options: HostedServerActivityOptions;
   #timer: ReturnType<typeof setInterval> | null = null;
-  #pending: Promise<void> | null = null;
+  #pending: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   #wasInUse = false;
   #lastInUseReportAt: number | null = null;
   /** Undefined until the first report, so that the first sample always sends the next run. */
@@ -44,24 +46,38 @@ export class HostedServerActivity {
   start(): void {
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void this.tick().catch((error) => this.#options.onError("The hosted server activity report failed.", error));
+      void runRemoteWorkflow(this.tick()).catch((error) =>
+        this.#options.onError("The hosted server activity report failed.", error),
+      );
     }, SAMPLE_INTERVAL_MS);
     this.#timer.unref();
   }
 
-  stop(): void {
-    if (this.#timer) clearInterval(this.#timer);
-    this.#timer = null;
-  }
-
-  tick(): Promise<void> {
-    this.#pending ??= this.#tick().finally(() => {
-      this.#pending = null;
+  stop(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#timer) clearInterval(this.#timer);
+      this.#timer = null;
+      return this.#pending ? Deferred.await(this.#pending).pipe(Effect.catch(() => Effect.void)) : Effect.void;
     });
-    return this.#pending;
   }
 
-  async #tick(): Promise<void> {
+  tick(): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.suspend(() => {
+      if (this.#pending) return Deferred.await(this.#pending);
+      const pending = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+      this.#pending = pending;
+      return this.#tickEffect().pipe(
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            this.#pending = null;
+            yield* Deferred.done(pending, exit);
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
+  }
+
+  readonly #tickEffect = Effect.fn("HostedServerActivity.tick")(function* (this: HostedServerActivity) {
     const now = this.#options.now?.() ?? Date.now();
     const inUse = this.#options.inUse();
     const nextRunAt = this.#options.nextRunAt();
@@ -73,7 +89,7 @@ export class HostedServerActivity {
       this.#wasInUse = inUse;
       return;
     }
-    await this.#options.report(`/v2/hosting/servers/${encodeURIComponent(this.#options.hostId)}/activity`, {
+    yield* this.#options.report(`/v2/hosting/servers/${encodeURIComponent(this.#options.hostId)}/activity`, {
       inUse,
       nextRunAt,
     });
@@ -81,5 +97,5 @@ export class HostedServerActivity {
     this.#wasInUse = inUse;
     this.#reportedNextRunAt = nextRunAt;
     if (inUse) this.#lastInUseReportAt = now;
-  }
+  });
 }

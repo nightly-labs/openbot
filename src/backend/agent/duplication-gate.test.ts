@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentMemoryStore } from "../agent-memory-store";
 import { AgentRoutineStore } from "../agent-routine-store";
@@ -15,6 +16,8 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import { runTestEffect } from "../effect-test-runtime";
+import { StoredStateFailure } from "../stored-state-effects";
 
 let root: string;
 let service: AgentService | null = null;
@@ -32,15 +35,17 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
   it("duplicates persistent agent data without conversation or routine-run history", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const source = await store.getOrCreate("chief", "Research", "Research lead");
-    await store.updateAgent({
-      agentId: source.id,
-      description: "Finds primary sources.",
-      notifications: false,
-      model: "gpt-5.6-sol",
-      reasoningEffort: "high",
-    });
+    await runTestEffect(service.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief", "Research", "Research lead"));
+    await runTestEffect(
+      store.updateAgent({
+        agentId: source.id,
+        description: "Finds primary sources.",
+        notifications: false,
+        model: "gpt-5.6-sol",
+        reasoningEffort: "high",
+      }),
+    );
     await writeFile(join(source.workspacePath, "research.md"), "source workspace\n");
     service.createMemory({ agentId: source.id, text: "Use official documents." });
     new AgentMemoryStore(store.database).saveAutomatic({
@@ -83,18 +88,18 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
 
-    const duplicate = await service.duplicateAgent(source.id);
+    const duplicate = await runTestEffect(service.duplicateAgent(source.id));
 
     expect(service.listAgents().some((agent) => agent.id === duplicate.id)).toBe(false);
-    await expect(service.sendMessage({ agentId: duplicate.id, text: "Do not start yet." })).rejects.toThrow(
-      `Unknown agent: ${duplicate.id}`,
-    );
-    await expect(service.updateAgent({ agentId: duplicate.id, title: "Hidden copy" })).rejects.toThrow(
+    await expect(
+      runTestEffect(service.sendMessage({ agentId: duplicate.id, text: "Do not start yet." })),
+    ).rejects.toThrow(`Unknown agent: ${duplicate.id}`);
+    await expect(runTestEffect(service.updateAgent({ agentId: duplicate.id, title: "Hidden copy" }))).rejects.toThrow(
       `Unknown agent: ${duplicate.id}`,
     );
     expect(service.listQueue(duplicate.id).deliveries).toEqual([]);
     expect(events).toEqual([]);
-    await service.commitAgentDuplication(duplicate.id, EMPTY_LAYOUT);
+    await runTestEffect(service.commitAgentDuplication(duplicate.id, EMPTY_LAYOUT));
     expect(service.listAgents().some((agent) => agent.id === duplicate.id)).toBe(true);
     expect(events).toEqual(
       expect.arrayContaining([
@@ -115,7 +120,7 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
       threadId: null,
       preview: "No messages yet",
     });
-    expect((await service.readConversation(duplicate.id)).messages).toEqual([]);
+    expect((await runTestEffect(service.readConversation(duplicate.id))).messages).toEqual([]);
     await expect(readFile(join(duplicate.workspacePath, "research.md"), "utf8")).resolves.toBe("source workspace\n");
 
     const sourceMemories = service.listMemories(source.id);
@@ -190,23 +195,23 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
   it("blocks duplication while the source agent has active work", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: "chief", text: "Keep working.", attachmentDraftIds: [] });
+    await runTestEffect(service.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Keep working.", attachmentDraftIds: [] }));
 
-    await expect(service.duplicateAgent("chief")).rejects.toThrow("finish and clear its queue");
+    await expect(runTestEffect(service.duplicateAgent("chief"))).rejects.toThrow("finish and clear its queue");
     expect(store.list().map((agent) => agent.id)).toEqual(["chief"]);
   });
 
   it("serializes duplication until the previous copy is committed", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("research");
-    const first = await service.duplicateAgent("chief");
+    await runTestEffect(service.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("research"));
+    const first = await runTestEffect(service.duplicateAgent("chief"));
     let secondResolved = false;
-    const secondRequest = service.duplicateAgent("research").then((duplicate) => {
+    const secondRequest = runTestEffect(service.duplicateAgent("research")).then((duplicate) => {
       secondResolved = true;
       return duplicate;
     });
@@ -214,9 +219,9 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(secondResolved).toBe(false);
-    await service.commitAgentDuplication(first.id, EMPTY_LAYOUT);
+    await runTestEffect(service.commitAgentDuplication(first.id, EMPTY_LAYOUT));
     const second = await secondRequest;
-    await service.commitAgentDuplication(second.id, EMPTY_LAYOUT);
+    await runTestEffect(service.commitAgentDuplication(second.id, EMPTY_LAYOUT));
     expect(service.listAgents().map((agent) => agent.id)).toEqual(
       expect.arrayContaining(["chief", "research", first.id, second.id]),
     );
@@ -232,21 +237,26 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
         return new FakeAgentClient(provider);
       },
     });
-    await service.initialize();
-    const source = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const source = await runTestEffect(store.getOrCreate("chief"));
     await writeFile(join(source.workspacePath, "research.md"), "source workspace\n");
     const duplicateInStore = store.duplicateAgent.bind(store);
-    vi.spyOn(store, "duplicateAgent").mockImplementationOnce(async (agentId, operationId) => {
-      const duplicate = await duplicateInStore(agentId, operationId);
-      // A message landing while the workspace is still being copied. The source is muted, so
-      // nothing schedules a drain for it and only the mute lifting can start this turn.
-      await service?.sendMessage({ agentId: source.id, text: "Anything on the sources?" });
-      expect(service?.listQueue(source.id).deliveries[0]?.status).toBe("queued");
-      return duplicate;
-    });
+    vi.spyOn(store, "duplicateAgent").mockImplementationOnce((agentId, operationId) =>
+      Effect.gen(function* () {
+        const duplicate = yield* duplicateInStore(agentId, operationId);
+        // A message landing while the workspace is still being copied. The source is muted, so
+        // nothing schedules a drain for it and only the mute lifting can start this turn.
+        if (service)
+          yield* service
+            .sendMessage({ agentId: source.id, text: "Anything on the sources?" })
+            .pipe(Effect.mapError((failure) => new StoredStateFailure({ cause: failure.cause })));
+        expect(service?.listQueue(source.id).deliveries[0]?.status).toBe("queued");
+        return duplicate;
+      }),
+    );
 
-    const duplicate = await service.duplicateAgent(source.id);
-    await service.commitAgentDuplication(duplicate.id, EMPTY_LAYOUT);
+    const duplicate = await runTestEffect(service.duplicateAgent(source.id));
+    await runTestEffect(service.commitAgentDuplication(duplicate.id, EMPTY_LAYOUT));
 
     await waitFor(() => service?.listQueue(source.id).deliveries[0]?.status === "completed");
     await expect(readFile(join(duplicate.workspacePath, "research.md"), "utf8")).resolves.toBe("source workspace\n");
@@ -255,16 +265,20 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
   it("removes copied data when the source changes during duplication", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
     const duplicateInStore = store.duplicateAgent.bind(store);
-    vi.spyOn(store, "duplicateAgent").mockImplementationOnce(async (agentId) => {
-      const duplicate = await duplicateInStore(agentId);
-      service?.createMemory({ agentId, text: "Changed during duplication." });
-      return duplicate;
-    });
+    vi.spyOn(store, "duplicateAgent").mockImplementationOnce((agentId) =>
+      Effect.gen(function* () {
+        const duplicate = yield* duplicateInStore(agentId);
+        service?.createMemory({ agentId, text: "Changed during duplication." });
+        return duplicate;
+      }),
+    );
 
-    await expect(service.duplicateAgent("chief")).rejects.toThrow("changed while it was being duplicated");
+    await expect(runTestEffect(service.duplicateAgent("chief"))).rejects.toThrow(
+      "changed while it was being duplicated",
+    );
 
     expect(store.list().map((agent) => agent.id)).toEqual(["chief"]);
     expect(service.listMemories("chief")).toEqual([expect.objectContaining({ text: "Changed during duplication." })]);

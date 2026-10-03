@@ -1,4 +1,6 @@
+import { Effect } from "effect";
 import { restartActivityGeneration } from "../backend/restart-activity";
+import { runRemoteWorkflow } from "./remote-service-effects";
 // @vitest-environment node
 
 import { createServer, type IncomingMessage } from "node:http";
@@ -38,13 +40,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -79,7 +83,7 @@ describe("the live browser view on a host", () => {
     // The member's pointer is a fraction of the frame they watched; the host's page is in pixels.
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("keeps a click on the last frame the member saw when a newer frame is dropped", async () => {
@@ -87,13 +91,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -139,7 +145,7 @@ describe("the live browser view on a host", () => {
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.resume();
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("expands a point with the frame the member named, not the newest one", async () => {
@@ -147,13 +153,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -188,7 +196,7 @@ describe("the live browser view on a host", () => {
     // The frame the member named, not the newest one: expanding with frame 2 puts this at (200, 75).
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("keeps a point on the frame still showing, and drops it once a newer frame is named", async () => {
@@ -196,13 +204,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -248,7 +258,7 @@ describe("the live browser view on a host", () => {
       ]),
     );
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("forgets frames older than the one the member has drawn, without a click", async () => {
@@ -256,13 +266,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -304,7 +316,7 @@ describe("the live browser view on a host", () => {
       ]),
     );
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("does not keep a frame size for a client that never acknowledges frames", async () => {
@@ -312,13 +324,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -353,18 +367,19 @@ describe("the live browser view on a host", () => {
     socket.send(encodeBrowserViewInput({ ...point }));
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("closes a view whose client stops acknowledging frames", async () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async () => undefined,
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
     });
@@ -384,7 +399,7 @@ describe("the live browser view on a host", () => {
     await closed;
     expect(frames.length).toBeLessThanOrEqual(121);
     expect(gateway.activeViewCount()).toBe(0);
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("keeps the view open while drawn frames are acknowledged inside the backlog", async () => {
@@ -392,13 +407,15 @@ describe("the live browser view on a host", () => {
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, onFrame) => {
-          send = onFrame;
-          return async () => undefined;
-        },
-        dispatchViewInput: async (_tabId, input) => {
-          dispatched.push(input);
-        },
+        startView: (_tabId, onFrame) =>
+          Effect.sync(() => {
+            send = onFrame;
+            return () => Effect.void;
+          }),
+        dispatchViewInput: (_tabId, input) =>
+          Effect.sync(() => {
+            dispatched.push(input);
+          }),
       },
       authenticate: () => null,
     });
@@ -436,19 +453,20 @@ describe("the live browser view on a host", () => {
     }
     expect(socket.readyState).toBe(webSockets.WebSocket.OPEN);
     socket.close();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: ((reason: string) => void) | undefined;
-    const stop = vi.fn(async () => undefined);
-    const dispatch = vi.fn(async () => undefined);
+    const stop = vi.fn(() => Effect.void);
+    const dispatch = vi.fn(() => Effect.void);
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, _onFrame, onEnded) => {
-          invalidate = onEnded;
-          return stop;
-        },
+        startView: (_tabId, _onFrame, onEnded) =>
+          Effect.sync(() => {
+            invalidate = onEnded;
+            return stop;
+          }),
         dispatchViewInput: dispatch,
       },
       authenticate: () => null,
@@ -471,14 +489,14 @@ describe("the live browser view on a host", () => {
     });
     const failure = await new Promise<string>((resolve) => retry.once("error", (error) => resolve(error.message)));
     expect(failure).toContain("401");
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("refuses a socket that names neither the session nor its member", async () => {
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async () => async () => undefined,
-        dispatchViewInput: async () => undefined,
+        startView: () => Effect.succeed(() => Effect.void),
+        dispatchViewInput: () => Effect.void,
       },
       authenticate: (token) => (token === "other-member-token" ? { id: "member-2" } : null),
     });
@@ -494,14 +512,14 @@ describe("the live browser view on a host", () => {
       const failure = await new Promise<string>((resolve) => socket.once("error", (error) => resolve(error.message)));
       expect(failure).toContain("401");
     }
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("counts only views with a live socket", async () => {
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async () => async () => undefined,
-        dispatchViewInput: async () => undefined,
+        startView: () => Effect.succeed(() => Effect.void),
+        dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
     });
@@ -519,15 +537,15 @@ describe("the live browser view on a host", () => {
     socket.close();
     await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
     expect(restartActivityGeneration()).toBeGreaterThan(before);
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 
   it("releases a session after an abrupt stream disconnect", async () => {
-    const startView = vi.fn(async () => async () => undefined);
+    const startView = vi.fn(() => Effect.succeed(() => Effect.void));
     const gateway = new BrowserViewGateway({
       browser: {
         startView,
-        dispatchViewInput: async () => undefined,
+        dispatchViewInput: () => Effect.void,
       },
       authenticate: () => null,
       maxSessions: 1,
@@ -548,7 +566,7 @@ describe("the live browser view on a host", () => {
     expect(() =>
       gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-2" }),
     ).not.toThrow();
-    await gateway.stop();
+    await runRemoteWorkflow(gateway.stop());
   });
 });
 

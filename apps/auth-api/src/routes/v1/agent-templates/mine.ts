@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import {
   apiError,
   json,
@@ -12,9 +13,9 @@ export const Route = createFileRoute("/v1/agent-templates/mine")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json(await requestAgentTemplates().listMine(user.id));
+          return json(await runApiEffect(requestAgentTemplates().listMine(user.id)));
         } catch (error) {
           return marketplaceErrorResponse(error);
         }

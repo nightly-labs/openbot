@@ -1,3 +1,4 @@
+import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -41,7 +42,7 @@ describe("AgentRoutineStore", () => {
     database.close();
 
     const reopened = new OpenBotDatabase(database.userDataPath);
-    await reopened.initialize();
+    await runTestEffect(reopened.initialize());
     expect(new AgentRoutineStore(reopened).list("chief")).toHaveLength(1);
     reopened.close();
   });
@@ -204,8 +205,8 @@ describe("AgentRoutineStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-routine-agent-delete-"));
     roots.push(root);
     const agents = new AgentStore(join(root, "data"), join(root, "home"));
-    await agents.initialize();
-    const agent = await agents.getOrCreate("chief");
+    await runTestEffect(agents.initialize());
+    const agent = await runTestEffect(agents.getOrCreate("chief"));
     const routines = new AgentRoutineStore(agents.database);
     routines.create({
       agentId: agent.id,
@@ -215,7 +216,7 @@ describe("AgentRoutineStore", () => {
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    await agents.deleteAgent(agent.id);
+    await runTestEffect(agents.deleteAgent(agent.id));
     expect(routines.list(agent.id)).toEqual([]);
     agents.database.close();
   });
@@ -253,7 +254,7 @@ describe("ChannelRoutineStore", () => {
     database.close();
 
     const reopened = new OpenBotDatabase(database.userDataPath);
-    await reopened.initialize();
+    await runTestEffect(reopened.initialize());
     expect(new ChannelRoutineStore(reopened).list("channel-1")).toHaveLength(1);
     reopened.close();
   });
@@ -435,7 +436,7 @@ async function setup(): Promise<{ database: OpenBotDatabase; routines: AgentRout
   const root = await mkdtemp(join(tmpdir(), "openbot-routine-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await database.initialize();
+  await runTestEffect(database.initialize());
   return { database, routines: new AgentRoutineStore(database) };
 }
 
@@ -446,7 +447,7 @@ async function channelSetup(
   const root = await mkdtemp(join(tmpdir(), "openbot-channel-routine-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await database.initialize();
+  await runTestEffect(database.initialize());
   const insert = database.connection.prepare("INSERT INTO projection_channels(channel_id, channel_json) VALUES (?, ?)");
   for (const channelId of channelIds) insert.run(channelId, JSON.stringify({ id: channelId }));
   return { database, routines: new ChannelRoutineStore(database) };

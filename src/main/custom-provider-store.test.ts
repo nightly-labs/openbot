@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -47,14 +48,14 @@ function input(overrides: Partial<SaveCustomProviderInput> = {}): SaveCustomProv
 
 async function loaded(cipher: CustomProviderCipher = testCipher()): Promise<CustomProviderStore> {
   const store = new CustomProviderStore({ path, cipher });
-  await store.load();
+  await Effect.runPromise(store.load());
   return store;
 }
 
 describe("CustomProviderStore", () => {
   it("gives a fresh instance the endpoint and its credentials back", async () => {
     const store = await loaded();
-    await store.save(input());
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
 
     const reopened = await loaded();
     expect(reopened.list()).toEqual([
@@ -80,7 +81,7 @@ describe("CustomProviderStore", () => {
 
   it("writes neither the key nor a header value in plain text", async () => {
     const store = await loaded();
-    await store.save(input());
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
 
     // Read as bytes: a key hidden from a string search by an escape or an encoding would still be
     // the key on disk.
@@ -94,7 +95,7 @@ describe("CustomProviderStore", () => {
 
   it("tells the renderer nothing but the four fields it needs", async () => {
     const store = await loaded();
-    await store.save(input());
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
     // Not `toEqual` on the whole object: this asserts that no fifth field can appear, whatever it
     // is named. `apiKey` and `headers` are the two that must never be here.
     expect(Object.keys(store.list()[0] ?? {}).sort()).toEqual(["baseUrl", "hasApiKey", "id", "models", "name"]);
@@ -102,14 +103,18 @@ describe("CustomProviderStore", () => {
 
   it("refuses a credential when the computer has no secure storage", async () => {
     const store = await loaded(testCipher({ canPersist: () => false }));
-    await expect(store.save(input())).rejects.toThrow(/no secure storage/);
+    await expect(Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
+      /no secure storage/,
+    );
     expect(store.list()).toEqual([]);
     await expect(readdir(root)).resolves.toEqual([]);
   });
 
   it("still saves a keyless endpoint without secure storage", async () => {
     const store = await loaded(testCipher({ canPersist: () => false }));
-    await store.save(input({ apiKey: null, headers: [] }));
+    await Effect.runPromise(
+      store.save(input({ apiKey: null, headers: [] })).pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(store.list()).toEqual([
       {
         id: "studio-local",
@@ -123,7 +128,7 @@ describe("CustomProviderStore", () => {
 
   it("keeps an endpoint whose ciphertext this computer can no longer read", async () => {
     const store = await loaded();
-    await store.save(input());
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
 
     const foreign = await loaded(
       testCipher({
@@ -155,8 +160,12 @@ describe("CustomProviderStore", () => {
 
     const store = await loaded();
     expect(store.list()).toEqual([]);
-    await expect(store.save(input())).rejects.toThrow(/newer version/);
-    await expect(store.remove("from-the-future")).rejects.toThrow(/newer version/);
+    await expect(Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
+      /newer version/,
+    );
+    await expect(
+      Effect.runPromise(store.remove("from-the-future").pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow(/newer version/);
     expect(await readFile(path, "utf8")).toBe(newer);
   });
 
@@ -165,42 +174,58 @@ describe("CustomProviderStore", () => {
     await writeFile(path, "{ half a file");
 
     const store = await loaded();
-    await expect(store.save(input())).rejects.toThrow(/cannot be read/);
+    await expect(Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
+      /cannot be read/,
+    );
     expect(await readFile(path, "utf8")).toBe("{ half a file");
   });
 
   it("refuses a second endpoint under one provider ID", async () => {
     const store = await loaded();
-    await store.save(input());
-    await expect(store.save(input({ name: "Another", apiKey: "sk-replacement" }))).rejects.toThrow(/already saved/);
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await expect(
+      Effect.runPromise(
+        store.save(input({ name: "Another", apiKey: "sk-replacement" })).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow(/already saved/);
     expect(store.list()).toHaveLength(1);
     expect(store.configs()[0]?.apiKey).toBe("sk-secret-key");
   });
 
   it("removes an endpoint and its credentials, and ignores an id it does not hold", async () => {
     const store = await loaded();
-    await store.save(input());
-    await store.save(input({ id: "house-router", name: "House Router" }));
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(
+      store.save(input({ id: "house-router", name: "House Router" })).pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    expect(await store.remove("studio-local")).toEqual([expect.objectContaining({ id: "house-router" })]);
+    expect(await Effect.runPromise(store.remove("studio-local").pipe(Effect.mapError((error) => error.cause)))).toEqual(
+      [expect.objectContaining({ id: "house-router" })],
+    );
     const raw = await readFile(path);
     expect(raw.includes("studio-local")).toBe(false);
 
-    expect(await store.remove("studio-local")).toHaveLength(1);
+    expect(
+      await Effect.runPromise(store.remove("studio-local").pipe(Effect.mapError((error) => error.cause))),
+    ).toHaveLength(1);
   });
 
   it("keeps the endpoint listed when the removal cannot be written, and removes it on a retry", async () => {
     const store = await loaded();
-    await store.save(input());
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
     // A directory this process cannot write to is the durable failure the user meets as a full or
     // read-only disk: the file keeps the endpoint, so the list in memory must keep it too.
     await chmod(dirname(path), 0o500);
 
-    await expect(store.remove("studio-local")).rejects.toThrow();
+    await expect(
+      Effect.runPromise(store.remove("studio-local").pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow();
 
     expect(store.list()).toHaveLength(1);
     await chmod(dirname(path), 0o700);
-    expect(await store.remove("studio-local")).toEqual([]);
+    expect(await Effect.runPromise(store.remove("studio-local").pipe(Effect.mapError((error) => error.cause)))).toEqual(
+      [],
+    );
     expect((await readFile(path, "utf8")).includes("studio-local")).toBe(false);
   });
 
@@ -209,7 +234,12 @@ describe("CustomProviderStore", () => {
   it("keeps both endpoints when two saves run together", async () => {
     const store = await loaded();
 
-    await Promise.all([store.save(input()), store.save(input({ id: "house-router", name: "House Router" }))]);
+    await Promise.all([
+      Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause))),
+      Effect.runPromise(
+        store.save(input({ id: "house-router", name: "House Router" })).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ]);
 
     expect(
       store
@@ -222,10 +252,15 @@ describe("CustomProviderStore", () => {
 
   it("removes both endpoints when two removals run together", async () => {
     const store = await loaded();
-    await store.save(input());
-    await store.save(input({ id: "house-router", name: "House Router" }));
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(
+      store.save(input({ id: "house-router", name: "House Router" })).pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    await Promise.all([store.remove("studio-local"), store.remove("house-router")]);
+    await Promise.all([
+      Effect.runPromise(store.remove("studio-local").pipe(Effect.mapError((error) => error.cause))),
+      Effect.runPromise(store.remove("house-router").pipe(Effect.mapError((error) => error.cause))),
+    ]);
 
     expect(store.list()).toEqual([]);
     expect(JSON.parse(await readFile(path, "utf8")).providers).toEqual([]);
@@ -233,9 +268,9 @@ describe("CustomProviderStore", () => {
 
   it("leaves no temporary file behind", async () => {
     const store = await loaded();
-    await store.save(input());
-    await store.save(input({ id: "house-router" }));
-    await store.remove("house-router");
+    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(store.save(input({ id: "house-router" })).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(store.remove("house-router").pipe(Effect.mapError((error) => error.cause)));
     expect((await readdir(join(root, "nested"))).filter((name) => name.includes(".tmp"))).toEqual([]);
   });
 
@@ -256,11 +291,11 @@ describe("CustomProviderStore", () => {
         },
       });
       const store = await loaded(cipher);
-      await store.save(input());
+      await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
       const before = JSON.parse(await readFile(path, "utf8")).providers[0].secret;
       sealed = 0;
 
-      await store.update({ ...edit });
+      await Effect.runPromise(store.update({ ...edit }).pipe(Effect.mapError((error) => error.cause)));
 
       expect(sealed).toBe(0);
       expect(JSON.parse(await readFile(path, "utf8")).providers[0].secret).toBe(before);
@@ -275,12 +310,28 @@ describe("CustomProviderStore", () => {
 
     it("refuses a new origin that would keep the stored credentials, and changes nothing", async () => {
       const store = await loaded();
-      await store.save(input());
+      await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
       const before = await readFile(path, "utf8");
 
-      await expect(store.update({ ...edit, baseUrl: "https://attacker.example/v1" })).rejects.toThrow();
-      await expect(store.update({ ...edit, baseUrl: "http://[::1]:11434/v1" })).rejects.toThrow();
-      await expect(store.update({ ...edit, baseUrl: "http://127.0.0.1:9999/v1", apiKey: "sk-new" })).rejects.toThrow();
+      await expect(
+        Effect.runPromise(
+          store
+            .update({ ...edit, baseUrl: "https://attacker.example/v1" })
+            .pipe(Effect.mapError((error) => error.cause)),
+        ),
+      ).rejects.toThrow();
+      await expect(
+        Effect.runPromise(
+          store.update({ ...edit, baseUrl: "http://[::1]:11434/v1" }).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      ).rejects.toThrow();
+      await expect(
+        Effect.runPromise(
+          store
+            .update({ ...edit, baseUrl: "http://127.0.0.1:9999/v1", apiKey: "sk-new" })
+            .pipe(Effect.mapError((error) => error.cause)),
+        ),
+      ).rejects.toThrow();
 
       expect(await readFile(path, "utf8")).toBe(before);
       expect(store.configs()[0]?.baseUrl).toBe("http://127.0.0.1:11434/v1");
@@ -288,14 +339,18 @@ describe("CustomProviderStore", () => {
 
     it("moves to a new origin when the key and the headers are both sent again", async () => {
       const store = await loaded();
-      await store.save(input());
+      await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
 
-      await store.update({
-        ...edit,
-        baseUrl: "https://models.example.com/v1",
-        apiKey: "sk-new",
-        headers: [],
-      });
+      await Effect.runPromise(
+        store
+          .update({
+            ...edit,
+            baseUrl: "https://models.example.com/v1",
+            apiKey: "sk-new",
+            headers: [],
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
 
       expect((await loaded()).configs()[0]).toMatchObject({
         baseUrl: "https://models.example.com/v1",
@@ -305,7 +360,7 @@ describe("CustomProviderStore", () => {
     });
 
     it("refuses to replace one part of a ciphertext this computer cannot read, and changes nothing", async () => {
-      await (await loaded()).save(input());
+      await Effect.runPromise((await loaded()).save(input()));
       const before = await readFile(path, "utf8");
       const foreign = await loaded(
         testCipher({
@@ -315,15 +370,21 @@ describe("CustomProviderStore", () => {
         }),
       );
 
-      await expect(foreign.update({ ...edit, apiKey: "sk-new" })).rejects.toThrow(/cannot read/);
+      await expect(
+        Effect.runPromise(foreign.update({ ...edit, apiKey: "sk-new" }).pipe(Effect.mapError((error) => error.cause))),
+      ).rejects.toThrow(/cannot read/);
       expect(await readFile(path, "utf8")).toBe(before);
-      await foreign.update({ ...edit, apiKey: "sk-new", headers: [] });
+      await Effect.runPromise(
+        foreign.update({ ...edit, apiKey: "sk-new", headers: [] }).pipe(Effect.mapError((error) => error.cause)),
+      );
       expect((await loaded()).configs()[0]).toMatchObject({ apiKey: "sk-new", headers: [] });
     });
 
     it("refuses an endpoint that is not saved", async () => {
       const store = await loaded();
-      await expect(store.update({ ...edit })).rejects.toThrow();
+      await expect(
+        Effect.runPromise(store.update({ ...edit }).pipe(Effect.mapError((error) => error.cause))),
+      ).rejects.toThrow();
       expect(store.list()).toEqual([]);
     });
   });

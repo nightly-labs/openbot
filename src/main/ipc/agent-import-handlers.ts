@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Agent import into the local host, or into a joined server with `agent-import-v1`. The file dialog
 // opens here, so the renderer never names a path. For a joined server, main reads the file and sends it.
 
@@ -65,19 +67,31 @@ export function agentImportIpcHandlers({
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(sourceText("error.import.remoteZipTooLarge"));
-    return remoteServers.stageAgentImport(serverId, new Uint8Array(await readFile(path)));
+    return Effect.runPromise(
+      remoteServers
+        .stageAgentImport(serverId, new Uint8Array(await readFile(path)))
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
   };
 
   const applyRemote = async (input: ApplyAgentImportInput, serverId: string) => {
     requireRemoteImport(serverId);
-    const result = await remoteServers.request(serverId, AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, {
-      method: "POST",
-      body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
-    });
+    const result = await Effect.runPromise(
+      remoteServers
+        .request(serverId, AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, {
+          method: "POST",
+          body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+        })
+        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    );
     return resolveRemoteAgentImportResult(
       result,
-      await remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+      await Effect.runPromise(
+        remoteServers
+          .request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
+          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      ),
     );
   };
 
@@ -86,22 +100,26 @@ export function agentImportIpcHandlers({
       choose: scopedQueryHandler({
         local: async () => {
           const path = await chooseExport();
-          return path ? agentImport.stage(path) : null;
+          return path ? Effect.runPromise(agentImport.stage(path).pipe(Effect.mapError((error) => error.cause))) : null;
         },
         remote: stageRemote,
       }),
       apply: scopedHandler(parseApplyAgentImportInput, {
-        local: (input) => agentImport.apply(input),
+        local: (input) => Effect.runPromise(agentImport.apply(input).pipe(Effect.mapError((error) => error.cause))),
         remote: applyRemote,
       }),
       discard: scopedHandler(stringPayload("token"), {
-        local: (token) => agentImport.discard(token),
+        local: (token) => Effect.runPromise(agentImport.discard(token)),
         remote: async (token, serverId) => {
           requireRemoteImport(serverId);
-          await remoteServers.request(serverId, AGENT_IMPORT_ROUTES.discard, () => undefined, {
-            method: "POST",
-            body: { token },
-          });
+          await Effect.runPromise(
+            remoteServers
+              .request(serverId, AGENT_IMPORT_ROUTES.discard, () => undefined, {
+                method: "POST",
+                body: { token },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       readSkill: handler(() => readFile(exportSkillPath, "utf8")),

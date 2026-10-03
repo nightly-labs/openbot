@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../../server/effect-runtime";
 import {
   apiError,
   hostedSiteErrorResponse,
@@ -14,11 +15,11 @@ export const Route = createFileRoute("/v1/sites/uploads/$uploadId/file")({
       PUT: async ({ request, params }) => {
         try {
           requireSitePublishingEnabled();
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           const path = new URL(request.url).searchParams.get("path");
           if (!path) return apiError(400, "invalid_site", "A file path is required.");
-          await requestHostedSiteService().uploadFile(user.id, params.uploadId, path, request);
+          await runApiEffect(requestHostedSiteService().uploadFile(user.id, params.uploadId, path, request));
           return json({ uploaded: true });
         } catch (error) {
           return hostedSiteErrorResponse(error);

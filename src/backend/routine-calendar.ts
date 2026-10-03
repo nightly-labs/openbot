@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The routine calendar: every routine of a host, of agents and channels, with its runs in a range.
 // A past run comes from the run history, a later one from the schedule. The local host and a remote
 // one give the same source, so both calendars place runs with the same schedule code.
@@ -16,31 +17,42 @@ import { nextValidRoutineOccurrence, validateRoutineSchedule } from "./routine-s
 /** A remote host gets one request for each owner and each routine; this many run at the same time. */
 const PARALLEL_REQUESTS = 8;
 
-export interface RoutineCalendarSource {
-  owners(): Promise<RoutineCalendarOwner[]>;
-  routines(owner: RoutineCalendarOwner): Promise<RoutineFields[]>;
+export interface RoutineCalendarSource<E> {
+  owners(): Effect.Effect<RoutineCalendarOwner[], E>;
+  routines(owner: RoutineCalendarOwner): Effect.Effect<RoutineFields[], E>;
   /** The newest runs of one routine, newest first. */
-  runs(owner: RoutineCalendarOwner, routineId: string, limit: number): Promise<RoutineRunFields[]>;
+  runs(owner: RoutineCalendarOwner, routineId: string, limit: number): Effect.Effect<RoutineRunFields[], E>;
 }
 
-export async function buildRoutineCalendar(
+export const buildRoutineCalendar = Effect.fn("RoutineCalendar.build")(function* <E>(
   range: { from: Date; to: Date },
   now: Date,
-  source: RoutineCalendarSource,
-): Promise<RoutineCalendar> {
-  const owners = await source.owners();
-  const routineLists = await mapLimited(owners, async (owner) =>
-    (await source.routines(owner)).map((routine) => ({ owner, routine })),
+  source: RoutineCalendarSource<E>,
+): Effect.fn.Return<RoutineCalendar, E> {
+  const owners = yield* source.owners();
+  const lists = yield* Effect.forEach(
+    owners,
+    (owner) => source.routines(owner).pipe(Effect.map((routines) => routines.map((routine) => ({ owner, routine })))),
+    { concurrency: PARALLEL_REQUESTS },
   );
-  const routines = routineLists.flat();
-  const runLists = await mapLimited(routines, async ({ owner, routine }) => {
-    // History reaches back from now, so a range that ends before the oldest run kept here has no history.
-    const history =
-      range.from.getTime() < now.getTime() ? await source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage) : [];
-    // Planning does not wait, so the main process gets a turn between routines.
-    await new Promise((resolve) => setImmediate(resolve));
-    return routineRuns(routine, history, range, now);
-  });
+  const routines = lists.flat();
+  const runLists = yield* Effect.forEach(
+    routines,
+    ({ owner, routine }) =>
+      Effect.gen(function* () {
+        const history =
+          range.from.getTime() < now.getTime()
+            ? yield* source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage)
+            : [];
+        // Give the native event loop a turn between schedule calculations.
+        yield* Effect.callback<void>((resume) => {
+          const immediate = setImmediate(() => resume(Effect.void));
+          return Effect.sync(() => clearImmediate(immediate));
+        });
+        return routineRuns(routine, history, range, now);
+      }),
+    { concurrency: PARALLEL_REQUESTS },
+  );
   return {
     routines: routines.map(({ owner, routine }) => ({
       id: routine.id,
@@ -52,19 +64,7 @@ export async function buildRoutineCalendar(
     })),
     runs: runLists.flat(),
   };
-}
-
-/** Like `Promise.all` over `map`, with at most `PARALLEL_REQUESTS` calls in flight. Results keep the input order. */
-async function mapLimited<T, R>(items: readonly T[], map: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  // The workers share one iterator, so each item is taken once.
-  const queue = items.entries();
-  const worker = async () => {
-    for (const [index, item] of queue) results[index] = await map(item);
-  };
-  await Promise.all(Array.from({ length: Math.min(PARALLEL_REQUESTS, items.length) }, worker));
-  return results;
-}
+});
 
 function routineRuns(
   routine: RoutineFields,

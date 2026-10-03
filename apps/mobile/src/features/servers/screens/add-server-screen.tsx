@@ -1,5 +1,6 @@
 import { type InviteLinkOptions, parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
+import { runTeamEffect } from "@openbot/team-client";
 import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
 import { router } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -80,7 +81,7 @@ export function AddServerScreen({
       return;
     }
     setPreviewing(true);
-    void teamDirectory.previewInvite(request.url).then(
+    void runTeamEffect(teamDirectory.previewInvite(request.url)).then(
       (value) => {
         if (!active) return;
         setPreview(value);

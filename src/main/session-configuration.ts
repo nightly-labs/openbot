@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 /**
  * Everything that configures the default Electron session: the renderer's Content-Security-Policy,
  * its permission handlers, and the custom protocols that serve the packaged renderer bundle,
@@ -65,16 +66,20 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
     try {
       const url = new URL(request.url);
       const id = url.pathname.split("/").filter(Boolean).at(-1);
-      const attachment = id ? await mailbox.resolveAttachment(id) : null;
+      const attachment = id
+        ? await Effect.runPromise(mailbox.resolveAttachment(id).pipe(Effect.mapError((error) => error.cause)))
+        : null;
       if (!attachment) return new Response("Not found", { status: 404 });
-      return await fileResponse(attachment.path, {
-        "Content-Type": attachment.mimeType,
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-        Vary: "Origin",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": "inline",
-      });
+      return await Effect.runPromise(
+        fileResponse(attachment.path, {
+          "Content-Type": attachment.mimeType,
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
+          Vary: "Origin",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Disposition": "inline",
+        }).pipe(Effect.mapError((error) => error.cause)),
+      );
     } catch {
       return new Response("Not found", { status: 404 });
     }
@@ -85,7 +90,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const serverId = decodeURIComponent(url.hostname);
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
-      const attachment = await remoteServers.downloadAttachment(attachmentId, serverId);
+      const attachment = await Effect.runPromise(
+        remoteServers.downloadAttachment(attachmentId, serverId).pipe(Effect.mapError((error) => error.cause)),
+      );
       return new Response(Buffer.from(attachment.bytes), {
         headers: {
           "Content-Type": attachment.mimeType,
@@ -109,11 +116,13 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       if (!avatar || avatar.version !== url.searchParams.get("v")) {
         return new Response("Not found", { status: 404 });
       }
-      return await fileResponse(avatar.path, {
-        "Content-Type": avatar.mimeType,
-        "Cache-Control": "private, max-age=31536000, immutable",
-        "X-Content-Type-Options": "nosniff",
-      });
+      return await Effect.runPromise(
+        fileResponse(avatar.path, {
+          "Content-Type": avatar.mimeType,
+          "Cache-Control": "private, max-age=31536000, immutable",
+          "X-Content-Type-Options": "nosniff",
+        }).pipe(Effect.mapError((error) => error.cause)),
+      );
     } catch {
       return new Response("Not found", { status: 404 });
     }
@@ -126,7 +135,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       if (!serverId || !agentId) return new Response("Not found", { status: 404 });
       const version = url.searchParams.get("v");
       if (!version) return new Response("Not found", { status: 404 });
-      const avatar = await remoteServers.downloadAgentAvatar(agentId, serverId, version);
+      const avatar = await Effect.runPromise(
+        remoteServers.downloadAgentAvatar(agentId, serverId, version).pipe(Effect.mapError((error) => error.cause)),
+      );
       return new Response(Buffer.from(avatar.bytes), {
         headers: {
           "Content-Type": avatar.mimeType,
@@ -153,11 +164,13 @@ export function configureServerLogoProtocols({ teamStore, remoteServers }: Serve
       if (url.hostname !== LOCAL_SERVER_ID || !logo || logo.version !== url.searchParams.get("v")) {
         return new Response("Not found", { status: 404 });
       }
-      return await fileResponse(logo.path, {
-        "Content-Type": logo.mimeType,
-        "Cache-Control": "private, max-age=31536000, immutable",
-        "X-Content-Type-Options": "nosniff",
-      });
+      return await Effect.runPromise(
+        fileResponse(logo.path, {
+          "Content-Type": logo.mimeType,
+          "Cache-Control": "private, max-age=31536000, immutable",
+          "X-Content-Type-Options": "nosniff",
+        }).pipe(Effect.mapError((error) => error.cause)),
+      );
     } catch {
       return new Response("Not found", { status: 404 });
     }
@@ -168,7 +181,9 @@ export function configureServerLogoProtocols({ teamStore, remoteServers }: Serve
       const serverId = decodeURIComponent(url.hostname);
       const version = url.searchParams.get("v");
       if (!serverId || !version) return new Response("Not found", { status: 404 });
-      const logo = await remoteServers.downloadServerLogo(serverId, version);
+      const logo = await Effect.runPromise(
+        remoteServers.downloadServerLogo(serverId, version).pipe(Effect.mapError((error) => error.cause)),
+      );
       return new Response(Buffer.from(logo.bytes), {
         headers: {
           "Content-Type": logo.mimeType,

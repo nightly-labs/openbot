@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { sha256 } from "../../../server/crypto";
+import { runApiEffect } from "../../../server/effect-runtime";
 import {
   apiError,
   authErrorResponse,
@@ -16,11 +17,11 @@ export const Route = createFileRoute("/v1/auth/logout")({
           const token = bearerToken(request);
           if (!token) return apiError(401, "unauthorized", "Sign in is required.");
           const service = requestAuthService();
-          const user = await service.authenticateDesktopSession(token);
+          const user = await runApiEffect(service.authenticateDesktopSession(token));
           if (!user) {
             return apiError(401, "unauthorized", "The session is invalid.");
           }
-          await requestRemoteControlPlane().endAccountSession(user.id, await sha256(token));
+          await runApiEffect(requestRemoteControlPlane().endAccountSession(user.id, await runApiEffect(sha256(token))));
           return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
         } catch (error) {
           return authErrorResponse(error);

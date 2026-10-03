@@ -5,6 +5,7 @@ import {
   removeAccountAvatar,
   storeAccountAvatar,
 } from "../../../server/avatar-storage";
+import { runApiEffect } from "../../../server/effect-runtime";
 import {
   apiError,
   authErrorResponse,
@@ -22,10 +23,10 @@ export const Route = createFileRoute("/v1/me/avatar")({
           const token = bearerToken(request);
           if (!token) return apiError(401, "unauthorized", "Sign in is required.");
           const service = requestAuthService();
-          const user = await service.authenticate(token);
+          const user = await runApiEffect(service.authenticate(token));
           if (!user) return apiError(401, "unauthorized", "The session is invalid.");
-          const upload = await readAvatarUpload(request);
-          return json(await storeAccountAvatar(service, requestAvatarBucket(), token, user, upload));
+          const upload = await runApiEffect(readAvatarUpload(request));
+          return json(await runApiEffect(storeAccountAvatar(service, requestAvatarBucket(), token, user, upload)));
         } catch (error) {
           if (error instanceof AvatarUploadError) {
             return apiError(error.status, error.code, error.message);
@@ -38,9 +39,9 @@ export const Route = createFileRoute("/v1/me/avatar")({
           const token = bearerToken(request);
           if (!token) return apiError(401, "unauthorized", "Sign in is required.");
           const service = requestAuthService();
-          const user = await service.authenticate(token);
+          const user = await runApiEffect(service.authenticate(token));
           if (!user) return apiError(401, "unauthorized", "The session is invalid.");
-          return json(await removeAccountAvatar(service, requestAvatarBucket(), token, user));
+          return json(await runApiEffect(removeAccountAvatar(service, requestAvatarBucket(), token, user)));
         } catch (error) {
           return authErrorResponse(error);
         }

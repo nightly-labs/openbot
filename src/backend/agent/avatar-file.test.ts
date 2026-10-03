@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runTestEffect } from "../effect-test-runtime";
 import { loadAvatarFile } from "./avatar-file";
 
 let root: string;
@@ -22,8 +23,8 @@ describe("avatar files", () => {
     const bytes = Buffer.from(header);
     const path = join(root, "avatar.data");
     await writeFile(path, bytes);
-    expect(await loadAvatarFile("avatar.data", root)).toEqual({ mimeType, bytes });
-    expect(await loadAvatarFile(path, join(root, "other"))).toEqual({ mimeType, bytes });
+    expect(await runTestEffect(loadAvatarFile("avatar.data", root))).toEqual({ mimeType, bytes });
+    expect(await runTestEffect(loadAvatarFile(path, join(root, "other")))).toEqual({ mimeType, bytes });
     expect(await readFile(path)).toEqual(bytes);
   });
 
@@ -31,7 +32,7 @@ describe("avatar files", () => {
     "rejects unsupported image content %j",
     async (bytes) => {
       await writeFile(join(root, "avatar.png"), bytes);
-      await expect(loadAvatarFile("avatar.png", root)).rejects.toThrow(
+      await expect(runTestEffect(loadAvatarFile("avatar.png", root))).rejects.toThrow(
         "Choose a valid PNG, JPEG, or WebP avatar image.",
       );
     },
@@ -41,15 +42,17 @@ describe("avatar files", () => {
     const bytes = Buffer.alloc(AVATAR_IMAGE_LIMITS.storedBytes, 0xff);
     bytes[1] = 0xd8;
     await writeFile(join(root, "avatar.jpg"), bytes);
-    expect((await loadAvatarFile("avatar.jpg", root)).bytes).toEqual(bytes);
+    expect((await runTestEffect(loadAvatarFile("avatar.jpg", root))).bytes).toEqual(bytes);
     await writeFile(join(root, "avatar.jpg"), Buffer.concat([bytes, Buffer.from([0])]));
-    await expect(loadAvatarFile("avatar.jpg", root)).rejects.toThrow(
+    await expect(runTestEffect(loadAvatarFile("avatar.jpg", root))).rejects.toThrow(
       "Resize or compress a copy with your available tools",
     );
   });
 
   it("rejects missing files and directories", async () => {
-    await expect(loadAvatarFile("missing.png", root)).rejects.toThrow("Use an existing local image path.");
-    await expect(loadAvatarFile(root, root)).rejects.toThrow("regular file");
+    await expect(runTestEffect(loadAvatarFile("missing.png", root))).rejects.toThrow(
+      "Use an existing local image path.",
+    );
+    await expect(runTestEffect(loadAvatarFile(root, root))).rejects.toThrow("regular file");
   });
 });

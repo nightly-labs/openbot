@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
+import { runTestEffect } from "../backend/effect-test-runtime";
 import { CuaDriverActionTap, readRequest } from "./cua-driver-action-tap";
 import { STRUCTURED_TEXT_LABEL } from "./cua-driver-structured-text";
 
@@ -83,8 +84,8 @@ describe("CuaDriverActionTap", () => {
     await daemon.listen();
     cleanUp.push(daemon.close);
     const tap = new CuaDriverActionTap(now, logger);
-    await tap.listen({ upstream, tap: address });
-    cleanUp.push(() => tap.close());
+    await runTestEffect(tap.listen({ upstream, tap: address }));
+    cleanUp.push(() => runTestEffect(tap.close()));
     const client = connect(address);
     cleanUp.push(async () => client.destroy());
     return { tap, daemon, client };

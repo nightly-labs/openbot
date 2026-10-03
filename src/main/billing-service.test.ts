@@ -1,6 +1,8 @@
 import { parseBillingPortalRequest } from "@openbot/contracts/billing";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { type BillingAuthClient, BillingDesktopService } from "./billing-service";
+import { authDecode } from "./central-auth-effects";
 import { HostedServerDesktopService } from "./hosted-server-service";
 
 describe("billing desktop service", () => {
@@ -15,7 +17,9 @@ describe("billing desktop service", () => {
     const openExternal = vi.fn().mockResolvedValue(undefined);
     const service = new BillingDesktopService(accountServer({ url }), openExternal);
 
-    await expect(service.openPortal({ flow: "manage" })).rejects.toThrow();
+    await expect(
+      Effect.runPromise(service.openPortal({ flow: "manage" }).pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow();
     expect(openExternal).not.toHaveBeenCalled();
   });
 
@@ -26,7 +30,9 @@ describe("billing desktop service", () => {
       openExternal,
     );
 
-    await service.openPortal({ flow: "cancel", subscriptionId: "sub_1" });
+    await Effect.runPromise(
+      service.openPortal({ flow: "cancel", subscriptionId: "sub_1" }).pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(openExternal).toHaveBeenCalledWith("https://billing.stripe.com/p/session/bps_1");
   });
 
@@ -70,15 +76,21 @@ describe("hosted server checkout", () => {
     const openExternal = vi.fn().mockResolvedValue(undefined);
     const service = new HostedServerDesktopService(accountServer({ server, checkoutUrl }), openExternal);
 
-    await expect(service.openCheckout("srv_1")).rejects.toThrow();
     await expect(
-      service.create({
-        name: "Cloud server",
-        plan: "starter",
-        interval: "month",
-        currency: "eur",
-        requestId: "request-0123456789",
-      }),
+      Effect.runPromise(service.openCheckout("srv_1").pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow();
+    await expect(
+      Effect.runPromise(
+        service
+          .create({
+            name: "Cloud server",
+            plan: "starter",
+            interval: "month",
+            currency: "eur",
+            requestId: "request-0123456789",
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).rejects.toThrow();
     expect(openExternal).not.toHaveBeenCalled();
   });
@@ -90,15 +102,17 @@ describe("hosted server checkout", () => {
       openExternal,
     );
 
-    await expect(service.openCheckout("srv_1")).resolves.toEqual(server);
+    await expect(
+      Effect.runPromise(service.openCheckout("srv_1").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual(server);
     expect(openExternal).toHaveBeenCalledWith("https://checkout.stripe.com/c/pay/cs_1");
   });
 });
 
 function accountServer(response: unknown): BillingAuthClient {
   return {
-    async requestAuthorized(_path, _init, decoder) {
-      return decoder(response);
+    requestAuthorized(_path, _init, decoder) {
+      return authDecode(() => decoder(response));
     },
   };
 }

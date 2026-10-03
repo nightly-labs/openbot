@@ -4,6 +4,7 @@ import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbo
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
+import { Effect, Semaphore } from "effect";
 import {
   app,
   BrowserWindow,
@@ -100,7 +101,7 @@ function reportMainProcessFailure(origin: "uncaughtException" | "unhandledReject
   logger.error(`Main process ${origin}:`, toLogValue(error));
   if (!crashTrace) return;
   crashTrace.record({ kind: "crash", name: origin, durationMs: 0, outcome: "reported" });
-  void crashTrace.flush();
+  Effect.runFork(crashTrace.flush());
 }
 
 const commandLineUserDataDirectory = app.commandLine.getSwitchValue("user-data-dir").trim();
@@ -203,7 +204,7 @@ let activeRemotePrincipalId: string | null = null;
 /** Counts account transitions, so queued work for a superseded one is dropped rather than applied. */
 let centralAuthGeneration = 0;
 let activeAnalyticsPrincipalId: string | null = null;
-let remoteAccountSync = Promise.resolve();
+const remoteAccountGate = Semaphore.makeUnsafe(1);
 const macHapticFeedback = new MacHapticFeedback();
 let isQuitting = false;
 let shutdownStarted = false;
@@ -359,16 +360,22 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
     isQuitting = true;
     if (systemSessionEndFlushStarted) return;
     systemSessionEndFlushStarted = true;
-    services?.updater.stop();
+    if (services) void Effect.runPromise(services.updater.stop());
     void windows
       .flushMainWindowBounds()
       .catch((error) =>
         logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
       );
-    void services?.browser
-      .flushPersistentStorage()
-      .catch((error) => logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)));
-    void services?.providerRuntimes.stop();
+    if (services)
+      void Effect.runPromise(
+        services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)),
+      ).catch((error) =>
+        logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
+      );
+    if (services)
+      void Effect.runPromise(services.providerRuntimes.stop()).catch((error) =>
+        logger.warn("Provider runtimes did not stop.", toLogValue(error)),
+      );
   });
   window.on("session-end", () => {
     systemSessionEnding = true;
@@ -378,10 +385,16 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
       .catch((error) =>
         logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
       );
-    void services?.browser
-      .flushPersistentStorage()
-      .catch((error) => logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)));
-    void services?.providerRuntimes.stop();
+    if (services)
+      void Effect.runPromise(
+        services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)),
+      ).catch((error) =>
+        logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)),
+      );
+    if (services)
+      void Effect.runPromise(services.providerRuntimes.stop()).catch((error) =>
+        logger.warn("Provider runtimes did not stop.", toLogValue(error)),
+      );
   });
 }
 
@@ -449,7 +462,8 @@ function registerIpcHandlers({
       approvalAutomation,
       language,
       logoColor,
-      initializeAgent: () => agentInitialization.start(),
+      initializeAgent: () =>
+        Effect.runPromise(agentInitialization.start().pipe(Effect.mapError((error) => error.cause))),
       appVariant,
       getMainWindow,
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
@@ -526,7 +540,9 @@ function registerIpcHandlers({
     ...mcpServerIpcHandlers({
       service,
       remoteServers,
-      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      startToolRuntimes: () => {
+        Effect.runFork(providerRuntimes.ensureToolRuntimes());
+      },
       ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     }),
@@ -549,14 +565,16 @@ function requestDesktopNotificationPermission(
   preference: ApplicationServices["notificationPreference"],
   translate: ApplicationServices["language"]["translate"],
 ): Promise<void> {
-  return requestNotificationPermission({
-    platform: process.platform,
-    preference,
-    showWelcome: () => {
-      if (!Notification.isSupported()) return;
-      showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
-    },
-  });
+  return Effect.runPromise(
+    requestNotificationPermission({
+      platform: process.platform,
+      preference,
+      showWelcome: () => {
+        if (!Notification.isSupported()) return;
+        showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
+      },
+    }).pipe(Effect.mapError((error) => error.cause)),
+  );
 }
 
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
@@ -577,66 +595,84 @@ function forwardCentralAuth(state: CentralAuthState): void {
   // The file is left alone until `applySignedInAccount` records the switch.
   services?.host.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
   const generation = ++centralAuthGeneration;
-  remoteAccountSync = remoteAccountSync
-    .then(async () => {
-      // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
-      // renderer was last told about may be activated; an earlier one would put a host the
-      // user has already left back within reach.
-      if (generation !== centralAuthGeneration) return;
-      const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
-      if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId) {
-        // Best-effort, like every other network step here: a bridge disconnect that
-        // rejects must not stop the local host from leaving the previous account.
-        try {
-          await services?.remoteServers.disconnectRemoteSessions();
-        } catch (error) {
-          logger.error("Unable to disconnect the previous account's remote sessions:", toLogValue(error));
-        }
-      }
-      // Rechecked after the disconnect: another account can be announced while it awaits,
-      // and activating this one now would put its host back within the newer account's reach.
-      if (generation !== centralAuthGeneration) return;
-      activeRemotePrincipalId = nextPrincipalId;
-      if (state.status !== "signed_in") {
-        if (state.status === "signed_out") {
-          // Stopping is best-effort; unbinding the host is not, so a failed teardown
-          // must not leave the signed-out account's host bound.
-          try {
-            await services?.host.stop(false);
-          } catch (error) {
-            logger.error("Unable to stop the host while signing out:", toLogValue(error));
+  void Effect.runPromise(
+    remoteAccountGate.withPermit(
+      Effect.tryPromise({
+        try: async () => {
+          // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
+          // renderer was last told about may be activated; an earlier one would put a host the
+          // user has already left back within reach.
+          if (generation !== centralAuthGeneration) return;
+          const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
+          if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId) {
+            // Best-effort, like every other network step here: a bridge disconnect that
+            // rejects must not stop the local host from leaving the previous account.
+            try {
+              if (services)
+                await Effect.runPromise(
+                  services.remoteServers.disconnectRemoteSessions().pipe(Effect.mapError((error) => error.cause)),
+                );
+            } catch (error) {
+              logger.error("Unable to disconnect the previous account's remote sessions:", toLogValue(error));
+            }
           }
-          await services?.host.applySignedInAccount(null);
-        }
-        return;
-      }
-      const host = services?.host ?? null;
-      // The local host is rebound before the joined-server list is synchronized, and the
-      // network failure is contained: this account must not end up signed in while the
-      // previous account's host is still selected and possibly online.
-      if (host) {
-        await host.applySignedInAccount(state.user);
-        if (generation !== centralAuthGeneration) {
-          // Another account was announced while this one was being activated. Its own queued
-          // callback binds it; until then no host answers for either.
-          host.unbindChangedAccount(null);
-          return;
-        }
-        services?.analytics.flushPending();
-      }
-      try {
-        await services?.remoteServers.syncRemoteHosts();
-      } catch (error) {
-        logger.error("Unable to synchronize the joined servers:", toLogValue(error));
-      }
-      // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
-      if (host && services?.serverMode) await services.serverMode.publish();
-      else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-        await host.start();
-    })
-    .catch((error) => {
-      logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
-    });
+          // Rechecked after the disconnect: another account can be announced while it awaits,
+          // and activating this one now would put its host back within the newer account's reach.
+          if (generation !== centralAuthGeneration) return;
+          activeRemotePrincipalId = nextPrincipalId;
+          if (state.status !== "signed_in") {
+            if (state.status === "signed_out") {
+              // Stopping is best-effort; unbinding the host is not, so a failed teardown
+              // must not leave the signed-out account's host bound.
+              try {
+                if (services)
+                  await Effect.runPromise(services.host.stop(false).pipe(Effect.mapError((error) => error.cause)));
+              } catch (error) {
+                logger.error("Unable to stop the host while signing out:", toLogValue(error));
+              }
+              if (services)
+                await Effect.runPromise(
+                  services.host.applySignedInAccount(null).pipe(Effect.mapError((error) => error.cause)),
+                );
+            }
+            return;
+          }
+          const host = services?.host ?? null;
+          // The local host is rebound before the joined-server list is synchronized, and the
+          // network failure is contained: this account must not end up signed in while the
+          // previous account's host is still selected and possibly online.
+          if (host) {
+            await Effect.runPromise(
+              host.applySignedInAccount(state.user).pipe(Effect.mapError((error) => error.cause)),
+            );
+            if (generation !== centralAuthGeneration) {
+              // Another account was announced while this one was being activated. Its own queued
+              // callback binds it; until then no host answers for either.
+              host.unbindChangedAccount(null);
+              return;
+            }
+            services?.analytics.flushPending();
+          }
+          try {
+            if (services)
+              await Effect.runPromise(
+                services.remoteServers.syncRemoteHosts().pipe(Effect.mapError((error) => error.cause)),
+              );
+          } catch (error) {
+            logger.error("Unable to synchronize the joined servers:", toLogValue(error));
+          }
+          // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
+          if (host && services?.serverMode)
+            await Effect.runPromise(services.serverMode.publish().pipe(Effect.mapError((error) => error.cause)));
+          else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
+            await Effect.runPromise(host.start().pipe(Effect.mapError((error) => error.cause)));
+        },
+        catch: (cause) => cause,
+      }),
+    ),
+  ).catch((error) => {
+    logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
+  });
   const window = windowHolder.current;
   if (!window || window.isDestroyed()) return;
   sendToRenderer(window, IPC_ENDPOINTS.auth.event, state);
@@ -694,8 +730,7 @@ function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
 function receiveSlackSignIn(link: Extract<DeepLink, { kind: "slack-workspace" }>): void {
   const messaging = services?.messaging;
   if (!messaging) return;
-  void messaging
-    .completeSlackWorkspace(link.nonce, link.grant)
+  void Effect.runPromise(messaging.completeSlackWorkspace(link.nonce, link.grant))
     .then((accepted) => {
       const window = windowHolder.current;
       if (accepted && window && !window.isDestroyed()) showMainWindow(window);
@@ -765,7 +800,7 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
-      if (!(await hostAllowsTenantLaunch())) {
+      if (!(await Effect.runPromise(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
@@ -777,7 +812,9 @@ if (!hasSingleInstanceLock) {
       // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
       // exists, so an AppImage writes its own first. Windows gets the scheme from the NSIS installer
       // instead.
-      await installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath });
+      await Effect.runPromise(
+        installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
+      );
       if (process.platform === "darwin" || process.platform === "linux") {
         if (!app.setAsDefaultProtocolClient("openbot")) {
           logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
@@ -901,7 +938,7 @@ if (!hasSingleInstanceLock) {
         .catch((error) => logger.error("Unable to initialize Dynamic Island:", toLogValue(error)));
       await windows.loadRenderer(mainWindow);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
-      remoteServers.startEventConnections();
+      await Effect.runPromise(remoteServers.startEventConnections());
       const reconcileDynamicIsland = () =>
         void dynamicIsland
           .reconcileWindow()
@@ -910,7 +947,7 @@ if (!hasSingleInstanceLock) {
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
-      powerMonitor.on("resume", () => remoteServers.wake());
+      powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
@@ -920,9 +957,12 @@ if (!hasSingleInstanceLock) {
       const teamIdentity = teamStore.getIdentity();
       if (built.serverMode) {
         const serverModeControl = built.serverMode;
-        void built.centralAuthInitialization
-          .then(() => serverModeControl.publish())
-          .catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
+        void Effect.runPromise(
+          built.centralAuthInitialization.pipe(
+            Effect.flatMap(() => serverModeControl.publish()),
+            Effect.mapError((error) => error.cause),
+          ),
+        ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
       } else if (
         shouldAutoStartHost({
           configured: Boolean(teamIdentity),
@@ -930,32 +970,45 @@ if (!hasSingleInstanceLock) {
           remoteRole: developmentRemoteRole,
         })
       ) {
-        void built.centralAuthInitialization
-          .then(() => host.start())
-          .catch((error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)));
+        void Effect.runPromise(
+          built.centralAuthInitialization.pipe(
+            Effect.flatMap(() => host.start()),
+            Effect.mapError((error) => error.cause),
+          ),
+        ).catch((error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)));
       }
-      void built.agentInitialization.start().catch((error) => {
-        logger.error("Unable to initialize the local agent backend:", toLogValue(error));
-      });
+      void Effect.runPromise(built.agentInitialization.start().pipe(Effect.mapError((error) => error.cause))).catch(
+        (error) => {
+          logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+        },
+      );
 
       const directoryRefresh = createRemoteDirectoryRefresh(() => {
         const generation = centralAuthGeneration;
-        remoteAccountSync = remoteAccountSync
-          .then(async () => {
-            if (generation !== centralAuthGeneration || built.centralAuth.getState().status !== "signed_in") return;
-            await remoteServers.syncRemoteHosts();
-          })
-          .catch((error) => logger.error("Unable to refresh joined servers:", toLogValue(error)));
-        return remoteAccountSync;
+        return remoteAccountGate
+          .withPermit(
+            Effect.gen(function* () {
+              if (generation !== centralAuthGeneration || built.centralAuth.getState().status !== "signed_in") return;
+              yield* remoteServers.syncRemoteHosts();
+            }),
+          )
+          .pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => logger.error("Unable to refresh joined servers:", toLogValue(error.cause))),
+            ),
+          );
       });
       app.on("browser-window-focus", (_event, window) => {
         if (window === windowHolder.current) {
           startDirectoryWatch();
-          remoteServers.setAppFocused(true);
+          void Effect.runPromise(remoteServers.setAppFocused(true));
         }
       });
-      app.on("browser-window-blur", () => remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null));
-      const refreshMemberships = () => void directoryRefresh.refresh(true);
+      app.on(
+        "browser-window-blur",
+        () => void Effect.runPromise(remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null)),
+      );
+      const refreshMemberships = () => void Effect.runPromise(directoryRefresh.refresh(true));
       remoteServers.on("directoryInvalidated", refreshMemberships);
       let stopDirectoryWatch = () => {};
       const startDirectoryWatch = () => {
@@ -998,8 +1051,11 @@ app.on("window-all-closed", () => {
 app.on("before-quit", (event) => {
   isQuitting = true;
   if (systemSessionEnding) {
-    services?.updater.stop();
-    void services?.providerRuntimes.stop();
+    if (services) void Effect.runPromise(services.updater.stop());
+    if (services)
+      void Effect.runPromise(services.providerRuntimes.stop()).catch((error) =>
+        logger.warn("Provider runtimes did not stop.", toLogValue(error)),
+      );
     return;
   }
   if (shutdownStarted) return;
@@ -1029,7 +1085,8 @@ function forceExitAfterShutdownDeadline(): void {
 }
 
 async function prepareForUpdateInstall(): Promise<void> {
-  await (services?.browser.flushPersistentStorage() ?? Promise.resolve());
+  if (services)
+    await Effect.runPromise(services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)));
   await prepareForShutdown();
 }
 
@@ -1045,7 +1102,7 @@ async function prepareForShutdown(): Promise<void> {
   shutdownStarted = true;
   isQuitting = true;
   forceExitAfterShutdownDeadline();
-  services?.updater.stop();
+  if (services) Effect.runFork(services.updater.stop());
   await windows
     .flushMainWindowBounds()
     .catch((error) => logger.error("Unable to save the main window position:", toLogValue(error)));

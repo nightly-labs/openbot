@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // `servers.json` against a real disk. `remote-server-stored-shape.test.ts` covers what the reader
@@ -54,7 +55,9 @@ describe("remote server store", () => {
     const path = await storePath(written);
     const store = newStore(path);
 
-    await expect(store.load()).rejects.toThrow(/format this version can read/);
+    await expect(Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
+      /format this version can read/,
+    );
 
     // The user downgraded, and the point is that reinstalling the newer build still finds their
     // servers. A store that loaded empty here would write that emptiness over them.
@@ -73,11 +76,11 @@ describe("remote server store", () => {
       hiddenHostIds: ["host-1"],
     });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
     expect(store.servers.map((server) => server.id)).toEqual(["alpha", "beta"]);
     store.setActiveServerId(LOCAL_SERVER_ID);
-    await store.persist();
+    await Effect.runPromise(store.persist().pipe(Effect.mapError((error) => error.cause)));
 
     // In its own slot, not appended: `servers` order is the sidebar order the user arranged, and an
     // unrelated write must not reshuffle a list this build cannot even display.
@@ -105,9 +108,13 @@ describe("remote server store", () => {
       hiddenHostIds: [],
     });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
-    await store.replaceServers([storedServer("beta", { name: "Advertised" })]);
+    await Effect.runPromise(
+      store
+        .replaceServers([storedServer("beta", { name: "Advertised" })])
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(JSON.parse(await readFile(path, "utf8")).servers).toEqual([broken]);
 
     // Displacing an entry from the file is not retiring it: the app runs on the entry reconciliation
@@ -120,9 +127,11 @@ describe("remote server store", () => {
     const broken = { ...storedServer("beta"), role: "overlord" };
     const path = await storePath({ version: 3, activeServerId: LOCAL_SERVER_ID, servers: [broken], hiddenHostIds: [] });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
-    await store.adopt(storedServer("beta", { name: "Rejoined" }));
+    await Effect.runPromise(
+      store.adopt(storedServer("beta", { name: "Rejoined" })).pipe(Effect.mapError((error) => error.cause)),
+    );
 
     expect(JSON.parse(await readFile(path, "utf8")).servers).toEqual([
       expect.objectContaining({ id: "beta", name: "Rejoined" }),
@@ -138,11 +147,11 @@ describe("remote server store", () => {
       hiddenHostIds: [],
     });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
     // The slot is the entry that followed it, not a number: removing the server in front of it must
     // not push it past the one behind it, which is what a saved index would have done.
-    await store.remove("alpha");
+    await Effect.runPromise(store.remove("alpha").pipe(Effect.mapError((error) => error.cause)));
 
     expect(JSON.parse(await readFile(path, "utf8")).servers).toEqual([broken, expect.objectContaining({ id: "beta" })]);
   });
@@ -156,16 +165,16 @@ describe("remote server store", () => {
       hiddenHostIds: [],
     });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
     // This build runs on the local server, because it cannot use the entry the user was on. An
     // unrelated write must not turn that into the user's stored choice.
     expect(store.activeServerId).toBe(LOCAL_SERVER_ID);
-    await store.persist();
+    await Effect.runPromise(store.persist().pipe(Effect.mapError((error) => error.cause)));
     expect(JSON.parse(await readFile(path, "utf8")).activeServerId).toBe("beta");
 
     store.setActiveServerId("alpha");
-    await store.persist();
+    await Effect.runPromise(store.persist().pipe(Effect.mapError((error) => error.cause)));
     expect(JSON.parse(await readFile(path, "utf8")).activeServerId).toBe("alpha");
   });
 
@@ -178,7 +187,7 @@ describe("remote server store", () => {
       hiddenHostIds: [],
     });
     const store = newStore(path);
-    await store.load();
+    await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
 
     // What `RemoteServerManager.select` does when its write throws. Restoring the id alone would
     // leave the preserved selection cleared, and the next unrelated write would make the local
@@ -186,7 +195,7 @@ describe("remote server store", () => {
     const selection = store.selection;
     store.setActiveServerId("alpha");
     store.restoreSelection(selection);
-    await store.persist();
+    await Effect.runPromise(store.persist().pipe(Effect.mapError((error) => error.cause)));
 
     expect(store.activeServerId).toBe(LOCAL_SERVER_ID);
     expect(JSON.parse(await readFile(path, "utf8")).activeServerId).toBe("beta");
@@ -200,39 +209,41 @@ it("keeps independent mute preferences through restart, reconciliation and re-lo
     servers: [storedServer("alpha"), storedServer("beta")],
   });
   const store = newStore(path);
-  await store.load();
+  await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
   expect(store.isMuted("alpha")).toBe(false);
-  await store.setMuted("alpha", true);
-  await store.setMuted(LOCAL_SERVER_ID, true);
-  await store.replaceServers([]);
-  await store.adopt(storedServer("alpha"));
+  await Effect.runPromise(store.setMuted("alpha", true).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(store.setMuted(LOCAL_SERVER_ID, true).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(store.replaceServers([]).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(store.adopt(storedServer("alpha")).pipe(Effect.mapError((error) => error.cause)));
   const restarted = newStore(path);
-  await restarted.load();
+  await Effect.runPromise(restarted.load().pipe(Effect.mapError((error) => error.cause)));
   expect([restarted.isMuted("alpha"), restarted.isMuted("beta"), restarted.isMuted(LOCAL_SERVER_ID)]).toEqual([
     true,
     false,
     true,
   ]);
-  await restarted.setMuted("alpha", false);
+  await Effect.runPromise(restarted.setMuted("alpha", false).pipe(Effect.mapError((error) => error.cause)));
   const unmuted = newStore(path);
-  await unmuted.load();
+  await Effect.runPromise(unmuted.load().pipe(Effect.mapError((error) => error.cause)));
   expect(unmuted.isMuted("alpha")).toBe(false);
   expect(unmuted.isMuted(LOCAL_SERVER_ID)).toBe(true);
-  await expect(unmuted.setMuted("missing", true)).rejects.toThrow("Remote server not found.");
+  await expect(
+    Effect.runPromise(unmuted.setMuted("missing", true).pipe(Effect.mapError((error) => error.cause))),
+  ).rejects.toThrow("Remote server not found.");
 });
 
 it("preserves mute writes when other server writes are queued", async () => {
   const path = await storePath({ version: 3, activeServerId: "alpha", servers: [storedServer("alpha")] });
   const store = newStore(path);
-  await store.load();
+  await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
   await Promise.all([
-    store.setMuted("alpha", true),
-    store.update("alpha", { name: "Renamed" }),
-    store.setMuted(LOCAL_SERVER_ID, true),
-    store.persist(),
+    Effect.runPromise(store.setMuted("alpha", true).pipe(Effect.mapError((error) => error.cause))),
+    Effect.runPromise(store.update("alpha", { name: "Renamed" }).pipe(Effect.mapError((error) => error.cause))),
+    Effect.runPromise(store.setMuted(LOCAL_SERVER_ID, true).pipe(Effect.mapError((error) => error.cause))),
+    Effect.runPromise(store.persist().pipe(Effect.mapError((error) => error.cause))),
   ]);
   const restarted = newStore(path);
-  await restarted.load();
+  await Effect.runPromise(restarted.load().pipe(Effect.mapError((error) => error.cause)));
   expect([restarted.isMuted("alpha"), restarted.isMuted(LOCAL_SERVER_ID), restarted.require("alpha").name]).toEqual([
     true,
     true,
@@ -243,12 +254,14 @@ it("preserves mute writes when other server writes are queued", async () => {
 it("keeps the prior mute preference when the write fails", async () => {
   const path = await storePath({ version: 3, activeServerId: "local", servers: [] });
   const store = newStore(path);
-  await store.load();
-  await store.setMuted(LOCAL_SERVER_ID, true);
+  await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(store.setMuted(LOCAL_SERVER_ID, true).pipe(Effect.mapError((error) => error.cause)));
   await rm(path);
   const { mkdir } = await import("node:fs/promises");
   await mkdir(path);
-  await expect(store.setMuted(LOCAL_SERVER_ID, false)).rejects.toThrow();
+  await expect(
+    Effect.runPromise(store.setMuted(LOCAL_SERVER_ID, false).pipe(Effect.mapError((error) => error.cause))),
+  ).rejects.toThrow();
   expect(store.isMuted(LOCAL_SERVER_ID)).toBe(true);
 });
 
@@ -260,20 +273,26 @@ it("keeps timed mutes and notification levels through restart", async () => {
     mutedServerIds: ["beta"],
   });
   const store = newStore(path);
-  await store.load();
+  await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
   expect([store.isMuted("beta"), store.notificationLevel("alpha")]).toEqual([true, "all"]);
-  await store.setMuted("alpha", true, 2_000);
-  await store.setNotificationLevel("alpha", "needs-me");
+  await Effect.runPromise(store.setMuted("alpha", true, 2_000).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(
+    store.setNotificationLevel("alpha", "needs-me").pipe(Effect.mapError((error) => error.cause)),
+  );
   const restarted = newStore(path);
-  await restarted.load();
+  await Effect.runPromise(restarted.load().pipe(Effect.mapError((error) => error.cause)));
   expect(restarted.muteState("alpha", 1_000)).toEqual({ muted: true, mutedUntil: 2_000 });
   expect(restarted.muteState("alpha", 2_000)).toEqual({ muted: false, mutedUntil: null });
   expect(restarted.nextMuteExpiry(1_000)).toBe(2_000);
   expect(restarted.notificationLevel("alpha")).toBe("needs-me");
-  await restarted.setMuted("alpha", false);
-  await restarted.setMuted("beta", false);
+  await Effect.runPromise(restarted.setMuted("alpha", false).pipe(Effect.mapError((error) => error.cause)));
+  await Effect.runPromise(restarted.setMuted("beta", false).pipe(Effect.mapError((error) => error.cause)));
   expect([restarted.isMuted("alpha", 1_000), restarted.isMuted("beta", 1_000)]).toEqual([false, false]);
-  await expect(restarted.setNotificationLevel("missing", "nothing")).rejects.toThrow("Remote server not found.");
+  await expect(
+    Effect.runPromise(
+      restarted.setNotificationLevel("missing", "nothing").pipe(Effect.mapError((error) => error.cause)),
+    ),
+  ).rejects.toThrow("Remote server not found.");
 });
 
 it("skips a bad notification entry and still loads the servers", async () => {
@@ -284,7 +303,7 @@ it("skips a bad notification entry and still loads the servers", async () => {
     serverNotifications: { alpha: { level: "loud", mutedUntil: "soon" }, [LOCAL_SERVER_ID]: { level: "nothing" } },
   });
   const store = newStore(path);
-  await store.load();
+  await Effect.runPromise(store.load().pipe(Effect.mapError((error) => error.cause)));
   expect(store.require("alpha").name).toBe("Server alpha");
   expect([store.notificationLevel("alpha"), store.isMuted("alpha")]).toEqual(["all", false]);
   expect(store.notificationLevel(LOCAL_SERVER_ID)).toBe("nothing");

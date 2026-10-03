@@ -2,6 +2,7 @@
 import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -23,6 +24,7 @@ import {
 } from "./agent-service-test-harness";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
+import { runTestEffect } from "./effect-test-runtime";
 import { getString } from "./protocol";
 
 let root: string;
@@ -40,11 +42,14 @@ afterEach(async () => {
 
 describe.sequential("AgentService: routines", () => {
   it("rearms the shared timer when restoring an archived channel routine", async () => {
-    vi.useFakeTimers({ now: new Date("2026-08-25T10:00:00.000Z") });
+    vi.useFakeTimers({
+      now: new Date("2026-08-25T10:00:00.000Z"),
+      toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"],
+    });
     const { store, mailbox } = stores(root);
-    await store.initialize();
-    await mailbox.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(store.initialize());
+    await runTestEffect(mailbox.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const channels = new ChannelStore(store.database);
     const channel = channels.create("channel-1", {
       name: "Project",
@@ -73,11 +78,13 @@ describe.sequential("AgentService: routines", () => {
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider),
     });
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.channels.command(
-      { type: "restore", channelId: channel.id, operationId: "test.channel-restore" },
-      { id: "member-1", name: "Alex" },
+    await runTestEffect(
+      service.channels.command(
+        { type: "restore", channelId: channel.id, operationId: "test.channel-restore" },
+        { id: "member-1", name: "Alex" },
+      ),
     );
     await vi.advanceTimersByTimeAsync(15 * 60_000);
 
@@ -95,8 +102,8 @@ describe.sequential("AgentService: routines", () => {
       // Keep the first run's turn open, as a run that stalls during a sleep does.
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
-    await service.initialize();
-    const agent = await store.getOrCreate("hourly");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("hourly"));
     vi.useFakeTimers({ now: new Date("2026-08-25T10:00:00.000Z") });
     try {
       const routine = service.createRoutine({
@@ -122,8 +129,8 @@ describe.sequential("AgentService: routines", () => {
   it("persists routine lifecycle markers without adding unread or search results", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
 
     const created = service.createRoutine({
       agentId: agent.id,
@@ -138,22 +145,24 @@ describe.sequential("AgentService: routines", () => {
       routineId: created.id,
       name: "Updated morning brief",
     });
-    await service.deleteRoutine({ agentId: agent.id, routineId: created.id });
+    await runTestEffect(service.deleteRoutine({ agentId: agent.id, routineId: created.id }));
 
-    const conversation = await service.readConversation(agent.id);
+    const conversation = await runTestEffect(service.readConversation(agent.id));
     expect(conversation.messages.flatMap((message) => routineConversationEvent(message) ?? [])).toEqual([
       { action: "created", routineId: created.id, routineName: "Morning brief" },
       { action: "updated", routineId: updated.id, routineName: "Updated morning brief" },
       { action: "deleted", routineId: updated.id, routineName: "Updated morning brief" },
     ]);
-    expect((await service.readConversationPageFor(agent.id, "member-1")).readState?.unreadCount).toBe(0);
+    expect((await runTestEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(0);
     expect(service.searchConversationMessages("morning brief", agent.id).total).toBe(0);
 
-    await service.stop();
+    await runTestEffect(service.stop());
     service = createTestService({ store, mailbox });
-    await service.initialize();
+    await runTestEffect(service.initialize());
     expect(
-      (await service.readConversation(agent.id)).messages.flatMap((message) => routineConversationEvent(message) ?? []),
+      (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+        (message) => routineConversationEvent(message) ?? [],
+      ),
     ).toHaveLength(3);
   });
 
@@ -171,8 +180,8 @@ describe.sequential("AgentService: routines", () => {
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Retry running marker",
@@ -191,7 +200,7 @@ describe.sequential("AgentService: routines", () => {
       return appendConversationMessage(input);
     });
 
-    const run = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const run = await runTestEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() => {
       const currentRun = service?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })[0];
       return currentRun?.id === run.id && currentRun.status === "running";
@@ -202,7 +211,7 @@ describe.sequential("AgentService: routines", () => {
     expect(emitted).toContainEqual(
       expect.objectContaining({ type: "error", code: "delivery_reconciliation_pending", agentId: agent.id }),
     );
-    const runningMarkers = (await service.readConversation(agent.id)).messages.filter(
+    const runningMarkers = (await runTestEffect(service.readConversation(agent.id))).messages.filter(
       (message) => routineRunConversationEvent(message)?.status === "running",
     );
     expect(runningMarkers).toHaveLength(1);
@@ -222,8 +231,8 @@ describe.sequential("AgentService: routines", () => {
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Approval marker retry",
@@ -232,7 +241,7 @@ describe.sequential("AgentService: routines", () => {
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    const run = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const run = await runTestEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() =>
       service
         ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
@@ -272,7 +281,7 @@ describe.sequential("AgentService: routines", () => {
     expect(client.responses).toEqual([]);
 
     rejectResumedRunningMarker = true;
-    await service.respondToApproval({ requestId: "retry-routine-approval", decision: "accept" });
+    await runTestEffect(service.respondToApproval({ requestId: "retry-routine-approval", decision: "accept" }));
     expect(client.responses).toContainEqual(
       expect.objectContaining({ id: "retry-routine-approval", result: { decision: "accept" } }),
     );
@@ -288,7 +297,7 @@ describe.sequential("AgentService: routines", () => {
           event.type === "error" && event.code === "delivery_reconciliation_pending" && event.agentId === agent.id,
       ),
     ).toHaveLength(2);
-    const transitions = (await service.readConversation(agent.id)).messages.flatMap(
+    const transitions = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => routineRunConversationEvent(message) ?? [],
     );
     expect(transitions.filter((event) => event.runId === run.id && event.status === "needs-attention")).toHaveLength(1);
@@ -309,8 +318,8 @@ describe.sequential("AgentService: routines", () => {
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Retry terminal marker",
@@ -319,8 +328,8 @@ describe.sequential("AgentService: routines", () => {
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    const firstRun = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const firstRun = await runTestEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
+    await runTestEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() => {
       const deliveries = service?.listQueue(agent.id).deliveries ?? [];
       return (
@@ -368,7 +377,7 @@ describe.sequential("AgentService: routines", () => {
     expect(emitted).toContainEqual(
       expect.objectContaining({ type: "error", code: "delivery_reconciliation_pending", agentId: agent.id }),
     );
-    const terminalMarkers = (await service.readConversation(agent.id)).messages.filter((message) => {
+    const terminalMarkers = (await runTestEffect(service.readConversation(agent.id))).messages.filter((message) => {
       const event = routineRunConversationEvent(message);
       return event?.runId === firstRun.id && event.status === "succeeded";
     });
@@ -383,8 +392,8 @@ describe.sequential("AgentService: routines", () => {
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider),
     });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Queue health",
@@ -394,7 +403,7 @@ describe.sequential("AgentService: routines", () => {
       schedule: { kind: "daily", time: "09:00" },
     });
 
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await runTestEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() => service?.listQueue(agent.id).deliveries[0]?.status === "completed");
 
     const turnId = service.listQueue(agent.id).deliveries[0]?.turnId;
@@ -404,9 +413,9 @@ describe.sequential("AgentService: routines", () => {
         .prepare("SELECT status, completed_at FROM projection_turns WHERE turn_id = ?")
         .get(turnId),
     ).toMatchObject({ status: "completed", completed_at: expect.any(String) });
-    expect((await service.readConversation(agent.id)).activeTurnId).toBeNull();
+    expect((await runTestEffect(service.readConversation(agent.id))).activeTurnId).toBeNull();
     expect(
-      (await service.readConversation(agent.id)).messages.flatMap(
+      (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
         (message) => routineRunConversationEvent(message)?.status ?? [],
       ),
     ).toContain("succeeded");
@@ -425,8 +434,8 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runTestEffect(service.initialize());
+    const agent = await runTestEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Build watcher",
@@ -437,9 +446,9 @@ describe.sequential("AgentService: routines", () => {
     });
     const input = { agentId: agent.id, routineId: routine.id, payload: "build 42 failed: 3 tests" };
 
-    await expect(service.runRoutineFromAutomation(input)).rejects.toThrow();
-    await service.updateAgent({ agentId: agent.id, allowAutomation: true });
-    const run = await service.runRoutineFromAutomation(input);
+    await expect(runTestEffect(service.runRoutineFromAutomation(input))).rejects.toThrow();
+    await runTestEffect(service.updateAgent({ agentId: agent.id, allowAutomation: true }));
+    const run = await runTestEffect(service.runRoutineFromAutomation(input));
 
     // `resumePendingRuns` sends the stored instruction again, so the payload survives a restart.
     expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 1 })[0]?.instruction).toContain(
@@ -467,8 +476,8 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
-    const receipt = await service.sendMessage({ agentId: "chief", text: "The launch is approved." });
+    await runTestEffect(service.initialize());
+    const receipt = await runTestEffect(service.sendMessage({ agentId: "chief", text: "The launch is approved." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
@@ -477,13 +486,15 @@ describe.sequential("AgentService: routines", () => {
     const messageId = receipt.deliveries[0]?.id;
     if (!client || !threadId || !turnId || !messageId) throw new Error("The reaction test turn did not start.");
 
-    await service.setMessageReaction({ agentId: "chief", messageId, emoji: "❤️" });
+    await runTestEffect(service.setMessageReaction({ agentId: "chief", messageId, emoji: "❤️" }));
     const first = await callOpenBotTool(client, threadId, "react_to_user_message", { emoji: "🎉" }, turnId);
     expect(openBotToolPayload(first.result)).toMatchObject({ status: "reacted", messageId, emoji: "🎉" });
     const second = await callOpenBotTool(client, threadId, "react_to_user_message", { emoji: "👨‍👩‍👧‍👦" }, turnId);
     expect(openBotToolPayload(second.result)).toMatchObject({ emoji: "👨‍👩‍👧‍👦" });
 
-    const message = (await service.readConversation("chief")).messages.find((candidate) => candidate.id === messageId);
+    const message = (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (candidate) => candidate.id === messageId,
+    );
     expect(message).toMatchObject({
       reaction: "❤️",
       reactions: [
@@ -504,15 +515,17 @@ describe.sequential("AgentService: routines", () => {
   it("rejects an agent reaction when the current turn was not started by the user", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    await store.initialize();
-    await mailbox.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("research");
-    await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "research" },
-      recipientAgentIds: ["chief"],
-      text: "Teammate update.",
-    });
+    await runTestEffect(store.initialize());
+    await runTestEffect(mailbox.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("research"));
+    await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "research" },
+        recipientAgentIds: ["chief"],
+        text: "Teammate update.",
+      }),
+    );
     service = createTestService({
       store,
       mailbox,
@@ -523,7 +536,7 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
+    await runTestEffect(service.initialize());
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
@@ -553,11 +566,11 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
+    await runTestEffect(service.initialize());
     const screenshotPath = join(store.sharedRoot, "desktop-screenshot.png");
     const screenshot = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4]);
     await writeFile(screenshotPath, screenshot);
-    await service.sendMessage({ agentId: "chief", text: "Send me a screenshot." });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Send me a screenshot." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
@@ -577,7 +590,7 @@ describe.sequential("AgentService: routines", () => {
       attachments: [{ name: "desktop-screenshot.png" }],
     });
 
-    const message = (await service.readConversation("chief")).messages.find(
+    const message = (await runTestEffect(service.readConversation("chief"))).messages.find(
       (candidate) => candidate.itemType === "agent_attachment" && candidate.turnId === turnId,
     );
     expect(message).toMatchObject({
@@ -596,7 +609,7 @@ describe.sequential("AgentService: routines", () => {
     expect(service.getRuntimeSnapshot().latestMessages).not.toContainEqual(
       expect.objectContaining({ id: message?.id }),
     );
-    const managed = await mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? "");
+    const managed = await runTestEffect(mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? ""));
     expect(managed?.path).not.toBe(screenshotPath);
     await expect(readFile(managed?.path ?? "")).resolves.toEqual(screenshot);
 
@@ -667,10 +680,12 @@ describe.sequential("AgentService: routines", () => {
         message: "conversation listener failed",
       }),
     );
-    const publishedMessage = (await service.readConversation("chief")).messages.find((candidate) =>
+    const publishedMessage = (await runTestEffect(service.readConversation("chief"))).messages.find((candidate) =>
       candidate.attachments?.some((attachment) => attachment.name === "published-screenshot.png"),
     );
-    await expect(mailbox.resolveAttachment(publishedMessage?.attachments?.[0]?.id ?? "")).resolves.not.toBeNull();
+    await expect(
+      runTestEffect(mailbox.resolveAttachment(publishedMessage?.attachments?.[0]?.id ?? "")),
+    ).resolves.not.toBeNull();
   });
 
   it("shares one attachment operation between concurrent retries", async () => {
@@ -686,10 +701,10 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
+    await runTestEffect(service.initialize());
     const screenshotPath = join(store.sharedRoot, "concurrent-screenshot.png");
     await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    await service.sendMessage({ agentId: "chief", text: "Send the screenshot once." });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Send the screenshot once." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
@@ -706,11 +721,13 @@ describe.sequential("AgentService: routines", () => {
     const storeStarted = new Promise<void>((resolve) => {
       markStoreStarted = resolve;
     });
-    const storage = vi.spyOn(mailbox, "stageGeneratedAttachments").mockImplementation(async (input) => {
-      markStoreStarted?.();
-      await storeGate;
-      return originalStore(input);
-    });
+    const storage = vi.spyOn(mailbox, "stageGeneratedAttachments").mockImplementation((input) =>
+      Effect.gen(function* () {
+        markStoreStarted?.();
+        yield* Effect.promise(() => storeGate);
+        return yield* originalStore(input);
+      }),
+    );
     const callId = "concurrent-attachment-call";
     const first = callOpenBotTool(
       client,
@@ -730,7 +747,7 @@ describe.sequential("AgentService: routines", () => {
       callId,
     );
     let stopCompleted = false;
-    const stopping = service.stop().then(() => {
+    const stopping = runTestEffect(service.stop()).then(() => {
       stopCompleted = true;
     });
     await Promise.resolve();
@@ -742,11 +759,11 @@ describe.sequential("AgentService: routines", () => {
     expect(openBotToolPayload(firstResult.result)).toEqual(openBotToolPayload(secondResult.result));
     expect(storage).toHaveBeenCalledTimes(1);
     expect(
-      (await service.readConversation("chief")).messages.filter(
+      (await runTestEffect(service.readConversation("chief"))).messages.filter(
         (message) => message.itemType === "agent_attachment" && message.turnId === turnId,
       ),
     ).toHaveLength(1);
-    await expect(mailbox.listExportAttachments()).resolves.toHaveLength(1);
+    await expect(runTestEffect(mailbox.listExportAttachments())).resolves.toHaveLength(1);
   });
 
   it("rolls back response attachments when conversation persistence fails and permits retry", async () => {
@@ -762,10 +779,10 @@ describe.sequential("AgentService: routines", () => {
         return client;
       },
     });
-    await service.initialize();
+    await runTestEffect(service.initialize());
     const screenshotPath = join(store.sharedRoot, "retry-screenshot.png");
     await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    await service.sendMessage({ agentId: "chief", text: "Send the screenshot safely." });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Send the screenshot safely." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
@@ -786,10 +803,10 @@ describe.sequential("AgentService: routines", () => {
       callId,
     );
     expect(failed.error?.message).toContain("conversation write failed");
-    expect((await service.readConversation("chief")).messages).not.toEqual(
+    expect((await runTestEffect(service.readConversation("chief"))).messages).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ itemType: "agent_attachment", turnId })]),
     );
-    await expect(mailbox.listExportAttachments()).resolves.toEqual([]);
+    await expect(runTestEffect(mailbox.listExportAttachments())).resolves.toEqual([]);
 
     persistence.mockRestore();
     const retried = await callOpenBotTool(
@@ -804,9 +821,9 @@ describe.sequential("AgentService: routines", () => {
       status: "attached",
       attachments: [{ name: "retry-screenshot.png" }],
     });
-    await expect(mailbox.listExportAttachments()).resolves.toHaveLength(1);
+    await expect(runTestEffect(mailbox.listExportAttachments())).resolves.toHaveLength(1);
     expect(
-      (await service.readConversation("chief")).messages.filter(
+      (await runTestEffect(service.readConversation("chief"))).messages.filter(
         (message) => message.itemType === "agent_attachment" && message.turnId === turnId,
       ),
     ).toHaveLength(1);
@@ -825,14 +842,16 @@ describe.sequential("AgentService: routines", () => {
     ]);
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await store.getOrCreate("design", "Design Studio", "Product design");
-    await store.updateAgent({
-      agentId: "design",
-      description: "Owns product interface and visual design.",
-    });
-    await store.getOrCreate("research", "Research", "Research partner");
-    await service.sendMessage({ agentId: "chief", text: "Ask the design agent." });
+    await runTestEffect(service.initialize());
+    await runTestEffect(store.getOrCreate("design", "Design Studio", "Product design"));
+    await runTestEffect(
+      store.updateAgent({
+        agentId: "design",
+        description: "Owns product interface and visual design.",
+      }),
+    );
+    await runTestEffect(store.getOrCreate("research", "Research", "Research partner"));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask the design agent." }));
 
     await waitForQueue(service, "design", (queue) => queue.deliveries.length === 1);
     expect(service.listQueue("research").deliveries).toHaveLength(0);
@@ -852,9 +871,9 @@ describe.sequential("AgentService: routines", () => {
     ]);
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await store.getOrCreate("design", "Design Studio", "Product design");
-    await service.sendMessage({ agentId: "chief", text: "Tell design where the proposal is." });
+    await runTestEffect(service.initialize());
+    await runTestEffect(store.getOrCreate("design", "Design Studio", "Product design"));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Tell design where the proposal is." }));
 
     await waitForQueue(service, "design", (queue) => queue.deliveries.length === 1);
     expect(service.listQueue("design").deliveries[0]).toMatchObject({ expectsReply: false });
@@ -864,30 +883,36 @@ describe.sequential("AgentService: routines", () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_WEATHER_RESULT";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await store.initialize();
-    await mailbox.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("sales-outbound");
+    await runTestEffect(store.initialize());
+    await runTestEffect(mailbox.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("sales-outbound"));
 
-    const rootMessage = await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Check the weather.",
-    });
-    const clarification = await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "sales-outbound" },
-      recipientAgentIds: ["chief"],
-      text: "Which city?",
-      replyToMessageId: rootMessage.messageId,
-    });
-    const location = await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Kraków.",
-      replyToMessageId: clarification.messageId,
-    });
+    const rootMessage = await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Check the weather.",
+      }),
+    );
+    const clarification = await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "sales-outbound" },
+        recipientAgentIds: ["chief"],
+        text: "Which city?",
+        replyToMessageId: rootMessage.messageId,
+      }),
+    );
+    const location = await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Kraków.",
+        replyToMessageId: clarification.messageId,
+      }),
+    );
 
-    await service.initialize();
+    await runTestEffect(service.initialize());
     await waitFor(() =>
       service
         ?.listQueue("chief")
@@ -902,7 +927,7 @@ describe.sequential("AgentService: routines", () => {
       (service?.listQueue("chief").deliveries ?? []).every((delivery) => delivery.status === "completed"),
     );
 
-    expect(await service.readConversation("chief")).toMatchObject({
+    expect(await runTestEffect(service.readConversation("chief"))).toMatchObject({
       messages: expect.arrayContaining([
         expect.objectContaining({
           author: "agent",
@@ -920,26 +945,30 @@ describe.sequential("AgentService: routines", () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_RESULT";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await store.initialize();
-    await mailbox.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("sales-outbound");
+    await runTestEffect(store.initialize());
+    await runTestEffect(mailbox.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("sales-outbound"));
 
-    await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "The Berlin deck is in the shared folder.",
-      expectsReply: false,
-    });
+    await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "The Berlin deck is in the shared folder.",
+        expectsReply: false,
+      }),
+    );
     // A request behind the notice: its relayed result is the point after which the notice's own
     // turn is certainly finished, so an absent relay is a decision rather than a race.
-    const request = await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Check the weather.",
-    });
+    const request = await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Check the weather.",
+      }),
+    );
 
-    await service.initialize();
+    await runTestEffect(service.initialize());
     await waitForQueue(service, "chief", (queue) => queue.deliveries.length === 1);
 
     expect(service.listQueue("chief").deliveries).toEqual([
@@ -962,25 +991,27 @@ describe.sequential("AgentService: routines", () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "∅";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await store.initialize();
-    await mailbox.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("sales-outbound");
+    await runTestEffect(store.initialize());
+    await runTestEffect(mailbox.initialize());
+    await runTestEffect(store.getOrCreate("chief"));
+    await runTestEffect(store.getOrCreate("sales-outbound"));
 
-    await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Check the weather.",
-    });
+    await runTestEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Check the weather.",
+      }),
+    );
 
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runTestEffect(service.initialize());
     // The turn relays its result and sets the preview before it reports completion, so this wait
     // is the point after which an absent relay is a decision rather than a race.
     await waitFor(() => events.some((event) => event.type === "turn-completed" && event.agentId === "sales-outbound"));
 
-    const snapshot = await service.readConversation("sales-outbound");
+    const snapshot = await runTestEffect(service.readConversation("sales-outbound"));
     expect(snapshot.messages.filter((message) => message.author === "assistant")).toEqual([]);
     expect(service.listQueue("chief").deliveries).toEqual([]);
     expect(service.listAgents().find((agent) => agent.id === "sales-outbound")?.preview).not.toBe("∅");
@@ -991,21 +1022,21 @@ describe.sequential("AgentService: routines", () => {
     service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "First turn" });
+    await runTestEffect(service.initialize());
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "First turn" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     const firstTurnId = service.listQueue("chief").deliveries[0]?.turnId;
     if (!firstTurnId) throw new Error("First turn did not start.");
-    await service.interrupt("chief", firstTurnId);
+    await runTestEffect(service.interrupt("chief", firstTurnId));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
-    await service.sendMessage({ agentId: "chief", text: "New live turn" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "New live turn" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "running");
     const liveTurnId = service.listQueue("chief").deliveries[1]?.turnId;
     // The queue can report `running` before the streamed text reaches the conversation,
     // so a read right away can miss it. The flushed delta writes it to SQLite.
     await waitFor(() => events.some((event) => event.type === "conversation-delta" && event.turnId === liveTurnId));
 
-    const snapshot = await service.readConversation("chief");
+    const snapshot = await runTestEffect(service.readConversation("chief"));
     expect(snapshot.activeTurnId).toBe(liveTurnId);
     expect(snapshot.messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ text: "Streaming", status: "streaming" })]),
@@ -1023,9 +1054,9 @@ describe.sequential("AgentService: routines", () => {
     service = createTestService({ store, mailbox, requestTimeoutMs: 400 });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run exactly once" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     await waitFor(() => events.some((event) => event.type === "error" && event.code === "delivery_start_unconfirmed"));
 
@@ -1042,23 +1073,23 @@ describe.sequential("AgentService: routines", () => {
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run exactly once" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const deliveryId = service.listQueue("chief").deliveries[0]?.id;
 
     // The fake answers `turn/start` on a delay, so a second completed turn is the
     // barrier proving the first turn's late start response was already written and
     // processed: both responses travel the same pipe, in order.
-    await service.sendMessage({ agentId: "chief", text: "Run once more" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run once more" }));
     await waitFor(
       () => service?.listQueue("chief").deliveries.filter((entry) => entry.status === "completed").length === 2,
     );
 
     const delivery = service.listQueue("chief").deliveries.find((entry) => entry.id === deliveryId);
     if (!delivery?.turnId) throw new Error("The completed delivery did not have a turn.");
-    expect((await service.readConversation("chief")).activeTurnId).toBeNull();
+    expect((await runTestEffect(service.readConversation("chief"))).activeTurnId).toBeNull();
     expect(
       store.database.connection
         .prepare("SELECT status, completed_at FROM projection_turns WHERE turn_id = ?")

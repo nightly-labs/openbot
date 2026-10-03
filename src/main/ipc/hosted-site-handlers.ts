@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Publishing a local directory to a hosted site, and the sites of one server.
 //
 // Publishing is local: agents publish from the computer that runs them. The list and the delete are
@@ -29,7 +31,12 @@ function decodeRemoteSiteList(value: unknown): HostedSiteList {
 
 interface HostedSiteRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
-  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
 export interface HostedSiteIpcDependencies {
@@ -54,13 +61,17 @@ export function hostedSiteIpcHandlers({
   return {
     hostedSites: {
       list: scopedQueryHandler({
-        local: () => hostedSites.list(),
+        local: () => Effect.runPromise(hostedSites.list().pipe(Effect.mapError((error) => error.cause))),
         remote: (serverId) => {
           requireRemoteSupport(serverId);
-          return remoteServers.request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
-            method: "POST",
-            body: {},
-          });
+          return Effect.runPromise(
+            remoteServers
+              .request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
+                method: "POST",
+                body: {},
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
       chooseDirectory: handler(async () => {
@@ -74,16 +85,25 @@ export function hostedSiteIpcHandlers({
           : await dialog.showOpenDialog(options);
         return result.canceled ? null : (result.filePaths[0] ?? null);
       }),
-      publish: payloadHandler(parsePublishHostedSite, (site) => hostedSites.publish(site)),
-      replace: payloadHandler(parseReplaceHostedSite, (site) => hostedSites.replace(site)),
+      publish: payloadHandler(parsePublishHostedSite, (site) =>
+        Effect.runPromise(hostedSites.publish(site).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      replace: payloadHandler(parseReplaceHostedSite, (site) =>
+        Effect.runPromise(hostedSites.replace(site).pipe(Effect.mapError((error) => error.cause))),
+      ),
       delete: scopedHandler(parseDeleteHostedSite, {
-        local: ({ siteId }) => hostedSites.delete(siteId),
+        local: ({ siteId }) =>
+          Effect.runPromise(hostedSites.delete(siteId).pipe(Effect.mapError((error) => error.cause))),
         remote: ({ siteId }, serverId) => {
           requireRemoteSupport(serverId);
-          return remoteServers.request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
-            method: "POST",
-            body: { siteId },
-          });
+          return Effect.runPromise(
+            remoteServers
+              .request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
+                method: "POST",
+                body: { siteId },
+              })
+              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          );
         },
       }),
     },

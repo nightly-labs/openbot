@@ -1,6 +1,8 @@
+import { Effect } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
+import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
@@ -9,13 +11,10 @@ import { deliverPendingRemoteAuthEvents, RemoteControlPlane } from "./remote-con
 import type { WorkerBindings } from "./types";
 
 type WorkerFetch = (request: Request) => Response | Promise<Response>;
-type AuthDataPruner = (database: D1Database, now: number) => Promise<AuthRetentionResult>;
+type AuthDataPruner = typeof pruneExpiredAuthData;
 type RetentionLogger = (result: AuthRetentionResult) => void;
 type WorkerExecutionContext = Pick<ExecutionContext, "waitUntil">;
-type RemoteAuthEventDelivery = (
-  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
-  now: number,
-) => Promise<void>;
+type RemoteAuthEventDelivery = typeof deliverPendingRemoteAuthEvents;
 
 export function createWorkerHandler(
   fetchHandler: WorkerFetch,
@@ -35,7 +34,7 @@ export function createWorkerHandler(
       const localSiteResponse = await serveLocalHostedSite(request, bindings);
       if (localSiteResponse) return localSiteResponse;
       try {
-        await enforceMarketplaceIngress(request, bindings);
+        await runApiEffect(enforceMarketplaceIngress(request, bindings));
       } catch (error) {
         if (error instanceof MarketplaceRateLimitError) {
           return Response.json(
@@ -70,10 +69,12 @@ export function createWorkerHandler(
       bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET"> &
         Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey>>,
     ) {
-      const hosting = bindings.BOAT_API_KEY ? tickHostedServers(bindings, controller.scheduledTime) : null;
-      const delivery = deliverRemoteAuthEvents(bindings, controller.scheduledTime);
+      const hosting = bindings.BOAT_API_KEY
+        ? runApiEffect(tickHostedServers(bindings, controller.scheduledTime))
+        : null;
+      const delivery = runApiEffect(deliverRemoteAuthEvents(bindings, controller.scheduledTime));
       const cleanup = bindings.SITES
-        ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(controller.scheduledTime)
+        ? runApiEffect(new HostedSiteService(bindings.DB, bindings.SITES).cleanup(controller.scheduledTime))
         : Promise.resolve(null);
       const hostingResult = await hosting;
       if (hostingResult && Object.values(hostingResult).some(Boolean)) {
@@ -84,7 +85,11 @@ export function createWorkerHandler(
         if (sites) console.info("Hosted site cleanup completed.", sites);
         return;
       }
-      const [result, , sites] = await Promise.all([prune(bindings.DB, controller.scheduledTime), delivery, cleanup]);
+      const [result, , sites] = await Promise.all([
+        runApiEffect(prune(bindings.DB, controller.scheduledTime)),
+        delivery,
+        cleanup,
+      ]);
       log(result);
       if (sites) console.info("Hosted site cleanup completed.", sites);
     },
@@ -108,22 +113,23 @@ function tickHostedServers(
 ) {
   const remote = new RemoteControlPlane(bindings);
   // The cron waits for the analytics sends itself. They never reject.
-  const sends: Promise<void>[] = [];
-  return createHostedBilling(bindings, {
-    removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
-    planChanged: (hostId) => remote.planChanged(hostId),
-    schedule: (send) => sends.push(send),
-  })
-    .hosting.tick(now)
-    .then(async (result) => {
-      await Promise.all(sends);
-      return result;
-    })
-    .catch(() => {
-      // The next minute checks again. The error can hold SQL or provider detail, so it is not logged.
-      console.warn("Hosted server check failed.");
-      return null;
-    });
+  const sends: Effect.Effect<void>[] = [];
+  return Effect.gen(function* () {
+    const result = yield* createHostedBilling(bindings, {
+      removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+      planChanged: (hostId) => remote.planChanged(hostId),
+      schedule: (send) => sends.push(send),
+    }).hosting.tick(now);
+    return result;
+  }).pipe(
+    Effect.ensuring(Effect.suspend(() => Effect.all(sends, { concurrency: "unbounded", discard: true }))),
+    Effect.catch(() =>
+      Effect.sync(() => {
+        console.warn("Hosted server check failed.");
+        return null;
+      }),
+    ),
+  );
 }
 
 async function serveLocalHostedSite(
@@ -147,10 +153,12 @@ async function serveLocalHostedSite(
   hostedUrl.protocol = "https:";
   hostedUrl.hostname = `${label}.openbot.site`;
   hostedUrl.port = "";
-  return routeHostedSiteRequest(
-    new Request(hostedUrl, request),
-    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
-    Date.now(),
+  return Effect.runPromise(
+    routeHostedSiteRequest(
+      new Request(hostedUrl, request),
+      { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
+      Date.now(),
+    ),
   );
 }
 

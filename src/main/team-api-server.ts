@@ -74,12 +74,15 @@ import { TEAM_LOCAL_PROVIDERS_CAPABILITY, TEAM_PROTOCOL_V5 } from "@openbot/cont
 import { encodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import type * as Ws from "ws";
 import { duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { McpServerError } from "../backend/mcp-server-store";
+import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { RemoteScreenError } from "./remote-screen-gateway";
+import { type RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -192,7 +195,7 @@ export class TeamApiServer {
   readonly #rateLimitCapacity: number;
   readonly #now: () => number;
   #server: Server | null = null;
-  readonly #lifecycle = new LifecycleGate<number>();
+  readonly #lifecycle = new LifecycleGate<number, RemoteWorkflowError>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
   #lastClientUseAt: number | null = null;
@@ -215,11 +218,15 @@ export class TeamApiServer {
   // Without the gate, two starts at once open two listeners and lose one, and a stop during a start
   // runs before the listener exists. A listener lost that way stays open for the previous account.
   start(): Promise<number> {
-    return this.#lifecycle.start(() => this.#start());
+    return Effect.runPromise(
+      this.#lifecycle.start(() => remoteCall(() => this.#start())).pipe(Effect.mapError((error) => error.cause)),
+    );
   }
 
   stop(): Promise<void> {
-    return this.#lifecycle.stop(() => this.#stop());
+    return Effect.runPromise(
+      this.#lifecycle.stop(() => remoteCall(() => this.#stop())).pipe(Effect.mapError((error) => error.cause)),
+    );
   }
 
   async #start(): Promise<number> {
@@ -318,8 +325,12 @@ export class TeamApiServer {
     this.#eventClients.clear();
     this.#localTypingAgentId = null;
     try {
-      await this.#options.remoteScreen?.stop();
-      await this.#options.browserView?.stop();
+      await (this.#options.remoteScreen
+        ? Effect.runPromise(this.#options.remoteScreen.stop().pipe(Effect.mapError((error) => error.cause)))
+        : undefined);
+      await (this.#options.browserView
+        ? Effect.runPromise(this.#options.browserView.stop().pipe(Effect.mapError((error) => error.cause)))
+        : undefined);
     } finally {
       // The heartbeat and the event listeners are already gone. Leaving the socket open
       // would let the next `start()` hand back its port unchanged, so the previous account
@@ -504,7 +515,9 @@ export class TeamApiServer {
       }
 
       if (this.#options.remoteScreen?.handlesHttp(url)) {
-        await this.#options.remoteScreen.handleHttp(request, response, url);
+        await Effect.runPromise(
+          this.#options.remoteScreen.handleHttp(request, response, url).pipe(Effect.mapError((error) => error.cause)),
+        );
         return;
       }
 
@@ -534,10 +547,14 @@ export class TeamApiServer {
       if (method === "POST" && url.pathname === TEAM_API_ROUTES.join.server) {
         const body = await readJson(request);
         this.#checkRate(request, stringField(body, "username", false, 64));
-        const result = await this.#options.store.acceptInvite(
-          stringField(body, "inviteToken", false, INPUT_LIMITS.identifier),
-          stringField(body, "username", false, 64),
-          stringField(body, "password", false, 256),
+        const result = await Effect.runPromise(
+          this.#options.store
+            .acceptInvite(
+              stringField(body, "inviteToken", false, INPUT_LIMITS.identifier),
+              stringField(body, "username", false, 64),
+              stringField(body, "password", false, 256),
+            )
+            .pipe(Effect.mapError((error) => error.cause)),
         );
         return this.#json(response, 201, result);
       }
@@ -545,25 +562,33 @@ export class TeamApiServer {
         const body = await readJson(request);
         const identity = this.#options.store.getIdentity();
         const user = identity
-          ? await this.#options.redeemCentralTicket?.(
-              stringField(body, "accountTicket", false, INPUT_LIMITS.identifier),
-              identity.serverId,
-            )
+          ? await (this.#options.redeemCentralTicket
+              ? Effect.runPromise(
+                  this.#options
+                    .redeemCentralTicket(
+                      stringField(body, "accountTicket", false, INPUT_LIMITS.identifier),
+                      identity.serverId,
+                    )
+                    .pipe(Effect.mapError((error) => error.cause)),
+                )
+              : undefined)
           : null;
         if (!user) return this.#json(response, 401, { error: sourceText("error.team.signInRequired") });
         this.#checkRate(request, user.email);
-        const result = await this.#options.store.acceptInviteWithAccount(
-          stringField(body, "inviteToken", false, INPUT_LIMITS.identifier),
-          user,
+        const result = await Effect.runPromise(
+          this.#options.store
+            .acceptInviteWithAccount(stringField(body, "inviteToken", false, INPUT_LIMITS.identifier), user)
+            .pipe(Effect.mapError((error) => error.cause)),
         );
         return this.#json(response, 201, result);
       }
       if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.login) {
         const body = await readJson(request);
         this.#checkRate(request, stringField(body, "username", false, 64));
-        const result = await this.#options.store.login(
-          stringField(body, "username", false, 64),
-          stringField(body, "password", false, 256),
+        const result = await Effect.runPromise(
+          this.#options.store
+            .login(stringField(body, "username", false, 64), stringField(body, "password", false, 256))
+            .pipe(Effect.mapError((error) => error.cause)),
         );
         return this.#json(response, 200, result);
       }
@@ -571,14 +596,26 @@ export class TeamApiServer {
         const body = await readJson(request);
         const identity = this.#options.store.getIdentity();
         const user = identity
-          ? await this.#options.redeemCentralTicket?.(
-              stringField(body, "accountTicket", false, INPUT_LIMITS.identifier),
-              identity.serverId,
-            )
+          ? await (this.#options.redeemCentralTicket
+              ? Effect.runPromise(
+                  this.#options
+                    .redeemCentralTicket(
+                      stringField(body, "accountTicket", false, INPUT_LIMITS.identifier),
+                      identity.serverId,
+                    )
+                    .pipe(Effect.mapError((error) => error.cause)),
+                )
+              : undefined)
           : null;
         if (!user) return this.#json(response, 401, { error: sourceText("error.team.signInRequired") });
         this.#checkRate(request, user.email);
-        return this.#json(response, 200, await this.#options.store.loginWithAccount(user));
+        return this.#json(
+          response,
+          200,
+          await Effect.runPromise(
+            this.#options.store.loginWithAccount(user).pipe(Effect.mapError((error) => error.cause)),
+          ),
+        );
       }
 
       // The auth gate does not look at the path. An unknown route without a token is 401, not 404,
@@ -1140,11 +1177,10 @@ export class TeamApiServer {
       }
       return pending.result;
     }
-    const result = duplicateAgentIntoLayout(
-      this.#options.agents,
-      this.#options.sidebarLayout,
-      sourceAgentId,
-      operationId,
+    const result = Effect.runPromise(
+      duplicateAgentIntoLayout(this.#options.agents, this.#options.sidebarLayout, sourceAgentId, operationId).pipe(
+        Effect.mapError((error) => error.cause),
+      ),
     ).finally(() => {
       this.#duplicateRequests.delete(operationId);
     });
@@ -1349,22 +1385,24 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
       agentAssignments: {},
       agentOrder: [],
     }),
-    mutate: async () => {
-      throw new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable"));
-    },
-    withProfileAssignment: async () => {
-      throw new Error(sourceText("error.team.sidebarLayoutUnavailable"));
-    },
-    placeDuplicateAfter: async () => {
-      throw new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable"));
-    },
-    removeAgent: async () => ({
-      revision: 0,
-      sections: [],
-      order: ["people", "unassigned"],
-      agentAssignments: {},
-      agentOrder: [],
-    }),
+    mutate: () =>
+      Effect.fail(
+        new StoredStateFailure({ cause: new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable")) }),
+      ),
+    withProfileAssignment: () =>
+      Effect.fail(new StoredStateFailure({ cause: new Error(sourceText("error.team.sidebarLayoutUnavailable")) })),
+    placeDuplicateAfter: () =>
+      Effect.fail(
+        new StoredStateFailure({ cause: new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable")) }),
+      ),
+    removeAgent: () =>
+      Effect.succeed({
+        revision: 0,
+        sections: [],
+        order: ["people", "unassigned"],
+        agentAssignments: {},
+        agentOrder: [],
+      }),
     on: () => undefined,
     off: () => undefined,
   };

@@ -22,8 +22,10 @@ import { parseHostedServerName } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CentralAuthState } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect } from "effect";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { HostService } from "./host-service";
+import { RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
 
 const CONTROL_SOCKET_FILE = "control.sock";
 const MAX_BODY_BYTES = 4096;
@@ -71,7 +73,7 @@ export class ServerMode {
   #pendingName: string | null = null;
   /** Why the last publish failed. Nobody reads the journal, so `status` shows it. */
   #publishError: string | null = null;
-  #publishing: Promise<void> = Promise.resolve();
+  #publishing: Deferred.Deferred<void> | null = null;
 
   constructor(options: ServerModeOptions) {
     this.#options = options;
@@ -123,29 +125,35 @@ export class ServerMode {
    * sign-in and at the start, and the start retry calls it after a failure. Calls run one at a time,
    * so two callers never name two hosts.
    */
-  publish(): Promise<void> {
-    const next = this.#publishing.then(() => this.#publish());
-    this.#publishing = next.catch(() => undefined);
-    return next;
-  }
-
-  async #publish(): Promise<void> {
-    this.#publishError = null;
-    if (this.#options.centralAuth.getState().status !== "signed_in") return;
-    const { host } = this.#options;
-    const serverName = this.#pendingName;
-    try {
-      // A name comes only from the owner (`openbot login --name`, `openbot name`), so it also renames
-      // the host that this account had before.
-      if (!host.getStatus().configured) await host.configure({ serverName: serverName ?? DEFAULT_SERVER_NAME });
-      else if (serverName && host.getStatus().serverName !== serverName) await host.updateIdentity({ serverName });
+  readonly publish = Effect.fn("ServerMode.publish")(function* (this: ServerMode) {
+    const previous = this.#publishing;
+    const completed = Deferred.makeUnsafe<void>();
+    this.#publishing = completed;
+    return yield* Effect.gen({ self: this }, function* () {
+      if (previous) yield* Deferred.await(previous);
+      this.#publishError = null;
+      if (this.#options.centralAuth.getState().status !== "signed_in") return;
+      const { host } = this.#options;
+      const serverName = this.#pendingName;
+      // Only the owner supplies a name; it also renames the account's existing host.
+      if (!host.getStatus().configured) yield* host.configure({ serverName: serverName ?? DEFAULT_SERVER_NAME });
+      else if (serverName && host.getStatus().serverName !== serverName) yield* host.updateIdentity({ serverName });
       this.#pendingName = null;
-      await host.start();
-    } catch (error) {
-      this.#publishError = error instanceof Error ? error.message : sourceText("error.host.publishFailed");
-      throw error;
-    }
-  }
+      yield* host.start();
+    }).pipe(
+      Effect.tapError(({ cause }) =>
+        Effect.sync(() => {
+          this.#publishError = cause instanceof Error ? cause.message : sourceText("error.host.publishFailed");
+        }),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#publishing === completed) this.#publishing = null;
+          Deferred.doneUnsafe(completed, Effect.void);
+        }),
+      ),
+    );
+  }, Effect.uninterruptible).bind(this);
 
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let answer: Answer;
@@ -169,13 +177,17 @@ export class ServerMode {
       case "GET /v1/status":
         return this.#status();
       case "POST /v1/login/start":
-        return this.#startLogin(body.get("email") ?? "", body.get("name"));
+        return runRemoteWorkflow(this.#startLogin(body.get("email") ?? "", body.get("name")));
       case "POST /v1/login/verify":
-        return this.#verifyLogin(body.get("challenge") ?? "", body.get("code") ?? "", body.get("name"));
+        return runRemoteWorkflow(
+          this.#verifyLogin(body.get("challenge") ?? "", body.get("code") ?? "", body.get("name")),
+        );
       case "POST /v1/name":
-        return this.#rename(body.get("name") ?? "");
+        return runRemoteWorkflow(this.#rename(body.get("name") ?? ""));
       case "POST /v1/logout":
-        await this.#options.centralAuth.logout();
+        await runRemoteWorkflow(
+          this.#options.centralAuth.logout().pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
+        );
         return this.#status();
       default:
         return failure(404, "not_found");
@@ -199,20 +211,31 @@ export class ServerMode {
     };
   }
 
-  async #startLogin(email: string, name: string | null): Promise<Answer> {
+  readonly #startLogin = Effect.fn("ServerMode.startLogin")(function* (
+    this: ServerMode,
+    email: string,
+    name: string | null,
+  ): Effect.fn.Return<Answer, RemoteWorkflowError> {
     const normalized = email.trim();
     if (!normalized.includes("@") || normalized.length > MAX_EMAIL_LENGTH) return failure(400, "invalid_email");
     // The name is stored only at the code check. A check here refuses it before an email is sent.
     if (name !== null && !parseHostedServerName(name)) return nameFailure(name);
     if (this.#options.centralAuth.getState().status === "signed_in") return failure(409, "signed_in");
-    const state = await this.#options.centralAuth.requestEmailCode(normalized);
+    const state = yield* this.#options.centralAuth
+      .requestEmailCode(normalized)
+      .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
     if (state.status === "code_sent" && !state.issue) {
       return { status: 200, lines: { challenge: state.challengeId, expires_at: state.expiresAt } };
     }
     return issueFailure(state);
-  }
+  });
 
-  async #verifyLogin(challenge: string, code: string, name: string | null): Promise<Answer> {
+  readonly #verifyLogin = Effect.fn("ServerMode.verifyLogin")(function* (
+    this: ServerMode,
+    challenge: string,
+    code: string,
+    name: string | null,
+  ): Effect.fn.Return<Answer, RemoteWorkflowError> {
     if (!challenge.trim() || !code.trim()) return failure(400, "invalid_request");
     if (name !== null) {
       // The host refuses such a name only when it publishes, after the sign-in.
@@ -220,24 +243,29 @@ export class ServerMode {
       if (!serverName) return nameFailure(name);
       this.#pendingName = serverName;
     }
-    const state = await this.#options.centralAuth.verifyEmailCode(challenge.trim(), code.trim());
+    const state = yield* this.#options.centralAuth
+      .verifyEmailCode(challenge.trim(), code.trim())
+      .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
     // The entry point publishes the host when the account change is applied. `status` shows it.
     if (state.status === "signed_in") return this.#status();
     return issueFailure(state);
-  }
+  });
 
-  async #rename(name: string): Promise<Answer> {
+  readonly #rename = Effect.fn("ServerMode.rename")(function* (
+    this: ServerMode,
+    name: string,
+  ): Effect.fn.Return<Answer, RemoteWorkflowError> {
     const serverName = parseHostedServerName(name);
     if (!serverName) return nameFailure(name);
     const { host } = this.#options;
     if (host.getStatus().configured) {
-      await host.updateIdentity({ serverName });
+      yield* host.updateIdentity({ serverName });
     } else {
       this.#pendingName = serverName;
-      await this.publish();
+      yield* this.publish();
     }
     return this.#status();
-  }
+  });
 }
 
 /** The form body, or null when it is larger than a control request can be. */

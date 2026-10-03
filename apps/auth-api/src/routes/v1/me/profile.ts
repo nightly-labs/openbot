@@ -1,5 +1,6 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
 import { apiError, authErrorResponse, bearerToken, json, requestAuthService } from "../../../server/request-auth";
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/v1/me/profile")({
           if (!isString(body.name)) {
             return apiError(400, "invalid_profile_name", "Enter a valid display name.");
           }
-          return json(await requestAuthService().updateName(token, body.name));
+          return json(await runApiEffect(requestAuthService().updateName(token, body.name)));
         } catch (error) {
           return authErrorResponse(error);
         }

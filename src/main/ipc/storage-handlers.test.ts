@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Storage reaches the local host or a joined server by the server the surface names. A host without
@@ -45,22 +46,25 @@ function usageFor(agentId: string): StorageUsage {
 function setup(options: { capable: boolean; answer?: unknown }) {
   bound.clear();
   const storage = {
-    usage: vi.fn(async () => usageFor("chief")),
-    deleteFile: vi.fn(async () => undefined),
-    clear: vi.fn(async () => undefined),
+    usage: vi.fn(() => Effect.sync(() => usageFor("chief"))),
+    deleteFile: vi.fn(() => Effect.sync(() => undefined)),
+    clear: vi.fn(() => Effect.sync(() => undefined)),
   };
   const requests: { serverId: string; path: string; init?: RemoteRequestInit }[] = [];
   const remoteServers = {
     supportsCapability: () => options.capable,
-    request: async <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit) => {
-      requests.push({ serverId, path, init });
-      return decoder(options.answer ?? {});
-    },
+    request: <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit) =>
+      Effect.sync(() => {
+        requests.push({ serverId, path, init });
+        return decoder(options.answer ?? {});
+      }),
     downloadAttachment: vi.fn(),
     forgetCachedAttachments: vi.fn(),
   };
   const mailbox = {
-    resolveAttachment: vi.fn(async () => ({ path: "/transfers/report.pdf", mimeType: "application/pdf", name: "a" })),
+    resolveAttachment: vi.fn(() =>
+      Effect.sync(() => ({ path: "/transfers/report.pdf", mimeType: "application/pdf", name: "a" })),
+    ),
   };
   const openPath = vi.fn(async () => "");
   registerIpcGroup(

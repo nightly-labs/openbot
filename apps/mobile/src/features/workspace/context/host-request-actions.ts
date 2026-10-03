@@ -23,6 +23,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/que
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { runTeamEffect } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import {
   installAgentTemplate,
@@ -32,6 +33,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import type { QueryClient } from "@tanstack/react-query";
+import { Effect } from "effect";
 import * as Crypto from "expo-crypto";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
@@ -219,13 +221,18 @@ export function createHostRequestActions({
       ),
     // A host too old to know the route answers 404, so ask its advertised capabilities first.
     loadAgentSkills: async (agentId, serverId, manage = false) => {
-      if (manage) return listAgentSkills(skillsAdmin(serverId), agentId);
+      if (manage)
+        return runTeamEffect(
+          listAgentSkills(skillsAdmin(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
+        );
       return capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
         ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
         : null;
     },
-    setAgentSkillEnabled: async (input, serverId) => setAgentSkillEnabled(skillsAdmin(serverId), input),
-    uninstallAgentSkill: async (input, serverId) => uninstallAgentSkill(skillsAdmin(serverId), input),
+    setAgentSkillEnabled: async (input, serverId) =>
+      runTeamEffect(setAgentSkillEnabled(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    uninstallAgentSkill: async (input, serverId) =>
+      runTeamEffect(uninstallAgentSkill(skillsAdmin(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     loadAgentStorage: async (agentId, serverId, force = false) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
       const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
@@ -253,9 +260,11 @@ export function createHostRequestActions({
       // A host too old to know the route answers 404, so refuse before the request.
       if (!capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY))
         return Promise.reject(new Error(currentText().t("mobile.link.template.error.unsupported")));
-      return installAgentTemplate(
-        (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload),
-        input,
+      return runTeamEffect(
+        installAgentTemplate(
+          (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload),
+          input,
+        ).pipe(Effect.mapError((error) => error.cause)),
       );
     },
     loadAgentAvatar: (agentId, avatarUrl, serverId) => requestAgentAvatar(request, agentId, avatarUrl, serverId),

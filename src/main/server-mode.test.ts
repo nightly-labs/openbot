@@ -3,7 +3,9 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CentralAuthState, HostStatus } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
 import { ServerMode, takeServerModeEnvironment } from "./server-mode";
 
 const SESSION_TOKEN = "session-token-that-must-stay-in-main";
@@ -43,36 +45,48 @@ function fixture() {
   };
   const centralAuth = {
     getState: () => state,
-    requestEmailCode: vi.fn(async (email: string) => {
-      state = { status: "code_sent", challengeId: "challenge-1", email, expiresAt: 1, resendAvailableAt: 1 };
-      return state;
-    }),
-    verifyEmailCode: vi.fn(async () => {
-      state = { status: "signed_in", user: { id: "u1", email: "owner@example.com", name: null, avatarUrl: null } };
-      // The real manager keeps the token to itself; a leak would come from echoing what it holds.
-      const held = { ...state, sessionToken: SESSION_TOKEN };
-      return held;
-    }),
-    logout: vi.fn(async () => {
-      state = { status: "signed_out" };
-      return state;
-    }),
+    requestEmailCode: vi.fn((email: string) =>
+      Effect.sync(() => {
+        state = { status: "code_sent", challengeId: "challenge-1", email, expiresAt: 1, resendAvailableAt: 1 };
+        return state;
+      }),
+    ),
+    verifyEmailCode: vi.fn(() =>
+      Effect.sync(() => {
+        state = { status: "signed_in", user: { id: "u1", email: "owner@example.com", name: null, avatarUrl: null } };
+        // The real manager keeps the token to itself; a leak would come from echoing what it holds.
+        const held = { ...state, sessionToken: SESSION_TOKEN };
+        return held;
+      }),
+    ),
+    logout: vi.fn(() =>
+      Effect.sync(() => {
+        state = { status: "signed_out" };
+        return state;
+      }),
+    ),
   };
   const host = {
     getStatus: () => hostStatus,
-    configure: vi.fn(async ({ serverName }: { serverName: string }) => {
-      await Promise.resolve();
-      hostStatus = { ...hostStatus, phase: "idle", configured: true, serverName };
-      return hostStatus;
-    }),
-    start: vi.fn(async () => {
-      hostStatus = { ...hostStatus, phase: "online" };
-      return hostStatus;
-    }),
-    updateIdentity: vi.fn(async ({ serverName }: { serverName?: string }) => {
-      hostStatus = { ...hostStatus, serverName: serverName ?? null };
-      return hostStatus;
-    }),
+    configure: vi.fn(({ serverName }: { serverName: string }) =>
+      remoteCall(async () => {
+        await Promise.resolve();
+        hostStatus = { ...hostStatus, phase: "idle", configured: true, serverName };
+        return hostStatus;
+      }),
+    ),
+    start: vi.fn(() =>
+      remoteCall(async () => {
+        hostStatus = { ...hostStatus, phase: "online" };
+        return hostStatus;
+      }),
+    ),
+    updateIdentity: vi.fn(({ serverName }: { serverName?: string }) =>
+      remoteCall(async () => {
+        hostStatus = { ...hostStatus, serverName: serverName ?? null };
+        return hostStatus;
+      }),
+    ),
   };
   const mode = new ServerMode({
     environment: { controlSocketPath: join(directory, "control.sock") },
@@ -163,7 +177,7 @@ describe("ServerMode control socket", () => {
     expect(verified.text).toContain("account=signed_in\n");
 
     // The entry point and the start retry can both call this at the same time.
-    await Promise.all([mode.publish(), mode.publish()]);
+    await Promise.all([runRemoteWorkflow(mode.publish()), runRemoteWorkflow(mode.publish())]);
     expect(host.configure).toHaveBeenCalledOnce();
     const status = await send("GET", "/v1/status");
     expect(status.text).toContain("server=online\nserver_name=Lab Server\n");
@@ -174,8 +188,10 @@ describe("ServerMode control socket", () => {
     server = mode;
     await server.listen();
     await send("POST", "/v1/login/verify", "challenge=challenge-1&code=123456");
-    host.configure.mockRejectedValueOnce(new Error("Refused.\naccount=x"));
-    await expect(mode.publish()).rejects.toThrow("Refused.");
+    host.configure.mockReturnValueOnce(
+      Effect.fail(new RemoteWorkflowError({ cause: new Error("Refused.\naccount=x") })),
+    );
+    await expect(runRemoteWorkflow(mode.publish())).rejects.toThrow("Refused.");
 
     // A message with a line break stays one line, so it cannot add a key.
     const status = await send("GET", "/v1/status");

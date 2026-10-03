@@ -11,6 +11,7 @@ import {
   waitFor,
   waitForQueue,
 } from "../agent-service-test-harness";
+import { runTestEffect } from "../effect-test-runtime";
 
 let root: string;
 let logPath: string;
@@ -33,10 +34,10 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "First large task" });
-    await service.sendMessage({ agentId: "chief", text: "Run after compaction" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "First large task" }));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run after compaction" }));
     await waitFor(async () => {
       const messages = await protocolMessages(logPath);
       return messages.filter((message) => message.method === "turn/start").length === 2;
@@ -55,8 +56,8 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     process.env.OPENBOT_FAKE_CONTEXT_USAGE = "79000";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Normal task" });
+    await runTestEffect(service.initialize());
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Normal task" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
 
     expect((await protocolMessages(logPath)).some((message) => message.method === "thread/compact/start")).toBe(false);
@@ -69,10 +70,10 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     process.env.OPENBOT_FAKE_COMPACTION_DELAY = "400";
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "First large task" });
-    await service.sendMessage({ agentId: "chief", text: "Run after compaction" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "First large task" }));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run after compaction" }));
     await waitFor(async () =>
       (await protocolMessages(logPath)).some((message) => message.method === "thread/compact/start"),
     );
@@ -80,21 +81,23 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     // A compaction keeps no conversation turn id, so a refresh reads its thread as idle. Dropping
     // the routing here would lose the compaction's own completion, and the agent would hold its
     // queue for good.
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
+    await runTestEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: [],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
 
     await waitFor(async () => {
       const messages = await protocolMessages(logPath);
@@ -110,10 +113,10 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runTestEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "First task" });
-    await service.sendMessage({ agentId: "chief", text: "Must still run" });
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "First task" }));
+    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Must still run" }));
     await waitFor(async () => {
       const messages = await protocolMessages(logPath);
       return messages.filter((message) => message.method === "turn/start").length === 2;

@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+import { authCall, CentralAuthOperationError } from "./central-auth-effects";
+import { remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -32,58 +35,60 @@ const listedHost = {
 
 function mockAuthenticatedSend(bridge: TeamWebRtcBridge, automaticallyConfirm = true) {
   const pendingConfirmations: Array<() => void> = [];
-  const send = vi.spyOn(bridge, "send").mockImplementation(async (hostId, channel, data) => {
-    if (channel !== "rpc" || !isString(data)) return;
-    let frame: TeamProtocolV2AuthFrame;
-    try {
-      frame = decodeTeamProtocolV2AuthFrame(data);
-    } catch {
-      return;
-    }
-    if (frame.type === "auth-complete") {
-      const confirm = () =>
+  const send = vi.spyOn(bridge, "send").mockImplementation((hostId, channel, data) =>
+    remoteCall(async () => {
+      if (channel !== "rpc" || !isString(data)) return;
+      let frame: TeamProtocolV2AuthFrame;
+      try {
+        frame = decodeTeamProtocolV2AuthFrame(data);
+      } catch {
+        return;
+      }
+      if (frame.type === "auth-complete") {
+        const confirm = () =>
+          bridge.emit(
+            "data",
+            hostId,
+            "rpc",
+            encodeTeamProtocolV2Frame({
+              version: 2,
+              type: "auth-confirmed",
+              clientNonce: frame.clientNonce,
+              hostNonce: frame.hostNonce,
+            }),
+          );
+        if (automaticallyConfirm) queueMicrotask(confirm);
+        else pendingConfirmations.push(confirm);
+        return;
+      }
+      if (frame.type !== "auth-init") return;
+      const hostNonce = "h".repeat(43);
+      const transcript = teamProtocolV2AuthenticationTranscript({
+        hostId,
+        sessionId: frame.ticket,
+        ticket: frame.ticket,
+        clientPublicKey: frame.clientPublicKey,
+        clientNonce: frame.clientNonce,
+        hostNonce,
+        clientFingerprint: channelBinding.localFingerprint,
+        hostFingerprint: channelBinding.remoteFingerprint,
+      });
+      queueMicrotask(() =>
         bridge.emit(
           "data",
           hostId,
           "rpc",
           encodeTeamProtocolV2Frame({
             version: 2,
-            type: "auth-confirmed",
+            type: "auth-ready",
             clientNonce: frame.clientNonce,
-            hostNonce: frame.hostNonce,
+            hostNonce,
+            signature: sign(null, Buffer.from(transcript), hostKeys.privateKey).toString("base64url"),
           }),
-        );
-      if (automaticallyConfirm) queueMicrotask(confirm);
-      else pendingConfirmations.push(confirm);
-      return;
-    }
-    if (frame.type !== "auth-init") return;
-    const hostNonce = "h".repeat(43);
-    const transcript = teamProtocolV2AuthenticationTranscript({
-      hostId,
-      sessionId: frame.ticket,
-      ticket: frame.ticket,
-      clientPublicKey: frame.clientPublicKey,
-      clientNonce: frame.clientNonce,
-      hostNonce,
-      clientFingerprint: channelBinding.localFingerprint,
-      hostFingerprint: channelBinding.remoteFingerprint,
-    });
-    queueMicrotask(() =>
-      bridge.emit(
-        "data",
-        hostId,
-        "rpc",
-        encodeTeamProtocolV2Frame({
-          version: 2,
-          type: "auth-ready",
-          clientNonce: frame.clientNonce,
-          hostNonce,
-          signature: sign(null, Buffer.from(transcript), hostKeys.privateKey).toString("base64url"),
-        }),
-      ),
-    );
-  });
+        ),
+      );
+    }),
+  );
   return {
     send,
     pendingConfirmations,
@@ -99,40 +104,44 @@ function createTransport(
 ): TeamWebRtcClientTransport {
   return new TeamWebRtcClientTransport({
     bridge,
-    listHosts: async () => [listedHost],
-    startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
-    issueTicket: async (sessionId: string) => ({
-      ticket: sessionId,
-      expiresAt: Date.now() + 180_000,
-      signalUrl: "wss://signal.example.test/v1/signal",
-    }),
-    endSession: async () => undefined,
-    createInvite: async () => ({
-      inviteId: "invite",
-      token: "token",
-      expiresAt: Date.now() + 60_000,
-      permanent: false,
-      useCount: 0,
-    }),
-    listInvites: async () => [],
-    previewInvite: async () => ({
-      inviteId: "invite",
-      hostId: "host-1",
-      hostName: "Host",
-      role: "member",
-      expiresAt: Date.now() + 60_000,
-      emailBound: false,
-      permanent: false,
-      devicePublicKey: null,
-    }),
-    acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-    revokeInvite: async () => undefined,
-    listMembers: async () => [],
-    updateMember: async () => undefined,
-    removeMember: async () => undefined,
+    listHosts: () => authCall(async () => [listedHost]),
+    startSession: () =>
+      authCall(async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 })),
+    issueTicket: (sessionId: string) =>
+      authCall(async () => ({
+        ticket: sessionId,
+        expiresAt: Date.now() + 180_000,
+        signalUrl: "wss://signal.example.test/v1/signal",
+      })),
+    endSession: () => authCall(async () => undefined),
+    createInvite: () =>
+      authCall(async () => ({
+        inviteId: "invite",
+        token: "token",
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      })),
+    listInvites: () => authCall(async () => []),
+    previewInvite: () =>
+      authCall(async () => ({
+        inviteId: "invite",
+        hostId: "host-1",
+        hostName: "Host",
+        role: "member",
+        expiresAt: Date.now() + 60_000,
+        emailBound: false,
+        permanent: false,
+        devicePublicKey: null,
+      })),
+    acceptInvite: () => authCall(async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+    revokeInvite: () => authCall(async () => undefined),
+    listMembers: () => authCall(async () => []),
+    updateMember: () => authCall(async () => undefined),
+    removeMember: () => authCall(async () => undefined),
     getPrincipalId: () => "user-1",
     controlPlaneUrl: "https://api.example.test",
-    downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+    downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
     transferDirectory: join(tmpdir(), "openbot-webrtc-client-test"),
     ...overrides,
   });
@@ -152,60 +161,97 @@ function sentRequestId(send: { mock: { calls: unknown[][] } }): string | null {
 }
 
 describe("TeamWebRtcClientTransport", () => {
+  it("ends a pending mutation on stop without replaying it", async () => {
+    const bridge = new TeamWebRtcBridge();
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    const authentication = mockAuthenticatedSend(bridge);
+    const transport = createTransport(bridge);
+    transport.pinHostKey("host-1", hostKeys.publicKey);
+    try {
+      await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+      const pending = Effect.runPromise(
+        transport
+          .request("host-1", "/v1/agents/research", { method: "DELETE" })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
+      const failure = expect(pending).rejects.toMatchObject({ code: "remote_disconnected", status: 503 });
+      await vi.waitFor(() => expect(sentRequestId(authentication.send)).not.toBeNull());
+      const sentBeforeStop = authentication.send.mock.calls.length;
+      await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+      await failure;
+      expect(authentication.send.mock.calls.length).toBe(sentBeforeStop);
+    } finally {
+      await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    }
+  });
+
   it("reuses the logical session after a WebRTC disconnect", async () => {
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
     const authentication = mockAuthenticatedSend(bridge, false);
-    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const startSession = vi
       .fn()
-      .mockResolvedValue({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 });
+      .mockReturnValue(
+        Effect.succeed({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
+      );
     const issueTicket = vi.fn((sessionId: string, _clientPublicKey: string) =>
-      Promise.resolve({
+      Effect.succeed({
         ticket: sessionId,
         expiresAt: 2_000,
         signalUrl: "wss://signal.example.test/v1/signal",
       }),
     );
-    const endSession = vi.fn().mockResolvedValue(undefined);
+    const endSession = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [listedHost],
+      listHosts: () => authCall(async () => [listedHost]),
       startSession,
       issueTicket,
       endSession,
-      createInvite: async () => ({
-        inviteId: "invite",
-        token: "token",
-        expiresAt: 2_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite",
-        hostId: "host-1",
-        hostName: "Host",
-        role: "member",
-        expiresAt: 2_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: null,
-      }),
-      acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          token: "token",
+          expiresAt: 2_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          hostId: "host-1",
+          hostName: "Host",
+          role: "member",
+          expiresAt: 2_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: null,
+        })),
+      acceptInvite: () => authCall(async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "user-1",
       controlPlaneUrl: "https://api.example.test",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(tmpdir(), "openbot-webrtc-client-test"),
     });
-    await transport.listHosts();
-    await expect(transport.connect("host-1")).rejects.toThrow("pinned device key");
+    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
+    await expect(
+      Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow("pinned device key");
     expect(startSession).not.toHaveBeenCalled();
     transport.pinHostKey("host-1", hostKeys.publicKey);
     const protocolError = vi.fn();
@@ -220,7 +266,9 @@ describe("TeamWebRtcClientTransport", () => {
     expect(disconnectBridge).not.toHaveBeenCalled();
     expect(protocolError).not.toHaveBeenCalled();
 
-    const initialConnection = transport.connect("host-1");
+    const initialConnection = Effect.runPromise(
+      transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)),
+    );
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     expect(bridge.send).not.toHaveBeenCalledWith("host-1", "events", expect.any(String));
     authentication.confirmNext();
@@ -246,7 +294,7 @@ describe("TeamWebRtcClientTransport", () => {
     );
     bridge.emit("disconnected", "host-1");
     expect(transport.isConnected("host-1")).toBe(false);
-    const reconnection = transport.connect("host-1");
+    const reconnection = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     authentication.confirmNext();
     await reconnection;
@@ -261,7 +309,9 @@ describe("TeamWebRtcClientTransport", () => {
       "events",
       JSON.stringify({ version: 2, type: "event-ack", throughSequence: 0 }),
     );
-    const malformedRequest = transport.request("host-1", "/v1/agents");
+    const malformedRequest = Effect.runPromise(
+      transport.request("host-1", "/v1/agents").pipe(Effect.mapError((error) => error.cause)),
+    );
     const malformedRejection = expect(malformedRequest).rejects.toMatchObject({ code: "protocol_error" });
     await vi.waitFor(() => expect(bridge.send).toHaveBeenCalledWith("host-1", "rpc", expect.any(String)));
     bridge.emit(
@@ -279,228 +329,249 @@ describe("TeamWebRtcClientTransport", () => {
     await malformedRejection;
     expect(protocolError).toHaveBeenCalledWith("host-1", "protocol_error", expect.any(String));
     await vi.waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("host-1"));
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("stays connected on a session that expires further out than a timer can be set", async () => {
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
-    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
+    const disconnectBridge = vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     mockAuthenticatedSend(bridge);
     // What the control plane answers `startSession` with for every account session: the largest date
     // JavaScript has. Scheduling the expiry for it directly overflows the timer range, and Node
     // resolves an overflow by firing in a millisecond -- so the session that never expires used to
     // be the one that hung up the moment it authenticated.
     const transport = createTransport(bridge, {
-      startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: 8_640_000_000_000_000 }),
+      startSession: () =>
+        authCall(async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: 8_640_000_000_000_000 })),
     });
-    await transport.listHosts();
+    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
     transport.pinHostKey("host-1", hostKeys.publicKey);
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     try {
-      await transport.connect("host-1");
+      await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
       await vi.advanceTimersByTimeAsync(5);
       expect(disconnectBridge).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("cancels a connection before a delayed session start can restore it", async () => {
     const bridge = new TeamWebRtcBridge();
-    const connectBridge = vi.spyOn(bridge, "connect").mockResolvedValue();
-    vi.spyOn(bridge, "send").mockResolvedValue();
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    const connectBridge = vi.spyOn(bridge, "connect").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "send").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     let resolveSession!: (value: { sessionId: string; hostId: string; expiresAt: number }) => void;
-    const startSession = vi.fn(
-      () =>
-        new Promise<{ sessionId: string; hostId: string; expiresAt: number }>((resolve) => {
-          resolveSession = resolve;
-        }),
+    const startSession = vi.fn(() =>
+      authCall(
+        () =>
+          new Promise<{ sessionId: string; hostId: string; expiresAt: number }>((resolve) => {
+            resolveSession = resolve;
+          }),
+      ),
     );
-    const endSession = vi.fn().mockResolvedValue(undefined);
+    const endSession = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [listedHost],
+      listHosts: () => authCall(async () => [listedHost]),
       startSession,
-      issueTicket: async () => ({
-        ticket: "ticket",
-        expiresAt: 2_000,
-        signalUrl: "wss://signal.example.test/v1/signal",
-      }),
+      issueTicket: () =>
+        authCall(async () => ({
+          ticket: "ticket",
+          expiresAt: 2_000,
+          signalUrl: "wss://signal.example.test/v1/signal",
+        })),
       endSession,
-      createInvite: async () => ({
-        inviteId: "invite",
-        token: "token",
-        expiresAt: 2_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite",
-        hostId: "host-1",
-        hostName: "Host",
-        role: "member",
-        expiresAt: 2_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: null,
-      }),
-      acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          token: "token",
+          expiresAt: 2_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          hostId: "host-1",
+          hostName: "Host",
+          role: "member",
+          expiresAt: 2_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: null,
+        })),
+      acceptInvite: () => authCall(async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "user-1",
       controlPlaneUrl: "https://api.example.test",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(tmpdir(), "openbot-webrtc-client-cancel-test"),
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    const connection = transport.connect("host-1");
+    const connection = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     await vi.waitFor(() => expect(startSession).toHaveBeenCalledOnce());
-    await transport.disconnect("host-1");
+    await Effect.runPromise(transport.disconnect("host-1").pipe(Effect.mapError((error) => error.cause)));
     resolveSession({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 });
 
     await expect(connection).rejects.toThrow("cancelled");
     expect(connectBridge).not.toHaveBeenCalled();
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("does not reuse a remote session after the signed-in principal changes", async () => {
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
     mockAuthenticatedSend(bridge);
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const startSession = vi
       .fn()
-      .mockResolvedValueOnce({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 })
-      .mockResolvedValueOnce({ sessionId: "session-2", hostId: "host-1", expiresAt: Date.now() + 86_400_000 });
-    const endSession = vi.fn().mockResolvedValue(undefined);
+      .mockReturnValueOnce(
+        Effect.succeed({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
+      )
+      .mockReturnValueOnce(
+        Effect.succeed({ sessionId: "session-2", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
+      );
+    const endSession = vi.fn().mockReturnValue(Effect.succeed(undefined));
     let principalId = "user-1";
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [listedHost],
+      listHosts: () => authCall(async () => [listedHost]),
       startSession,
-      issueTicket: async (sessionId) => ({
-        ticket: sessionId,
-        expiresAt: 2_000,
-        signalUrl: "wss://signal.example.test/v1/signal",
-      }),
+      issueTicket: (sessionId) =>
+        authCall(async () => ({
+          ticket: sessionId,
+          expiresAt: 2_000,
+          signalUrl: "wss://signal.example.test/v1/signal",
+        })),
       endSession,
-      createInvite: async () => ({
-        inviteId: "invite",
-        token: "token",
-        expiresAt: 2_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite",
-        hostId: "host-1",
-        hostName: "Host",
-        role: "member",
-        expiresAt: 2_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: null,
-      }),
-      acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          token: "token",
+          expiresAt: 2_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          hostId: "host-1",
+          hostName: "Host",
+          role: "member",
+          expiresAt: 2_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: null,
+        })),
+      acceptInvite: () => authCall(async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => principalId,
       controlPlaneUrl: "https://api.example.test",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(tmpdir(), "openbot-webrtc-client-principal-test"),
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    await transport.connect("host-1");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     principalId = "user-2";
-    await transport.connect("host-1");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
 
     expect(startSession).toHaveBeenCalledTimes(2);
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("replaces a logical session before it expires", async () => {
     const now = Date.now();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
     mockAuthenticatedSend(bridge);
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const startSession = vi
       .fn()
-      .mockResolvedValueOnce({ sessionId: "session-1", hostId: "host-1", expiresAt: now + 100_000 })
-      .mockResolvedValueOnce({ sessionId: "session-2", hostId: "host-1", expiresAt: now + 200_000 });
+      .mockReturnValueOnce(Effect.succeed({ sessionId: "session-1", hostId: "host-1", expiresAt: now + 100_000 }))
+      .mockReturnValueOnce(Effect.succeed({ sessionId: "session-2", hostId: "host-1", expiresAt: now + 200_000 }));
     const issueTicket = vi.fn((sessionId: string) =>
-      Promise.resolve({
+      Effect.succeed({
         ticket: sessionId,
         expiresAt: now + 60_000,
         signalUrl: "wss://signal.example.test/v1/signal",
       }),
     );
-    const endSession = vi.fn().mockResolvedValue(undefined);
+    const endSession = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const transport = new TeamWebRtcClientTransport({
       bridge,
-      listHosts: async () => [listedHost],
+      listHosts: () => authCall(async () => [listedHost]),
       startSession,
       issueTicket,
       endSession,
-      createInvite: async () => ({
-        inviteId: "invite",
-        token: "token",
-        expiresAt: now + 60_000,
-        permanent: false,
-        useCount: 0,
-      }),
-      listInvites: async () => [],
-      previewInvite: async () => ({
-        inviteId: "invite",
-        hostId: "host-1",
-        hostName: "Host",
-        role: "member",
-        expiresAt: now + 60_000,
-        emailBound: false,
-        permanent: false,
-        devicePublicKey: null,
-      }),
-      acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-      revokeInvite: async () => undefined,
-      listMembers: async () => [],
-      updateMember: async () => undefined,
-      removeMember: async () => undefined,
+      createInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          token: "token",
+          expiresAt: now + 60_000,
+          permanent: false,
+          useCount: 0,
+        })),
+      listInvites: () => authCall(async () => []),
+      previewInvite: () =>
+        authCall(async () => ({
+          inviteId: "invite",
+          hostId: "host-1",
+          hostName: "Host",
+          role: "member",
+          expiresAt: now + 60_000,
+          emailBound: false,
+          permanent: false,
+          devicePublicKey: null,
+        })),
+      acceptInvite: () => authCall(async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+      revokeInvite: () => authCall(async () => undefined),
+      listMembers: () => authCall(async () => []),
+      updateMember: () => authCall(async () => undefined),
+      removeMember: () => authCall(async () => undefined),
       getPrincipalId: () => "user-1",
       controlPlaneUrl: "https://api.example.test",
-      downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+      downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(tmpdir(), "openbot-webrtc-client-expiration-test"),
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    await transport.connect("host-1");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     bridge.emit("disconnected", "host-1");
     nowSpy.mockReturnValue(now + 80_000);
-    await transport.connect("host-1");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
 
     expect(startSession).toHaveBeenCalledTimes(2);
     expect(issueTicket).toHaveBeenNthCalledWith(2, "session-2", expect.stringContaining("PUBLIC KEY"));
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
     nowSpy.mockRestore();
   });
 
@@ -510,19 +581,23 @@ describe("TeamWebRtcClientTransport", () => {
   // that will answer the next request with the same nonsense.
   it("reports an undecodable response body as a protocol failure", async () => {
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
     const authentication = mockAuthenticatedSend(bridge);
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = createTransport(bridge);
-    await transport.listHosts();
+    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
     transport.pinHostKey("host-1", hostKeys.publicKey);
-    await transport.connect("host-1");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
 
     // `GET /v1/agents/:id/usage` is one of the routes carried by the V3 codec, so its body is the
     // adapter's to accept -- and a number where the shape says otherwise is not something it can.
-    const pending = transport.request("host-1", "/v1/agents/research/usage");
+    const pending = Effect.runPromise(
+      transport.request("host-1", "/v1/agents/research/usage").pipe(Effect.mapError((error) => error.cause)),
+    );
     const rejection = expect(pending).rejects.toMatchObject({ code: "protocol_error" });
     await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
     bridge.emit(
@@ -538,21 +613,25 @@ describe("TeamWebRtcClientTransport", () => {
     );
 
     await rejection;
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("carries channel payloads and revision events outside the released base adapter", async () => {
     const bridge = new TeamWebRtcBridge();
-    vi.spyOn(bridge, "connect").mockImplementation(async ({ peerId }) => {
-      queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
-    });
+    vi.spyOn(bridge, "connect").mockImplementation(({ peerId }) =>
+      remoteCall(async () => {
+        queueMicrotask(() => bridge.emit("connected", peerId, channelBinding));
+      }),
+    );
     const authentication = mockAuthenticatedSend(bridge);
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = createTransport(bridge);
-    await transport.listHosts();
+    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
     transport.pinHostKey("host-1", hostKeys.publicKey);
-    await transport.connect("host-1");
-    const pending = transport.request("host-1", "/v1/channels");
+    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const pending = Effect.runPromise(
+      transport.request("host-1", "/v1/channels").pipe(Effect.mapError((error) => error.cause)),
+    );
     await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
     const channels = [
       {
@@ -609,37 +688,43 @@ describe("TeamWebRtcClientTransport", () => {
       );
       expect(event).toHaveBeenCalledWith("host-1", payload);
     }
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 
   it("rejects every concurrent caller when the bridge connection fails", async () => {
     const bridge = new TeamWebRtcBridge();
     let rejectBridge!: (error: Error) => void;
-    const connectBridge = vi.spyOn(bridge, "connect").mockImplementation(
-      () =>
-        new Promise<void>((_resolve, reject) => {
-          rejectBridge = reject;
-        }),
+    const connectBridge = vi.spyOn(bridge, "connect").mockImplementation(() =>
+      remoteCall(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectBridge = reject;
+          }),
+      ),
     );
-    vi.spyOn(bridge, "send").mockResolvedValue();
-    vi.spyOn(bridge, "disconnect").mockResolvedValue();
-    const startSession = vi.fn(async () => ({
-      sessionId: "session-1",
-      hostId: "host-1",
-      expiresAt: Date.now() + 86_400_000,
-    }));
-    const issueTicket = vi.fn(async (sessionId: string) => ({
-      ticket: sessionId,
-      expiresAt: Date.now() + 180_000,
-      signalUrl: "wss://signal.example.test/v1/signal",
-    }));
-    const endSession = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(bridge, "send").mockReturnValue(Effect.void);
+    vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
+    const startSession = vi.fn(() =>
+      authCall(async () => ({
+        sessionId: "session-1",
+        hostId: "host-1",
+        expiresAt: Date.now() + 86_400_000,
+      })),
+    );
+    const issueTicket = vi.fn((sessionId: string) =>
+      authCall(async () => ({
+        ticket: sessionId,
+        expiresAt: Date.now() + 180_000,
+        signalUrl: "wss://signal.example.test/v1/signal",
+      })),
+    );
+    const endSession = vi.fn().mockReturnValue(Effect.succeed(undefined));
     const transport = createTransport(bridge, { startSession, issueTicket, endSession });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    const first = transport.connect("host-1");
+    const first = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledOnce());
-    const second = transport.connect("host-1");
+    const second = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     rejectBridge(new Error("bridge failed"));
     const results = await Promise.allSettled([first, second]);
 
@@ -649,7 +734,7 @@ describe("TeamWebRtcClientTransport", () => {
     );
     // A failed attempt keeps its session, so a retry against an offline host costs one ticket.
     expect(endSession).not.toHaveBeenCalled();
-    const retry = transport.connect("host-1");
+    const retry = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledTimes(2));
     rejectBridge(new Error("bridge failed"));
     await expect(retry).rejects.toThrow("bridge failed");
@@ -659,18 +744,20 @@ describe("TeamWebRtcClientTransport", () => {
 
     // A temporary account API failure keeps the session; only an ended session is replaced.
     const apiError = (status: number) => Object.assign(new Error(`status ${status}`), { status });
-    issueTicket.mockRejectedValueOnce(apiError(503));
-    await expect(transport.connect("host-1")).rejects.toThrow("status 503");
+    issueTicket.mockReturnValueOnce(Effect.fail(new CentralAuthOperationError({ cause: apiError(503) })));
+    await expect(
+      Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow("status 503");
     expect(startSession).toHaveBeenCalledOnce();
     expect(endSession).not.toHaveBeenCalled();
-    issueTicket.mockRejectedValueOnce(apiError(403));
-    const replaced = transport.connect("host-1");
+    issueTicket.mockReturnValueOnce(Effect.fail(new CentralAuthOperationError({ cause: apiError(403) })));
+    const replaced = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledTimes(3));
     rejectBridge(new Error("bridge failed"));
     await expect(replaced).rejects.toThrow("bridge failed");
     expect(endSession).toHaveBeenCalledWith("session-1");
     expect(startSession).toHaveBeenCalledTimes(2);
 
-    await transport.stop();
+    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
   });
 });

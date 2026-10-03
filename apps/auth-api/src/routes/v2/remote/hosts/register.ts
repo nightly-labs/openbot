@@ -1,5 +1,6 @@
 import { isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import {
   apiError,
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/v2/remote/hosts/register")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           const body = await readJsonObject(request);
           if (
@@ -28,14 +29,16 @@ export const Route = createFileRoute("/v2/remote/hosts/register")({
             return apiError(400, "invalid_remote_request", "The host registration is invalid.");
           }
           return json(
-            await requestRemoteControlPlane().registerHost(user, {
-              hostId: body.hostId,
-              name: body.name,
-              ownerMembershipId: body.ownerMembershipId,
-              devicePublicKey: body.devicePublicKey,
-              rotateCredential: body.rotateCredential,
-              machineToken: body.machineToken,
-            }),
+            await runApiEffect(
+              requestRemoteControlPlane().registerHost(user, {
+                hostId: body.hostId,
+                name: body.name,
+                ownerMembershipId: body.ownerMembershipId,
+                devicePublicKey: body.devicePublicKey,
+                rotateCredential: body.rotateCredential,
+                machineToken: body.machineToken,
+              }),
+            ),
             201,
           );
         } catch (error) {

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { marketplaceErrorResponse, requestAgentTemplates } from "../../../../server/request-auth";
 
 export const Route = createFileRoute("/v1/agent-templates/$templateId/avatar")({
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId/avatar")({
     handlers: {
       GET: async ({ request, params }) => {
         try {
-          const object = await requestAgentTemplates().avatar(params.templateId, request.headers);
+          const object = await runApiEffect(requestAgentTemplates().avatar(params.templateId, request.headers));
           const headers = new Headers();
           object.writeHttpMetadata(headers);
           // Stored but checked on each use (a cheap 304 by ETag), so after an unpublish no cache

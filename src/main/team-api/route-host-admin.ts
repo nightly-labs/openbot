@@ -3,6 +3,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { parseHostIdentity } from "../ipc/server-inputs";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -25,7 +26,7 @@ export async function routeHostAdmin(
   requireAdmin(member);
   const input = parsedIdentity(await readJson(request));
   try {
-    await identity.updateIdentity(input);
+    await Effect.runPromise(identity.updateIdentity(input).pipe(Effect.mapError((error) => error.cause)));
     return json(200, {});
   } catch (error) {
     // A signed-out host or a failed upload is a sentence for the admin, not a host fault.

@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { app, BrowserWindow, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
@@ -434,7 +435,11 @@ async function main(): Promise<void> {
       recordingMaxAggregateBytes: 100 * 1024 * 1024,
     });
     if (!scenario || scenario === "background") await runBackgroundScenario(browser, origin);
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (scenario) {
       try {
         if (scenario === "background") {
@@ -462,12 +467,12 @@ async function main(): Promise<void> {
               await runEvaluationScenario(browser, tab.id, contents);
             }
           } finally {
-            await browser.close(tab.id);
+            await Effect.runPromise(browser.close(tab.id).pipe(Effect.mapError((error) => error.cause)));
           }
         }
         process.stdout.write(`BrowserHost: ${scenario} scenario passed.\n`);
       } finally {
-        await browser.destroy();
+        await Effect.runPromise(browser.destroy().pipe(Effect.mapError((error) => error.cause)));
         window.destroy();
       }
       return;
@@ -495,30 +500,44 @@ async function main(): Promise<void> {
       } else if (controlPhases.length > 0) controlPhases.push("ended");
     });
 
-    const openingTab = browser.open(origin, "smoke-thread", "smoke-bot", true);
+    const openingTab = Effect.runPromise(
+      browser.open(origin, "smoke-thread", "smoke-bot", true).pipe(Effect.mapError((error) => error.cause)),
+    );
     window.webContents.focus();
     const tab = await openingTab;
     await waitFor(async () => webContents.getFocusedWebContents()?.getURL() === `${origin}/`);
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const resizedFillViewport = browser.listTabs().find((candidate) => candidate.id === tab.id)?.environment?.viewport;
     if (resizedFillViewport?.width !== 760 || resizedFillViewport?.height !== 560) {
       throw new Error("Browser fill-mode status did not use the current panel bounds.");
     }
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const localContents = webContents.getFocusedWebContents();
     if (!localContents) throw new Error("The local tab lost focus.");
     await waitForPresentedFrame(localContents);
     process.stdout.write("BrowserHost: local tab opened.\n");
-    const first = await browser.snapshot(tab.id);
+    const first = await Effect.runPromise(browser.snapshot(tab.id).pipe(Effect.mapError((error) => error.cause)));
     const input = first.elements.find((element) => element.name === "Task");
     const save = first.elements.find((element) => element.name === "Save");
     if (!input || !save) throw new Error(`Snapshot did not expose local controls: ${JSON.stringify(first)}`);
 
-    const typed = await browser.act(tab.id, first.revision, {
-      type: "type",
-      ref: input.ref,
-      text: "runs locally",
-    });
+    const typed = await Effect.runPromise(
+      browser
+        .act(tab.id, first.revision, {
+          type: "type",
+          ref: input.ref,
+          text: "runs locally",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!typed.text.includes("runs locally|input:true")) {
       throw new Error(`Browser input was not native: ${typed.text}`);
     }
@@ -528,7 +547,9 @@ async function main(): Promise<void> {
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
     await runDoubleClickScenario(browser, origin);
-    const v2Tab = await browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot");
+    const v2Tab = await Effect.runPromise(
+      browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+    );
     const v2Contents = webContents
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/v2`));
@@ -696,7 +717,9 @@ async function main(): Promise<void> {
       })()`,
       true,
     );
-    const rejectedCandidateSnapshot = await browser.snapshot(v2Tab.id);
+    const rejectedCandidateSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!rejectedCandidateSnapshot.elements.some((element) => element.name === "Action after rejected candidates")) {
       throw new Error("V2 rejected candidates consumed the actionable-element limit.");
     }
@@ -789,15 +812,21 @@ async function main(): Promise<void> {
       timeoutMs: 2_000,
     });
     if (!frameTextWait.success) throw new Error(`V2 iframe text wait failed: ${toolError(frameTextWait)}`);
-    const legacyFrameSnapshot = await browser.snapshot(v2Tab.id);
+    const legacyFrameSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const legacyFrameField = legacyFrameSnapshot.elements.find((element) => element.name === "Frame field");
     if (!legacyFrameField) throw new Error("V2 legacy iframe submit target was not available.");
-    const legacyFrameSubmitted = await browser.act(v2Tab.id, legacyFrameSnapshot.revision, {
-      type: "type",
-      ref: legacyFrameField.ref,
-      text: "legacy iframe input",
-      submit: true,
-    });
+    const legacyFrameSubmitted = await Effect.runPromise(
+      browser
+        .act(v2Tab.id, legacyFrameSnapshot.revision, {
+          type: "type",
+          ref: legacyFrameField.ref,
+          text: "legacy iframe input",
+          submit: true,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!legacyFrameSubmitted.text.includes("Frame key:true")) {
       throw new Error("V2 legacy iframe submit used the wrong CDP session.");
     }
@@ -852,7 +881,9 @@ async function main(): Promise<void> {
     if (staleFrameClick.success || !toolError(staleFrameClick).includes("Stale browser reference")) {
       throw new Error("V2 iframe navigation did not invalidate revision-bound references.");
     }
-    const semanticChangeSnapshot = await browser.snapshot(v2Tab.id);
+    const semanticChangeSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const semanticChangeTarget = semanticChangeSnapshot.elements.find((element) => element.name === "SPA");
     if (!semanticChangeTarget) throw new Error("V2 semantic-change stale-reference fixture was not available.");
     await v2Contents.executeJavaScript(
@@ -868,10 +899,14 @@ async function main(): Promise<void> {
     }
     let legacySemanticChangeRejected = false;
     try {
-      await browser.act(v2Tab.id, semanticChangeSnapshot.revision, {
-        type: "click",
-        ref: semanticChangeTarget.ref,
-      });
+      await Effect.runPromise(
+        browser
+          .act(v2Tab.id, semanticChangeSnapshot.revision, {
+            type: "click",
+            ref: semanticChangeTarget.ref,
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
     } catch (error) {
       legacySemanticChangeRejected = String(error).includes("target changed");
     }
@@ -882,7 +917,7 @@ async function main(): Promise<void> {
       `document.querySelector('[aria-label="Delete"]').setAttribute('aria-label', 'SPA'); true`,
       true,
     );
-    await browser.snapshot(v2Tab.id);
+    await Effect.runPromise(browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)));
     const noDomRefs = await v2Contents.executeJavaScript("document.querySelector('[data-openbot-ref]') === null", true);
     if (noDomRefs !== true) throw new Error("V2 snapshot mutated the page DOM.");
     await runControlActions(browser, v2Tab.id, v2Contents);
@@ -892,7 +927,11 @@ async function main(): Promise<void> {
     // whose process is spinning never answers the walk. The timeout must return an error to the caller
     // and cancel the command, or the promise the tab's queue was told to wait on stays pending and
     // nothing on this tab ever runs again -- which is what the close below proves.
-    const blockedTab = await browser.open(`${origin}/blocking-frame`, "smoke-thread", "smoke-bot");
+    const blockedTab = await Effect.runPromise(
+      browser
+        .open(`${origin}/blocking-frame`, "smoke-thread", "smoke-bot")
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const blockedContents = webContents
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(`${origin}/blocking-frame`));
@@ -939,7 +978,9 @@ async function main(): Promise<void> {
       throw new Error(`V2 snapshot did not bound a frame that never answers: ${toolError(blockedSnapshotWait)}`);
     }
     const blockedTabClosed = await Promise.race([
-      browser.close(blockedTab.id).then(() => "closed"),
+      Effect.runPromise(browser.close(blockedTab.id).pipe(Effect.mapError((error) => error.cause))).then(
+        () => "closed",
+      ),
       new Promise((resolve) => setTimeout(() => resolve("blocked"), 5_000)),
     ]);
     if (blockedTabClosed !== "closed") {
@@ -948,7 +989,11 @@ async function main(): Promise<void> {
     // Environment commands reach the main renderer before the snapshot starts. Use a separate site
     // so stopping that renderer does not stop the other fixture tabs.
     const frozenOrigin = `http://environment.localhost:${address.port}`;
-    const frozenTab = await browser.open(`${frozenOrigin}/spinning-frame`, "smoke-thread", "smoke-bot");
+    const frozenTab = await Effect.runPromise(
+      browser
+        .open(`${frozenOrigin}/spinning-frame`, "smoke-thread", "smoke-bot")
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const frozenContents = webContents
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenOrigin));
@@ -974,14 +1019,16 @@ async function main(): Promise<void> {
       );
     }
     const frozenClosed = await Promise.race([
-      browser.close(frozenTab.id).then(() => true),
+      Effect.runPromise(browser.close(frozenTab.id).pipe(Effect.mapError((error) => error.cause))).then(() => true),
       new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
     ]);
     if (!frozenClosed) throw new Error("V2 environment timeout left the tab queue blocked.");
     // `submit: true` reached through a snapshot ref is the case that used to fail: typing changes a
     // contenteditable's visible text, so re-resolving the same ref to press Enter fingerprinted the
     // element against its pre-typing text and threw instead of submitting.
-    const notesSnapshot = await browser.snapshot(v2Tab.id);
+    const notesSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const notesRef = notesSnapshot.elements.find((element) => element.name === "Notes")?.ref;
     if (!notesRef) throw new Error("V2 snapshot did not expose the contenteditable notes field.");
     const submittedContentEditable = await callBrowserTool(browser, "type", {
@@ -1204,7 +1251,9 @@ async function main(): Promise<void> {
     if (nonActionableRoleClick.success || !toolError(nonActionableRoleClick).includes("No element matches")) {
       throw new Error("V2 action targeting accepted a non-actionable ARIA role.");
     }
-    const refWaitSnapshot = await browser.snapshot(v2Tab.id);
+    const refWaitSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const removedRefTarget = refWaitSnapshot.elements.find((element) => element.name === "Late action");
     if (!removedRefTarget) throw new Error("V2 removed-ref wait fixture was not available.");
     await v2Contents.executeJavaScript(`document.querySelector('[aria-label="Late action"]').remove()`, true);
@@ -1281,7 +1330,11 @@ async function main(): Promise<void> {
     if (frameUploadInputIds.length !== 2 || frameUploadInputIds[0] !== frameUploadInputIds[1]) {
       throw new Error("V2 frame upload input identity changed between CDP sessions.");
     }
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 220, height: 560 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 220, height: 560 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const narrowFillEnvironment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
       preset: "fill",
@@ -1306,7 +1359,11 @@ async function main(): Promise<void> {
         `V2 fill environment rejected a supported narrow panel: ${JSON.stringify({ reported: narrowFillSnapshot?.viewport, measured: narrowFillViewport })}`,
       );
     }
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const environment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
       preset: "mobile",
@@ -1363,7 +1420,11 @@ async function main(): Promise<void> {
     if (oversizedEnvironment.success || !toolError(oversizedEnvironment).includes("physical viewport")) {
       throw new Error("V2 environment accepted an unsafe physical pixel area.");
     }
-    await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 1200, height: 800 } });
+    await Effect.runPromise(
+      browser
+        .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 1200, height: 800 } })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const restoredFill = await callBrowserTool(browser, "set_environment", { tabId: v2Tab.id, preset: "fill" });
     const restoredFillSnapshot = toolTextPayload(restoredFill);
     if (
@@ -1374,10 +1435,12 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`V2 mobile-to-fill reset retained the custom scale: ${JSON.stringify(restoredFill)}`);
     }
-    const preTakeoverSnapshot = await browser.snapshot(v2Tab.id);
+    const preTakeoverSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const preTakeoverTarget = preTakeoverSnapshot.elements.find((element) => element.name === "SPA");
     if (!preTakeoverTarget) throw new Error("V2 takeover stale-reference fixture was not available.");
-    await browser.beginTakeover(v2Tab.id);
+    await Effect.runPromise(browser.beginTakeover(v2Tab.id).pipe(Effect.mapError((error) => error.cause)));
     await v2Contents.executeJavaScript("console.error('takeover-console-secret'); true", true);
     await new Promise((resolve) => setTimeout(resolve, 50));
     browser.endTakeover(v2Tab.id);
@@ -1388,7 +1451,9 @@ async function main(): Promise<void> {
     if (postTakeoverOldRef.success || !toolError(postTakeoverOldRef).includes("Stale browser reference")) {
       throw new Error("V2 takeover left a pre-takeover browser reference valid.");
     }
-    const postTakeoverSnapshot = await browser.snapshot(v2Tab.id);
+    const postTakeoverSnapshot = await Effect.runPromise(
+      browser.snapshot(v2Tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (JSON.stringify(postTakeoverSnapshot.diagnostics).includes("takeover-console-secret")) {
       throw new Error("V2 takeover exposed console messages captured while the user had control.");
     }
@@ -1476,14 +1541,16 @@ async function main(): Promise<void> {
     ) {
       throw new Error("V2 action-triggered navigation escaped tab serialization.");
     }
-    await browser.close(actionNavigationTab.id);
+    await Effect.runPromise(browser.close(actionNavigationTab.id).pipe(Effect.mapError((error) => error.cause)));
     const { tab: waitTab, contents: waitContents } = await openTabWithContents(
       browser,
       origin,
       "smoke-thread",
       "smoke-bot",
     );
-    const beforeNavigation = await browser.snapshot(waitTab.id);
+    const beforeNavigation = await Effect.runPromise(
+      browser.snapshot(waitTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const staleNavigationTarget = beforeNavigation.elements.find((element) => element.name === "Save");
     if (!staleNavigationTarget) throw new Error("V2 stale-reference test did not find its source target.");
     await waitContents.executeJavaScript(
@@ -1551,7 +1618,9 @@ async function main(): Promise<void> {
       "document.body.replaceChildren(Object.assign(document.createElement('textarea'), { ariaLabel: 'Large value', value: 'x'.repeat(5_000) }), ...Array.from({ length: 200 }, (_, index) => Object.assign(document.createElement('div'), { role: 'presentation', tabIndex: 0, textContent: 'Decoration ' + index })), ...Array.from({ length: 200 }, (_, index) => Object.assign(document.createElement('button'), { hidden: true, textContent: 'Hidden ' + index })), Object.assign(document.createElement('div'), { role: 'switch', ariaLabel: 'Bounded switch', textContent: 'Switch' }), ...Array.from({ length: 250 }, (_, index) => Object.assign(document.createElement('button'), { textContent: 'Bounded ' + index }))); true",
       true,
     );
-    const boundedSnapshot = await browser.snapshot(boundedTab.id);
+    const boundedSnapshot = await Effect.runPromise(
+      browser.snapshot(boundedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (boundedSnapshot.elements.length !== 200) {
       throw new Error(`V2 snapshot did not enforce its global element cap: ${boundedSnapshot.elements.length}`);
     }
@@ -1567,7 +1636,9 @@ async function main(): Promise<void> {
       "document.body.replaceChildren(...Array.from({ length: 400 }, (_, index) => Object.assign(document.createElement('p'), { textContent: 'Background ' + index + ' ' + 'filler '.repeat(20) })), Object.assign(document.createElement('div'), { role: 'dialog', textContent: 'Dialog sentinel', style: 'position:fixed;top:0;left:0' })); true",
       true,
     );
-    const longTextSnapshot = await browser.snapshot(boundedTab.id);
+    const longTextSnapshot = await Effect.runPromise(
+      browser.snapshot(boundedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (
       !longTextSnapshot.truncated ||
       longTextSnapshot.text.length > 20_000 ||
@@ -1576,7 +1647,9 @@ async function main(): Promise<void> {
       throw new Error("V2 snapshot did not bound its text or put viewport text first.");
     }
     // A preview behind an agent operation gets the last frame at once instead of waiting for it.
-    const firstPreview = await browser.capturePreview(boundedTab.id);
+    const firstPreview = await Effect.runPromise(
+      browser.capturePreview(boundedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     let heldEvaluationSettled = false;
     const heldEvaluation = callBrowserTool(browser, "evaluate", {
       tabId: boundedTab.id,
@@ -1589,13 +1662,15 @@ async function main(): Promise<void> {
       async () => (await boundedContents.executeJavaScript("document.body.dataset.held === 'true'")) === true,
       "the held evaluation to start",
     );
-    const busyPreview = await browser.capturePreview(boundedTab.id);
+    const busyPreview = await Effect.runPromise(
+      browser.capturePreview(boundedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (heldEvaluationSettled || busyPreview.dataUrl !== firstPreview.dataUrl) {
       throw new Error("A preview waited behind an agent operation instead of returning the last frame.");
     }
     await boundedContents.executeJavaScript("window.releaseHeldEvaluation(true); true");
     if (!(await heldEvaluation).success) throw new Error("The held evaluation failed.");
-    await browser.close(boundedTab.id);
+    await Effect.runPromise(browser.close(boundedTab.id).pipe(Effect.mapError((error) => error.cause)));
     const focusSentinel = new BrowserWindow({
       show: false,
       opacity: 0,
@@ -1607,11 +1682,15 @@ async function main(): Promise<void> {
     focusSentinel.focus();
     focusSentinel.webContents.focus();
     await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
-    const backgroundTab = await browser.open(origin, "smoke-thread", "smoke-bot");
+    const backgroundTab = await Effect.runPromise(
+      browser.open(origin, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+    );
     if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
       throw new Error("A background browser open stole focus from an unrelated application renderer.");
     }
-    const backgroundSnapshot = await browser.snapshot(backgroundTab.id);
+    const backgroundSnapshot = await Effect.runPromise(
+      browser.snapshot(backgroundTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (webContents.getFocusedWebContents() !== focusSentinel.webContents) {
       throw new Error("A background CDP operation stole focus from an unrelated application renderer.");
     }
@@ -1628,12 +1707,16 @@ async function main(): Promise<void> {
     if (!backgroundAction.success || webContents.getFocusedWebContents() !== focusSentinel.webContents) {
       throw new Error("A background browser action did not restore focus to the unrelated application renderer.");
     }
-    await browser.close(backgroundTab.id);
+    await Effect.runPromise(browser.close(backgroundTab.id).pipe(Effect.mapError((error) => error.cause)));
     focusSentinel.destroy();
     process.stdout.write("BrowserHost: V2 semantics, adaptive image, iframe, upload, waits, and emulation passed.\n");
 
-    const headerTab = await browser.open(`${origin}/headers`, "smoke-thread");
-    const headerSnapshot = await browser.snapshot(headerTab.id);
+    const headerTab = await Effect.runPromise(
+      browser.open(`${origin}/headers`, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const headerSnapshot = await Effect.runPromise(
+      browser.snapshot(headerTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const identity = JSON.parse(headerSnapshot.text);
     if (!isDynamicRecord(identity) || !isDynamicRecord(identity.requestHeaders)) {
       throw new Error("Browser identity payload is invalid.");
@@ -1663,12 +1746,22 @@ async function main(): Promise<void> {
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
-    await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
+    await expectFailure(() =>
+      Effect.runPromise(
+        browser
+          .act(tab.id, first.revision, { type: "click", ref: save.ref })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    );
 
-    const current = await browser.snapshot(tab.id);
+    const current = await Effect.runPromise(browser.snapshot(tab.id).pipe(Effect.mapError((error) => error.cause)));
     const child = current.elements.find((element) => element.name === "Child");
     if (!child) throw new Error("Child-tab control is missing.");
-    await browser.act(tab.id, current.revision, { type: "click", ref: child.ref });
+    await Effect.runPromise(
+      browser
+        .act(tab.id, current.revision, { type: "click", ref: child.ref })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     await waitForValue(() =>
       browser.listTabs().find((candidate) => candidate.id !== tab.id && candidate.url.includes("/child")),
     );
@@ -1684,67 +1777,105 @@ async function main(): Promise<void> {
     );
     if (!childContents.isAudioMuted()) unmutedTabs.push("child tab");
 
-    const screenshot = await browser.screenshot(tab.id);
+    const screenshot = await Effect.runPromise(
+      browser.screenshot(tab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!screenshot.startsWith("data:image/png;base64,")) throw new Error("Screenshot failed.");
     process.stdout.write("BrowserHost: screenshot passed.\n");
 
-    await browser.open(`${origin}/cookie?set=1`, "smoke-thread");
-    const cookieTab = await browser.open(`${origin}/cookie`, "other-thread");
-    const cookieSnapshot = await browser.snapshot(cookieTab.id);
+    await Effect.runPromise(
+      browser.open(`${origin}/cookie?set=1`, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const cookieTab = await Effect.runPromise(
+      browser.open(`${origin}/cookie`, "other-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const cookieSnapshot = await Effect.runPromise(
+      browser.snapshot(cookieTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!cookieSnapshot.text.includes("openbot=shared")) throw new Error("Cookies were not shared.");
     process.stdout.write("BrowserHost: shared cookies passed.\n");
 
-    const firstCachedTab = await browser.open(`${origin}/cached`, "smoke-thread");
-    const firstCachedSnapshot = await browser.snapshot(firstCachedTab.id);
+    const firstCachedTab = await Effect.runPromise(
+      browser.open(`${origin}/cached`, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const firstCachedSnapshot = await Effect.runPromise(
+      browser.snapshot(firstCachedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!firstCachedSnapshot.text.includes("version:1")) {
       throw new Error("Initial cached page did not load.");
     }
     cachedPageVersion = 2;
-    const revalidatedTab = await browser.open(`${origin}/cached`, "smoke-thread");
-    const revalidatedSnapshot = await browser.snapshot(revalidatedTab.id);
+    const revalidatedTab = await Effect.runPromise(
+      browser.open(`${origin}/cached`, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const revalidatedSnapshot = await Effect.runPromise(
+      browser.snapshot(revalidatedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!revalidatedSnapshot.text.includes("version:2")) {
       throw new Error("A new top-level navigation reused stale cached content.");
     }
     process.stdout.write("BrowserHost: top-level cache revalidation passed.\n");
 
-    await expectFailure(() => browser.open("file:///etc/passwd"));
+    await expectFailure(() =>
+      Effect.runPromise(browser.open("file:///etc/passwd").pipe(Effect.mapError((error) => error.cause))),
+    );
     const tabCountBeforeAbort = browser.listTabs().length;
-    await expectFailure(() => browser.open(`${origin}/abort`));
+    await expectFailure(() =>
+      Effect.runPromise(browser.open(`${origin}/abort`).pipe(Effect.mapError((error) => error.cause))),
+    );
     if (browser.listTabs().length !== tabCountBeforeAbort) {
       throw new Error("A failed navigation leaked a browser tab.");
     }
 
-    const downloadPage = await browser.open(origin, "smoke-thread");
-    const downloadSnapshot = await browser.snapshot(downloadPage.id);
+    const downloadPage = await Effect.runPromise(
+      browser.open(origin, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const downloadSnapshot = await Effect.runPromise(
+      browser.snapshot(downloadPage.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const download = downloadSnapshot.elements.find((element) => element.name === "Download");
     if (!download) throw new Error("Download link is missing.");
-    await browser.act(downloadPage.id, downloadSnapshot.revision, {
-      type: "click",
-      ref: download.ref,
-    });
+    await Effect.runPromise(
+      browser
+        .act(downloadPage.id, downloadSnapshot.revision, {
+          type: "click",
+          ref: download.ref,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const downloadPath = join(downloadsRoot, "openbot-smoke.txt");
     await waitFor(async () => (await readFile(downloadPath, "utf8")) === "local download");
-    const nextDownloadSnapshot = await browser.snapshot(downloadPage.id);
+    const nextDownloadSnapshot = await Effect.runPromise(
+      browser.snapshot(downloadPage.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     const nextDownload = nextDownloadSnapshot.elements.find((element) => element.name === "Download");
     if (!nextDownload) throw new Error("Download link disappeared.");
-    await browser.act(downloadPage.id, nextDownloadSnapshot.revision, {
-      type: "click",
-      ref: nextDownload.ref,
-    });
+    await Effect.runPromise(
+      browser
+        .act(downloadPage.id, nextDownloadSnapshot.revision, {
+          type: "click",
+          ref: nextDownload.ref,
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     await waitFor(
       async () => (await readFile(join(downloadsRoot, "openbot-smoke (2).txt"), "utf8")) === "local download",
     );
     process.stdout.write("BrowserHost: download passed.\n");
 
-    const toolResult = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-turn",
-      callId: "browser-smoke-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "open",
-      arguments: { url: `${origin}/cookie` },
-    });
+    const toolResult = await Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-turn",
+          callId: "browser-smoke-call",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "open",
+          arguments: { url: `${origin}/cookie` },
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
@@ -1764,7 +1895,9 @@ async function main(): Promise<void> {
     }
     process.stdout.write("BrowserHost: agent control lifecycle passed.\n");
 
-    const persistedTab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
+    const persistedTab = await Effect.runPromise(
+      browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+    );
     const persistedEnvironment = await callBrowserTool(browser, "set_environment", {
       tabId: persistedTab.id,
       preset: "mobile",
@@ -1774,14 +1907,15 @@ async function main(): Promise<void> {
     if (!persistedEnvironment.success) {
       throw new Error(`Persisted environment setup failed: ${toolError(persistedEnvironment)}`);
     }
-    await browser.activate(persistedTab.id);
-    const browserDestruction = browser.destroy();
+    await Effect.runPromise(browser.activate(persistedTab.id).pipe(Effect.mapError((error) => error.cause)));
+    const browserDestruction = Effect.runPromise(browser.destroy().pipe(Effect.mapError((error) => error.cause)));
     if (browser.listTabs().length !== 0) {
       throw new Error("BrowserHost kept views active while shutdown persistence was pending.");
     }
     await browserDestruction;
-    await browser
-      .open(`${origin}/cookie`, "late-thread")
+    await Effect.runPromise(
+      browser.open(`${origin}/cookie`, "late-thread").pipe(Effect.mapError((error) => error.cause)),
+    )
       .then(() => {
         throw new Error("BrowserHost accepted a new tab after shutdown started.");
       })
@@ -1792,7 +1926,7 @@ async function main(): Promise<void> {
     window.destroy();
     const restoredBrowser = new BrowserHost(restoredWindow, downloadsRoot, statePath);
     const existingContentsIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
-    await restoredBrowser.restore();
+    await Effect.runPromise(restoredBrowser.restore().pipe(Effect.mapError((error) => error.cause)));
     const restoredContents = webContents
       .getAllWebContents()
       .filter((contents) => !existingContentsIds.has(contents.id));
@@ -1808,7 +1942,9 @@ async function main(): Promise<void> {
     ) {
       throw new Error("Browser tabs did not survive a BrowserHost restart.");
     }
-    const restoredEnvironmentSnapshot = await restoredBrowser.snapshot(persistedTab.id);
+    const restoredEnvironmentSnapshot = await Effect.runPromise(
+      restoredBrowser.snapshot(persistedTab.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     if (!restoredEnvironmentSnapshot.text.includes("load-environment:390:dark:reduce")) {
       throw new Error("Restored browser environment was not applied before navigation.");
     }
@@ -1817,7 +1953,7 @@ async function main(): Promise<void> {
       throw new Error(`Browser tabs were not muted: ${unmutedTabs.join(", ")}`);
     }
     process.stdout.write("BrowserHost: new, navigated, child, and restored tabs stayed muted.\n");
-    await restoredBrowser.destroy();
+    await Effect.runPromise(restoredBrowser.destroy().pipe(Effect.mapError((error) => error.cause)));
     const persistedState = JSON.parse(await readFile(statePath, "utf8"));
     if (!isDynamicRecord(persistedState)) throw new Error("Persisted browser state is invalid.");
     if (persistedState.version !== 2) throw new Error("Browser state was not persisted as version 2.");
@@ -1848,12 +1984,12 @@ async function main(): Promise<void> {
     );
     const legacyWindow = new BrowserWindow({ show: false });
     const legacyBrowser = new BrowserHost(legacyWindow, downloadsRoot, statePath);
-    await legacyBrowser.restore();
+    await Effect.runPromise(legacyBrowser.restore().pipe(Effect.mapError((error) => error.cause)));
     const legacyTab = legacyBrowser.listTabs().find((candidate) => candidate.id === legacyTabId);
     if (legacyTab?.environment?.viewport.mode !== "fill" || legacyTab.environment.colorScheme !== "system") {
       throw new Error("Browser state v1 did not migrate to the default V2 environment.");
     }
-    await legacyBrowser.destroy();
+    await Effect.runPromise(legacyBrowser.destroy().pipe(Effect.mapError((error) => error.cause)));
     legacyWindow.destroy();
     restoredWindow.destroy();
     process.stdout.write("BrowserHost smoke test passed.\n");
@@ -1866,8 +2002,12 @@ async function main(): Promise<void> {
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {
-  const tab = await browser.open(origin, "smoke-thread", "smoke-bot");
-  const other = await browser.open(`${origin}/child`, "other-thread", "other-agent");
+  const tab = await Effect.runPromise(
+    browser.open(origin, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+  );
+  const other = await Effect.runPromise(
+    browser.open(`${origin}/child`, "other-thread", "other-agent").pipe(Effect.mapError((error) => error.cause)),
+  );
   const failures: string[] = [];
   try {
     // Neither page has been displayed. A different agent now owns the active tab.
@@ -1880,10 +2020,14 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
     // tab can prove. Captures and clicks on displayed tabs are proven in the
     // main flow.
     try {
-      const first = await browser.snapshot(tab.id);
+      const first = await Effect.runPromise(browser.snapshot(tab.id).pipe(Effect.mapError((error) => error.cause)));
       const input = first.elements.find((element) => element.name === "Task");
       if (!input) throw new Error("Background page did not expose Task.");
-      const typed = await browser.act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" });
+      const typed = await Effect.runPromise(
+        browser
+          .act(tab.id, first.revision, { type: "type", ref: input.ref, text: "background" })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
       if (!typed.text.includes("typed:background|input:true"))
         throw new Error(`Background input was not native: ${typed.text}`);
     } catch (error) {
@@ -1891,15 +2035,15 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
     }
     if (failures.length) throw new Error(`Background browser failed: ${failures.join("; ")}`);
   } finally {
-    await browser.close(tab.id);
-    await browser.close(other.id);
+    await Effect.runPromise(browser.close(tab.id).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(browser.close(other.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
 async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
   // A timeout returns before its CDP commands finish unwinding. A queued snapshot waits for
   // that cleanup, so the next measurement covers its own deadline rather than the prior queue.
-  await browser.snapshot(tabId);
+  await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   await v2Contents.executeJavaScript(
     "(() => { const container = Object.assign(document.createElement('div'), { innerHTML: Array.from({ length: 200 }, (_, index) => '<button aria-label=\"Bulk ' + index + '\">Bulk ' + index + '</button>').join('') }); container.dataset.bulkTargets = ''; document.body.appendChild(container); return true; })()",
     true,
@@ -1926,7 +2070,7 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
     throw new Error("V2 wait snapshot did not share the condition deadline.");
   }
   await v2Contents.executeJavaScript("document.querySelector('[data-bulk-targets]').remove(); true", true);
-  await browser.snapshot(tabId);
+  await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   const boundedActionPoint = await v2Contents.executeJavaScript(
     `(() => {
       const bounds = document.querySelector('[aria-label="SPA"]').getBoundingClientRect();
@@ -2004,10 +2148,14 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     true,
   );
   const frames: Array<{ sequence: number; at: number }> = [];
-  const stopView = await browser.startView(tabId, (frame) => {
-    if (frame.image.byteLength === 0) throw new Error("A live view frame carried no image.");
-    frames.push({ sequence: frame.sequence, at: Date.now() });
-  });
+  const stopView = await Effect.runPromise(
+    browser
+      .startView(tabId, (frame) => {
+        if (frame.image.byteLength === 0) throw new Error("A live view frame carried no image.");
+        frames.push({ sequence: frame.sequence, at: Date.now() });
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     // Chromium lets a page hold only a few unacknowledged frames, so passing this count proves the
     // acknowledgements are landing rather than the stream having stopped after its first burst.
@@ -2038,17 +2186,21 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${centre})`, true);
     if (!isNumber(x) || !isNumber(y)) throw new Error("The live view target did not report a position.");
     for (const action of ["move", "down", "up"] as const) {
-      await browser.dispatchViewInput(tabId, {
-        type: "pointer",
-        action,
-        x,
-        y,
-        button: "left",
-        clickCount: action === "move" ? 0 : 1,
-        deltaX: 0,
-        deltaY: 0,
-        modifiers: 0,
-      });
+      await Effect.runPromise(
+        browser
+          .dispatchViewInput(tabId, {
+            type: "pointer",
+            action,
+            x,
+            y,
+            button: "left",
+            clickCount: action === "move" ? 0 : 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
     }
     const pressedDeadline = Date.now() + 5_000;
     let pressed = false;
@@ -2061,7 +2213,7 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
   } finally {
-    await stopView();
+    await Effect.runPromise(stopView());
   }
   // The page still draws. Nothing more may arrive once the member stops watching.
   const afterStop = frames.length;
@@ -2123,7 +2275,9 @@ async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: 
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
   const doubleUrl = `${origin}/blocking-frame?double-click`;
-  const doubleTab = await browser.open(doubleUrl, "smoke-thread", "smoke-bot");
+  const doubleTab = await Effect.runPromise(
+    browser.open(doubleUrl, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     const doubleContents = webContents
       .getAllWebContents()
@@ -2159,7 +2313,7 @@ async function runDoubleClickScenario(browser: BrowserHost, origin: string): Pro
     if (!doubleClicked.success || !activated) throw new Error("V2 double-click did not select before activation.");
     await doubleContents.executeJavaScript("document.getElementById('double-click-item').remove()", true);
   } finally {
-    await browser.close(doubleTab.id);
+    await Effect.runPromise(browser.close(doubleTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
@@ -2409,7 +2563,7 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
     }
   } finally {
     unsubscribe();
-    await browser.close(keysTab.id);
+    await Effect.runPromise(browser.close(keysTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
@@ -2499,7 +2653,7 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
       throw new Error(`Canvas grid accepted a mode without a target: ${toolError(modeWithoutTarget)}`);
     }
   } finally {
-    await browser.close(gridTab.id);
+    await Effect.runPromise(browser.close(gridTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
@@ -2515,7 +2669,9 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   }
   const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
   if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
-  const evaluationSnapshot = await browser.snapshot(tabId);
+  const evaluationSnapshot = await Effect.runPromise(
+    browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)),
+  );
   if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
     throw new Error("V2 page evaluation was not recorded in browser action history.");
   }
@@ -2572,8 +2728,12 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
 }
 
 async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Promise<void> {
-  const tab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
-  const otherAgentTab = await browser.open(`${origin}/cookie`, "smoke-thread", "other-bot");
+  const tab = await Effect.runPromise(
+    browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+  );
+  const otherAgentTab = await Effect.runPromise(
+    browser.open(`${origin}/cookie`, "smoke-thread", "other-bot").pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     const invalidToolArguments = [
       ["click", { tabId: tab.id, target: { kind: "point", x: 10, y: 10 }, clickCount: 1.5 }],
@@ -2589,15 +2749,19 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
       }
     }
     process.stdout.write("BrowserHost: runtime tool argument schemas passed.\n");
-    const scopedTabsResult = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-scope-turn",
-      callId: "browser-smoke-scope-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "list_tabs",
-      arguments: {},
-    });
+    const scopedTabsResult = await Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-scope-turn",
+          callId: "browser-smoke-scope-call",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "list_tabs",
+          arguments: {},
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const scopedTabsContent = scopedTabsResult.contentItems[0];
     const scopedTabsPayload = scopedTabsContent?.type === "inputText" ? JSON.parse(scopedTabsContent.text) : undefined;
     if (
@@ -2608,55 +2772,73 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
     ) {
       throw new Error("Dynamic browser tools exposed another agent's tab.");
     }
-    const crossAgentSnapshot = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-scope-turn",
-      callId: "browser-smoke-cross-agent-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "snapshot",
-      arguments: { tabId: otherAgentTab.id },
-    });
+    const crossAgentSnapshot = await Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-scope-turn",
+          callId: "browser-smoke-cross-agent-call",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "snapshot",
+          arguments: { tabId: otherAgentTab.id },
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (crossAgentSnapshot.success) throw new Error("Dynamic browser tools accessed another agent's tab.");
-    const crossAgentClose = await browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-cross-agent-close-turn",
-      callId: "browser-smoke-cross-agent-close-call",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: otherAgentTab.id },
-    });
+    const crossAgentClose = await Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-cross-agent-close-turn",
+          callId: "browser-smoke-cross-agent-close-call",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "close_tab",
+          arguments: { tabId: otherAgentTab.id },
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     if (crossAgentClose.success || !browser.listTabs().some((candidate) => candidate.id === otherAgentTab.id)) {
       throw new Error("Dynamic browser tools closed another agent's tab.");
     }
-    const closableToolTab = await browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot");
-    const firstClose = browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-close-turn-1",
-      callId: "browser-smoke-close-call-1",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: closableToolTab.id },
-    });
-    const repeatedClose = browser.handleDynamicTool({
-      threadId: "smoke-thread",
-      turnId: "browser-smoke-close-turn-2",
-      callId: "browser-smoke-close-call-2",
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool: "close_tab",
-      arguments: { tabId: closableToolTab.id },
-    });
+    const closableToolTab = await Effect.runPromise(
+      browser.open(`${origin}/cookie`, "smoke-thread", "smoke-bot").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const firstClose = Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-close-turn-1",
+          callId: "browser-smoke-close-call-1",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "close_tab",
+          arguments: { tabId: closableToolTab.id },
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    const repeatedClose = Effect.runPromise(
+      browser
+        .handleDynamicTool({
+          threadId: "smoke-thread",
+          turnId: "browser-smoke-close-turn-2",
+          callId: "browser-smoke-close-call-2",
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool: "close_tab",
+          arguments: { tabId: closableToolTab.id },
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const closeResults = await Promise.all([firstClose, repeatedClose]);
     if (closeResults.some((result) => !result.success)) {
       throw new Error("Repeated agent tab close was not idempotent.");
     }
     process.stdout.write("BrowserHost: agent tab isolation passed.\n");
   } finally {
-    await browser.close(tab.id);
-    await browser.close(otherAgentTab.id);
+    await Effect.runPromise(browser.close(tab.id).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(browser.close(otherAgentTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
@@ -2667,21 +2849,25 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
   await app.whenReady();
   const window = new BrowserWindow({ show: false });
   const browser = new BrowserHost(window, join(root, "downloads"), join(root, "browser-tabs.json"));
-  await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+  await Effect.runPromise(
+    browser
+      .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     if (phase === "read-clear") {
       // Read proves write persists across restart. Clear runs in the same
       // boot. A later boot must verify that clear persists across restart.
       await checkOnePersistencePage(browser, origin, "read", true);
       await checkOnePersistencePage(browser, origin, "clear", false);
-      await browser.flushPersistentStorage();
+      await Effect.runPromise(browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)));
     } else {
       await checkOnePersistencePage(browser, origin, phase, phase === "write" || phase === "read");
-      await browser.flushPersistentStorage();
+      await Effect.runPromise(browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)));
     }
   } finally {
     try {
-      await browser.destroy();
+      await Effect.runPromise(browser.destroy().pipe(Effect.mapError((error) => error.cause)));
     } finally {
       window.destroy();
     }
@@ -2695,7 +2881,11 @@ async function checkOnePersistencePage(
   phase: string,
   expectedStored: boolean,
 ): Promise<void> {
-  const tab = await browser.open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread");
+  const tab = await Effect.runPromise(
+    browser
+      .open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread")
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     const snapshot = await waitForPersistenceSnapshot(browser, tab.id);
     const cookie = getString(snapshot, "cookie") ?? "";
@@ -2718,14 +2908,14 @@ async function checkOnePersistencePage(
       process.stdout.write("BrowserHost: signed macOS app must verify encrypted cookie persistence.\n");
     }
   } finally {
-    await browser.close(tab.id);
+    await Effect.runPromise(browser.close(tab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
 async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): Promise<PersistenceSnapshot> {
   let latest = "";
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    const snapshot = await browser.snapshot(tabId);
+    const snapshot = await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
     latest = snapshot.text;
     try {
       const parsed = JSON.parse(snapshot.text);
@@ -2784,18 +2974,23 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
       if (BrowserWindow.fromWebContents(popupContents) !== BrowserWindow.fromWebContents(contents))
         throw new Error("Unmanaged popup window.");
-      await browser.setVisible({ visible: false });
-      await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+      await Effect.runPromise(browser.setVisible({ visible: false }).pipe(Effect.mapError((error) => error.cause)));
+      await Effect.runPromise(
+        browser
+          .setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } })
+          .pipe(Effect.mapError((error) => error.cause)),
+      );
       if (browser.listTabs().filter((tab) => tab.openerTabId === parent.id).length !== 1)
         throw new Error("Duplicate named popup.");
       // Reloading a top-level opener preserves it; reloading removes an iframe opener.
-      if (button !== "Iframe sign-in") await browser.reload(parent.id);
+      if (button !== "Iframe sign-in")
+        await Effect.runPromise(browser.reload(parent.id).pipe(Effect.mapError((error) => error.cause)));
       if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
       // Background preview capture must not resize the opener and dispose its login callback.
       await contents.executeJavaScript(
         "window.callbackExpired = false; window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
       );
-      await browser.capturePreview(parent.id);
+      await Effect.runPromise(browser.capturePreview(parent.id).pipe(Effect.mapError((error) => error.cause)));
       await click(popup.id, "button", "Use test account");
       await waitFor(
         async () => !browser.listTabs().some((tab) => tab.id === popup.id),
@@ -2824,19 +3019,19 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       "independent popup navigation",
     );
     if (independent.openerTabId) throw new Error("noopener link gained an opener.");
-    await browser.activate(parent.id);
+    await Effect.runPromise(browser.activate(parent.id).pipe(Effect.mapError((error) => error.cause)));
     await click(parent.id, "button", "Post sign-in");
     const post = await waitForValue(() => browser.listTabs().find((tab) => tab.url === `${origin}/popup-post`));
     const result = await callBrowserTool(browser, "snapshot", { tabId: post.id, image: "never" });
     if (!JSON.stringify(toolTextPayload(result)).includes("Post received"))
       throw new Error("Popup form POST was lost.");
-    await browser.close(parent.id);
+    await Effect.runPromise(browser.close(parent.id).pipe(Effect.mapError((error) => error.cause)));
     if (!browser.listTabs().some((tab) => tab.id === independent.id))
       throw new Error("Closing opener closed independent tab.");
-    await browser.close(independent.id);
-    await browser.close(post.id);
+    await Effect.runPromise(browser.close(independent.id).pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(browser.close(post.id).pipe(Effect.mapError((error) => error.cause)));
   } finally {
-    await browser.close(parent.id);
+    await Effect.runPromise(browser.close(parent.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
@@ -2845,9 +3040,11 @@ async function openTabWithContents(
   url: string,
   ownerThreadId: string,
   ownerAgentId?: string,
-): Promise<{ tab: Awaited<ReturnType<BrowserHost["open"]>>; contents: WebContents }> {
+): Promise<{ tab: Effect.Success<ReturnType<BrowserHost["open"]>>; contents: WebContents }> {
   const existingIds = new Set(webContents.getAllWebContents().map((contents) => contents.id));
-  const tab = await browser.open(url, ownerThreadId, ownerAgentId);
+  const tab = await Effect.runPromise(
+    browser.open(url, ownerThreadId, ownerAgentId).pipe(Effect.mapError((error) => error.cause)),
+  );
   const contents = webContents
     .getAllWebContents()
     .find((candidate) => !existingIds.has(candidate.id) && !candidate.isDestroyed());
@@ -2862,17 +3059,21 @@ function callBrowserTool(
   hooks?: Parameters<BrowserHost["handleDynamicTool"]>[1],
 ): Promise<DynamicToolResult> {
   browserToolCall += 1;
-  return browser.handleDynamicTool(
-    {
-      threadId: "smoke-thread",
-      turnId: `browser-v2-${browserToolCall}`,
-      callId: `browser-v2-call-${browserToolCall}`,
-      ownerAgentId: "smoke-bot",
-      namespace: "openbot_browser",
-      tool,
-      arguments: argumentsValue,
-    },
-    hooks,
+  return Effect.runPromise(
+    browser
+      .handleDynamicTool(
+        {
+          threadId: "smoke-thread",
+          turnId: `browser-v2-${browserToolCall}`,
+          callId: `browser-v2-call-${browserToolCall}`,
+          ownerAgentId: "smoke-bot",
+          namespace: "openbot_browser",
+          tool,
+          arguments: argumentsValue,
+        },
+        hooks,
+      )
+      .pipe(Effect.mapError((error) => error.cause)),
   );
 }
 
@@ -2896,7 +3097,9 @@ function toolError(result: DynamicToolResult): string {
 async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Promise<void> {
   // Every source must present the same identity the session carries: a subframe or worker that
   // falls back to a different string reads as a second, unknown client next to the page.
-  const frameTab = await browser.open(`${origin}/identity-frame`, "smoke-thread");
+  const frameTab = await Effect.runPromise(
+    browser.open(`${origin}/identity-frame`, "smoke-thread").pipe(Effect.mapError((error) => error.cause)),
+  );
   try {
     const deadline = Date.now() + 15_000;
     let report: Record<string, string> = {};
@@ -2924,28 +3127,36 @@ async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Prom
     }
     process.stdout.write("BrowserHost: matching frame and worker identity passed.\n");
   } finally {
-    await browser.close(frameTab.id);
+    await Effect.runPromise(browser.close(frameTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
 }
 
 async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
-  const googleTab = await browser.open(
-    "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.google.com%2F&hl=en",
-    "google-live-smoke",
-    "google-live-smoke",
-    true,
+  const googleTab = await Effect.runPromise(
+    browser
+      .open(
+        "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.google.com%2F&hl=en",
+        "google-live-smoke",
+        "google-live-smoke",
+        true,
+      )
+      .pipe(Effect.mapError((error) => error.cause)),
   );
   const identifierPage = await waitForGoogleSnapshot(browser, googleTab.id, (snapshot) =>
     snapshot.elements.some((element) => element.tag === "input" && !element.disabled),
   );
   const identifier = identifierPage.elements.find((element) => element.tag === "input" && !element.disabled);
   if (!identifier) throw new Error("Google did not show an account identifier field.");
-  await browser.act(googleTab.id, identifierPage.revision, {
-    type: "type",
-    ref: identifier.ref,
-    text: "openbot-google-probe@example.com",
-    submit: true,
-  });
+  await Effect.runPromise(
+    browser
+      .act(googleTab.id, identifierPage.revision, {
+        type: "type",
+        ref: identifier.ref,
+        text: "openbot-google-probe@example.com",
+        submit: true,
+      })
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
   const outcome = await waitForGoogleSnapshot(browser, googleTab.id, (snapshot) => {
     const normalized = snapshot.text.toLowerCase();
     return (
@@ -2973,7 +3184,9 @@ async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
 }
 
 async function runXLiveProbe(browser: BrowserHost): Promise<void> {
-  const xTab = await browser.open("https://x.com/", "x-live-smoke", "x-live-smoke", true);
+  const xTab = await Effect.runPromise(
+    browser.open("https://x.com/", "x-live-smoke", "x-live-smoke", true).pipe(Effect.mapError((error) => error.cause)),
+  );
   let loginPage = await waitForXSnapshot(browser, xTab.id, (snapshot) => {
     const normalized = snapshot.text.toLowerCase();
     return (
@@ -3000,7 +3213,11 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
   }
   if (refuseCookies) {
     process.stdout.write(`BrowserHost: X cookie control ${JSON.stringify(refuseCookies)}.\n`);
-    loginPage = await browser.act(xTab.id, loginPage.revision, { type: "click", ref: refuseCookies.ref });
+    loginPage = await Effect.runPromise(
+      browser
+        .act(xTab.id, loginPage.revision, { type: "click", ref: refuseCookies.ref })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     loginPage = await waitForXSnapshot(
       browser,
       xTab.id,
@@ -3020,7 +3237,11 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
   if (!loginPage.elements.some((element) => element.tag === "input" && !element.disabled)) {
     const signIn = loginPage.elements.find((element) => element.name.toLowerCase() === "sign in");
     if (!signIn) throw new Error(`X did not show a sign-in control: ${loginPage.text.slice(0, 500)}`);
-    loginPage = await browser.act(xTab.id, loginPage.revision, { type: "click", ref: signIn.ref });
+    loginPage = await Effect.runPromise(
+      browser
+        .act(xTab.id, loginPage.revision, { type: "click", ref: signIn.ref })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     loginPage = await waitForXSnapshot(browser, xTab.id, (snapshot) =>
       snapshot.elements.some((element) => element.tag === "input" && !element.disabled),
     );
@@ -3033,14 +3254,13 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
 async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
   // No credentials needed: the allowlist refusal renders before any login, while the real
   // login page shows the phone-linking controls instead.
-  const whatsappTab = await browser.open(
-    "https://web.whatsapp.com/",
-    "whatsapp-live-smoke",
-    "whatsapp-live-smoke",
-    true,
+  const whatsappTab = await Effect.runPromise(
+    browser
+      .open("https://web.whatsapp.com/", "whatsapp-live-smoke", "whatsapp-live-smoke", true)
+      .pipe(Effect.mapError((error) => error.cause)),
   );
   const deadline = Date.now() + 30_000;
-  let page = await browser.snapshot(whatsappTab.id);
+  let page = await Effect.runPromise(browser.snapshot(whatsappTab.id).pipe(Effect.mapError((error) => error.cause)));
   while (Date.now() < deadline) {
     const normalized = page.text.toLowerCase();
     if (
@@ -3052,7 +3272,7 @@ async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
       break;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
-    page = await browser.snapshot(whatsappTab.id);
+    page = await Effect.runPromise(browser.snapshot(whatsappTab.id).pipe(Effect.mapError((error) => error.cause)));
   }
   const normalized = page.text.toLowerCase();
   if (normalized.includes("works with google chrome") || normalized.includes("update google chrome")) {
@@ -3067,14 +3287,14 @@ async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
 async function waitForXSnapshot(
   browser: BrowserHost,
   tabId: string,
-  predicate: (snapshot: Awaited<ReturnType<BrowserHost["snapshot"]>>) => boolean,
-): Promise<Awaited<ReturnType<BrowserHost["snapshot"]>>> {
+  predicate: (snapshot: Effect.Success<ReturnType<BrowserHost["snapshot"]>>) => boolean,
+): Promise<Effect.Success<ReturnType<BrowserHost["snapshot"]>>> {
   const deadline = Date.now() + 20_000;
-  let snapshot = await browser.snapshot(tabId);
+  let snapshot = await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   while (Date.now() < deadline) {
     if (predicate(snapshot)) return snapshot;
     await new Promise((resolve) => setTimeout(resolve, 250));
-    snapshot = await browser.snapshot(tabId);
+    snapshot = await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   }
   throw new Error(`Timed out waiting for X: ${snapshot.url} ${snapshot.text.slice(0, 500)}`);
 }
@@ -3082,14 +3302,14 @@ async function waitForXSnapshot(
 async function waitForGoogleSnapshot(
   browser: BrowserHost,
   tabId: string,
-  predicate: (snapshot: Awaited<ReturnType<BrowserHost["snapshot"]>>) => boolean,
-): Promise<Awaited<ReturnType<BrowserHost["snapshot"]>>> {
+  predicate: (snapshot: Effect.Success<ReturnType<BrowserHost["snapshot"]>>) => boolean,
+): Promise<Effect.Success<ReturnType<BrowserHost["snapshot"]>>> {
   const deadline = Date.now() + 20_000;
-  let snapshot = await browser.snapshot(tabId);
+  let snapshot = await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   while (Date.now() < deadline) {
     if (predicate(snapshot)) return snapshot;
     await new Promise((resolve) => setTimeout(resolve, 250));
-    snapshot = await browser.snapshot(tabId);
+    snapshot = await Effect.runPromise(browser.snapshot(tabId).pipe(Effect.mapError((error) => error.cause)));
   }
   throw new Error(`Timed out waiting for Google: ${snapshot.url} ${snapshot.text.slice(0, 500)}`);
 }

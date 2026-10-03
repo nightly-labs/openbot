@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { marketplaceErrorResponse, requestAgentTemplates } from "../../../../server/request-auth";
 
 /** The share card a link preview shows. It is public, like the page it describes. */
@@ -7,7 +8,7 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId/card")({
     handlers: {
       GET: async ({ request, params }) => {
         try {
-          const object = await requestAgentTemplates().card(params.templateId, request.headers);
+          const object = await runApiEffect(requestAgentTemplates().card(params.templateId, request.headers));
           const headers = new Headers();
           object.writeHttpMetadata(headers);
           headers.set("Content-Type", "image/png");

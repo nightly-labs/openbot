@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
@@ -43,7 +44,7 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
   };
   bound.clear();
   const { computerUse: endpoints } = computerUseIpcHandlers({
-    cuaDriver: { state: async () => READY },
+    cuaDriver: { state: () => Effect.sync(() => READY) },
     openExternal: async (url) => {
       opened.push(url);
     },

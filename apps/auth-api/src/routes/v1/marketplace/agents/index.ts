@@ -1,6 +1,7 @@
 import { isSkillCategory } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../../server/effect-runtime";
 import { readMultipartFormData } from "../../../../server/json-body";
 import { normalizeMarketplaceQuery, parseMarketplaceLimit } from "../../../../server/marketplace-pagination";
 import {
@@ -27,14 +28,16 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
           const sort = url.searchParams.get("sort") ?? undefined;
           if (sort && sort !== "installs") return apiError(400, "invalid_sort", "Unknown agent sort order.");
           return publicMarketplaceJson(
-            await requestAgentMarketplace().list({
-              ...(category ? { category } : {}),
-              query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
-              featured: url.searchParams.get("featured") === "true",
-              sort: sort === "installs" ? sort : undefined,
-              cursor: url.searchParams.get("cursor") ?? undefined,
-              limit: parseMarketplaceLimit(url.searchParams.get("limit")),
-            }),
+            await runApiEffect(
+              requestAgentMarketplace().list({
+                ...(category ? { category } : {}),
+                query: normalizeMarketplaceQuery(url.searchParams.get("query") ?? undefined),
+                featured: url.searchParams.get("featured") === "true",
+                sort: sort === "installs" ? sort : undefined,
+                cursor: url.searchParams.get("cursor") ?? undefined,
+                limit: parseMarketplaceLimit(url.searchParams.get("limit")),
+              }),
+            ),
           );
         } catch (error) {
           return marketplaceErrorResponse(error);
@@ -42,9 +45,9 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
       },
       POST: async ({ request }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await enforceMarketplaceMutationRateLimit("upload", user.id);
+          await runApiEffect(enforceMarketplaceMutationRateLimit("upload", user.id));
           const form = await readMultipartFormData(request, AGENT_SUBMISSION_BODY_LIMIT);
           const showCreatorAvatar = form.get("showCreatorAvatar");
           if (showCreatorAvatar !== null && showCreatorAvatar !== "true" && showCreatorAvatar !== "false")
@@ -59,17 +62,19 @@ export const Route = createFileRoute("/v1/marketplace/agents/")({
           if (avatar !== null && !(avatar instanceof File))
             return apiError(400, "invalid_avatar", "The avatar is invalid.");
           return json(
-            await requestAgentMarketplace().submit({
-              user,
-              ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
-              snapshot: JSON.parse(snapshotText),
-              ...(category ? { category } : {}),
-              avatar:
-                avatar instanceof File
-                  ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
-                  : null,
-              ...(isString(agentId) && agentId ? { agentId } : {}),
-            }),
+            await runApiEffect(
+              requestAgentMarketplace().submit({
+                user,
+                ...(showCreatorAvatar !== null ? { showCreatorAvatar: showCreatorAvatar === "true" } : {}),
+                snapshot: JSON.parse(snapshotText),
+                ...(category ? { category } : {}),
+                avatar:
+                  avatar instanceof File
+                    ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
+                    : null,
+                ...(isString(agentId) && agentId ? { agentId } : {}),
+              }),
+            ),
             201,
           );
         } catch (error) {

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   AGENT_DATABASE_LIMITS,
   type AgentDatabaseFailure,
@@ -63,13 +64,27 @@ export class AgentDatabaseSupervisor {
     this.#queueWaitMs = options.queueWaitMs ?? AGENT_DATABASE_LIMITS.queueWaitMs;
   }
 
-  send(request: AgentDatabaseRequestInput): Promise<AgentDatabaseOutcome> {
-    if (this.#disposed) return Promise.resolve(shuttingDown());
-    const id = this.#nextId++;
-    const numbered: AgentDatabaseRequest = request.kind === "statement" ? { ...request, id } : { ...request, id };
-    return new Promise<AgentDatabaseOutcome>((settle) => {
-      this.#queue.push({ request: numbered, settle, queuedAt: Date.now() });
+  send(request: AgentDatabaseRequestInput): Effect.Effect<AgentDatabaseOutcome> {
+    return Effect.callback<AgentDatabaseOutcome>((resume) => {
+      if (this.#disposed) {
+        resume(Effect.succeed(shuttingDown()));
+        return;
+      }
+      const id = this.#nextId++;
+      const numbered: AgentDatabaseRequest = request.kind === "statement" ? { ...request, id } : { ...request, id };
+      const entry: PendingRequest = {
+        request: numbered,
+        settle: (outcome) => resume(Effect.succeed(outcome)),
+        queuedAt: Date.now(),
+      };
+      this.#queue.push(entry);
       this.#pump();
+      // Cancellation removes queued work only. An executing write keeps its original deadline;
+      // dropping its reply must not replay it or terminate another caller's statement.
+      return Effect.sync(() => {
+        const index = this.#queue.indexOf(entry);
+        if (index !== -1) this.#queue.splice(index, 1);
+      });
     });
   }
 

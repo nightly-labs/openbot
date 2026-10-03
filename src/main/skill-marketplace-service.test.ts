@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
@@ -72,7 +73,7 @@ describe("SkillMarketplaceService", () => {
         return new Response(null, { status: 404 });
       },
     });
-    await auth.initialize();
+    await Effect.runPromise(auth.initialize().pipe(Effect.mapError((error) => error.cause)));
     const agent: AgentSummary = {
       id: "writer",
       provider: "codex",
@@ -94,16 +95,23 @@ describe("SkillMarketplaceService", () => {
     const service = new SkillMarketplaceService(
       auth,
       () => [agent],
-      async (agentId) => {
-        refreshedAgents.push(agentId);
-      },
+      (agentId) =>
+        Effect.sync(() => {
+          refreshedAgents.push(agentId);
+        }),
     );
 
-    await expect(service.get("skill-1")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(service.get("skill-1").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       examplePrompt: "Write notes for the latest commits.",
     });
 
-    await expect(service.install({ agentId: agent.id, skillId: "skill-1" })).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(
+        service.install({ agentId: agent.id, skillId: "skill-1" }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toMatchObject({
       state: "installed",
       description: "Writes release notes.",
     });
@@ -119,11 +127,17 @@ describe("SkillMarketplaceService", () => {
     const claudeSkill = join(agent.workspacePath, ".claude", "skills", "release-notes", "SKILL.md");
     const agentsSkill = join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md");
     await rm(agentsSkill);
-    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
-      "This skill needs repair before it can be disabled.",
-    );
+    await expect(
+      Effect.runPromise(
+        service
+          .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("This skill needs repair before it can be disabled.");
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe(skillContents);
-    const [installed] = await service.listInstalled(agent.id);
+    const [installed] = await Effect.runPromise(
+      service.listInstalled(agent.id).pipe(Effect.mapError((error) => error.cause)),
+    );
     assert(installed);
     expect(installed.enabled).not.toBe(false);
     await writeFile(agentsSkill, skillContents);
@@ -137,60 +151,100 @@ describe("SkillMarketplaceService", () => {
       "template.md",
     );
     await rm(agentsReference);
-    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
-      "local changes",
-    );
+    await expect(
+      Effect.runPromise(
+        service
+          .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("local changes");
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Claude edits");
     await writeFile(agentsReference, "Template");
     await writeFile(claudeSkill, skillContents);
     const gitMetadata = join(agent.workspacePath, ".agents", "skills", "release-notes", ".git");
     await mkdir(gitMetadata);
     await writeFile(join(gitMetadata, "HEAD"), "ref: refs/heads/main");
-    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })).rejects.toThrow(
-      "local changes",
-    );
+    await expect(
+      Effect.runPromise(
+        service
+          .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("local changes");
     await expect(readFile(join(gitMetadata, "HEAD"), "utf8")).resolves.toBe("ref: refs/heads/main");
     await rm(gitMetadata, { recursive: true });
-    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
-    expect(await service.listPublishable(agent.id)).toEqual([]);
+    await Effect.runPromise(
+      service
+        .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    expect(
+      await Effect.runPromise(service.listPublishable(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).toEqual([]);
     await mkdir(dirname(claudeSkill), { recursive: true });
     await writeFile(claudeSkill, "New user files");
-    await expect(service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })).rejects.toThrow(
-      "occupied",
-    );
+    await expect(
+      Effect.runPromise(
+        service
+          .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("occupied");
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("New user files");
     await rm(dirname(claudeSkill), { recursive: true });
-    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true });
-    expect(await service.listPublishable(agent.id)).toEqual([
-      expect.objectContaining({ skillId: "skill-1", version: 1 }),
-    ]);
+    await Effect.runPromise(
+      service
+        .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: true })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    expect(
+      await Effect.runPromise(service.listPublishable(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).toEqual([expect.objectContaining({ skillId: "skill-1", version: 1 })]);
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), "locally changed");
     requests.length = 0;
-    await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([
-      expect.objectContaining({ state: "modified", description: "Writes release notes." }),
-    ]);
+    await expect(
+      Effect.runPromise(service.listInstalledForChatTags(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual([expect.objectContaining({ state: "modified", description: "Writes release notes." })]);
     expect(requests).toEqual([]);
-    await expect(service.listInstalled(agent.id)).resolves.toEqual([expect.objectContaining({ state: "modified" })]);
-    await expect(service.uninstall({ agentId: agent.id, skillId: "skill-1" })).rejects.toThrow("local changes");
+    await expect(
+      Effect.runPromise(service.listInstalled(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual([expect.objectContaining({ state: "modified" })]);
+    await expect(
+      Effect.runPromise(
+        service.uninstall({ agentId: agent.id, skillId: "skill-1" }).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("local changes");
     await writeFile(join(agent.workspacePath, ".agents", "skills", "release-notes", "SKILL.md"), skillContents);
     await rm(join(agent.workspacePath, ".claude", "skills", "release-notes", "references", "template.md"));
-    await expect(service.listInstalledForChatTags(agent.id)).resolves.toEqual([
-      expect.objectContaining({ state: "needs-repair" }),
-    ]);
     await expect(
-      service.uninstall({ agentId: agent.id, skillId: "skill-1", removeModified: true }),
+      Effect.runPromise(service.listInstalledForChatTags(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual([expect.objectContaining({ state: "needs-repair" })]);
+    await expect(
+      Effect.runPromise(
+        service
+          .uninstall({ agentId: agent.id, skillId: "skill-1", removeModified: true })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).resolves.toBeUndefined();
     expect(refreshedAgents).toEqual([agent.id, agent.id, agent.id, agent.id]);
-    await service.install({ agentId: agent.id, skillId: "skill-1" });
-    await service.setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false });
+    await Effect.runPromise(
+      service.install({ agentId: agent.id, skillId: "skill-1" }).pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      service
+        .setEnabled({ agentId: agent.id, skillId: "skill-1", enabled: false })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     await mkdir(dirname(claudeSkill), { recursive: true });
     await writeFile(claudeSkill, "Unowned files after disable");
-    await service.uninstall({ agentId: agent.id, skillId: "skill-1" });
+    await Effect.runPromise(
+      service.uninstall({ agentId: agent.id, skillId: "skill-1" }).pipe(Effect.mapError((error) => error.cause)),
+    );
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
     // The files the user kept are still in a folder the provider reads, so the list shows them.
-    await expect(service.listInstalled(agent.id)).resolves.toEqual([
-      expect.objectContaining({ origin: "workspace", location: ".claude/skills/release-notes" }),
-    ]);
+    await expect(
+      Effect.runPromise(service.listInstalled(agent.id).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual([expect.objectContaining({ origin: "workspace", location: ".claude/skills/release-notes" })]);
   });
   /*
    * A plugin listing pins the version of each skill it brings, so the install must ask for that
@@ -240,7 +294,7 @@ describe("SkillMarketplaceService", () => {
         return new Response(null, { status: 404 });
       },
     });
-    await auth.initialize();
+    await Effect.runPromise(auth.initialize().pipe(Effect.mapError((error) => error.cause)));
     const agent: AgentSummary = {
       id: "reader",
       provider: "codex",
@@ -261,18 +315,26 @@ describe("SkillMarketplaceService", () => {
     const service = new SkillMarketplaceService(
       auth,
       () => [agent],
-      async () => undefined,
+      () => Effect.void,
     );
 
     await expect(
-      service.install({ agentId: agent.id, skillId: "skill-1", versionId: "version-7" }),
+      Effect.runPromise(
+        service
+          .install({ agentId: agent.id, skillId: "skill-1", versionId: "version-7" })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).resolves.toMatchObject({ installedVersion: 7, state: "installed" });
     expect(requests).toContain("GET /v1/skills/skill-1/versions/version-7");
     expect(requests).toContain("GET /v1/skills/skill-1/versions/version-7/content");
     expect(requests).not.toContain("GET /v1/skills/skill-1");
 
     await expect(
-      service.install({ agentId: agent.id, skillId: "local-skill-1", versionId: "version-7" }),
+      Effect.runPromise(
+        service
+          .install({ agentId: agent.id, skillId: "local-skill-1", versionId: "version-7" })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).rejects.toThrow("A local skill has no published version.");
   });
 });

@@ -1,6 +1,7 @@
 import { isDeleteSharedTableInput } from "@openbot/contracts/ipc";
 import { SHARED_TABLES_CAPABILITY, SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -23,10 +24,11 @@ export async function routeSharedTables(
     throw new HttpError(400, sourceText("error.team.sharedDataUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
-  if (list) return json(200, await tables.listTables());
+  if (list)
+    return json(200, await Effect.runPromise(tables.listTables().pipe(Effect.mapError((error) => error.cause))));
   if (!isDeleteSharedTableInput(body)) throw new HttpError(400, "Invalid table deletion request.");
   try {
-    await tables.deleteTable({ name: body.name });
+    await Effect.runPromise(tables.deleteTable({ name: body.name }).pipe(Effect.mapError((error) => error.cause)));
   } catch (error) {
     // A missing table or an unavailable database is a sentence for the admin, not a host fault.
     if (error instanceof Error) throw new HttpError(409, error.message);

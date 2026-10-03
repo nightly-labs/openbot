@@ -11,11 +11,14 @@ import {
   channelRoutingConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { validateProfileName } from "@openbot/contracts/validation";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
+import { channelFailure } from "./channel-effects";
 import { ChannelHistory, type ChannelTextModel } from "./channel-history";
 import { ChannelRoutineStore } from "./channel-routine-store";
-import { ChannelService, resourcesConflict } from "./channel-service";
+import { type ChannelHooks, ChannelService, resourcesConflict } from "./channel-service";
+import { runChannel } from "./channel-test-runtime";
 
 let root: string;
 let service: ChannelService;
@@ -25,18 +28,18 @@ const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
 const queueHoldChanged = vi.fn();
 const schedule = vi.fn();
-const interrupt = vi.fn(async () => undefined);
+const interrupt = vi.fn<ChannelHooks["interrupt"]>(() => Effect.void);
 const busy = vi.fn((_agentId: string) => false);
-const generate = vi.fn<ChannelTextModel>(async () => JSON.stringify({ agentId: "agent-a" }));
+const generate = vi.fn<ChannelTextModel>(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
 let count = 0;
 const operationId = () => `command-${++count}`;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-channels-"));
   data = stores(root);
-  await data.store.initialize();
-  await data.mailbox.initialize();
-  await data.store.getOrCreate("agent-a");
-  await data.store.getOrCreate("agent-b");
+  await runChannel(data.store.initialize());
+  await runChannel(data.mailbox.initialize());
+  await runChannel(data.store.getOrCreate("agent-a"));
+  await runChannel(data.store.getOrCreate("agent-b"));
   draft = {
     name: "Project",
     title: "Release coordination",
@@ -63,37 +66,39 @@ beforeEach(async () => {
       throw error;
     },
   });
-  await service.command({ type: "save", channelId: "channel-1", operationId: operationId(), draft }, actor);
+  await runChannel(service.command({ type: "save", channelId: "channel-1", operationId: operationId(), draft }, actor));
 });
 afterEach(async () => {
-  await service.stop();
+  await runChannel(service.stop());
   data.store.database.close();
   await rm(root, { recursive: true, force: true });
 });
 async function send(text: string, recipientAgentId: string | null = "agent-a") {
-  await service.command(
-    {
-      type: "send",
-      channelId: "channel-1",
-      operationId: operationId(),
-      text,
-      recipientAgentId,
-      replyToMessageId: null,
-      attachmentDraftIds: [],
-    },
-    actor,
+  await runChannel(
+    service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text,
+        recipientAgentId,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    ),
   );
   await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
   return required(service.store.tasks("channel-1")[0]);
 }
 describe("shared channel coordination", () => {
   it("addresses one member and keeps the agent normal thread and provider session", async () => {
-    const threadId = await data.store.ensureThreadId("agent-a");
+    const threadId = await runChannel(data.store.ensureThreadId("agent-a"));
     data.store.bindProviderSession("agent-a", "normal-provider-session");
     const task = await send("Prepare the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const context = required(data.mailbox.getDelivery(required(assignment.deliveryId)));
-    const execution = await service.prepare(context);
+    const execution = await runChannel(service.prepare(context));
     expect(execution?.threadId).not.toBe(threadId);
     expect(data.store.list().find((agent) => agent.id === "agent-a")?.threadId).toBe(threadId);
     expect(data.store.activeProviderSession("agent-a")?.externalSessionId).toBe("normal-provider-session");
@@ -103,12 +108,12 @@ describe("shared channel coordination", () => {
     expect(data.mailbox.conversationMessages("agent-a")).toEqual([]);
   });
   it("lists the channel execution thread among the agent provider session threads", async () => {
-    const threadId = await data.store.ensureThreadId("agent-a");
+    const threadId = await runChannel(data.store.ensureThreadId("agent-a"));
     data.store.bindProviderSession("agent-a", "normal-provider-session");
     await send("Prepare the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const context = required(data.mailbox.getDelivery(required(assignment.deliveryId)));
-    const execution = required(await service.prepare(context));
+    const execution = required(await runChannel(service.prepare(context)));
     data.store.database.bindProviderSession({
       threadId: execution.threadId,
       provider: "codex",
@@ -138,7 +143,7 @@ describe("shared channel coordination", () => {
 
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = assignment.deliveryId ?? "";
-    service.accepted(deliveryId, "session-1", "turn-1");
+    await runChannel(service.accepted(deliveryId, "session-1", "turn-1"));
     expect(queueHoldChanged).toHaveBeenCalledTimes(1);
 
     // Two tasks that reserve nothing run at the same time. The queue of agent-b waits behind the
@@ -149,7 +154,7 @@ describe("shared channel coordination", () => {
     expect(service.queueHold("agent-b")?.agentId).toBe("agent-b");
     expect(service.queueHold("agent-a")?.agentId).toBe("agent-a");
 
-    service.deliveryFailed(deliveryId, "The provider stopped.");
+    await runChannel(service.deliveryFailed(deliveryId, "The provider stopped."));
     expect(queueHoldChanged).toHaveBeenCalledTimes(2);
     expect(service.queueHold("agent-a")?.agentId).toBe("agent-b");
   });
@@ -164,23 +169,27 @@ describe("shared channel coordination", () => {
       replyToMessageId: null,
       attachmentDraftIds: [],
     };
-    await service.command(command, actor);
-    await service.command(command, actor);
+    await runChannel(service.command(command, actor));
+    await runChannel(service.command(command, actor));
     expect(service.store.messages("channel-1").filter((item) => item.author.kind === "member")).toHaveLength(1);
     expect(service.store.tasks("channel-1")).toHaveLength(1);
   });
   it("stops queued assignments and resumes with the current task revision", async () => {
     const task = await send("Prepare the report");
     const first = required(service.store.assignments("channel-1")[0]);
-    await service.command(
-      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     expect(data.mailbox.getDelivery(required(first.deliveryId))?.delivery.status).toBe("cancelled");
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
-    await service.command(
-      { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(2));
     expect(service.store.assignments("channel-1")[1]?.taskRevision).toBe(2);
@@ -189,8 +198,8 @@ describe("shared channel coordination", () => {
     const task = await send("Prepare the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
     const stop = {
       type: "stop" as const,
       channelId: "channel-1",
@@ -198,11 +207,11 @@ describe("shared channel coordination", () => {
       taskId: task.id,
       recipientAgentId: null,
     };
-    await service.command(stop, actor);
-    const interrupt = vi.fn(async () => undefined);
+    await runChannel(service.command(stop, actor));
+    const interrupt = vi.fn<ChannelHooks["interrupt"]>(() => Effect.void);
     service.hooks.interrupt = interrupt;
-    await data.mailbox.markRunning(deliveryId, "late-turn");
-    service.accepted(deliveryId, "late-session", "late-turn");
+    await runChannel(data.mailbox.markRunning(deliveryId, "late-turn"));
+    await runChannel(service.accepted(deliveryId, "late-session", "late-turn"));
     await vi.waitFor(() =>
       expect(interrupt).toHaveBeenCalledWith(
         "agent-a",
@@ -211,9 +220,9 @@ describe("shared channel coordination", () => {
       ),
     );
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
-    interrupt.mockRejectedValueOnce(new Error("Provider unavailable"));
-    await expect(service.command(stop, actor)).rejects.toThrow("Provider unavailable");
-    await service.command(stop, actor);
+    interrupt.mockReturnValueOnce(Effect.fail(channelFailure(new Error("Provider unavailable"))));
+    await expect(runChannel(service.command(stop, actor))).rejects.toThrow("Provider unavailable");
+    await runChannel(service.command(stop, actor));
     expect(service.store.tasks("channel-1")[0]?.revision).toBe(1);
     expect(service.store.assignments("channel-1")).toHaveLength(1);
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
@@ -260,25 +269,29 @@ describe("shared channel coordination", () => {
   it("removes a member the deletion of its agent left behind, and still refuses a new one", async () => {
     // Both members are deleted agents. The draft the settings panel sends holds the other one.
     vi.spyOn(data.store, "list").mockReturnValue([]);
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: { ...draft, members: [{ agentId: "agent-b" }], leadAgentId: "agent-b" },
-      },
-      actor,
-    );
-    expect(service.store.get("channel-1").members).toEqual([{ agentId: "agent-b" }]);
-    await expect(
+    await runChannel(
       service.command(
         {
           type: "save",
           channelId: "channel-1",
           operationId: operationId(),
-          draft: { ...draft, members: [{ agentId: "agent-b" }, { agentId: "agent-c" }], leadAgentId: "agent-b" },
+          draft: { ...draft, members: [{ agentId: "agent-b" }], leadAgentId: "agent-b" },
         },
         actor,
+      ),
+    );
+    expect(service.store.get("channel-1").members).toEqual([{ agentId: "agent-b" }]);
+    await expect(
+      runChannel(
+        service.command(
+          {
+            type: "save",
+            channelId: "channel-1",
+            operationId: operationId(),
+            draft: { ...draft, members: [{ agentId: "agent-b" }, { agentId: "agent-c" }], leadAgentId: "agent-b" },
+          },
+          actor,
+        ),
       ),
     ).rejects.toThrow("A channel member is unavailable.");
   });
@@ -341,11 +354,11 @@ describe("shared channel coordination", () => {
   it("keeps an uncertain accepted turn paused after restart", async () => {
     await send("Write a file");
     const assignment = required(service.store.assignments("channel-1")[0]);
-    await data.mailbox.markStarting(required(assignment.deliveryId));
-    await data.mailbox.markRunning(required(assignment.deliveryId), "turn-1");
-    service.accepted(required(assignment.deliveryId), "session-1", "turn-1");
-    await data.mailbox.markTerminal(required(assignment.deliveryId), "interrupted");
-    await service.recover();
+    await runChannel(data.mailbox.markStarting(required(assignment.deliveryId)));
+    await runChannel(data.mailbox.markRunning(required(assignment.deliveryId), "turn-1"));
+    await runChannel(service.accepted(required(assignment.deliveryId), "session-1", "turn-1"));
+    await runChannel(data.mailbox.markTerminal(required(assignment.deliveryId), "interrupted"));
+    await runChannel(service.recover());
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     expect(service.store.tasks("channel-1")[0]?.error).toContain("no confirmed result");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
@@ -354,45 +367,49 @@ describe("shared channel coordination", () => {
     await send("Write a file");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "turn-1");
-    service.accepted(deliveryId, "session-1", "turn-1");
-    await service.recover();
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "turn-1"));
+    await runChannel(service.accepted(deliveryId, "session-1", "turn-1"));
+    await runChannel(service.recover());
     expect(service.store.assignments("channel-1")[0]?.state).not.toBe("interrupted");
     expect(service.store.tasks("channel-1")[0]?.state).toBe("running");
   });
   it("asks one visible question for ambiguous routing and never broadcasts", async () => {
-    generate.mockResolvedValueOnce(JSON.stringify({ question: "Which member should own this?" }));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Can someone help?",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed(JSON.stringify({ question: "Which member should own this?" })));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Can someone help?",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("paused"));
     expect(service.store.messages("channel-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(1);
     expect(service.store.assignments("channel-1")).toEqual([]);
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
-    generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-a", idle: true }));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Research a second project",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed(JSON.stringify({ agentId: "agent-a", idle: true })));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Research a second project",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.tasks("channel-1").at(-1)?.state).toBe("paused"));
     expect(service.store.messages("channel-1").filter((item) => item.author.kind === "coordinator")).toHaveLength(2);
@@ -402,17 +419,19 @@ describe("shared channel coordination", () => {
     // Membership alone is not eligibility: agent-b stays a member here, but no agent answers for
     // it, so there is one possible owner and nothing for the lead to decide.
     vi.spyOn(data.store, "list").mockReturnValue(data.store.list().filter((agent) => agent.id === "agent-a"));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Prepare the report",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Prepare the report",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-a");
@@ -439,35 +458,39 @@ describe("shared channel coordination", () => {
         },
       ],
     });
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Write that up",
-        recipientAgentId: null,
-        replyToMessageId: "note",
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Write that up",
+          recipientAgentId: null,
+          replyToMessageId: "note",
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
     expect(generate).not.toHaveBeenCalled();
   });
   it("posts the routing decision as one message from the lead", async () => {
-    generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-b" }));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Someone please research this",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed(JSON.stringify({ agentId: "agent-b" })));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Someone please research this",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     const task = required(service.store.tasks("channel-1")[0]);
@@ -487,54 +510,60 @@ describe("shared channel coordination", () => {
     // its own publish the routing decision would sit in the database, invisible until the next
     // unrelated change.
     busy.mockImplementation((agentId) => agentId === "agent-b");
-    generate.mockResolvedValueOnce(JSON.stringify({ agentId: "agent-b" }));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Someone please research this",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed(JSON.stringify({ agentId: "agent-b" })));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Someone please research this",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.messages("channel-1")).toHaveLength(2));
     expect(service.store.assignments("channel-1")).toEqual([]);
     expect(changed).toHaveBeenLastCalledWith("channel-1", service.store.get("channel-1").revision);
   });
   it("writes no message when routing finds no work to do", async () => {
-    generate.mockResolvedValueOnce(JSON.stringify({ idle: true }));
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Thanks all",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed(JSON.stringify({ idle: true })));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Thanks all",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("completed"));
     expect(service.store.messages("channel-1")).toHaveLength(1);
     expect(service.store.assignments("channel-1")).toEqual([]);
   });
   it("routes a decision that arrives after a sentence of prose", async () => {
-    generate.mockResolvedValueOnce('Agent B knows the archive.\n{"agentId":"agent-b"}');
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Someone please research this",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    generate.mockReturnValueOnce(Effect.succeed('Agent B knows the archive.\n{"agentId":"agent-b"}'));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Someone please research this",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBe("agent-b");
@@ -564,17 +593,19 @@ describe("shared channel coordination", () => {
       throughSequence: required(service.store.messages("channel-1").at(-1)).sequence,
       text: "Earlier the team agreed the archive migration is done.",
     });
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Someone please research this",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Someone please research this",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(generate).toHaveBeenCalled());
     const prompt = required(generate.mock.calls[0])[1];
@@ -583,33 +614,39 @@ describe("shared channel coordination", () => {
   });
   it("discards routing after the membership changes", async () => {
     let resolve!: (value: string) => void;
-    generate.mockImplementationOnce(
-      () =>
-        new Promise<string>((done) => {
-          resolve = done;
-        }),
+    generate.mockImplementationOnce(() =>
+      Effect.promise(
+        () =>
+          new Promise<string>((done) => {
+            resolve = done;
+          }),
+      ),
     );
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Research this project",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Research this project",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(generate).toHaveBeenCalled());
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: { ...draft, members: draft.members.filter((item) => item.agentId !== "agent-b") },
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: { ...draft, members: draft.members.filter((item) => item.agentId !== "agent-b") },
+        },
+        actor,
+      ),
     );
     resolve(JSON.stringify({ agentId: "agent-b" }));
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
@@ -618,23 +655,27 @@ describe("shared channel coordination", () => {
   });
   it("keeps a routing decision when an ordinary progress message arrives", async () => {
     let resolve!: (value: string) => void;
-    generate.mockImplementationOnce(
-      () =>
-        new Promise<string>((done) => {
-          resolve = done;
-        }),
+    generate.mockImplementationOnce(() =>
+      Effect.promise(
+        () =>
+          new Promise<string>((done) => {
+            resolve = done;
+          }),
+      ),
     );
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Research this project",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Research this project",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(generate).toHaveBeenCalled());
     service.store.update(service.store.get("channel-1"), {
@@ -664,15 +705,17 @@ describe("shared channel coordination", () => {
     expect(service.store.get("channel-1").revision).toBeGreaterThan(revision);
   });
   it("runs independent child tasks and returns their results to the parent once", async () => {
-    await data.store.getOrCreate("agent-c");
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
-      },
-      actor,
+    await runChannel(data.store.getOrCreate("agent-c"));
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
+        },
+        actor,
+      ),
     );
     const parent = await send("Compare the two projects");
     const begin = async (taskId: string, turnId: string) => {
@@ -690,44 +733,54 @@ describe("shared channel coordination", () => {
           .at(-1),
       );
       const context = required(data.mailbox.getDelivery(required(assignment.deliveryId)));
-      const execution = await service.prepare(context);
-      await data.mailbox.markStarting(required(assignment.deliveryId));
-      await data.mailbox.markRunning(required(assignment.deliveryId), turnId);
-      service.accepted(required(assignment.deliveryId), `session-${taskId}`, turnId);
+      const execution = await runChannel(service.prepare(context));
+      await runChannel(data.mailbox.markStarting(required(assignment.deliveryId)));
+      await runChannel(data.mailbox.markRunning(required(assignment.deliveryId), turnId));
+      await runChannel(service.accepted(required(assignment.deliveryId), `session-${taskId}`, turnId));
       return { assignment, execution };
     };
     const finish = async (taskId: string, turnId: string) => {
       const assignment = required(service.store.assignments("channel-1").find((item) => item.turnId === turnId));
-      await data.mailbox.markTerminal(required(assignment.deliveryId), "completed");
+      await runChannel(data.mailbox.markTerminal(required(assignment.deliveryId), "completed"));
       const threadId = service.store.context("channel-1", assignment.agentId).threadId;
       service.event({ type: "turn-completed", agentId: assignment.agentId, threadId, turnId, status: "completed" });
       expect(service.store.tasks("channel-1").find((item) => item.id === taskId)?.state).not.toBe("running");
     };
     await begin(parent.id, "parent-turn");
-    await service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
-      recipientAgentId: "agent-b",
-      task: "Inspect project B",
-      expectedResult: "Findings B",
-      sourceMessageIds: [parent.requestMessageId],
-      resources: ["workspace:/work/b"],
-    });
-    await service.tool("channel-1", "agent-a", "parent-turn", "child-2", "channel_assign", {
-      recipientAgentId: "agent-c",
-      task: "Inspect project C",
-      expectedResult: "Findings C",
-      sourceMessageIds: [parent.requestMessageId],
-      resources: ["workspace:/work/c"],
-    });
+    await runChannel(
+      service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
+        recipientAgentId: "agent-b",
+        task: "Inspect project B",
+        expectedResult: "Findings B",
+        sourceMessageIds: [parent.requestMessageId],
+        resources: ["workspace:/work/b"],
+      }),
+    );
+    await runChannel(
+      service.tool("channel-1", "agent-a", "parent-turn", "child-2", "channel_assign", {
+        recipientAgentId: "agent-c",
+        task: "Inspect project C",
+        expectedResult: "Findings C",
+        sourceMessageIds: [parent.requestMessageId],
+        resources: ["workspace:/work/c"],
+      }),
+    );
     await finish(parent.id, "parent-turn");
     const children = service.store.tasks("channel-1").filter((item) => item.parentTaskId === parent.id);
     await begin(required(children[0]).id, "child-turn-b");
     await begin(required(children[1]).id, "child-turn-c");
     expect(service.store.tasks("channel-1").filter((item) => item.state === "running")).toHaveLength(2);
-    await service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" });
-    await service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" });
+    await runChannel(
+      service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" }),
+    );
+    await runChannel(
+      service.tool("channel-1", "agent-b", "child-turn-b", "result-b", "channel_result", { text: "Findings B" }),
+    );
     await finish(required(children[0]).id, "child-turn-b");
     expect(service.store.tasks("channel-1").find((item) => item.id === parent.id)?.state).toBe("waiting");
-    await service.tool("channel-1", "agent-c", "child-turn-c", "result-c", "channel_result", { text: "Findings C" });
+    await runChannel(
+      service.tool("channel-1", "agent-c", "child-turn-c", "result-c", "channel_result", { text: "Findings C" }),
+    );
     await finish(required(children[1]).id, "child-turn-c");
     const resumed = await begin(parent.id, "parent-result-turn");
     expect(resumed.execution?.text).toContain("Findings B");
@@ -742,10 +795,10 @@ describe("shared channel coordination", () => {
     const task = await send("Prepare the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "turn-correction");
-    service.accepted(deliveryId, "session-correction", "turn-correction");
+    const execution = required(await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId)))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "turn-correction"));
+    await runChannel(service.accepted(deliveryId, "session-correction", "turn-correction"));
     service.event({
       type: "conversation",
       snapshot: {
@@ -765,22 +818,25 @@ describe("shared channel coordination", () => {
         ],
       },
     });
-    service.hooks.steer = async (_agentId, threadId, turnId) => {
-      service.event({ type: "turn-completed", agentId: "agent-a", threadId, turnId, status: "completed" });
-      expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("queued");
-      return "accepted";
-    };
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Actually use the revised figures",
-        recipientAgentId: null,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    service.hooks.steer = (_agentId, threadId, turnId) =>
+      Effect.gen(function* () {
+        service.event({ type: "turn-completed", agentId: "agent-a", threadId, turnId, status: "completed" });
+        expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("queued");
+        return "accepted" as const;
+      });
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Actually use the revised figures",
+          recipientAgentId: null,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     expect(service.store.tasks("channel-1")[0]).toMatchObject({
       id: task.id,
@@ -796,34 +852,40 @@ describe("shared channel coordination", () => {
     const task = await send("Write the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "pending-correction-turn");
-    service.accepted(deliveryId, "pending-correction-session", "pending-correction-turn");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "pending-correction-turn"));
+    await runChannel(service.accepted(deliveryId, "pending-correction-session", "pending-correction-turn"));
     let resolve!: (result: "accepted") => void;
-    const steer = vi.fn(
-      () =>
-        new Promise<"accepted">((done) => {
-          resolve = done;
-        }),
+    const steer = vi.fn(() =>
+      Effect.promise(
+        () =>
+          new Promise<"accepted">((done) => {
+            resolve = done;
+          }),
+      ),
     );
     service.hooks.steer = steer;
-    const correcting = service.command(
-      {
-        type: "send",
-        operationId: operationId(),
-        channelId: "channel-1",
-        text: "Actually use new figures",
-        recipientAgentId: null,
-        replyToMessageId: task.requestMessageId,
-        attachmentDraftIds: [],
-      },
-      actor,
+    const correcting = runChannel(
+      service.command(
+        {
+          type: "send",
+          operationId: operationId(),
+          channelId: "channel-1",
+          text: "Actually use new figures",
+          recipientAgentId: null,
+          replyToMessageId: task.requestMessageId,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(steer).toHaveBeenCalled());
-    const stopping = service.command(
-      { type: "stop", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
-      actor,
+    const stopping = runChannel(
+      service.command(
+        { type: "stop", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     try {
       await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.state).toBe("paused"));
@@ -838,16 +900,16 @@ describe("shared channel coordination", () => {
     const task = await send("Write the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "turn-before-restart");
-    service.accepted(deliveryId, "session-before-restart", "turn-before-restart");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "turn-before-restart"));
+    await runChannel(service.accepted(deliveryId, "session-before-restart", "turn-before-restart"));
     service.store.update(service.store.get("channel-1"), {
       tasks: [{ ...task, revision: 1, instruction: "Use new figures", state: "queued" }],
       assignments: [{ ...assignment, turnId: "turn-before-restart", state: "running", pendingRevision: 1 }],
     });
-    await data.mailbox.markTerminal(deliveryId, "completed");
-    await service.recover();
+    await runChannel(data.mailbox.markTerminal(deliveryId, "completed"));
+    await runChannel(service.recover());
     expect(service.store.tasks("channel-1")[0]).toMatchObject({
       state: "paused",
       revision: 1,
@@ -860,24 +922,26 @@ describe("shared channel coordination", () => {
     const task = await send("Write the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "uncertain-turn");
-    service.accepted(deliveryId, "uncertain-session", "uncertain-turn");
-    service.hooks.steer = async () => "uncertain";
-    await service.command(
-      {
-        type: "send",
-        operationId: operationId(),
-        channelId: "channel-1",
-        text: "Actually use new figures",
-        recipientAgentId: null,
-        replyToMessageId: task.requestMessageId,
-        attachmentDraftIds: [],
-      },
-      actor,
+    const execution = required(await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId)))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "uncertain-turn"));
+    await runChannel(service.accepted(deliveryId, "uncertain-session", "uncertain-turn"));
+    service.hooks.steer = () => Effect.succeed("uncertain");
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          operationId: operationId(),
+          channelId: "channel-1",
+          text: "Actually use new figures",
+          recipientAgentId: null,
+          replyToMessageId: task.requestMessageId,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
-    await data.mailbox.markTerminal(deliveryId, "completed");
+    await runChannel(data.mailbox.markTerminal(deliveryId, "completed"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -886,9 +950,11 @@ describe("shared channel coordination", () => {
       status: "completed",
     });
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
-    await service.command(
-      { type: "resume", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "resume", operationId: operationId(), channelId: "channel-1", taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-a")).not.toBeNull());
     expect(service.store.assignments("channel-1")).toHaveLength(2);
@@ -912,15 +978,15 @@ describe("shared channel coordination", () => {
       },
     }));
     service.store.update(service.store.get("channel-1"), { messages });
-    const model = vi.fn(async () => "DECISION_A applies. Source: history-0.");
+    const model = vi.fn(() => Effect.succeed("DECISION_A applies. Source: history-0."));
     const history = new ChannelHistory(service.store, model, service.memories);
     const agents = data.store.list();
-    const first = await history.prepare(task, required(agents[0]), required(agents[0]));
+    const first = await runChannel(history.prepare(task, required(agents[0]), required(agents[0])));
     const summary = service.store.summary("channel-1");
     expect(summary.throughSequence).toBeGreaterThan(0);
     expect(summary.throughSequence).toBeLessThan(service.store.page("channel-1").throughSequence);
     expect(first.text).toContain("DECISION_A applies");
-    const late = await history.prepare(task, required(agents[1]), required(agents[0]));
+    const late = await runChannel(history.prepare(task, required(agents[1]), required(agents[0])));
     expect(late.text).toContain("DECISION_A applies");
     expect(late.text).toContain("Apply the shared decision");
     expect(service.store.messages("channel-1")).toHaveLength(151);
@@ -964,10 +1030,10 @@ describe("shared channel coordination", () => {
       },
     ];
     service.store.update(service.store.get("channel-1"), { messages });
-    const model = vi.fn<ChannelTextModel>(async () => "DECISION_A applies. Source: history-huge.");
+    const model = vi.fn<ChannelTextModel>(() => Effect.succeed("DECISION_A applies. Source: history-huge."));
     const history = new ChannelHistory(service.store, model, service.memories);
     const agents = data.store.list();
-    const prepared = await history.prepare(task, required(agents[0]), required(agents[0]));
+    const prepared = await runChannel(history.prepare(task, required(agents[0]), required(agents[0])));
     expect(prepared.text).toContain("DECISION_A applies");
     expect(service.store.summary("channel-1").throughSequence).toBeGreaterThan(0);
     // Every part of the large message reaches the model, and each one fits the input it accepts.
@@ -1000,7 +1066,9 @@ describe("shared channel coordination", () => {
       ],
     });
     const history = new ChannelHistory(service.store, vi.fn<ChannelTextModel>(), service.memories);
-    const prepared = await history.prepare(task, required(data.store.list()[0]), required(data.store.list()[0]));
+    const prepared = await runChannel(
+      history.prepare(task, required(data.store.list()[0]), required(data.store.list()[0])),
+    );
     expect(prepared.text).toContain("Write the report");
     expect(prepared.text).not.toContain("Assigned to B.");
     // The receipt stays in the channel, so the reader still sees the activity row.
@@ -1011,40 +1079,44 @@ describe("shared channel coordination", () => {
     const task = await send("Write the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "transfer-turn");
-    service.accepted(deliveryId, "transfer-session", "transfer-turn");
-    await service.command(
-      {
-        type: "send",
-        operationId: operationId(),
-        channelId: "channel-1",
-        text: "Check the figures",
-        recipientAgentId: "agent-b",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    const execution = required(await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId)))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "transfer-turn"));
+    await runChannel(service.accepted(deliveryId, "transfer-session", "transfer-turn"));
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          operationId: operationId(),
+          channelId: "channel-1",
+          text: "Check the figures",
+          recipientAgentId: "agent-b",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     const dependency = required(
       service.store.tasks("channel-1").find((item) => item.instruction === "Check the figures"),
     );
-    await service.tool("channel-1", "agent-a", "transfer-turn", "transfer", "channel_transfer", {
-      recipientAgentId: "agent-b",
-      task: "Finish the report",
-      expectedResult: "The final report",
-      sourceMessageIds: [task.requestMessageId],
-      dependencies: [dependency.id],
-      resources: ["none"],
-    });
+    await runChannel(
+      service.tool("channel-1", "agent-a", "transfer-turn", "transfer", "channel_transfer", {
+        recipientAgentId: "agent-b",
+        task: "Finish the report",
+        expectedResult: "The final report",
+        sourceMessageIds: [task.requestMessageId],
+        dependencies: [dependency.id],
+        resources: ["none"],
+      }),
+    );
     expect(service.store.tasks("channel-1").find((item) => item.id === task.id)).toMatchObject({
       ownerAgentId: "agent-b",
       state: "queued",
       dependencies: [dependency.id],
     });
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
-    await data.mailbox.markTerminal(deliveryId, "completed");
+    await runChannel(data.mailbox.markTerminal(deliveryId, "completed"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -1060,32 +1132,36 @@ describe("shared channel coordination", () => {
     const task = await send("Prepare the report");
     const first = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(first.deliveryId);
-    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "old-turn");
-    service.accepted(deliveryId, "old-session", "old-turn");
+    const execution = required(await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId)))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "old-turn"));
+    await runChannel(service.accepted(deliveryId, "old-session", "old-turn"));
     let finish!: () => void;
-    service.hooks.interrupt = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
+    service.hooks.interrupt = vi.fn(() =>
+      Effect.promise(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      ),
     );
-    const changing = service.command(
-      {
-        type: "reassign",
-        channelId: "channel-1",
-        operationId: operationId(),
-        taskId: task.id,
-        recipientAgentId: "agent-b",
-      },
-      actor,
+    const changing = runChannel(
+      service.command(
+        {
+          type: "reassign",
+          channelId: "channel-1",
+          operationId: operationId(),
+          taskId: task.id,
+          recipientAgentId: "agent-b",
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.hooks.interrupt).toHaveBeenCalled());
-    service.wake();
+    await runChannel(service.wake());
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
     expect(service.store.assignments("channel-1")).toHaveLength(1);
-    await data.mailbox.markTerminal(deliveryId, "interrupted");
+    await runChannel(data.mailbox.markTerminal(deliveryId, "interrupted"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -1102,35 +1178,39 @@ describe("shared channel coordination", () => {
 
   it("pauses removed members and restores their transcript without restarting work", async () => {
     const task = await send("Keep the conversation");
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: {
-          ...draft,
-          leadAgentId: "agent-b",
-          members: draft.members.filter((member) => member.agentId !== "agent-a"),
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: {
+            ...draft,
+            leadAgentId: "agent-b",
+            members: draft.members.filter((member) => member.agentId !== "agent-a"),
+          },
         },
-      },
-      actor,
+        actor,
+      ),
     );
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
-    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
-    await service.command({ type: "restore", channelId: "channel-1", operationId: operationId() }, actor);
+    await runChannel(service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor));
+    await runChannel(service.command({ type: "restore", channelId: "channel-1", operationId: operationId() }, actor));
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
     expect(service.store.messages("channel-1")[0]?.message.text).toBe("Keep the conversation");
     expect(data.store.list()).toHaveLength(2);
-    await service.command(
-      {
-        type: "reassign",
-        channelId: "channel-1",
-        operationId: operationId(),
-        taskId: task.id,
-        recipientAgentId: "agent-b",
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "reassign",
+          channelId: "channel-1",
+          operationId: operationId(),
+          taskId: task.id,
+          recipientAgentId: "agent-b",
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(data.mailbox.nextQueued("agent-b")).not.toBeNull());
   });
@@ -1162,17 +1242,19 @@ describe("shared channel coordination", () => {
       schedule: { kind: "hourly", minute: 30 },
     });
     routines.delete("channel-1", removedRoutine.id);
-    const generated = await data.mailbox.storeGeneratedAttachment({
-      bytes: new Uint8Array([1, 2, 3]),
-      name: "channel.png",
-      mimeType: "image/png",
-      ownerAgentId: "agent-a",
-      ownerThreadId: context.threadId,
-    });
-    expect(await data.mailbox.resolveAttachment(generated.id)).toMatchObject({ path: expect.any(String) });
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "delete-turn");
-    service.accepted(deliveryId, "delete-session", "delete-turn");
+    const generated = await runChannel(
+      data.mailbox.storeGeneratedAttachment({
+        bytes: new Uint8Array([1, 2, 3]),
+        name: "channel.png",
+        mimeType: "image/png",
+        ownerAgentId: "agent-a",
+        ownerThreadId: context.threadId,
+      }),
+    );
+    expect(await runChannel(data.mailbox.resolveAttachment(generated.id))).toMatchObject({ path: expect.any(String) });
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "delete-turn"));
+    await runChannel(service.accepted(deliveryId, "delete-session", "delete-turn"));
     const channelRevision = service.store.get("channel-1").revision;
     changed.mockClear();
     expect(
@@ -1181,13 +1263,13 @@ describe("shared channel coordination", () => {
         .get(context.threadId),
     ).toBeDefined();
 
-    await service.deleteChannel("channel-1");
+    await runChannel(service.deleteChannel("channel-1"));
 
     expect(service.store.exists("channel-1")).toBe(false);
     expect(changed).toHaveBeenCalledWith("channel-1", channelRevision + 1);
     expect(interrupt).toHaveBeenCalledWith("agent-a", "delete-turn", context.threadId);
     expect(data.mailbox.getDelivery(deliveryId)).toBeNull();
-    expect(await data.mailbox.resolveAttachment(generated.id)).toBeNull();
+    expect(await runChannel(data.mailbox.resolveAttachment(generated.id))).toBeNull();
     expect(service.memories.list("channel-1")).toEqual([]);
     expect(routines.list("channel-1")).toEqual([]);
     expect(
@@ -1243,22 +1325,22 @@ describe("shared channel coordination", () => {
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
     const threadId = service.store.context("channel-1", "agent-a").threadId;
-    await data.mailbox.markStarting(deliveryId);
+    await runChannel(data.mailbox.markStarting(deliveryId));
 
     let release!: () => void;
     const pendingInterrupt = new Promise<undefined>(() => undefined);
-    interrupt.mockImplementationOnce(() => pendingInterrupt);
+    interrupt.mockImplementationOnce(() => Effect.promise(() => pendingInterrupt));
     const pendingDrain = new Promise<void>((resolve) => {
       release = resolve;
     });
-    service.hooks.awaitDrain = vi.fn(() => pendingDrain);
+    service.hooks.awaitDrain = vi.fn(() => Effect.promise(() => pendingDrain));
 
-    const deletion = service.deleteChannel("channel-1");
+    const deletion = runChannel(service.deleteChannel("channel-1"));
     await vi.waitFor(() => expect(service.hooks.awaitDrain).toHaveBeenCalledWith("agent-a"));
     expect(service.store.exists("channel-1")).toBe(true);
 
-    await data.mailbox.markRunning(deliveryId, "late-start-turn");
-    service.accepted(deliveryId, "late-start-session", "late-start-turn");
+    await runChannel(data.mailbox.markRunning(deliveryId, "late-start-turn"));
+    await runChannel(service.accepted(deliveryId, "late-start-session", "late-start-turn"));
     release();
     await vi.waitFor(() => expect(interrupt).toHaveBeenCalledWith("agent-a", "late-start-turn", threadId));
     service.event({
@@ -1279,11 +1361,11 @@ describe("shared channel coordination", () => {
     await send("Keep this channel while the provider outcome is unknown");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await data.mailbox.markStarting(deliveryId);
+    await runChannel(data.mailbox.markStarting(deliveryId));
     service.deliveryUncertain(deliveryId);
-    service.hooks.awaitDrain = vi.fn(async () => undefined);
+    service.hooks.awaitDrain = vi.fn(() => Effect.void);
 
-    await expect(service.deleteChannel("channel-1")).rejects.toThrow("unconfirmed assignment start");
+    await expect(runChannel(service.deleteChannel("channel-1"))).rejects.toThrow("unconfirmed assignment start");
 
     expect(service.store.exists("channel-1")).toBe(true);
     expect(service.store.tasks("channel-1")[0]?.state).toBe("paused");
@@ -1294,10 +1376,10 @@ describe("shared channel coordination", () => {
     const task = await send("Coordinate the report");
     const first = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(first.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "parent-limit-turn");
-    service.accepted(deliveryId, "session-limit", "parent-limit-turn");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "parent-limit-turn"));
+    await runChannel(service.accepted(deliveryId, "session-limit", "parent-limit-turn"));
     const args = {
       recipientAgentId: "agent-b",
       task: "Research",
@@ -1305,22 +1387,30 @@ describe("shared channel coordination", () => {
       sourceMessageIds: [task.requestMessageId],
     };
     await expect(
-      service.tool("channel-1", "agent-a", "parent-limit-turn", "cycle", "channel_assign", {
-        ...args,
-        dependencies: [task.id],
-      }),
+      runChannel(
+        service.tool("channel-1", "agent-a", "parent-limit-turn", "cycle", "channel_assign", {
+          ...args,
+          dependencies: [task.id],
+        }),
+      ),
     ).rejects.toThrow("Invalid task dependencies");
     await expect(
-      service.tool("channel-1", "agent-a", "parent-limit-turn", "duplicate-source", "channel_assign", {
-        ...args,
-        sourceMessageIds: [task.requestMessageId, task.requestMessageId],
-      }),
+      runChannel(
+        service.tool("channel-1", "agent-a", "parent-limit-turn", "duplicate-source", "channel_assign", {
+          ...args,
+          sourceMessageIds: [task.requestMessageId, task.requestMessageId],
+        }),
+      ),
     ).rejects.toThrow("Invalid channel task");
     expect(service.store.tasks("channel-1")).toHaveLength(1);
     for (let index = 0; index < 8; index++)
-      await service.tool("channel-1", "agent-a", "parent-limit-turn", `child-${index}`, "channel_assign", args);
+      await runChannel(
+        service.tool("channel-1", "agent-a", "parent-limit-turn", `child-${index}`, "channel_assign", args),
+      );
     expect(service.store.tasks("channel-1")).toHaveLength(9);
-    await service.tool("channel-1", "agent-a", "parent-limit-turn", "child-over-limit", "channel_assign", args);
+    await runChannel(
+      service.tool("channel-1", "agent-a", "parent-limit-turn", "child-over-limit", "channel_assign", args),
+    );
     expect(service.store.tasks("channel-1")).toHaveLength(9);
     expect(service.store.tasks("channel-1").every((item) => item.state === "paused")).toBe(true);
     expect(data.mailbox.nextQueued("agent-b")).toBeNull();
@@ -1330,22 +1420,26 @@ describe("shared channel coordination", () => {
     const parent = await send("Prepare the report");
     const first = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(first.deliveryId);
-    const execution = required(await service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "parent-stop-turn");
-    service.accepted(deliveryId, "session-stop", "parent-stop-turn");
-    await service.tool("channel-1", "agent-a", "parent-stop-turn", "child-1", "channel_assign", {
-      recipientAgentId: "agent-b",
-      task: "Research",
-      expectedResult: "Findings",
-      sourceMessageIds: [parent.requestMessageId],
-    });
-    await service.command(
-      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: parent.id, recipientAgentId: null },
-      actor,
+    const execution = required(await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId)))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "parent-stop-turn"));
+    await runChannel(service.accepted(deliveryId, "session-stop", "parent-stop-turn"));
+    await runChannel(
+      service.tool("channel-1", "agent-a", "parent-stop-turn", "child-1", "channel_assign", {
+        recipientAgentId: "agent-b",
+        task: "Research",
+        expectedResult: "Findings",
+        sourceMessageIds: [parent.requestMessageId],
+      }),
+    );
+    await runChannel(
+      service.command(
+        { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: parent.id, recipientAgentId: null },
+        actor,
+      ),
     );
     expect(service.store.tasks("channel-1").every((item) => item.state === "paused")).toBe(true);
-    await data.mailbox.markTerminal(deliveryId, "interrupted");
+    await runChannel(data.mailbox.markTerminal(deliveryId, "interrupted"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -1353,15 +1447,17 @@ describe("shared channel coordination", () => {
       turnId: "parent-stop-turn",
       status: "interrupted",
     });
-    await service.command(
-      {
-        type: "reassign",
-        channelId: "channel-1",
-        operationId: operationId(),
-        taskId: parent.id,
-        recipientAgentId: "agent-b",
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "reassign",
+          channelId: "channel-1",
+          operationId: operationId(),
+          taskId: parent.id,
+          recipientAgentId: "agent-b",
+        },
+        actor,
+      ),
     );
     // The parent waits for the task it delegated, so the run moves only when the child starts again.
     const child = required(service.store.tasks("channel-1").find((item) => item.parentTaskId === parent.id));
@@ -1372,7 +1468,7 @@ describe("shared channel coordination", () => {
   });
 
   it("lists an archived channel among the sidebar ids so its place in the layout survives", async () => {
-    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    await runChannel(service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor));
     expect(service.store.ids()).toContain("channel-1");
   });
 
@@ -1380,17 +1476,19 @@ describe("shared channel coordination", () => {
     const open = await send("Prepare the report");
     // "Actually …" is the exact text that makes `send` reuse the one open task. A routine must not
     // inherit that heuristic, or a schedule silently rewrites the request a human is waiting on.
-    await service.command(
-      {
-        type: "request",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Actually re-check the figures",
-        recipientAgentId: null,
-        requestMessageId: "routine-request-1",
-        origin: { kind: "routine", routineId: "routine-1", routineName: "Daily check", runId: "run-1" },
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "request",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Actually re-check the figures",
+          recipientAgentId: null,
+          requestMessageId: "routine-request-1",
+          origin: { kind: "routine", routineId: "routine-1", routineName: "Daily check", runId: "run-1" },
+        },
+        actor,
+      ),
     );
     const tasks = service.store.tasks("channel-1");
     expect(tasks).toHaveLength(2);
@@ -1416,48 +1514,56 @@ describe("shared channel coordination", () => {
       requestMessageId: "routine-request-2",
       origin: { kind: "routine" as const, routineId: "routine-1", routineName: "Weekly", runId: "run-1" },
     };
-    await service.command(command, actor);
-    await service.command(command, actor);
+    await runChannel(service.command(command, actor));
+    await runChannel(service.command(command, actor));
     expect(service.store.tasks("channel-1")).toHaveLength(1);
     expect(service.store.messages("channel-1").filter((item) => item.id === "routine-request-2")).toHaveLength(1);
-    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
-    await expect(service.command({ ...command, operationId: "channel-routine-run:run-2" }, actor)).rejects.toThrow(
-      /Restore this channel/,
-    );
+    await runChannel(service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor));
+    await expect(
+      runChannel(service.command({ ...command, operationId: "channel-routine-run:run-2" }, actor)),
+    ).rejects.toThrow(/Restore this channel/);
   });
 
   it("writes one channel memory for a tool call and ignores the retry of that call", async () => {
     const task = await send("Prepare the report");
     const assignment = required(service.store.assignments("channel-1")[0]);
     const deliveryId = required(assignment.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "memory-turn");
-    service.accepted(deliveryId, "session-memory", "memory-turn");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "memory-turn"));
+    await runChannel(service.accepted(deliveryId, "session-memory", "memory-turn"));
     expect(service.store.tasks("channel-1").find((item) => item.id === task.id)?.state).toBe("running");
-    await service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
-      text: "The client signs off on Fridays.",
-    });
-    await service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
-      text: "The client signs off on Fridays.",
-    });
+    await runChannel(
+      service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
+        text: "The client signs off on Fridays.",
+      }),
+    );
+    await runChannel(
+      service.tool("channel-1", "agent-a", "memory-turn", "call-1", "channel_remember", {
+        text: "The client signs off on Fridays.",
+      }),
+    );
     const memories = service.memories.list("channel-1");
     expect(memories).toHaveLength(1);
     expect(memories[0]).toMatchObject({ text: "The client signs off on Fridays.", origin: "automatic" });
-    await service.tool("channel-1", "agent-a", "memory-turn", "call-2", "channel_forget_memory", {
-      text: "The client signs off on Fridays.",
-    });
+    await runChannel(
+      service.tool("channel-1", "agent-a", "memory-turn", "call-2", "channel_forget_memory", {
+        text: "The client signs off on Fridays.",
+      }),
+    );
     expect(service.memories.list("channel-1")).toHaveLength(0);
   });
 
   it("counts a normal request held behind another agent's channel work as unfinished", async () => {
     await send("Inspect project A");
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Draft the release note",
-      idempotencyKey: "test:channel-hold:normal-request",
-    });
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Draft the release note",
+        idempotencyKey: "test:channel-hold:normal-request",
+      }),
+    );
     // One active assignment reserves the host, so every agent whose next request is not channel
     // work is held: this delivery stays queued for as long as agent-a's assignment runs.
     expect(service.mayDrain("agent-b")).toBe(false);
@@ -1470,15 +1576,17 @@ describe("shared channel coordination", () => {
   it("schedules the agents held behind a channel assignment when it fails to start", async () => {
     await send("Inspect project A");
     const deliveryId = required(service.store.assignments("channel-1").find((item) => item.deliveryId)?.deliveryId);
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Draft the release note",
-      idempotencyKey: "test:channel-hold:startup-failure",
-    });
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Draft the release note",
+        idempotencyKey: "test:channel-hold:startup-failure",
+      }),
+    );
     expect(service.mayDrain("agent-b")).toBe(false);
     schedule.mockClear();
-    service.deliveryFailed(deliveryId, "The provider did not start.");
+    await runChannel(service.deliveryFailed(deliveryId, "The provider did not start."));
     // The failure lifts the reservation, so agent-b may drain again - but the drain scheduler
     // retries only the failed assignment's agent, so without this the held request waits for an
     // unrelated trigger.
@@ -1488,17 +1596,21 @@ describe("shared channel coordination", () => {
 
   it("schedules the agents held behind a channel assignment stopped before it starts", async () => {
     const task = await send("Inspect project A");
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Draft the release note",
-      idempotencyKey: "test:channel-hold:stopped-before-start",
-    });
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Draft the release note",
+        idempotencyKey: "test:channel-hold:stopped-before-start",
+      }),
+    );
     expect(service.mayDrain("agent-b")).toBe(false);
     schedule.mockClear();
-    await service.command(
-      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     // The delivery never started, so cancelling it is the only thing left that can lift the
     // reservation it took. Without that, the held request waits for an unrelated trigger.
@@ -1512,35 +1624,43 @@ describe("shared channel coordination", () => {
       release = resolve;
     });
     const enqueue = data.mailbox.enqueue.bind(data.mailbox);
-    vi.spyOn(data.mailbox, "enqueue").mockImplementation(async (input) => {
-      if (input.channelId === "channel-1") await copy;
-      return enqueue(input);
-    });
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Inspect project A",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    vi.spyOn(data.mailbox, "enqueue").mockImplementation((input) =>
+      Effect.gen(function* () {
+        if (input.channelId === "channel-1") yield* Effect.promise(() => copy);
+        return yield* enqueue(input);
+      }),
+    );
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Inspect project A",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     // The reservation is taken before the delivery is created, which is the state this test needs.
     await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(1));
     const task = required(service.store.tasks("channel-1")[0]);
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Draft the release note",
-      idempotencyKey: "test:channel-hold:stopped-while-prepared",
-    });
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Draft the release note",
+        idempotencyKey: "test:channel-hold:stopped-while-prepared",
+      }),
+    );
     expect(service.mayDrain("agent-b")).toBe(false);
-    await service.command(
-      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
     schedule.mockClear();
     release();
@@ -1551,21 +1671,23 @@ describe("shared channel coordination", () => {
   });
 
   it("keeps channel deliveries ahead of normal messages queued during attachment copying", async () => {
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-2",
-        operationId: operationId(),
-        draft: { ...draft, title: "Second channel" },
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-2",
+          operationId: operationId(),
+          draft: { ...draft, title: "Second channel" },
+        },
+        actor,
+      ),
     );
     const firstFile = join(root, "first-brief.txt");
     const secondFile = join(root, "second-brief.txt");
     await writeFile(firstFile, "the first brief");
     await writeFile(secondFile, "the second brief");
-    const firstAttachment = required((await data.mailbox.prepareAttachments([firstFile]))[0]);
-    const secondAttachment = required((await data.mailbox.prepareAttachments([secondFile]))[0]);
+    const firstAttachment = required((await runChannel(data.mailbox.prepareAttachments([firstFile])))[0]);
+    const secondAttachment = required((await runChannel(data.mailbox.prepareAttachments([secondFile])))[0]);
     let releaseFirst!: () => void;
     let releaseSecond!: () => void;
     const firstCopy = new Promise<void>((resolve) => {
@@ -1575,36 +1697,42 @@ describe("shared channel coordination", () => {
       releaseSecond = resolve;
     });
     const enqueue = data.mailbox.enqueue.bind(data.mailbox);
-    vi.spyOn(data.mailbox, "enqueue").mockImplementation(async (input) => {
-      if (input.channelId === "channel-1") await firstCopy;
-      if (input.channelId === "channel-2") await secondCopy;
-      return enqueue(input);
-    });
-
-    const wake = vi.spyOn(service, "wake").mockImplementation(() => undefined);
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: `Compare the first brief ${serializeAttachmentReference(firstAttachment.name, firstAttachment.id)}`,
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [firstAttachment.id],
-      },
-      actor,
+    vi.spyOn(data.mailbox, "enqueue").mockImplementation((input) =>
+      Effect.gen(function* () {
+        if (input.channelId === "channel-1") yield* Effect.promise(() => firstCopy);
+        if (input.channelId === "channel-2") yield* Effect.promise(() => secondCopy);
+        return yield* enqueue(input);
+      }),
     );
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-2",
-        operationId: operationId(),
-        text: `Compare the second brief ${serializeAttachmentReference(secondAttachment.name, secondAttachment.id)}`,
-        recipientAgentId: "agent-b",
-        replyToMessageId: null,
-        attachmentDraftIds: [secondAttachment.id],
-      },
-      actor,
+
+    const wake = vi.spyOn(service, "wake").mockImplementation(() => Effect.void);
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: `Compare the first brief ${serializeAttachmentReference(firstAttachment.name, firstAttachment.id)}`,
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [firstAttachment.id],
+        },
+        actor,
+      ),
+    );
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-2",
+          operationId: operationId(),
+          text: `Compare the second brief ${serializeAttachmentReference(secondAttachment.name, secondAttachment.id)}`,
+          recipientAgentId: "agent-b",
+          replyToMessageId: null,
+          attachmentDraftIds: [secondAttachment.id],
+        },
+        actor,
+      ),
     );
     const firstTask = required(service.store.tasks("channel-1")[0]);
     const secondTask = required(service.store.tasks("channel-2")[0]);
@@ -1617,34 +1745,42 @@ describe("shared channel coordination", () => {
       tasks: [{ ...secondTask, resources: ["workspace:/second"] }],
     });
     wake.mockRestore();
-    service.wake("channel-1");
-    service.wake("channel-2");
+    await runChannel(service.wake("channel-1"));
+    await runChannel(service.wake("channel-2"));
     await vi.waitFor(() => expect(service.store.assignments("channel-1")).toHaveLength(1));
     await vi.waitFor(() => expect(service.store.assignments("channel-2")).toHaveLength(1));
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-a"],
-      text: "Answer the first normal request",
-      idempotencyKey: "test:channel-order:first-normal",
-    });
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-a"],
-      text: "Answer the first follow-up",
-      idempotencyKey: "test:channel-order:first-follow-up",
-    });
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Answer the second normal request",
-      idempotencyKey: "test:channel-order:second-normal",
-    });
-    await data.mailbox.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["agent-b"],
-      text: "Answer the second follow-up",
-      idempotencyKey: "test:channel-order:second-follow-up",
-    });
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-a"],
+        text: "Answer the first normal request",
+        idempotencyKey: "test:channel-order:first-normal",
+      }),
+    );
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-a"],
+        text: "Answer the first follow-up",
+        idempotencyKey: "test:channel-order:first-follow-up",
+      }),
+    );
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Answer the second normal request",
+        idempotencyKey: "test:channel-order:second-normal",
+      }),
+    );
+    await runChannel(
+      data.mailbox.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["agent-b"],
+        text: "Answer the second follow-up",
+        idempotencyKey: "test:channel-order:second-follow-up",
+      }),
+    );
 
     expect(service.mayDrain("agent-a")).toBe(false);
     expect(service.mayDrain("agent-b")).toBe(false);
@@ -1679,10 +1815,10 @@ describe("shared channel coordination", () => {
     });
     // Once the channel deliveries finish, the normal messages that arrived during the copy are
     // still queued and can become the next work for each agent.
-    await data.mailbox.cancel("agent-a", firstDeliveryId);
-    service.deliveryFailed(firstDeliveryId, "The channel delivery failed.");
-    await data.mailbox.cancel("agent-b", secondDeliveryId);
-    service.deliveryFailed(secondDeliveryId, "The channel delivery failed.");
+    await runChannel(data.mailbox.cancel("agent-a", firstDeliveryId));
+    await runChannel(service.deliveryFailed(firstDeliveryId, "The channel delivery failed."));
+    await runChannel(data.mailbox.cancel("agent-b", secondDeliveryId));
+    await runChannel(service.deliveryFailed(secondDeliveryId, "The channel delivery failed."));
     expect(data.mailbox.nextQueued("agent-a")?.delivery.text).toBe("Answer the first normal request");
     expect(data.mailbox.nextQueued("agent-b")?.delivery.text).toBe("Answer the second normal request");
     expect(data.mailbox.listQueue("agent-a").deliveries.map((item) => item.text)).toEqual([
@@ -1698,30 +1834,34 @@ describe("shared channel coordination", () => {
   });
 
   it("keeps the stored request and its file when a child task starts", async () => {
-    await data.store.getOrCreate("agent-c");
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
-      },
-      actor,
+    await runChannel(data.store.getOrCreate("agent-c"));
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
+        },
+        actor,
+      ),
     );
     const file = join(root, "brief.txt");
     await writeFile(file, "the brief");
-    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: `Compare the two projects ${serializeAttachmentReference(attachment.name, attachment.id)}`,
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [attachment.id],
-      },
-      actor,
+    const attachment = required((await runChannel(data.mailbox.prepareAttachments([file])))[0]);
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: `Compare the two projects ${serializeAttachmentReference(attachment.name, attachment.id)}`,
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [attachment.id],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     const parent = required(service.store.tasks("channel-1")[0]);
@@ -1733,18 +1873,20 @@ describe("shared channel coordination", () => {
     // committed file.
     expect(text).toContain(committed.id);
     const deliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
-    await data.mailbox.markStarting(deliveryId);
-    await data.mailbox.markRunning(deliveryId, "parent-turn");
-    service.accepted(deliveryId, "parent-session", "parent-turn");
-    await service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
-      recipientAgentId: "agent-b",
-      task: "Inspect project B",
-      expectedResult: "Findings B",
-      sourceMessageIds: [parent.requestMessageId],
-      resources: ["workspace:/work/b"],
-    });
-    await data.mailbox.markTerminal(deliveryId, "completed");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+    await runChannel(data.mailbox.markStarting(deliveryId));
+    await runChannel(data.mailbox.markRunning(deliveryId, "parent-turn"));
+    await runChannel(service.accepted(deliveryId, "parent-session", "parent-turn"));
+    await runChannel(
+      service.tool("channel-1", "agent-a", "parent-turn", "child-1", "channel_assign", {
+        recipientAgentId: "agent-b",
+        task: "Inspect project B",
+        expectedResult: "Findings B",
+        sourceMessageIds: [parent.requestMessageId],
+        resources: ["workspace:/work/b"],
+      }),
+    );
+    await runChannel(data.mailbox.markTerminal(deliveryId, "completed"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -1763,32 +1905,38 @@ describe("shared channel coordination", () => {
   it("sends the request file again when a stopped assignment resumes", async () => {
     const file = join(root, "brief.txt");
     await writeFile(file, "the brief");
-    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Prepare the report",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [attachment.id],
-      },
-      actor,
+    const attachment = required((await runChannel(data.mailbox.prepareAttachments([file])))[0]);
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Prepare the report",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [attachment.id],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     const task = required(service.store.tasks("channel-1")[0]);
     const first = required(service.store.assignments("channel-1")[0]);
     expect(data.mailbox.getDelivery(required(first.deliveryId))?.delivery.attachments).toHaveLength(1);
-    await service.command(
-      { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "stop", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
-    await service.command(
-      { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
-      actor,
+    await runChannel(
+      service.command(
+        { type: "resume", channelId: "channel-1", operationId: operationId(), taskId: task.id, recipientAgentId: null },
+        actor,
+      ),
     );
-    await vi.waitFor(() => expect(service.store.assignments("channel-1")[1]?.deliveryId).not.toBeNull());
+    await vi.waitFor(() => expect(service.store.assignments("channel-1")[1]?.deliveryId).toEqual(expect.any(String)));
     const second = required(service.store.assignments("channel-1")[1]);
     // The drafts are consumed by the first dispatch, so a retry has to attach the committed
     // copies. Without them the agent resumes a request without the file it is about.
@@ -1804,33 +1952,35 @@ describe("shared channel coordination", () => {
   it("sends the files of a request that was still queued at a restart", async () => {
     const file = join(root, "brief.txt");
     await writeFile(file, "the brief");
-    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    const attachment = required((await runChannel(data.mailbox.prepareAttachments([file])))[0]);
     // No member is free, so the request waits. This is the normal state of a busy channel.
     busy.mockReturnValue(true);
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: `Prepare the report ${serializeAttachmentReference(attachment.name, attachment.id)}`,
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [attachment.id],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: `Prepare the report ${serializeAttachmentReference(attachment.name, attachment.id)}`,
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [attachment.id],
+        },
+        actor,
+      ),
     );
     expect(service.store.assignments("channel-1")).toHaveLength(0);
     // The restart. It clears every draft and deletes the uploaded files, so only a copy the send
     // committed can still reach the member.
-    await data.mailbox.initialize();
+    await runChannel(data.mailbox.initialize());
     busy.mockReturnValue(false);
-    service.wake("channel-1");
+    await runChannel(service.wake("channel-1"));
     await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
     const deliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
     const delivery = required(data.mailbox.getDelivery(deliveryId)).delivery;
     expect(delivery.attachments.map((item) => item.name)).toEqual([attachment.name]);
     const request = required(service.store.messages("channel-1").find((item) => item.author.kind === "member")).message;
-    const stored = required(await data.mailbox.resolveAttachment(required(request.attachments?.[0]).id));
+    const stored = required(await runChannel(data.mailbox.resolveAttachment(required(request.attachments?.[0]).id)));
     expect(await readFile(stored.path, "utf8")).toBe("the brief");
     // The reference in the text follows the file, or the member reads the name of a file it has no
     // way to open.
@@ -1840,31 +1990,35 @@ describe("shared channel coordination", () => {
   it("refuses a send that an archive overtakes while its files are copied", async () => {
     const file = join(root, "brief.txt");
     await writeFile(file, "the brief");
-    const attachment = required((await data.mailbox.prepareAttachments([file]))[0]);
+    const attachment = required((await runChannel(data.mailbox.prepareAttachments([file])))[0]);
     let release!: () => void;
     const copying = new Promise<void>((resolve) => {
       release = resolve;
     });
     const commit = data.mailbox.commitChannelAttachments.bind(data.mailbox);
-    const copy = vi.spyOn(data.mailbox, "commitChannelAttachments").mockImplementation(async (input) => {
-      await copying;
-      return commit(input);
-    });
-    const sent = service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Prepare the report",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [attachment.id],
-      },
-      actor,
+    const copy = vi.spyOn(data.mailbox, "commitChannelAttachments").mockImplementation((input) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => copying);
+        return yield* commit(input);
+      }),
+    );
+    const sent = runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Prepare the report",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [attachment.id],
+        },
+        actor,
+      ),
     );
     await vi.waitFor(() => expect(copy).toHaveBeenCalled());
     // Archive does not queue behind the other commands, so it lands inside the copy.
-    await service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor);
+    await runChannel(service.command({ type: "archive", channelId: "channel-1", operationId: operationId() }, actor));
     release();
     await expect(sent).rejects.toThrow("Restore this channel before sending messages or changing tasks.");
     // The send read the channel before the archive. Writing that read back would restore the
@@ -1875,42 +2029,53 @@ describe("shared channel coordination", () => {
   });
 
   it("refuses a settings save that arrives after its channel is deleted", async () => {
-    await service.deleteChannel("channel-1");
+    await runChannel(service.deleteChannel("channel-1"));
     await expect(
-      service.command({ type: "save", channelId: "channel-1", operationId: operationId(), draft, update: true }, actor),
+      runChannel(
+        service.command(
+          { type: "save", channelId: "channel-1", operationId: operationId(), draft, update: true },
+          actor,
+        ),
+      ),
     ).rejects.toThrow("Channel not found.");
     expect(service.store.exists("channel-1")).toBe(false);
     // A save with no channel behind it is still how a channel is made.
-    await service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor);
+    await runChannel(
+      service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor),
+    );
     expect(service.store.exists("channel-2")).toBe(true);
   });
 
   it("holds a transferred task and its resource until the previous owner stops", async () => {
-    await data.store.getOrCreate("agent-c");
-    await service.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: operationId(),
-        draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
-      },
-      actor,
+    await runChannel(data.store.getOrCreate("agent-c"));
+    await runChannel(
+      service.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: operationId(),
+          draft: { ...draft, members: [...draft.members, { agentId: "agent-c" }] },
+        },
+        actor,
+      ),
     );
     const parent = await send("Compare the two projects");
     const parentDeliveryId = required(service.store.assignments("channel-1")[0]?.deliveryId);
-    await service.prepare(required(data.mailbox.getDelivery(parentDeliveryId)));
-    await data.mailbox.markStarting(parentDeliveryId);
-    await data.mailbox.markRunning(parentDeliveryId, "parent-turn");
-    service.accepted(parentDeliveryId, "parent-session", "parent-turn");
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(parentDeliveryId))));
+    await runChannel(data.mailbox.markStarting(parentDeliveryId));
+    await runChannel(data.mailbox.markRunning(parentDeliveryId, "parent-turn"));
+    await runChannel(service.accepted(parentDeliveryId, "parent-session", "parent-turn"));
     for (const [index, recipientAgentId] of ["agent-b", "agent-c"].entries())
-      await service.tool("channel-1", "agent-a", "parent-turn", `child-${index}`, "channel_assign", {
-        recipientAgentId,
-        task: `Inspect project B as ${recipientAgentId}`,
-        expectedResult: "Findings B",
-        sourceMessageIds: [parent.requestMessageId],
-        resources: ["workspace:/work/b"],
-      });
-    await data.mailbox.markTerminal(parentDeliveryId, "completed");
+      await runChannel(
+        service.tool("channel-1", "agent-a", "parent-turn", `child-${index}`, "channel_assign", {
+          recipientAgentId,
+          task: `Inspect project B as ${recipientAgentId}`,
+          expectedResult: "Findings B",
+          sourceMessageIds: [parent.requestMessageId],
+          resources: ["workspace:/work/b"],
+        }),
+      );
+    await runChannel(data.mailbox.markTerminal(parentDeliveryId, "completed"));
     service.event({
       type: "turn-completed",
       agentId: "agent-a",
@@ -1926,17 +2091,19 @@ describe("shared channel coordination", () => {
     const childDeliveryId = required(
       service.store.assignments("channel-1").find((item) => item.taskId === transferred.id)?.deliveryId,
     );
-    await service.prepare(required(data.mailbox.getDelivery(childDeliveryId)));
-    await data.mailbox.markStarting(childDeliveryId);
-    await data.mailbox.markRunning(childDeliveryId, "child-turn");
-    service.accepted(childDeliveryId, "child-session", "child-turn");
-    await service.tool("channel-1", "agent-b", "child-turn", "transfer", "channel_transfer", {
-      recipientAgentId: "agent-a",
-      task: "Finish the inspection",
-      expectedResult: "Findings B",
-      sourceMessageIds: [parent.requestMessageId],
-      resources: ["none"],
-    });
+    await runChannel(service.prepare(required(data.mailbox.getDelivery(childDeliveryId))));
+    await runChannel(data.mailbox.markStarting(childDeliveryId));
+    await runChannel(data.mailbox.markRunning(childDeliveryId, "child-turn"));
+    await runChannel(service.accepted(childDeliveryId, "child-session", "child-turn"));
+    await runChannel(
+      service.tool("channel-1", "agent-b", "child-turn", "transfer", "channel_transfer", {
+        recipientAgentId: "agent-a",
+        task: "Finish the inspection",
+        expectedResult: "Findings B",
+        sourceMessageIds: [parent.requestMessageId],
+        resources: ["none"],
+      }),
+    );
     // Agent-b still runs the turn that holds the workspace. The new owner of that task must not
     // start a second turn on it, and the task that declares the same workspace must not read the
     // lowered resources of the transfer as a free reservation.
@@ -1944,7 +2111,7 @@ describe("shared channel coordination", () => {
       service.store.assignments("channel-1").filter((item) => item.taskId === taskId);
     expect(assignmentsFor(transferred.id)).toHaveLength(1);
     expect(assignmentsFor(waiting.id)).toHaveLength(0);
-    await data.mailbox.markTerminal(childDeliveryId, "completed");
+    await runChannel(data.mailbox.markTerminal(childDeliveryId, "completed"));
     service.event({
       type: "turn-completed",
       agentId: "agent-b",
@@ -1977,17 +2144,19 @@ describe("shared channel coordination", () => {
     const name = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}".repeat(8);
     expect(validateProfileName(name).error).toBeNull();
     expect(name.length).toBeGreaterThan(INPUT_LIMITS.agentName);
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Prepare the report",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      { id: "human-2", name },
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Prepare the report",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        { id: "human-2", name },
+      ),
     );
 
     expect(service.store.messages("channel-1").at(-1)?.author.name).toBe(name);
@@ -2021,17 +2190,19 @@ describe("shared channel coordination", () => {
   });
 
   it("keeps a message the reader wrote before signing in out of the unread count", async () => {
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: operationId(),
-        text: "Draft the release note.",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      { id: "local", name: "You" },
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: operationId(),
+          text: "Draft the release note.",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        { id: "local", name: "You" },
+      ),
     );
 
     // The signed-in reader holds no cursor here, so only authorship can hold this message out of
@@ -2043,19 +2214,23 @@ describe("shared channel coordination", () => {
   });
 
   it("carries every read channel to the reader that signs in", async () => {
-    await service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor);
+    await runChannel(
+      service.command({ type: "save", channelId: "channel-2", operationId: operationId(), draft }, actor),
+    );
     await send("Draft the release note.");
-    await service.command(
-      {
-        type: "send",
-        channelId: "channel-2",
-        operationId: operationId(),
-        text: "Check the changelog.",
-        recipientAgentId: "agent-a",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runChannel(
+      service.command(
+        {
+          type: "send",
+          channelId: "channel-2",
+          operationId: operationId(),
+          text: "Check the changelog.",
+          recipientAgentId: "agent-a",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     for (const channelId of ["channel-1", "channel-2"]) {
       service.store.markRead(channelId, "local", service.store.page(channelId).throughSequence, operationId());

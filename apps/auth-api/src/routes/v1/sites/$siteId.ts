@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import { requireIdempotencyKey } from "../../../server/hosted-site-contract";
 import {
   apiError,
@@ -14,10 +15,10 @@ export const Route = createFileRoute("/v1/sites/$siteId")({
     handlers: {
       DELETE: async ({ request, params }) => {
         try {
-          const user = await requestUser(request);
+          const user = await runApiEffect(requestUser(request));
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          const scope = await requestHostedSiteScope(request, user.id);
-          await requestHostedSiteService().delete(scope, params.siteId, requireIdempotencyKey(request));
+          const scope = await runApiEffect(requestHostedSiteScope(request, user.id));
+          await runApiEffect(requestHostedSiteService().delete(scope, params.siteId, requireIdempotencyKey(request)));
           return json({ deleted: true });
         } catch (error) {
           return hostedSiteErrorResponse(error);

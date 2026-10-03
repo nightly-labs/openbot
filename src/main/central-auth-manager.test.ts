@@ -2,6 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 
@@ -28,14 +29,14 @@ describe("CentralAuthManager", () => {
       decrypt: (value) => value.toString(),
       fetch: request,
     });
-    await manager.initialize();
+    await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
     const changed = vi.fn();
     manager.on("changed", changed);
     try {
       user = { ...user, name: "From phone", avatarUrl: "/v1/avatars/user-1?v=new" };
       await vi.advanceTimersByTimeAsync(15_000);
       expect(manager.getSignedInUser().name).toBe("Original");
-      await manager.refreshProfile();
+      await Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
       expect(manager.getSignedInUser()).toMatchObject({
         name: "From phone",
         avatarUrl: "http://127.0.0.1:3100/v1/avatars/user-1?v=new",
@@ -44,13 +45,13 @@ describe("CentralAuthManager", () => {
         expect.objectContaining({ status: "signed_in", user: expect.objectContaining({ name: "From phone" }) }),
       );
       changed.mockClear();
-      await manager.refreshProfile();
+      await Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
       expect(changed).not.toHaveBeenCalled();
       request.mockRejectedValueOnce(new Error("Offline"));
-      await manager.refreshProfile();
+      await Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
       expect(manager.getSignedInUser().name).toBe("From phone");
       user = { ...user, avatarUrl: "" };
-      await manager.refreshProfile();
+      await Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
       expect(manager.getSignedInUser().avatarUrl).toBeNull();
       manager.stopProfileRefresh();
       user = { ...user, name: "After stop" };
@@ -74,7 +75,7 @@ describe("CentralAuthManager", () => {
       decrypt: (value) => value.toString(),
       fetch: request,
     });
-    await manager.initialize();
+    await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
     let finishStale: ((response: Response) => void) | undefined;
     request.mockImplementationOnce(
       () =>
@@ -82,12 +83,12 @@ describe("CentralAuthManager", () => {
           finishStale = resolve;
         }),
     );
-    const refresh = manager.refreshProfile();
-    expect(manager.refreshProfile()).toBe(refresh);
+    const refresh = Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
+    const concurrentRefresh = Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
     request.mockResolvedValueOnce(Response.json({ ...user, name: "Local edit" }));
-    await manager.updateName("Local edit");
+    await Effect.runPromise(manager.updateName("Local edit").pipe(Effect.mapError((error) => error.cause)));
     finishStale?.(Response.json(user));
-    await refresh;
+    await Promise.all([refresh, concurrentRefresh]);
     expect(manager.getSignedInUser().name).toBe("Local edit");
     let finishLate: ((response: Response) => void) | undefined;
     request.mockImplementationOnce(
@@ -96,14 +97,14 @@ describe("CentralAuthManager", () => {
           finishLate = resolve;
         }),
     );
-    const pending = manager.refreshProfile();
+    const pending = Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
     request.mockResolvedValueOnce(new Response(null, { status: 204 }));
-    await manager.logout();
+    await Effect.runPromise(manager.logout().pipe(Effect.mapError((error) => error.cause)));
     finishLate?.(Response.json(user));
     await pending;
     expect(manager.getState().status).toBe("signed_out");
     request.mockClear();
-    await manager.refreshProfile();
+    await Effect.runPromise(manager.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -140,18 +141,26 @@ describe("CentralAuthManager", () => {
       }),
     });
 
-    await manager.initialize();
-    await manager.registerRemoteHost({
-      hostId: serverId,
-      name: "Studio",
-      ownerMembershipId: "membership-1",
-    });
+    await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
+    await Effect.runPromise(
+      manager
+        .registerRemoteHost({
+          hostId: serverId,
+          name: "Studio",
+          ownerMembershipId: "membership-1",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    await expect(manager.issueRemoteHostTicket(serverId)).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.issueRemoteHostTicket(serverId).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       signalUrl: "ws://192.168.1.143:3101/v1/signal",
     });
     signalUrl = "ws://signal.example.com/v1/signal";
-    await expect(manager.issueRemoteHostTicket(serverId)).rejects.toThrow("Invalid Remote Signal URL.");
+    await expect(
+      Effect.runPromise(manager.issueRemoteHostTicket(serverId).pipe(Effect.mapError((error) => error.cause))),
+    ).rejects.toThrow("Invalid Remote Signal URL.");
   });
 
   it("requests an email code, verifies it, and restores an encrypted session", async () => {
@@ -235,26 +244,50 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     };
     const manager = new CentralAuthManager(options);
-    expect((await manager.initialize()).status).toBe("signed_out");
-    expect(await manager.requestEmailCode("Person@Example.com")).toMatchObject({
+    expect((await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)))).status).toBe(
+      "signed_out",
+    );
+    expect(
+      await Effect.runPromise(
+        manager.requestEmailCode("Person@Example.com").pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toMatchObject({
       status: "code_sent",
       email: "person@example.com",
       developmentCode: "ABCD-EFGH",
     });
-    expect(await manager.verifyEmailCode("challenge-1", "ABCD-EFGH")).toMatchObject({
+    expect(
+      await Effect.runPromise(
+        manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toMatchObject({
       status: "signed_in",
     });
     const serverId = "00000000-0000-4000-8000-000000000000";
-    expect(await manager.createTeamAuthTicket(serverId)).toBe("one-time-ticket");
-    expect(await manager.redeemTeamAuthTicket("one-time-ticket", serverId)).toMatchObject({
+    expect(
+      await Effect.runPromise(manager.createTeamAuthTicket(serverId).pipe(Effect.mapError((error) => error.cause))),
+    ).toBe("one-time-ticket");
+    expect(
+      await Effect.runPromise(
+        manager.redeemTeamAuthTicket("one-time-ticket", serverId).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toMatchObject({
       email: "person@example.com",
     });
-    expect(await manager.createMobileConnect({ hostId: serverId, fingerprint: "a".repeat(43) })).toMatchObject({
+    expect(
+      await Effect.runPromise(
+        manager
+          .createMobileConnect({ hostId: serverId, fingerprint: "a".repeat(43) })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toMatchObject({
       qrData: expect.stringMatching(
         /^openbot:\/\/mobile-connect\?api=http%3A%2F%2F192\.168\.1\.143%3A3100&ticket=mobile-ticket_1234567890abcdefghijklmnop&host=00000000-0000-4000-8000-000000000000&fingerprint=a{43}$/u,
       ),
     });
-    expect(await manager.listMobileConnectedDevices()).toEqual([
+    expect(
+      await Effect.runPromise(manager.listMobileConnectedDevices().pipe(Effect.mapError((error) => error.cause))),
+    ).toEqual([
       {
         sessionId: "11111111-1111-4111-8111-111111111111",
         name: "Norbert’s iPhone",
@@ -263,8 +296,14 @@ describe("CentralAuthManager", () => {
         lastActiveAt: 2_000,
       },
     ]);
-    await manager.revokeMobileConnectedDevice("11111111-1111-4111-8111-111111111111");
-    expect(await manager.listAccountSessions()).toEqual([
+    await Effect.runPromise(
+      manager
+        .revokeMobileConnectedDevice("11111111-1111-4111-8111-111111111111")
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    expect(
+      await Effect.runPromise(manager.listAccountSessions().pipe(Effect.mapError((error) => error.cause))),
+    ).toEqual([
       {
         sessionId: "11111111-1111-4111-8111-111111111111",
         name: "Desktop",
@@ -274,20 +313,28 @@ describe("CentralAuthManager", () => {
         lastActiveAt: 2000,
       },
     ]);
-    await manager.revokeAccountSession("11111111-1111-4111-8111-111111111111");
+    await Effect.runPromise(
+      manager
+        .revokeAccountSession("11111111-1111-4111-8111-111111111111")
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     const [revokeUrl, revokeOptions] = fetchMock.mock.calls.at(-1) ?? [];
     expect(revokeUrl?.toString()).toBe(
       "http://127.0.0.1:3100/v1/mobile-auth/devices/11111111-1111-4111-8111-111111111111?includeDesktop=true",
     );
     expect(revokeOptions?.method).toBe("DELETE");
     expect(new Headers(revokeOptions?.headers).get("Authorization")).toBe("Bearer session-secret");
-    await manager.sendTeamInviteEmail({
-      email: "alice@example.com",
-      serverName: "Studio Mac",
-      inviteUrl:
-        "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      role: "member",
-    });
+    await Effect.runPromise(
+      manager
+        .sendTeamInviteEmail({
+          email: "alice@example.com",
+          serverName: "Studio Mac",
+          inviteUrl:
+            "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          role: "member",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(requests[0]).toMatchObject({ path: "/health/live", authorization: null });
     expect(requests[2]?.body).toEqual({ challengeId: "challenge-1", code: "ABCD-EFGH" });
     expect(await readFile(storagePath, "utf8")).not.toContain("session-secret");
@@ -316,7 +363,9 @@ describe("CentralAuthManager", () => {
       authorization: "Bearer session-secret",
     });
     const restored = new CentralAuthManager(options);
-    expect(await restored.initialize()).toMatchObject({ status: "signed_in" });
+    expect(await Effect.runPromise(restored.initialize().pipe(Effect.mapError((error) => error.cause)))).toMatchObject({
+      status: "signed_in",
+    });
     expect(requests.at(-1)).toMatchObject({
       path: "/v1/me",
       authorization: "Bearer session-secret",
@@ -355,17 +404,31 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     };
     const manager = new CentralAuthManager(options);
-    await manager.requestEmailCode("person@example.com");
-    await expect(manager.verifyEmailCode("challenge-1", "ABCD-EFGH")).resolves.toMatchObject({
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await expect(
+      Effect.runPromise(
+        manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toMatchObject({
       status: "signed_in",
     });
-    await expect(manager.createTeamAuthTicket("00000000-0000-4000-8000-000000000000")).resolves.toBe("memory-ticket");
+    await expect(
+      Effect.runPromise(
+        manager
+          .createTeamAuthTicket("00000000-0000-4000-8000-000000000000")
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toBe("memory-ticket");
     await expect(readFile(storagePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
     expect(options.encrypt).not.toHaveBeenCalled();
     expect(options.decrypt).not.toHaveBeenCalled();
 
     const restarted = new CentralAuthManager(options);
-    await expect(restarted.initialize()).resolves.toMatchObject({ status: "signed_out" });
+    await expect(
+      Effect.runPromise(restarted.initialize().pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({ status: "signed_out" });
   });
 
   it("keeps a verified session in memory when secure persistence fails", async () => {
@@ -399,11 +462,23 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     });
 
-    await manager.requestEmailCode("person@example.com");
-    await expect(manager.verifyEmailCode("challenge-1", "ABCD-EFGH")).resolves.toMatchObject({
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await expect(
+      Effect.runPromise(
+        manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toMatchObject({
       status: "signed_in",
     });
-    await expect(manager.createTeamAuthTicket("00000000-0000-4000-8000-000000000000")).resolves.toBe("memory-ticket");
+    await expect(
+      Effect.runPromise(
+        manager
+          .createTeamAuthTicket("00000000-0000-4000-8000-000000000000")
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).resolves.toBe("memory-ticket");
     await expect(readFile(storagePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
     expect(encrypt).toHaveBeenCalledTimes(1);
   });
@@ -426,8 +501,14 @@ describe("CentralAuthManager", () => {
         );
       }),
     });
-    await manager.requestEmailCode("person@example.com");
-    expect(await manager.verifyEmailCode("challenge-1", "AAAA-AAAA")).toMatchObject({
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    expect(
+      await Effect.runPromise(
+        manager.verifyEmailCode("challenge-1", "AAAA-AAAA").pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toMatchObject({
       status: "code_sent",
       challengeId: "challenge-1",
       issue: {
@@ -468,12 +549,16 @@ describe("CentralAuthManager", () => {
       }),
     });
 
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: "challenge-1",
       resendAvailableAt: 61_000,
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: "challenge-1",
       issue: {
@@ -481,7 +566,9 @@ describe("CentralAuthManager", () => {
         retryAfterSeconds: 42,
       },
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: "challenge-2",
       resendAvailableAt: 661_000,
@@ -503,11 +590,14 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     });
 
-    const first = manager.requestEmailCode("person@example.com");
-    const second = manager.requestEmailCode(" Person@Example.com ");
+    const first = Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    const second = Effect.runPromise(
+      manager.requestEmailCode(" Person@Example.com ").pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    expect(second).toBe(first);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
     expect(headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/u);
     finishRequest?.(Response.json({ challengeId: "challenge-1", expiresAt: 610_000 }));
@@ -526,7 +616,9 @@ describe("CentralAuthManager", () => {
     });
 
     try {
-      await manager.requestEmailCode("person@example.com");
+      await Effect.runPromise(
+        manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+      );
       expect(timeout).toHaveBeenCalledWith(35_000);
     } finally {
       timeout.mockRestore();
@@ -556,11 +648,15 @@ describe("CentralAuthManager", () => {
       emailCodeRequestTimeoutMs: 5,
     });
 
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "error",
       issue: { code: "email_delivery_timeout" },
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: keys[0],
     });
@@ -591,11 +687,15 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     });
 
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "error",
       issue: { code: "email_delivery_pending", retryAfterSeconds: 25 },
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({ status: "code_sent" });
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({ status: "code_sent" });
     expect(keys[1]).toBe(keys[0]);
   });
 
@@ -625,15 +725,21 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     });
 
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: "challenge-1",
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "error",
       issue: { code: "email_delivery_pending" },
     });
-    await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "code_sent",
       challengeId: keys[1],
     });
@@ -671,11 +777,15 @@ describe("CentralAuthManager", () => {
         fetch: fetchMock,
       });
 
-      const state = await manager.requestEmailCode("person@example.com");
+      const state = await Effect.runPromise(
+        manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+      );
       expect(state).toMatchObject({ status: "error", issue: { code: failure.code } });
       if (state.status !== "error") throw new Error("Expected a failed code request.");
       expect(state.issue.retryAfterSeconds).toBe(failure.retryAfterSeconds);
-      await expect(manager.requestEmailCode("person@example.com")).resolves.toMatchObject({ status: "code_sent" });
+      await expect(
+        Effect.runPromise(manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause))),
+      ).resolves.toMatchObject({ status: "code_sent" });
       expect(keys[1]).not.toBe(keys[0]);
     }
   });
@@ -696,7 +806,9 @@ describe("CentralAuthManager", () => {
       ),
     });
 
-    const state = await manager.requestEmailCode("person@example.com");
+    const state = await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
     expect(state).toMatchObject({
       status: "error",
       issue: { code: "rate_limited" },
@@ -729,7 +841,7 @@ describe("CentralAuthManager", () => {
       startupRetryDelaysMs: [10, 20],
     });
 
-    const initialization = manager.initialize();
+    const initialization = Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
     expect(manager.getState()).toEqual({ status: "loading" });
 
     await expect(initialization).resolves.toEqual({ status: "signed_out" });
@@ -766,7 +878,7 @@ describe("CentralAuthManager", () => {
       startupRetryDelaysMs: [1],
     });
 
-    const initialization = manager.initialize();
+    const initialization = Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
 
     await expect(initialization).resolves.toMatchObject({ status: "signed_in" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -793,7 +905,9 @@ describe("CentralAuthManager", () => {
       fetch: fetchMock,
     });
 
-    await expect(manager.initialize()).resolves.toEqual({ status: "signed_out" });
+    await expect(
+      Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual({ status: "signed_out" });
     expect(fetchMock).toHaveBeenCalledOnce();
     await expect(readFile(storagePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
@@ -812,8 +926,8 @@ describe("CentralAuthManager", () => {
       startupRetryDelaysMs: [5, 10],
     });
 
-    const initialization = manager.initialize();
-    expect(manager.retry()).toBe(initialization);
+    const initialization = Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
+    const concurrentRetry = Effect.runPromise(manager.retry().pipe(Effect.mapError((error) => error.cause)));
     await expect(initialization).resolves.toMatchObject({
       status: "error",
       issue: {
@@ -822,8 +936,11 @@ describe("CentralAuthManager", () => {
       },
     });
 
+    await expect(concurrentRetry).resolves.toEqual(await initialization);
     fetchMock.mockResolvedValueOnce(Response.json({ service: "openbot-auth-api", status: "ok" }));
-    await expect(manager.retry()).resolves.toEqual({ status: "signed_out" });
+    await expect(Effect.runPromise(manager.retry().pipe(Effect.mapError((error) => error.cause)))).resolves.toEqual({
+      status: "signed_out",
+    });
   });
 
   it("uploads and removes the signed-in account avatar", async () => {
@@ -854,14 +971,22 @@ describe("CentralAuthManager", () => {
         });
       }),
     });
-    await manager.requestEmailCode("person@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
     await expect(
-      manager.updateAvatar({
-        mimeType: "image/png",
-        bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      }),
+      Effect.runPromise(
+        manager
+          .updateAvatar({
+            mimeType: "image/png",
+            bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          })
+          .pipe(Effect.mapError((error) => error.cause)),
+      ),
     ).resolves.toMatchObject({
       status: "signed_in",
       user: { avatarUrl: "https://api.openbot.run/v1/avatars/user-1?v=image-1" },
@@ -870,7 +995,9 @@ describe("CentralAuthManager", () => {
     expect(requests.at(-1)?.headers.get("Content-Type")).toBe("image/png");
     expect(requests.at(-1)?.headers.get("Authorization")).toBe("Bearer session-secret");
 
-    await expect(manager.updateAvatar(null)).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.updateAvatar(null).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "signed_in",
       user: { avatarUrl: null },
     });
@@ -922,19 +1049,31 @@ describe("CentralAuthManager", () => {
         });
       }),
     });
-    await manager.requestEmailCode("person1@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person1@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    const pending = manager.registerRemoteHost({
-      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
-      name: "Studio Mac",
-      ownerMembershipId: "member-1",
-    });
+    const pending = Effect.runPromise(
+      manager
+        .registerRemoteHost({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          ownerMembershipId: "member-1",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     // Attach the rejection handler before the switch, so settling it raises no unhandled error.
     const settled = pending.catch(() => undefined);
     await started;
-    await manager.requestEmailCode("person2@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person2@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
     releaseRegistration();
     await settled;
 
@@ -978,17 +1117,29 @@ describe("CentralAuthManager", () => {
         });
       }),
     });
-    await manager.requestEmailCode("person1@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
-    await manager.registerRemoteHost({
-      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
-      name: "Studio Mac",
-      ownerMembershipId: "member-1",
-    });
+    await Effect.runPromise(
+      manager.requestEmailCode("person1@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager
+        .registerRemoteHost({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          ownerMembershipId: "member-1",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
 
     // Signing in as somebody else without signing out first.
-    await manager.requestEmailCode("person2@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person2@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
     const stored = Buffer.from(await readFile(storagePath, "utf8"), "base64").toString();
     expect(stored).toContain("session-two");
@@ -1031,16 +1182,28 @@ describe("CentralAuthManager", () => {
         });
       }),
     });
-    await manager.requestEmailCode("person1@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
-    await manager.registerRemoteHost({
-      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
-      name: "Studio Mac",
-      ownerMembershipId: "member-1",
-    });
+    await Effect.runPromise(
+      manager.requestEmailCode("person1@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager
+        .registerRemoteHost({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          ownerMembershipId: "member-1",
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    await manager.requestEmailCode("person2@example.com");
-    await manager.verifyEmailCode("challenge-1", "AAAA-AAAA");
+    await Effect.runPromise(
+      manager.requestEmailCode("person2@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "AAAA-AAAA").pipe(Effect.mapError((error) => error.cause)),
+    );
 
     const stored = Buffer.from(await readFile(storagePath, "utf8"), "base64").toString();
     expect(stored).toContain("session-one");
@@ -1076,10 +1239,16 @@ describe("CentralAuthManager", () => {
         });
       }),
     });
-    await manager.requestEmailCode("person@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    await expect(manager.updateName("Norbert")).resolves.toMatchObject({
+    await expect(
+      Effect.runPromise(manager.updateName("Norbert").pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toMatchObject({
       status: "signed_in",
       user: { name: "Norbert" },
     });
@@ -1141,14 +1310,22 @@ describe("CentralAuthManager", () => {
         return new Response(null, { status: 404 });
       }),
     });
-    await manager.requestEmailCode("person@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    const nameUpdate = manager.updateName("New name");
-    const avatarUpdate = manager.updateAvatar({
-      mimeType: "image/png",
-      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    });
+    const nameUpdate = Effect.runPromise(manager.updateName("New name").pipe(Effect.mapError((error) => error.cause)));
+    const avatarUpdate = Effect.runPromise(
+      manager
+        .updateAvatar({
+          mimeType: "image/png",
+          bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
     finishAvatar();
     await avatarUpdate;
     finishName();
@@ -1205,14 +1382,22 @@ describe("CentralAuthManager", () => {
         return new Response(null, { status: 404 });
       }),
     });
-    await manager.requestEmailCode("person@example.com");
-    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await Effect.runPromise(
+      manager.requestEmailCode("person@example.com").pipe(Effect.mapError((error) => error.cause)),
+    );
+    await Effect.runPromise(
+      manager.verifyEmailCode("challenge-1", "ABCD-EFGH").pipe(Effect.mapError((error) => error.cause)),
+    );
 
-    const avatarUpdate = manager.updateAvatar({
-      mimeType: "image/png",
-      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    });
-    const logout = manager.logout();
+    const avatarUpdate = Effect.runPromise(
+      manager
+        .updateAvatar({
+          mimeType: "image/png",
+          bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        })
+        .pipe(Effect.mapError((error) => error.cause)),
+    );
+    const logout = Effect.runPromise(manager.logout().pipe(Effect.mapError((error) => error.cause)));
     finishLogout?.();
     await logout;
     finishAvatar?.();

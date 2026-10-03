@@ -1,7 +1,12 @@
 import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
-import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
+import {
+  RemoteDirectoryError,
+  type RemoteInvitePreview,
+  type RemoteTeamDirectoryClient,
+} from "@openbot/team-client/remote-directory";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { Effect } from "effect";
 import { act, type PropsWithChildren, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -23,7 +28,7 @@ const state = vi.hoisted(() => {
     dismiss: vi.fn(),
     push: vi.fn(),
     openBrowser: vi.fn(),
-    preview: vi.fn<(url: string) => Promise<RemoteInvitePreview>>(),
+    preview: vi.fn<RemoteTeamDirectoryClient["previewInvite"]>(),
     join: vi.fn<(input: { inviteUrl: string }) => Promise<string>>(),
   };
 });
@@ -166,7 +171,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.request = undefined;
   state.session = null;
-  state.preview.mockReset().mockResolvedValue(preview);
+  state.preview.mockReset().mockReturnValue(Effect.succeed(preview));
   state.join.mockReset().mockResolvedValue("host");
   state.redeem.mockReset().mockResolvedValue(session);
   state.openBrowser.mockResolvedValue(undefined);
@@ -254,7 +259,9 @@ it("verifies the host before showing Join and accepts only on a press", async ()
 });
 
 it("blocks joining when verification fails and allows a retry", async () => {
-  state.preview.mockRejectedValueOnce(new Error("The invitation host identity does not match its fingerprint."));
+  state.preview.mockReturnValueOnce(
+    Effect.fail(new RemoteDirectoryError(403, "The invitation host identity does not match its fingerprint.")),
+  );
   await act(() => root.render(<AddServerScreen initialInvite={invite} />));
   expect(screen.queryByRole("button", { name: "Join server" })).toBeNull();
   expect(state.join).not.toHaveBeenCalled();
@@ -265,17 +272,19 @@ it("blocks joining when verification fails and allows a retry", async () => {
 
 it("discards a late preview after switching to another invitation", async () => {
   let finish: (value: RemoteInvitePreview) => void = () => {};
-  state.preview.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
+  state.preview.mockImplementationOnce(() =>
+    Effect.promise(
+      () =>
+        new Promise<RemoteInvitePreview>((resolve) => {
+          finish = resolve;
+        }),
+    ),
   );
   receive(invite);
   await act(() => root.render(<AddServerLinkScreen />));
   await waitFor(() => expect(state.preview).toHaveBeenCalledWith(invite));
   const second = invite.replace("t".repeat(32), "u".repeat(32));
-  state.preview.mockResolvedValue({ ...preview, hostName: "Other host" });
+  state.preview.mockReturnValue(Effect.succeed({ ...preview, hostName: "Other host" }));
   receive(second);
   await act(() => root.render(<AddServerLinkScreen />));
   await act(() => finish(preview));

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { runApiEffect } from "../../../server/effect-runtime";
 import {
   apiError,
   bearerToken,
@@ -20,10 +21,10 @@ export const Route = createFileRoute("/v1/github/installation-tokens")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          await enforceGitHubTokenRateLimit(requestSourceIp(request));
+          await runApiEffect(enforceGitHubTokenRateLimit(requestSourceIp(request)));
           const userToken = bearerToken(request);
           if (!userToken) return apiError(401, "github_unauthorized", "Send the GitHub sign-in as a bearer token.");
-          return json({ installations: await requestGitHubInstallationTokens().issue(userToken) });
+          return json({ installations: await runApiEffect(requestGitHubInstallationTokens().issue(userToken)) });
         } catch (error) {
           return githubInstallationTokensErrorResponse(error);
         }

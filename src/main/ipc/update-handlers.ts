@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The application updater, its preferences, and the restart an admin of a joined server asked for.
 
 import type { IdleRestart } from "../idle-restart";
@@ -23,11 +24,17 @@ export function updateIpcHandlers({
   return {
     update: {
       getStatus: handler(() => updater.getStatus()),
-      check: handler(() => updater.checkForUpdates()),
-      download: handler(() => updater.downloadUpdate()),
-      install: handler(() => updater.installUpdate()),
-      getPreference: handler(() => readUpdatePreference(updatePreferenceFile)),
-      setPreference: payloadHandler(parseUpdatePreference, (parsed) => requestedUpdate.setPreference(parsed)),
+      check: handler(() => Effect.runPromise(updater.checkForUpdates().pipe(Effect.mapError((error) => error.cause)))),
+      download: handler(() =>
+        Effect.runPromise(updater.downloadUpdate().pipe(Effect.mapError((error) => error.cause))),
+      ),
+      install: handler(() => Effect.runPromise(updater.installUpdate().pipe(Effect.mapError((error) => error.cause)))),
+      getPreference: handler(() =>
+        Effect.runPromise(readUpdatePreference(updatePreferenceFile).pipe(Effect.mapError((error) => error.cause))),
+      ),
+      setPreference: payloadHandler(parseUpdatePreference, (parsed) =>
+        Effect.runPromise(requestedUpdate.setPreference(parsed).pipe(Effect.mapError((error) => error.cause))),
+      ),
       cancelScheduledRestart: handler(() => {
         requestedUpdate.cancel();
         return updater.getStatus();

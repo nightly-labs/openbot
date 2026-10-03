@@ -1,3 +1,4 @@
+import { runTestEffect } from "../backend/effect-test-runtime";
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
@@ -35,7 +36,7 @@ describe("latestRelease", () => {
       },
     });
 
-    const spec = await latestRelease("codex", { target: "darwin-arm64", lock, fetch });
+    const spec = await runTestEffect(latestRelease("codex", { target: "darwin-arm64", lock, fetch }));
 
     expect(spec).toMatchObject({
       version: "0.160.0",
@@ -58,7 +59,7 @@ describe("latestRelease", () => {
       },
     });
 
-    const spec = await latestRelease("claude", { target: "darwin-arm64", lock, fetch });
+    const spec = await runTestEffect(latestRelease("claude", { target: "darwin-arm64", lock, fetch }));
 
     expect(spec).toMatchObject({
       version: "2.1.280",
@@ -81,7 +82,7 @@ describe("latestRelease", () => {
       },
     });
 
-    await expect(latestRelease("opencode", { target: "darwin-arm64", lock, fetch })).rejects.toThrow(
+    await expect(runTestEffect(latestRelease("opencode", { target: "darwin-arm64", lock, fetch }))).rejects.toThrow(
       "no verifiable download",
     );
   });
@@ -97,15 +98,15 @@ describe("latestRelease", () => {
       });
 
     await expect(
-      latestRelease("antigravity", { target: "darwin-arm64", lock, fetch: registry(google) }),
+      runTestEffect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch: registry(google) })),
     ).resolves.toMatchObject({ version: "1.3.0", url: google, archiveDigest: null, downloadBytes: tarball.byteLength });
     for (const fetch of [
       registry("https://mirror.example/agy-acp-server-1.3.0-darwin-arm64.zip"),
       registry(google, "./other_server"),
     ]) {
-      await expect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch })).rejects.toThrow(
-        "The Gemini release has an unexpected shape.",
-      );
+      await expect(
+        runTestEffect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch })),
+      ).rejects.toThrow("The Gemini release has an unexpected shape.");
     }
   });
 });

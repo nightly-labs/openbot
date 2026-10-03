@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // The Computer Use driver's readiness, and the macOS permission panes it may need.
 
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -39,7 +40,7 @@ export function computerUseIpcHandlers({
   openExternal,
   permissionHelp,
 }: ComputerUseIpcDependencies): Pick<IpcGroupHandlers, "computerUse"> {
-  const state = () => cuaDriver.state();
+  const state = () => Effect.runPromise(cuaDriver.state().pipe(Effect.mapError((error) => error.cause)));
   return {
     computerUse: {
       getState: handler(state),

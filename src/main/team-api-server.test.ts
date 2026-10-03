@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 // What is true of the router as a whole, rather than of one domain: that it comes down when it is
@@ -51,7 +53,8 @@ describe("TeamApiServer teardown", () => {
         closeMemberSession: unreachable,
         revokeTeamSession: unreachable,
         revokeMember: unreachable,
-        stop: () => Promise.reject(new Error("The remote screen would not come down.")),
+        stop: () =>
+          Effect.fail(new RemoteWorkflowError({ cause: new Error("The remote screen would not come down.") })),
       },
     });
 
@@ -114,16 +117,18 @@ describe("TeamApiServer compatibility", () => {
 
   it("serves installed skill summaries", async () => {
     const { start, signIn } = await createTeamApiFixture("skills", { configure: true });
-    const listInstalledForChatTags = vi.fn(async () => [
-      {
-        skillId: "skill-1",
-        slug: "release-notes",
-        name: "Release Notes",
-        installedVersion: 1,
-        availableVersion: 2,
-        state: "update-available" as const,
-      },
-    ]);
+    const listInstalledForChatTags = vi.fn(() =>
+      Effect.sync(() => [
+        {
+          skillId: "skill-1",
+          slug: "release-notes",
+          name: "Release Notes",
+          installedVersion: 1,
+          availableVersion: 2,
+          state: "update-available" as const,
+        },
+      ]),
+    );
     const { base } = await start({
       skills: { listInstalledForChatTags },
     });
@@ -321,7 +326,7 @@ describe("TeamApiServer routing", () => {
   it("answers every path the shared route table builds", async () => {
     const { root, start, signIn } = await createTeamApiFixture("routes", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-    await sidebarLayout.initialize();
+    await Effect.runPromise(sidebarLayout.initialize());
     const { base } = await start({
       agents: createAgents({ listAgents: () => [] }),
       sidebarLayout,
