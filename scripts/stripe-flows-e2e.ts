@@ -196,7 +196,11 @@ function d1<T>(sql: string, schema: z.ZodType<T>): T[] {
     ["d1", "execute", ...target, "--json", "--command", sql],
     { cwd: join(ROOT, "apps/auth-api"), encoding: "utf8", env },
   );
-  if (result.status !== 0) throw new Error(`D1 failed: ${result.stderr.slice(0, 400)}`);
+  if (result.status !== 0) {
+    // spawnSync leaves stderr undefined when it cannot start wrangler. Report that error, not a TypeError.
+    const detail = result.stderr?.slice(0, 400) || result.error?.message || `exit ${String(result.status)}`;
+    throw new Error(`D1 failed: ${detail}`);
+  }
   return d1ResultSchema
     .parse(JSON.parse(result.stdout))
     .flatMap((entry) => entry.results)

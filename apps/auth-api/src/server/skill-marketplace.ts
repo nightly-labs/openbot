@@ -97,10 +97,10 @@ export class SkillMarketplace {
     const limit = normalizeMarketplaceLimit(input.limit);
     const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
     const cursor = decodeMarketplaceCursor(input.cursor, sort);
-    if (cursor && "legacyUpdatedAt" in cursor) {
-      clauses.push("skills.updated_at < ?");
-      values.push(cursor.legacyUpdatedAt);
-    } else if (cursor) {
+    // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
+    // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
+    // and its v1 cursor then pages the rest, which costs one request and loses no skill.
+    if (cursor && !("legacyUpdatedAt" in cursor)) {
       const primary = sort === "installs" ? "skills.installs" : "skills.featured";
       clauses.push(
         `(${primary} < ? OR (${primary} = ? AND (skills.updated_at < ? OR (skills.updated_at = ? AND skills.id < ?))))`,

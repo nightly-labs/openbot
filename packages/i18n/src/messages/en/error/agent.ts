@@ -5,6 +5,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",
+  "error.agent.commitEffectsFailed": "The transaction committed, but its saved effects failed.",
   "error.agent.settingsLocalOnly": "Agent settings can only be changed on the computer that runs the agent.",
   "error.agent.skillsLocalOnly": "Skills can only be changed on the computer that runs the agent.",
   "error.agent.addLocalOnly": "Agents can only be added on the computer that runs them.",

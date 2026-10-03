@@ -189,6 +189,26 @@ describe("TeamWebRtcFileTransfer", () => {
     await transfers.stop();
   });
 
+  it("settles a pending receive when the transfer service stops", async () => {
+    // A waiter left pending past shutdown keeps its timeout on the event loop, so the caller waits
+    // for the whole timeout and Node cannot exit. The timer count is the observable proof of both.
+    vi.useFakeTimers();
+    try {
+      const bridge = new FakeBridge();
+      const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
+      transfers.setPeerAuthenticated("host-1", true);
+      const waiting = transfers.receive("host-1", "transfer-1");
+      expect(vi.getTimerCount()).toBe(1);
+
+      await transfers.stop();
+
+      expect(vi.getTimerCount()).toBe(0);
+      await expect(waiting).rejects.toThrow("The WebRTC file transport stopped.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the transfer ID and resumes from the last acknowledged offset", async () => {
     const bridge = new ResumingBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());

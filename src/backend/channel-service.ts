@@ -1315,6 +1315,9 @@ export class ChannelService {
       Array.isArray(args.resources) && args.resources.length && args.resources.every(isString)
         ? args.resources
         : ["host"];
+    // Reject an oversized list before the loop. The loop runs a blocking `realpathSync` per
+    // workspace entry on the Electron main thread.
+    if (resources.length > 64) throw new Error("Invalid task resources.");
     for (let i = 0; i < resources.length; i++) {
       const resource = resources[i] ?? "host";
       if (resource.startsWith("workspace:") && isAbsolute(resource.slice(10)))
@@ -1322,8 +1325,9 @@ export class ChannelService {
       else if (resource !== "host" && resource !== "browser" && resource !== "none")
         throw new Error("Use host, browser, none, or workspace:<absolute path> for task resources.");
     }
-    if (resources.length > 64 || resources.some((resource) => resource.length > 4096))
-      throw new Error("Invalid task resources.");
+    // This check stays after the loop. The loop rewrites each entry to its canonical form, so the
+    // length to measure is the canonical length.
+    if (resources.some((resource) => resource.length > 4096)) throw new Error("Invalid task resources.");
     const dependencies = Array.isArray(args.dependencies) && args.dependencies.every(isString) ? args.dependencies : [];
     if (dependencies.some((id) => dependsOn(tasks, id, task.id) || !tasks.some((item) => item.id === id)))
       throw new Error("Invalid task dependencies.");

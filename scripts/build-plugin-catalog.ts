@@ -313,7 +313,10 @@ function parseServer(slug: string, value: unknown): PluginServer {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
       throw new Error(`Plugin ${slug} server needs a command and args.`);
     }
-    const args = value.args.every(isString) ? [...value.args] : [];
+    if (!value.args.every(isString)) {
+      throw new Error(`Plugin ${slug} server args must all be strings: ${JSON.stringify(value.args)}.`);
+    }
+    const args = [...value.args];
     return auth
       ? { name: value.name, transport: "stdio", command: value.command, args, auth }
       : { name: value.name, transport: "stdio", command: value.command, args };

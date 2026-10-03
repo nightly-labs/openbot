@@ -33,6 +33,8 @@ export const messages = defineMessages("island", {
   "island.action.approve": "Approve",
   "island.action.later": "Later",
   "island.action.answerInOpenBot": "Answer in OpenBot",
+  "island.action.expand": "Expand {label}",
+  "island.action.collapse": "Collapse {label}",
   "island.failure.fallback": "The task stopped before it could finish.",
   "island.failure.title": "Task failed",
   "island.failure.detail": "The task stopped before it could finish. Open the conversation to try again.",

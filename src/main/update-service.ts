@@ -88,6 +88,8 @@ interface UpdateServiceOptions {
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
   checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
+  /** The uid of this process. It tells a refusal in this account apart from another account. */
+  currentUid?: number;
   platform?: NodeJS.Platform;
   logDirectory?: string;
   shipItDirectory?: string;
@@ -159,7 +161,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   readonly #options: Required<
     Pick<UpdateServiceOptions, "currentVersion" | "enabled" | "platform" | "initialCheckDelayMs" | "checkIntervalMs">
   > &
-    Pick<UpdateServiceOptions, "beforeInstall" | "checkSiblingInstances" | "logDirectory" | "shipItDirectory"> & {
+    Pick<
+      UpdateServiceOptions,
+      "beforeInstall" | "checkSiblingInstances" | "currentUid" | "logDirectory" | "shipItDirectory"
+    > & {
       phaseTimeoutsMs: Record<UpdateBusyPhase, number>;
     };
   #status: UpdateStatus;
@@ -514,7 +519,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#pendingInstallRequests -= 1;
     }
     if (siblings.length > 0) {
-      throw new Error(SIBLING_SESSION_MESSAGE);
+      throw new Error(this.#siblingSessionMessage(siblings));
     }
     if (this.#managedByHost) throw new Error(MANAGED_HOST_MESSAGE);
     if (!this.#canInstall() || this.#installStarted) throw new Error(sourceText("error.update.notReady"));
@@ -547,6 +552,20 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
       throw new Error(sourceText("error.update.restartFailed"));
     }
+  }
+
+  /**
+   * A refusal that says where the blocking session runs. Siblings in this account are usually a second
+   * window of this user, so the message points at it. Anything else is another macOS user, and
+   * the generic message keeps applying. An unknown uid cannot tell them apart, so it also keeps
+   * the generic message.
+   */
+  #siblingSessionMessage(siblings: readonly OpenBotSiblingInstance[]): string {
+    const currentUid = this.#options.currentUid;
+    if (currentUid !== undefined && siblings.every((sibling) => sibling.uid === currentUid)) {
+      return sourceText("error.update.siblingSessionSameAccount");
+    }
+    return SIBLING_SESSION_MESSAGE;
   }
 
   stop(): void {

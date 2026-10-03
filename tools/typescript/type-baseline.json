@@ -122,7 +122,7 @@
     "src/main/remote-server-host-directory.test.ts": 3,
     "src/main/remote-server-http.ts": 2,
     "src/main/remote-server-manager.ts": 1,
-    "src/main/remote-server-test-harness.ts": 2,
+    "src/main/remote-server-test-harness.ts": 1,
     "src/main/remote-viewer-proxy.ts": 1,
     "src/main/session-configuration.ts": 1,
     "src/main/team-api-server-test-harness.ts": 2,

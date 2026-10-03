@@ -478,6 +478,11 @@ export class SignalService {
       this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
       return;
     }
+    // The socket can close while the ticket is verified. `disconnect` then finds no peer, so it
+    // cannot clear the peer, its timer and the host event this method creates. Return before it
+    // creates them. Nothing awaits between here and the registrations below, so the socket cannot
+    // close again first.
+    if (!this.#sockets.has(socket.id)) return;
     if (usedInitialTicket) this.#usedTicketIds.set(claims.jti, claims.exp);
     const peer: AuthenticatedPeer = {
       socket,
