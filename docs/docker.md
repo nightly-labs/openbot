@@ -87,13 +87,12 @@ In the container, `openbot status`, `login`, `logout`, `name` and `version` work
 | Read the log | `docker logs openbot` |
 | Stop, start, restart | `docker stop openbot`, `docker start openbot`, `docker restart openbot` |
 | Upgrade | `docker compose pull && docker compose up -d`, or pull the image and make the container again with the same volume |
-| Remove | `docker exec openbot openbot logout`, then `docker rm -f openbot`. The data stays in the volume. `docker volume rm openbot-data` deletes it. |
+| Remove | `docker exec openbot openbot logout`, then `docker stop openbot && docker rm openbot`. The data stays in the volume. `docker volume rm openbot-data` deletes it. |
 
 ## Upgrades
 
 OpenBot does not update itself in a container. A new image replaces it. Do not go back to an older
-tag: an older OpenBot cannot open a database that a newer one migrated, and the container stops with
-an error.
+tag: an older OpenBot cannot open a database that a newer one migrated, so it does not start.
 
 ## Environment
 

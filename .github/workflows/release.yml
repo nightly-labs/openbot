@@ -793,11 +793,15 @@ jobs:
           trap 'docker logs openbot' ERR
           docker run --detach --name openbot --shm-size 1g \
             --security-opt seccomp=docker/seccomp.json --security-opt no-new-privileges:true openbot:release
+          # The socket opens before the account state loads, so wait for that state too.
+          status=
           for _ in $(seq 1 120); do
-            docker exec openbot test -S /run/openbot/control.sock && break
+            if docker exec openbot test -S /run/openbot/control.sock; then
+              status=$(docker exec openbot openbot status)
+              grep -Fxq "Account: loading" <<<"$status" || break
+            fi
             sleep 1
           done
-          status=$(docker exec openbot openbot status)
           echo "$status"
           grep -Fxq "OpenBot $RELEASE_VERSION" <<<"$status"
           grep -Fxq "Account: signed out. Sign in with: openbot login" <<<"$status"
@@ -805,6 +809,7 @@ jobs:
           test "$(docker inspect openbot --format '{{.State.ExitCode}}')" = 0
 
       - name: Save the image
+        shell: bash
         run: docker save openbot:release | gzip --fast > "openbot-image-$SUFFIX.tar.gz"
         env:
           SUFFIX: ${{ matrix.suffix }}

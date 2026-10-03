@@ -51,6 +51,14 @@ require_root() {
   [ "$(id -u)" -eq 0 ] || fail "Run this with sudo: sudo openbot $*"
 }
 
+# Stops with the command that shows the log, which is not the same in a container.
+not_answering() {
+  if in_container; then
+    fail "OpenBot does not answer. Read the log on the host with: docker logs <container>"
+  fi
+  fail "OpenBot does not answer. Read the log with: openbot logs"
+}
+
 # Waits for the socket after a start. A user that cannot enter /run/openbot never sees it.
 wait_for_socket() {
   local second
@@ -62,7 +70,7 @@ wait_for_socket() {
     fi
     sleep 1
   done
-  fail "OpenBot does not answer. Read the log with: openbot logs"
+  not_answering
 }
 
 # Percent-encodes each byte. printf is a shell builtin, so the value is in no process arguments.
@@ -83,7 +91,7 @@ control() {
   wait_for_socket
   response=$(printf '%s' "$body" | curl --silent --show-error --max-time 120 --unix-socket "$SOCKET" \
     -X "$method" "${arguments[@]}" --write-out 'status=%{http_code}\n' "http://openbot$path") ||
-    fail "OpenBot does not answer. Read the log with: openbot logs"
+    not_answering
 }
 
 value() {
