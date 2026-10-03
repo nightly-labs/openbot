@@ -5,6 +5,8 @@ server or a cloud VM. It is a normal Remote host of your account. You use it fro
 the iPhone app or `openbot.run/app`, as you use a [hosted server](hosted-servers.md). You install
 and control it from a terminal.
 
+To run it in a container, see [Docker](docker.md).
+
 ## Install
 
 On Ubuntu 24.04 (x86_64 or arm64) with systemd:
