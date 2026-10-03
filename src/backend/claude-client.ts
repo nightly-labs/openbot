@@ -36,7 +36,7 @@ import {
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
-import { isClaudeTaskNotification } from "./conversation-snapshots";
+import { isClaudeCompactionSummary, isClaudeInterruptMarker, isClaudeTaskNotification } from "./conversation-snapshots";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -1341,16 +1341,6 @@ function readInputText(params: unknown): string {
     .filter((item) => item.type === "text" && isString(item.text))
     .map((item) => item.text)
     .join("\n");
-}
-
-/** The SDK drops the transcript's `isCompactSummary` flag, so the summary's fixed opening identifies it. */
-function isClaudeCompactionSummary(text: string): boolean {
-  return text.startsWith("This session is being continued from a previous conversation that ran out of context.");
-}
-
-/** Claude records a user interrupt as a user entry with this text. */
-function isClaudeInterruptMarker(text: string): boolean {
-  return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
 }
 
 function messageText(message: unknown): string {
