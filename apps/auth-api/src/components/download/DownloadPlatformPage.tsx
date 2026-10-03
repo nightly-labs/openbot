@@ -2,25 +2,21 @@ import { PlatformLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
-import {
-  DOWNLOAD_PAGES,
-  type DownloadPageContent,
-  type DownloadStep,
-  downloadPagePath,
-} from "../../lib/download-pages";
+import { type DownloadPageContent, type DownloadStep, downloadPagePath } from "../../lib/download-pages";
 import { DOWNLOAD_PLATFORM_ORDER } from "../../lib/download-platforms";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
-import { Button } from "../ui/button";
+import { CommandBlock, InstallerButton, SystemCard } from "./DownloadPieces";
 import { DownloadResources } from "./DownloadResources";
 
 export interface DownloadPlatformPageProps {
   page: DownloadPageContent;
 }
 
-// One operating system: the installers first, then what the computer needs, how to install, and
-// what differs on this system. Plain text and lists, so a crawler reads what a visitor reads.
+// One operating system. The landing card of the system opens into a panel in its colour, with the
+// installers and the spec sheet. Under it, each topic is one row: the heading on the left and the
+// text on the right, as plain lists, so a crawler reads what a visitor reads.
 export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, downloadPagePath(props.page.platform)));
 
@@ -30,54 +26,55 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
     <div class="landing-page download-page">
       <SiteHeader page="content" />
 
-      <main class="post-main">
-        <div class="post-container download-container">
-          <header class="download-hero" data-enter="post-copy">
-            <Link class="post-article-back" to="/download">
-              All systems
-            </Link>
-            <PlatformLogo platform={props.page.platform} solid class="download-hero-logo" />
-            <h1 class="compare-title">{props.page.heading}</h1>
-            <p class="compare-standfirst">{props.page.intro}</p>
-            <ul class="download-installers">
-              <For each={props.page.installers}>
-                {(installer, index) => (
-                  <li>
-                    <Button
-                      href={installer.href}
-                      variant={index() === 0 ? "primary" : "secondary"}
-                      size="lg"
-                      icon="download"
-                    >
-                      {installer.label}
-                    </Button>
-                    <span class="download-installer-detail">{installer.detail}</span>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </header>
+      <main class="download-main" data-download-platform={props.page.platform}>
+        <section class="download-panel" data-enter="post-copy" aria-labelledby="download-title">
+          <div class="download-panel-body">
+            <div class="download-panel-copy">
+              <Link class="download-panel-back" to="/download">
+                <LandingIcon name="arrow-right" class="download-panel-back-icon" />
+                All systems
+              </Link>
+              <h1 class="download-panel-title" id="download-title">
+                {props.page.heading}
+              </h1>
+              <p class="download-panel-intro">{props.page.intro}</p>
+              <ul class="download-panel-installers">
+                <For each={props.page.installers}>
+                  {(installer, index) => (
+                    <li>
+                      <InstallerButton installer={installer} primary={index() === 0} />
+                      <span class="download-panel-installer-detail">{installer.detail}</span>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
+            <PlatformLogo platform={props.page.platform} class="download-panel-logo" />
+          </div>
+          <dl class="download-panel-specs">
+            <For each={props.page.specs}>
+              {(spec) => (
+                <div>
+                  <dt>{spec.label}</dt>
+                  <dd>{spec.value}</dd>
+                </div>
+              )}
+            </For>
+          </dl>
+        </section>
 
-          <section class="compare-section" aria-labelledby="download-requirements-title">
-            <h2 class="compare-heading" id="download-requirements-title">
-              System requirements
-            </h2>
-            <ul class="download-list">
-              <For each={props.page.requirements}>{(requirement) => <li>{requirement}</li>}</For>
-            </ul>
-          </section>
-
-          <section class="compare-section" aria-labelledby="download-install-title">
-            <h2 class="compare-heading" id="download-install-title">
-              Install OpenBot on {props.page.name}
+        <div class="download-rows">
+          <section class="download-row" aria-labelledby="download-install-title">
+            <h2 class="download-row-title" id="download-install-title">
+              Install on {props.page.name}
             </h2>
             <DownloadSteps steps={props.page.installSteps} />
           </section>
 
           <For each={props.page.extraSections}>
             {(section, index) => (
-              <section class="compare-section" aria-labelledby={`download-extra-${index()}`}>
-                <h2 class="compare-heading" id={`download-extra-${index()}`}>
+              <section class="download-row" aria-labelledby={`download-extra-${index()}`}>
+                <h2 class="download-row-title" id={`download-extra-${index()}`}>
                   {section.title}
                 </h2>
                 <DownloadSteps steps={section.steps} />
@@ -85,20 +82,20 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
             )}
           </For>
 
-          <section class="compare-section" aria-labelledby="download-notes-title">
-            <h2 class="compare-heading" id="download-notes-title">
+          <section class="download-row" aria-labelledby="download-notes-title">
+            <h2 class="download-row-title" id="download-notes-title">
               Good to know
             </h2>
-            <ul class="download-list">
+            <ul class="download-notes">
               <For each={props.page.notes}>{(note) => <li>{note}</li>}</For>
             </ul>
           </section>
 
-          <section class="compare-section" aria-labelledby="download-faq-title">
-            <h2 class="compare-heading" id="download-faq-title">
+          <section class="download-row" aria-labelledby="download-faq-title">
+            <h2 class="download-row-title" id="download-faq-title">
               Questions
             </h2>
-            <div class="compare-faq-list">
+            <div class="compare-faq-list download-faq">
               <For each={props.page.faq}>
                 {(entry) => (
                   <details class="compare-faq-item">
@@ -113,23 +110,22 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
             </div>
           </section>
 
-          <section class="compare-section" aria-labelledby="download-other-title">
-            <h2 class="compare-heading" id="download-other-title">
+          <section class="download-row" aria-labelledby="download-other-title">
+            <h2 class="download-row-title" id="download-other-title">
               Other systems
             </h2>
-            <ul class="download-other">
-              <For each={otherPlatforms()}>
-                {(platform) => (
-                  <li>
-                    <Link class="download-other-link" to="/download/$platform" params={{ platform }}>
-                      <PlatformLogo platform={platform} solid class="download-other-logo" />
-                      {DOWNLOAD_PAGES[platform].heading}
-                    </Link>
-                  </li>
-                )}
-              </For>
-            </ul>
-            <DownloadResources />
+            <div>
+              <ul class="download-system-cards">
+                <For each={otherPlatforms()}>
+                  {(platform) => (
+                    <li>
+                      <SystemCard platform={platform} />
+                    </li>
+                  )}
+                </For>
+              </ul>
+              <DownloadResources />
+            </div>
           </section>
         </div>
       </main>
@@ -139,6 +135,7 @@ export function DownloadPlatformPage(props: DownloadPlatformPageProps) {
   );
 }
 
+// The steps are a sequence, so the numbers carry meaning: they come from the list itself.
 function DownloadSteps(props: { steps: readonly DownloadStep[] }) {
   return (
     <ol class="download-steps">
@@ -146,13 +143,7 @@ function DownloadSteps(props: { steps: readonly DownloadStep[] }) {
         {(step) => (
           <li>
             <p>{step.text}</p>
-            <Show when={step.code}>
-              {(code) => (
-                <pre class="download-code">
-                  <code>{code()}</code>
-                </pre>
-              )}
-            </Show>
+            <Show when={step.code}>{(code) => <CommandBlock code={code()} />}</Show>
           </li>
         )}
       </For>

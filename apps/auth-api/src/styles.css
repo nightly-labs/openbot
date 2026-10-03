@@ -8074,123 +8074,424 @@ a {
 /* ---------------------------------------------------------------------------
    /download and /download/<platform>.
 
-   One column of plain sections, so a reader and a crawler get the same text.
-   The headings, the title and the questions are the comparison pages' own.
+   The landing download cards grow into the page: each system keeps its card
+   colour, with dark text and dark buttons on it. Everything under the panel is
+   quiet rows on the canvas, so the colour stays the one loud thing.
    ------------------------------------------------------------------------- */
 
-.download-container {
-  max-width: 920px;
+.download-main {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px) clamp(20px, 4vw, 48px) clamp(64px, 8vw, 112px);
 }
 
-.download-hero {
-  margin-top: clamp(20px, 3vw, 36px);
+.download-main[data-download-platform="macos"],
+.download-main [data-download-platform="macos"] {
+  --download-color: var(--openbot-logo-production);
 }
 
-.download-hero-logo {
-  display: block;
-  width: 44px;
-  height: 44px;
-  margin-top: 28px;
-  color: var(--openbot-text-primary);
+.download-main[data-download-platform="windows"],
+.download-main [data-download-platform="windows"] {
+  --download-color: var(--openbot-logo-preview);
 }
 
-.download-installers {
+.download-main[data-download-platform="linux"],
+.download-main [data-download-platform="linux"] {
+  --download-color: var(--openbot-logo-dev);
+}
+
+.download-panel,
+.download-hub-card,
+.download-system-card {
+  border: 1px solid var(--openbot-download-card-border);
+  background: var(--download-color);
+  color: var(--openbot-text-on-light);
+}
+
+/* Platform page: the panel ---------------------------------------------- */
+
+.download-panel {
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.download-panel-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 40px;
+  padding: clamp(24px, 4.4vw, 60px) clamp(24px, 4.4vw, 60px) clamp(36px, 5vw, 68px);
+}
+
+.download-panel-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-download-card-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.download-panel-back-icon {
+  width: 16px;
+  height: 16px;
+  transform: scaleX(-1);
+}
+
+.download-panel-title {
+  margin: clamp(36px, 5vw, 64px) 0 0;
+  font-size: clamp(46px, 7.4vw, 104px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.94;
+  text-wrap: balance;
+}
+
+.download-panel-intro {
+  max-width: 50ch;
+  margin: clamp(20px, 2.4vw, 28px) 0 0;
+  color: var(--openbot-download-card-muted);
+  font-size: clamp(17px, 1.5vw, 19px);
+  line-height: 1.5;
+}
+
+.download-panel-installers {
   display: flex;
   flex-wrap: wrap;
-  gap: 18px 24px;
-  margin-top: 32px;
+  gap: 20px 28px;
+  margin: clamp(32px, 4vw, 44px) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.download-installers li {
+.download-panel-installers li {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
 }
 
-.download-installer-detail {
-  color: var(--openbot-text-dim);
-  font-family: var(--openbot-font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
+.download-panel-installer-detail {
+  padding-left: 4px;
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
 }
 
-.download-hub-selector {
-  margin-top: 32px;
+.download-panel-logo {
+  width: clamp(120px, 17vw, 232px);
+  height: clamp(120px, 17vw, 232px);
 }
 
-.download-list,
+.download-panel-specs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--openbot-download-card-border);
+}
+
+.download-panel-specs > div {
+  min-width: 0;
+  padding: 20px clamp(20px, 2.4vw, 32px) 24px;
+}
+
+.download-panel-specs > div + div {
+  border-left: 1px solid var(--openbot-download-card-border);
+}
+
+.download-panel-specs dt,
+.download-hub-card-specs dt {
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
+}
+
+.download-panel-specs dd {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+/* Installer buttons: dark on the system's colour ------------------------- */
+
+.download-installer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 24px 0 20px;
+  border: 1px solid var(--openbot-text-on-light);
+  border-radius: var(--openbot-radius-pill);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease,
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-installer-button[data-variant="primary"] {
+  background: var(--openbot-text-on-light);
+  color: var(--download-color);
+}
+
+.download-installer-button[data-variant="secondary"] {
+  background: var(--openbot-download-card-chip);
+  color: var(--openbot-text-on-light);
+}
+
+.download-installer-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.download-installer-button:focus-visible,
+.download-panel-back:focus-visible,
+.download-hub-card-link:focus-visible,
+.download-system-card:focus-visible {
+  outline: 3px solid var(--openbot-download-card-focus);
+  outline-offset: 3px;
+}
+
+/* Platform page: the rows under the panel -------------------------------- */
+
+.download-rows {
+  margin-top: clamp(56px, 8vw, 104px);
+}
+
+.download-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 300px) minmax(0, 1fr);
+  gap: 24px clamp(32px, 5vw, 80px);
+  padding: clamp(36px, 4.5vw, 56px) 0;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.download-row > * {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.download-row-title {
+  margin: 0;
+  font-size: clamp(24px, 2.4vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* The steps are a sequence, so each one is numbered, and a line joins them. */
 .download-steps {
   display: grid;
-  gap: 12px;
-  max-width: 70ch;
-  margin-top: 20px;
-  padding-left: 1.4em;
+  margin: 0;
+  padding: 0;
+  counter-reset: download-step;
+  list-style: none;
+}
+
+.download-steps > li {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 20px;
+  padding-bottom: 32px;
+  counter-increment: download-step;
+}
+
+.download-steps > li:last-child {
+  padding-bottom: 0;
+}
+
+.download-steps > li::before {
+  content: counter(download-step);
+  grid-row: 1 / span 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--download-color, var(--openbot-border-strong));
+  border-radius: 50%;
+  background: var(--openbot-bg-canvas);
+  color: var(--download-color, var(--openbot-text-primary));
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.download-steps > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 48px;
+  bottom: 8px;
+  left: 19.5px;
+  width: 1px;
+  background: var(--openbot-border-strong);
+}
+
+.download-steps p {
+  grid-column: 2;
+  margin: 8px 0 0;
   color: var(--openbot-text-secondary);
   font-size: 16px;
   line-height: 1.6;
 }
 
-.download-list {
-  list-style: disc;
-}
-
-.download-steps {
-  list-style: decimal;
-  gap: 18px;
-}
-
-/* A grid item grows to its widest command, so a long one scrolls inside its block instead. */
-.download-steps > li {
+.download-command {
+  grid-column: 2;
   min-width: 0;
-}
-
-.download-list li::marker,
-.download-steps li::marker {
-  color: var(--openbot-text-dim);
-}
-
-.download-code {
-  margin-top: 10px;
-  overflow-x: auto;
-  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  margin-top: 14px;
   border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface);
+}
+
+.download-command pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  padding: 15px 18px;
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
-.download-other {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.download-other-link {
+.download-command-copy {
+  flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
+  gap: 6px;
+  height: 32px;
+  margin: 9px 9px 9px 0;
+  padding: 0 12px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-surface);
-  font-size: 15px;
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: 13px;
   font-weight: 500;
-  transition: background-color var(--openbot-duration-normal) ease;
+  cursor: pointer;
+  transition:
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease;
 }
 
-.download-other-link:focus-visible {
+.download-command-copy[data-state="copied"] {
+  color: var(--openbot-text-primary);
+}
+
+.download-command-copy:focus-visible {
   outline: 2px solid var(--openbot-border-focus);
   outline-offset: 2px;
 }
 
-.download-other-logo {
-  width: 18px;
-  height: 18px;
+.download-command-copy-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.download-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-notes li {
+  position: relative;
+  padding: 0 0 18px 24px;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.download-notes li + li {
+  padding-top: 18px;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.download-notes li::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--download-color, var(--openbot-text-dim));
+}
+
+.download-notes li + li::before {
+  top: calc(18px + 0.62em);
+}
+
+.compare-faq-list.download-faq {
+  margin-top: -18px;
+  border-top: 0;
+}
+
+.download-system-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-system-card {
+  min-height: 108px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  border-radius: 20px;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-system-card-logo {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+
+.download-system-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.download-system-card-name {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.download-system-card-detail {
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.download-system-card-arrow,
+.download-hub-card-link-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-system-card-arrow {
+  margin-left: auto;
 }
 
 .download-resources {
@@ -8208,22 +8509,181 @@ a {
   text-underline-offset: 3px;
 }
 
-.download-hub-grid > li {
-  display: flex;
+/* Hub ------------------------------------------------------------------- */
+
+.download-hub-hero {
+  padding: clamp(28px, 6vw, 88px) 0 clamp(48px, 6vw, 80px);
 }
 
-.download-hub-grid .landing-download-card {
-  flex: 1;
-  min-height: 320px;
+.download-hub-title {
+  margin: 0;
+  font-size: clamp(56px, 11vw, 164px);
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 0.88;
+}
+
+.download-hub-intro {
+  max-width: 48ch;
+  margin: clamp(24px, 3vw, 36px) 0 clamp(28px, 3.4vw, 40px);
+  color: var(--openbot-text-secondary);
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.5;
+}
+
+.download-hub-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-hub-card {
+  min-width: 0;
+  min-height: 540px;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(26px, 2.6vw, 34px);
+  border-radius: 24px;
+}
+
+.download-hub-card-logo {
+  width: clamp(80px, 7.4vw, 104px);
+  height: clamp(80px, 7.4vw, 104px);
+}
+
+.download-hub-card-name {
+  margin: auto 0 0;
+  padding-top: 40px;
+  font-size: clamp(36px, 3.6vw, 50px);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.download-hub-card-specs {
+  margin: 22px 0 0;
+}
+
+.download-hub-card-specs > div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--openbot-download-card-border);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.download-hub-card-specs dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.download-hub-card-installers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.download-hub-card .download-installer-button {
+  height: 46px;
+  padding: 0 20px 0 16px;
+  font-size: 14px;
+}
+
+.download-hub-card-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 22px;
+  border-radius: var(--openbot-radius-xs);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.download-main > .download-resources {
+  margin-top: 32px;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .download-other-link:hover {
+  .download-installer-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .download-installer-button[data-variant="secondary"]:hover {
+    background: var(--openbot-download-card-border);
+  }
+
+  .download-panel-back:hover {
+    color: var(--openbot-text-on-light);
+  }
+
+  .download-system-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .download-system-card:hover .download-system-card-arrow,
+  .download-hub-card-link:hover .download-hub-card-link-icon {
+    transform: translateX(3px);
+  }
+
+  .download-command-copy:hover {
     background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
   }
 
   .download-resources a:hover {
     color: var(--openbot-text-primary);
+  }
+}
+
+@media (max-width: 960px) {
+  .download-hub-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .download-hub-card {
+    min-height: 0;
+  }
+
+  .download-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .download-panel-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Beside the back link, so the title keeps the full width of the panel. */
+  .download-panel-logo {
+    position: absolute;
+    top: 20px;
+    right: 22px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .download-panel-specs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .download-panel-specs > div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .download-panel-specs > div:nth-child(n + 3) {
+    border-top: 1px solid var(--openbot-download-card-border);
+  }
+
+  .download-system-cards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

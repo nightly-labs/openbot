@@ -18,10 +18,19 @@ import {
 export const DOWNLOAD_PAGES_UPDATED_AT = "2026-10-03";
 
 export interface DownloadInstaller {
+  /** The button text where the system is not on screen, such as a list of every installer. */
   label: string;
-  /** What the file is, for a reader who has to choose between two. */
+  /** The button text inside a card or panel that already names the system. */
+  shortLabel: string;
+  /** Which computer the file is for, for a reader who has to choose between two. */
   detail: string;
   href: string;
+}
+
+/** One line of the spec sheet: what the computer needs, or what the download is. */
+export interface DownloadSpec {
+  label: string;
+  value: string;
 }
 
 /** One instruction. `code` is a command to copy, shown under the text. */
@@ -44,7 +53,7 @@ export interface DownloadPageContent {
   heading: string;
   intro: string;
   installers: readonly DownloadInstaller[];
-  requirements: readonly string[];
+  specs: readonly DownloadSpec[];
   installSteps: readonly DownloadStep[];
   /** Optional steps for one situation, such as a distribution that needs a security profile. */
   extraSections: readonly DownloadPageSection[];
@@ -61,7 +70,8 @@ const CONNECT_STEP: DownloadStep = {
   text: "Connect a provider, such as Codex with your ChatGPT plan or Claude Code with your Claude plan. Then describe the agent you want in one prompt and save it.",
 };
 const UPDATES_NOTE = "OpenBot checks for new versions and updates itself.";
-const NETWORK_REQUIREMENT = "An internet connection for the AI provider you choose. A local model needs none.";
+const NETWORK_NOTE = "The AI provider you choose needs an internet connection. A local model needs none.";
+const UPDATES_SPEC: DownloadSpec = { label: "Updates", value: "Automatic" };
 
 function providersQuestion(system: string): LandingQuestion {
   return {
@@ -83,13 +93,24 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     intro:
       "Run a team of AI agents on your Mac with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or with your own model. Your chats and files stay on your Mac.",
     installers: [
-      { label: "Download for Apple silicon", detail: "M1 or newer · DMG", href: OPENBOT_DOWNLOAD_LINKS.macos },
-      { label: "Download for Intel", detail: "Intel Mac · DMG", href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos },
+      {
+        label: "Download for Apple silicon",
+        shortLabel: "Apple silicon",
+        detail: "For a Mac with M1 or newer",
+        href: OPENBOT_DOWNLOAD_LINKS.macos,
+      },
+      {
+        label: "Download for Intel Mac",
+        shortLabel: "Intel",
+        detail: "For a Mac with an Intel processor",
+        href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
+      },
     ],
-    requirements: [
-      "macOS 13 Ventura or later",
-      "Apple silicon (M1 or newer) or an Intel processor",
-      NETWORK_REQUIREMENT,
+    specs: [
+      { label: "System", value: "macOS 13 Ventura or later" },
+      { label: "Processor", value: "Apple silicon or Intel" },
+      { label: "File", value: "DMG, notarized by Apple" },
+      UPDATES_SPEC,
     ],
     installSteps: [
       {
@@ -104,6 +125,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     extraSections: [],
     notes: [
       UPDATES_NOTE,
+      NETWORK_NOTE,
       "Computer Use needs the Screen Recording and Accessibility permissions. macOS asks for them, and OpenBot does not go around the prompts.",
     ],
     faq: [
@@ -126,12 +148,18 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     intro:
       "Run a team of AI agents on your PC with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or with your own model. Your chats and files stay on your PC.",
     installers: [
-      { label: "Download for Windows", detail: "x64 · installer (.exe)", href: OPENBOT_DOWNLOAD_LINKS.windows },
+      {
+        label: "Download for Windows",
+        shortLabel: "Windows x64",
+        detail: "For a PC with a 64-bit Intel or AMD processor",
+        href: OPENBOT_DOWNLOAD_LINKS.windows,
+      },
     ],
-    requirements: [
-      "Windows 10 or Windows 11",
-      "A 64-bit Intel or AMD (x64) processor. There is no Arm64 build for Windows.",
-      NETWORK_REQUIREMENT,
+    specs: [
+      { label: "System", value: "Windows 10 or 11" },
+      { label: "Processor", value: "x64, Intel or AMD" },
+      { label: "File", value: "Installer (.exe)" },
+      UPDATES_SPEC,
     ],
     installSteps: [
       { text: "Download the installer." },
@@ -144,6 +172,8 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     extraSections: [],
     notes: [
       UPDATES_NOTE,
+      NETWORK_NOTE,
+      "There is no build for Windows on Arm yet.",
       "To check the installer before you run it, compare its checksum with the one on the GitHub release, or check the GitHub build attestation.",
     ],
     faq: [
@@ -167,13 +197,24 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
     intro:
       "Run a team of AI agents on your Linux computer with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or with your own model. Your chats and files stay on your computer.",
     installers: [
-      { label: "Download for x64", detail: "x86_64 · AppImage", href: OPENBOT_DOWNLOAD_LINKS.linux },
-      { label: "Download for arm64", detail: "aarch64 · AppImage", href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux },
+      {
+        label: "Download for Linux x64",
+        shortLabel: "x64",
+        detail: "When uname -m shows x86_64",
+        href: OPENBOT_DOWNLOAD_LINKS.linux,
+      },
+      {
+        label: "Download for Linux arm64",
+        shortLabel: "arm64",
+        detail: "When uname -m shows aarch64",
+        href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux,
+      },
     ],
-    requirements: [
-      "A 64-bit Linux distribution on x64 or arm64. Each release is tested on Ubuntu 24.04 x64.",
-      "A desktop session. Remote desktop also needs an X11 session and the x64 AppImage.",
-      NETWORK_REQUIREMENT,
+    specs: [
+      { label: "System", value: "Any 64-bit distribution" },
+      { label: "Processor", value: "x64 or arm64" },
+      { label: "File", value: "AppImage" },
+      UPDATES_SPEC,
     ],
     installSteps: [
       {
@@ -216,7 +257,9 @@ export const DOWNLOAD_PAGES: Record<DownloadPlatform, DownloadPageContent> = {
       },
     ],
     notes: [
+      "Each release is tested on Ubuntu 24.04 on x64.",
       UPDATES_NOTE,
+      NETWORK_NOTE,
       "Voice prompts are not available on Linux.",
       "Remote desktop works with the x64 AppImage in an X11 session, such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.",
     ],
@@ -246,13 +289,7 @@ export const DOWNLOAD_HUB = {
     "Download OpenBot, the free app that runs AI agents as a team on your computer. For macOS 13 or later, Windows 10 or later, and Linux on x64 or arm64.",
   heading: "Download OpenBot",
   intro:
-    "Free for Mac, Windows and Linux. Download the installer for this computer, or choose your system to see its requirements and install steps.",
-  /** The line on each card, shorter than the page's requirements. */
-  summaries: {
-    macos: "macOS 13+ · Apple silicon or Intel",
-    windows: "Windows 10+ · x64",
-    linux: "x64 or arm64 · AppImage",
-  } satisfies Record<DownloadPlatform, string>,
+    "Free for Mac, Windows and Linux. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
 
 export function downloadPagePath(platform: DownloadPlatform | "hub"): string {

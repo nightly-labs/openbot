@@ -8,10 +8,12 @@ import { HeroDownloadSelector } from "../landing/HeroDownloadSelector";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
+import { InstallerButton } from "./DownloadPieces";
 import { DownloadResources } from "./DownloadResources";
 
-// The installer for this computer, as the landing hero offers it, then one card per system that
-// opens its page. The cards use the landing download cards' look.
+// The installer for this computer, as the landing hero offers it, then one card per system in the
+// colours of the landing download cards. Each card has every installer of its system, and a link
+// to its page for the requirements and install steps.
 export function DownloadHubPage() {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, downloadPagePath("hub")));
 
@@ -19,50 +21,47 @@ export function DownloadHubPage() {
     <div class="landing-page download-page">
       <SiteHeader page="content" />
 
-      <main class="post-main">
-        <div class="post-container download-container">
-          <header class="download-hero" data-enter="post-copy">
-            <h1 class="compare-title">{DOWNLOAD_HUB.heading}</h1>
-            <p class="compare-standfirst">{DOWNLOAD_HUB.intro}</p>
-            <div class="download-hub-selector">
-              <HeroDownloadSelector />
-            </div>
-          </header>
+      <main class="download-main">
+        <header class="download-hub-hero" data-enter="post-copy">
+          <h1 class="download-hub-title">{DOWNLOAD_HUB.heading}</h1>
+          <p class="download-hub-intro">{DOWNLOAD_HUB.intro}</p>
+          <HeroDownloadSelector />
+        </header>
 
-          <section class="compare-section" aria-labelledby="download-systems-title">
-            <h2 class="compare-heading" id="download-systems-title">
-              Requirements and install steps
-            </h2>
-            <ul class="landing-download-grid download-hub-grid">
-              <For each={DOWNLOAD_PLATFORM_ORDER}>
-                {(platform) => (
-                  <li>
-                    <Link
-                      class="landing-download-card"
-                      to="/download/$platform"
-                      params={{ platform }}
-                      data-download-platform={platform}
-                      data-state="available"
-                    >
-                      <div class="landing-download-card-top">
-                        <PlatformLogo platform={platform} class="landing-download-platform-logo" />
-                      </div>
-                      <div class="landing-download-card-copy">
-                        <h3>{DOWNLOAD_PAGES[platform].name}</h3>
-                        <p>{DOWNLOAD_HUB.summaries[platform]}</p>
-                        <span class="landing-download-action">
-                          {DOWNLOAD_PAGES[platform].heading}
-                          <LandingIcon name="arrow-right" class="landing-download-arrow" />
-                        </span>
-                      </div>
-                    </Link>
-                  </li>
-                )}
-              </For>
-            </ul>
-            <DownloadResources />
-          </section>
-        </div>
+        <ul class="download-hub-cards" aria-label="Systems">
+          <For each={DOWNLOAD_PLATFORM_ORDER}>
+            {(platform) => {
+              const page = DOWNLOAD_PAGES[platform];
+              return (
+                <li class="download-hub-card" data-download-platform={platform}>
+                  <PlatformLogo platform={platform} class="download-hub-card-logo" />
+                  <h2 class="download-hub-card-name">{page.name}</h2>
+                  <dl class="download-hub-card-specs">
+                    <For each={page.specs.slice(0, 3)}>
+                      {(spec) => (
+                        <div>
+                          <dt>{spec.label}</dt>
+                          <dd>{spec.value}</dd>
+                        </div>
+                      )}
+                    </For>
+                  </dl>
+                  <div class="download-hub-card-installers">
+                    <For each={page.installers}>
+                      {(installer, index) => <InstallerButton installer={installer} primary={index() === 0} short />}
+                    </For>
+                  </div>
+                  <Link class="download-hub-card-link" to="/download/$platform" params={{ platform }}>
+                    Requirements and install steps
+                    <LandingIcon name="arrow-right" class="download-hub-card-link-icon" />
+                  </Link>
+                </li>
+              );
+            }}
+          </For>
+        </ul>
+
+        <DownloadResources />
       </main>
 
       <LandingFooter />
