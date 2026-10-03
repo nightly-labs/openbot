@@ -98,6 +98,7 @@ export const messages = {
   "mobile.server.members.updateFailed": "Bu üye güncellenemedi. Tekrar deneyin.",
   "mobile.server.members.title": "Sunucu üyeleri",
   "mobile.server.members.limitCount": {
+    one: "{count} / {limit} üye",
     other: "{count} / {limit} üye",
   },
   "mobile.server.members.loadFailed": "Üyeler yüklenemedi. Yenileyip tekrar deneyin.",

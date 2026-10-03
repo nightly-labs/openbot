@@ -48,6 +48,8 @@ export const messages = {
   "composer.attachment.remove": "{name} ögesini kaldır",
   "composer.placeholder.hostSetup": "Başlamak için ana makinenizde sağlayıcı kurulumunu tamamlayın",
   "composer.placeholder.connectHost": "Başlamak için ana makinenize bağlanın",
+  "composer.placeholder.hostSleeping": "Bu sunucu uykuda. Uyandırmak için bir tuşa basın veya tıklayın",
+  "composer.placeholder.hostWaking": "Sunucu uyandırılıyor…",
   "composer.placeholder.cliSetup": "Başlamak için ajan CLI kurulumunu tamamlayın",
   "composer.placeholder.reply": "Yanıtla…",
   "composer.placeholder.message": "{name} adlı ajana mesaj gönder",

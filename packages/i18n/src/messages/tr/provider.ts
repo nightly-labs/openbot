@@ -34,6 +34,8 @@ export const messages = {
   "provider.action.connect": "Bağlan",
   "provider.action.reconnect": "Yeniden bağlan",
   "provider.action.restart": "Yeniden başlat",
+  "provider.action.cancelRestart": "Yeniden başlatmayı iptal et",
+  "provider.restartPending": "Mevcut görevler durduktan sonra yeniden başlatılır",
   "provider.action.updateTo": "{version} sürümüne güncelle",
   "provider.action.checkForUpdates": "Güncellemeleri denetle",
   "provider.lastError": "Son hata: {detail}",

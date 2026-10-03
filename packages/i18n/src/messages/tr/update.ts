@@ -25,6 +25,8 @@ export const messages = {
   "update.provider.unavailable": "Sağlayıcı güncellemeleri kullanılamıyor.",
   "update.provider.downloadsUnavailable": "Sağlayıcı indirmeleri kullanılamıyor.",
   "update.provider.startFailed": "Güncelleme başlatılamadı. Tekrar deneyin.",
+  "update.provider.showDetails": "Ayrıntıları göster",
+  "update.provider.hideDetails": "Ayrıntıları gizle",
 
   "update.scheduled.title": "{name} bir OpenBot güncellemesi zamanladı",
   "update.scheduled.automaticTitle": "OpenBot bir güncelleme yüklüyor",
@@ -32,6 +34,16 @@ export const messages = {
   "update.scheduled.now": "OpenBot, güncelleme indirildiğinde yeniden başlar.",
   "update.scheduled.cancel": "Güncellemeyi iptal et",
   "update.scheduled.cancelFailed": "Güncelleme iptal edilemedi.",
+
+  // Bu bilgisayarın kullanıcısının istediği yeniden başlatma. Hiçbir çalışma kalmayana kadar bekler.
+  "update.idleRestart.relaunchTitle": "Ajanlar boştayken OpenBot yeniden başlatılır",
+  "update.idleRestart.updateTitle": "Ajanlar boştayken OpenBot güncellemeyi yükler",
+  "update.idleRestart.description": "Yeni rutin çalıştırmaları yeniden başlatmaya kadar bekler.",
+  "update.idleRestart.waitingFor": "{reasons} bekleniyor.",
+  "update.idleRestart.cancel": "Yeniden başlatmayı iptal et",
+  "update.idleRestart.cancelFailed": "Yeniden başlatma iptal edilemedi.",
+  "update.idleRestart.requestFailed": "Yeniden başlatma zamanlanamadı.",
+  "update.idleRestart.failedTitle": "OpenBot yeniden başlatılmadı",
 
   "update.whatsNew.title": "OpenBot'taki yenilikler",
   "update.whatsNew.description": "OpenBot'un bu sürümündeki yeni özellikler ve değişiklikler.",
