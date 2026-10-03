@@ -36,6 +36,9 @@ export function OtpInput(props: OtpInputProps) {
   let inputElement: HTMLInputElement | undefined;
   let slotsElement: HTMLDivElement | undefined;
   let composing = false;
+  // An IME can still change composed text, so a code that it completes is
+  // submitted at `compositionend`, not before.
+  let completeAfterComposition = false;
 
   const status = () => props.status ?? "idle";
   const disabled = () => Boolean(props.disabled || status() === "verifying" || status() === "success");
@@ -98,10 +101,22 @@ export function OtpInput(props: OtpInputProps) {
     setSlots(next);
     const value = next.join("");
     props.onChange(value);
-    if (value !== previous && next.every(Boolean)) {
+    if (value === previous) return;
+    const complete = next.every(Boolean);
+    if (composing) {
+      completeAfterComposition = complete;
+      return;
+    }
+    if (complete) {
       props.onComplete?.(value);
       inputElement?.focus({ preventScroll: true });
     }
+  }
+
+  function applyCode(value: string): void {
+    const next = toSlots(value);
+    commit(next);
+    setActive(firstEmptySlot(next));
   }
 
   function clearSlot(index: number): void {
@@ -160,14 +175,23 @@ export function OtpInput(props: OtpInputProps) {
       // as a hyphen, must not move the characters after an empty slot.
       const inserted = sanitize(event.data ?? "");
       const value = inserted.length === length() ? inserted : sanitize(event.currentTarget.value);
-      if (value !== slots().join("")) {
-        const next = toSlots(value);
-        commit(next);
-        setActive(firstEmptySlot(next));
-      }
+      if (value !== slots().join("")) applyCode(value);
     }
     // The field can hold text that the code drops, such as a hyphen or a
     // ninth character, and then the slots do not change to start the effect.
+    flush();
+    syncNativeValue();
+  }
+
+  function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
+    composing = false;
+    const pending = completeAfterComposition;
+    completeAfterComposition = false;
+    if (!disabled()) {
+      const value = sanitize(event.currentTarget.value);
+      if (value !== slots().join("")) applyCode(value);
+      else if (pending && value.length === length()) props.onComplete?.(value);
+    }
     flush();
     syncNativeValue();
   }
@@ -272,10 +296,7 @@ export function OtpInput(props: OtpInputProps) {
           onBlur={() => setFocused(false)}
           onFocus={() => setFocused(true)}
           onCompositionStart={() => (composing = true)}
-          onCompositionEnd={() => {
-            composing = false;
-            syncNativeValue();
-          }}
+          onCompositionEnd={handleCompositionEnd}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={(event) => {
