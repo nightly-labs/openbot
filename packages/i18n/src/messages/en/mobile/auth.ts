@@ -31,6 +31,11 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.signIn.helpStep1": "1. Open OpenBot on your computer.",
   "mobile.auth.signIn.helpStep2": "2. Go to Settings → Mobile Connect.",
   "mobile.auth.signIn.helpStep3": "3. Choose Generate QR code, then scan it here.",
+  "mobile.auth.signIn.pasteLink": "Paste connect link",
+  "mobile.auth.signIn.pasting": "Connecting…",
+  "mobile.auth.signIn.pasteEmpty": "Copy the connect link on your computer first.",
+  "mobile.auth.signIn.helpPaste":
+    "No camera? Choose Copy link under the QR code on your computer, send it to this device, copy it, then choose Paste connect link.",
   "mobile.auth.error.sessionEnded": "Your session has ended. Scan a new code from OpenBot on your desktop.",
   "mobile.auth.error.connectionInProgress": "Another connection is in progress. Wait for it to finish.",
   "mobile.auth.error.invalidCode": "This is not a valid OpenBot Mobile Connect code.",

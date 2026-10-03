@@ -150,6 +150,8 @@ export const messages = {
   "settings.mobileConnect.expired.description": "Générez un nouveau code pour connecter votre téléphone.",
   "settings.mobileConnect.qrLabel": "Code QR de connexion Mobile Connect",
   "settings.mobileConnect.scan.title": "Ouvrez OpenBot sur votre téléphone",
+  "settings.mobileConnect.copyConnectLink": "Copier le lien",
+  "settings.mobileConnect.connectLinkCopied": "Lien copié",
   "settings.mobileConnect.scan.description": "Choisissez Scanner un code QR et pointez l’appareil photo vers ce code.",
   "settings.mobileConnect.expiresIn": "Expire dans {time}",
   "settings.mobileConnect.connected.title": "Téléphone connecté",

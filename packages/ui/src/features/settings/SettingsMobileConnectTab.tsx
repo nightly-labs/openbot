@@ -149,6 +149,14 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
                             <Text class="settings-mobile-connect-expiry" variant="caption" aria-atomic="true">
                               {t("settings.mobileConnect.expiresIn", { time: props.store.expiryLabel() })}
                             </Text>
+                            {/* Devices without a camera, such as e-ink readers, paste this link instead. */}
+                            <CopyButton
+                              variant="outline"
+                              size="sm"
+                              value={session().ticket.qrData}
+                              label={t("settings.mobileConnect.copyConnectLink")}
+                              copiedLabel={t("settings.mobileConnect.connectLinkCopied")}
+                            />
                           </>
                         }
                       >
