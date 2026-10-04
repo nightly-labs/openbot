@@ -158,6 +158,28 @@ describe("QuestionPromptBubble", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
   });
 
+  it("holds plain Enter and submits on the modifier chord in modifier mode", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} sendShortcut="meta-enter" onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.input(input, { target: { value: "A working prototype" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
+  });
+
   it("leaves Enter that commits an IME composition to the browser", async () => {
     const onSubmit = vi.fn(async () => true);
     const customQuestion: AgentPromptQuestion[] = [

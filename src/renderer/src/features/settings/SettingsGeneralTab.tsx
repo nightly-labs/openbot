@@ -21,11 +21,13 @@ import {
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
+import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSignal, Show } from "solid-js";
 import { replayActionSoundChoice } from "../../action-sounds";
 import { useI18n } from "../../i18n-context";
 import { useLogoColorChoice } from "../../logo-color";
+import { usePlatform } from "../../platform";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
 
@@ -55,6 +57,7 @@ interface SettingsGeneralTabProps {
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
+  const platform = usePlatform();
   const runNotificationAction = (
     action: () => void | Promise<void>,
     failed: "settings.testNotification.failed" | "settings.testNotification.openSettingsFailed",
@@ -88,6 +91,20 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.sendShortcut.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.sendShortcut.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SendShortcutSelect
+                value={props.value.sendShortcut}
+                onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
+                devicePlatform={platform.appInfo()?.platform ?? "darwin"}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
           <SwitchField
             checked={props.value.launchAtLogin}
             onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}

@@ -22,6 +22,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { isSendShortcutKey, type SendShortcut } from "../features/conversation/send-shortcut";
 
 export interface QuestionPromptBubbleProps {
   questions: AgentPromptQuestion[];
@@ -29,6 +30,12 @@ export interface QuestionPromptBubbleProps {
   readOnly?: boolean;
   resolution?: AgentPromptResolution | null;
   elementRef?: (element: HTMLDivElement | undefined) => void;
+  /**
+   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
+   * plain Enter does not submit and the single-line field adds no line. The renderer resolves
+   * the platform and passes it.
+   */
+  sendShortcut?: SendShortcut;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
 }
@@ -449,7 +456,8 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     onKeyDown={(event) => {
                       // The browser owns the key that commits an IME composition. Safari sends it
                       // after `compositionend` without `isComposing`; keyCode 229 marks it.
-                      if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+                      if (event.isComposing || event.keyCode === 229) return;
+                      if (!isSendShortcutKey(event, props.sendShortcut ?? "enter")) return;
                       event.preventDefault();
                       commitCustomAnswer(current(), pageProps.index);
                     }}

@@ -1,6 +1,7 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
 import { useNavigation } from "../../navigation";
+import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
@@ -11,6 +12,7 @@ import { ChannelConversation } from "./ChannelConversation";
 
 /** The desktop's open channel: the reader, the waiting requests and the browser tabs come from its contexts. */
 export function WorkspaceChannelConversation() {
+  const platform = usePlatform();
   const { selectAgent } = useNavigation();
   const { centralAuth } = useAuth();
   const { currentTeamMember } = usePresence();
@@ -25,6 +27,7 @@ export function WorkspaceChannelConversation() {
   });
   return (
     <ChannelConversation
+      platform={platform.appInfo()?.platform}
       isOwnMessage={(authorId) => {
         const auth = centralAuth();
         return isReaderAuthor(authorId, {

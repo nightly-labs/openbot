@@ -11,6 +11,7 @@ import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readSendShortcutMode, setSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
@@ -69,6 +70,7 @@ const Settings = createSimpleContext({
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
+      sendShortcut: readSendShortcutMode(),
       soundFeedback: isActionSoundEnabled(),
       soundTheme: readActionSoundTheme(),
     });
@@ -130,6 +132,9 @@ const Settings = createSimpleContext({
       setGeneralSettings({ ...value, turboMode });
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
         setCompletionSoundEnabled(value.taskCompletionSound);
+      }
+      if (previous.sendShortcut !== value.sendShortcut) {
+        setSendShortcutMode(value.sendShortcut);
       }
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");

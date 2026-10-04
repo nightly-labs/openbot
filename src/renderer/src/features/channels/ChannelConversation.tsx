@@ -63,6 +63,7 @@ import { planItems, planTitle } from "../../app-message-projection";
 import { channelAwaitingReplies } from "../../awaiting-replies";
 import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
@@ -77,6 +78,8 @@ const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPa
 /** What the open channel reads from the client around it. The channel itself comes from `useChannels()`. */
 export interface ChannelConversationProps {
   isOwnMessage: (authorId: string) => boolean;
+  /** The device with the keyboard on desktop. Web leaves it empty and the browser is detected. */
+  platform?: "darwin" | "win32" | "linux";
   /** Keyed by agent id. */
   pendingApprovals: Record<string, AgentApproval | undefined>;
   /** Keyed by agent id. */
@@ -788,6 +791,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                                   questions={prompt().questions}
                                   resolution={prompt().resolution}
                                   readOnly={page().channel.archived}
+                                  sendShortcut={deviceSendShortcut(props.platform)}
                                   onSubmit={(answers) =>
                                     page().channel.archived
                                       ? Promise.resolve(false)
@@ -969,6 +973,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       agents={agentList().filter((agent) =>
                         page().channel.members.some((member) => member.agentId === agent.id),
                       )}
+                      sendShortcut={deviceSendShortcut(props.platform)}
                       attachments={composer.attachments}
                       ariaLabel={t("channel.composer.label")}
                       placeholder={t("channel.composer.placeholder", { name: page().channel.name })}
@@ -1003,6 +1008,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
                             variant="ghost"
                             class="voice-button"
                             aria-label={t("channel.composer.send")}
+                            aria-keyshortcuts={sendShortcutAriaKey(deviceSendShortcut(props.platform))}
+                            title={t(sendShortcutHintKey(deviceSendShortcut(props.platform), "send"))}
                             disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
                           >
                             <ArrowUp aria-hidden="true" />
