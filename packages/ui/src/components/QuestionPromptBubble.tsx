@@ -22,7 +22,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
-import { isSendShortcutKey, type SendShortcut } from "../features/conversation/send-shortcut";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
 export interface QuestionPromptBubbleProps {
   questions: AgentPromptQuestion[];
@@ -450,6 +450,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                       current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
                     }
                     aria-label={t("prompt.question.customAnswerFor", { question: current().question })}
+                    aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
                     maxlength={INPUT_LIMITS.promptAnswerText}
                     disabled={busy()}
                     onValueChange={(value) => setCustomDrafts((drafts) => ({ ...drafts, [current().id]: value }))}

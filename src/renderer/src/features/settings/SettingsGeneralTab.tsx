@@ -27,7 +27,6 @@ import { createSignal, Show } from "solid-js";
 import { replayActionSoundChoice } from "../../action-sounds";
 import { useI18n } from "../../i18n-context";
 import { useLogoColorChoice } from "../../logo-color";
-import { usePlatform } from "../../platform";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
 
@@ -42,6 +41,8 @@ const LINK_TARGET_KEYS = {
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
+  /** The device with the keyboard, naming ⌘ or Ctrl in the shortcut option. */
+  platform?: "darwin" | "win32" | "linux";
   /** A dev or preview build keeps its own logo color, so the logo color row says so. */
   variant: AppVariant;
   /** The dialog element the Select popovers portal into, captured when the tab was created. */
@@ -57,7 +58,6 @@ interface SettingsGeneralTabProps {
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
-  const platform = usePlatform();
   const runNotificationAction = (
     action: () => void | Promise<void>,
     failed: "settings.testNotification.failed" | "settings.testNotification.openSettingsFailed",
@@ -100,7 +100,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               <SendShortcutSelect
                 value={props.value.sendShortcut}
                 onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
-                devicePlatform={platform.appInfo()?.platform ?? "darwin"}
+                devicePlatform={props.platform ?? "darwin"}
                 mount={props.selectMount}
               />
             </ItemActions>

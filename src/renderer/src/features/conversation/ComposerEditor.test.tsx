@@ -168,15 +168,26 @@ describe("ComposerEditor", () => {
   it("adds a line on plain Enter and sends on the modifier chord in modifier mode", async () => {
     const { editor, onSubmit, onValueChange } = renderComposer([], "", [], [], [], "meta-enter");
 
+    await typeQuery(editor, "first");
     await fireEvent.keyDown(editor, { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onValueChange).toHaveBeenCalledWith("first\n"));
+    expect(editor.textContent).toContain("\n");
 
     await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, shiftKey: true });
     expect(onSubmit).not.toHaveBeenCalled();
 
     await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
     expect(onSubmit).toHaveBeenCalledOnce();
-    expect(onValueChange).toHaveBeenCalled();
+  });
+
+  it("sends on Ctrl+Enter in modifier mode on other platforms", async () => {
+    const { editor, onSubmit } = renderComposer([], "", [], [], [], "ctrl-enter");
+
+    await typeQuery(editor, "first");
+    await fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(editor.textContent).toContain("first");
   });
 
   it("does not submit a Safari post-composition Enter in modifier mode", async () => {

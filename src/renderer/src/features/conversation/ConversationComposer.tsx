@@ -478,10 +478,19 @@ export function ConversationComposer() {
                           ? t("composer.send.voice")
                           : t("composer.send.message")
                     }
-                    aria-keyshortcuts={sendShortcutAriaKey(deviceSendShortcut(props.platform))}
-                    title={t(
-                      sendShortcutHintKey(deviceSendShortcut(props.platform), editingDeliveryId() ? "save" : "send"),
-                    )}
+                    aria-keyshortcuts={
+                      voicePhase() === "recording" ? undefined : sendShortcutAriaKey(deviceSendShortcut(props.platform))
+                    }
+                    title={
+                      voicePhase() === "recording"
+                        ? undefined
+                        : t(
+                            sendShortcutHintKey(
+                              deviceSendShortcut(props.platform),
+                              editingDeliveryId() ? "save" : "send",
+                            ),
+                          )
+                    }
                     data-cuelume-emphasis="normal"
                     disabled={
                       attachmentBusy() ||

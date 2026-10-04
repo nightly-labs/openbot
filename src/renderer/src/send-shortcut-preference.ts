@@ -1,11 +1,14 @@
-import type { AppTextKey } from "@openbot/i18n";
 import {
   parseSendShortcutMode,
   resolveSendShortcut,
   type SendShortcut,
   type SendShortcutMode,
+  sendShortcutAriaKey,
+  sendShortcutHintKey,
 } from "@openbot/ui/features/conversation/send-shortcut";
 import { createSignal } from "solid-js";
+
+export { sendShortcutAriaKey, sendShortcutHintKey };
 
 const SEND_SHORTCUT_STORAGE_KEY = "openbot:send-shortcut-mode";
 
@@ -64,7 +67,12 @@ function readStorageIntoSignal(event: StorageEvent): void {
 }
 
 if (typeof window !== "undefined") {
+  // One registration per page: addEventListener ignores the same listener twice, and HMR
+  // disposal removes it when this module is replaced.
   window.addEventListener("storage", readStorageIntoSignal);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener("storage", readStorageIntoSignal);
+  });
 }
 
 /**
@@ -86,28 +94,4 @@ export function setSendShortcutMode(mode: SendShortcutMode): void {
  */
 export function deviceSendShortcut(appPlatform?: "darwin" | "win32" | "linux"): SendShortcut {
   return resolveSendShortcut(sendShortcutMode(), appPlatform ?? currentDevicePlatform());
-}
-
-const SEND_HINT_KEYS = {
-  enter: "composer.send.hint.enter",
-  "meta-enter": "composer.send.hint.modEnterMac",
-  "ctrl-enter": "composer.send.hint.modEnterWin",
-} as const satisfies Record<SendShortcut, AppTextKey>;
-
-const SAVE_HINT_KEYS = {
-  enter: "composer.save.hint.enter",
-  "meta-enter": "composer.save.hint.modEnterMac",
-  "ctrl-enter": "composer.save.hint.modEnterWin",
-} as const satisfies Record<SendShortcut, AppTextKey>;
-
-/** The hint text key for a send or save button using the chord. */
-export function sendShortcutHintKey(shortcut: SendShortcut, action: "send" | "save"): AppTextKey {
-  return action === "send" ? SEND_HINT_KEYS[shortcut] : SAVE_HINT_KEYS[shortcut];
-}
-
-/** The `aria-keyshortcuts` value for the chord. */
-export function sendShortcutAriaKey(shortcut: SendShortcut): "Enter" | "Meta+Enter" | "Control+Enter" {
-  if (shortcut === "meta-enter") return "Meta+Enter";
-  if (shortcut === "ctrl-enter") return "Control+Enter";
-  return "Enter";
 }

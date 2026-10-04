@@ -11,7 +11,7 @@ import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
-import { readSendShortcutMode, setSendShortcutMode } from "../../send-shortcut-preference";
+import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
@@ -73,6 +73,13 @@ const Settings = createSimpleContext({
       sendShortcut: readSendShortcutMode(),
       soundFeedback: isActionSoundEnabled(),
       soundTheme: readActionSoundTheme(),
+    });
+    // The mode also changes outside this dialog: another window, or the web Preferences tab on
+    // the same page. The shared signal carries those changes into the displayed settings value.
+    const sendShortcutMode = useSendShortcutMode();
+    createEffect(() => {
+      const mode = sendShortcutMode();
+      setGeneralSettings((current) => (current.sendShortcut === mode ? current : { ...current, sendShortcut: mode }));
     });
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,

@@ -188,6 +188,7 @@ export function SettingsModal(props: SettingsModalProps) {
           <SettingsGeneralTab
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
             onUpdateSetting={updateSetting}
             onUpdateSettings={updateSettings}
             selectMount={modalElement}

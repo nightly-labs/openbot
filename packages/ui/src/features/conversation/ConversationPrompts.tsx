@@ -12,7 +12,7 @@ import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecr
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "./send-shortcut";
 
 export function ChoiceCard(props: {
   title: string;
@@ -88,6 +88,7 @@ export function ChoiceCard(props: {
         value={answer()}
         placeholder={t("prompt.customPlaceholder")}
         aria-label={t("prompt.choice.customLabel")}
+        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
         maxlength={INPUT_LIMITS.promptAnswerText}
         disabled={props.pending}
         onValueChange={(value) => {

@@ -24,7 +24,7 @@ import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
-import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "./send-shortcut";
 
 interface DirectConversationProps {
   member: TeamPresenceMember;
@@ -447,6 +447,8 @@ export function DirectConversation(props: DirectConversationProps) {
             variant="default"
             type="button"
             aria-label={t("conversation.direct.send")}
+            aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
+            title={t(sendShortcutHintKey(props.sendShortcut ?? "enter", "send"))}
             disabled={!text().trim() || sending()}
             onClick={() => void send()}
           >
