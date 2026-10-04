@@ -158,6 +158,26 @@ describe("QuestionPromptBubble", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
   });
 
+  it("keeps a modified Enter submitting in the default mode", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.input(input, { target: { value: "A working prototype" } });
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
+  });
+
   it("holds plain Enter and submits on the modifier chord in modifier mode", async () => {
     const onSubmit = vi.fn(async () => true);
     const customQuestion: AgentPromptQuestion[] = [
@@ -174,6 +194,10 @@ describe("QuestionPromptBubble", () => {
     const input = screen.getByRole("textbox", { name: /Custom answer/ });
     await fireEvent.input(input, { target: { value: "A working prototype" } });
     await fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // The send chord during composition belongs to the IME too.
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true, keyCode: 229, isComposing: true });
     expect(onSubmit).not.toHaveBeenCalled();
 
     await fireEvent.keyDown(input, { key: "Enter", metaKey: true });

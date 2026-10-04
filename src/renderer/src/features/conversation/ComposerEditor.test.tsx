@@ -202,6 +202,10 @@ describe("ComposerEditor", () => {
     await fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
     expect(onSubmit).not.toHaveBeenCalled();
 
+    // The send chord during composition belongs to the IME too.
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, keyCode: 229, isComposing: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
     await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
     expect(onSubmit).toHaveBeenCalledOnce();
   });

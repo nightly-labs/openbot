@@ -38,7 +38,7 @@ export const messages = defineMessages("settings", {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description":
-    "Choose which keys send a message on this device. The choice stays on this device and this browser.",
+    "Choose which keys send a message on this device and browser. With Enter to send, Shift+Enter adds a new line. With the modifier mode, Enter adds a new line.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",

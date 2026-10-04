@@ -458,7 +458,11 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                       // The browser owns the key that commits an IME composition. Safari sends it
                       // after `compositionend` without `isComposing`; keyCode 229 marks it.
                       if (event.isComposing || event.keyCode === 229) return;
-                      if (!isSendShortcutKey(event, props.sendShortcut ?? "enter")) return;
+                      const sendShortcut = props.sendShortcut ?? "enter";
+                      // Enter to send keeps the previous chord: every Enter sends.
+                      if (sendShortcut === "enter") {
+                        if (event.key !== "Enter") return;
+                      } else if (!isSendShortcutKey(event, sendShortcut)) return;
                       event.preventDefault();
                       commitCustomAnswer(current(), pageProps.index);
                     }}

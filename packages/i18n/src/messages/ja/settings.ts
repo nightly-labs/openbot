@@ -34,7 +34,7 @@ export const messages = {
   "settings.externalLinks.openbot": "OpenBot",
   "settings.sendShortcut.title": "送信キー",
   "settings.sendShortcut.description":
-    "このデバイスでメッセージを送信するキーを選びます。この選択はこのデバイスとこのブラウザーに保存されます。",
+    "このデバイスとこのブラウザーでメッセージを送信するキーを選びます。「Enter で送信」では Shift+Enter で改行します。修飾キー方式では Enter で改行します。",
   "settings.sendShortcut.enter": "Enter で送信",
   "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",
