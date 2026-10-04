@@ -6,12 +6,18 @@ import {
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { z } from "zod";
 
 const profileFields = {
   name: z.string().trim().min(1).max(INPUT_LIMITS.agentName),
   title: z.string().max(INPUT_LIMITS.agentTitle),
-  description: z.string().max(INPUT_LIMITS.agentDescription),
+  description: z
+    .string()
+    .max(INPUT_LIMITS.agentDescription)
+    .describe(
+      `Standing instructions, at most ${INPUT_LIMITS.agentDescription} characters. Shorten longer instructions before calling this tool. An invalid request saves no profile changes.`,
+    ),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
   avatarHue: z.literal(AVATAR_HUES).nullable(),
 };
@@ -102,3 +108,17 @@ export const readAgentToolSchema = z
       .optional(),
   })
   .strict();
+
+/** Describe schema failures without returning submitted instructions or unknown field names. */
+export function profileToolValidationMessage(error: z.ZodError, input: unknown): string {
+  const details = error.issues.map((issue) => {
+    if (issue.code === "unrecognized_keys") return "Remove unsupported profile fields.";
+    const field = issue.path.join(".") || "arguments";
+    const value = isDynamicRecord(input) ? input[field] : undefined;
+    if (issue.code === "too_big" && issue.origin === "string" && typeof value === "string") {
+      return `${field} must have at most ${issue.maximum} characters; received ${value.length}. Shorten it and retry.`;
+    }
+    return `${field}: ${issue.message}`;
+  });
+  return `${details.join(" ")} No agent was created or changed. Correct the arguments and retry.`;
+}

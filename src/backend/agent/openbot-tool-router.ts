@@ -52,6 +52,7 @@ import {
 import {
   createAgentToolSchema,
   listModelsToolSchema,
+  profileToolValidationMessage,
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./profile-tools";
@@ -490,7 +491,9 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "create_agent") {
-      const args = createAgentToolSchema.parse(params.arguments);
+      const parsed = createAgentToolSchema.safeParse(params.arguments);
+      if (!parsed.success) return openBotToolFailure(profileToolValidationMessage(parsed.error, params.arguments));
+      const args = parsed.data;
       const hue = args.avatarHue ?? null;
       const caller = this.#requireAgent(senderAgentId);
       const listed = this.#hooks.listModels();
@@ -568,7 +571,9 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "update_profile") {
-      const args = updateProfileToolSchema.parse(params.arguments);
+      const parsed = updateProfileToolSchema.safeParse(params.arguments);
+      if (!parsed.success) return openBotToolFailure(profileToolValidationMessage(parsed.error, params.arguments));
+      const args = parsed.data;
       const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, access, computerUse, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");
