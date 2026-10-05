@@ -5,6 +5,7 @@ import {
   parseMobileFeatureFlags,
 } from "@openbot/contracts/mobile-features";
 import * as Application from "expo-application";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { create } from "zustand";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
@@ -35,7 +36,8 @@ export async function refreshMobileFeatures(apiUrl: string, force = false): Prom
 
   const url = new URL(MOBILE_FEATURES_PATH, apiUrl);
   url.searchParams.set("platform", platform);
-  if (Application.nativeApplicationVersion) url.searchParams.set("version", Application.nativeApplicationVersion);
+  const version = appVersion();
+  if (version) url.searchParams.set("version", version);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FLAGS_TIMEOUT_MS);
   try {
@@ -51,6 +53,16 @@ export async function refreshMobileFeatures(apiUrl: string, force = false): Prom
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * The OpenBot version. In Expo Go the native version is the version of Expo Go, so Expo Go and
+ * development builds send the version of the app config; for a development build it is the same.
+ * A release build sends its native version.
+ */
+function appVersion(): string | null {
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return Constants.expoConfig?.version ?? null;
+  return Application.nativeApplicationVersion;
 }
 
 /** One flag for the account server of this session. It is off for another account server. */
