@@ -278,6 +278,7 @@
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
+        "@openbot/team-client": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@speed-highlight/core": "catalog:",
         "@tanstack/virtual-core": "catalog:",

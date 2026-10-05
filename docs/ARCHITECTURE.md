@@ -17,7 +17,7 @@ packages/
   contracts/         Process and network boundary types, limits, and pure validation
   i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
-  team-client/       Shared team connection, recovery, WebRTC framing, and Dynamic Island state
+  team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials

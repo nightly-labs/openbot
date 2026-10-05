@@ -71,7 +71,10 @@ export function ServerDrawerContent({
   const localServers = servers.filter((server) => server.kind === "local");
   const remoteIds = servers.filter((server) => server.kind !== "local").map((server) => server.id);
   const canReorder = remoteIds.length > 1;
-  const menuActions: MenuAction[] = [{ id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" }];
+  const menuActions: MenuAction[] = [
+    { id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" },
+    { id: "routines", title: t("mobile.server.drawer.routines"), image: "calendar" },
+  ];
   if (canReorder)
     menuActions.push({ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" });
 
@@ -94,13 +97,19 @@ export function ServerDrawerContent({
   }
 
   const openOptions = (serverId: string) => onNavigate({ pathname: "/server-settings", params: { serverId } });
+  const openRoutines = (serverId: string) => onNavigate({ pathname: "/server-routines", params: { serverId } });
 
   function renderRow(serverItem: MobileServer, width?: number) {
     const selected = serverItem.id === activeServerId;
     const remoteIndex = remoteIds.indexOf(serverItem.id);
     const serverLabel = serverKindLabel(serverItem, t);
     const accessibilityActions = [
-      ...(editing ? [] : [{ name: "options", label: t("mobile.server.drawer.serverOptions") }]),
+      ...(editing
+        ? []
+        : [
+            { name: "options", label: t("mobile.server.drawer.serverOptions") },
+            { name: "routines", label: t("mobile.server.drawer.routines") },
+          ]),
       ...(remoteIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
       ...(remoteIndex >= 0 && remoteIndex < remoteIds.length - 1
         ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }]
@@ -116,6 +125,7 @@ export function ServerDrawerContent({
         onAccessibilityAction={(event) => {
           const action = event.nativeEvent.actionName;
           if (action === "options") openOptions(serverItem.id);
+          if (action === "routines") openRoutines(serverItem.id);
           if (action === "moveUp") move(serverItem.id, remoteIndex - 1);
           if (action === "moveDown") move(serverItem.id, remoteIndex + 1);
         }}
@@ -169,6 +179,7 @@ export function ServerDrawerContent({
         actions={menuActions}
         onPressAction={(event) => {
           if (event.nativeEvent.event === "options") openOptions(serverItem.id);
+          if (event.nativeEvent.event === "routines") openRoutines(serverItem.id);
           if (event.nativeEvent.event === "reorder") setEditing(true);
         }}
       >

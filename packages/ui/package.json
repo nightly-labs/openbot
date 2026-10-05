@@ -297,6 +297,7 @@
     "solid-recharts": "catalog:",
     "qrcode": "catalog:",
     "@openbot/brand": "workspace:*",
+    "@openbot/team-client": "workspace:*",
     "@openbot/user-errors": "workspace:*",
     "@norbert_bodziony/bloub": "catalog:",
     "@speed-highlight/core": "catalog:",

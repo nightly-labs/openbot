@@ -1,6 +1,16 @@
 import type { RoutineSchedule } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  addCalendarDays,
+  type CalendarDay,
+  calendarDayDate,
+  calendarDayOf,
+  calendarDays,
+  calendarHourOf,
+  calendarWeekStart,
+  clockChangeDay,
+} from "@openbot/team-client/routine-calendar-dates";
+import {
   Alert,
   AlertActions,
   AlertContent,
@@ -21,16 +31,6 @@ import { createMemo, createStore, For, Match, onSettled, Show, Switch, untrack }
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import {
-  addCalendarDays,
-  type CalendarDay,
-  calendarDayDate,
-  calendarDayOf,
-  calendarDays,
-  calendarHourOf,
-  calendarWeekStart,
-  clockChangeDay,
-} from "./routine-calendar-dates";
 import { routineScheduleSummary } from "./routine-schedule-ui";
 
 /**

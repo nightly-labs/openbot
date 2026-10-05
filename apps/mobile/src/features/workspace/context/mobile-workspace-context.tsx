@@ -663,6 +663,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void applyMobileQueueEvent(queryClient, serverId, event);
       }
       if (
+        event.type === "routines-changed" ||
+        event.type === "channel-routines-changed" ||
+        event.type === "agents-changed" ||
+        // A routine run ends as a turn: its slot changes from planned to its outcome.
+        (event.type === "turn-completed" && event.origin === "routine")
+      ) {
+        void queryClient.invalidateQueries({
+          queryKey: ["server-routines", session.apiUrl, session.user.id, sessionScope, serverId],
+        });
+      }
+      if (
         event.type === "channels-changed" ||
         event.type === "channel-memories-changed" ||
         event.type === "channel-routines-changed"
