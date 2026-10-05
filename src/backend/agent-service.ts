@@ -1427,8 +1427,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
     const activeSession = this.#store.activeProviderSession(agent.id);
     if (previous?.threadId && requestedProvider && requestedProvider !== providerForAgent(previous)) {
-      for (const [session, steps] of captures) await this.#threads.saveWorkSteps(session, steps);
+      // Retire first, with no wait after the update: a turn that starts while a file is written
+      // binds a session of the new provider, and a later retirement would close that one too.
       this.#store.database.deactivateProviderSessions(previous.threadId);
+      for (const [session, steps] of captures) await this.#threads.saveWorkSteps(session, steps);
     } else if (activeSession && (input.model || input.reasoningEffort)) {
       this.#store.database.updateProviderSessionConfig(
         activeSession.id,

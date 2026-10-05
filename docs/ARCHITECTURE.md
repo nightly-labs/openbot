@@ -944,7 +944,9 @@ no tool steps, so the work log comes from the providers. At the switch, before t
 retired, `ThreadLifecycle.readWorkSteps` reads each active session with `thread/read` through the
 client that holds it, with a 10-second limit. The switch then checks again that no turn started.
 Only after the switch is stored, `saveWorkSteps` writes the rendered steps of the 60 newest turns to
-`provider-work-steps/<sha256(session id)>` (mode 0600), or `{}` for a session with none. The file is
+`provider-work-steps/<sha256(session id)>` (mode 0600), or `{}` for a session with none. The sessions
+are retired before the write, so a turn that starts during it keeps its new session and reads the
+provider instead. The file is
 deleted and reconciled with the other session files, and a file that does not parse counts as no
 capture. A session without a capture, such as one that no client held, is read when the
 handoff is built: only the three newest, on their own providers, with a stopped CLI started again
