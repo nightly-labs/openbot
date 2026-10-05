@@ -8,17 +8,17 @@ import {
   calendarDays,
   calendarWeekStart,
 } from "@openbot/team-client/routine-calendar-dates";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { Check, CirclePause, X } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useChannels } from "@/features/channels/components/use-channels";
-import { WeekPager } from "@/features/servers/components/week-pager";
+import { DAY_STRIP_LENGTH, DayStrip } from "@/features/servers/components/day-strip";
 import {
   SettingsContent,
   SettingsNote,
@@ -100,10 +100,34 @@ export function ServerRoutinesScreen() {
   const today = calendarDayOf(now, timeZone);
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(today);
-  const week = calendarDays(calendarWeekStart(anchor, 1), 7);
-  const days = view === "week" ? week : [anchor];
-  // The day view loads its whole week, so the day strip can mark the days that have runs.
-  const range = rangeAround(week[0] ?? anchor, week.at(-1) ?? anchor);
+  // The first of the seven days on screen. A swipe stops on any day, not only on a Monday.
+  const [start, setStart] = useState(() => calendarWeekStart(today, 1));
+  const shownDays = calendarDays(start, DAY_STRIP_LENGTH);
+  const lastDay = shownDays.at(-1) ?? start;
+  const days = view === "week" ? shownDays : [anchor];
+
+  // Runs load by calendar week, so a swipe of one day asks the host only when it reaches a new week.
+  // The weeks on each side load too, so their days are marked before the swipe reaches them.
+  const firstWeek = calendarWeekStart(start, 1);
+  const lastWeek = calendarWeekStart(lastDay, 1);
+  const neededWeeks = firstWeek === lastWeek ? [firstWeek] : [firstWeek, lastWeek];
+  const loadedWeeks = [addCalendarDays(firstWeek, -7), ...neededWeeks, addCalendarDays(lastWeek, 7)];
+  const weeks = useQueries({
+    queries: loadedWeeks.map((weekStart) => {
+      const range = rangeAround(weekStart, addCalendarDays(weekStart, 6));
+      return {
+        queryKey: ["server-routines", session?.apiUrl, session?.user.id, sessionScope, serverId, range.from, range.to],
+        enabled: online,
+        retry: false,
+        // Host events refresh a week; a swipe back to a loaded week does not ask the host again.
+        staleTime: 60_000,
+        queryFn: () => loadRoutineCalendar(range, serverId),
+      };
+    }),
+  });
+  const needed = weeks.slice(1, 1 + neededWeeks.length);
+  const neededData = needed.flatMap((week) => (week.data ? [week.data] : []));
+  const ready = neededData.length === needed.length;
 
   // A planned run that passes without a result keeps its place; the clock only moves "now".
   useEffect(() => {
@@ -111,22 +135,23 @@ export function ServerRoutinesScreen() {
     return () => clearInterval(clock);
   }, []);
 
-  const calendar = useQuery({
-    queryKey: ["server-routines", session?.apiUrl, session?.user.id, sessionScope, serverId, range.from, range.to],
-    enabled: online,
-    retry: false,
-    queryFn: () => loadRoutineCalendar(range, serverId),
-  });
-
-  const entries = useMemo(() => {
-    const data = calendar.data;
-    if (!data) return [];
-    const routines = new Map(data.routines.map((routine) => [routine.id, routine]));
+  // A few weeks of runs: building the list on each render costs less than keeping it in step.
+  const entries = (() => {
+    const routines = new Map<string, RoutineCalendarRoutine>();
+    const runs: RoutineCalendarRun[] = [];
+    // Each loaded range reaches into the next week, so a run counts only in the week of its own day.
+    loadedWeeks.forEach((weekStart, index) => {
+      const data = weeks[index]?.data;
+      if (!data) return;
+      for (const routine of data.routines) routines.set(routine.id, routine);
+      const ownDays = new Set(calendarDays(weekStart, 7));
+      for (const run of data.runs) if (ownDays.has(calendarDayOf(new Date(run.at), timeZone))) runs.push(run);
+    });
     const serverAgents = new Map(
       agents.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
     );
     const channelById = new Map(channels.map((channel) => [channel.id, channel]));
-    return data.runs
+    return runs
       .flatMap((run): Entry[] => {
         const routine = routines.get(run.routineId);
         if (!routine) return [];
@@ -148,7 +173,7 @@ export function ServerRoutinesScreen() {
         ];
       })
       .sort((left, right) => Date.parse(left.run.at) - Date.parse(right.run.at));
-  }, [calendar.data, agents, channels, serverId, timeZone]);
+  })();
 
   const entriesByDay = new Map<CalendarDay, Entry[]>();
   for (const entry of entries) {
@@ -177,8 +202,8 @@ export function ServerRoutinesScreen() {
     });
   };
   const rangeLabel = t("mobile.server.routines.range", {
-    start: dayText(week[0] ?? anchor, { month: "short", day: "numeric" }),
-    end: dayText(week.at(-1) ?? anchor, { month: "short", day: "numeric", year: "numeric" }),
+    start: dayText(start, { month: "short", day: "numeric" }),
+    end: dayText(lastDay, { month: "short", day: "numeric", year: "numeric" }),
   });
 
   function openRoutine(routine: RoutineCalendarRoutine) {
@@ -194,16 +219,23 @@ export function ServerRoutinesScreen() {
       });
   }
 
-  function moveTo(day: CalendarDay, nextView: CalendarView = view) {
+  function selectDay(day: CalendarDay, nextView: CalendarView = view) {
     void haptics.selection();
     setAnchor(day);
     setView(nextView);
   }
 
-  /** Another week keeps the weekday of the open day. */
-  const moveWeek = (weeks: number) => moveTo(addCalendarDays(anchor, weeks * 7));
-  const showWeek = (weekStart: CalendarDay) =>
-    moveTo(addCalendarDays(weekStart, Math.round((Date.parse(anchor) - Date.parse(week[0] ?? anchor)) / DAY)));
+  /** Moves the days on screen. The open day keeps its place among them. */
+  function moveStart(next: CalendarDay) {
+    const shift = Math.round((Date.parse(next) - Date.parse(start)) / DAY);
+    setStart(next);
+    setAnchor((day) => addCalendarDays(day, shift));
+  }
+
+  function showToday() {
+    setAnchor(today);
+    if (!shownDays.includes(today)) setStart(calendarWeekStart(today, 1));
+  }
 
   const renderEntry = (entry: Entry, when: string) => {
     const status = t(STATUS_LABEL[entry.status]);
@@ -239,21 +271,17 @@ export function ServerRoutinesScreen() {
         <Stack.Toolbar.Label>
           {t(view === "week" ? "mobile.server.routines.viewWeek" : "mobile.server.routines.viewDay")}
         </Stack.Toolbar.Label>
-        <Stack.Toolbar.MenuAction
-          icon="calendar.badge.clock"
-          disabled={days.includes(today)}
-          onPress={() => moveTo(today)}
-        >
+        <Stack.Toolbar.MenuAction icon="calendar.badge.clock" disabled={days.includes(today)} onPress={showToday}>
           {t("mobile.server.routines.today")}
         </Stack.Toolbar.MenuAction>
         <Stack.Toolbar.MenuAction
           icon="calendar.day.timeline.left"
           isOn={view === "day"}
-          onPress={() => moveTo(anchor, "day")}
+          onPress={() => selectDay(anchor, "day")}
         >
           {t("mobile.server.routines.viewDay")}
         </Stack.Toolbar.MenuAction>
-        <Stack.Toolbar.MenuAction icon="calendar" isOn={view === "week"} onPress={() => moveTo(anchor, "week")}>
+        <Stack.Toolbar.MenuAction icon="calendar" isOn={view === "week"} onPress={() => selectDay(anchor, "week")}>
           {t("mobile.server.routines.viewWeek")}
         </Stack.Toolbar.MenuAction>
       </Stack.Toolbar.Menu>
@@ -281,39 +309,46 @@ export function ServerRoutinesScreen() {
               { name: "decrement", label: t("mobile.server.routines.previousWeek") },
               { name: "increment", label: t("mobile.server.routines.nextWeek") },
             ]}
-            onAccessibilityAction={(event) => moveWeek(event.nativeEvent.actionName === "increment" ? 1 : -1)}
+            onAccessibilityAction={(event) =>
+              moveStart(addCalendarDays(start, event.nativeEvent.actionName === "increment" ? 7 : -7))
+            }
           >
             {rangeLabel}
           </Typography.Paragraph>
-          <WeekPager
-            anchor={anchor}
+          <DayStrip
+            start={start}
             today={today}
             selected={view === "day" ? anchor : null}
             counts={countByDay}
             weekdayText={(day) => dayText(day, { weekday: "narrow" })}
             dayNumberText={(day) => dayText(day, { day: "numeric" })}
             dayLabel={(day, count) => t("mobile.server.routines.dayLabel", { day: longDay(day), count })}
-            onSelectDay={(day) => moveTo(day, "day")}
-            onWeekChange={showWeek}
+            onSelectDay={(day) => selectDay(day, "day")}
+            onStartChange={moveStart}
           />
         </View>
 
-        {!online && !calendar.data ? (
+        {!online && !ready ? (
           <SettingsNote>{t("mobile.server.routines.offline")}</SettingsNote>
-        ) : calendar.isPending ? (
-          <SettingsNote>{t("mobile.server.routines.loading")}</SettingsNote>
-        ) : calendar.isError ? (
+        ) : needed.some((week) => week.isError) ? (
           <SettingsSection footer={t("mobile.server.routines.loadFailed")}>
-            <SettingsRow disclosure={false} onPress={() => void calendar.refetch()}>
+            <SettingsRow
+              disclosure={false}
+              onPress={() => {
+                for (const week of needed) if (week.isError) void week.refetch();
+              }}
+            >
               <Typography.Paragraph>{t("common.retry")}</Typography.Paragraph>
             </SettingsRow>
           </SettingsSection>
-        ) : calendar.data?.routines.length === 0 ? (
+        ) : !ready ? (
+          <SettingsNote>{t("mobile.server.routines.loading")}</SettingsNote>
+        ) : neededData.every((data) => data.routines.length === 0) ? (
           <SettingsNote>{t("mobile.server.routines.empty")}</SettingsNote>
         ) : (
           <>
             {view === "week" ? (
-              week.map((day) => {
+              shownDays.map((day) => {
                 const dayEntries = entriesByDay.get(day) ?? [];
                 const hidden = dayEntries.length - WEEK_DAY_LIMIT;
                 return (
@@ -327,7 +362,7 @@ export function ServerRoutinesScreen() {
                           count: dayEntries.length,
                           day: longDay(day),
                         })}
-                        onPress={() => moveTo(day, "day")}
+                        onPress={() => selectDay(day, "day")}
                       >
                         <Typography.Paragraph className="text-accent-text">
                           {t("mobile.server.routines.more", { count: hidden })}
