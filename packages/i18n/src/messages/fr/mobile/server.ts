@@ -31,6 +31,8 @@ export const messages = {
   "mobile.server.join.joinedNamed": "Vous avez rejoint {name}. {status}",
   "mobile.server.join.joined": "Vous avez rejoint le serveur. {status}",
   "mobile.server.join.description": "Collez ou scannez l’invitation reçue du propriétaire d’un serveur.",
+  "mobile.server.join.paste": "Coller",
+  "mobile.server.join.scanShort": "Scanner le QR code",
   "mobile.server.join.scan": "Scanner le code QR de l’invitation",
   "mobile.server.join.inviteLink": "Lien d’invitation",
   "mobile.server.join.joining": "Connexion…",

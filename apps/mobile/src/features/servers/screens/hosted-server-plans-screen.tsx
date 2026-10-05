@@ -317,7 +317,7 @@ function OtherOptions({ disabled }: { disabled: boolean }) {
         leading={<Ticket color={foreground} size={22} strokeWidth={1.8} />}
         supportingText={t("mobile.server.hosted.joinHint")}
         disabled={disabled}
-        onPress={() => router.replace("/add-server")}
+        onPress={() => router.push("/hosted-server/join")}
       >
         <Typography.Paragraph>{t("mobile.server.hosted.join")}</Typography.Paragraph>
       </SettingsRow>

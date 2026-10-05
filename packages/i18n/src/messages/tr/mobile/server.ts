@@ -31,6 +31,8 @@ export const messages = {
   "mobile.server.join.joinedNamed": "{name} sunucusuna katıldınız. {status}",
   "mobile.server.join.joined": "Sunucuya katıldınız. {status}",
   "mobile.server.join.description": "Bir sunucu sahibinden aldığınız daveti yapıştırın veya tarayın.",
+  "mobile.server.join.paste": "Yapıştır",
+  "mobile.server.join.scanShort": "QR kodunu tara",
   "mobile.server.join.scan": "Davet QR kodunu tara",
   "mobile.server.join.inviteLink": "Davet bağlantısı",
   "mobile.server.join.joining": "Katılınıyor…",

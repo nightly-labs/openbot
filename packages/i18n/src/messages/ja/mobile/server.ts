@@ -31,6 +31,8 @@ export const messages = {
   "mobile.server.join.joinedNamed": "{name} に参加しました。{status}",
   "mobile.server.join.joined": "サーバーに参加しました。{status}",
   "mobile.server.join.description": "サーバーの所有者から受け取った招待を貼り付けるか、スキャンしてください。",
+  "mobile.server.join.paste": "ペースト",
+  "mobile.server.join.scanShort": "QR コードをスキャン",
   "mobile.server.join.scan": "招待の QR コードをスキャン",
   "mobile.server.join.inviteLink": "招待リンク",
   "mobile.server.join.joining": "参加しています…",

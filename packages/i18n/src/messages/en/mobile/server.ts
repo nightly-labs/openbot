@@ -30,6 +30,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.join.joinedNamed": "You joined {name}. {status}",
   "mobile.server.join.joined": "You joined the server. {status}",
   "mobile.server.join.description": "Paste or scan the invitation you received from a server owner.",
+  "mobile.server.join.paste": "Paste",
+  "mobile.server.join.scanShort": "Scan QR code",
   "mobile.server.join.scan": "Scan invitation QR code",
   "mobile.server.join.inviteLink": "Invite link",
   "mobile.server.join.joining": "Joining…",

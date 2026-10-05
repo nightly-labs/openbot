@@ -8,6 +8,7 @@ export const unstable_settings = { initialRouteName: "index" };
 
 // One sheet owns the purchase: the plans, then the payment and the setup of the new server as an
 // inner page. The back button on the setup returns to the plans while the server waits for payment.
+// Join with an invitation is an inner page too, so the user can go back to the plans.
 export default function HostedServerLayout() {
   const { t } = useText();
   const background = String(useCSSVariable("--openbot-bg-sheet"));
@@ -27,6 +28,10 @@ export default function HostedServerLayout() {
     >
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.hostedServerPlans") }} />
       <Stack.Screen name="setup" options={{ title: t("mobile.app.route.hostedServerSetup") }} />
+      {/* Join draws its own title; the header keeps only the back button. */}
+      <Stack.Screen name="join" options={{ title: "" }} />
+      {/* The header stays, so the push does not hide the bar and move the join page under it. */}
+      <Stack.Screen name="scan" options={{ title: t("mobile.server.scan.title") }} />
     </Stack>
   );
 }
