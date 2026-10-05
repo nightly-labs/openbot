@@ -186,6 +186,7 @@
     "test:browser": "bun scripts/browser-smoke.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
     "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
+    "test:browser:canva-live": "bun scripts/browser-smoke.ts --canva-live",
     "test:codex": "bun scripts/codex-doctor.ts --strict",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",
     "test:filesystem": "bun scripts/filesystem-smoke.ts",

@@ -389,6 +389,7 @@ async function main(): Promise<void> {
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
   const whatsappLive = process.argv.includes("--whatsapp-live");
+  const canvaLive = process.argv.includes("--canva-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -1746,6 +1747,7 @@ async function main(): Promise<void> {
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
+    if (canvaLive) await runCanvaLiveProbe(browser);
     await expectFailure(() =>
       Effect.runPromise(
         browser
@@ -3282,6 +3284,32 @@ async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
     throw new Error(`WhatsApp returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
   }
   process.stdout.write("BrowserHost: WhatsApp login page loaded without a browser block.\n");
+}
+
+async function runCanvaLiveProbe(browser: BrowserHost): Promise<void> {
+  // No credentials needed: the presentations page renders the update-your-browser block for a
+  // refused user agent before any login, and the editor links go through the same gate.
+  const canvaTab = await Effect.runPromise(
+    browser
+      .open("https://www.canva.com/presentations/", "canva-live-smoke", "canva-live-smoke", true)
+      .pipe(Effect.mapError((error) => error.cause)),
+  );
+  const deadline = Date.now() + 30_000;
+  let page = await Effect.runPromise(browser.snapshot(canvaTab.id).pipe(Effect.mapError((error) => error.cause)));
+  while (Date.now() < deadline) {
+    const normalized = page.text.toLowerCase();
+    if (normalized.includes("update your browser") || normalized.includes("presentation")) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    page = await Effect.runPromise(browser.snapshot(canvaTab.id).pipe(Effect.mapError((error) => error.cause)));
+  }
+  const normalized = page.text.toLowerCase();
+  if (normalized.includes("update your browser")) {
+    throw new Error(`Canva rejected the embedded browser: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  if (!normalized.includes("presentation")) {
+    throw new Error(`Canva returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  process.stdout.write("BrowserHost: Canva presentations page loaded without a browser block.\n");
 }
 
 async function waitForXSnapshot(

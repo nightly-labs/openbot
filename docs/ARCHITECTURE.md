@@ -1047,7 +1047,7 @@ The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
 Break down the funnel by `acquisition_source`, then `source_platform` once schema version 8
 events reach OpenPanel. Historical events do not contain the new platform property.
 
-The `/download/*` Worker handlers fall back to the releases page when the GitHub manifest cannot be
+The `/download/<os>/latest` Worker handler falls back to the releases page when the GitHub manifest cannot be
 read. That fallback is written to the Worker log, not to OpenPanel: a server event has no session,
 and the landing dashboards are defined on sessions.
 

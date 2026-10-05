@@ -6,9 +6,10 @@ export type AvailableDownloadPlatform = "linux" | "macos" | "windows";
 /**
  * `latest-mac.yml` lists the Apple silicon and the Intel installer, so a macOS download also names
  * its architecture. electron-builder puts `arm64` in the Apple silicon asset name and no
- * architecture suffix that contains it in the Intel one.
+ * architecture suffix that contains it in the Intel one. Linux has one manifest per architecture,
+ * and Windows ships x64 only.
  */
-export type MacDownloadArchitecture = "arm64" | "x64";
+export type DownloadArchitecture = "arm64" | "x64";
 
 interface DownloadManifestConfig {
   /**
@@ -16,16 +17,39 @@ interface DownloadManifestConfig {
    * published as `.AppImage`.
    */
   extension: ".appimage" | ".dmg" | ".exe";
-  manifest: "latest-linux.yml" | "latest-mac.yml" | "latest.yml";
+  manifest: "latest-linux-arm64.yml" | "latest-linux.yml" | "latest-mac.yml" | "latest.yml";
 }
 
 const RELEASES_BASE_URL = "https://github.com/nightly-labs/openbot/releases";
 
-const DOWNLOAD_MANIFESTS: Record<AvailableDownloadPlatform, DownloadManifestConfig> = {
-  linux: { extension: ".appimage", manifest: "latest-linux.yml" },
-  macos: { extension: ".dmg", manifest: "latest-mac.yml" },
-  windows: { extension: ".exe", manifest: "latest.yml" },
-};
+const DOWNLOAD_PLATFORMS = ["linux", "macos", "windows"] as const satisfies readonly AvailableDownloadPlatform[];
+
+function downloadManifest(
+  platform: AvailableDownloadPlatform,
+  architecture: DownloadArchitecture,
+): DownloadManifestConfig {
+  if (platform === "linux")
+    return {
+      extension: ".appimage",
+      manifest: architecture === "arm64" ? "latest-linux-arm64.yml" : "latest-linux.yml",
+    };
+  if (platform === "macos") return { extension: ".dmg", manifest: "latest-mac.yml" };
+  return { extension: ".exe", manifest: "latest.yml" };
+}
+
+export function isAvailableDownloadPlatform(value: string): value is AvailableDownloadPlatform {
+  return DOWNLOAD_PLATFORMS.some((platform) => platform === value);
+}
+
+/**
+ * The architecture a `?arch=` value asks for. Most Macs are Apple silicon and most Linux computers
+ * are x64, so anything else gets those. Windows has only the x64 installer.
+ */
+export function downloadArchitecture(platform: AvailableDownloadPlatform, arch: string | null): DownloadArchitecture {
+  if (platform === "macos") return arch === "x64" ? "x64" : "arm64";
+  if (platform === "linux") return arch === "arm64" ? "arm64" : "x64";
+  return "x64";
+}
 
 function redirect(location: string): Response {
   return new Response(null, {
@@ -40,7 +64,7 @@ function redirect(location: string): Response {
 function findInstaller(
   manifest: string,
   extension: DownloadManifestConfig["extension"],
-  macArchitecture: MacDownloadArchitecture | undefined,
+  macArchitecture: DownloadArchitecture | undefined,
 ): string | undefined {
   const assetLines = manifest.matchAll(/^\s*-\s+url:\s*["']?([^\s"']+)["']?\s*$/gim);
   for (const match of assetLines) {
@@ -67,9 +91,9 @@ class DownloadManifestError extends Schema.TaggedError<DownloadManifestError>()(
 const latestDownload = Effect.fn("LatestDownload.resolve")(function* (
   platform: AvailableDownloadPlatform,
   fetcher: typeof fetch,
-  macArchitecture: MacDownloadArchitecture,
+  architecture: DownloadArchitecture,
 ) {
-  const config = DOWNLOAD_MANIFESTS[platform];
+  const config = downloadManifest(platform, architecture);
   const manifestUrl = `${RELEASES_BASE_URL}/latest/download/${config.manifest}`;
   const response = yield* Effect.tryPromise({
     try: (signal) =>
@@ -84,7 +108,8 @@ const latestDownload = Effect.fn("LatestDownload.resolve")(function* (
     try: () => response.text(),
     catch: () => new DownloadManifestError({}),
   });
-  const installer = findInstaller(manifest, config.extension, platform === "macos" ? macArchitecture : undefined);
+  // Only the macOS manifest lists two architectures.
+  const installer = findInstaller(manifest, config.extension, platform === "macos" ? architecture : undefined);
   if (!installer) return fallbackToReleases(platform, `no ${config.extension} asset in the manifest`);
   return redirect(`${RELEASES_BASE_URL}/latest/download/${encodeURIComponent(installer)}`);
 });
@@ -92,9 +117,9 @@ const latestDownload = Effect.fn("LatestDownload.resolve")(function* (
 export function latestDownloadResponse(
   platform: AvailableDownloadPlatform,
   fetcher: typeof fetch = fetch,
-  macArchitecture: MacDownloadArchitecture = "arm64",
+  architecture: DownloadArchitecture = downloadArchitecture(platform, null),
 ) {
-  return latestDownload(platform, fetcher, macArchitecture).pipe(
+  return latestDownload(platform, fetcher, architecture).pipe(
     Effect.catch(() => Effect.sync(() => fallbackToReleases(platform, "the manifest request failed"))),
   );
 }

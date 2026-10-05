@@ -14,12 +14,48 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   name: "Compare",
   indexTitle: "Compare OpenBot with other AI agent apps",
   indexDescription:
-    "How OpenBot compares with other AI agent apps: where the agents run, which models they use, how teams work, and where your data stays.",
+    "How AI agent apps compare: OpenBot against other apps, coding agents against each other, and where agents run, which models they use and what they cost.",
   feedTitle: "OpenBot comparisons",
   backLabel: "All comparisons",
   moreTitle: "More comparisons",
   imageEyebrow: "OPENBOT · COMPARE",
   articles: publishedFirst([
+    {
+      slug: "best-ai-agent-apps",
+      title: "Best AI Agent Apps in 2026: 13 Apps Compared",
+      description:
+        "13 AI agent apps compared: OpenBot, Claude Code, Codex, Cursor, Antigravity, Devin, Manus and more. Where they run, models, price and benchmark scores.",
+      publishedAt: "2026-10-03",
+      updatedAt: "2026-10-03",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "codex-vs-claude-code",
+      title: "Codex vs Claude Code: Which Coding Agent to Use",
+      description:
+        "Codex vs Claude Code: benchmark scores, cost per task, plans, sandboxes and privacy, from official sources. Or run both as one team in OpenBot.",
+      publishedAt: "2026-10-03",
+      updatedAt: "2026-10-03",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "claude-code-vs-antigravity",
+      title: "Claude Code vs Antigravity: Claude or Gemini Agent",
+      description:
+        "Claude Code vs Google Antigravity: benchmark scores, cost per task, plans, apps and privacy, from official sources. Or run both in OpenBot.",
+      publishedAt: "2026-10-03",
+      updatedAt: "2026-10-03",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "cursor-vs-claude-code",
+      title: "Cursor vs Claude Code: Editor or Terminal Agent",
+      description:
+        "Cursor vs Claude Code: an editor with many models, or Claude's agent in your terminal. Plans, cloud agents and privacy, from official sources.",
+      publishedAt: "2026-10-03",
+      updatedAt: "2026-10-03",
+      author: NEWS_AUTHOR,
+    },
     {
       slug: "chatgpt-dots",
       title: "OpenBot vs ChatGPT dots: A Local Alternative",

@@ -1,13 +1,25 @@
 export const EXTERNAL_LINK_REL = "noopener noreferrer";
 
+/** The installer each platform's download button starts: Apple silicon on macOS, x64 elsewhere. */
 export const OPENBOT_DOWNLOAD_LINKS = {
+  macos: "/download/macos/latest",
+  windows: "/download/windows/latest",
+  linux: "/download/linux/latest",
+} as const;
+
+/** The other installer of a platform that ships two architectures. Windows ships x64 only. */
+export const OPENBOT_ALTERNATE_DOWNLOAD_LINKS = {
+  macos: "/download/macos/latest?arch=x64",
+  linux: "/download/linux/latest?arch=arm64",
+} as const;
+
+/** The pages that describe each installer: requirements, install steps and known limits. */
+export const OPENBOT_DOWNLOAD_PAGE_LINKS = {
+  hub: "/download",
   macos: "/download/macos",
   windows: "/download/windows",
   linux: "/download/linux",
 } as const;
-
-// Not a platform of its own: the landing pages offer Apple silicon, and this link is for Intel Macs.
-export const OPENBOT_MACOS_INTEL_DOWNLOAD_LINK = "/download/macos?arch=x64";
 
 export const OPENBOT_LINKS = {
   contact: "https://x.com/OpenBot_",
@@ -43,7 +55,7 @@ export type FooterLink =
   | {
       readonly label: string;
       readonly external: false;
-      readonly to: "/" | "/news" | "/guides" | "/plugins" | "/changelog" | "/compare";
+      readonly to: "/" | "/download" | "/news" | "/guides" | "/plugins" | "/changelog" | "/compare";
       readonly hash?: string;
     }
   | { readonly label: string; readonly external: false; readonly to: "/compare/$slug"; readonly slug: string };
@@ -57,7 +69,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
   {
     title: "Product",
     links: [
-      { label: "Download", external: false, to: "/", hash: "download" },
+      { label: "Download", external: false, to: "/download" },
       { label: "News", external: false, to: "/news" },
       { label: "Guides", external: false, to: "/guides" },
       { label: "Plugins", external: false, to: "/plugins" },
@@ -90,6 +102,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "OpenBot vs Manus", external: false, to: "/compare/$slug", slug: "manus" },
       { label: "OpenBot vs Claude Cowork", external: false, to: "/compare/$slug", slug: "claude-cowork" },
       { label: "OpenBot vs Devin", external: false, to: "/compare/$slug", slug: "devin" },
+      { label: "Best AI agent apps", external: false, to: "/compare/$slug", slug: "best-ai-agent-apps" },
       { label: "All comparisons", external: false, to: "/compare" },
     ],
   },
