@@ -1464,7 +1464,7 @@ export class HostedSiteService {
         const result = yield* run();
         yield* this.completeOperationEffect(userId, key, operation, resourceId, claim.token, responseFor(result));
         return result;
-      }).pipe(Effect.tapError(() => this.releaseOperationEffect(userId, key, operation, resourceId, claim.token)));
+      }).pipe(Effect.tapCause(() => this.releaseOperationEffect(userId, key, operation, resourceId, claim.token)));
     })();
   }
 

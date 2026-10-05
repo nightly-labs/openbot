@@ -596,44 +596,48 @@ function forwardCentralAuth(state: CentralAuthState): void {
   services?.host.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
   const generation = ++centralAuthGeneration;
   void Effect.runPromise(
-    remoteAccountGate.withPermit(
-      Effect.tryPromise({
-        try: async () => {
+    remoteAccountGate
+      .withPermit(
+        Effect.gen(function* () {
           // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
           // renderer was last told about may be activated; an earlier one would put a host the
           // user has already left back within reach.
           if (generation !== centralAuthGeneration) return;
           const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
-          if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId) {
+          if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId && services) {
             // Best-effort, like every other network step here: a bridge disconnect that
             // rejects must not stop the local host from leaving the previous account.
-            try {
-              if (services)
-                await Effect.runPromise(
-                  services.remoteServers.disconnectRemoteSessions().pipe(Effect.mapError((error) => error.cause)),
-                );
-            } catch (error) {
-              logger.error("Unable to disconnect the previous account's remote sessions:", toLogValue(error));
-            }
+            yield* services.remoteServers
+              .disconnectRemoteSessions()
+              .pipe(
+                Effect.catch((error) =>
+                  Effect.sync(() =>
+                    logger.error(
+                      "Unable to disconnect the previous account's remote sessions:",
+                      toLogValue(error.cause),
+                    ),
+                  ),
+                ),
+              );
           }
           // Rechecked after the disconnect: another account can be announced while it awaits,
           // and activating this one now would put its host back within the newer account's reach.
           if (generation !== centralAuthGeneration) return;
           activeRemotePrincipalId = nextPrincipalId;
           if (state.status !== "signed_in") {
-            if (state.status === "signed_out") {
+            if (state.status === "signed_out" && services) {
               // Stopping is best-effort; unbinding the host is not, so a failed teardown
               // must not leave the signed-out account's host bound.
-              try {
-                if (services)
-                  await Effect.runPromise(services.host.stop(false).pipe(Effect.mapError((error) => error.cause)));
-              } catch (error) {
-                logger.error("Unable to stop the host while signing out:", toLogValue(error));
-              }
-              if (services)
-                await Effect.runPromise(
-                  services.host.applySignedInAccount(null).pipe(Effect.mapError((error) => error.cause)),
+              yield* services.host
+                .stop(false)
+                .pipe(
+                  Effect.catch((error) =>
+                    Effect.sync(() =>
+                      logger.error("Unable to stop the host while signing out:", toLogValue(error.cause)),
+                    ),
+                  ),
                 );
+              yield* services.host.applySignedInAccount(null);
             }
             return;
           }
@@ -642,9 +646,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
           // network failure is contained: this account must not end up signed in while the
           // previous account's host is still selected and possibly online.
           if (host) {
-            await Effect.runPromise(
-              host.applySignedInAccount(state.user).pipe(Effect.mapError((error) => error.cause)),
-            );
+            yield* host.applySignedInAccount(state.user);
             if (generation !== centralAuthGeneration) {
               // Another account was announced while this one was being activated. Its own queued
               // callback binds it; until then no host answers for either.
@@ -653,23 +655,21 @@ function forwardCentralAuth(state: CentralAuthState): void {
             }
             services?.analytics.flushPending();
           }
-          try {
-            if (services)
-              await Effect.runPromise(
-                services.remoteServers.syncRemoteHosts().pipe(Effect.mapError((error) => error.cause)),
+          if (services)
+            yield* services.remoteServers
+              .syncRemoteHosts()
+              .pipe(
+                Effect.catch((error) =>
+                  Effect.sync(() => logger.error("Unable to synchronize the joined servers:", toLogValue(error.cause))),
+                ),
               );
-          } catch (error) {
-            logger.error("Unable to synchronize the joined servers:", toLogValue(error));
-          }
           // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
-          if (host && services?.serverMode)
-            await Effect.runPromise(services.serverMode.publish().pipe(Effect.mapError((error) => error.cause)));
+          if (host && services?.serverMode) yield* services.serverMode.publish();
           else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-            await Effect.runPromise(host.start().pipe(Effect.mapError((error) => error.cause)));
-        },
-        catch: (cause) => cause,
-      }),
-    ),
+            yield* host.start();
+        }),
+      )
+      .pipe(Effect.mapError((error) => error.cause)),
   ).catch((error) => {
     logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
   });

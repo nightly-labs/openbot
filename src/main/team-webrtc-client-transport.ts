@@ -187,11 +187,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this: TeamWebRtcClientTransport,
   ): Effect.fn.Return<RemoteHostSummary[], RemoteWorkflowError> {
     return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        return yield* this.#options
-          .listHosts()
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
-      }),
+      this.#options.listHosts().pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
     );
   }).bind(this);
 
@@ -313,11 +309,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this: TeamWebRtcClientTransport,
     hostId: string,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        yield* this.#sendEventControlEffect(hostId, { type: "runtime-snapshot-request" });
-      }),
-    );
+    return yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "runtime-snapshot-request" }));
   }).bind(this);
 
   readonly setTyping = Effect.fn("TeamWebRtcClient.setTyping")(function* (
@@ -326,11 +318,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     agentId: string | null,
     typing: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        yield* this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing });
-      }),
-    );
+    return yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing }));
   }).bind(this);
 
   readonly setDirectTyping = Effect.fn("TeamWebRtcClient.setDirectTyping")(function* (
@@ -340,9 +328,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     typing: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        yield* this.#sendEventControlEffect(hostId, { type: "team-direct-typing", recipientMemberId, typing });
-      }),
+      this.#sendEventControlEffect(hostId, { type: "team-direct-typing", recipientMemberId, typing }),
     );
   }).bind(this);
 
@@ -366,10 +352,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     init: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
   ): Effect.fn.Return<TeamProtocolV2Json | undefined, RemoteWorkflowError> {
     return yield* this.#owned(
-      Effect.gen({ self: this }, function* () {
-        const response = yield* this.requestResponse(hostId, path, init);
-        return response.status === 204 ? undefined : response.body;
-      }),
+      this.requestResponse(hostId, path, init).pipe(
+        Effect.map((response) => (response.status === 204 ? undefined : response.body)),
+      ),
     );
   }).bind(this);
 
@@ -443,19 +428,20 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           }, TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS);
           this.#pending.set(requestId, { hostId, resolve, reject, timer });
         }
-        const attempt1 = yield* Effect.gen({ self: this }, function* () {
-          yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame));
-        }).pipe(Effect.result);
-        if (Result.isFailure(attempt1)) {
-          const error = attempt1.failure.cause;
-          const pending = this.#pending.get(requestId);
-          if (pending) {
-            clearTimeout(pending.timer);
-            this.#pending.delete(requestId);
-            pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
+        // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
+        const envelope = yield* Effect.gen({ self: this }, function* () {
+          const sent = yield* TeamClientBridge.use((bridge) => bridge.send(hostId, "rpc", frame)).pipe(Effect.result);
+          if (Result.isFailure(sent)) {
+            const error = sent.failure.cause;
+            const pending = this.#pending.get(requestId);
+            if (pending) {
+              clearTimeout(pending.timer);
+              this.#pending.delete(requestId);
+              pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
+            }
           }
-        }
-        const envelope = yield* Deferred.await(result).pipe(
+          return yield* Deferred.await(result);
+        }).pipe(
           Effect.ensuring(
             Effect.sync(() => {
               const pending = this.#pending.get(requestId);
@@ -527,14 +513,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#active.delete(hostId);
         this.#retainedSessions.delete(hostId);
         this.#files.setPeerAuthenticated(hostId, false);
-        let disconnectError: unknown;
-        const attempt2 = yield* Effect.gen({ self: this }, function* () {
-          yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId));
-        }).pipe(Effect.result);
-        if (Result.isFailure(attempt2)) {
-          const error = attempt2.failure.cause;
-          disconnectError = error;
-        }
+        const disconnected = yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.result);
+        const disconnectError = Result.isFailure(disconnected) ? disconnected.failure.cause : undefined;
         if (sessionId)
           yield* this.#options
             .endSession(sessionId)

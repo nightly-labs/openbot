@@ -10,7 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Exit, Result, Schema, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import type { OpenBotSiblingInstance } from "./update-sibling-instances";
@@ -579,15 +579,18 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return SIBLING_SESSION_MESSAGE;
   }
 
-  readonly stop = Effect.fn("UpdateService.stop")(function* (this: UpdateService) {
-    if (this.#checkTimer) clearTimeout(this.#checkTimer);
-    this.#checkTimer = null;
-    // An install runs shutdown preparation, which stops background work through this method. The
-    // install deadline has to survive that: it is the only thing that can release a restart which
-    // never happens, and clearing it here would leave the app latched in "installing" forever.
-    if (this.#status.phase !== "installing") this.#clearPhaseTimer();
-    yield* Scope.close(this.#workScope, Exit.void);
-  });
+  // A download in progress keeps running: a cancelled Windows logoff stops background work and
+  // leaves the app open, and a download or install after that must still work.
+  stop(): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.#checkTimer) clearTimeout(this.#checkTimer);
+      this.#checkTimer = null;
+      // An install runs shutdown preparation, which stops background work through this method. The
+      // install deadline has to survive that: it is the only thing that can release a restart which
+      // never happens, and clearing it here would leave the app latched in "installing" forever.
+      if (this.#status.phase !== "installing") this.#clearPhaseTimer();
+    });
+  }
 
   /**
    * Issues the one outstanding request every caller shares. The handle is cleared when the call

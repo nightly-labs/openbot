@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { Effect, Schema } from "effect";
-import { type VersionedJsonFile, type WriteJsonFileOptions, writeFileAtomically } from "../backend/atomic-json-file";
+import {
+  type VersionedJsonFile,
+  type WriteJsonFileOptions,
+  writeJsonFileAtomically,
+} from "../backend/atomic-json-file";
 
 export class PreferenceFileFailure extends Schema.TaggedError<PreferenceFileFailure>()("PreferenceFileFailure", {
   cause: Schema.Defect(),
@@ -25,7 +29,7 @@ export function writePreferenceFile<A extends VersionedJsonFile>(
   value: A,
   options: WriteJsonFileOptions = {},
 ): Effect.Effect<void, PreferenceFileFailure> {
-  return writeFileAtomically(path, `${JSON.stringify(value)}\n`, options).pipe(
+  return writeJsonFileAtomically(path, value, options).pipe(
     Effect.mapError(({ cause }) => new PreferenceFileFailure({ cause })),
   );
 }

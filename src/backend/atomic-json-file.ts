@@ -22,20 +22,21 @@ export function writeJsonFileAtomically<Content extends VersionedJsonFile>(
   return writeFileAtomically(path, `${JSON.stringify(value)}\n`, options);
 }
 
-/**
- * Replaces `path` with `content`, readable only by the user.
- *
- * The content goes to a temporary sibling first and is renamed over `path`, so a crash leaves the
- * previous file or the new one, never a truncated one. Each call has its own temporary name, so
- * overlapping writes never share a file, and a failed write removes its temporary file.
- */
 /** The native cause stays at the adapter; callers must not export it without redaction. */
 export class AtomicFileWriteError extends Schema.TaggedError<AtomicFileWriteError>()("AtomicFileWriteError", {
   operation: Schema.Literals(["directory", "write", "rename"]),
   cause: Schema.Defect(),
 }) {}
 
-/** Keep the write and rename together even when the caller interrupts the operation. */
+/**
+ * Replaces `path` with `content`, readable only by the user.
+ *
+ * The content goes to a temporary sibling first and is renamed over `path`, so a crash leaves the
+ * previous file or the new one, never a truncated one. Each call has its own temporary name, so
+ * overlapping writes never share a file, and a failed write removes its temporary file.
+ *
+ * The write and rename stay together even when the caller interrupts the operation.
+ */
 export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
   path: string,
   content: string | Uint8Array,
