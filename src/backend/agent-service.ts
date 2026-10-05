@@ -121,6 +121,7 @@ import { OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { ProfileClients } from "./agent/profile-clients";
 import { GenerationUsageLimitError, generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
+import { isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { QueueControls } from "./agent/queue-controls";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
@@ -653,10 +654,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ),
           );
         } catch (error) {
-          // A routing turn can be the first one a spent plan refuses. It holds the lead's model the
-          // way a refused member turn does, and the channel keeps the task queued for the reset.
+          // A routing turn can be the first one a spent plan refuses: in its completion, or as the
+          // error of the `turn/start` request. It holds the lead's model the way a refused member turn
+          // does, and the channel keeps the task queued for the reset.
           if (error instanceof GenerationUsageLimitError)
             this.#usageLimits.reached(lead.id, error.resetsAt, lead.model);
+          else if (error instanceof Error && isPlanLimitDiagnostic(error.message))
+            this.#usageLimits.reached(lead.id, null, lead.model);
           throw error;
         }
       },
