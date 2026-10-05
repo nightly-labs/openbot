@@ -366,9 +366,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request],
   );
 
+  /** The open channels of each server that the routine calendar last read its owners from. */
+  const calendarChannels = useRef(new Map<string, string>());
   const channelStore = useMemo(
     () =>
       new MobileChannelStore(request, (serverId, channels) => {
+        // The calendar leaves out archived channels. Message streaming also sends `channels-changed`,
+        // so the calendar reloads only when the set of open channels changes: an archive, a restore,
+        // a new channel or a deleted one.
+        const open = channels
+          .filter((channel) => !channel.archived)
+          .map((channel) => channel.id)
+          .sort()
+          .join("\n");
+        const previous = calendarChannels.current.get(serverId);
+        calendarChannels.current.set(serverId, open);
+        if (previous !== undefined && previous !== open)
+          void queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === "server-routines" && query.queryKey[5] === serverId,
+          });
         const pinned = preferencesRef.current[serverId]?.pinnedChannels;
         if (!pinned?.length) return;
         const available = new Set(channels.map((channel) => channel.id));
@@ -383,7 +399,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
         }
       }),
-    [request, preferenceStore],
+    [request, preferenceStore, queryClient],
   );
   useEffect(() => () => channelStore.dispose(), [channelStore]);
   useEffect(() => channelStore.setActive(foreground), [channelStore, foreground]);
