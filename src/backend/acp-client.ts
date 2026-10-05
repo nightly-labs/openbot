@@ -138,6 +138,10 @@ interface AcpTurn {
   toolNames: Map<string, string>;
   /** The ACP `kind` of each tool call; a later update can omit it. */
   toolKinds: Map<string, string>;
+  /** Steered prompts that the agent refused while this turn ran; sent when the running prompt ends. */
+  deferredPrompts: ContentBlock[][];
+  /** The user stopped the turn, so no deferred prompt is sent. */
+  stopped: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
 }
 
@@ -628,6 +632,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // A closed idle session has no turn to stop.
         if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
         const thread = yield* providerSync(() => this.#requireThread(threadId));
+        // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
+        if (thread.activeTurn) thread.activeTurn.stopped = true;
         (yield* providerSync(() => this.#requireConnection())).cancel({ sessionId: thread.id });
         return yield* providerSync(() => decoder({}));
       }
@@ -1207,11 +1213,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (steer) {
       // A steered message can want an answer, so an empty turn is again a failure to report.
       if (activeTurn) activeTurn.answerOptional = false;
+      // ACP has no steer request, and an agent can refuse a second prompt while one runs. The turn
+      // then sends the refused prompt after the running one ends, so the message is not lost.
       const connection = yield* providerSync(() => this.#requireConnection());
       yield* Effect.forkIn(
         providerCall(() => connection.prompt({ sessionId: thread.id, prompt: blocks })).pipe(
           Effect.catch((failure) =>
-            Effect.sync(() => this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`))),
+            Effect.sync(() => {
+              if (activeTurn && thread.activeTurn === activeTurn) {
+                activeTurn.deferredPrompts.push(blocks);
+                return;
+              }
+              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
+            }),
           ),
         ),
         this.#scope,
@@ -1231,6 +1245,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       messages: [],
       toolNames: new Map(),
       toolKinds: new Map(),
+      deferredPrompts: [],
+      stopped: false,
       task: null,
     };
     thread.activeTurn = turn;
@@ -1261,14 +1277,39 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     prompt: ContentBlock[],
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
-      const response = providerResult(
+      let response = providerResult(
         yield* Effect.result(providerCall(() => this.#requireConnection().prompt({ sessionId: thread.id, prompt }))),
       );
-      if (response.usage)
-        this.emit("notification", {
-          method: "openbot/usage",
-          params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
-        });
+      for (;;) {
+        if (response.usage)
+          this.emit("notification", {
+            method: "openbot/usage",
+            params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
+          });
+        const deferred = response.stopReason === "end_turn" && !turn.stopped ? turn.deferredPrompts.shift() : undefined;
+        if (!deferred) break;
+        // The reply to the earlier prompt is complete; the refused steer gets its own reply.
+        this.#completeThought(thread, turn);
+        this.#completeMessage(thread, turn, "final_answer");
+        const answered = turn.receivedOutput;
+        turn.receivedOutput = false;
+        const next = yield* providerCall(() =>
+          this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred }),
+        ).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              // The agent refused the steer again, so the earlier reply ends the turn.
+              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
+              return null;
+            }),
+          ),
+        );
+        if (!next) {
+          turn.receivedOutput = answered;
+          break;
+        }
+        response = next;
+      }
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
       // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
       // to answer ends empty on purpose, and an error there costs no answer the user waits for.

@@ -349,7 +349,8 @@ export function agentIpcHandlers({
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
               method: "POST",
-              body: input,
+              // The host uses this computer's zone for a routine the agent creates from the message.
+              body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
             }),
           ),
       }),

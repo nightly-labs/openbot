@@ -5,7 +5,7 @@
  * group is not a place in the layout, and its tooltip says what the agent waits for.
  */
 
-import { Badge, buttonVariants, ContextMenu, Lock, Tooltip } from "@openbot/ui";
+import { Badge, buttonVariants, Clock3, ContextMenu, Lock, Tooltip } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createStore, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
@@ -20,6 +20,7 @@ import {
   SIDEBAR_WAIT_TITLE,
   sidebarAgentStateLabel,
   sidebarMessageTime,
+  sidebarUsageResetTime,
 } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -50,11 +51,17 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
   };
   const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
+  const limit = () => {
+    const current = state();
+    return current?.kind === "limited" ? current : undefined;
+  };
   const stateLabel = () => {
     const current = state();
-    return current?.kind === "routine" || current?.kind === "waiting" ? sidebarAgentStateLabel(current, t) : "";
+    return current?.kind === "routine" || current?.kind === "waiting" || current?.kind === "limited"
+      ? sidebarAgentStateLabel(current, t, format)
+      : "";
   };
-  const routineLabel = () => (state()?.kind === "routine" ? stateLabel() : "");
+  const routineLabel = () => (state()?.kind === "routine" || limit() ? stateLabel() : "");
   // Only a waiting row has a tooltip, so the rows in the sections do not each carry one.
   const row = (): JSX.Element => (
     <ContextMenu.Root
@@ -110,11 +117,23 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
             <Show
               when={wait()}
               fallback={
-                <span class="agent-row-time">
-                  {rowProps.agent.updatedAt
-                    ? sidebarMessageTime(rowProps.agent.updatedAt, format)
-                    : rowProps.agent.time}
-                </span>
+                <Show
+                  when={limit()}
+                  fallback={
+                    <span class="agent-row-time">
+                      {rowProps.agent.updatedAt
+                        ? sidebarMessageTime(rowProps.agent.updatedAt, format)
+                        : rowProps.agent.time}
+                    </span>
+                  }
+                >
+                  {(current) => (
+                    <span class="agent-row-wait-chip">
+                      <Clock3 aria-hidden="true" />
+                      {sidebarUsageResetTime(current().resetsAt, format) ?? t("sidebar.state.usageLimitChip")}
+                    </span>
+                  )}
+                </Show>
               }
             >
               {(current) => (
@@ -128,7 +147,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
           <span class="agent-row-preview">{rowProps.agent.preview}</span>
         </span>
         <Show when={props.agentStates[rowProps.agent.id]}>
-          {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t)}</span>}
+          {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t, format)}</span>}
         </Show>
       </ContextMenu.Trigger>
       <SidebarAgentContextMenu agent={rowProps.agent} pinned={false} />

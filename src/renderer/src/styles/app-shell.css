@@ -2239,7 +2239,8 @@ textarea {
   line-height: 12px;
 }
 
-.agent-row-agent-status-routine {
+.agent-row-agent-status-routine,
+.agent-row-agent-status-limited {
   width: 16px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
@@ -2247,7 +2248,8 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.agent-row-agent-status-routine svg {
+.agent-row-agent-status-routine svg,
+.agent-row-agent-status-limited svg {
   width: 10px;
   height: 10px;
 }

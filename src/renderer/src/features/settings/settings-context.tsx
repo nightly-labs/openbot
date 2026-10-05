@@ -11,6 +11,7 @@ import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
@@ -69,9 +70,20 @@ const Settings = createSimpleContext({
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
+      sendShortcut: readSendShortcutMode(),
       soundFeedback: isActionSoundEnabled(),
       soundTheme: readActionSoundTheme(),
     });
+    // The mode also changes outside this dialog: another window, or the web Preferences tab on
+    // the same page. The shared signal carries those changes into the displayed settings value.
+    // Two-arg form: compute tracks the signal, apply writes the store outside tracking.
+    const sendShortcutMode = useSendShortcutMode();
+    createEffect(
+      () => sendShortcutMode(),
+      (mode) => {
+        setGeneralSettings((current) => (current.sendShortcut === mode ? current : { ...current, sendShortcut: mode }));
+      },
+    );
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,
       defaultAutoApprove: false,
@@ -130,6 +142,9 @@ const Settings = createSimpleContext({
       setGeneralSettings({ ...value, turboMode });
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
         setCompletionSoundEnabled(value.taskCompletionSound);
+      }
+      if (previous.sendShortcut !== value.sendShortcut) {
+        setSendShortcutMode(value.sendShortcut);
       }
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");

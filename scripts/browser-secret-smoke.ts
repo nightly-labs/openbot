@@ -19,6 +19,14 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         : `
       <label>Password<input id="password" type="password"></label>
       <label>Code<input id="code" inputmode="numeric"></label>
+      ${
+        url.pathname === "/login"
+          ? `<form method="get" action="/search"><label>Search password<input id="get-password" type="password"></label></form>
+      <form action="/search"><label>Default password<input id="default-password" type="password"></label></form>
+      <form method="post" action="/search"><label>Override password<input id="override-password" type="password"></label><button id="override-submit" formmethod="get">Go</button></form>
+      <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>`
+          : ""
+      }
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
       <button id="submit" disabled onclick="${url.pathname === "/native-submit" ? "if (!event.isTrusted) return; " : ""}${url.pathname === "/same-page" ? "history.replaceState({}, '', '/complete')" : "location.href='/complete'"}">Sign in</button>
       <script>
@@ -63,6 +71,10 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       };
       try {
         const handoff = await runCauseEffect(browser.prepareSecret(params));
+        // Only a real password field may take a vault password with no card; the digit boxes do not
+        // ask for a one-time code, and an email or SMS code never comes from the vault.
+        if (handoff.vaultFillable !== (method === "password"))
+          throw new Error(`The ${method} fields were classified wrongly for a vault fill.`);
         for (const tool of ["snapshot", "screenshot"]) {
           const capture = await runCauseEffect(
             browser.handleDynamicTool({ ...params, tool, arguments: { tabId: tab.id } }),
@@ -87,40 +99,87 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(tab.id));
       }
     }
-    const staleTab = await runCauseEffect(
-      browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
-    );
-    try {
-      const handoff = await runCauseEffect(
-        browser.prepareSecret({
-          namespace: "openbot_browser",
-          tool: "submit_secret",
-          threadId: "secret-thread",
-          ownerAgentId: "secret-agent",
-          turnId: "secret-turn",
-          callId: "stale",
-          arguments: {
-            tabId: staleTab.id,
-            method: "otp",
-            targets: [{ kind: "css", selector: "#code" }],
-            submission: "on_input",
-          },
-        }),
+    // A field built for something else must not take a vault password: its value can reach a URL.
+    // A password field in a POST form may.
+    for (const [selector, fillable] of [
+      ["#code", false],
+      ["#get-password", false],
+      ["#default-password", false],
+      ["#override-password", false],
+      ["#post-password", true],
+    ] as const) {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
       );
-      const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
-      if (!contents) throw new Error("Missing stale-target fixture.");
-      await contents.executeJavaScript("document.querySelector('#code').name = 'changed'; true");
-      let rejected = false;
       try {
-        await runCauseEffect(handoff.submit("729104"));
-      } catch {
-        rejected = true;
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `vault-${selector}`,
+            arguments: {
+              tabId: tab.id,
+              method: "password",
+              targets: [{ kind: "css", selector }],
+              submission: "enter",
+            },
+          }),
+        );
+        handoff.cancel();
+        if (handoff.vaultFillable !== fillable)
+          throw new Error(`${selector} was classified wrongly for a vault password.`);
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
       }
-      if (!rejected) throw new Error("A changed authentication target was accepted.");
-      if ((await contents.executeJavaScript("document.querySelector('#code').value")) !== "")
-        throw new Error("A changed authentication target received a value.");
-    } finally {
-      await runCauseEffect(browser.close(staleTab.id));
+    }
+    // A target that changes while the secret waits takes no value, also when a page adds a submitter
+    // that would send the form as GET.
+    for (const [selector, method, change] of [
+      ["#code", "otp", "document.querySelector('#code').name = 'changed'"],
+      [
+        "#post-password",
+        "password",
+        "const button = document.createElement('button'); button.setAttribute('formmethod', 'get'); document.querySelector('#post-password').form.append(button)",
+      ],
+    ] as const) {
+      const staleTab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
+      );
+      try {
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `stale-${selector}`,
+            arguments: {
+              tabId: staleTab.id,
+              method,
+              targets: [{ kind: "css", selector }],
+              submission: "on_input",
+            },
+          }),
+        );
+        const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
+        if (!contents) throw new Error("Missing stale-target fixture.");
+        await contents.executeJavaScript(`${change}; true`);
+        let rejected = false;
+        try {
+          await runCauseEffect(handoff.submit(method === "otp" ? "729104" : "fixture-password-729104"));
+        } catch {
+          rejected = true;
+        }
+        if (!rejected) throw new Error(`A changed authentication target ${selector} was accepted.`);
+        if ((await contents.executeJavaScript(`document.querySelector('${selector}').value`)) !== "")
+          throw new Error(`A changed authentication target ${selector} received a value.`);
+      } finally {
+        await runCauseEffect(browser.close(staleTab.id));
+      }
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

@@ -138,7 +138,7 @@ export class ChannelStore {
     );
     return rows.map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
-      const latestJson = row["latest_json"];
+      const latestJson = row.latest_json;
       const latest =
         typeof latestJson === "string" && latestJson.length > 0
           ? (() => {
@@ -149,8 +149,8 @@ export class ChannelStore {
           : undefined;
       return {
         ...channel,
-        unreadCount: Number(row["unread"] ?? 0),
-        activeTasks: Number(row["running"] ?? 0),
+        unreadCount: Number(row.unread ?? 0),
+        activeTasks: Number(row.running ?? 0),
         lastMessage: latest
           ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
           : null,

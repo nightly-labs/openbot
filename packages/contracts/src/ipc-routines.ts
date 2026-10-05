@@ -110,6 +110,13 @@ function isRoutineTrigger(value: unknown): value is RoutineTrigger {
 }
 
 /**
+ * What a run does while the provider plan of its agent is spent: `wait` stays in the queue until the
+ * reset, `skip` is dropped, for a routine whose result is no use when late.
+ */
+export const ROUTINE_LIMIT_POLICIES = ["wait", "skip"] as const;
+export type RoutineLimitPolicy = (typeof ROUTINE_LIMIT_POLICIES)[number];
+
+/**
  * The part of a routine that does not name its owner. One store and one settings panel serve both
  * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
  * shapes exactly.
@@ -121,6 +128,8 @@ export interface RoutineFields {
   active: boolean;
   timezone: string;
   trigger: RoutineTrigger;
+  /** Absent from a host that does not store it: the released Team API projects a fixed key list. */
+  limitPolicy?: RoutineLimitPolicy;
   createdAt: string;
   updatedAt: string;
 }
@@ -138,6 +147,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     isBoolean(value.active) &&
     isString(value.timezone) &&
     isRoutineTrigger(value.trigger) &&
+    (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -212,6 +222,8 @@ export interface CreateRoutineInput {
   active: boolean;
   timezone: string;
   schedule: RoutineSchedule;
+  /** `wait` when absent. */
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 export interface UpdateRoutineInput {
@@ -221,6 +233,7 @@ export interface UpdateRoutineInput {
   instruction?: string;
   active?: boolean;
   schedule?: RoutineSchedule;
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 export interface DeleteRoutineInput {

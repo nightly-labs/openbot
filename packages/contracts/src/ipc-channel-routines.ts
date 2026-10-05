@@ -3,6 +3,7 @@ import {
   isRoutineFields,
   isRoutineRunFields,
   type RoutineFields,
+  type RoutineLimitPolicy,
   type RoutineRunFields,
   type RoutineRunStatus,
   type RoutineSchedule,
@@ -81,6 +82,8 @@ export interface CreateChannelRoutineInput {
   active: boolean;
   timezone: string;
   schedule: RoutineSchedule;
+  /** `wait` when absent. */
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 export interface UpdateChannelRoutineInput {
@@ -90,6 +93,7 @@ export interface UpdateChannelRoutineInput {
   instruction?: string;
   active?: boolean;
   schedule?: RoutineSchedule;
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 export interface DeleteChannelRoutineInput {

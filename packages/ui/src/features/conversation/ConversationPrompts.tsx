@@ -12,6 +12,7 @@ import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecr
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "./send-shortcut";
 
 export function ChoiceCard(props: {
   title: string;
@@ -19,6 +20,11 @@ export function ChoiceCard(props: {
   choices: string[];
   customChoice?: string;
   pending?: boolean;
+  /**
+   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
+   * plain Enter does not submit and the single-line field adds no line.
+   */
+  sendShortcut?: SendShortcut;
   onSubmit: (answer: string) => Promise<boolean>;
 }) {
   const { t } = useText();
@@ -82,6 +88,7 @@ export function ChoiceCard(props: {
         value={answer()}
         placeholder={t("prompt.customPlaceholder")}
         aria-label={t("prompt.choice.customLabel")}
+        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
         maxlength={INPUT_LIMITS.promptAnswerText}
         disabled={props.pending}
         onValueChange={(value) => {
@@ -91,7 +98,13 @@ export function ChoiceCard(props: {
         onKeyDown={(event) => {
           // The browser owns the key that commits an IME composition. Safari sends it
           // after `compositionend` without `isComposing`; keyCode 229 marks it.
-          if (event.key === "Enter" && !event.isComposing && event.keyCode !== 229) void submit();
+          if (event.isComposing || event.keyCode === 229) return;
+          const sendShortcut = props.sendShortcut ?? "enter";
+          // Enter to send keeps the previous chord: every Enter sends.
+          if (sendShortcut === "enter") {
+            if (event.key !== "Enter") return;
+          } else if (!isSendShortcutKey(event, sendShortcut)) return;
+          void submit();
         }}
       />
     </div>

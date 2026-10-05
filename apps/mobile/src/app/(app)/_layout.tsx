@@ -201,6 +201,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="hosted-server"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="search-agents"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
@@ -225,6 +236,28 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="server-settings"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="server-routines"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="server-usage"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,

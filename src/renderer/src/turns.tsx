@@ -72,6 +72,8 @@ const Turns = createSimpleContext({
       Record<string, { turnId: string; detail: string } | undefined>
     >(seed?.turnProgress ?? {});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
+    // The agents whose queue waits for a provider plan to reset, in epoch seconds. Only a runtime snapshot of the local host carries it.
+    const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
     const [routinesByConversation, setRoutinesByConversation] = createSignal<
       Record<string, RoutineSnapshot | undefined>
@@ -377,6 +379,8 @@ const Turns = createSimpleContext({
       setTurnProgress,
       failedTurns,
       setFailedTurns,
+      usageLimits,
+      setUsageLimits,
       queues,
       setQueues,
       routinesByConversation,

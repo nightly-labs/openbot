@@ -20,6 +20,8 @@ import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { BrowserOperationError } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
+import { parseBrowserToolCall } from "../browser-tools";
+import type { PasswordVault } from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -141,6 +143,11 @@ export interface AttentionRegistryOptions {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
+  /**
+   * The vault the user shared with OpenBot, or null. A password or authenticator request for a login
+   * saved there is filled without a card: putting the login in the shared vault is the consent.
+   */
+  passwordVault?: PasswordVault | null;
 }
 
 export type RuntimeAttention = Pick<
@@ -168,6 +175,7 @@ export class AttentionRegistry {
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
+  readonly #passwordVault: PasswordVault | null;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -182,6 +190,7 @@ export class AttentionRegistry {
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
+    this.#passwordVault = options.passwordVault ?? null;
   }
 
   hasAttentionFor(agentId: string): boolean {
@@ -549,7 +558,11 @@ export class AttentionRegistry {
       });
       const prepared = yield* Effect.result(prepare);
       if (Result.isSuccess(prepared)) {
-        if (this.#takeovers.get(requestId) === pending) {
+        if (
+          this.#takeovers.get(requestId) === pending &&
+          !(yield* this.#fillFromVault(requestId, pending)) &&
+          this.#takeovers.get(requestId) === pending
+        ) {
           this.#routines.markNeedsAttention(turnId);
           this.#emit({ type: "browser-takeover-requested", request: takeover });
         }
@@ -574,6 +587,40 @@ export class AttentionRegistry {
         }),
       ),
     );
+  }).bind(this);
+
+  /**
+   * Answers `list_logins`: the logins of the shared vault for the tab's current site. `params` carries
+   * the public thread id and the owner agent, as the browser host receives them.
+   */
+  readonly listVaultLogins = Effect.fn("AttentionRegistry.listVaultLogins")(function* (
+    this: AttentionRegistry,
+    params: DynamicToolCallParams,
+  ) {
+    const call = yield* attentionStep(() => parseBrowserToolCall("list_logins", params.arguments));
+    if (call.tool !== "list_logins")
+      return yield* new AttentionOperationFailed({ cause: new Error("Invalid login list request.") });
+    const { tabId } = call.args;
+    const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
+    if (!tab || tab.ownerAgentId !== params.ownerAgentId || tab.ownerThreadId !== params.threadId)
+      return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
+    const listed = yield* Effect.result(
+      this.#passwordVault ? this.#passwordVault.loginsFor(tab.url) : Effect.succeed(null),
+    );
+    if (Result.isFailure(listed)) {
+      logger.warn("Unable to list the shared logins", { error: toLogValue(listed.failure.cause) });
+      return browserTakeoverError("The shared password vault could not be read. Use submit_secret without loginId.");
+    }
+    const logins = listed.success;
+    const answer =
+      logins === null
+        ? { connected: false, logins: [], next: "No password vault is connected. Use submit_secret without loginId." }
+        : { connected: true, logins };
+    const result: DynamicToolResult = {
+      success: true,
+      contentItems: [{ type: "inputText", text: JSON.stringify(answer) }],
+    };
+    return result;
   }).bind(this);
 
   surfaceDynamicPrompt(client: AgentClient, request: AppServerRequest): void {
@@ -830,6 +877,56 @@ export class AttentionRegistry {
     }
     client.respond(request.id, { decision: "decline" });
   }
+
+  /**
+   * Fills a password or authenticator request from the shared vault, without a card. True when the
+   * request was answered this way. With no login for the site, or several and no `loginId`, the card
+   * opens as before. The value goes to the browser only; the agent gets the usual result.
+   */
+  readonly #fillFromVault = Effect.fn("AttentionRegistry.fillFromVault")(function* (
+    this: AttentionRegistry,
+    requestId: RequestId,
+    pending: PendingBrowserTakeover,
+  ) {
+    const vault = this.#passwordVault;
+    const request = pending.secret?.request;
+    if (!vault || !request || request.method === "otp") return false;
+    // A script the agent ran on this site can read what is filled, and a field built for something
+    // else can carry the value into a URL. In both cases the card lets the user decide.
+    if (pending.secret?.agentScriptedOrigin !== false || pending.secret.vaultFillable !== true) return false;
+    const kind = request.method === "password" ? "password" : "totp";
+    const found = yield* Effect.result(
+      Effect.gen(function* () {
+        const call = yield* attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments));
+        const loginId = call.tool === "submit_secret" ? call.args.loginId : undefined;
+        const candidates = loginId
+          ? []
+          : ((yield* vault.loginsFor(request.origin)) ?? []).filter(
+              (login) => kind === "password" || login.hasOneTimePassword,
+            );
+        const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
+        return chosen ? yield* vault.secretFor(chosen, request.origin, kind) : null;
+      }),
+    );
+    if (Result.isFailure(found)) {
+      logger.warn("Unable to fill from the shared vault", { error: toLogValue(found.failure.cause) });
+      return false;
+    }
+    const secret = found.success;
+    if (!secret || this.#takeovers.get(requestId) !== pending) return false;
+    const submitted = yield* Effect.result(
+      this.respondToBrowserSecret({ requestId, agentId: pending.request.agentId, decision: "submit", secret }),
+    );
+    if (Result.isFailure(submitted)) {
+      // The tab could not be handed to the user. Answer the agent, so it does not wait forever.
+      logger.warn("Unable to submit the shared login", { error: toLogValue(submitted.failure.cause) });
+      if (this.#takeovers.get(requestId) === pending) this.#resolveBrowserTakeover(requestId, pending, "cancel");
+      return true;
+    }
+    // A failed fill hands the tab to the user, as a failed card submission does.
+    if (this.#takeovers.get(requestId) === pending) this.#routines.markNeedsAttention(pending.request.turnId);
+    return true;
+  }).bind(this);
 
   #resolveBrowserTakeover(
     requestId: RequestId,

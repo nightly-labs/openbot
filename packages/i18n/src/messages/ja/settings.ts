@@ -32,6 +32,12 @@ export const messages = {
   "settings.externalLinks.description": "会話内のリンクをどこで開くかを選びます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザ",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.sendShortcut.title": "送信キー",
+  "settings.sendShortcut.description":
+    "このデバイスとこのブラウザーでメッセージを送信するキーを選びます。「Enter で送信」では Shift+Enter で改行します。修飾キー方式では Enter で改行します。",
+  "settings.sendShortcut.enter": "Enter で送信",
+  "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
+  "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",
   "settings.autonomy.title": "エージェントの自律動作",
   "settings.turbo.title": "ターボモード",
   "settings.turbo.description":

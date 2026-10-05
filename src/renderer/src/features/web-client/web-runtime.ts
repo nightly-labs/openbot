@@ -719,6 +719,8 @@ export function createWebWorkspaceRuntime(
         text,
         attachmentDraftIds,
         replyToMessageId,
+        // The host uses this browser's zone for a routine the agent creates from the message.
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
       removeCompletedDrafts(attachmentDraftIds);

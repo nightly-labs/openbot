@@ -124,11 +124,21 @@ export class BrowserCdpEngine {
     {
       enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      /**
+       * Which secret the fields are built for, so a fill that no user approves goes only there: every
+       * field is a password field, or every field asks for a one-time code, and no native submission of
+       * them or of the submit button is GET, which would put the value in a URL. The fingerprint check
+       * of `enter` keeps this true until the fill.
+       */
+      fields: { password: boolean; oneTimeCode: boolean };
     },
     BrowserOperationError
   > {
     const generation = this.#navigationGeneration;
-    const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
+    // A submitter that overrides the form to GET is part of it, so a page cannot add one while the
+    // vault read waits.
+    const fingerprintFields = `[this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method, [...(this.form?.elements ?? [])].some((element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post')]`;
+    const fingerprint = `function() { return JSON.stringify(${fingerprintFields}); }`;
     const nodes = yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const inputs = [];
@@ -155,7 +165,40 @@ export class BrowserCdpEngine {
           if (!isString(value)) return yield* browserFailure(new Error("Authentication target is unavailable."));
           fingerprints.push(value);
         }
-        return { inputs, button, fingerprints };
+        // A native submission that could send the value in a URL: a form whose effective method is not
+        // POST (a form with no method is GET), or a submitter in it that overrides to GET. A field with
+        // no form is sent only by the page's own script.
+        const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
+        for (const node of inputs) {
+          const kind = yield* this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function() {
+              const form = this.form;
+              const overrides = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post';
+              const posts = !form || (form.method === 'post' && ![...form.elements].some(overrides));
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), posts };
+            }`,
+            [],
+          );
+          const posts = isDynamicRecord(kind) && kind.posts === true;
+          fields.password &&= isDynamicRecord(kind) && kind.password === true && posts;
+          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true && posts;
+        }
+        if (button) {
+          const posts = yield* this.#callOnNode(
+            send,
+            button.backendNodeId,
+            `function() {
+              if (!this.form) return true;
+              if (this.hasAttribute('formmethod')) return this.getAttribute('formmethod').trim().toLowerCase() === 'post';
+              return this.form.method === 'post';
+            }`,
+            [],
+          );
+          if (posts !== true) fields.password = fields.oneTimeCode = false;
+        }
+        return { inputs, button, fingerprints, fields };
       }),
     );
     if (generation !== this.#navigationGeneration)
@@ -206,7 +249,7 @@ export class BrowserCdpEngine {
                 return new Promise((resolve, reject) => {
                   const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
                   const check = () => {
-                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify(${fingerprintFields}) !== expected) return finish('Authentication target changed.');
                     if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
                   };
                   const observer = new MutationObserver(check);
@@ -225,6 +268,12 @@ export class BrowserCdpEngine {
               } else if (submission === "enter") {
                 const last = nodes.inputs.at(-1);
                 if (!last) return yield* browserFailure(new Error("Authentication target changed."));
+                // An input handler can change the form after the fill; the click branch checks the same.
+                if (
+                  (yield* this.#callOnNode(send, last.backendNodeId, fingerprint, [])) !==
+                  nodes.fingerprints[nodes.inputs.length - 1]
+                )
+                  return yield* browserFailure(new Error("Authentication target changed."));
                 yield* send("DOM.focus", { backendNodeId: last.backendNodeId });
                 yield* dispatchShortcut(send, "Enter");
               }
@@ -266,7 +315,7 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    return { enter, clear };
+    return { enter, clear, fields: nodes.fields };
   });
   #retainDebugger = false;
   #ownsDebugger = false;

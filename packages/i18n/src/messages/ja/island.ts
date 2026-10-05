@@ -33,6 +33,7 @@ export const messages = {
   "island.action.decline": "拒否",
   "island.action.approve": "承認",
   "island.action.later": "後で",
+  "island.action.dismiss": "閉じる",
   "island.action.answerInOpenBot": "OpenBot で回答",
   "island.failure.fallback": "タスクは完了する前に停止しました。",
   "island.failure.title": "タスクが失敗しました",

@@ -1,8 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isRoutineSchedule, ROUTINE_MINIMUM_INTERVAL_MINUTES, type RoutineSchedule } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { isRecord } from "../protocol";
-import { RoutineInputError } from "../routine-schedule";
 
 export function routineToolArguments(value: unknown, allowedKeys: readonly string[]): DynamicRecord {
   if (!isRecord(value)) throw new RoutineInputError("Routine tool arguments are required.");

@@ -1,4 +1,3 @@
-import { DeviceMotion } from "expo-sensors";
 import { useCallback, useEffect, useRef } from "react";
 import {
   cancelAnimation,
@@ -29,11 +28,6 @@ const WINK_HOLD_DURATION_MS = 72;
 const WINK_OPEN_DURATION_MS = WINK_DURATION_MS - WINK_CLOSE_DURATION_MS - WINK_HOLD_DURATION_MS;
 const WINK_RIGHT_REACTION_DURATION_MS = 173;
 const WINK_RIGHT_RECOVERY_DURATION_MS = WINK_DURATION_MS - WINK_RIGHT_REACTION_DURATION_MS;
-const ORIENTATION_UPDATE_INTERVAL_MS = 100;
-const ORIENTATION_ROTATION_DURATION_MS = 160;
-const ORIENTATION_DEAD_ZONE_DEGREES = 1;
-const MIN_PLANAR_GRAVITY = DeviceMotion.Gravity * 0.25;
-const RADIANS_TO_DEGREES = 180 / Math.PI;
 
 function createBlinkAnimation(): number {
   return withRepeat(
@@ -50,25 +44,13 @@ function createBlinkAnimation(): number {
   );
 }
 
-export function useAppLogoMotion({
-  animation,
-  followDeviceOrientation,
-  size,
-}: {
-  animation: AppLogoAnimation;
-  followDeviceOrientation: boolean;
-  size: number;
-}) {
+export function useAppLogoMotion({ animation, size }: { animation: AppLogoAnimation; size: number }) {
   const reduceMotion = useReducedMotion();
-  const deviceRotation = useSharedValue(0);
   const leftEyeScaleY = useSharedValue(1);
   const rightEyeScaleX = useSharedValue(1);
   const rightEyeScaleY = useSharedValue(1);
   const rightEyeTranslateY = useSharedValue(0);
   const resumeBlinkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastDeviceAngle = useRef<number | null>(null);
-  const accumulatedDeviceRotation = useRef(0);
-  const renderedDeviceRotation = useRef(0);
 
   const stopEyeAnimations = useCallback(() => {
     cancelAnimation(leftEyeScaleY);
@@ -102,60 +84,6 @@ export function useAppLogoMotion({
       stopEyeAnimations();
     };
   }, [startIdleBlink, stopEyeAnimations]);
-
-  useEffect(() => {
-    if (!followDeviceOrientation) {
-      cancelAnimation(deviceRotation);
-      deviceRotation.set(0);
-      lastDeviceAngle.current = null;
-      accumulatedDeviceRotation.current = 0;
-      renderedDeviceRotation.current = 0;
-      return;
-    }
-
-    let active = true;
-    let subscription: ReturnType<typeof DeviceMotion.addListener> | undefined;
-
-    DeviceMotion.setUpdateInterval(ORIENTATION_UPDATE_INTERVAL_MS);
-    void DeviceMotion.isAvailableAsync().then((available) => {
-      if (!active || !available) return;
-
-      subscription = DeviceMotion.addListener(({ acceleration, accelerationIncludingGravity }) => {
-        const x = accelerationIncludingGravity.x - (acceleration?.x ?? 0);
-        const y = accelerationIncludingGravity.y - (acceleration?.y ?? 0);
-        if (Math.hypot(x, y) < MIN_PLANAR_GRAVITY) return;
-
-        const deviceAngle = -Math.atan2(x, -y) * RADIANS_TO_DEGREES;
-        const previousAngle = lastDeviceAngle.current;
-
-        if (previousAngle === null) {
-          accumulatedDeviceRotation.current = deviceAngle;
-        } else {
-          let delta = deviceAngle - previousAngle;
-          if (delta > 180) delta -= 360;
-          if (delta < -180) delta += 360;
-          accumulatedDeviceRotation.current += delta;
-        }
-
-        lastDeviceAngle.current = deviceAngle;
-        const nextRotation = accumulatedDeviceRotation.current;
-        if (Math.abs(nextRotation - renderedDeviceRotation.current) < ORIENTATION_DEAD_ZONE_DEGREES) return;
-
-        renderedDeviceRotation.current = nextRotation;
-        deviceRotation.set(
-          reduceMotion
-            ? nextRotation
-            : withTiming(nextRotation, { duration: ORIENTATION_ROTATION_DURATION_MS, easing: EASE_OUT }),
-        );
-      });
-    });
-
-    return () => {
-      active = false;
-      subscription?.remove();
-      cancelAnimation(deviceRotation);
-    };
-  }, [deviceRotation, followDeviceOrientation, reduceMotion]);
 
   const handlePressIn = useCallback(() => {
     void haptics.impact();
@@ -218,9 +146,5 @@ export function useAppLogoMotion({
       { scaleY: rightEyeScaleY.get() },
     ],
   }));
-  const deviceRotationAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${deviceRotation.get()}deg` }],
-  }));
-
-  return { deviceRotationAnimatedStyle, handlePressIn, leftEyeAnimatedStyle, rightEyeAnimatedStyle };
+  return { handlePressIn, leftEyeAnimatedStyle, rightEyeAnimatedStyle };
 }

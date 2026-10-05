@@ -2,6 +2,8 @@ import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { useText } from "@openbot/ui/text";
 import { Loading } from "solid-js";
 import { DirectConversation } from "../../lazy-views";
+import { usePlatform } from "../../platform";
+import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { useDirectMessages } from "./direct-messages-context";
@@ -14,6 +16,7 @@ import { useDirectMessages } from "./direct-messages-context";
  * screen.
  */
 export function WorkspaceDirectConversation(props: { member: TeamPresenceMember }) {
+  const platform = usePlatform();
   const { activeServerSupportsCapability } = useServers();
   const { currentTeamMember } = usePresence();
   const {
@@ -60,6 +63,7 @@ export function WorkspaceDirectConversation(props: { member: TeamPresenceMember 
         onLoadOlder={() => void loadOlderDirectMessages(props.member.id)}
         onOpenMessage={(messageId) => openDirectMessage(props.member.id, messageId)}
         onTypingChange={setDirectTyping}
+        sendShortcut={deviceSendShortcut(platform.appInfo()?.platform)}
       />
     </Loading>
   );

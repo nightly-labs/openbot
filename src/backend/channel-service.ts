@@ -38,6 +38,13 @@ export interface ChannelHooks {
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
   busy(agentId: string): boolean;
+  /** Whether a spent provider plan holds this agent, so a routing turn on its model would be refused. */
+  usageLimited?(agentId: string): boolean;
+  /**
+   * Whether a task that a spent plan holds is dropped, because its routine has no use for a late
+   * result. It settles the routine run before the task is cancelled.
+   */
+  skipAtLimit?(task: ChannelTask): boolean;
   normalBusy?(): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -621,6 +628,11 @@ export class ChannelService {
       if (!task.ownerAgentId) {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
+        // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
+        if (lead && this.hooks.usageLimited?.(lead.id)) {
+          yield* channelSync(() => this.#dropForLimit(channelId, task));
+          continue;
+        }
         try {
           if (!lead) throw new ChannelRoutingError(sourceText("error.backend.channelLeadRequired"));
           // The channel summary that member turns already maintain stands in for the transcript.
@@ -773,6 +785,12 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
+          // A spent plan refused the routing turn and now holds the lead. The task is not paused for
+          // a human: it stays queued, and the reset wakes the channel again.
+          if (lead && this.hooks.usageLimited?.(lead.id)) {
+            yield* channelSync(() => this.#dropForLimit(channelId, task));
+            continue;
+          }
           channel = yield* channelSync(() => this.store.get(channelId));
           const detail =
             error instanceof ChannelRoutingError ? error.message : "Routing failed. Choose a member or try again.";
@@ -792,6 +810,10 @@ export class ChannelService {
           this.publish(channelId);
           continue;
         }
+      }
+      if (task.ownerAgentId && this.hooks.usageLimited?.(task.ownerAgentId)) {
+        yield* channelSync(() => this.#dropForLimit(channelId, task));
+        continue;
       }
       if (!task.ownerAgentId || this.hooks.busy(task.ownerAgentId) || this.hooks.normalBusy?.()) continue;
       if (
@@ -1035,6 +1057,62 @@ export class ChannelService {
     });
   }
 
+  /**
+   * A spent provider plan holds the agent of this delivery. The task goes back to the queue with a
+   * new revision and the assignment ends, so nothing reserves the host while the agent waits: the
+   * pump assigns the task again once the agent takes turns. False when there is no active assignment
+   * to give back, or when a transfer is pending on it. A task whose routine drops late work is
+   * cancelled instead.
+   */
+  requeueForLimit(deliveryId: string): boolean {
+    const assignment = this.store.assignmentForDelivery(deliveryId);
+    if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
+    const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
+    const current = task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
+    const skipped = task && current && this.hooks.skipAtLimit?.(task) ? this.#skippedTasks(task) : null;
+    this.store.update(this.store.get(assignment.channelId), {
+      assignments: [{ ...assignment, state: "interrupted" }],
+      tasks:
+        skipped ?? (task && current ? [{ ...task, state: "queued", revision: task.revision + 1, error: null }] : []),
+    });
+    this.resolveAssignmentTerminal(assignment.id);
+    this.publish(assignment.channelId);
+    // The drain hook that calls this is synchronous, so the owned scope runs the release.
+    this.#dispatchEvent(this.#releaseHeldAgents());
+    return true;
+  }
+
+  /** A queued task that a spent plan holds, and whose routine drops late work, is cancelled. */
+  #dropForLimit(channelId: string, task: ChannelTask): void {
+    if (!this.hooks.skipAtLimit?.(task)) return;
+    this.store.update(this.store.get(channelId), { tasks: this.#skippedTasks(task) });
+    this.publish(channelId);
+  }
+
+  /**
+   * The task a skipped routine run drops, and every other task of the same request that still
+   * waits with no assignment: a delegated task shares the request, and the settled run would no
+   * longer claim it. A task that already runs keeps its turn.
+   */
+  #skippedTasks(task: ChannelTask): ChannelTask[] {
+    const assigned = new Set(
+      this.store
+        .assignments(task.channelId)
+        .filter(activeAssignment)
+        .map((assignment) => assignment.taskId),
+    );
+    return this.store
+      .tasks(task.channelId)
+      .filter(
+        (item) =>
+          item.id === task.id ||
+          (item.requestMessageId === task.requestMessageId &&
+            (item.state === "queued" || item.state === "waiting") &&
+            !assigned.has(item.id)),
+      )
+      .map((item) => ({ ...item, state: "cancelled", revision: item.revision + 1, error: null }));
+  }
+
   restoreDeliveryLinks(): void {
     for (const channelId of this.store.ids())
       for (const assignment of this.store.assignments(channelId)) {
@@ -1267,7 +1345,7 @@ export class ChannelService {
     return false;
   }
 
-  /** Native event callbacks own this work; stop drains it before closing the scope. */
+  /** Native event callbacks and synchronous hooks own this work; stop drains it before closing the scope. */
   #dispatchEvent(operation: Effect.Effect<void, ChannelOperationError>): void {
     const fiber = Effect.runSync(
       Effect.forkIn(

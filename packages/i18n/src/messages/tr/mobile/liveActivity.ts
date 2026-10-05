@@ -9,12 +9,18 @@ export const messages = {
   "mobile.liveActivity.badge.approval": "Onay",
   "mobile.liveActivity.badge.takeover": "Devral",
   "mobile.liveActivity.badge.failed": "Başarısız",
-  "mobile.liveActivity.unread": { other: "{count} okunmamış" },
+  "mobile.liveActivity.unread": {
+    one: "{count} okunmamış",
+    other: "{count} okunmamış",
+  },
   "mobile.liveActivity.moreRequests": {
     one: "+{count} istek daha",
     other: "+{count} istek daha",
   },
-  "mobile.liveActivity.moreChats": { other: "+{count} daha" },
+  "mobile.liveActivity.moreChats": {
+    one: "+{count} daha",
+    other: "+{count} daha",
+  },
   "mobile.liveActivity.question.fallback": "{name} bir yanıta ihtiyaç duyuyor.",
   "mobile.liveActivity.approval.fallback": "İstenen eylemi çalıştırılmadan önce inceleyin.",
   "mobile.liveActivity.takeover.fallback": "Ajanın devam edebilmesi için tarayıcı adımını tamamlayın.",

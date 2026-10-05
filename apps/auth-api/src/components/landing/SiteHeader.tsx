@@ -30,7 +30,16 @@ export function SiteHeader(props: SiteHeaderProps) {
       >
         Contact
       </Button>
-      <ButtonLink to="/app" variant="secondary" size="sm" icon="arrow-right" class="site-header-secondary">
+      {/* A full page load: the /app route brings the desktop document styles, which stop the site page from
+          scrolling. A preload on hover or a client-side visit would add them to this page. */}
+      <ButtonLink
+        to="/app"
+        reloadDocument
+        variant="secondary"
+        size="sm"
+        icon="arrow-right"
+        class="site-header-secondary"
+      >
         App
       </ButtonLink>
       {props.page === "landing" ? (

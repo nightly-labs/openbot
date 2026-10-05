@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
-import { resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
 import { Effect, Semaphore } from "effect";
@@ -59,6 +59,7 @@ import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
+import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -257,6 +258,7 @@ const {
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardOnePasswordConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -273,6 +275,7 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
+  getFormat: () => createFormat(services?.language.locale ?? "en"),
   desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
 });
 
@@ -424,6 +427,7 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   githubConnector,
+  onePasswordConnector,
   billing,
   hostedServers,
   customProviderChanges,
@@ -477,6 +481,7 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
     ...hostedSiteIpcHandlers({ hostedSites, remoteServers, getMainWindow, translate: language.translate }),
     ...githubConnectorIpcHandlers({ githubConnector }),
+    ...onePasswordConnectorIpcHandlers({ onePasswordConnector }),
     ...billingIpcHandlers({ billing }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
@@ -886,6 +891,7 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);

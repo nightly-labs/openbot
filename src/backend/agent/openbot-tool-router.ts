@@ -19,8 +19,9 @@ import {
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Effect, Result } from "effect";
+import { z } from "zod";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
@@ -54,6 +55,8 @@ import {
 import {
   createAgentToolSchema,
   listModelsToolSchema,
+  PROFILE_TOOL_NAMES,
+  profileToolErrorMessage,
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./profile-tools";
@@ -64,6 +67,8 @@ import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool }
 import { isDynamicToolCall } from "./thread-items";
 import { ToolOperationFailed, toolStep } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
+
+const logger = createOpenBotLogger("openbot-tool-router");
 
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
@@ -79,6 +84,8 @@ export interface OpenBotToolRouterHooks {
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
   enabledMcpServers(): McpServerConfig[];
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** Masks the MCP secret values and handoff values that `redactText` does not know. */
+  redactMcp(text: string): string;
   /** True while the provider runs a turn for this agent, a context compaction included. */
   runsTurn(agentId: string): boolean;
   /** `false` when the turn no longer runs or `mayStop` refuses, so no stop was sent. */
@@ -230,7 +237,9 @@ export class OpenBotToolRouter {
               request.id,
               request.params.tool === "upload_files"
                 ? yield* this.#browserUploads.uploadFiles(agentId, params)
-                : yield* this.#browser.handleDynamicTool(params),
+                : request.params.tool === "list_logins"
+                  ? yield* this.#attention.listVaultLogins(params)
+                  : yield* this.#browser.handleDynamicTool(params),
             );
             return;
           }
@@ -243,10 +252,21 @@ export class OpenBotToolRouter {
               yield* this.#attention.surfaceHostedSiteApproval(client, request, request.params, request.params.tool);
               return;
             }
+            const tool = request.params.tool;
+            // The calling agent can correct a profile request, so it gets the reason as a failed tool result.
+            const profileFailure = (error: unknown) =>
+              Effect.sync(() => {
+                const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
+                if (!(error instanceof z.ZodError)) logger.warn("A profile tool failed.", { tool, error: message });
+                return openBotToolFailure(message);
+              });
+            const profileTool = PROFILE_TOOL_NAMES.has(tool);
             const response = this.#handleOpenBotTool(request.params).pipe(
+              Effect.catch((failure) => (profileTool ? profileFailure(failure.cause) : Effect.fail(failure))),
+              Effect.catchDefect((defect) => (profileTool ? profileFailure(defect) : Effect.die(defect))),
               Effect.tap((result) => Effect.sync(() => client.respond(request.id, result))),
             );
-            yield* request.params.tool === "attach_files_to_response" ? Effect.uninterruptible(response) : response;
+            yield* tool === "attach_files_to_response" ? Effect.uninterruptible(response) : response;
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${request.params.namespace}`);
@@ -579,7 +599,7 @@ export class OpenBotToolRouter {
       params: DynamicToolCallParams,
       senderAgentId: string,
     ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
-      const args = createAgentToolSchema.parse(params.arguments);
+      const args = createAgentToolSchema.parse(params.arguments, { reportInput: true });
       const hue = args.avatarHue ?? null;
       const caller = this.#requireAgent(senderAgentId);
       const listed = this.#hooks.listModels();
@@ -675,7 +695,7 @@ export class OpenBotToolRouter {
       params: DynamicToolCallParams,
       senderAgentId: string,
     ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
-      const args = updateProfileToolSchema.parse(params.arguments);
+      const args = updateProfileToolSchema.parse(params.arguments, { reportInput: true });
       const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, access, computerUse, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");

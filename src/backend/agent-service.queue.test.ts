@@ -2,7 +2,9 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEVELOPMENT_DEFAULT_MODEL, DEVELOPMENT_DEFAULT_REASONING_EFFORT } from "./agent/development-defaults";
@@ -799,6 +801,82 @@ describe.sequential("AgentService: queue", () => {
       { provider: "claude", state: "inactive" },
       { provider: "grok", state: "active" },
     ]);
+  });
+
+  it("captures the work steps at the switch and hands them to the next provider, with secrets redacted", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const secret = "handoff-secret-7c1f9e2a4b";
+    registerSecretValue(secret);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const started = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      preferredProvider: "codex",
+    });
+    service = started.service;
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First request" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+    const turnId = (await runCauseEffect(service.readConversation("chief"))).messages.find(
+      (message) => message.text === "CODEX_DONE",
+    )?.turnId;
+    const codex = clients.get("codex");
+    assert(turnId && codex, "The Codex turn did not complete.");
+    // Answers once: the capture at the switch must be what the handoff uses. A provider that stopped
+    // after the switch, as an unused one does, has nothing to read.
+    let reads = 0;
+    codex.threadRead = (params) => {
+      reads += 1;
+      if (reads > 1) throw new Error("The previous provider stopped.");
+      return {
+        thread: {
+          id: getString(params, "threadId"),
+          turns: [
+            {
+              id: turnId,
+              items: [
+                {
+                  id: "command-1",
+                  type: "commandExecution",
+                  command: "bun test",
+                  status: "completed",
+                  exitCode: 1,
+                  // The kept end of the output starts inside the secret.
+                  aggregatedOutput: `1 failed\ntoken ${secret}\n${"y".repeat(590)}`,
+                },
+                {
+                  id: "patch-1",
+                  type: "fileChange",
+                  status: "completed",
+                  changes: [{ path: "src/app.ts", kind: { type: "update" }, diff: "@@ -1 +1 @@" }],
+                },
+              ],
+            },
+          ],
+        },
+      };
+    };
+
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
+    const stepsDirectory = join(started.store.database.userDataPath, "provider-work-steps");
+    const [capture] = await readdir(stepsDirectory);
+    assert(capture, "The switch saved no work steps.");
+    const saved = await readFile(join(stepsDirectory, capture), "utf8");
+    expect(saved).toContain("bun test");
+    expect(saved).not.toContain("e2a4b");
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Second request" }));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+    const grokInput = firstInputText(
+      clients.get("grok")?.requests.find((request) => request.method === "turn/start")?.params,
+    );
+
+    expect(grokInput).toContain("$ bun test (exit 1)");
+    expect(grokInput).toContain("update src/app.ts");
+    expect(grokInput).toContain("CODEX_DONE");
+    expect(grokInput).not.toContain("e2a4b");
+    expect(reads).toBe(1);
   });
 
   it("resumes and retries once when Grok loses its in-memory session", async () => {
@@ -1935,7 +2013,7 @@ describe.sequential("AgentService: queue", () => {
     const expectedAssignments =
       context === "assigned" ? { ...originalAssignments, [createdAgentId]: sectionId } : originalAssignments;
     expect({
-      error: result.error?.message,
+      error: result.error?.message ?? openBotToolPayload(result.result).error,
       assignmentAtEnqueue,
       assignments: sidebar.getSnapshot().agentAssignments,
       persistedAssignments: restored.getSnapshot().agentAssignments,
@@ -1943,7 +2021,7 @@ describe.sequential("AgentService: queue", () => {
       created: service.listAgents().some((agent) => agent.id === createdAgentId),
       deliveries: service.listQueue(createdAgentId).deliveries.length,
     }).toEqual({
-      error: context === "rollback" ? "Error: Queue write failed." : undefined,
+      error: context === "rollback" ? "Queue write failed." : undefined,
       assignmentAtEnqueue: inherits ? sectionId : null,
       assignments: expectedAssignments,
       persistedAssignments: expectedAssignments,
@@ -2009,8 +2087,11 @@ describe.sequential("AgentService: queue", () => {
       provider: "codex",
       model: "gpt-missing",
     });
-    expect(unknownModel.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
-    expect(unknownModel.error?.message).toContain("gpt-5.6-terra");
+    expect(unknownModel.result).toMatchObject({ success: false });
+    expect(openBotToolPayload(unknownModel.result).error).toContain(
+      'Model "gpt-missing" is not available. Available models: ',
+    );
+    expect(openBotToolPayload(unknownModel.result).error).toContain("gpt-5.6-terra");
     const unsupportedEffort = await callOpenBotTool(client, threadId, "create_agent", {
       name: "Unsupported effort",
       description: "",
@@ -2018,7 +2099,7 @@ describe.sequential("AgentService: queue", () => {
       model: "gpt-5.5",
       reasoningEffort: "high",
     });
-    expect(unsupportedEffort.error?.message).toContain(
+    expect(openBotToolPayload(unsupportedEffort.result).error).toContain(
       'Model "gpt-5.5" does not support reasoning effort "high". Supported efforts: medium.',
     );
     expect(
@@ -2100,7 +2181,9 @@ describe.sequential("AgentService: queue", () => {
       name: "Renamed",
       model: "gpt-missing",
     });
-    expect(rejected.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
+    expect(openBotToolPayload(rejected.result).error).toContain(
+      'Model "gpt-missing" is not available. Available models: ',
+    );
     expect(service.listAgents().find((agent) => agent.id === "design")).toMatchObject({
       name: "Designer",
       model: "gpt-6-luna",
@@ -2337,7 +2420,7 @@ describe.sequential("AgentService: queue", () => {
         name: "Must not change",
         ...fields,
       });
-      expect(rejected.error).toBeDefined();
+      expect(rejected.result).toMatchObject({ success: false });
       expect(service.listAgents().find((agent) => agent.id === agentId)).toMatchObject({
         name: "Research Partner",
         avatarUrl: customUrl,
@@ -2351,14 +2434,18 @@ describe.sequential("AgentService: queue", () => {
       name: "Invalid",
       avatarHue: 999,
     });
-    expect(invalid.error).toBeDefined();
+    expect(invalid.error).toBeUndefined();
+    expect(invalid.result).toMatchObject({ success: false });
+    expect(openBotToolPayload(invalid.result).error).toContain("avatarHue");
     expect(service.listAgents().find((agent) => agent.id === agentId)?.name).toBe("Research Partner");
     const invalidCreation = await callOpenBotTool(client, threadId, "create_agent", {
       name: "Invalid",
       description: "",
       initialMessage: " ",
     });
-    expect(invalidCreation.error).toBeDefined();
+    expect(invalidCreation.error).toBeUndefined();
+    expect(invalidCreation.result).toMatchObject({ success: false });
+    expect(openBotToolPayload(invalidCreation.result).error).toContain("initialMessage");
     expect(service.listAgents().filter((agent) => agent.name === "Invalid")).toEqual([]);
     await callOpenBotTool(client, threadId, "update_profile", { agentId, avatarHue: null });
     expect(service.listAgents().find((agent) => agent.id === agentId)?.avatarUrl).toBeNull();
@@ -2409,6 +2496,82 @@ describe.sequential("AgentService: queue", () => {
       avatarSeed: "research-partner",
       avatarHue: null,
     });
+  });
+
+  it("preserves profiles on invalid tool arguments and saves a corrected retry without exposing input", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    const original = await runCauseEffect(store.getOrCreate("design", "Designer", "Design"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Update the design teammate." }));
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(threadId);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    const description = "private-profile-text".padEnd(INPUT_LIMITS.agentDescription + 1, "x");
+    const rejected = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "design",
+      name: "Must not be saved",
+      title: "Must not be saved",
+      description,
+    });
+    expect(rejected.error).toBeUndefined();
+    expect(rejected.result).toMatchObject({ success: false });
+    const failure = openBotToolPayload(rejected.result).error;
+    expect(failure).toContain("description");
+    expect(failure).toContain(`at most ${INPUT_LIMITS.agentDescription} characters`);
+    expect(failure).toContain(`received ${description.length}`);
+    expect(failure).not.toContain("private-profile-text");
+    expect(store.list().find((agent) => agent.id === "design")).toEqual(original);
+
+    const beforeCreation = service.listAgents();
+    const creation = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Must not exist",
+      description,
+      initialMessage: "Start.",
+    });
+    expect(creation.error).toBeUndefined();
+    expect(creation.result).toMatchObject({ success: false });
+    expect(openBotToolPayload(creation.result).error).toContain(`received ${description.length}`);
+    expect(service.listAgents()).toEqual(beforeCreation);
+
+    const unknownField = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "design",
+      "private-field-name": "private-field-value",
+    });
+    expect(unknownField.error).toBeUndefined();
+    expect(unknownField.result).toMatchObject({ success: false });
+    expect(JSON.stringify(unknownField.result)).not.toContain("private-field");
+    expect(store.list().find((agent) => agent.id === "design")).toEqual(original);
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+
+    const corrected = description.slice(0, INPUT_LIMITS.agentDescription);
+    const retry = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "design",
+      name: "Updated designer",
+      description: corrected,
+    });
+    expect(retry.error).toBeUndefined();
+    expect(retry.result).toMatchObject({ success: true });
+    expect(openBotToolPayload(retry.result)).toMatchObject({ name: "Updated designer", description: corrected });
+    await runCauseEffect(service.stop());
+    service = null;
+    const restored = stores(root);
+    try {
+      await runCauseEffect(restored.store.initialize());
+      expect(restored.store.list().find((agent) => agent.id === "design")).toMatchObject({
+        name: "Updated designer",
+        title: original.title,
+        description: corrected,
+      });
+      expect(restored.store.list().some((agent) => agent.name === "Must not exist")).toBe(false);
+    } finally {
+      restored.store.database.close();
+    }
   });
 
   it("lists complete local profiles and updates a selected agent profile", async () => {

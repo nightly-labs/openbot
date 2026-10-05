@@ -32,6 +32,7 @@ export const messages = {
   "island.action.decline": "Reddet",
   "island.action.approve": "Onayla",
   "island.action.later": "Daha sonra",
+  "island.action.dismiss": "Kapat",
   "island.action.answerInOpenBot": "OpenBot'ta Yanıtla",
   "island.failure.fallback": "Görev bitmeden durdu.",
   "island.failure.title": "Görev başarısız oldu",

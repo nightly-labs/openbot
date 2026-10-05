@@ -103,6 +103,7 @@ import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockMessaging } from "./mock-messaging";
+import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
@@ -380,6 +381,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     active: boolean;
     timezone: string;
     schedule: RoutineSchedule;
+    limitPolicy?: Routine["limitPolicy"];
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -390,6 +392,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       instruction: input.instruction.trim(),
       active: input.active,
       timezone: input.timezone,
+      limitPolicy: input.limitPolicy ?? "wait",
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -588,6 +591,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     githubConnector: createMockGitHubConnector(),
+    onePasswordConnector: createMockOnePasswordConnector(),
     billing: createMockBilling(),
     hostedServers: createMockHostedServers(),
     customProviders: {
@@ -1211,6 +1215,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.name === undefined ? {} : { name: input.name.trim() }),
           ...(input.instruction === undefined ? {} : { instruction: input.instruction.trim() }),
           ...(input.active === undefined ? {} : { active: input.active }),
+          ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.schedule === undefined
             ? {}
             : {

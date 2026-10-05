@@ -17,7 +17,7 @@ packages/
   contracts/         Process and network boundary types, limits, and pure validation
   i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
-  team-client/       Shared team connection, recovery, WebRTC framing, and Dynamic Island state
+  team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
@@ -978,6 +978,29 @@ handoff while retaining the public thread, agent identity, workspace, and stored
 Unchanged fingerprints resume the existing session. Pending history handoffs are written before
 the replacement is bound, reloaded after restart, and removed after a turn accepts the handoff.
 
+The same handoff carries a chat to another provider after a provider switch. It holds the user and
+assistant messages after the last context-reset marker, with attachment names only. OpenBot stores
+no tool steps, so the work log comes from the providers. At the switch, before the old sessions are
+retired, `ThreadLifecycle.readWorkSteps` reads each active session with `thread/read` through the
+client that holds it, with a 10-second limit. The switch then checks again that no turn started.
+Only after the switch is stored, `saveWorkSteps` writes the rendered steps of the 60 newest turns to
+`provider-work-steps/<sha256(session id)>` (mode 0600), or `{}` for a session with none. The sessions
+are retired before the write, so a turn that starts during it keeps its new session and reads the
+provider instead. The file is
+deleted and reconciled with the other session files, and a file that does not parse counts as no
+capture. A session without a capture, such as one that no client held, is read when the
+handoff is built: only the three newest, on their own providers, with a stopped CLI started again
+and one 10-second limit for the start and the read. From the turns that match a transcript message,
+`renderTurnSteps` adds a work log: commands with exit code and output tail, changed file paths, tool
+calls, searches and progress notes. Each field is redacted before it is cut, and each turn has a
+size limit. Reasoning, diffs, images and other provider-private state stay with the provider that
+made them. A failed capture or read leaves that session's steps out. Codex returns tool steps from
+its stored rollout. Claude returns only notes. An ACP agent keeps only the text and thinking of its
+turns, so it also gives only notes, and only while its process holds the session: the handoff read
+sends no `cwd`, as the boot backfill does, so a session that the process released is not opened
+again. That handoff read uses the shared provider process, so a session that ran in a Workspace only
+process gives no steps unless the switch captured it.
+
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path
 retains its recovery and retry guarantees:
@@ -1089,6 +1112,12 @@ Tool and media fees are outside the estimate. Stored estimates retain their pric
 Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
 inert until Back, so conversation drafts and settings survive navigation. Agent settings opens
 the same report with an agent filter. Host changes clear the filter and stale responses are rejected.
+The iPhone app opens Usage from the server menu in a sheet. It reads the same route through
+`readHostAnalytics` in `@openbot/team-client` and shows the per-agent rows; a row or the header
+filter narrows the report to one agent. The agent Usage page reads the same route with the agent
+filter, so its chart has the provider split too; a host without `host-analytics` gets the
+agent-scoped route and one area. The series pivot is in `@openbot/team-client/usage-series`, which
+the desktop chart also reads.
 
 `host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
 The host queries its local usage tables once for the date range and optional agent filter; it does
@@ -1097,7 +1126,7 @@ host-wide response carries per-agent rows that the client labels from the agent 
 reads. The same pass also groups by day and provider, which is what lets the chart draw one area
 per provider over a shared baseline; a cell carries only the token count and the cost estimate,
 because those are the two measures the chart reads. Both arrays are on the host report only, which
-is why the agent-scoped route, its codec and the mobile screen are unchanged. Session and turn identities include agent and provider. HTTP and
+is why the agent-scoped route and its codec are unchanged. Session and turn identities include agent and provider. HTTP and
 WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
 contracts. All authenticated team members can read these aggregates; no additional analytics data
 is stored by the account service or Signal service.
@@ -1420,11 +1449,17 @@ The provider `acp` runs ACP programs that the user saves. The model id names the
 `<agentId>/<model>`, or `<agentId>/default` for an agent that lists no models. So `agent_json` does
 not change, and the agent id pattern (`CUSTOM_AGENT_ID_PATTERN`) has no `_`, which `isAgentModel`
 refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one `AcpAgentClient`
-for each agent, which it starts when a thread first needs it. It adds the prefix `<agentId>:` to
-session ids and to the ids of requests that an agent sends, and removes it on the way back, so two
-agents that give the same session id stay apart. A thread on another agent than its model reads as
-a missing session, and the runtime hands the conversation over as for a provider switch. When a
-process that serves a thread exits, the router exits, and every custom agent restarts.
+for each agent and working folder, which it starts when a thread first needs it: an agent can serve
+one folder for each process (Command Code refuses a session in a second folder). `model/list` uses
+one more process for each agent, in a private temporary folder, so the probe session never opens on
+a process that serves a thread. A session id gets the prefix `<agentId>:<folderTag>:` (12 hex
+characters of the SHA-256 of the folder), so two agents, or two folders of one agent, that give the
+same session id stay apart; a session saved before this keeps its `<agentId>:<sessionId>` id, and
+the folder of its resume finds its process. Requests that an agent sends get an id of the router's
+own. A thread on another agent than its model reads as a missing session, and the
+runtime hands the conversation over as for a provider switch. When a process that serves a thread
+exits, the router exits, and every custom agent restarts. When a model list process exits, the
+next list starts another.
 
 `src/main/custom-agent-store.ts` keeps `custom-agents.json`: env names in plain text and all env
 values in one `safeStorage` ciphertext. `list()` returns summaries; only the backend gets the
@@ -1696,6 +1731,26 @@ provider when the session starts. Claude starts with `strictMcpConfig`, so it ig
 and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
 environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
 `safeStorage`.
+
+The 1Password connector is built in and has no SQLite row. `src/main/onepassword-connector-service.ts`
+runs the user's `op` CLI once to create the vault "Shared with OpenBot" and a `read_items` service
+account, or takes a pasted service account token. Before Connect, the page shows three setup steps
+that `checkSetup()` reads: a CLI of 2.18 or later (the user's own on `PATH`, else the copy that
+`src/main/onepassword-cli-installer.ts` downloads, with a SHA-256 pinned per target, into
+`<userData>/provider-state/1password-cli`), the 1Password app's CLI integration (`op account list`
+answers at least one account), and Connect. The service keeps only the token in
+`openbot-onepassword-connector-v1.json`, encrypted with `safeStorage`. It reads the vault with
+`@1password/sdk` and implements `PasswordVault` (`src/backend/password-vault.ts`). The developer
+instructions tell agents about the vault only while `PasswordVault.connected()` is true, read at
+each session start and resume, because most users have no vault. The agent service
+uses it in two places: `openbot_browser.list_logins` returns the logins saved for the tab's HTTPS
+site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
+authenticator request for a saved login by filling it through the same `prepareSecret` path as the
+secure card, with no card. On an origin where an agent ran `evaluate` during this app session,
+`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because the agent's script
+could read the filled fields. A login matches by 1Password's autofill rule, on the registrable domain
+with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
+password or a code.
 
 The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
 in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps

@@ -22,6 +22,11 @@ export interface SidebarAgentStatesInput {
   pendingPrompts: Record<string, SidebarAttention | undefined>;
   pendingApprovals: Record<string, SidebarApproval | undefined>;
   failedTurns: Record<string, string | undefined>;
+  /**
+   * The agents whose queue waits for a plan limit, with the reset in epoch seconds or `null`. Absent
+   * where the host does not report it, as on a remote server.
+   */
+  usageLimits?: Record<string, number | null>;
 }
 
 /**
@@ -65,7 +70,9 @@ export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Recor
   const states: Record<string, SidebarAgentState> = {};
   for (const agentId of input.agentIds) {
     const marked =
-      waitingState(input.pendingPrompts[agentId], input.pendingApprovals[agentId]) ?? routineBadge(agentId, input);
+      waitingState(input.pendingPrompts[agentId], input.pendingApprovals[agentId]) ??
+      limitedState(input.usageLimits, agentId) ??
+      routineBadge(agentId, input);
     if (marked) states[agentId] = marked;
     else if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
@@ -89,6 +96,15 @@ function routineBadge(agentId: string, input: SidebarAgentStatesInput): SidebarA
   const queued = deliveries.filter((delivery) => delivery.status === "queued");
   if (queued.length > 0) return routineState("queued", queued.length);
   return undefined;
+}
+
+/** A spent plan holds every message and routine run of the agent, so it names the wait over a routine mark. */
+function limitedState(
+  usageLimits: SidebarAgentStatesInput["usageLimits"],
+  agentId: string,
+): SidebarAgentState | undefined {
+  const resetsAt = usageLimits?.[agentId];
+  return resetsAt === undefined ? undefined : { kind: "limited", resetsAt };
 }
 
 function routineState(phase: SidebarRoutinePhase, count: number): SidebarAgentState {

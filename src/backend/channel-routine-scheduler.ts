@@ -11,11 +11,11 @@ import type {
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { recordRestartActivity } from "./restart-activity";
-import { collapseMissedOccurrences } from "./routine-schedule";
 import type { RoutineHoldWindow } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
@@ -23,6 +23,8 @@ export interface ChannelRoutineHooks {
   changed(channelId: string): void;
   emitError(code: string, error: unknown): void;
   excludedChannels(): ReadonlySet<string>;
+  /** Whether a spent provider plan holds the queue of the channel's lead, who takes each routine request. */
+  usageLimited(channelId: string): boolean;
 }
 
 export interface ChannelRoutineSchedulerOptions {
@@ -155,10 +157,32 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       if (!stored) throw new Error(sourceText("error.backend.routineGone"));
       return stored;
     });
-    const run = yield* this.#fireEffect(routine, null, new Date().toISOString());
+    const now = new Date().toISOString();
+    // The run would wait for the reset, and a routine set to skip has no use for a late result.
+    const run =
+      routine.limitPolicy === "skip" && this.#hooks.usageLimited(routine.channelId)
+        ? yield* channelRoutineStep(() =>
+            this.#routines.updateRunStatus(
+              this.#routines.createRun(routine, null, "manual", now).id,
+              "cancelled",
+              null,
+            ),
+          )
+        : yield* this.#fireEffect(routine, null, now);
     this.#changed(routine.channelId);
     return run;
   }, Effect.uninterruptible);
+
+  /**
+   * Whether a spent plan drops this channel task: it belongs to an open run of a routine set to
+   * skip. The run is settled as cancelled here, before the task is.
+   */
+  skipAtLimit(channelId: string, requestMessageId: string): boolean {
+    const run = this.#routines.openRuns(channelId).find((item) => item.requestMessageId === requestMessageId);
+    if (!run || this.#routines.get(channelId, run.routineId)?.limitPolicy !== "skip") return false;
+    this.#settle(run, { status: "cancelled", error: null });
+    return true;
+  }
 
   skipMissed(now: Date, held?: RoutineHoldWindow): void {
     this.#routines.skipMissed(now, held);
@@ -187,11 +211,13 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
             new Date(due.nextRunAt),
             now,
           );
-          // Advance on every fire attempt so a channel cannot build a backlog after sleep.
+          // The trigger advances whether or not the fire succeeds, so a channel builds no backlog.
           this.#routines.advanceTrigger(due.routine.id, due.triggerId, occurrence.nextRunAt.toISOString());
           changed.add(due.routine.channelId);
           return occurrence.scheduledFor.toISOString();
         });
+        // A routine set to skip drops the occurrence while a spent plan would only make it wait.
+        if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
         yield* this.#fireEffect(due.routine, due.triggerId, scheduledFor);
       }
     }).pipe(

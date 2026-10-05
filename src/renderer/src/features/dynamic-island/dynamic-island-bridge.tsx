@@ -144,6 +144,12 @@ export function DynamicIslandBridge() {
       publishDynamicIslandPresentation();
       return;
     }
+    if (action.type === "dismiss-failure") {
+      // The island hides the card only. The agent keeps its failed turn until the user opens it.
+      dynamicIslandCoordinator.resolveAction(action);
+      publishDynamicIslandPresentation();
+      return;
+    }
     if (activeServerId() !== action.serverId) {
       // The switch replaces this bridge along with the rest of the scope, so the
       // action is handed to the one that lands rather than finished here against

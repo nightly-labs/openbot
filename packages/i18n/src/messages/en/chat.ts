@@ -199,6 +199,7 @@ export const messages = defineMessages("chat", {
   "chat.row.reactions": "Reactions: {emoji}",
   "chat.row.agentReaction": "{name} reacted with {emoji}",
   "chat.row.removeReaction": "Remove your reaction {emoji}",
+  "chat.row.unavailable": "This message could not be shown",
   "chat.day.today": "Today {time}",
   "chat.day.yesterday": "Yesterday {time}",
   "chat.day.date": "{date} {time}",

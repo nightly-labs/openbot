@@ -24,9 +24,15 @@ const errors: string[] = [];
 const generate = vi.fn(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
 let count = 0;
 const operationId = () => `command-${++count}`;
+/** Whether a spent plan holds the members, as the usage-limit gate reports it. */
+let limited = false;
+/** Whether the members run other work, so the pump leaves a task unassigned. */
+let busy = false;
 
 beforeEach(async () => {
   errors.length = 0;
+  limited = false;
+  busy = false;
   generate.mockReset();
   generate.mockImplementation(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
   root = await mkdtemp(join(tmpdir(), "openbot-channel-routines-"));
@@ -40,7 +46,9 @@ beforeEach(async () => {
     generate,
     schedule: () => undefined,
     interrupt: () => Effect.void,
-    busy: () => false,
+    busy: () => busy,
+    usageLimited: () => limited,
+    skipAtLimit: (task) => scheduler.skipAtLimit(task.channelId, task.requestMessageId),
     // The production wiring: every channel commit publishes, and the publish reconciles the runs.
     changed: (channelId) => scheduler.reconcile(channelId),
     error: (error) => {
@@ -88,6 +96,7 @@ function newScheduler(): ChannelRoutineScheduler {
       changed: () => undefined,
       emitError: (code) => errors.push(code),
       excludedChannels: () => new Set(),
+      usageLimited: () => limited,
     },
   });
 }
@@ -268,6 +277,46 @@ describe("ChannelRoutineScheduler", () => {
     expect(currentRun(run.id).error).toBeNull();
   });
 
+  it("drops the work of a routine set to skip while a spent plan holds its channel", async () => {
+    routine = scheduler.update({ channelId: "channel-1", routineId: routine.id, limitPolicy: "skip" });
+    const run = await fire();
+    const assignment = required(service.store.assignments("channel-1")[0]);
+
+    // The hold gives the task back, and the routine drops it rather than run it late.
+    expect(service.requeueForLimit(required(assignment.deliveryId))).toBe(true);
+    expect(currentRun(run.id).status).toBe("cancelled");
+    expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "cancelled" })]);
+
+    // A run that arrives during the hold is dropped at once and sends no request.
+    limited = true;
+    const late = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+    expect(late.status).toBe("cancelled");
+    expect(service.store.tasks("channel-1")).toHaveLength(1);
+  });
+
+  it("drops a queued task of a routine set to skip that has no assignment yet when the hold starts", async () => {
+    routine = scheduler.update({ channelId: "channel-1", routineId: routine.id, limitPolicy: "skip" });
+    // Its owner runs other work, so the task waits in the channel without an assignment.
+    busy = true;
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+    await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBeTruthy());
+    expect(service.store.assignments("channel-1")).toEqual([]);
+    // A task the first one delegated shares its request.
+    const parent = required(service.store.tasks("channel-1")[0]);
+    service.store.update(service.store.get("channel-1"), {
+      tasks: [{ ...parent, id: "delegated-task", parentTaskId: parent.id, state: "waiting" }],
+    });
+
+    limited = true;
+    await runCauseEffect(service.wake("channel-1"));
+    await vi.waitFor(() => expect(currentRun(run.id).status).toBe("cancelled"));
+    expect(service.store.tasks("channel-1")).toEqual([
+      expect.objectContaining({ id: parent.id, state: "cancelled" }),
+      expect.objectContaining({ id: "delegated-task", state: "cancelled" }),
+    ]);
+    expect(service.store.assignments("channel-1")).toEqual([]);
+  });
+
   it("waits for a human when the lead cannot route, then follows the resumed task", async () => {
     generate.mockImplementation(() => Effect.succeed(JSON.stringify({ question: "Which report do you mean?" })));
     const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
@@ -395,7 +444,12 @@ describe("ChannelRoutineScheduler", () => {
     });
     const cold = new ChannelRoutineScheduler({
       channels: restarted,
-      hooks: { changed: () => undefined, emitError: (code) => errors.push(code), excludedChannels: () => new Set() },
+      hooks: {
+        changed: () => undefined,
+        emitError: (code) => errors.push(code),
+        excludedChannels: () => new Set(),
+        usageLimited: () => false,
+      },
     });
     cold.reconcileAll();
     expect(currentRun(run.id, cold).status).toBe("succeeded");

@@ -47,7 +47,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { setSkillsMarketplaceOpen } = useSettings();
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
-  const { activeTurns, queues, failedTurns, pendingPrompts, pendingApprovals } = useTurns();
+  const { activeTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals } = useTurns();
   const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
@@ -95,6 +95,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         Object.entries(pendingApprovals()).filter(([agentId, approval]) => inAgentThread(agentId, approval?.threadId)),
       ),
       failedTurns: failedTurns(),
+      usageLimits: usageLimits(),
     });
   });
 

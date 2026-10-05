@@ -7,12 +7,12 @@ import { type AgentSummary, agentAutomationAllowed, type Routine, type RoutineRu
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
+import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import type { Effect } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { RoutineInputError } from "../backend/routine-schedule";
 
 const logger = createOpenBotLogger("automation");
 

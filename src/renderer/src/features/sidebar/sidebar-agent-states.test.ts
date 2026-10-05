@@ -1,5 +1,5 @@
 import type { QueueDelivery, QueueDeliveryStatus, QueueSnapshot } from "@openbot/contracts/ipc";
-import { translateFor } from "@openbot/i18n";
+import { createFormat, translateFor } from "@openbot/i18n";
 import {
   computeSidebarAgentStates,
   type SidebarAgentStatesInput,
@@ -176,7 +176,7 @@ describe("computeSidebarAgentStates", () => {
 
     expect(states).toEqual({ chief: { kind: "routine", phase: "running", count: 2 } });
     assert(states.chief);
-    expect(sidebarAgentStateLabel(states.chief, translateFor("en"))).toBe("2 routines running");
+    expect(sidebarAgentStateLabel(states.chief, translateFor("en"), createFormat("en"))).toBe("2 routines running");
   });
 
   it("shows a queued routine only when none of its runs are already going", () => {
@@ -185,7 +185,7 @@ describe("computeSidebarAgentStates", () => {
     );
     expect(waiting.chief).toEqual({ kind: "routine", phase: "queued", count: 1 });
     assert(waiting.chief);
-    expect(sidebarAgentStateLabel(waiting.chief, translateFor("en"))).toBe("Routine waiting");
+    expect(sidebarAgentStateLabel(waiting.chief, translateFor("en"), createFormat("en"))).toBe("Routine waiting");
 
     const started = computeSidebarAgentStates(
       input({
@@ -212,7 +212,9 @@ describe("computeSidebarAgentStates", () => {
 
     expect(states.chief).toEqual({ kind: "waiting", reason: "question", detail: "Which region?" });
     assert(states.chief);
-    expect(sidebarAgentStateLabel(states.chief, translateFor("en"))).toBe("Waiting for your answer: Which region?");
+    expect(sidebarAgentStateLabel(states.chief, translateFor("en"), createFormat("en"))).toBe(
+      "Waiting for your answer: Which region?",
+    );
   });
 
   it("marks the current failed routine turn and ignores an older one", () => {

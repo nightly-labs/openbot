@@ -16,13 +16,25 @@ import {
   decodeRecordResponse,
   getRecord,
   getString,
+  isRecord,
 } from "../protocol";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./provider-diagnostics";
+import { USAGE_LIMIT_METHOD } from "./usage-limit-gate";
 
 const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Shown when the endpoints changed under a generation that had not yet spawned its process. */
 const CANCELLED_MESSAGE = sourceText("error.agent.profileEndpointsChanged");
+
+/**
+ * A generation that a spent plan window refused. It reads as any failed generation, and it carries
+ * the reset in epoch seconds when the provider gave one, so a caller can hold the model's work.
+ */
+export class GenerationUsageLimitError extends Schema.TaggedError<GenerationUsageLimitError>()(
+  "GenerationUsageLimitError",
+  { resetsAt: Schema.NullOr(Schema.Number), cause: Schema.Defect() },
+) {}
 
 /** Owns a disposable provider session; no durable agent, tools, workspace or conversation is involved. */
 export class ProfileGenerationFailed extends Schema.TaggedError<ProfileGenerationFailed>()("ProfileGenerationFailed", {
@@ -195,9 +207,10 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
 });
 
 const profileCompletion = Effect.fnUntraced(function* (client: AgentClient) {
-  return yield* Effect.callback<string, ProfileGenerationFailed>((resume) => {
+  return yield* Effect.callback<string, ProfileGenerationFailed | GenerationUsageLimitError>((resume) => {
     let text = "";
-    const finish = (effect: Effect.Effect<string, ProfileGenerationFailed>) => {
+    let limit: { resetsAt: number | null } | null = null;
+    const finish = (effect: Effect.Effect<string, ProfileGenerationFailed | GenerationUsageLimitError>) => {
       cleanup();
       resume(effect);
     };
@@ -208,6 +221,19 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient) {
       reject(sourceText("error.agent.profileToolUse"));
     };
     const notification = (notification: AppServerNotification) => {
+      const params = notification.params;
+      if (notification.method === USAGE_LIMIT_METHOD) {
+        limit = { resetsAt: isRecord(params) && typeof params.resetsAt === "number" ? params.resetsAt : null };
+      }
+      if (notification.method === "error" && !(isRecord(params) && params.willRetry === true)) {
+        const error = getRecord(params, "error");
+        const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        if (
+          isPlanLimitDiagnostic(message) ||
+          (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message))
+        )
+          limit ??= { resetsAt: null };
+      }
       if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
       if (notification.method === "item/completed") {
         const item = getRecord(notification.params, "item");
@@ -216,6 +242,15 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient) {
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
         if (getString(turn, "status") === "completed") finish(Effect.succeed(text));
+        else if (limit)
+          finish(
+            Effect.fail(
+              new GenerationUsageLimitError({
+                resetsAt: limit.resetsAt,
+                cause: new Error(sourceText("error.agent.profileFailed")),
+              }),
+            ),
+          );
         else reject(sourceText("error.agent.profileFailed"));
       }
       if (text.length > 32_000) reject(sourceText("error.agent.profileTooLarge"));

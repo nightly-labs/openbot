@@ -193,6 +193,7 @@ export const messages = {
   "chat.row.reactions": "リアクション: {emoji}",
   "chat.row.agentReaction": "{name} が {emoji} でリアクションしました",
   "chat.row.removeReaction": "自分のリアクション {emoji} を削除",
+  "chat.row.unavailable": "このメッセージを表示できません",
   "chat.day.today": "今日 {time}",
   "chat.day.yesterday": "昨日 {time}",
   "chat.day.date": "{date} {time}",

@@ -196,7 +196,8 @@ export class DynamicIslandWindowController {
       return;
     }
     const window = await this.#ensureMainWindow();
-    this.#options.presentMainWindow(window);
+    // A dismissal changes only the island, so the main window stays where it is.
+    if (action.type !== "dismiss-failure") this.#options.presentMainWindow(window);
     if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
       throw new Error(sourceText("error.backend.windowTemporarilyUnavailable"));
     }

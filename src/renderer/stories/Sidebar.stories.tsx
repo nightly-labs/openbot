@@ -325,6 +325,18 @@ export const AgentTiles: Story = {
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
+/** Two agents on a spent plan: one with a reported reset, one without. */
+export const UsageLimit: Story = {
+  args: {
+    agentStates: {
+      chief: { kind: "limited", resetsAt: Math.floor(Date.now() / 1_000) + 70 * 60 },
+      sales: { kind: "limited", resetsAt: null },
+    },
+    pinnedItems: [],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
 export const AgentLongLabels: Story = {
   args: {
     agents: longLabelAgents,
