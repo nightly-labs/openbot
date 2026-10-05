@@ -23,6 +23,7 @@ const HEADROOM = 8;
 /** The value labels sit at the right of the plot, as on iOS charts. */
 const AXIS_WIDTH = 52;
 const MORPH_MS = 320;
+const POINT_RADIUS = 3;
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 
 export interface UsageChartSeries {
@@ -87,9 +88,15 @@ function shownValues(from: number[], to: number[], progress: number): number[] {
 
 /**
  * A monotone cubic line through each run of known values, as the desktop chart's `monotone` areas
- * draw it, and the area under it down to the zero line.
+ * draw it, and the area under it down to the zero line. A run of one known value, such as a one-day
+ * range or a day between two unknown days, has no line, so it is a dot.
  */
-function seriesPaths(from: number[], to: number[], progress: number, width: number): { line: string; area: string } {
+function seriesPaths(
+  from: number[],
+  to: number[],
+  progress: number,
+  width: number,
+): { line: string; area: string; points: string } {
   "worklet";
   const count = to.length;
   const ys: number[] = [];
@@ -98,6 +105,7 @@ function seriesPaths(from: number[], to: number[], progress: number, width: numb
   const y = (index: number) => valueAt(ys, index);
   let line = "";
   let area = "";
+  let points = "";
   let index = 0;
   while (index < count) {
     if (Number.isNaN(y(index))) {
@@ -106,6 +114,13 @@ function seriesPaths(from: number[], to: number[], progress: number, width: numb
     }
     let end = index;
     while (end + 1 < count && !Number.isNaN(y(end + 1))) end++;
+    if (end === index) {
+      const cx = x(index);
+      const cy = y(index);
+      points += `M${(cx - POINT_RADIUS).toFixed(1)} ${cy.toFixed(1)}a${POINT_RADIUS} ${POINT_RADIUS} 0 1 0 ${POINT_RADIUS * 2} 0a${POINT_RADIUS} ${POINT_RADIUS} 0 1 0 ${-POINT_RADIUS * 2} 0Z`;
+      index++;
+      continue;
+    }
     const slopes: number[] = [];
     for (let point = index; point < end; point++) slopes.push((y(point + 1) - y(point)) / (x(point + 1) - x(point)));
     const tangents: number[] = [];
@@ -144,7 +159,7 @@ function seriesPaths(from: number[], to: number[], progress: number, width: numb
     area += `${run}L${x(end).toFixed(1)} ${HEIGHT}L${x(index).toFixed(1)} ${HEIGHT}Z`;
     index = end + 1;
   }
-  return { line, area };
+  return { line, area, points };
 }
 
 /**
@@ -170,6 +185,7 @@ function SeriesArea({ ys, width, color, enter }: { ys: number[]; width: number; 
   const paths = useDerivedValue(() => seriesPaths(from.get(), to.get(), progress.get(), width));
   const areaProps = useAnimatedProps(() => ({ d: paths.get().area }));
   const lineProps = useAnimatedProps(() => ({ d: paths.get().line }));
+  const pointProps = useAnimatedProps(() => ({ d: paths.get().points }));
   return (
     <>
       <AnimatedPath animatedProps={areaProps} fill={color} fillOpacity={0.12} />
@@ -181,6 +197,7 @@ function SeriesArea({ ys, width, color, enter }: { ys: number[]; width: number; 
         strokeLinejoin="round"
         strokeLinecap="round"
       />
+      <AnimatedPath animatedProps={pointProps} fill={color} />
     </>
   );
 }
