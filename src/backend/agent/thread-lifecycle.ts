@@ -35,6 +35,7 @@ import {
 } from "../mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
 import { decodeRecordResponse, decodeThreadResponse, getString, type ResponseDecoder } from "../protocol";
+import { withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -73,7 +74,7 @@ const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
 const HANDOFF_PRECEDENCE =
   "Your current profile and developer instructions take precedence over any different instructions or behavior in this transcript.";
 
-/** How many of the newest earlier sessions without a capture a handoff reads its work steps from. */
+/** How many of the newest earlier sessions a handoff reads, when they have no capture. */
 const HANDOFF_SESSIONS_READ = 3;
 /** The provider switch waits for the capture, so its read is short. */
 const CAPTURE_READ_TIMEOUT_MS = 10_000;
@@ -807,7 +808,7 @@ export class ThreadLifecycle {
       sessions.map(async (session, index): Promise<Array<readonly [string, string]>> => {
         try {
           // A capture costs one file read, so every session is checked for one.
-          const captured = await this.#capturedWorkSteps(session.externalSessionId);
+          const captured = await this.#capturedWorkSteps(session);
           if (captured) return [...captured];
           if (!read || index < firstRead) return [];
           const turns = await read(session.provider, session.externalSessionId);
@@ -824,34 +825,50 @@ export class ThreadLifecycle {
     return new Map(perSession.flat().filter(([turnId]) => turnIds.has(turnId)));
   }
 
-  async #capturedWorkSteps(sessionId: string): Promise<Map<string, string> | null> {
+  /** The saved steps of a session, or `null` when it has none to give, and a live read is next. */
+  async #capturedWorkSteps(session: ProviderSession): Promise<Map<string, string> | null> {
+    let text: string;
     try {
-      return decodeCapturedSteps(await readFile(this.workStepsPath(sessionId), "utf8"));
+      text = await readFile(this.workStepsPath(session.externalSessionId), "utf8");
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
       throw error;
     }
+    try {
+      return decodeCapturedSteps(text);
+    } catch (error) {
+      // A write that a crash cut short. The provider may still give the steps.
+      this.#hooks.logHandoffReadFailure(session.provider, error);
+      return null;
+    }
   }
 
   /**
-   * Saves the work steps of a session that a provider switch is about to replace. The session is
-   * read through the client that holds it, while it still does: an ACP agent keeps its turns only in
-   * its own process, and a provider no agent uses stops a minute later. A session no client holds is
-   * left to the read that the next handoff makes. A failed capture is logged and changes nothing
-   * else.
+   * Reads the work steps of a session that a provider switch is about to replace, through the
+   * client that holds it, while it still does: an ACP agent keeps its turns only in its own process,
+   * and a provider no agent uses stops a minute later. The result is saved with `saveWorkSteps`
+   * once the switch is stored. `null` - no client holds the session, or the read failed - leaves
+   * the session to the read that the next handoff makes.
    */
-  async captureWorkSteps(session: ProviderSession): Promise<void> {
+  async readWorkSteps(session: ProviderSession): Promise<string | null> {
     const client = this.#conversation.loadedClientFor(session.externalSessionId);
-    if (!client) return;
+    if (!client) return null;
     try {
-      const turns = await client.request(
-        "thread/read",
-        { threadId: session.externalSessionId, includeTurns: true },
-        decodeProviderTurns,
+      // Not the request's own timeout: the Claude and ACP clients answer a read without one.
+      const turns = await withTimeout(
+        client.request("thread/read", { threadId: session.externalSessionId, includeTurns: true }, decodeProviderTurns),
         CAPTURE_READ_TIMEOUT_MS,
+        "The session to replace could not be read in time.",
       );
-      const captured = encodeCapturedSteps(turns);
-      if (!captured) return;
+      return encodeCapturedSteps(turns);
+    } catch (error) {
+      this.#hooks.logHandoffReadFailure(session.provider, error);
+      return null;
+    }
+  }
+
+  async saveWorkSteps(session: ProviderSession, captured: string): Promise<void> {
+    try {
       await mkdir(join(this.#store.database.userDataPath, "provider-work-steps"), { recursive: true, mode: 0o700 });
       await writeFile(this.workStepsPath(session.externalSessionId), captured, { mode: 0o600 });
     } catch (error) {

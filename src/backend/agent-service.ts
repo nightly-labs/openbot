@@ -138,6 +138,7 @@ import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
+import type { ProviderSession } from "./database/provider-sessions";
 import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
@@ -1383,25 +1384,33 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
       throw new Error(sourceText("error.agent.modelProviderMismatch"));
     }
+    const captures: Array<readonly [ProviderSession, string]> = [];
     if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
       if (!input.model || !input.provider) {
         throw new Error("Changing provider requires an atomic provider and model selection.");
       }
-      const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
-      const activeTurn =
-        this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
-        (previous.threadId
-          ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
-          : null);
-      if (hasPendingWork || activeTurn) {
-        throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
-      }
+      const requireIdle = () => {
+        const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
+        const activeTurn =
+          this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
+          (previous.threadId
+            ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
+            : null);
+        if (hasPendingWork || activeTurn) {
+          throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
+        }
+      };
+      requireIdle();
       await this.ensureProvider(requestedProvider);
-      // Before the sessions are retired below, while the previous provider still holds them.
+      // Before the sessions are retired below, while the previous provider still holds them. The
+      // steps are saved only once the switch is stored: a switch that fails keeps the session.
       const sessions = previous.threadId ? this.#store.database.listProviderSessions(previous.threadId) : [];
-      for (const session of sessions) {
-        if (session.state === "active") await this.#threads.captureWorkSteps(session);
+      for (const session of sessions.filter((one) => one.state === "active")) {
+        const steps = await this.#threads.readWorkSteps(session);
+        if (steps !== null) captures.push([session, steps]);
       }
+      // The reads and the provider start take time, and a message sent in it can start a turn.
+      requireIdle();
     }
     const profileChanged =
       input.name !== undefined ||
@@ -1418,6 +1427,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
     const activeSession = this.#store.activeProviderSession(agent.id);
     if (previous?.threadId && requestedProvider && requestedProvider !== providerForAgent(previous)) {
+      for (const [session, steps] of captures) await this.#threads.saveWorkSteps(session, steps);
       this.#store.database.deactivateProviderSessions(previous.threadId);
     } else if (activeSession && (input.model || input.reasoningEffort)) {
       this.#store.database.updateProviderSessionConfig(
