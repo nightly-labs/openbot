@@ -54,6 +54,13 @@ describe("hosted server request keys", () => {
     expect(requests.keyFor("pro", "month", "usd").requestId).not.toBe(first.requestId);
   });
 
+  it("forgets the key of a choice whose create returned a paid server", () => {
+    const requests = keys();
+    const first = requests.keyFor("standard", "year", "eur");
+    requests.forget("standard", "year", "eur");
+    expect(requests.keyFor("standard", "year", "eur").requestId).not.toBe(first.requestId);
+  });
+
   it("gives each plan, billing period and currency its own key", () => {
     const requests = keys();
     const ids = new Set([

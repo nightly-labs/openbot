@@ -149,6 +149,10 @@ export function hostedServerLimit(list: HostedServerList): number | null {
   return paid >= list.maxServers ? list.maxServers : null;
 }
 
+function choiceOf(plan: BillingPlanId, interval: BillingInterval, currency: BillingCurrency): string {
+  return `${plan}:${interval}:${currency}`;
+}
+
 interface RequestKey {
   requestId: string;
   /** Null until the account server answers. */
@@ -167,13 +171,21 @@ export class HostedRequestKeys {
 
   /** The key of one choice. It is new only when the choice has no key that waits. */
   keyFor(plan: BillingPlanId, interval: BillingInterval, currency: BillingCurrency): RequestKey {
-    const choice = `${plan}:${interval}:${currency}`;
+    const choice = choiceOf(plan, interval, currency);
     let key = this.#keys.get(choice);
     if (!key) {
       key = { requestId: this.newId(), serverId: null };
       this.#keys.set(choice, key);
     }
     return key;
+  }
+
+  /**
+   * Forgets the key of one choice, when its server does not wait for payment. A create that timed
+   * out leaves a key with no server, so `settle` cannot forget it after the server was paid.
+   */
+  forget(plan: BillingPlanId, interval: BillingInterval, currency: BillingCurrency): void {
+    this.#keys.delete(choiceOf(plan, interval, currency));
   }
 
   /** Forgets each key whose server no longer waits for payment, so the next choice makes a new server. */

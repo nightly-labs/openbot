@@ -152,7 +152,10 @@ export function HostedServerPlansScreen() {
         currency,
         requestId: key.requestId,
       });
-      key.serverId = checkout.server.serverId;
+      // A server that no longer waits for payment, such as one paid after a create timed out, frees
+      // the choice, so the next purchase of it makes a new server.
+      if (checkout.server.state === "awaiting_payment") key.serverId = checkout.server.serverId;
+      else hostedRequestKeys.forget(chosen, interval, currency);
       rememberHostedServer(checkout.server);
       setCreating(false);
       router.push({ pathname: "/hosted-server/setup", params: { serverId: checkout.server.serverId } });
