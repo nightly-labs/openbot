@@ -141,7 +141,18 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
         ),
+      loginId: identifier
+        .optional()
+        .describe(
+          "For password or authenticator: the id of a saved login from list_logins. OpenBot fills its password or current code without asking the user.",
+        ),
     },
+  }),
+  browserTool({
+    name: "list_logins",
+    description:
+      "List the logins that the user shared with OpenBot for the tab's current HTTPS site: id, title, username, and whether it has an authenticator code. Passwords and codes are never returned. Type the username yourself, then call submit_secret with loginId.",
+    shape: { tabId },
   }),
   browserTool({
     name: "request_takeover",

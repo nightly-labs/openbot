@@ -29,7 +29,7 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
@@ -137,11 +137,13 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { probeModels } from "./model-server-probe";
 import { NotificationPreferenceStore } from "./notification-preference-store";
+import { OnePasswordConnectorService } from "./onepassword-connector-service";
+import { OnePasswordConnectorStore } from "./onepassword-connector-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
 import { startProviderLog } from "./provider-log";
-import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
+import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -206,6 +208,8 @@ const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
+/** The 1Password service account token of this computer, with the same cipher. */
+const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -253,6 +257,8 @@ const TEARDOWN_ORDER = {
   githubConnector: 107,
   // Before the agent service, so no script starts a run while the service stops.
   automation: 108,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  onePasswordConnector: 109,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
@@ -297,6 +303,7 @@ export interface ApplicationServices {
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   githubConnector: GitHubConnectorService;
+  onePasswordConnector: OnePasswordConnectorService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   browser: BrowserHost;
@@ -726,6 +733,23 @@ export async function createApplicationServices({
   });
   await githubConnector.load();
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () => githubConnector.dispose());
+  /*
+   * The 1Password connection. The browser fills logins from it, so the agent service reads it. The
+   * login list is read from 1Password in the background; startup does not wait for it.
+   */
+  const onePasswordCliTarget = runtimeTarget(process.platform, process.arch);
+  const onePasswordConnector = new OnePasswordConnectorService({
+    store: new OnePasswordConnectorStore(join(app.getPath("userData"), ONEPASSWORD_CONNECTOR_FILE), secretCipher),
+    hostName: hostname(),
+    appVersion: app.getVersion(),
+    // Outside every root an agent can write, like the GitHub tool files.
+    cliInstall: onePasswordCliTarget
+      ? { directory: join(app.getPath("userData"), "provider-state", "1password-cli"), target: onePasswordCliTarget }
+      : null,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  await onePasswordConnector.load();
+  teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () => onePasswordConnector.dispose());
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -895,6 +919,7 @@ export async function createApplicationServices({
     // handing every provider a command it cannot start.
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
     githubConnector,
+    passwordVault: onePasswordConnector,
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
     deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
@@ -1680,6 +1705,7 @@ export async function createApplicationServices({
     messaging,
     mcpOAuth,
     githubConnector,
+    onePasswordConnector,
     mailbox,
     storageUsage,
     browser,

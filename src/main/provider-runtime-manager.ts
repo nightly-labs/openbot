@@ -963,7 +963,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 }
 
-function runtimeTarget(platform: NodeJS.Platform, architecture: string): RuntimeTarget | null {
+export function runtimeTarget(platform: NodeJS.Platform, architecture: string): RuntimeTarget | null {
   if (platform === "darwin" && architecture === "arm64") return "darwin-arm64";
   if (platform === "darwin" && architecture === "x64") return "darwin-x64";
   if (platform === "linux" && architecture === "x64") return "linux-x64";

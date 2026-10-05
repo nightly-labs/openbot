@@ -11,6 +11,7 @@ import {
   type ComputerUseState,
   type ConversationPage,
   DISCONNECTED_GITHUB_CONNECTOR,
+  DISCONNECTED_ONEPASSWORD_CONNECTOR,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
   type DynamicIslandAction,
@@ -609,6 +610,9 @@ export function installOpenbotStub(): void {
     githubConnector: stubGroup(IPC_ENDPOINTS.githubConnector, "githubConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
       repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
+    }),
+    onePasswordConnector: stubGroup(IPC_ENDPOINTS.onePasswordConnector, "onePasswordConnector", {
+      status: vi.fn().mockResolvedValue(DISCONNECTED_ONEPASSWORD_CONNECTOR),
     }),
     billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
     hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {

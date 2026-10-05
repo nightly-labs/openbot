@@ -177,6 +177,17 @@ const BROWSER_WEB_PREFERENCES = {
 
 export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
+  /**
+   * True when an agent ran its own script on a page of this origin during this app session. That
+   * script can still listen to the fields, so only the user may decide to fill them.
+   */
+  agentScriptedOrigin: boolean;
+  /**
+   * True when the target fields are built for this secret: password fields for a password, one-time
+   * code fields for an authenticator code, none in a `method="get"` form. A field that the agent
+   * chose for something else, such as a search box, could put the value in a URL the agent reads.
+   */
+  vaultFillable: boolean;
   submit(secret: string): Promise<"submitted" | "takeover">;
   cancel(): void;
 }
@@ -202,6 +213,10 @@ function runBrowserTool<Name extends BrowserToolName>(
   hooks: BrowserDynamicToolHooks,
 ): Promise<DynamicToolResult> {
   return handlers[tool](call, params, hooks);
+}
+
+function urlOrigin(value: string): string | null {
+  return URL.canParse(value) ? new URL(value).origin : null;
 }
 
 async function rejectTakeoverTool(): Promise<DynamicToolResult> {
@@ -231,6 +246,11 @@ export class BrowserHost {
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   readonly #takeoverTabIds = new Set<string>();
+  /**
+   * The origins where an agent ran `evaluate`. Kept by origin, not by document: a same-origin popup,
+   * opener or service worker carries the script past one document.
+   */
+  readonly #agentScriptedOrigins = new Set<string>();
   #persistQueue: Promise<void> = Promise.resolve();
   #destroyPromise: Promise<void> | null = null;
   /** Whether the machine is too low on memory for one more tab. Only a hosted server has a reading. */
@@ -654,6 +674,11 @@ export class BrowserHost {
       return {
         // Password cards do not use digits; keep public metadata within its released bounds.
         request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
+        agentScriptedOrigin: this.#agentScriptedOrigins.has(url.origin),
+        vaultFillable:
+          args.method === "password"
+            ? entry.fields.password
+            : args.method === "authenticator" && entry.fields.oneTimeCode,
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
             tab.secret = undefined;
@@ -1243,6 +1268,7 @@ export class BrowserHost {
     // been asked for control when nobody was.
     submit_secret: rejectTakeoverTool,
     request_takeover: rejectTakeoverTool,
+    list_logins: rejectTakeoverTool,
   };
 
   async handleDynamicTool(
@@ -1950,13 +1976,22 @@ export class BrowserHost {
     timeoutMs: number,
   ): Promise<BrowserJsonValue> {
     const tab = this.#requireTab(tabId);
+    // The origin is read in the tab's queue, just before the script runs, and again when it ends: a
+    // navigation queued before it, or one that commits while it runs, decides where it ran.
+    const markScripted = () => {
+      const origin = urlOrigin(currentTabUrl(tab));
+      if (origin) this.#agentScriptedOrigins.add(origin);
+    };
     return runTabEvaluation(
       tab,
-      () => this.#requireNoSecretDocument(tab, "Page evaluation"),
+      () => {
+        this.#requireNoSecretDocument(tab, "Page evaluation");
+        markScripted();
+      },
       expression,
       awaitPromise,
       timeoutMs,
-    );
+    ).finally(markScripted);
   }
 
   /** The app contents that has focus, unless it is one of the browser's own tabs. */
