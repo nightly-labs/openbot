@@ -12,8 +12,11 @@ export interface ProviderTurnSteps {
   items: DynamicRecord[];
 }
 
-/** The ids Claude (`:reasoning`) and the ACP client (`:thought`) give a turn's thinking. */
-const REASONING_ID = /:(?:reasoning|thought)$/u;
+/**
+ * The ids Claude (`:reasoning`) and the ACP client (`:thought`, then `:thought:<n>` for each later
+ * block) give a turn's thinking.
+ */
+const REASONING_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
 
 /** The most text one step adds, and the end of a command's output that is kept. */
 const STEP_LIMIT = 1_000;
