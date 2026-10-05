@@ -145,6 +145,26 @@ describe("Team protocol v5", () => {
     expect(() => encodeTeamProtocolV5CurrentHttpResponse("GET", queuePath, 200, malformed)).toThrow("reply mark");
   });
 
+  it("carries the sender's timezone on a message; v4 drops it, and an unknown zone fails closed", () => {
+    const path = "/v1/agents/chief/messages";
+    const input = { text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null, timezone: "Europe/Warsaw" };
+    const wire = JSON.parse(encodeTeamProtocolV5CurrentHttpRequest("POST", path, input));
+    expect(decodeTeamProtocolV5CurrentHttpRequest("POST", path, wire)).toEqual(input);
+    expect(
+      decodeTeamProtocolV5CurrentHttpRequest("POST", path, encodeTeamProtocolV5WebRtcHttpRequest("POST", path, input)),
+    ).toEqual(input);
+
+    // An older host keeps its own zone, as it always did.
+    expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire)).not.toHaveProperty("timezone");
+
+    expect(() => encodeTeamProtocolV5CurrentHttpRequest("POST", path, { ...input, timezone: "Mars/Olympus" })).toThrow(
+      "Invalid message timezone.",
+    );
+    expect(() => decodeTeamProtocolV5CurrentHttpRequest("POST", path, { ...wire, timezone: 7 })).toThrow(
+      "Invalid message timezone.",
+    );
+  });
+
   it("names the member who wrote a user message; v4 drops the name, and a malformed one fails closed", () => {
     const pagePath = "/v1/agents/chief/conversation-page";
     const message = (id: string, senderMember?: { id: string; name: string }) => ({

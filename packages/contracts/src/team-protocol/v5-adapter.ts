@@ -20,6 +20,7 @@ import { withConversationSenders } from "./conversation-sender-v5";
 import {
   isAgentAnalyticsRoute,
   isAgentCreateRoute,
+  isAgentMessageRoute,
   isAgentProfileRoute,
   isConversationRoute,
   isConversationUnreadRoute,
@@ -135,6 +136,29 @@ function withExchangeExpectsReply(
   return result;
 }
 
+/**
+ * The sender's `timezone` rides beside the frozen message projection: the shipped key list drops it,
+ * so an older host never reads it and keeps its own zone for a routine the agent creates.
+ *
+ * A present value must name a zone. The host uses it as a schedule default, so a value it cannot read
+ * would only fail later, inside the agent's tool call. Fail closed instead.
+ */
+function messageTimezone(source: unknown): TeamProtocolV5BaseJsonObject {
+  if (!isDynamicRecord(source) || source.timezone === undefined) return {};
+  if (!isTimezone(source.timezone)) throw new Error("Invalid message timezone.");
+  return { timezone: source.timezone };
+}
+
+function isTimezone(value: unknown): value is string {
+  if (!isString(value) || value.length > 128) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function encodeQueueSnapshot(json: string, source: unknown): string {
   return JSON.stringify(withQueueMarks(JSON.parse(json), source));
 }
@@ -169,6 +193,10 @@ export function encodeTeamProtocolV5CurrentHttpRequest(
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       const projected = JSON.parse(encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options));
       return JSON.stringify({ ...projected, ...decodeAgentCreateModel(value) });
+    }
+    if (isAgentMessageRoute(method, path)) {
+      const projected = JSON.parse(encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options));
+      return JSON.stringify({ ...projected, ...messageTimezone(value) });
     }
     return encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options);
   }
@@ -211,6 +239,7 @@ export function decodeTeamProtocolV5CurrentHttpRequest(
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       return { ...decoded, ...decodeAgentCreateModel(value) };
     }
+    if (isAgentMessageRoute(method, path)) return { ...decoded, ...messageTimezone(value) };
     return decoded;
   }
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV5HttpRequest(method, path, value)));

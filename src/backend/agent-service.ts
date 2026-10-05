@@ -1768,7 +1768,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * `sender` is the person the host saw send it. It is not part of `SendMessageInput`: the caller of
    * that input, a renderer or a Team API body, never names who it is.
    */
-  async sendMessage(input: SendMessageInput, sender?: ConversationMessageSender): Promise<QueuedMessageReceipt> {
+  /** `timezone` is the sending client's zone, which a Team API member's client sends. */
+  async sendMessage(
+    input: SendMessageInput,
+    sender?: ConversationMessageSender,
+    timezone?: string,
+  ): Promise<QueuedMessageReceipt> {
     const validateRecipient = this.#mailbox.prepareDelivery([input.agentId]);
     if (this.#duplication.isPending(input.agentId))
       throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
@@ -1786,6 +1791,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery) throw new Error(sourceText("error.agent.queuedMessageCreateFailed"));
+    this.#routines.noteSenderTimezone(agent.id, timezone);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     this.#mailboxSync.syncMailboxMessages(snapshot);
     await this.#store.updatePreview(

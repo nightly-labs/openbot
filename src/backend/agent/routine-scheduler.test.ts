@@ -44,7 +44,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     });
     await service.initialize();
     await store.getOrCreate("design", "Design Studio", "Product design");
-    await service.sendMessage({ agentId: "chief", text: "Manage our routines." });
+    await service.sendMessage({ agentId: "chief", text: "Manage our routines." }, undefined, "Pacific/Auckland");
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
 
     const client = clients.get("codex");
@@ -62,7 +62,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       agentId: "chief",
       name: "Morning brief",
       active: true,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      // The sender's zone, not the host's.
+      timezone: "Pacific/Auckland",
     });
 
     const otherCreate = await callOpenBotTool(client, threadId, "create_routine", {

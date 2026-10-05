@@ -104,6 +104,12 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   readonly #deletionAgents = new Set<string>();
   readonly #timer: RoutineTimer;
+  /**
+   * The timezone of the last person who wrote to each agent, when their client sent one. A routine
+   * the agent creates for them runs on their clock, not on the host's. Memory only: after a restart,
+   * the host zone applies until they write again.
+   */
+  readonly #senderTimezones = new Map<string, string>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -112,6 +118,12 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#hooks = options.hooks;
     this.#timer = options.timer;
     this.#routines = new AgentRoutineStore(options.store.database);
+  }
+
+  /** A sender without a timezone writes from the host, or from a client too old to send one. */
+  noteSenderTimezone(agentId: string, timezone: string | undefined): void {
+    if (timezone === undefined) this.#senderTimezones.delete(agentId);
+    else this.#senderTimezones.set(agentId, timezone);
   }
 
   /** The scheduler's clause in the drain mute registry. */
@@ -339,7 +351,7 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       const timezone =
         args.timezone === undefined
-          ? localTimezone()
+          ? (this.#senderTimezones.get(senderAgentId) ?? localTimezone())
           : routineToolString(args.timezone, "timezone", 128, "A routine timezone is required.");
       const name = routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required.");
       const key = name.trim().toLowerCase();
