@@ -43,6 +43,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
+import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { phoneCurrencyAndRegion } from "@/shared/lib/phone-languages";
 import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
@@ -81,6 +82,8 @@ export function HostedServerPlansScreen() {
   const [accent, accentForeground, muted] = useThemeColor(["accent", "accent-foreground", "muted"]);
   const calls = useMemo(() => (session ? hostedServerCalls(session) : null), [session]);
   const userId = session?.user.id ?? null;
+  const apiUrl = session?.apiUrl ?? null;
+  const cloudServersOn = useMobileFeature(apiUrl ?? "", "cloudServers");
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [interval, setBillingInterval] = useState<BillingInterval>("year");
   const [currency, setCurrency] = useState<BillingCurrency>(firstCurrency);
@@ -98,7 +101,11 @@ export function HostedServerPlansScreen() {
     async (source: HostedServerCalls, resume: boolean): Promise<void> => {
       setLoad({ kind: "loading" });
       try {
-        const [catalog, list] = await Promise.all([source.plans(), source.list()]);
+        const [catalog, list] = await Promise.all([
+          source.plans(),
+          source.list(),
+          apiUrl ? refreshMobileFeatures(apiUrl, true) : undefined,
+        ]);
         hostedRequestKeys.settle(list.servers);
         if (userId) useHostedServerAvailability.setState({ userId, available: list.available, checkedAt: Date.now() });
         setLoad({ kind: "ready", plans: catalog.plans, list });
@@ -112,7 +119,7 @@ export function HostedServerPlansScreen() {
         setLoad({ kind: "failed", message: text.errorMessage(cause, text.t("mobile.server.hosted.loadFailed")) });
       }
     },
-    [userId],
+    [userId, apiUrl],
   );
 
   useEffect(() => {
@@ -128,7 +135,7 @@ export function HostedServerPlansScreen() {
   }
 
   async function continueToPayment(): Promise<void> {
-    if (!calls || load.kind !== "ready" || createInFlight.current) return;
+    if (!calls || load.kind !== "ready" || !cloudServersOn || createInFlight.current) return;
     // The plan that shows as selected, also when the catalog does not have the first choice.
     const chosen = (load.plans.find((entry) => entry.id === plan) ?? load.plans[0])?.id;
     if (!chosen) return;
@@ -177,7 +184,7 @@ export function HostedServerPlansScreen() {
     );
   }
 
-  if (!load.list.available || load.plans.length === 0) {
+  if (!load.list.available || !cloudServersOn || load.plans.length === 0) {
     return (
       <PlansContent>
         <PlansHeader description={t("mobile.server.hosted.unavailable")} />

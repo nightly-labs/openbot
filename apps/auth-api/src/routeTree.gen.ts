@@ -55,6 +55,7 @@ import { Route as V1MobileAuthDevicesRouteImport } from './routes/v1/mobile-auth
 import { Route as V1MobileAuthRedeemRouteImport } from './routes/v1/mobile-auth/redeem'
 import { Route as V1MobileAuthSessionRouteImport } from './routes/v1/mobile-auth/session'
 import { Route as V1MobileAuthTicketRouteImport } from './routes/v1/mobile-auth/ticket'
+import { Route as V1MobileFeaturesRouteImport } from './routes/v1/mobile/features'
 import { Route as V1SitesIndexRouteImport } from './routes/v1/sites/index'
 import { Route as V1SitesSiteIdRouteImport } from './routes/v1/sites/$siteId'
 import { Route as V1SitesReportsRouteImport } from './routes/v1/sites/reports'
@@ -355,6 +356,11 @@ const V1MobileAuthSessionRoute = V1MobileAuthSessionRouteImport.update({
 const V1MobileAuthTicketRoute = V1MobileAuthTicketRouteImport.update({
   id: '/v1/mobile-auth/ticket',
   path: '/v1/mobile-auth/ticket',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MobileFeaturesRoute = V1MobileFeaturesRouteImport.update({
+  id: '/v1/mobile/features',
+  path: '/v1/mobile/features',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1SitesIndexRoute = V1SitesIndexRouteImport.update({
@@ -771,6 +777,7 @@ export interface FileRoutesByFullPath {
   '/v1/mobile-auth/redeem': typeof V1MobileAuthRedeemRoute
   '/v1/mobile-auth/session': typeof V1MobileAuthSessionRoute
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
+  '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -886,6 +893,7 @@ export interface FileRoutesByTo {
   '/v1/mobile-auth/redeem': typeof V1MobileAuthRedeemRoute
   '/v1/mobile-auth/session': typeof V1MobileAuthSessionRoute
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
+  '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -1002,6 +1010,7 @@ export interface FileRoutesById {
   '/v1/mobile-auth/redeem': typeof V1MobileAuthRedeemRoute
   '/v1/mobile-auth/session': typeof V1MobileAuthSessionRoute
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
+  '/v1/mobile/features': typeof V1MobileFeaturesRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -1119,6 +1128,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/redeem'
     | '/v1/mobile-auth/session'
     | '/v1/mobile-auth/ticket'
+    | '/v1/mobile/features'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -1234,6 +1244,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/redeem'
     | '/v1/mobile-auth/session'
     | '/v1/mobile-auth/ticket'
+    | '/v1/mobile/features'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -1349,6 +1360,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/redeem'
     | '/v1/mobile-auth/session'
     | '/v1/mobile-auth/ticket'
+    | '/v1/mobile/features'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -1463,6 +1475,7 @@ export interface RootRouteChildren {
   V1MobileAuthRedeemRoute: typeof V1MobileAuthRedeemRoute
   V1MobileAuthSessionRoute: typeof V1MobileAuthSessionRoute
   V1MobileAuthTicketRoute: typeof V1MobileAuthTicketRoute
+  V1MobileFeaturesRoute: typeof V1MobileFeaturesRoute
   V1SitesSiteIdRoute: typeof V1SitesSiteIdRoute
   V1SitesReportsRoute: typeof V1SitesReportsRoute
   V1SkillsSkillIdRoute: typeof V1SkillsSkillIdRouteWithChildren
@@ -1841,6 +1854,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/mobile-auth/ticket'
       fullPath: '/v1/mobile-auth/ticket'
       preLoaderRoute: typeof V1MobileAuthTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mobile/features': {
+      id: '/v1/mobile/features'
+      path: '/v1/mobile/features'
+      fullPath: '/v1/mobile/features'
+      preLoaderRoute: typeof V1MobileFeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/sites/': {
@@ -2486,6 +2506,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MobileAuthRedeemRoute: V1MobileAuthRedeemRoute,
   V1MobileAuthSessionRoute: V1MobileAuthSessionRoute,
   V1MobileAuthTicketRoute: V1MobileAuthTicketRoute,
+  V1MobileFeaturesRoute: V1MobileFeaturesRoute,
   V1SitesSiteIdRoute: V1SitesSiteIdRoute,
   V1SitesReportsRoute: V1SitesReportsRoute,
   V1SkillsSkillIdRoute: V1SkillsSkillIdRouteWithChildren,

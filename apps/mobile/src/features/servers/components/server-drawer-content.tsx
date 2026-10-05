@@ -18,6 +18,7 @@ import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
+import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
@@ -91,10 +92,15 @@ export function ServerDrawerContent({
     setDragging(false);
   }, [open]);
 
-  // As on desktop, the plus button opens the plans when the account can create hosted servers.
-  const canCreateServer = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  // As on desktop, the plus button opens the plans when the account can create hosted servers and
+  // the feature flag of this build allows the purchase.
+  const accountCanCreate = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  const cloudServersOn = useMobileFeature(session.apiUrl, "cloudServers");
+  const canCreateServer = accountCanCreate && cloudServersOn;
   useEffect(() => {
-    if (open) void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
+    if (!open) return;
+    void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
+    void refreshMobileFeatures(session.apiUrl);
   }, [open, session]);
 
   function move(serverId: string, targetIndex: number) {
