@@ -930,10 +930,11 @@ export class ChannelService {
     if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
     const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
     const current = task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
-    const state = task && current && this.hooks.skipAtLimit?.(task) ? "cancelled" : "queued";
+    const skipped = task && current && this.hooks.skipAtLimit?.(task) ? this.#skippedTasks(task) : null;
     this.store.update(this.store.get(assignment.channelId), {
       assignments: [{ ...assignment, state: "interrupted" }],
-      tasks: task && current ? [{ ...task, state, revision: task.revision + 1, error: null }] : [],
+      tasks:
+        skipped ?? (task && current ? [{ ...task, state: "queued", revision: task.revision + 1, error: null }] : []),
     });
     this.resolveAssignmentTerminal(assignment.id);
     this.publish(assignment.channelId);
@@ -944,10 +945,32 @@ export class ChannelService {
   /** A queued task that a spent plan holds, and whose routine drops late work, is cancelled. */
   #dropForLimit(channelId: string, task: ChannelTask): void {
     if (!this.hooks.skipAtLimit?.(task)) return;
-    this.store.update(this.store.get(channelId), {
-      tasks: [{ ...task, state: "cancelled", revision: task.revision + 1, error: null }],
-    });
+    this.store.update(this.store.get(channelId), { tasks: this.#skippedTasks(task) });
     this.publish(channelId);
+  }
+
+  /**
+   * The task a skipped routine run drops, and every other task of the same request that still
+   * waits with no assignment: a delegated task shares the request, and the settled run would no
+   * longer claim it. A task that already runs keeps its turn.
+   */
+  #skippedTasks(task: ChannelTask): ChannelTask[] {
+    const assigned = new Set(
+      this.store
+        .assignments(task.channelId)
+        .filter(activeAssignment)
+        .map((assignment) => assignment.taskId),
+    );
+    return this.store
+      .tasks(task.channelId)
+      .filter(
+        (item) =>
+          item.id === task.id ||
+          (item.requestMessageId === task.requestMessageId &&
+            (item.state === "queued" || item.state === "waiting") &&
+            !assigned.has(item.id)),
+      )
+      .map((item) => ({ ...item, state: "cancelled", revision: item.revision + 1, error: null }));
   }
 
   restoreDeliveryLinks(): void {

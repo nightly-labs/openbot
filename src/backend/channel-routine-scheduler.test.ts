@@ -288,11 +288,19 @@ describe("ChannelRoutineScheduler", () => {
     const run = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
     await vi.waitFor(() => expect(service.store.tasks("channel-1")[0]?.ownerAgentId).toBeTruthy());
     expect(service.store.assignments("channel-1")).toEqual([]);
+    // A task the first one delegated shares its request.
+    const parent = required(service.store.tasks("channel-1")[0]);
+    service.store.update(service.store.get("channel-1"), {
+      tasks: [{ ...parent, id: "delegated-task", parentTaskId: parent.id, state: "waiting" }],
+    });
 
     limited = true;
     service.wake("channel-1");
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("cancelled"));
-    expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "cancelled" })]);
+    expect(service.store.tasks("channel-1")).toEqual([
+      expect.objectContaining({ id: parent.id, state: "cancelled" }),
+      expect.objectContaining({ id: "delegated-task", state: "cancelled" }),
+    ]);
     expect(service.store.assignments("channel-1")).toEqual([]);
   });
 
