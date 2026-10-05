@@ -76,11 +76,14 @@ const Settings = createSimpleContext({
     });
     // The mode also changes outside this dialog: another window, or the web Preferences tab on
     // the same page. The shared signal carries those changes into the displayed settings value.
+    // Two-arg form: compute tracks the signal, apply writes the store outside tracking.
     const sendShortcutMode = useSendShortcutMode();
-    createEffect(() => {
-      const mode = sendShortcutMode();
-      setGeneralSettings((current) => (current.sendShortcut === mode ? current : { ...current, sendShortcut: mode }));
-    });
+    createEffect(
+      () => sendShortcutMode(),
+      (mode) => {
+        setGeneralSettings((current) => (current.sendShortcut === mode ? current : { ...current, sendShortcut: mode }));
+      },
+    );
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,
       defaultAutoApprove: false,
