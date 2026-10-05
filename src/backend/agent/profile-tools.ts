@@ -109,8 +109,16 @@ export const readAgentToolSchema = z
   })
   .strict();
 
-/** Describe schema failures without returning submitted instructions or unknown field names. */
-export function profileToolValidationMessage(error: z.ZodError, input: unknown): string {
+export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "list_models",
+  "read_agent",
+  "create_agent",
+  "update_profile",
+]);
+
+/** Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field names. */
+export function profileToolErrorMessage(error: unknown, input: unknown): string {
+  if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
   const details = error.issues.map((issue) => {
     if (issue.code === "unrecognized_keys") return "Remove unsupported profile fields.";
     const field = issue.path.join(".") || "arguments";

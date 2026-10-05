@@ -1835,7 +1835,7 @@ describe.sequential("AgentService: queue", () => {
     const expectedAssignments =
       context === "assigned" ? { ...originalAssignments, [createdAgentId]: sectionId } : originalAssignments;
     expect({
-      error: result.error?.message,
+      error: result.error?.message ?? openBotToolPayload(result.result).error,
       assignmentAtEnqueue,
       assignments: sidebar.getSnapshot().agentAssignments,
       persistedAssignments: restored.getSnapshot().agentAssignments,
@@ -1843,7 +1843,7 @@ describe.sequential("AgentService: queue", () => {
       created: service.listAgents().some((agent) => agent.id === createdAgentId),
       deliveries: service.listQueue(createdAgentId).deliveries.length,
     }).toEqual({
-      error: context === "rollback" ? "Error: Queue write failed." : undefined,
+      error: context === "rollback" ? "Queue write failed." : undefined,
       assignmentAtEnqueue: inherits ? sectionId : null,
       assignments: expectedAssignments,
       persistedAssignments: expectedAssignments,
@@ -1909,8 +1909,11 @@ describe.sequential("AgentService: queue", () => {
       provider: "codex",
       model: "gpt-missing",
     });
-    expect(unknownModel.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
-    expect(unknownModel.error?.message).toContain("gpt-5.6-terra");
+    expect(unknownModel.result).toMatchObject({ success: false });
+    expect(openBotToolPayload(unknownModel.result).error).toContain(
+      'Model "gpt-missing" is not available. Available models: ',
+    );
+    expect(openBotToolPayload(unknownModel.result).error).toContain("gpt-5.6-terra");
     const unsupportedEffort = await callOpenBotTool(client, threadId, "create_agent", {
       name: "Unsupported effort",
       description: "",
@@ -1918,7 +1921,7 @@ describe.sequential("AgentService: queue", () => {
       model: "gpt-5.5",
       reasoningEffort: "high",
     });
-    expect(unsupportedEffort.error?.message).toContain(
+    expect(openBotToolPayload(unsupportedEffort.result).error).toContain(
       'Model "gpt-5.5" does not support reasoning effort "high". Supported efforts: medium.',
     );
     expect(
@@ -2000,7 +2003,9 @@ describe.sequential("AgentService: queue", () => {
       name: "Renamed",
       model: "gpt-missing",
     });
-    expect(rejected.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
+    expect(openBotToolPayload(rejected.result).error).toContain(
+      'Model "gpt-missing" is not available. Available models: ',
+    );
     expect(service.listAgents().find((agent) => agent.id === "design")).toMatchObject({
       name: "Designer",
       model: "gpt-6-luna",
@@ -2231,7 +2236,7 @@ describe.sequential("AgentService: queue", () => {
         name: "Must not change",
         ...fields,
       });
-      expect(rejected.error).toBeDefined();
+      expect(rejected.result).toMatchObject({ success: false });
       expect(service.listAgents().find((agent) => agent.id === agentId)).toMatchObject({
         name: "Research Partner",
         avatarUrl: customUrl,

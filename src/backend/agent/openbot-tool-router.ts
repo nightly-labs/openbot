@@ -52,7 +52,8 @@ import {
 import {
   createAgentToolSchema,
   listModelsToolSchema,
-  profileToolValidationMessage,
+  PROFILE_TOOL_NAMES,
+  profileToolErrorMessage,
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./profile-tools";
@@ -226,7 +227,14 @@ export class OpenBotToolRouter {
               await this.#attention.surfaceHostedSiteApproval(client, request, request.params, request.params.tool);
               return;
             }
-            client.respond(request.id, await this.#handleOpenBotTool(request.params));
+            const tool = request.params.tool;
+            const args = request.params.arguments;
+            const response = await this.#handleOpenBotTool(request.params).catch((error: unknown) => {
+              // The calling agent can correct a profile request, so it gets the reason as a failed tool result.
+              if (!PROFILE_TOOL_NAMES.has(tool)) throw error;
+              return openBotToolFailure(redactText(profileToolErrorMessage(error, args)));
+            });
+            client.respond(request.id, response);
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${request.params.namespace}`);
@@ -491,9 +499,7 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "create_agent") {
-      const parsed = createAgentToolSchema.safeParse(params.arguments);
-      if (!parsed.success) return openBotToolFailure(profileToolValidationMessage(parsed.error, params.arguments));
-      const args = parsed.data;
+      const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
       const caller = this.#requireAgent(senderAgentId);
       const listed = this.#hooks.listModels();
@@ -571,9 +577,7 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "update_profile") {
-      const parsed = updateProfileToolSchema.safeParse(params.arguments);
-      if (!parsed.success) return openBotToolFailure(profileToolValidationMessage(parsed.error, params.arguments));
-      const args = parsed.data;
+      const args = updateProfileToolSchema.parse(params.arguments);
       const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, access, computerUse, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");
