@@ -8,7 +8,7 @@ import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { CircleCheck, ClipboardPaste, ScanLine, Server } from "lucide-react-native";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Keyboard, Pressable, View } from "react-native";
+import { AppState, Keyboard, Pressable, View } from "react-native";
 
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
@@ -278,7 +278,7 @@ export function AddServerScreen({
   );
 }
 
-/** The height and shape of the two quiet actions under the field. The native paste control gets the same box. */
+/** The height and shape of the two quiet actions under the field. */
 const QUICK_ACTION_CLASS = `h-12 flex-1 overflow-hidden bg-control ${isIOS ? "" : "rounded-2xl"}`;
 /** The corners of `SheetFormField` on iOS, so the actions match the field above them. Android uses its class. */
 const QUICK_ACTION_SHAPE = isIOS ? ({ borderCurve: "continuous", borderRadius: 16 } as const) : null;
@@ -316,46 +316,60 @@ function QuickAction({
 }
 
 /**
- * Paste the invitation from the clipboard. On iOS this is the system paste control, which reads the
- * clipboard without the "Allow Paste" prompt; iOS draws its label and icon, and the box around it
- * gives it the same shape as the scan action.
+ * Paste the invitation from the clipboard: the text, or a link that another app copied as a link.
+ * It is the app's own action, so it always shows; it is dimmed while the clipboard has neither.
  */
 function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: (value: string) => void }) {
   const { t } = useText();
-  const [foreground, control] = useThemeColor(["foreground", "surface-secondary"]);
-  if (Clipboard.isPasteButtonAvailable) {
-    return (
-      <View
-        className={QUICK_ACTION_CLASS}
-        pointerEvents={disabled ? "none" : "auto"}
-        style={[QUICK_ACTION_SHAPE, { opacity: disabled ? 0.5 : 1 }]}
-      >
-        <Clipboard.ClipboardPasteButton
-          acceptedContentTypes={["plain-text"]}
-          backgroundColor={String(control)}
-          foregroundColor={String(foreground)}
-          cornerStyle="fixed"
-          style={{ height: 48, width: "100%" }}
-          onPress={(data) => {
-            if (data.type !== "text") return;
-            void haptics.impact("soft");
-            onPaste(data.text.trim());
-          }}
-        />
-      </View>
-    );
-  }
+  const [foreground] = useThemeColor(["foreground"]);
+  const pasteable = useClipboardHasLink();
   return (
     <QuickAction
-      disabled={disabled}
+      disabled={disabled || !pasteable}
       icon={<ClipboardPaste size={18} strokeWidth={1.8} color={foreground} />}
       label={t("mobile.server.join.paste")}
       onPress={() => {
-        void Clipboard.getStringAsync().then(
-          (value) => onPaste(value.trim()),
+        void readClipboardLink().then(
+          (value) => {
+            if (value) onPaste(value);
+          },
           () => undefined,
         );
       }}
     />
   );
+}
+
+async function readClipboardLink(): Promise<string> {
+  const text = (await Clipboard.getStringAsync()).trim();
+  if (text) return text;
+  return ((await Clipboard.getUrlAsync()) ?? "").trim();
+}
+
+/**
+ * Whether the clipboard has text or a link. These checks read no content, so iOS shows no paste
+ * prompt. The user copies the invitation in another app, so the check runs again on each return.
+ */
+function useClipboardHasLink(): boolean {
+  const [pasteable, setPasteable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const check = () => {
+      void Promise.all([Clipboard.hasStringAsync(), Clipboard.hasUrlAsync()]).then(
+        ([text, url]) => {
+          if (active) setPasteable(text || url);
+        },
+        () => undefined,
+      );
+    };
+    check();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") check();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+  return pasteable;
 }

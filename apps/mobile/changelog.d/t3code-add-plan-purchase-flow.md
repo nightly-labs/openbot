@@ -5,3 +5,4 @@
 ### Changed
 
 - The OpenBot logo no longer turns when you turn your phone, and the app no longer uses motion access.
+- Settings → About shows the build number after the version, such as "1.1.0 (17)".

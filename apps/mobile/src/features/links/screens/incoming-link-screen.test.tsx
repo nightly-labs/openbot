@@ -71,7 +71,12 @@ vi.mock("expo-router", () => ({
 }));
 vi.mock("expo-router/react-navigation", () => ({ usePreventRemove: () => {} }));
 vi.mock("expo-web-browser", () => ({ openBrowserAsync: state.openBrowser }));
-vi.mock("expo-clipboard", () => ({ isPasteButtonAvailable: false, getStringAsync: async () => "" }));
+vi.mock("expo-clipboard", () => ({
+  getStringAsync: async () => "",
+  getUrlAsync: async () => null,
+  hasStringAsync: async () => false,
+  hasUrlAsync: async () => false,
+}));
 vi.mock("heroui-native", () => ({
   Typography: {
     Heading: ({ children }: PropsWithChildren) => <h1>{children}</h1>,
@@ -106,6 +111,7 @@ vi.mock("react-native", () => ({
     </button>
   ),
   Keyboard: { dismiss: () => {} },
+  AppState: { addEventListener: () => ({ remove: () => {} }) },
 }));
 vi.mock("lucide-react-native", () => ({
   Bot: () => null,
