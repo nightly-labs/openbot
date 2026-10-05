@@ -17,9 +17,11 @@ const FLAGS_TIMEOUT_MS = 10_000;
  * first answer every feature is off, and a failed read keeps the last answer. An account server
  * without the flags endpoint, such as an older or self-hosted one, leaves every feature off.
  */
-export const useMobileFeatures = create<{ apiUrl: string | null; flags: MobileFeatureFlags; checkedAt: number }>(
-  () => ({ apiUrl: null, flags: mobileFeaturesOff(), checkedAt: 0 }),
-);
+const useMobileFeatures = create<{ apiUrl: string | null; flags: MobileFeatureFlags; checkedAt: number }>(() => ({
+  apiUrl: null,
+  flags: mobileFeaturesOff(),
+  checkedAt: 0,
+}));
 
 export async function refreshMobileFeatures(apiUrl: string, force = false): Promise<MobileFeatureFlags> {
   const current = useMobileFeatures.getState();
