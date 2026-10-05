@@ -973,8 +973,12 @@ describe("secure browser handoff", () => {
     prepared.cancel();
   });
 
-  it.each(["otp", "authenticator"] as const)("rejects zero digits for %s", async (method) => {
-    await expect(prepare(method, 0)).rejects.toThrow();
+  it.each([
+    ["otp", 0],
+    ["authenticator", 0],
+    ["otp", 3],
+  ] as const)("rejects a %s code with %i digits", async (method, digits) => {
+    await expect(prepare(method, digits)).rejects.toThrow("4–12 digits");
     expect(secretEntry).not.toHaveBeenCalled();
   });
 

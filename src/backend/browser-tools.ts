@@ -124,9 +124,8 @@ export const BROWSER_TOOL_DEFINITIONS = [
       digits: z
         .number()
         .int()
-        .min(4)
+        .min(0)
         .max(12)
-        .or(z.literal(0))
         .default(6)
         .describe(
           "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",

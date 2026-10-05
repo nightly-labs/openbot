@@ -644,7 +644,7 @@ export class BrowserHost {
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error(sourceText("error.backend.authHttpsRequired"));
     this.#requireIsolatedFromConnectedTabs(tab, url.origin);
-    if (args.method !== "password" && args.digits === 0) throw new Error(sourceText("error.backend.authDigitsRange"));
+    if (args.method !== "password" && args.digits < 4) throw new Error(sourceText("error.backend.authDigitsRange"));
     if (
       (args.method === "password" && args.targets.length !== 1) ||
       (args.targets.length !== 1 && args.targets.length !== args.digits) ||

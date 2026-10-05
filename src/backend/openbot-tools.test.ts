@@ -4,9 +4,28 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { AGENT_DATABASE_LIMITS } from "./agent-data/agent-database-protocol";
+import { BROWSER_DYNAMIC_TOOLS } from "./browser-tools";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 
 describe("OpenBot tool declarations", () => {
+  // Gemini types `enum` as a string list and rejects the whole request for any other value (#1358).
+  it("declares only string enum and const values", () => {
+    const invalid: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (typeof node !== "object" || node === null) return;
+      for (const [key, value] of Object.entries(node)) {
+        if (key === "enum" && Array.isArray(value) && value.some((item) => typeof item !== "string"))
+          invalid.push(path);
+        if (key === "const" && typeof value !== "string") invalid.push(path);
+        walk(value, `${path}.${key}`);
+      }
+    };
+    for (const namespace of [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS]) {
+      for (const tool of namespace.tools) walk(tool.inputSchema, `${namespace.name}/${tool.name}`);
+    }
+    expect(invalid).toEqual([]);
+  });
+
   it("requires site identity and local source details for mutations", () => {
     const publish = OPENBOT_DYNAMIC_TOOLS.tools.find((tool) => tool.name === "publish_site");
     const replace = OPENBOT_DYNAMIC_TOOLS.tools.find((tool) => tool.name === "replace_site");
@@ -31,7 +50,6 @@ describe("OpenBot tool declarations", () => {
     ["update_profile", { agentId: "agent-1", avatarSeed: "agent:1", avatarHue: null }, true],
     ["update_profile", { agentId: "agent-1", avatarSeed: "INVALID" }, false],
     ["update_profile", { agentId: "agent-1", avatarSeed: "x".repeat(129) }, false],
-    ["update_profile", { agentId: "agent-1", avatarHue: 123 }, false],
     ["update_profile", { agentId: "agent-1", avatarPath: "/tmp/avatar.png" }, true],
     ["update_profile", { agentId: "agent-1", avatarPath: "" }, false],
     ["update_profile", { agentId: "agent-1", avatarPath: "x".repeat(INPUT_LIMITS.path + 1) }, false],
@@ -83,6 +101,7 @@ describe("OpenBot tool declarations", () => {
     for (const avatarHue of [...AVATAR_HUES, null]) {
       expect(updateProfileToolSchema.safeParse({ agentId: "agent-1", avatarHue }).success).toBe(true);
     }
+    expect(updateProfileToolSchema.safeParse({ agentId: "agent-1", avatarHue: 123 }).success).toBe(false);
   });
 
   it.each([
