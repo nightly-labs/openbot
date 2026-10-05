@@ -814,6 +814,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
+        turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
       },
     });
     this.#removal = new AgentRemoval({

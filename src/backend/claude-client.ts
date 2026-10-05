@@ -837,30 +837,39 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       });
     const fallback = message.subtype === "success" ? message.result : "";
     const errors = message.errors ?? [];
+    const interrupted =
+      message.terminal_reason === "aborted_streaming" ||
+      message.terminal_reason === "aborted_tools" ||
+      errors.some((error) => /interrupt|abort/i.test(error));
     const turn = runtime.activeTurn;
     if (turn) {
       for (const [toolCallId, name] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
-      // A rejected window alone is not a failure: the request can still run on overage.
+      // A rejected window alone is not a failure: the request can still run on overage. Only the
+      // refusal message, or a request that then failed with an API error, ends the turn on the limit.
       const limit = turn.usageLimit;
-      if (limit && (limit.text !== null || message.is_error === true || message.subtype !== "success")) {
+      if (
+        limit &&
+        !interrupted &&
+        (limit.text !== null || (message.subtype === "success" && message.is_error === true))
+      ) {
         this.emit("notification", {
           method: USAGE_LIMIT_METHOD,
           params: { threadId: runtime.id, turnId: turn.id, resetsAt: limit.resetsAt },
         });
         this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
-        this.#completeTurn(runtime, "failed", limit.text ?? (errors.join("\n") || fallback || "Usage limit reached."));
+        this.#completeTurn(
+          runtime,
+          "failed",
+          limit.text ?? (errors.join("\n") || fallback || sourceText("error.provider.usageLimitReached")),
+        );
         return;
       }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
       if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
-    const interrupted =
-      message.terminal_reason === "aborted_streaming" ||
-      message.terminal_reason === "aborted_tools" ||
-      errors.some((error) => /interrupt|abort/i.test(error));
     const status = interrupted ? "interrupted" : message.subtype === "success" ? "completed" : "failed";
     this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : null);
   }

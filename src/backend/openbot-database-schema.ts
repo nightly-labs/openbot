@@ -819,6 +819,11 @@ function migrateProviderSessionsForCursor(db: DatabaseSync): void {
 }
 
 // Migration 26 adds the Cline provider with the same rebuild and the same skip.
+function migrateProviderSessionsForCline(db: DatabaseSync): void {
+  widenProviderSessionsCheck(db, "'cline'", V26_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v26");
+}
+
+// Migration 27 adds the routine limit policy to the agent and the channel routine tables.
 function addRoutineLimitPolicy(db: DatabaseSync): void {
   for (const table of ["projection_agent_routines", "projection_channel_routines"]) {
     // A development profile that ran this version before it shipped has the column already.
@@ -826,10 +831,6 @@ function addRoutineLimitPolicy(db: DatabaseSync): void {
     if (columns.some((column) => isDynamicRecord(column) && column.name === "limit_policy")) continue;
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}`);
   }
-}
-
-function migrateProviderSessionsForCline(db: DatabaseSync): void {
-  widenProviderSessionsCheck(db, "'cline'", V26_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v26");
 }
 
 // Migrations 17, 22, 23, 24 and 26 share this SQL. Each migration gives its own CHECK line and staging table name, so the

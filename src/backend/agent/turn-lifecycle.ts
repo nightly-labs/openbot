@@ -32,7 +32,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import {
   isForeignReasoningError,
@@ -71,6 +71,8 @@ export interface TurnHooks {
   redactMcp(text: string): string;
   /** A finished tool step, for product analytics only. It never reaches a renderer or a remote client. */
   emitToolUsage(usage: ToolUsageSignal): void;
+  /** The model this turn was started with, or null when the drain no longer knows it. */
+  turnModel(agentId: string, turnId: string): string | null;
 }
 
 export interface TurnLifecycleOptions {
@@ -318,7 +320,6 @@ export class TurnLifecycle {
         const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId, notification.method === "item/agentMessage/delta" && delta.trim() !== "");
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         let message = snapshot.messages.find((candidate) => candidate.id === itemId);
@@ -326,6 +327,11 @@ export class TurnLifecycle {
           message = newAssistantMessage(itemId, turnId);
           snapshot.messages.push(message);
         }
+        // Claude streams its thinking as message deltas on a commentary item, which is not an answer.
+        this.#markProduced(
+          turnId,
+          notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
+        );
         if (notification.method.startsWith("item/reasoning/")) {
           if (message.itemType !== "commentary") {
             message.itemType = "commentary";
@@ -419,7 +425,11 @@ export class TurnLifecycle {
           isUsageLimitDiagnostic(message) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
-          if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+          // Only a plan window resets by itself. A spent balance fails as before, with its reason.
+          const planLimit =
+            isPlanLimitDiagnostic(message) ||
+            (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
+          if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
             this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
           }
           this.#providers.refreshUsageAfterLimit(source);
@@ -467,31 +477,33 @@ export class TurnLifecycle {
       return;
     }
     // The plan refused the turn before it did anything that a second run would repeat, so its
-    // messages wait in the queue for the reset. A channel task pauses as for any other failure. The
-    // limit is recorded after the requeue, so a routine set to skip finds its run back in the queue.
-    if (
+    // messages wait in the queue for the reset. A channel task pauses as for any other failure.
+    const requeue =
       limited &&
       running !== undefined &&
       !running.acted &&
       deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(snapshot.threadId)
-    ) {
-      await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
-      this.#usageLimits.reached(agentId, resetsAt);
-      this.#hooks.scheduleDrain(agentId);
-      return;
-    }
-    if (limited) this.#usageLimits.reached(agentId, resetsAt);
-    else if (status === "completed") this.#usageLimits.completed(agentId);
-    if (status === "failed") this.#failedTurns.set(agentId, turnId);
-    else this.#failedTurns.delete(agentId);
+      !this.#conversation.isExecutionThread(snapshot.threadId);
     for (const message of snapshot.messages) {
       if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
-      message.status = normalizeCompletionStatus(status);
+      message.status = normalizeCompletionStatus(requeue ? "interrupted" : status);
       markIncompleteImageGeneration(message, message.status);
     }
     // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
     for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
+    // The limit belongs to the model the turn ran on, which the agent may have left since.
+    const model = this.#hooks.turnModel(agentId, turnId);
+    if (requeue) {
+      await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+      // After the requeue, so a routine set to skip finds its run back in the queue.
+      this.#usageLimits.reached(agentId, resetsAt, model);
+      this.#hooks.scheduleDrain(agentId);
+      return;
+    }
+    if (limited) this.#usageLimits.reached(agentId, resetsAt, model);
+    else if (status === "completed") this.#usageLimits.completed(agentId, model);
+    if (status === "failed") this.#failedTurns.set(agentId, turnId);
+    else this.#failedTurns.delete(agentId);
     const failure = refused
       ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
       : reportedError;

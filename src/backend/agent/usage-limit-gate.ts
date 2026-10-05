@@ -75,13 +75,17 @@ export class UsageLimitGate {
     });
   }
 
-  /** The plan refused a turn of this agent. `resetsAt` is in epoch seconds. */
-  reached(agentId: string, resetsAt: number | null): void {
+  /**
+   * The plan refused a turn of this agent. `resetsAt` is in epoch seconds. `model` is the one the
+   * turn ran on; the agent's current model when null.
+   */
+  reached(agentId: string, resetsAt: number | null, model: string | null = null): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
-    const key = limitKey(provider, agent.model);
-    const limit = this.#limits.get(key) ?? { provider, model: agent.model, resetsAt: null, timer: null };
+    const turnModel = model ?? agent.model;
+    const key = limitKey(provider, turnModel);
+    const limit = this.#limits.get(key) ?? { provider, model: turnModel, resetsAt: null, timer: null };
     // A reset already past would release the queue at once into the same refusal.
     const future = (value: number | null) => (value !== null && value * 1_000 > Date.now() ? value : null);
     limit.resetsAt = future(resetsAt) ?? future(limit.resetsAt);
@@ -99,12 +103,12 @@ export class UsageLimitGate {
     });
   }
 
-  /** A turn of this agent completed, so its provider and model take turns again. */
-  completed(agentId: string): void {
+  /** A turn of this agent completed on `model`, so its provider and model take turns again. */
+  completed(agentId: string, model: string | null = null): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
-    const key = limitKey(provider, agent.model);
+    const key = limitKey(provider, model ?? agent.model);
     if (this.#limits.has(key)) this.#release(key);
     if (![...this.#limits.values()].some((limit) => limit.provider === provider)) this.#announced.delete(provider);
   }
@@ -127,7 +131,7 @@ export class UsageLimitGate {
       agentId,
       provider: limit.provider,
       resetsAt: limit.resetsAt,
-      agentCount: this.#store.list().filter((agent) => providerForAgent(agent) === limit.provider).length,
+      agentCount: this.#heldAgents(limit).length,
     });
   }
 

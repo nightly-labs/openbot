@@ -231,9 +231,25 @@ export function isUsageLimitDiagnostic(message: string): boolean {
       message,
     ) ||
     /\bbilling hard limit (?:has been )?reached\b/iu.test(message) ||
-    // Claude's plan windows: "You've hit your session limit · resets 8:40pm", the weekly and the
-    // per-model ones. A short request-rate throttle says "rate limit" and is not matched.
+    isPlanLimitDiagnostic(message)
+  );
+}
+
+/**
+ * Whether a provider says that a plan window is spent, a limit that resets by itself: "You've hit
+ * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM." A
+ * spent credit balance or quota does not reset, so it is not one: holding work for it would wait
+ * forever and hide the provider's reason. A short request-rate throttle says "rate limit".
+ */
+export function isPlanLimitDiagnostic(message: string): boolean {
+  if (isBalanceDiagnostic(message)) return false;
+  return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
     /\b(?:session|weekly) limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message)
   );
+}
+
+/** Whether a provider's text names money or a quota, which no wait gives back. */
+export function isBalanceDiagnostic(message: string): boolean {
+  return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
 }

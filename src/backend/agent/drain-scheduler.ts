@@ -13,7 +13,7 @@ import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { ProfileSave } from "./profile-save";
-import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { isPlanLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
@@ -490,8 +490,8 @@ export class DrainScheduler {
         return;
       }
       const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
-      // A spent plan refused the start, so nothing ran. The messages wait for the reset.
-      if (!channelDelivery && !messagingDelivery && isUsageLimitDiagnostic(reason)) {
+      // A spent plan window refused the start, so nothing ran. The messages wait for the reset.
+      if (!channelDelivery && !messagingDelivery && isPlanLimitDiagnostic(reason)) {
         for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
         this.#usageLimits.reached(delivery.recipientAgentId, null);

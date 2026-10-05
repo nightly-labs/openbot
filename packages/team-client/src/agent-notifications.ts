@@ -22,8 +22,16 @@ export function notificationForUsageLimit(
 ): AgentNotificationContent | null {
   if (level === "nothing") return null;
   const count = event.agentCount;
+  // A weekly window can reset days later, so a reset that is not today names its day.
+  const resetDate = event.resetsAt === null ? null : new Date(event.resetsAt * 1_000);
   const reset =
-    event.resetsAt === null ? null : format.date(event.resetsAt * 1_000, { hour: "numeric", minute: "2-digit" });
+    resetDate === null
+      ? null
+      : format.date(resetDate, {
+          ...(resetDate.toDateString() === new Date().toDateString() ? {} : { weekday: "short" }),
+          hour: "numeric",
+          minute: "2-digit",
+        });
   return {
     title: translate("notification.usageLimit.title", { provider: agentProviderName(event.provider) }),
     body: reset

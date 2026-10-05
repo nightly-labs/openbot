@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { USAGE_LIMIT_RECHECK_MS } from "./agent/usage-limit-gate";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -139,10 +139,20 @@ describe.sequential("AgentService: usage limit", () => {
     expect(started.mailbox.getDelivery(run.deliveryId ?? "")?.delivery.status).toBe("cancelled");
   });
 
-  it("reads a spent plan window as a limit and a request-rate throttle as not one", () => {
-    expect(isUsageLimitDiagnostic(SESSION_LIMIT)).toBe(true);
-    expect(isUsageLimitDiagnostic("You've hit your weekly limit · resets Oct 9")).toBe(true);
+  it("holds work for a spent plan window, not for a throttle or a spent balance", () => {
+    expect(isPlanLimitDiagnostic(SESSION_LIMIT)).toBe(true);
+    expect(isPlanLimitDiagnostic("You've hit your weekly limit · resets Oct 9")).toBe(true);
+    expect(isPlanLimitDiagnostic("You've hit your usage limit. Try again at 10:34 AM.")).toBe(true);
     expect(isUsageLimitDiagnostic("You've hit your rate limit. Try again in 20 seconds.")).toBe(false);
     expect(isUsageLimitDiagnostic("429 Rate limit reached for requests")).toBe(false);
+    // A balance does not come back by waiting, so the turn fails with the provider's reason.
+    for (const balance of [
+      "Your credit balance is too low.",
+      "You exceeded your current quota.",
+      "insufficient_quota",
+    ]) {
+      expect(isUsageLimitDiagnostic(balance)).toBe(true);
+      expect(isPlanLimitDiagnostic(balance)).toBe(false);
+    }
   });
 });
