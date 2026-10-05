@@ -177,6 +177,10 @@ const Auth = createSimpleContext({
       }
     }
 
+    async function deleteCentralAccount(email: string): Promise<void> {
+      applyCentralAuthState(await accountPort().auth.deleteAccount(email));
+    }
+
     async function updateAccountAvatar(image: AvatarImageInput | null): Promise<void> {
       applyCentralAuthState(await accountPort().auth.updateAvatar(image));
     }
@@ -273,6 +277,7 @@ const Auth = createSimpleContext({
       retryCentralAccount,
       verifyEmailCode,
       logoutCentralAccount,
+      deleteCentralAccount,
       updateAccountName,
       updateAccountAvatar,
       createMobileConnect,

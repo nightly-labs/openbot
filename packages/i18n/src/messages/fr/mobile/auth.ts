@@ -60,4 +60,7 @@ export const messages = {
     "Impossible d’enregistrer votre profil. Vérifiez votre connexion et réessayez.",
   "mobile.auth.error.signOutUnconfirmed":
     "Impossible de confirmer la déconnexion. Vérifiez votre connexion et réessayez.",
+  "mobile.auth.error.accountHasHostedServers": "Supprimez vos serveurs hébergés avant de supprimer le compte.",
+  "mobile.auth.error.accountDeleteFailed":
+    "Impossible de supprimer votre compte. Vérifiez votre connexion et réessayez.",
 } as const satisfies PartialTranslation<typeof source>;

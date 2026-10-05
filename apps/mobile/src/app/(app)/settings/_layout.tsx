@@ -27,6 +27,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="profile" options={{ title: t("mobile.app.route.profile") }} />
       <Stack.Screen name="general" options={{ title: t("mobile.app.route.general") }} />
       <Stack.Screen name="sessions" options={{ title: t("mobile.app.route.accountSessions") }} />
+      <Stack.Screen name="delete-account" options={{ title: t("mobile.app.route.deleteAccount") }} />
       <Stack.Screen name="about" options={{ title: t("mobile.app.route.about") }} />
       <Stack.Screen name="hidden-chats" options={{ title: t("mobile.app.route.hiddenChats") }} />
       <Stack.Screen name="deleted-chats" options={{ title: t("mobile.app.route.deletedChannels") }} />

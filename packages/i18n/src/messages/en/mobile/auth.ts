@@ -55,4 +55,6 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.error.photoConflict": "Your photo changed on another device. Try again.",
   "mobile.auth.error.profileSaveFailed": "Could not save your profile. Check your connection and try again.",
   "mobile.auth.error.signOutUnconfirmed": "Could not confirm sign-out. Check your connection and try again.",
+  "mobile.auth.error.accountHasHostedServers": "Delete your hosted servers before you delete the account.",
+  "mobile.auth.error.accountDeleteFailed": "Could not delete your account. Check your connection and try again.",
 });

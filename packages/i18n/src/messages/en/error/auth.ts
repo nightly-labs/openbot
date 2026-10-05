@@ -16,6 +16,9 @@ export const messages = defineMessages("error.auth", {
     "OpenBot could not confirm delivery in time. The code may still arrive; check delivery before sending again.",
   "error.auth.deliveryInterrupted":
     "The connection ended before OpenBot confirmed delivery. Check delivery to avoid sending another code.",
+  // Account deletion errors. The account service sends the same English.
+  "error.auth.accountConfirmMismatch": "Type the account email to delete the account.",
+  "error.auth.accountHasHostedServers": "Delete your hosted servers before you delete the account.",
   "error.auth.deliveryUnknown":
     "OpenBot could not confirm whether the sign-in code was sent. Check delivery before sending again.",
 });

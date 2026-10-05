@@ -189,8 +189,10 @@ can use `ProfileAvatar neutral`; agent colors still convey their own identities.
 
 Action rows use the same flat grouped surface as navigation rows. Sign-out and photo-removal
 rows do not have chevrons; destructive actions use `text-danger-text` instead of a filled red block.
-Keep pending/disabled behavior and confirmation for sign-out. Do not add account deletion or other
-unsupported actions just because a visual reference shows them.
+Keep pending/disabled behavior and confirmation for sign-out. Account deletion is a separate
+Profile row that opens the `delete-account` card page: the user types the account email, then
+confirms in an alert. Do not add other unsupported actions just because a visual reference shows
+them.
 
 Use `Typography` for application text. Native pickers and other platform controls remain inside
 an Expo UI `Host` with the selected app appearance. A whole SwiftUI `FieldGroup`/`Form` introduces

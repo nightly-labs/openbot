@@ -591,6 +591,7 @@ function AppSettings(props: AccountProps) {
         onRevokeMobileConnectedDevice={auth.revokeMobileConnectedDevice}
         onListAccountSessions={auth.listAccountSessions}
         onRevokeAccountSession={auth.revokeAccountSession}
+        onDeleteAccount={platform.landingPreview ? undefined : auth.deleteCentralAccount}
         billingApi={appPort().billing}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {

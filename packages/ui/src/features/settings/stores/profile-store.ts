@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot/contracts/ipc";
-import { normalizeAccountName, validateProfileName } from "@openbot/contracts/validation";
+import { normalizeAccountName, normalizeEmailAddress, validateProfileName } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { normalizeAvatarFile } from "../../../avatar-image";
 import { currentText } from "../../../text";
@@ -12,6 +12,8 @@ interface ProfileStoreProps {
   onUpdateAccountAvatar: (image: AvatarImageInput | null) => Promise<void>;
   onListAccountSessions?: () => Promise<AccountSession[]>;
   onRevokeAccountSession?: (sessionId: string) => Promise<void>;
+  /** Deletes the account. `email` is the account email that the user typed to confirm. */
+  onDeleteAccount?: (email: string) => Promise<void>;
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
 }
 
@@ -28,6 +30,13 @@ interface AvatarUpload {
   error: string | null;
 }
 
+interface AccountDeletion {
+  open: boolean;
+  confirmEmail: string;
+  busy: boolean;
+  error: string | null;
+}
+
 /**
  * One record per panel of the Profile tab. Each group's fields are written together — a save
  * touches the draft, its error and its busy flag at once — so they are one store rather than a
@@ -35,6 +44,7 @@ interface AvatarUpload {
  */
 interface SettingsProfilePanels {
   avatar: AvatarUpload;
+  deletion: AccountDeletion;
   profile: ProfileNameEdit;
   sessions: { items: AccountSession[]; loading: boolean; error: string | null; revokingId: string | null };
 }
@@ -48,6 +58,7 @@ interface SettingsProfilePanels {
 export function createSettingsProfileStore(props: ProfileStoreProps, isActive: () => boolean) {
   const [panels, setPanels] = createStore<SettingsProfilePanels>({
     avatar: { busy: false, error: null },
+    deletion: { open: false, confirmEmail: "", busy: false, error: null },
     profile: { busy: false, name: "", saveError: null, savedName: "", touched: false },
     sessions: { items: [], loading: false, error: null, revokingId: null },
   });
@@ -255,6 +266,56 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     }
   }
 
+  function requestDeleteAccount(): void {
+    if (!props.onDeleteAccount || panels.deletion.busy) return;
+    setPanels((state) => {
+      state.deletion = { open: true, confirmEmail: "", busy: false, error: null };
+    });
+  }
+
+  function setDeleteConfirmEmail(value: string): void {
+    setPanels((state) => {
+      state.deletion.confirmEmail = value;
+      state.deletion.error = null;
+    });
+  }
+
+  function cancelDeleteAccount(): void {
+    if (panels.deletion.busy) return;
+    setPanels((state) => {
+      state.deletion = { open: false, confirmEmail: "", busy: false, error: null };
+    });
+  }
+
+  /** A failed deletion keeps the dialog open with the error. On success the app signs out. */
+  async function confirmDeleteAccount(): Promise<void> {
+    const deleteAccount = props.onDeleteAccount;
+    if (!deleteAccount || panels.deletion.busy) return;
+    const email = panels.deletion.confirmEmail;
+    if (normalizeEmailAddress(email) !== props.account.email) {
+      setPanels((state) => {
+        state.deletion.error = currentText().t("settings.profile.delete.emailMismatch");
+      });
+      return;
+    }
+    setPanels((state) => {
+      state.deletion.busy = true;
+      state.deletion.error = null;
+    });
+    try {
+      await deleteAccount(email);
+      setPanels((state) => {
+        state.deletion = { open: false, confirmEmail: "", busy: false, error: null };
+      });
+    } catch (error) {
+      setPanels((state) => {
+        const text = currentText();
+        state.deletion.busy = false;
+        state.deletion.error = text.errorMessage(error, text.t("settings.profile.delete.failed"));
+      });
+    }
+  }
+
   function registerAvatarInput(element: HTMLInputElement): void {
     avatarFileInput = element;
   }
@@ -268,15 +329,19 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
   }
 
   return {
+    cancelDeleteAccount,
+    confirmDeleteAccount,
     markTouchedIfDirty,
     nameDirty,
     openAvatarPicker,
     refreshSessions,
     registerAvatarInput,
+    requestDeleteAccount,
     registerNameInput,
     resetName,
     revokeSession,
     saveName,
+    setDeleteConfirmEmail,
     state: panels,
     updateAvatar,
     updateName,

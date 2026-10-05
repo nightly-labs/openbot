@@ -177,6 +177,13 @@ export function ProfileSettingsScreen() {
           </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
+      <SettingsSection>
+        <SettingsRow disabled={busy} onPress={() => router.push("/settings/delete-account")}>
+          <Typography.Paragraph className="text-danger-text">
+            {t("mobile.settings.profile.deleteAccount")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
     </SheetScrollView>
   );
 }

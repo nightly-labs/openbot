@@ -312,4 +312,15 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para uma equipe pequena com rotinas diárias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muitos agentes e uso intenso do navegador.",
+  "settings.profile.delete.title": "Excluir conta",
+  "settings.profile.delete.description":
+    "Exclui permanentemente sua conta OpenBot. Agentes, conversas e arquivos continuam neste computador.",
+  "settings.profile.delete.action": "Excluir conta",
+  "settings.profile.delete.dialogTitle": "Excluir sua conta?",
+  "settings.profile.delete.dialogDescription":
+    "Isso exclui permanentemente sua conta OpenBot, suas sessões em todos os dispositivos, suas participações em equipes, os servidores que você compartilha com sua equipe e seus sites e modelos publicados. Exclua seus servidores hospedados primeiro. Não é possível desfazer.",
+  "settings.profile.delete.confirmLabel": "Digite {email} para confirmar",
+  "settings.profile.delete.emailMismatch": "O e-mail não corresponde.",
+  "settings.profile.delete.deleting": "Excluindo…",
+  "settings.profile.delete.failed": "Não foi possível excluir sua conta.",
 } as const satisfies PartialTranslation<typeof source>;

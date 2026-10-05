@@ -82,4 +82,14 @@ export const messages = {
   "mobile.settings.profile.signOutTitle": "Sair?",
   "mobile.settings.profile.signOutBody": "Reconecte-se lendo um novo código do OpenBot no computador.",
   "mobile.settings.profile.signOut": "Sair",
+  "mobile.settings.profile.deleteAccount": "Excluir conta",
+  "mobile.settings.deleteAccount.body":
+    "Isso exclui permanentemente sua conta OpenBot, suas sessões em todos os dispositivos, suas participações em equipes, os servidores que você compartilha com sua equipe e seus sites e modelos publicados. Não é possível desfazer.",
+  "mobile.settings.deleteAccount.localData":
+    "Agentes, conversas e arquivos continuam nos seus computadores. Exclua os servidores hospedados primeiro.",
+  "mobile.settings.deleteAccount.emailLabel": "Digite {email} para confirmar",
+  "mobile.settings.deleteAccount.confirm": "Excluir conta",
+  "mobile.settings.deleteAccount.deleting": "Excluindo conta…",
+  "mobile.settings.deleteAccount.finalTitle": "Excluir sua conta?",
+  "mobile.settings.deleteAccount.finalBody": "Não é possível desfazer.",
 } as const satisfies PartialTranslation<typeof source>;

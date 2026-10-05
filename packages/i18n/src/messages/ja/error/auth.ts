@@ -18,4 +18,6 @@ export const messages = {
     "OpenBot が配信を確認する前に接続が終了しました。別のコードを送信しないように、配信を確認してください。",
   "error.auth.deliveryUnknown":
     "サインインコードが送信されたかどうかを OpenBot が確認できませんでした。再送信する前に配信を確認してください。",
+  "error.auth.accountConfirmMismatch": "アカウントを削除するには、アカウントのメールアドレスを入力してください。",
+  "error.auth.accountHasHostedServers": "アカウントを削除する前に、ホスト型サーバーを削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

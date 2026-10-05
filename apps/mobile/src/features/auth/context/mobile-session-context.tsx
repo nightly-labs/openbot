@@ -12,6 +12,7 @@ import {
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { loadAnalyticsPreference } from "@/features/analytics/preference";
 import {
+  deleteMobileAccount,
   logoutMobileSession,
   type MobileProfileChange,
   type MobileSession,
@@ -34,6 +35,8 @@ interface MobileSessionContextValue {
   handleSessionError: (error: unknown, initiatingSession: MobileSession) => void;
   connect: (session: MobileSession) => void;
   signOut: () => Promise<void>;
+  /** `email` is the account email that the user typed to confirm. */
+  deleteAccount: (email: string) => Promise<void>;
   updateProfile: (change: MobileProfileChange) => Promise<void>;
 }
 
@@ -130,6 +133,23 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     }
   }, [setCurrentSession]);
 
+  const deleteAccount = useCallback(
+    async (email: string) => {
+      const current = sessionRef.current;
+      if (!current) throw new MobileSessionExpiredError();
+      try {
+        await deleteMobileAccount(current, email);
+      } catch (error) {
+        handleSessionError(error, current);
+        throw error;
+      }
+      if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
+        setCurrentSession(null);
+      }
+    },
+    [handleSessionError, setCurrentSession],
+  );
+
   const updateProfile = useCallback(
     async (change: MobileProfileChange) => {
       const current = sessionRef.current;
@@ -156,9 +176,10 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       handleSessionError,
       connect: setCurrentSession,
       signOut,
+      deleteAccount,
       updateProfile,
     }),
-    [sessionState, setCurrentSession, signOut, updateProfile, handleSessionError, refreshProfile],
+    [sessionState, setCurrentSession, signOut, deleteAccount, updateProfile, handleSessionError, refreshProfile],
   );
 
   return <MobileSessionContext.Provider value={value}>{children}</MobileSessionContext.Provider>;

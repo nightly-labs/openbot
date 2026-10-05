@@ -522,6 +522,7 @@ const openbotApi: OpenBotDesktopApi = {
     revokeAccountSession: decodeVoid,
     revokeMobileConnectedDevice: decodeVoid,
     logout: decodeCentralAuthState,
+    deleteAccount: decodeCentralAuthState,
     event: decodeCentralAuthState,
   }),
   skills: bridgeGroup(IPC_ENDPOINTS.skills, {

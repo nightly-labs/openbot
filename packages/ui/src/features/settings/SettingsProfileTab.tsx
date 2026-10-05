@@ -2,6 +2,8 @@ import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
+  ConfirmDialog,
+  Field,
   ImageRemoveButton,
   Input,
   Item,
@@ -23,6 +25,7 @@ interface SettingsProfileTabProps {
   account: CentralAuthUser;
   canListSessions: boolean;
   canRevokeSession: boolean;
+  canDeleteAccount?: boolean;
 }
 
 /** `Date.prototype.toLocaleString()` with no options: the date and the time, each field numeric. */
@@ -203,6 +206,50 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
             </For>
           </ItemGroup>
         </SettingsSection>
+      </Show>
+      <Show when={props.canDeleteAccount}>
+        <SettingsSection title={t("settings.profile.delete.title")}>
+          <ItemGroup class="settings-modal-card">
+            <Item>
+              <ItemContent>
+                <ItemTitle>{t("settings.profile.delete.title")}</ItemTitle>
+                <ItemDescription>{t("settings.profile.delete.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  variant="destructive"
+                  disabled={props.store.state.deletion.busy}
+                  onClick={props.store.requestDeleteAccount}
+                >
+                  {t("settings.profile.delete.action")}
+                </Button>
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </SettingsSection>
+        <ConfirmDialog
+          open={props.store.state.deletion.open}
+          title={t("settings.profile.delete.dialogTitle")}
+          description={t("settings.profile.delete.dialogDescription")}
+          confirmLabel={t("settings.profile.delete.action")}
+          pendingLabel={t("settings.profile.delete.deleting")}
+          pending={props.store.state.deletion.busy}
+          error={props.store.state.deletion.error ?? undefined}
+          initialFocus="cancel"
+          onCancel={props.store.cancelDeleteAccount}
+          onConfirm={props.store.confirmDeleteAccount}
+        >
+          <Field label={t("settings.profile.delete.confirmLabel", { email: props.account.email })}>
+            <Input
+              type="email"
+              value={props.store.state.deletion.confirmEmail}
+              autocomplete="off"
+              spellcheck={false}
+              disabled={props.store.state.deletion.busy}
+              onValueChange={props.store.setDeleteConfirmEmail}
+            />
+          </Field>
+        </ConfirmDialog>
       </Show>
     </>
   );

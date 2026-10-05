@@ -118,6 +118,11 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
       emitAuthState(authState);
       return clone(authState);
     },
+    deleteAccount: async () => {
+      authState = { status: "signed_out" };
+      emitAuthState(authState);
+      return clone(authState);
+    },
     onEvent: (listener) => {
       authListeners.add(listener);
       return () => authListeners.delete(listener);

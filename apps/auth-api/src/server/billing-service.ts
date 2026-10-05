@@ -37,7 +37,7 @@ import {
 
 /** Stripe retries a webhook for up to 3 days, so older event ids are not needed to stop duplicates. */
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
-const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
+export const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
 /** The Remote host id shape (`requiredIdentifier` in remote-control-plane.ts). Other values are stored as no server. */
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
 const LAPSED_PLAN_GRACE_MS = 24 * 60 * 60 * 1000;

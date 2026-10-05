@@ -9,6 +9,7 @@ export interface AccountPort {
   auth: Pick<
     OpenBotDesktopApi["auth"],
     | "createMobileConnect"
+    | "deleteAccount"
     | "getState"
     | "listAccountSessions"
     | "listMobileConnectedDevices"

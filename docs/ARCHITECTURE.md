@@ -776,6 +776,15 @@ name does not restrict it to phones. Avatar uploads send validated binary bytes 
 Expo fetch, without constructing a React Native Blob from a typed array. Profile reads, writes and their UI-state application
 are serialized together. A read queued after an edit can apply a newer remote profile; a read
 before a later edit cannot overwrite that edit. Results apply only to the initiating login.
+Account deletion is `DELETE /v1/me` with the typed account email, from desktop Settings → Profile
+and the mobile `settings/delete-account` page; the browser API does not expose it.
+`account-deletion.ts` refuses an account with a live hosted server or an open plan. It leaves joined
+teams through `changeMembership`, deletes owned hosts through `deleteHost` and sites through
+`HostedSiteService.delete`, so Signal gets the usual events. One D1 batch then revokes every session,
+queues `account-profile-changed` for the other devices, and deletes the account rows. An account
+with hosted server history keeps an anonymized `users` row, because `hosted_servers` has no
+`ON DELETE` action. R2 files are deleted last, on a best-effort basis. The desktop and phone clear
+their stored credential only after the service answers 204; local data stays.
 Account-session queries are scoped to each login without including credentials in query keys,
 cancel when abandoned, and are removed on account transitions. An HTTP 401 clears only its
 initiating credential; transport failures retain the session for retry.

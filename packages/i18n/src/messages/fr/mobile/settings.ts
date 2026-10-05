@@ -83,4 +83,14 @@ export const messages = {
   "mobile.settings.profile.signOutBody":
     "Reconnectez-vous en scannant un nouveau code depuis OpenBot sur votre ordinateur.",
   "mobile.settings.profile.signOut": "Se déconnecter",
+  "mobile.settings.profile.deleteAccount": "Supprimer le compte",
+  "mobile.settings.deleteAccount.body":
+    "Cette action supprime définitivement votre compte OpenBot, vos sessions sur tous les appareils, vos adhésions aux équipes, les serveurs que vous partagez avec votre équipe, ainsi que vos sites et modèles publiés. Cette action est irréversible.",
+  "mobile.settings.deleteAccount.localData":
+    "Les agents, les conversations et les fichiers restent sur vos ordinateurs. Supprimez d’abord les serveurs hébergés.",
+  "mobile.settings.deleteAccount.emailLabel": "Saisissez {email} pour confirmer",
+  "mobile.settings.deleteAccount.confirm": "Supprimer le compte",
+  "mobile.settings.deleteAccount.deleting": "Suppression du compte…",
+  "mobile.settings.deleteAccount.finalTitle": "Supprimer votre compte ?",
+  "mobile.settings.deleteAccount.finalBody": "Cette action est irréversible.",
 } as const satisfies PartialTranslation<typeof source>;

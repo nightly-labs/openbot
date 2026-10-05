@@ -243,4 +243,15 @@ export const messages = {
   "settings.hostedSites.loadFailed": "公開サイトを読み込めませんでした。",
   "settings.hostedSites.deleteFailed": "サイトを削除できませんでした。",
   "settings.hostedSites.reloadFailed": "公開サイトを再読み込みできませんでした。",
+  "settings.profile.delete.title": "アカウントを削除",
+  "settings.profile.delete.description":
+    "OpenBot アカウントを完全に削除します。エージェント、会話、ファイルはこのコンピューターに残ります。",
+  "settings.profile.delete.action": "アカウントを削除",
+  "settings.profile.delete.dialogTitle": "アカウントを削除しますか？",
+  "settings.profile.delete.dialogDescription":
+    "OpenBot アカウント、すべてのデバイスのセッション、チームのメンバーシップ、チームと共有しているサーバー、公開したサイトとテンプレートを完全に削除します。先にホスト型サーバーを削除してください。この操作は元に戻せません。",
+  "settings.profile.delete.confirmLabel": "確認のため {email} と入力してください",
+  "settings.profile.delete.emailMismatch": "メールアドレスが一致しません。",
+  "settings.profile.delete.deleting": "削除中…",
+  "settings.profile.delete.failed": "アカウントを削除できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -57,4 +57,7 @@ export const messages = {
   "mobile.auth.error.profileSaveFailed": "Não foi possível salvar seu perfil. Verifique sua conexão e tente novamente.",
   "mobile.auth.error.signOutUnconfirmed":
     "Não foi possível confirmar a saída. Verifique sua conexão e tente novamente.",
+  "mobile.auth.error.accountHasHostedServers": "Exclua seus servidores hospedados antes de excluir a conta.",
+  "mobile.auth.error.accountDeleteFailed":
+    "Não foi possível excluir sua conta. Verifique sua conexão e tente novamente.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -81,4 +81,14 @@ export const messages = {
   "mobile.settings.profile.signOutTitle": "Oturum kapatılsın mı?",
   "mobile.settings.profile.signOutBody": "Masaüstünüzdeki OpenBot'tan yeni bir kod tarayarak yeniden bağlanın.",
   "mobile.settings.profile.signOut": "Oturumu kapat",
+  "mobile.settings.profile.deleteAccount": "Hesabı sil",
+  "mobile.settings.deleteAccount.body":
+    "Bu işlem OpenBot hesabınızı, tüm cihazlardaki oturumlarınızı, ekip üyeliklerinizi, ekibinizle paylaştığınız sunucuları ve yayımladığınız siteleri ve şablonları kalıcı olarak siler. Bu işlem geri alınamaz.",
+  "mobile.settings.deleteAccount.localData":
+    "Ajanlar, sohbetler ve dosyalar bilgisayarlarınızda kalır. Önce barındırılan sunucuları silin.",
+  "mobile.settings.deleteAccount.emailLabel": "Onaylamak için {email} yazın",
+  "mobile.settings.deleteAccount.confirm": "Hesabı sil",
+  "mobile.settings.deleteAccount.deleting": "Hesap siliniyor…",
+  "mobile.settings.deleteAccount.finalTitle": "Hesabınız silinsin mi?",
+  "mobile.settings.deleteAccount.finalBody": "Bu işlem geri alınamaz.",
 } as const satisfies PartialTranslation<typeof source>;

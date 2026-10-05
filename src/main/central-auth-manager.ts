@@ -840,6 +840,31 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return this.#setState({ status: "signed_out" });
   }
 
+  /**
+   * Deletes the account on the account service, then signs out like `logout`. A failed request keeps
+   * the session, so the user can see the error and try again. The local data stays on this computer.
+   */
+  async deleteAccount(email: string): Promise<CentralAuthState> {
+    try {
+      await this.#authorizedRequest(
+        "/v1/me",
+        { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) },
+        decodeVoid,
+      );
+    } catch (error) {
+      if (error instanceof AuthApiError && error.code === "account_has_hosted_servers") {
+        throw new AuthApiError(error.status, error.code, sourceText("error.auth.accountHasHostedServers"));
+      }
+      if (error instanceof AuthApiError && error.code === "account_confirm_mismatch") {
+        throw new AuthApiError(error.status, error.code, sourceText("error.auth.accountConfirmMismatch"));
+      }
+      throw error;
+    }
+    this.#emailCodeRequest = null;
+    await this.#clearStoredSession();
+    return this.#setState({ status: "signed_out" });
+  }
+
   async updateAvatar(image: AvatarImageInput | null): Promise<CentralAuthState> {
     const sessionToken = this.#sessionToken;
     if (!sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));

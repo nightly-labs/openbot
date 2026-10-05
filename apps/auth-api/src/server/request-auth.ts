@@ -1,5 +1,6 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
+import { AccountDeletionError, deleteAccount } from "./account-deletion";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthService, AuthServiceError } from "./auth-service";
@@ -30,7 +31,7 @@ import {
 } from "./remote-control-plane";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
 import { SlackAppError, SlackAppService } from "./slack-app";
-import { requireWorkerBindings, type TeamInviteEmailDelivery } from "./types";
+import { type AuthUser, requireWorkerBindings, type TeamInviteEmailDelivery } from "./types";
 
 export function requestAuthService(): AuthService {
   const bindings = requireWorkerBindings(env);
@@ -45,6 +46,30 @@ export function requestAuthService(): AuthService {
     },
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, waitUntil),
   });
+}
+
+/** Deletes the account of the session. See `deleteAccount`. */
+export async function requestAccountDeletion(user: AuthUser, confirmEmail: unknown): Promise<void> {
+  const bindings = requireWorkerBindings(env);
+  await deleteAccount(
+    {
+      database: bindings.DB,
+      avatars: bindings.AVATARS,
+      skills: bindings.SKILLS,
+      remote: requestRemoteControlPlane(),
+      sites: requestHostedSiteService(),
+      now: Date.now,
+      flushAuthEvents: async () => waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now())),
+    },
+    user,
+    confirmEmail,
+  );
+}
+
+export function accountDeletionErrorResponse(error: unknown): Response {
+  if (error instanceof AccountDeletionError) return apiError(error.status, error.code, error.message);
+  if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function requestAvatarBucket(): R2Bucket {

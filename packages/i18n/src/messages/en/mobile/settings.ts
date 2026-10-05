@@ -80,4 +80,14 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.profile.signOutTitle": "Sign out?",
   "mobile.settings.profile.signOutBody": "Reconnect by scanning a new code from OpenBot on your desktop.",
   "mobile.settings.profile.signOut": "Sign out",
+  "mobile.settings.profile.deleteAccount": "Delete account",
+  "mobile.settings.deleteAccount.body":
+    "This permanently deletes your OpenBot account, your sessions on all devices, your team memberships, the servers that you share with your team, and your published sites and templates. You cannot undo this.",
+  "mobile.settings.deleteAccount.localData":
+    "Agents, conversations and files stay on your computers. Hosted servers must be deleted first.",
+  "mobile.settings.deleteAccount.emailLabel": "Type {email} to confirm",
+  "mobile.settings.deleteAccount.confirm": "Delete account",
+  "mobile.settings.deleteAccount.deleting": "Deleting account…",
+  "mobile.settings.deleteAccount.finalTitle": "Delete your account?",
+  "mobile.settings.deleteAccount.finalBody": "You cannot undo this.",
 });

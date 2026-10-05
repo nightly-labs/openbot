@@ -207,6 +207,17 @@ export const messages = defineMessages("settings", {
   "settings.profile.sessions.disconnectLabel": "Disconnect {name} session from {signedIn}",
   "settings.profile.sessions.loadFailed": "Could not load account sessions. Please try again.",
   "settings.profile.sessions.disconnectFailed": "Could not disconnect this session. Please try again.",
+  "settings.profile.delete.title": "Delete account",
+  "settings.profile.delete.description":
+    "Permanently delete your OpenBot account. Agents, conversations and files stay on this computer.",
+  "settings.profile.delete.action": "Delete account",
+  "settings.profile.delete.dialogTitle": "Delete your account?",
+  "settings.profile.delete.dialogDescription":
+    "This permanently deletes your OpenBot account, your sessions on all devices, your team memberships, the servers that you share with your team, and your published sites and templates. Delete your hosted servers first. You cannot undo this.",
+  "settings.profile.delete.confirmLabel": "Type {email} to confirm",
+  "settings.profile.delete.emailMismatch": "The email does not match.",
+  "settings.profile.delete.deleting": "Deleting…",
+  "settings.profile.delete.failed": "Could not delete your account.",
   // The Updates tab. {target} is "OpenBot v1.2.3" or settings.updates.target.latest.
   "settings.updates.title": "OpenBot updates",
   "settings.updates.track.title": "Update track",

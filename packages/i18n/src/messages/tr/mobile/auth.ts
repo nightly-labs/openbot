@@ -56,4 +56,6 @@ export const messages = {
   "mobile.auth.error.photoConflict": "Fotoğrafınız başka bir cihazda değiştirildi. Tekrar deneyin.",
   "mobile.auth.error.profileSaveFailed": "Profiliniz kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
   "mobile.auth.error.signOutUnconfirmed": "Çıkış onaylanamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "mobile.auth.error.accountHasHostedServers": "Hesabı silmeden önce barındırılan sunucularınızı silin.",
+  "mobile.auth.error.accountDeleteFailed": "Hesabınız silinemedi. Bağlantınızı kontrol edip tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

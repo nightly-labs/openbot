@@ -82,4 +82,14 @@ export const messages = {
   "mobile.settings.profile.signOutTitle": "サインアウトしますか？",
   "mobile.settings.profile.signOutBody": "デスクトップの OpenBot で新しいコードをスキャンして再接続してください。",
   "mobile.settings.profile.signOut": "サインアウト",
+  "mobile.settings.profile.deleteAccount": "アカウントを削除",
+  "mobile.settings.deleteAccount.body":
+    "OpenBot アカウント、すべてのデバイスのセッション、チームのメンバーシップ、チームと共有しているサーバー、公開したサイトとテンプレートを完全に削除します。この操作は元に戻せません。",
+  "mobile.settings.deleteAccount.localData":
+    "エージェント、会話、ファイルはお使いのコンピューターに残ります。先にホスト型サーバーを削除してください。",
+  "mobile.settings.deleteAccount.emailLabel": "確認のため {email} と入力してください",
+  "mobile.settings.deleteAccount.confirm": "アカウントを削除",
+  "mobile.settings.deleteAccount.deleting": "アカウントを削除中…",
+  "mobile.settings.deleteAccount.finalTitle": "アカウントを削除しますか？",
+  "mobile.settings.deleteAccount.finalBody": "この操作は元に戻せません。",
 } as const satisfies PartialTranslation<typeof source>;

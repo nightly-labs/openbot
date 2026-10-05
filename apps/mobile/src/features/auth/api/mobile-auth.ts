@@ -281,6 +281,27 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileC
   return updated;
 }
 
+/**
+ * Deletes the account on the account service. The service revokes every session of the account, so
+ * this device only removes its stored credential.
+ */
+export async function deleteMobileAccount(session: MobileSession, email: string): Promise<void> {
+  const response = await withMobileAuthRequestTimeout((signal) =>
+    fetch(new URL("/v1/me", session.apiUrl).toString(), {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${session.sessionToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+      signal,
+    }),
+  );
+  await checkMobileAuthorization(response, session);
+  if (!response.ok) {
+    if (response.status === 409) throw new Error(currentText().t("mobile.auth.error.accountHasHostedServers"));
+    throw new Error(currentText().t("mobile.auth.error.accountDeleteFailed"));
+  }
+  await deleteMobileSessionIfCurrent(session.sessionToken);
+}
+
 export async function logoutMobileSession(session: MobileSession): Promise<void> {
   await serializeMobileSessionStorage(async () => {
     const pending = await readPendingRevocations();

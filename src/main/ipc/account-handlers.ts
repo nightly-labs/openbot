@@ -37,6 +37,9 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
         centralAuth.revokeMobileConnectedDevice(sessionId),
       ),
       logout: handler(() => centralAuth.logout()),
+      deleteAccount: payloadHandler(stringPayload("email", INPUT_LIMITS.email), (email) =>
+        centralAuth.deleteAccount(email),
+      ),
     },
   };
 }

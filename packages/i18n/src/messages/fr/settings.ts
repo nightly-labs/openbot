@@ -255,4 +255,15 @@ export const messages = {
   "settings.hostedSites.loadFailed": "Impossible de charger les sites hébergés.",
   "settings.hostedSites.deleteFailed": "Impossible de supprimer le site.",
   "settings.hostedSites.reloadFailed": "Impossible de recharger les sites hébergés.",
+  "settings.profile.delete.title": "Supprimer le compte",
+  "settings.profile.delete.description":
+    "Supprime définitivement votre compte OpenBot. Les agents, les conversations et les fichiers restent sur cet ordinateur.",
+  "settings.profile.delete.action": "Supprimer le compte",
+  "settings.profile.delete.dialogTitle": "Supprimer votre compte ?",
+  "settings.profile.delete.dialogDescription":
+    "Cette action supprime définitivement votre compte OpenBot, vos sessions sur tous les appareils, vos adhésions aux équipes, les serveurs que vous partagez avec votre équipe, ainsi que vos sites et modèles publiés. Supprimez d’abord vos serveurs hébergés. Cette action est irréversible.",
+  "settings.profile.delete.confirmLabel": "Saisissez {email} pour confirmer",
+  "settings.profile.delete.emailMismatch": "L’adresse e-mail ne correspond pas.",
+  "settings.profile.delete.deleting": "Suppression…",
+  "settings.profile.delete.failed": "Impossible de supprimer votre compte.",
 } as const satisfies PartialTranslation<typeof source>;

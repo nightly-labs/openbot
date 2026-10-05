@@ -19,4 +19,6 @@ export const messages = {
     "A conexão terminou antes de o OpenBot confirmar a entrega. Verifique a entrega para evitar o envio de outro código.",
   "error.auth.deliveryUnknown":
     "O OpenBot não conseguiu confirmar se o código de acesso foi enviado. Verifique a entrega antes de enviar novamente.",
+  "error.auth.accountConfirmMismatch": "Digite o e-mail da conta para excluí-la.",
+  "error.auth.accountHasHostedServers": "Exclua seus servidores hospedados antes de excluir a conta.",
 } as const satisfies PartialTranslation<typeof source>;

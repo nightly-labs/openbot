@@ -59,4 +59,6 @@ export const messages = {
   "mobile.auth.error.profileSaveFailed": "プロフィールを保存できませんでした。接続を確認して、もう一度お試しください。",
   "mobile.auth.error.signOutUnconfirmed":
     "サインアウトを確認できませんでした。接続を確認して、もう一度お試しください。",
+  "mobile.auth.error.accountHasHostedServers": "アカウントを削除する前に、ホスト型サーバーを削除してください。",
+  "mobile.auth.error.accountDeleteFailed": "アカウントを削除できませんでした。接続を確認して、もう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

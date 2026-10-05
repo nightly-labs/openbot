@@ -526,6 +526,34 @@ counts, and a summary of the local trace: counts, outcomes, and durations for ea
 turn origin, and failure origin. It contains no conversations, visited URLs, account email, file
 contents, or local file paths.
 
+## Delete your account
+
+Settings → Profile → Delete account on the desktop, and Settings → Profile → Delete account on the
+phone, delete your OpenBot account. You type the account email to confirm. Delete your hosted
+servers first: the account service refuses to delete an account that has a hosted server or an
+open plan.
+
+The account service then:
+
+- leaves each team that you joined, and deletes each server that you own from the team directory.
+  Its members lose access, and Signal disconnects their sessions;
+- deletes your published sites, with their files and addresses;
+- revokes every session of the account on all devices;
+- deletes your account record, email sign-in challenges, memberships, invitations, team tickets,
+  Slack workspace links, published agent templates, marketplace skills and agents, and install
+  records. Site audit records stay without your account ID;
+- deletes your avatar, the logos of your servers, and the files of your templates, skills and
+  agents from R2. A failed file deletion leaves a file that no record links to.
+
+When the account had a hosted server, the service keeps the account ID with no email, name or
+avatar, the hosted server records, and the billing records with their Stripe IDs, so that it never
+loses track of a sandbox or a payment. Stripe keeps the customer, invoices and payment records
+under its own policy. Product analytics that OpenPanel already stored are not deleted
+automatically.
+
+Account deletion does not delete local data. Agents, conversations, files and team data stay on
+each OpenBot computer. See [Delete local data](#delete-local-data).
+
 ## Delete local data
 
 Quit OpenBot, then remove the OpenBot folders listed above. Removing

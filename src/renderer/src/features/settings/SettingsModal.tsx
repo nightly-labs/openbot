@@ -52,6 +52,7 @@ export interface SettingsModalProps {
   onRevokeMobileConnectedDevice?: (sessionId: string) => Promise<void>;
   onListAccountSessions?: () => Promise<AccountSession[]>;
   onRevokeAccountSession?: (sessionId: string) => Promise<void>;
+  onDeleteAccount?: (email: string) => Promise<void>;
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
   billingApi?: BillingDesktopApi;
   /** The account's hosted servers. The tab is shown only when the account server offers them. */
@@ -223,6 +224,7 @@ export function SettingsModal(props: SettingsModalProps) {
             account={props.account}
             canListSessions={Boolean(props.onListAccountSessions)}
             canRevokeSession={Boolean(props.onRevokeAccountSession)}
+            canDeleteAccount={Boolean(props.onDeleteAccount)}
           />
         </Tabs.Content>
 

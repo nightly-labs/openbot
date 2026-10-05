@@ -27,4 +27,5 @@ export const messages = {
   "mobile.app.messageActions.copied": "メッセージをコピーしました",
   "mobile.app.messageActions.copy": "メッセージをコピー",
   "mobile.app.messageActions.text": "メッセージのテキスト",
+  "mobile.app.route.deleteAccount": "アカウントを削除",
 } as const satisfies PartialTranslation<typeof source>;

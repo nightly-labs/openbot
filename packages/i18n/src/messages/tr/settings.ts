@@ -311,4 +311,15 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
+  "settings.profile.delete.title": "Hesabı sil",
+  "settings.profile.delete.description":
+    "OpenBot hesabınızı kalıcı olarak siler. Ajanlar, sohbetler ve dosyalar bu bilgisayarda kalır.",
+  "settings.profile.delete.action": "Hesabı sil",
+  "settings.profile.delete.dialogTitle": "Hesabınız silinsin mi?",
+  "settings.profile.delete.dialogDescription":
+    "Bu işlem OpenBot hesabınızı, tüm cihazlardaki oturumlarınızı, ekip üyeliklerinizi, ekibinizle paylaştığınız sunucuları ve yayımladığınız siteleri ve şablonları kalıcı olarak siler. Önce barındırılan sunucularınızı silin. Bu işlem geri alınamaz.",
+  "settings.profile.delete.confirmLabel": "Onaylamak için {email} yazın",
+  "settings.profile.delete.emailMismatch": "E-posta eşleşmiyor.",
+  "settings.profile.delete.deleting": "Siliniyor…",
+  "settings.profile.delete.failed": "Hesabınız silinemedi.",
 } as const satisfies PartialTranslation<typeof source>;

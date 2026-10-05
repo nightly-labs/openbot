@@ -27,4 +27,5 @@ export const messages = {
   "mobile.app.messageActions.copied": "Message copié",
   "mobile.app.messageActions.copy": "Copier le message",
   "mobile.app.messageActions.text": "Texte du message",
+  "mobile.app.route.deleteAccount": "Supprimer le compte",
 } as const satisfies PartialTranslation<typeof source>;

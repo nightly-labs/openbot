@@ -677,6 +677,8 @@ export const IPC_ENDPOINTS = {
     revokeAccountSession: request<string, void>()("auth:revoke-account-session"),
     revokeMobileConnectedDevice: request<string, void>()("auth:revoke-mobile-connected-device"),
     logout: request<undefined, CentralAuthState>()("auth:logout"),
+    /** The input is the account email that the user typed to confirm. */
+    deleteAccount: request<string, CentralAuthState>()("auth:delete-account"),
     event: event<CentralAuthState>()("auth:event"),
   },
   update: {
