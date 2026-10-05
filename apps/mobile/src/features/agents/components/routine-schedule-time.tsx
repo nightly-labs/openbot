@@ -8,14 +8,18 @@ import { useText } from "@/shared/lib/text";
 
 export function RoutineTimePicker({
   time,
+  label,
   disabled,
   onChange,
 }: {
   time: string;
+  /** The row label. Defaults to "Time". */
+  label?: string;
   disabled: boolean;
   onChange: (time: string) => void;
 }) {
   const { t } = useText();
+  const title = label ?? t("mobile.agent.record.time");
   const { theme } = useUniwind();
   const [open, setOpen] = useState(false);
   const [hour, minute] = time.split(":").map(Number);
@@ -46,7 +50,7 @@ export function RoutineTimePicker({
           isAndroid ? <Typography.Paragraph className="text-grouped-secondary">{time}</Typography.Paragraph> : picker
         }
       >
-        <Typography.Paragraph>{t("mobile.agent.record.time")}</Typography.Paragraph>
+        <Typography.Paragraph>{title}</Typography.Paragraph>
       </SettingsRow>
       {isAndroid && open ? picker : null}
     </>

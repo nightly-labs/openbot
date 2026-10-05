@@ -13,6 +13,7 @@
     "./routine-calendar": "./src/routine-calendar.ts",
     "./routine-calendar-dates": "./src/routine-calendar-dates.ts",
     "./routine-schedule": "./src/routine-schedule.ts",
+    "./routine-schedule-draft": "./src/routine-schedule-draft.ts",
     "./runtime-attention": "./src/runtime-attention.ts",
     "./agent-notifications": "./src/agent-notifications.ts",
     "./webrtc-framing": "./src/webrtc-framing.ts",
