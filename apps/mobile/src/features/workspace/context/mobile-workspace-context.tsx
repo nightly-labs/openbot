@@ -1116,6 +1116,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             text,
             attachmentDraftIds,
             replyToMessageId,
+            // The host uses this phone's zone for a routine the agent creates from the message.
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
           serverId,
         );
