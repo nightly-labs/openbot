@@ -383,7 +383,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         calendarChannels.current.set(serverId, open);
         if (previous !== undefined && previous !== open)
           void queryClient.invalidateQueries({
-            predicate: (query) => query.queryKey[0] === "server-routines" && query.queryKey[5] === serverId,
+            predicate: (query) => query.queryKey[0] === "server-routines" && query.queryKey[4] === serverId,
           });
         const pinned = preferencesRef.current[serverId]?.pinnedChannels;
         if (!pinned?.length) return;
