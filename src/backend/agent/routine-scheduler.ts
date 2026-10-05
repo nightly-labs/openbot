@@ -577,6 +577,16 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   async #enqueueRun(run: RoutineRun): Promise<RoutineRun> {
+    // A test or a script run that arrives while a spent plan holds the agent would wait for the
+    // reset, and a routine set to skip has no use for a late result.
+    if (
+      this.#routines.get(run.agentId, run.routineId)?.limitPolicy === "skip" &&
+      this.#hooks.usageLimited(run.agentId)
+    ) {
+      const cancelled = this.#transitionRunWithConversation(run, "cancelled");
+      this.stateChanged(run.agentId);
+      return cancelled;
+    }
     recordRestartActivity();
     const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);

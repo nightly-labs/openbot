@@ -667,8 +667,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         [...this.#conversation.activeSnapshots()].some(
           ([, snapshot]) => snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId),
         ),
+      // A held agent gets no channel assignment: one that waited for the reset would reserve the host.
       busy: (agentId) =>
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
+        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
+        !this.#usageLimits.mayDrain(agentId),
+      usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
       steer: async (agentId, threadId, turnId, messageId, text) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
@@ -749,8 +752,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         readUsage: (provider, model) => this.#providers.usage({ provider, model }),
         held: (agentIds) => {
-          void this.#dropSkippedRoutineRuns(agentIds).catch((error) => this.#emitError("routine_skip_failed", error));
+          void this.#settleHeldQueues(agentIds).catch((error) => this.#emitError("usage_limit_hold_failed", error));
         },
+        // A channel task that went back to its queue is assigned again only by a pump.
+        released: () => this.channels.wake(),
       },
     });
     this.#drain = new DrainScheduler({
@@ -815,6 +820,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
+        requeueChannelDelivery: (deliveryId) => this.channels.requeueForLimit(deliveryId),
       },
     });
     this.#removal = new AgentRemoval({
@@ -1808,11 +1814,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * A routine set to skip leaves the queue once a spent plan holds its agent: its result is no use
-   * when late. Cancelling the delivery settles the run as cancelled.
+   * What a spent plan does to the queues it now holds. A channel task goes back to its channel, so
+   * its assignment does not reserve the host until the reset. A routine set to skip leaves the
+   * queue, because its result is no use when late; cancelling the delivery settles the run.
    */
-  async #dropSkippedRoutineRuns(agentIds: readonly string[]): Promise<void> {
+  async #settleHeldQueues(agentIds: readonly string[]): Promise<void> {
     for (const agentId of agentIds) {
+      for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
+        if (!this.channels.store.assignmentForDelivery(deliveryId) || !this.channels.requeueForLimit(deliveryId))
+          continue;
+        await this.#mailbox.cancel(agentId, deliveryId);
+        this.#mailboxSync.emitQueue(agentId);
+      }
       const skipped = new Set(
         this.#routines
           .listFor(agentId)

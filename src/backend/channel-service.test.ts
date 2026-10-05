@@ -87,6 +87,31 @@ async function send(text: string, recipientAgentId: string | null = "agent-a") {
   return required(service.store.tasks("channel-1")[0]);
 }
 describe("shared channel coordination", () => {
+  it("gives a task back to the queue at a spent plan, so it reserves nothing until the agent runs again", async () => {
+    const task = await send("Prepare the report");
+    const first = required(service.store.assignments("channel-1")[0]);
+    // The assignment reserves the host: another agent's own message cannot start.
+    expect(service.mayDrain("agent-b")).toBe(false);
+
+    busy.mockImplementation((agentId) => agentId === "agent-a");
+    expect(service.requeueForLimit(required(first.deliveryId))).toBe(true);
+    service.wake("channel-1");
+
+    expect(service.store.assignments("channel-1")).toEqual([
+      expect.objectContaining({ id: first.id, state: "interrupted" }),
+    ]);
+    expect(service.store.tasks("channel-1")).toEqual([
+      expect.objectContaining({ id: task.id, state: "queued", revision: task.revision + 1, error: null }),
+    ]);
+    expect(service.mayDrain("agent-b")).toBe(true);
+
+    busy.mockImplementation(() => false);
+    service.wake("channel-1");
+    await vi.waitFor(() =>
+      expect(service.store.assignments("channel-1").find((item) => item.id !== first.id)?.deliveryId).toBeTruthy(),
+    );
+  });
+
   it("addresses one member and keeps the agent normal thread and provider session", async () => {
     const threadId = await data.store.ensureThreadId("agent-a");
     data.store.bindProviderSession("agent-a", "normal-provider-session");

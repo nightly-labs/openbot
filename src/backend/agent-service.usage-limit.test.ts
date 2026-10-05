@@ -137,6 +137,11 @@ describe.sequential("AgentService: usage limit", () => {
 
     expect(client.turnStarts).toBe(1);
     expect(started.mailbox.getDelivery(run.deliveryId ?? "")?.delivery.status).toBe("cancelled");
+
+    // A run that arrives during the hold is dropped at once. A local script run takes the same path.
+    const late = await service.testRoutine({ agentId: "chief", routineId: routine.id });
+    expect(late).toMatchObject({ status: "cancelled", deliveryId: null });
+    expect(client.turnStarts).toBe(1);
   });
 
   it("holds work for a spent plan window, not for a throttle or a spent balance", () => {

@@ -70,7 +70,7 @@ export class AgentRoutineStore extends RoutineStore {
             active: routine.active,
             timezone: routine.timezone,
             schedule: routine.trigger.schedule,
-            limitPolicy: routine.limitPolicy,
+            ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
           },
           now,
         ),

@@ -23,6 +23,8 @@ export interface UsageLimitHooks {
   readUsage(provider: AgentProvider, model: string): Promise<AccountUsage | null>;
   /** The agents a limit now holds, each time a refused turn reports it. */
   held(agentIds: readonly string[]): void;
+  /** A limit ended, after its agents' drains were scheduled. */
+  released(): void;
 }
 
 export interface UsageLimitGateOptions {
@@ -172,6 +174,7 @@ export class UsageLimitGate {
     this.#limits.delete(key);
     this.#hooks.emitRuntimeSnapshot();
     for (const agent of this.#heldAgents(limit)) this.#hooks.scheduleDrain(agent.id);
+    this.#hooks.released();
   }
 
   #heldAgents(limit: UsageLimit) {

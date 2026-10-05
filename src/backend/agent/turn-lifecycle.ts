@@ -73,6 +73,11 @@ export interface TurnHooks {
   emitToolUsage(usage: ToolUsageSignal): void;
   /** The model this turn was started with, or null when the drain no longer knows it. */
   turnModel(agentId: string, turnId: string): string | null;
+  /**
+   * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
+   * when the delivery is not an active channel assignment that can go back.
+   */
+  requeueChannelDelivery(deliveryId: string): boolean;
 }
 
 export interface TurnLifecycleOptions {
@@ -477,16 +482,14 @@ export class TurnLifecycle {
       return;
     }
     // The plan refused the turn before it did anything that a second run would repeat, so its
-    // messages wait in the queue for the reset. A channel task pauses as for any other failure.
-    const requeue =
-      limited &&
-      running !== undefined &&
-      !running.acted &&
-      deliveries.length > 0 &&
-      !this.#conversation.isExecutionThread(snapshot.threadId);
+    // messages wait in the queue for the reset. A channel task goes back to its channel's queue
+    // instead: an assignment that waited here would reserve the whole host until the reset.
+    const repeatable = limited && running !== undefined && !running.acted && deliveries.length > 0;
+    const channelTurn = this.#conversation.isExecutionThread(snapshot.threadId);
+    const requeue = repeatable && !channelTurn;
     for (const message of snapshot.messages) {
       if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
-      message.status = normalizeCompletionStatus(requeue ? "interrupted" : status);
+      message.status = normalizeCompletionStatus(repeatable ? "interrupted" : status);
       markIncompleteImageGeneration(message, message.status);
     }
     // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
@@ -502,7 +505,13 @@ export class TurnLifecycle {
     }
     if (limited) this.#usageLimits.reached(agentId, resetsAt, model);
     else if (status === "completed") this.#usageLimits.completed(agentId, model);
-    if (status === "failed") this.#failedTurns.set(agentId, turnId);
+    // After the limit is recorded, so the channel does not assign the task to this agent again
+    // before the reset. A channel that took the task back ends this turn as interrupted.
+    const outcome =
+      repeatable && channelTurn && deliveries.every(({ delivery }) => this.#hooks.requeueChannelDelivery(delivery.id))
+        ? "interrupted"
+        : status;
+    if (outcome === "failed") this.#failedTurns.set(agentId, turnId);
     else this.#failedTurns.delete(agentId);
     const failure = refused
       ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
@@ -523,7 +532,7 @@ export class TurnLifecycle {
           message.text.trim(),
       );
     if (deliveries.length > 0) {
-      const terminal = status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "completed";
+      const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {
         this.#refusedRetries.delete(delivery.delivery.id);
         const reason = terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null;
@@ -546,7 +555,7 @@ export class TurnLifecycle {
       await this.#store.updatePreview(agentId, latestAssistant.text);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     }
-    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status });
+    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
     if (deliveries.length > 0) {
       try {
         this.#mailboxSync.emitQueue(agentId);
@@ -560,7 +569,7 @@ export class TurnLifecycle {
       agentId,
       threadId: this.#conversation.publicThreadId(agentId, threadId),
       turnId,
-      status,
+      status: outcome,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
     if (refused) this.#hooks.dropRefusedSession(agentId, threadId);

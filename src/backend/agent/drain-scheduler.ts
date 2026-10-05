@@ -490,12 +490,23 @@ export class DrainScheduler {
         return;
       }
       const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
-      // A spent plan window refused the start, so nothing ran. The messages wait for the reset.
-      if (!channelDelivery && !messagingDelivery && isPlanLimitDiagnostic(reason)) {
-        for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
-        this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
+      // a channel task goes back to its channel, so that its assignment does not reserve the host.
+      if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
+        if (!channelDelivery) {
+          for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
+          this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+          // After the restore, so a routine set to skip finds its run back in the queue.
+          this.#usageLimits.reached(delivery.recipientAgentId, null);
+          return;
+        }
+        // Before the requeue, so the channel does not assign the task to this agent again at once.
         this.#usageLimits.reached(delivery.recipientAgentId, null);
-        return;
+        if (this.#channels?.requeueForLimit(delivery.id)) {
+          await this.#mailbox.markTerminal(delivery.id, "interrupted", null);
+          this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+          return;
+        }
       }
       await this.#mailbox.markTerminal(delivery.id, "failed", reason);
       // The provider did not read the answers that were to start with it, so they wait for the next turn.

@@ -37,6 +37,8 @@ export interface ChannelHooks {
   awaitDrain?(agentId: string): Promise<void> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Promise<void>;
   busy(agentId: string): boolean;
+  /** Whether a spent provider plan holds this agent, so a routing turn on its model would be refused. */
+  usageLimited?(agentId: string): boolean;
   normalBusy?(): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -568,6 +570,8 @@ export class ChannelService {
       if (!task.ownerAgentId) {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
+        // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
+        if (lead && this.hooks.usageLimited?.(lead.id)) continue;
         try {
           if (!lead) throw new ChannelRoutingError(sourceText("error.backend.channelLeadRequired"));
           // The channel summary that member turns already maintain stands in for the transcript.
@@ -894,6 +898,27 @@ export class ChannelService {
     });
     this.publish(assignment.channelId);
     this.#releaseHeldAgents();
+  }
+
+  /**
+   * A spent provider plan holds the agent of this delivery. The task goes back to the queue with a
+   * new revision and the assignment ends, so nothing reserves the host while the agent waits: the
+   * pump assigns the task again once the agent takes turns. False when there is no active assignment
+   * to give back, or when a transfer is pending on it.
+   */
+  requeueForLimit(deliveryId: string): boolean {
+    const assignment = this.store.assignmentForDelivery(deliveryId);
+    if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
+    const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
+    const current = task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
+    this.store.update(this.store.get(assignment.channelId), {
+      assignments: [{ ...assignment, state: "interrupted" }],
+      tasks: task && current ? [{ ...task, state: "queued", revision: task.revision + 1, error: null }] : [],
+    });
+    this.resolveAssignmentTerminal(assignment.id);
+    this.publish(assignment.channelId);
+    this.#releaseHeldAgents();
+    return true;
   }
 
   restoreDeliveryLinks(): void {
