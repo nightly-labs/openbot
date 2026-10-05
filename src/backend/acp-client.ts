@@ -131,6 +131,8 @@ interface AcpTurn {
   toolKinds: Map<string, string>;
   /** Steered prompts that the agent refused while this turn ran; sent when the running prompt ends. */
   deferredPrompts: ContentBlock[][];
+  /** The user stopped the turn, so no deferred prompt is sent. */
+  stopped: boolean;
   task: Promise<void>;
 }
 
@@ -547,7 +549,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (this.#threads.isReleased(threadId)) return decoder({});
         const thread = this.#requireThread(threadId);
         // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
-        if (thread.activeTurn) thread.activeTurn.deferredPrompts.length = 0;
+        if (thread.activeTurn) thread.activeTurn.stopped = true;
         this.#requireConnection().cancel({ sessionId: thread.id });
         return decoder({});
       }
@@ -1036,6 +1038,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolNames: new Map(),
       toolKinds: new Map(),
       deferredPrompts: [],
+      stopped: false,
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
@@ -1066,7 +1069,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             method: "openbot/usage",
             params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
           });
-        const deferred = response.stopReason === "end_turn" ? turn.deferredPrompts.shift() : undefined;
+        const deferred = response.stopReason === "end_turn" && !turn.stopped ? turn.deferredPrompts.shift() : undefined;
         if (!deferred) break;
         // The reply to the earlier prompt is complete; the refused steer gets its own reply.
         this.#completeThought(thread, turn);
