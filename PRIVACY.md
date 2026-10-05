@@ -549,6 +549,12 @@ The draft is reviewed before OpenBot saves it; generating a draft does not creat
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
 
+When you change an agent's provider, the new provider receives the chat history with its first
+message. That history includes the work steps that the previous provider recorded: commands, the end
+of their output, changed file paths, tool names, searches and progress notes. OpenBot removes known
+secrets from these steps first. Command output can contain file contents. Reasoning, diffs and
+attachment contents are not sent.
+
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
 stops the publish when a text field looks like a secret. Workspace files and memories are not sent.

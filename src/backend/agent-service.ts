@@ -103,6 +103,7 @@ import { agentNamesById, displayMessageReferences } from "./agent/delivery-conte
 import { DeltaBuffer } from "./agent/delta-buffer";
 import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
+import { decodeProviderTurns } from "./agent/handoff-tool-steps";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
@@ -582,12 +583,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpAuthorization: (config) => this.#mcp.authorization(config),
       ...(credentials.agentEnvironment ? { agentEnvironment: credentials.agentEnvironment } : {}),
+      // The previous provider's CLI stops a minute after no agent uses it, so it is started again. The
+      // read is shorter than a request's usual wait: the first turn on the new provider waits for it.
+      readProviderTurns: async (provider, threadId) => {
+        await this.#providers.ensureProvider(provider);
+        const client = this.#providers.clientFor(provider);
+        return client
+          ? client.request("thread/read", { threadId, includeTurns: true }, decodeProviderTurns, 10_000)
+          : [];
+      },
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
         logReleaseFailure: (provider, error) =>
           logger.warn("Could not close a replaced provider session.", { provider, error }),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
+        logHandoffReadFailure: (provider, error) =>
+          logger.warn("Could not read the work steps of an earlier provider session.", { provider, error }),
       },
     });
     this.#boot = new BootRecovery({
