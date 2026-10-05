@@ -149,7 +149,7 @@ export class UsageLimitGate {
     limit.timer = null;
     if (limit.resetsAt !== null) {
       if (limit.resetsAt * 1_000 + RESET_GRACE_MS > Date.now()) this.#arm(key, limit);
-      else this.#release(key);
+      else this.#release(key, true);
       return;
     }
     // A reading that still shows a spent window gives the reset; anything else lets one turn try.
@@ -167,11 +167,18 @@ export class UsageLimitGate {
     return resetsAt;
   }
 
-  #release(key: string): void {
+  /**
+   * Ends a limit. At the reset the provider reported, the limit is over, so the next one is announced
+   * again. A probe of a limit with no known reset keeps the announcement: the next refused turn may
+   * only close the same limit again.
+   */
+  #release(key: string, reset = false): void {
     const limit = this.#limits.get(key);
     if (!limit) return;
     if (limit.timer) clearTimeout(limit.timer);
     this.#limits.delete(key);
+    if (reset && ![...this.#limits.values()].some((other) => other.provider === limit.provider))
+      this.#announced.delete(limit.provider);
     this.#hooks.emitRuntimeSnapshot();
     for (const agent of this.#heldAgents(limit)) this.#hooks.scheduleDrain(agent.id);
     this.#hooks.released();
