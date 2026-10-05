@@ -6,7 +6,6 @@ import {
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { z } from "zod";
 
 const profileFields = {
@@ -116,17 +115,20 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "update_profile",
 ]);
 
-/** Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field names. */
-export function profileToolErrorMessage(error: unknown, input: unknown): string {
+/**
+ * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
+ * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
+ * trimmed length.
+ */
+export function profileToolErrorMessage(error: unknown): string {
   if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
   const details = error.issues.map((issue) => {
     if (issue.code === "unrecognized_keys") return "Remove unsupported profile fields.";
     const field = issue.path.join(".") || "arguments";
-    const value = isDynamicRecord(input) ? input[field] : undefined;
-    if (issue.code === "too_big" && issue.origin === "string" && typeof value === "string") {
-      return `${field} must have at most ${issue.maximum} characters; received ${value.length}. Shorten it and retry.`;
+    if (issue.code === "too_big" && issue.origin === "string" && typeof issue.input === "string") {
+      return `${field} must have at most ${issue.maximum} characters; received ${issue.input.length}. Shorten it and retry.`;
     }
     return `${field}: ${issue.message}`;
   });
-  return `${details.join(" ")} No agent was created or changed. Correct the arguments and retry.`;
+  return `${details.join(" ")} Correct the arguments and retry.`;
 }
