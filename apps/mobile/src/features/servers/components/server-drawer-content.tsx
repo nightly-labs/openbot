@@ -40,6 +40,8 @@ function serverDetail(server: MobileServer, t: MobileTranslate): string {
   return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server, t)}` : label;
 }
 
+function ignoreLongPress(): void {}
+
 function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
   return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
 }
@@ -119,6 +121,9 @@ export function ServerDrawerContent({
         }}
         className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
+        // The native context menu does not cancel this touch. Without a long-press handler, lifting the
+        // finger after the menu opens counts as a tap and closes the drawer under the open menu.
+        onLongPress={editing ? undefined : ignoreLongPress}
         style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 8, opacity: pressed ? 0.58 : 1, width })}
       >
         <ServerAvatar server={serverItem} />
