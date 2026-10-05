@@ -1,5 +1,5 @@
 import { Deferred, Effect } from "effect";
-import { type RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 /**
  * A hosted server has nobody to press Retry, so it publishes the host again after a failed start. A
  * start that could not sign in leaves the host idle or unconfigured, so those phases also start again.
@@ -7,6 +7,7 @@ import { type RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-ef
  */
 
 import type { HostPhase } from "@openbot/contracts/ipc";
+import { runCauseEffect } from "../backend/effect-boundary";
 
 const CHECK_INTERVAL_MS = 60_000;
 const START_RETRY_DELAYS_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000];
@@ -36,7 +37,7 @@ export class HostedServerStartRetry {
   start(): void {
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void runRemoteWorkflow(this.tick()).catch((error) =>
+      void runCauseEffect(this.tick()).catch((error) =>
         this.#options.onError("The hosted server start retry failed.", error),
       );
     }, CHECK_INTERVAL_MS);

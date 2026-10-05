@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import type { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // Storage: what the files, chats and caches of the local host or a joined server take on disk.
 //
@@ -20,6 +20,7 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -67,11 +68,7 @@ export function storageIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY))
       throw new Error(sourceText("error.storage.unsupported"));
     try {
-      await Effect.runPromise(
-        remoteServers
-          .request(serverId, path, decodeStorageChange, { method: "POST", body })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+      await runCauseEffect(remoteServers.request(serverId, path, decodeStorageChange, { method: "POST", body }));
     } finally {
       // A failed answer can still follow a delete that the host completed.
       remoteServers.forgetCachedAttachments(serverId);
@@ -81,28 +78,24 @@ export function storageIpcHandlers({
   return {
     storage: {
       getUsage: scopedHandler(parseGetStorageUsageInput, {
-        local: (parsed) => Effect.runPromise(storage.usage(parsed).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(storage.usage(parsed)),
         remote: async (parsed, serverId) => {
           if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY)) return null;
-          const usage = await Effect.runPromise(
-            remoteServers
-              .request(serverId, STORAGE_ROUTES.usage, decodeStorageUsage, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          const usage = await runCauseEffect(
+            remoteServers.request(serverId, STORAGE_ROUTES.usage, decodeStorageUsage, {
+              method: "POST",
+              body: parsed,
+            }),
           );
           return assertStorageUsageScope(usage, parsed);
         },
       }),
       deleteFile: scopedHandler(parseDeleteStoredFileInput, {
-        local: (parsed) =>
-          Effect.runPromise(storage.deleteFile(parsed.fileId).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(storage.deleteFile(parsed.fileId)),
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
       }),
       clear: scopedHandler(parseClearStorageInput, {
-        local: (parsed) =>
-          Effect.runPromise(storage.clear(parsed.category).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(storage.clear(parsed.category)),
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.clear, parsed),
       }),
       // A stored file is a sent or generated attachment, so the chat's open path serves it.

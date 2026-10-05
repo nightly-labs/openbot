@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "./remote-service-effects";
 import { remoteDecode } from "./remote-service-effects";
 // @vitest-environment node
 
@@ -14,6 +12,7 @@ import { remoteDecode } from "./remote-service-effects";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CAPABILITIES_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { decodeAgentModelOptions } from "./remote-agent-decoding";
 import { RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
@@ -36,9 +35,7 @@ describe("Team API compatibility negotiation", () => {
     stubTeamFetch({});
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("assumed")] });
 
-    await Effect.runPromise(
-      fixture.manager.retryConnection("assumed").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    await runCauseEffect(fixture.manager.retryConnection("assumed"));
 
     const compatibility = fixture.server()?.compatibility;
     expect(compatibility).toMatchObject({ negotiatedProtocol: 1 });
@@ -61,11 +58,7 @@ describe("Team API compatibility negotiation", () => {
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("binary-protocol")], appVersion: "0.4.0" });
 
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .downloadSharedFile("~/OpenBot/Shared/report.csv", "binary-protocol")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
+      runCauseEffect(fixture.manager.downloadSharedFile("~/OpenBot/Shared/report.csv", "binary-protocol")),
     ).rejects.toThrow("could not safely use");
     expect(fixture.server()).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
@@ -78,11 +71,7 @@ describe("Team API compatibility negotiation", () => {
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("binary-request")], appVersion: "0.4.0" });
 
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .downloadSharedFile("~/OpenBot/Shared/report.csv", "binary-request")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
+      runCauseEffect(fixture.manager.downloadSharedFile("~/OpenBot/Shared/report.csv", "binary-request")),
     ).rejects.toThrow("Remote server request failed (502).");
     // A gateway that is merely down is not a host the client has to stop talking to.
     expect(fixture.server()).toMatchObject({ state: "offline", issue: null });
@@ -96,13 +85,9 @@ describe("Team API compatibility negotiation", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("retry-error")], appVersion: "0.4.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .retryConnection("retry-error")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("Unexpected compatibility failure");
+    await expect(runCauseEffect(fixture.manager.retryConnection("retry-error"))).rejects.toThrow(
+      "Unexpected compatibility failure",
+    );
     expect(fixture.server()?.state).toBe("error");
   });
 
@@ -119,20 +104,8 @@ describe("Team API compatibility negotiation", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("retry-timeout")], appVersion: "0.4.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .retryConnection("retry-timeout")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .retryConnection("retry-timeout")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("timed out");
+    await expect(runCauseEffect(fixture.manager.retryConnection("retry-timeout"))).rejects.toThrow();
+    await expect(runCauseEffect(fixture.manager.retryConnection("retry-timeout"))).rejects.toThrow("timed out");
     // The timeout replaces neither the verdict nor its retryability: the host is still the one that
     // is too new, and asking again is still worth offering.
     expect(fixture.server()).toMatchObject({
@@ -146,24 +119,14 @@ describe("Team API compatibility negotiation", () => {
     const stub = stubTeamFetch({ compatibility: { appVersion: "0.5.0", protocol } });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("range")], appVersion: "0.4.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager.retryConnection("range").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow();
+    await expect(runCauseEffect(fixture.manager.retryConnection("range"))).rejects.toThrow();
     expect(fixture.server()).toMatchObject({
       state: "incompatible",
       issue: { code: "client_update_required" },
       compatibility: { negotiatedProtocol: null, hostProtocol: protocol },
     });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request("range", "/v1/agents", (value) => value)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow();
+    await expect(runCauseEffect(fixture.manager.request("range", "/v1/agents", (value) => value))).rejects.toThrow();
     // The blocked verdict is remembered, so the next call never reaches the network.
     expect(stub.calls).toHaveLength(1);
   });
@@ -172,11 +135,7 @@ describe("Team API compatibility negotiation", () => {
     stubTeamFetch({ fallback: () => new Response(null, { status: 404 }) });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("missing")], appVersion: "0.4.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager.retryConnection("missing").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow();
+    await expect(runCauseEffect(fixture.manager.retryConnection("missing"))).rejects.toThrow();
     expect(fixture.server()).toMatchObject({ state: "incompatible", issue: { code: "host_update_required" } });
   });
 
@@ -199,26 +158,20 @@ describe("Team API compatibility negotiation", () => {
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("headers")], appVersion: "0.4.0" });
 
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request("headers", "/v1/agents/status", (value) => value)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
+      runCauseEffect(fixture.manager.request("headers", "/v1/agents/status", (value) => value)),
     ).resolves.toMatchObject({
       phase: "ready",
     });
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request("headers", "/v1/agents/chief/messages", (value) => value, {
-            method: "POST",
-            body: {
-              text: "Ask @[Research](agent:research) to use @[Sources](skill:sources).",
-              attachmentDraftIds: [],
-              replyToMessageId: null,
-            },
-          })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      runCauseEffect(
+        fixture.manager.request("headers", "/v1/agents/chief/messages", (value) => value, {
+          method: "POST",
+          body: {
+            text: "Ask @[Research](agent:research) to use @[Sources](skill:sources).",
+            attachmentDraftIds: [],
+            replyToMessageId: null,
+          },
+        }),
       ),
     ).resolves.toMatchObject({ messageId: "message-1" });
 
@@ -282,27 +235,13 @@ describe("Team API compatibility negotiation", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("duplicate")], appVersion: "1.0.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .duplicateAgent("bot-source", "duplicate")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("connection reset");
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .duplicateAgent("bot-source", "duplicate")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("Host response was lost");
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .duplicateAgent("bot-source", "duplicate")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).resolves.toMatchObject({
+    await expect(runCauseEffect(fixture.manager.duplicateAgent("bot-source", "duplicate"))).rejects.toThrow(
+      "connection reset",
+    );
+    await expect(runCauseEffect(fixture.manager.duplicateAgent("bot-source", "duplicate"))).rejects.toThrow(
+      "Host response was lost",
+    );
+    await expect(runCauseEffect(fixture.manager.duplicateAgent("bot-source", "duplicate"))).resolves.toMatchObject({
       agent: { id: "bot-copy" },
     });
 
@@ -322,13 +261,9 @@ describe("Team API compatibility negotiation", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("permission")], appVersion: "0.4.0" });
 
-    await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request("permission", "/v1/admin", (value) => value)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("Administrator access is required.");
+    await expect(runCauseEffect(fixture.manager.request("permission", "/v1/admin", (value) => value))).rejects.toThrow(
+      "Administrator access is required.",
+    );
     expect(fixture.server()).toMatchObject({ state: "offline", issue: null });
   });
 });
@@ -358,12 +293,10 @@ describe("WebRTC request decoding", () => {
     });
 
     await expect(
-      Effect.runPromise(
-        client
-          .request("host", "/api/team/agents", () => {
-            throw new Error("Unexpected agent payload.");
-          })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      runCauseEffect(
+        client.request("host", "/api/team/agents", () => {
+          throw new Error("Unexpected agent payload.");
+        }),
       ),
     ).rejects.toThrow("could not safely use");
 
@@ -396,21 +329,15 @@ describe("WebRTC request decoding", () => {
       },
     });
 
-    await expect(
-      Effect.runPromise(
-        client
-          .request("host", "/api/team/agents", () => null)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("invalid compatibility information");
+    await expect(runCauseEffect(client.request("host", "/api/team/agents", () => null))).rejects.toThrow(
+      "invalid compatibility information",
+    );
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
 
     connections.forget("host");
-    await expect(
-      Effect.runPromise(
-        client.refreshWebRtcCompatibility("host").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("invalid compatibility information");
+    await expect(runCauseEffect(client.refreshWebRtcCompatibility("host"))).rejects.toThrow(
+      "invalid compatibility information",
+    );
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
 
@@ -445,11 +372,7 @@ describe("WebRTC request decoding", () => {
       },
     });
 
-    await expect(
-      Effect.runPromise(
-        client.probeRemoteDesktop(server).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("invalid response body");
+    await expect(runCauseEffect(client.probeRemoteDesktop(server))).rejects.toThrow("invalid response body");
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
 
     // The same failure on the compatibility route, which `refreshWebRtcCompatibility` asks for before
@@ -471,13 +394,9 @@ describe("WebRTC request decoding", () => {
       },
     });
 
-    await expect(
-      Effect.runPromise(
-        unreadableHost
-          .refreshWebRtcCompatibility("host")
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("invalid response body");
+    await expect(runCauseEffect(unreadableHost.refreshWebRtcCompatibility("host"))).rejects.toThrow(
+      "invalid response body",
+    );
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
 
@@ -509,11 +428,7 @@ describe("WebRTC request decoding", () => {
       },
     });
 
-    await expect(
-      Effect.runPromise(
-        client.probeRemoteDesktop(server).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("could not safely use");
+    await expect(runCauseEffect(client.probeRemoteDesktop(server))).rejects.toThrow("could not safely use");
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
 
@@ -559,11 +474,7 @@ describe("WebRTC request decoding", () => {
     });
 
     await expect(
-      Effect.runPromise(
-        client
-          .request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
+      runCauseEffect(client.request("host", TEAM_API_ROUTES.agents.models, decodeAgentModelOptions)),
     ).rejects.toThrow();
     expect(connections.statusFor("host")).toMatchObject({ issue: { code: "protocol_error" } });
   });
@@ -595,11 +506,7 @@ describe("HTTPS request decoding", () => {
       transport: null,
     });
 
-    await expect(
-      Effect.runPromise(
-        client.probeRemoteDesktop(server).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("invalid data");
+    await expect(runCauseEffect(client.probeRemoteDesktop(server))).rejects.toThrow("invalid data");
     expect(connections.statusFor("host")).toMatchObject({ state: "error", issue: { code: "protocol_error" } });
   });
 
@@ -637,20 +544,12 @@ describe("HTTPS request decoding", () => {
       transport: null,
     });
 
-    await Effect.runPromise(
-      client.ensureCompatibility(server).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    const renegotiated = Effect.runPromise(
-      client.ensureCompatibility(server, true).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    await runCauseEffect(client.ensureCompatibility(server));
+    const renegotiated = runCauseEffect(client.ensureCompatibility(server, true));
     await renegotiation.arrived;
 
     // The probe reuses the compatibility already on record, so it answers while the refresh is out.
-    await expect(
-      Effect.runPromise(
-        client.probeRemoteDesktop(server).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
-    ).rejects.toThrow("could not safely use");
+    await expect(runCauseEffect(client.probeRemoteDesktop(server))).rejects.toThrow("could not safely use");
     renegotiation.resolve(
       Response.json({ appVersion: "0.4.0", protocol: { minimum: 1, maximum: 1 }, capabilities: ["remote-desktop"] }),
     );

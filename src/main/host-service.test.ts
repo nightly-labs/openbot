@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import { desktopCall } from "./remote-desktop-effects";
-import { remoteCall, runRemoteWorkflow } from "./remote-service-effects";
+import { remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
 // `HostService` is what the app binds a Team API host to an account with, and every case here is
@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, HostService } from "./host-service";
 import { createAgents, createBrowser, createMailbox, unimplemented } from "./team-api-server-test-harness";
 import { TeamStore } from "./team-store";
@@ -58,7 +59,7 @@ async function createHostService(
   const root = await mkdtemp(join(tmpdir(), "openbot-host-service-"));
   roots.push(root);
   const store = new TeamStore(join(root, "team.json"));
-  await runRemoteWorkflow(store.initialize());
+  await runCauseEffect(store.initialize());
   let signedIn: CentralAuthUser | null = null;
   const options: HostOptions = {
     appVersion: "0.4.0",
@@ -119,7 +120,7 @@ async function createHostService(
     },
     signIn: async (user) => {
       signedIn = user;
-      await runRemoteWorkflow(service.applySignedInAccount(user));
+      await runCauseEffect(service.applySignedInAccount(user));
     },
   };
 }
@@ -138,7 +139,7 @@ describe.runIf(process.platform === "darwin")("HostService permission setup", ()
   it.each(["accessibility", "screen-recording", "reveal"] as const)("opens Sunshine setup for %s", async (action) => {
     const openRemoteDesktopSetup = vi.fn(() => remoteCall(async () => undefined));
     const { service } = await createHostService({ openRemoteDesktopSetup }, () => false);
-    await runRemoteWorkflow(service.openRemoteDesktopSetup(action));
+    await runCauseEffect(service.openRemoteDesktopSetup(action));
     expect(openRemoteDesktopSetup).toHaveBeenCalledWith(action, "/runtime/Sunshine.app");
   });
 });
@@ -151,14 +152,14 @@ describe("HostService screen recording", () => {
     const changed = vi.fn();
     service.on("changed", changed);
 
-    await expect(runRemoteWorkflow(service.recheckScreenRecording())).resolves.toMatchObject({
+    await expect(runCauseEffect(service.recheckScreenRecording())).resolves.toMatchObject({
       remoteDesktopScreenRecordingDenied: true,
     });
     expect(service.getStatus().remoteDesktopScreenRecordingDenied).toBe(true);
     expect(changed).toHaveBeenCalledWith(expect.objectContaining({ remoteDesktopScreenRecordingDenied: true }));
 
     denied = false;
-    await expect(runRemoteWorkflow(service.recheckScreenRecording())).resolves.toMatchObject({
+    await expect(runCauseEffect(service.recheckScreenRecording())).resolves.toMatchObject({
       remoteDesktopScreenRecordingDenied: false,
     });
     expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ remoteDesktopScreenRecordingDenied: false }));
@@ -181,7 +182,7 @@ describe("HostService account binding", () => {
   it("stops reporting the previous account's server when the account changes", async () => {
     const { service, signIn } = await createHostService();
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
     expect(service.getStatus().serverName).toBe("Studio Mac");
 
     await signIn(second);
@@ -197,7 +198,7 @@ describe("HostService account binding", () => {
   it("stops reporting the previous account's server before the switch is recorded", async () => {
     const { service, signIn } = await createHostService();
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
     // What `forwardCentralAuth` calls before it tells the renderer the account changed.
     service.unbindChangedAccount(second);
@@ -210,7 +211,7 @@ describe("HostService account binding", () => {
   it("puts the account's server back when the same account is reported after the unbind", async () => {
     const { service, signIn } = await createHostService();
     await signIn(first);
-    const identity = await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    const identity = await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
     // A sign-out and an immediate sign-in as the same account: the unbind lands first, and
     // the queued switch that follows is the only thing that can bind the host again.
@@ -225,14 +226,14 @@ describe("HostService account binding", () => {
   it("does not bind the previous account's server when its switch is applied too late", async () => {
     const { service, signIn } = await createHostService();
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
     await signIn(second);
 
     // A's queued switch, arriving after B is the signed-in account.
-    await runRemoteWorkflow(service.applySignedInAccount(first));
+    await runCauseEffect(service.applySignedInAccount(first));
 
     expect(service.getStatus().configured).toBe(false);
-    await expect(runRemoteWorkflow(service.listMembers())).rejects.toThrow("The team server is not configured.");
+    await expect(runCauseEffect(service.listMembers())).rejects.toThrow("The team server is not configured.");
   });
 
   it("answers invitations from the host that is active when the read returns", async () => {
@@ -245,11 +246,11 @@ describe("HostService account binding", () => {
       listRemoteInvites: () => remoteCall(async () => loading),
     });
     await signIn(second);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Air" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Air" }));
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
-    const pending = runRemoteWorkflow(service.listInvites());
+    const pending = runCauseEffect(service.listInvites());
     await signIn(second);
     deliver([
       {
@@ -297,25 +298,25 @@ describe("HostService account binding", () => {
         }),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
-    const invite = await runRemoteWorkflow(store.createInvite("member", "guest@example.com", { permanent: false }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
+    const invite = await runCauseEffect(store.createInvite("member", "guest@example.com", { permanent: false }));
 
-    expect(await runRemoteWorkflow(service.listInvites())).toEqual([expect.objectContaining({ id: invite.id })]);
-    await runRemoteWorkflow(service.revokeInvite(invite.id));
-    expect(await runRemoteWorkflow(service.listInvites())).toEqual([]);
+    expect(await runCauseEffect(service.listInvites())).toEqual([expect.objectContaining({ id: invite.id })]);
+    await runCauseEffect(service.revokeInvite(invite.id));
+    expect(await runCauseEffect(service.listInvites())).toEqual([]);
 
-    const joined = await runRemoteWorkflow(store.createInvite("member"));
-    const { member } = await runRemoteWorkflow(store.acceptInvite(joined.token, "guest", "guest-password"));
-    expect(await runRemoteWorkflow(service.listMembers())).toContainEqual(
+    const joined = await runCauseEffect(store.createInvite("member"));
+    const { member } = await runCauseEffect(store.acceptInvite(joined.token, "guest", "guest-password"));
+    expect(await runCauseEffect(service.listMembers())).toContainEqual(
       expect.objectContaining({ id: member.id, role: "member" }),
     );
-    await runRemoteWorkflow(service.updateMember({ memberId: member.id, role: "admin" }));
-    expect(await runRemoteWorkflow(service.listMembers())).toContainEqual(
+    await runCauseEffect(service.updateMember({ memberId: member.id, role: "admin" }));
+    expect(await runCauseEffect(service.listMembers())).toContainEqual(
       expect.objectContaining({ id: member.id, role: "admin" }),
     );
-    await runRemoteWorkflow(service.removeMember(member.id));
+    await runCauseEffect(service.removeMember(member.id));
 
-    expect((await runRemoteWorkflow(service.listMembers())).map((listed) => listed.id)).not.toContain(member.id);
+    expect((await runCauseEffect(service.listMembers())).map((listed) => listed.id)).not.toContain(member.id);
     expect(remoteCalls).toEqual([]);
   });
 
@@ -344,9 +345,9 @@ describe("HostService account binding", () => {
         }),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
-    const pending = runRemoteWorkflow(
+    const pending = runCauseEffect(
       service.updateIdentity({
         serverName: "Renamed",
         logo: { mimeType: "image/png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) },
@@ -391,9 +392,9 @@ describe("HostService account binding", () => {
       registerRemoteHost: () => remoteCall(async () => Promise.resolve()),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
-    const pending = runRemoteWorkflow(service.updateMember({ memberId: "member-1", role: "admin" }));
+    const pending = runCauseEffect(service.updateMember({ memberId: "member-1", role: "admin" }));
     const settled = pending.catch(() => undefined);
     await started;
     await signIn(second);
@@ -434,7 +435,7 @@ describe("HostService account binding", () => {
     });
     await signIn(first);
 
-    const pending = runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    const pending = runCauseEffect(service.configure({ serverName: "Studio Mac" }));
     await started;
     await signIn(second);
     const beforeFailure = service.getStatus();
@@ -470,9 +471,9 @@ describe("HostService account binding", () => {
         }),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
-    const pending = runRemoteWorkflow(service.createInvite({ role: "member", email: "guest@example.com" }));
+    const pending = runCauseEffect(service.createInvite({ role: "member", email: "guest@example.com" }));
     const settled = pending.catch(() => undefined);
     await started;
     await signIn(second);
@@ -495,9 +496,9 @@ describe("HostService account binding", () => {
       registerRemoteHost: () => remoteCall(async () => Promise.resolve()),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
     await signIn(second);
-    const secondIdentity = await runRemoteWorkflow(service.configure({ serverName: "Loft Mini" }));
+    const secondIdentity = await runCauseEffect(service.configure({ serverName: "Loft Mini" }));
     await signIn(first);
 
     // The team file cannot be written while its directory is gone, so recording the switch fails.
@@ -521,7 +522,7 @@ describe("HostService account binding", () => {
     });
     await signIn(first);
 
-    const pending = runRemoteWorkflow(
+    const pending = runCauseEffect(
       service.configure({
         serverName: "Studio Mac",
         logo: { mimeType: "image/png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) },
@@ -535,7 +536,7 @@ describe("HostService account binding", () => {
     // Registering would have reserved A's server under B's authentication.
     expect(registrations).toEqual([]);
     // Nor may what was created stay readable: the owner's address is in there.
-    await expect(runRemoteWorkflow(service.listMembers())).rejects.toThrow("The team server is not configured.");
+    await expect(runCauseEffect(service.listMembers())).rejects.toThrow("The team server is not configured.");
   });
 
   it("hands the development client a working session after the directory disabled it", async () => {
@@ -555,23 +556,23 @@ describe("HostService account binding", () => {
         ]),
     });
     await signIn(first);
-    await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
-    await runRemoteWorkflow(service.startDevelopmentLocal());
-    await runRemoteWorkflow(service.createDevelopmentConnection());
+    await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
+    await runCauseEffect(service.startDevelopmentLocal());
+    await runCauseEffect(service.createDevelopmentConnection());
 
     // What publishing this host does to it: the control plane becomes the whole membership, and the
     // technical development client -- password-only, owned by no account -- is not in that list.
-    await runRemoteWorkflow(service.listMembers());
+    await runCauseEffect(service.listMembers());
 
-    const reconnected = await runRemoteWorkflow(service.createDevelopmentConnection());
+    const reconnected = await runCauseEffect(service.createDevelopmentConnection());
     expect(store.authenticate(reconnected.sessionToken)?.username).toBe(DEVELOPMENT_REMOTE_CLIENT_USERNAME);
-    await runRemoteWorkflow(service.stop(false));
+    await runCauseEffect(service.stop(false));
   });
 
   it("reports the account's own server again after signing out and back in", async () => {
     const { service, signIn } = await createHostService();
     await signIn(first);
-    const identity = await runRemoteWorkflow(service.configure({ serverName: "Studio Mac" }));
+    const identity = await runCauseEffect(service.configure({ serverName: "Studio Mac" }));
 
     await signIn(null);
     expect(service.getStatus().configured).toBe(false);

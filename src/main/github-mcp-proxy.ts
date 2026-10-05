@@ -22,6 +22,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { readJsonBody } from "../backend/local-mcp-bridge";
 
 const logger = createOpenBotLogger("github-mcp-proxy");
@@ -114,7 +115,7 @@ export class GitHubMcpProxy {
   #listen(port: number): Effect.Effect<HttpServer, GitHubOperationError> {
     return Effect.callback((resume) => {
       const server = createServer((request, response) => {
-        void Effect.runPromise(this.#handleEffect(request, response).pipe(Effect.mapError((error) => error.cause)));
+        void runCauseEffect(this.#handleEffect(request, response));
       });
       let transferred = false;
       const failed = (cause: Error) => resume(Effect.fail(new GitHubOperationError({ cause })));
@@ -216,8 +217,7 @@ export class GitHubMcpProxy {
         ...(instructions ? { instructions } : {}),
       },
     );
-    const forward = <T>(token: string, call: (client: Client) => Promise<T>) =>
-      Effect.runPromise(this.#call(token, call).pipe(Effect.mapError((error) => error.cause)));
+    const forward = <T>(token: string, call: (client: Client) => Promise<T>) => runCauseEffect(this.#call(token, call));
     mcp.setRequestHandler(ListToolsRequestSchema, ({ params }, extra) =>
       forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))),
     );

@@ -2,9 +2,10 @@
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
-import { type RemoteWorkflowError, remoteCall } from "./remote-service-effects";
+import { remoteCall } from "./remote-service-effects";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -81,17 +82,9 @@ function harness() {
 describe("RemoteEventRefresh", () => {
   it("reloads the roster once after reconnect despite unrelated activity events", async () => {
     const { refresh, paths, replies, emitted } = harness();
-    const first = Effect.runPromise(
-      refresh.refreshAgentRoster("server").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    const second = Effect.runPromise(
-      refresh.refreshAgentRoster("server").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", { type: "usage-changed", usage: { limits: [] } })
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    const first = runCauseEffect(refresh.refreshAgentRoster("server"));
+    const second = runCauseEffect(refresh.refreshAgentRoster("server"));
+    runCauseEffect(refresh.forward("server", { type: "usage-changed", usage: { limits: [] } }));
     replies[0]?.resolve([]);
     await Promise.all([first, second]);
     expect({ paths, events: emitted.map((entry) => entry.event) }).toEqual({
@@ -105,15 +98,8 @@ describe("RemoteEventRefresh", () => {
 
   it.each(["event", "forget", "clear"] as const)("discards a roster load superseded by %s", async (action) => {
     const { refresh, replies, emitted } = harness();
-    const pending = Effect.runPromise(
-      refresh.refreshAgentRoster("server").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    if (action === "event")
-      Effect.runPromise(
-        refresh
-          .forward("server", { type: "agents-changed", agents: [] })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+    const pending = runCauseEffect(refresh.refreshAgentRoster("server"));
+    if (action === "event") runCauseEffect(refresh.forward("server", { type: "agents-changed", agents: [] }));
     else if (action === "forget") refresh.forget("server");
     else refresh.clear();
     replies[0]?.resolve([]);
@@ -124,21 +110,9 @@ describe("RemoteEventRefresh", () => {
   it("holds a burst to one fetch in flight, then refetches once for what arrived during it", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 7))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 7))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 7))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    runCauseEffect(refresh.forward("server", invalidated("research", 7)));
     expect(paths).toHaveLength(1);
 
     // Repeating a revision is not repeating an announcement. A read on another device moves the
@@ -162,16 +136,8 @@ describe("RemoteEventRefresh", () => {
   it("fetches again when a newer revision is announced while the first fetch is in flight", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 7))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 9))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    runCauseEffect(refresh.forward("server", invalidated("research", 9)));
     const refetched = nextRequest();
     replies[0]?.resolve(conversationPage(7));
     await refetched;
@@ -191,16 +157,8 @@ describe("RemoteEventRefresh", () => {
   it("retries a failed refetch for the revision announced while it was away", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 7))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", invalidated("research", 9))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    runCauseEffect(refresh.forward("server", invalidated("research", 9)));
     const retried = nextRequest();
     replies[0]?.reject(new Error("Refresh failed"));
     await retried;
@@ -223,16 +181,8 @@ describe("RemoteEventRefresh", () => {
 
     // The queue carries no revision, so "changed again" is the only thing a second event can say --
     // which makes coalescing and retrying the same question here, unlike a conversation page.
-    Effect.runPromise(
-      refresh
-        .forward("server", queueInvalidated("research"))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    Effect.runPromise(
-      refresh
-        .forward("server", queueInvalidated("research"))
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(refresh.forward("server", queueInvalidated("research")));
+    runCauseEffect(refresh.forward("server", queueInvalidated("research")));
     expect(paths).toHaveLength(1);
 
     const retried = nextRequest();
@@ -250,12 +200,8 @@ describe("RemoteEventRefresh", () => {
   it("drops a fallback load that a later one has already replaced", async () => {
     const { refresh, replies, emitted, nextEmit } = harness();
 
-    void Effect.runPromise(
-      refresh.refreshAgentState("server").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
-    void Effect.runPromise(
-      refresh.refreshAgentState("server").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    void runCauseEffect(refresh.refreshAgentState("server"));
+    void runCauseEffect(refresh.refreshAgentState("server"));
     const shown = nextEmit();
     replies[0]?.resolve([]);
     replies[1]?.resolve([]);

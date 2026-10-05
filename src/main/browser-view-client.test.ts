@@ -1,9 +1,10 @@
 import { Effect } from "effect";
-import { runRemoteWorkflow } from "./remote-service-effects";
+
 // @vitest-environment node
 
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { BrowserViewClient } from "./browser-view-client";
 import { stubEventSockets } from "./remote-server-test-harness";
 
@@ -29,7 +30,7 @@ describe("BrowserViewClient", () => {
       onEvent,
     });
 
-    await runRemoteWorkflow(client.start("tab-1"));
+    await runCauseEffect(client.start("tab-1"));
     last()?.dispatchEvent(new MessageEvent("message", { data: new ArrayBuffer(4) }));
 
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "stopped" })));

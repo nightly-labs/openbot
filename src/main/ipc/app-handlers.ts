@@ -57,6 +57,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TraceFile } from "../trace-file";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
@@ -104,43 +105,33 @@ export function appIpcHandlers({
         }
         return { name: app.getName(), version: app.getVersion(), platform, variant: appVariant };
       }),
-      getSetupState: handler(() =>
-        Effect.runPromise(readSetupState(setupFile).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
       getAnalyticsPreference: handler(() => Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile))),
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) => {
-        return Effect.runPromise(
-          analyticsPreferenceWrites
-            .withPermit(
-              writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled).pipe(
-                Effect.tap((preference) => Effect.sync(() => setAnalyticsTrackingEnabled(preference.enabled))),
-                Effect.uninterruptible,
-              ),
-            )
-            .pipe(Effect.mapError((error) => error.cause)),
+        return runCauseEffect(
+          analyticsPreferenceWrites.withPermit(
+            writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled).pipe(
+              Effect.tap((preference) => Effect.sync(() => setAnalyticsTrackingEnabled(preference.enabled))),
+              Effect.uninterruptible,
+            ),
+          ),
         );
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) =>
-        Effect.runPromise(approvalAutomation.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(approvalAutomation.set(parsed)),
       ),
       getAppLanguagePreference: handler(() => language.preference),
       setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) =>
-        Effect.runPromise(language.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(language.set(parsed)),
       ),
       getAppLogoColorPreference: handler(() => logoColor.preference),
       setAppLogoColorPreference: payloadHandler(parseAppLogoColorPreference, (parsed) =>
-        Effect.runPromise(logoColor.set(parsed).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(logoColor.set(parsed)),
       ),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
-        const state = await Effect.runPromise(
-          writeSetupState(setupFile, input).pipe(Effect.mapError((error) => error.cause)),
-        );
-        await Effect.runPromise(
-          service
-            .setPreferredProvider(input.preferredProvider, input.preferredModel)
-            .pipe(Effect.mapError((error) => error.cause)),
-        );
+        const state = await runCauseEffect(writeSetupState(setupFile, input));
+        await runCauseEffect(service.setPreferredProvider(input.preferredProvider, input.preferredModel));
         await initializeAgent();
         return state;
       }),
@@ -157,14 +148,12 @@ export function appIpcHandlers({
     },
     maintenance: {
       exportData: handler(() =>
-        Effect.runPromise(
-          exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }).pipe(
-            Effect.mapError((error) => error.cause),
-          ),
+        runCauseEffect(
+          exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }),
         ),
       ),
       exportDiagnostics: handler(() =>
-        Effect.runPromise(
+        runCauseEffect(
           exportDiagnostics({
             service,
             browser,
@@ -172,7 +161,7 @@ export function appIpcHandlers({
             trace,
             parentWindow: getMainWindow(),
             translate: language.translate,
-          }).pipe(Effect.mapError((error) => error.cause)),
+          }),
         ),
       ),
     },

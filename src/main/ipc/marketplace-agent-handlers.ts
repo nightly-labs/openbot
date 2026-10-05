@@ -1,6 +1,6 @@
-import { Effect } from "effect";
 // The agent marketplace: browsing, submitting and installing a published agent.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import { parseInstallMarketplaceAgent, parseMarketplaceAgentQuery, parseSubmitMarketplaceAgent } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -16,22 +16,18 @@ export function marketplaceAgentIpcHandlers({
   return {
     marketplaceAgents: {
       list: payloadHandler(nullishPayload(parseMarketplaceAgentQuery), (query) =>
-        Effect.runPromise(marketplaceAgents.list(query).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(marketplaceAgents.list(query)),
       ),
-      get: payloadHandler(stringPayload("agentId"), (agentId) =>
-        Effect.runPromise(marketplaceAgents.get(agentId).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      listMine: handler(() =>
-        Effect.runPromise(marketplaceAgents.listMine().pipe(Effect.mapError((error) => error.cause))),
-      ),
+      get: payloadHandler(stringPayload("agentId"), (agentId) => runCauseEffect(marketplaceAgents.get(agentId))),
+      listMine: handler(() => runCauseEffect(marketplaceAgents.listMine())),
       preview: payloadHandler(stringPayload("agentId"), (agentId) =>
-        Effect.runPromise(marketplaceAgents.preview(agentId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(marketplaceAgents.preview(agentId)),
       ),
       submit: payloadHandler(parseSubmitMarketplaceAgent, (submission) =>
-        Effect.runPromise(marketplaceAgents.submit(submission).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(marketplaceAgents.submit(submission)),
       ),
       install: payloadHandler(parseInstallMarketplaceAgent, (installation) =>
-        Effect.runPromise(marketplaceAgents.install(installation).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(marketplaceAgents.install(installation)),
       ),
     },
   };

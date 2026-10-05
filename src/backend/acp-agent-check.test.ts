@@ -1,4 +1,3 @@
-import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -6,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkAcpAgent } from "./acp-agent-check";
+import { runCauseEffect } from "./effect-boundary";
 
 // A fake ACP agent. `MODE` picks what it does with `initialize`; it writes its pid so the test can
 // prove that the check stopped it.
@@ -56,7 +56,7 @@ afterEach(async () => {
 });
 
 function check(mode: string, timeoutMs = 5_000) {
-  return runTestEffect(
+  return runCauseEffect(
     checkAcpAgent({
       executable,
       args: [],

@@ -1,7 +1,7 @@
-import { Effect } from "effect";
 // The user's own model endpoints: list, add, edit, remove. Edit is local only. `custom-provider-changes.ts` owns the order of
 // the writes; the `providers-v1` host routes use the same instance.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomProviderChanges } from "../custom-provider-changes";
 import {
   parseDeleteCustomProvider,
@@ -14,15 +14,9 @@ export function customProviderIpcHandlers(changes: CustomProviderChanges): Pick<
   return {
     customProviders: {
       list: handler(() => changes.list()),
-      save: payloadHandler(parseSaveCustomProvider, (input) =>
-        Effect.runPromise(changes.save(input).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      delete: payloadHandler(parseDeleteCustomProvider, ({ id }) =>
-        Effect.runPromise(changes.remove(id).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      update: payloadHandler(parseUpdateCustomProvider, (input) =>
-        Effect.runPromise(changes.update(input).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      save: payloadHandler(parseSaveCustomProvider, (input) => runCauseEffect(changes.save(input))),
+      delete: payloadHandler(parseDeleteCustomProvider, ({ id }) => runCauseEffect(changes.remove(id))),
+      update: payloadHandler(parseUpdateCustomProvider, (input) => runCauseEffect(changes.update(input))),
     },
   };
 }

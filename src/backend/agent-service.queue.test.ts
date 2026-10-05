@@ -29,7 +29,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import { getString } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
@@ -52,14 +52,14 @@ describe.sequential("AgentService: queue", () => {
   it("sends an edited delivery once after a repeated save and drains past a deleted hold", async () => {
     const { service: agentService, client, store, mailbox } = await startService(root, { provider: "codex" });
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
-    const first = await runTestEffect(
+    await runCauseEffect(store.getOrCreate("chief"));
+    const first = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
     );
     const [original] = first.deliveries;
     assert(original);
     const deliveryId = original.id;
-    const editing = await runTestEffect(
+    const editing = await runCauseEffect(
       service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" }),
     );
     expect(editing.deliveries[0]).toMatchObject({ id: deliveryId, text: "Original" });
@@ -74,23 +74,23 @@ describe.sequential("AgentService: queue", () => {
       keepAttachmentIds: [],
       attachmentDraftIds: [],
     };
-    await runTestEffect(service.editQueuedMessage("chief", save));
-    await runTestEffect(service.editQueuedMessage("chief", save));
+    await runCauseEffect(service.editQueuedMessage("chief", save));
+    await runCauseEffect(service.editQueuedMessage("chief", save));
     await expect(
-      runTestEffect(service.editQueuedMessage("chief", { ...save, text: "Changed after lost response" })),
+      runCauseEffect(service.editQueuedMessage("chief", { ...save, text: "Changed after lost response" })),
     ).rejects.toThrow("different contents");
     await expect(
-      runTestEffect(service.editQueuedMessage("chief", { ...save, keepAttachmentIds: ["different-file"] })),
+      runCauseEffect(service.editQueuedMessage("chief", { ...save, keepAttachmentIds: ["different-file"] })),
     ).rejects.toThrow("different contents");
     const file = join(root, "retry-upload.txt");
     await writeFile(file, "New attachment after lost response");
-    const [draft] = await runTestEffect(mailbox.prepareImportedAttachments([file], []));
+    const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
     assert(draft);
     await expect(
-      runTestEffect(service.editQueuedMessage("chief", { ...save, attachmentDraftIds: [draft.id] })),
+      runCauseEffect(service.editQueuedMessage("chief", { ...save, attachmentDraftIds: [draft.id] })),
     ).rejects.toThrow("different contents");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "user" },
           recipientAgentIds: ["chief"],
@@ -100,7 +100,7 @@ describe.sequential("AgentService: queue", () => {
       ),
     ).rejects.toThrow("no longer exists");
     const restored = new MailboxStore(join(root, "user-data"), store.sharedRoot, store.database);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, save.text, [], [])).toBe(true);
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, "Changed", [], [])).toBe(false);
     expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditOutcomes");
@@ -109,7 +109,7 @@ describe.sequential("AgentService: queue", () => {
     const starts = client.requests.filter((request) => request.method === "turn/start");
     expect(starts).toHaveLength(1);
     expect(firstInputText(starts[0]?.params)).toContain("Edited on phone");
-    const removed = await runTestEffect(
+    const removed = await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "user" },
         recipientAgentIds: ["chief"],
@@ -118,25 +118,25 @@ describe.sequential("AgentService: queue", () => {
     );
     const [removedDelivery] = removed.deliveries;
     assert(removedDelivery);
-    await runTestEffect(
+    await runCauseEffect(
       service.editQueuedMessage("chief", {
         action: "begin",
         deliveryId: removedDelivery.id,
         editId: "removed-edit",
       }),
     );
-    const next = await runTestEffect(
+    const next = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Continue" }),
     );
     const [nextDelivery] = next.deliveries;
     assert(nextDelivery);
-    await runTestEffect(service.cancelQueuedMessage("chief", removedDelivery.id));
+    await runCauseEffect(service.cancelQueuedMessage("chief", removedDelivery.id));
     // Deletion finishes the edit too: cancellation retries confirm, but Save cannot revive it.
     const cancelRemoved = { action: "cancel" as const, deliveryId: removedDelivery.id, editId: "removed-edit" };
-    await runTestEffect(service.editQueuedMessage("chief", cancelRemoved));
-    await runTestEffect(service.editQueuedMessage("chief", cancelRemoved));
+    await runCauseEffect(service.editQueuedMessage("chief", cancelRemoved));
+    await runCauseEffect(service.editQueuedMessage("chief", cancelRemoved));
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.editQueuedMessage("chief", {
           ...save,
           deliveryId: cancelRemoved.deliveryId,
@@ -158,10 +158,10 @@ describe.sequential("AgentService: queue", () => {
     // The active turn never completes, so the edited message waits queued behind it.
     const client = new FakeAgentClient("codex", "CODEX_DONE", false);
     service = createTestService({ store, mailbox, clientFactory: () => client });
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Active task" }));
-    const first = await runTestEffect(
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Active task" }));
+    const first = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
     );
     const [original] = first.deliveries;
@@ -175,25 +175,25 @@ describe.sequential("AgentService: queue", () => {
       keepAttachmentIds: [],
       attachmentDraftIds: [],
     };
-    await runTestEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-a-edit" }));
-    await runTestEffect(service.editQueuedMessage("chief", saveA));
+    await runCauseEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-a-edit" }));
+    await runCauseEffect(service.editQueuedMessage("chief", saveA));
     // The message stays queued, so a second device edits and saves it again. That
     // must not forget the first save: its exact retry still confirms.
-    await runTestEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-b-edit" }));
+    await runCauseEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-b-edit" }));
     const saveB = { ...saveA, editId: "device-b-edit", text: "Edited on B" };
-    await runTestEffect(service.editQueuedMessage("chief", saveB));
-    await runTestEffect(service.editQueuedMessage("chief", saveA));
+    await runCauseEffect(service.editQueuedMessage("chief", saveB));
+    await runCauseEffect(service.editQueuedMessage("chief", saveA));
     // The retry confirms without re-applying superseded text over the newer save.
     const queued = service.listQueue("chief").deliveries.find((item) => item.id === deliveryId);
     expect(queued).toMatchObject({ text: "Edited on B" });
     // A cancel reports the recorded save instead of overwriting its outcome,
     // so the second device keeps its own confirmation.
     await expect(
-      runTestEffect(service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "device-a-edit" })),
+      runCauseEffect(service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "device-a-edit" })),
     ).rejects.toThrow("already saved");
-    await runTestEffect(service.editQueuedMessage("chief", saveB));
+    await runCauseEffect(service.editQueuedMessage("chief", saveB));
     const restored = new MailboxStore(join(root, "user-data"), store.sharedRoot, store.database);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, "device-a-edit", "Edited on A", [], [])).toBe(true);
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, "device-b-edit", "Edited on B", [], [])).toBe(true);
   });
@@ -201,23 +201,23 @@ describe.sequential("AgentService: queue", () => {
   it("rejects a save that repeats a finished cancellation and keeps the original message", async () => {
     const { service: agentService, client, store, mailbox } = await startService(root, { provider: "codex" });
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
-    const first = await runTestEffect(
+    await runCauseEffect(store.getOrCreate("chief"));
+    const first = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
     );
     const [original] = first.deliveries;
     assert(original);
     const deliveryId = original.id;
-    await runTestEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" }));
-    await runTestEffect(service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "phone-edit" }));
+    await runCauseEffect(service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" }));
+    await runCauseEffect(service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "phone-edit" }));
     const file = join(root, "late-upload.txt");
     await writeFile(file, "Late upload");
-    const [draft] = await runTestEffect(mailbox.prepareImportedAttachments([file], []));
+    const [draft] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
     assert(draft);
     // A cancel whose response was lost leaves the editor open. The save that follows it
     // must report the rejection instead of success, so the client keeps the typed text.
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.editQueuedMessage("chief", {
           action: "save",
           deliveryId,
@@ -230,7 +230,7 @@ describe.sequential("AgentService: queue", () => {
     ).rejects.toThrow("cancelled");
     // The upload belonged to the finished edit, so the host keeps no orphan draft.
     await expect(
-      runTestEffect(
+      runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "user" },
           recipientAgentIds: ["chief"],
@@ -263,12 +263,12 @@ describe.sequential("AgentService: queue", () => {
       },
     });
 
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.ensureProvider("opencode"));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.ensureProvider("opencode"));
 
     // The developer asked for this model at this effort, and OpenCode lists it, so the built-in
     // `codex` default steps aside -- provider included, because the model belongs to OpenCode.
-    await expect(runTestEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
+    await expect(runCauseEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
       provider: "opencode",
       model: DEVELOPMENT_DEFAULT_MODEL,
       reasoningEffort: DEVELOPMENT_DEFAULT_REASONING_EFFORT,
@@ -287,25 +287,25 @@ describe.sequential("AgentService: queue", () => {
     });
     service = agentService;
 
-    await runTestEffect(service.ensureProvider("opencode"));
+    await runCauseEffect(service.ensureProvider("opencode"));
 
     // Same catalog, no development build: the built-in default stands.
-    await expect(runTestEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
+    await expect(runCauseEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
       provider: "codex",
       model: "gpt-6-luna",
     });
 
     // And a provider the developer chose is theirs, development build or not.
-    await runTestEffect(service.setPreferredProvider("claude"));
+    await runCauseEffect(service.setPreferredProvider("claude"));
     await expect(
-      runTestEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" })),
+      runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" })),
     ).resolves.toMatchObject({
       provider: "claude",
       model: "claude-opus-5-5",
     });
     // A template, a marketplace agent or an import names no model, and starts on the same choice.
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.createAgentProfile({
           name: "Template Agent",
           description: "",
@@ -316,9 +316,9 @@ describe.sequential("AgentService: queue", () => {
     ).resolves.toMatchObject({ provider: "claude", model: "claude-opus-5-5" });
 
     // A Codex model saved in setup is a choice too, not the built-in Luna 6 the record starts on.
-    await runTestEffect(service.setPreferredProvider("codex", "gpt-5.6-terra"));
+    await runCauseEffect(service.setPreferredProvider("codex", "gpt-5.6-terra"));
     await expect(
-      runTestEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Terra Agent", avatarSeed: "setup:terra" })),
+      runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Terra Agent", avatarSeed: "setup:terra" })),
     ).resolves.toMatchObject({ provider: "codex", model: "gpt-5.6-terra" });
   });
 
@@ -336,10 +336,10 @@ describe.sequential("AgentService: queue", () => {
         return client;
       },
     });
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.createAgent({ ...CREATE_AGENT_INPUT, provider: "opencode", model: "opencode/example-model" }),
       ),
     ).resolves.toMatchObject({ provider: "opencode", model: "opencode/example-model" });
@@ -360,7 +360,7 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
 
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.createAgent({ ...CREATE_AGENT_INPUT, provider: "opencode", model: "opencode/no-such-model" }),
       ),
     ).rejects.toThrow('The selected agent model "opencode/no-such-model" is unavailable: OpenCode does not list it.');
@@ -397,7 +397,7 @@ describe.sequential("AgentService: queue", () => {
       ],
     });
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.createAgent({
           ...CREATE_AGENT_INPUT,
           name: "Claude Planning Agent",
@@ -408,31 +408,31 @@ describe.sequential("AgentService: queue", () => {
       model: "claude-opus-5-5",
       reasoningEffort: "high",
     });
-    await runTestEffect(service.setPreferredProvider("codex"));
+    await runCauseEffect(service.setPreferredProvider("codex"));
     expect(service.getStatus()).toMatchObject({
       auth: { kind: "chatgpt", email: "codex@example.com" },
       cliVersion: "0.144.1",
     });
     // The store default, which is what a new agent on the default provider keeps: `low`, not the
     // `medium` the Codex CLI reports for every GPT-5.6 model.
-    await expect(runTestEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
+    await expect(runCauseEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
       model: "gpt-6-luna",
       reasoningEffort: "low",
     });
     // Setup can record a model beside the provider, which is how a custom endpoint becomes the
     // default: it is a model of the CLI that runs it, so only the model names it.
-    await runTestEffect(service.setPreferredProvider("claude", "claude-opus-5"));
+    await runCauseEffect(service.setPreferredProvider("claude", "claude-opus-5"));
     await expect(
-      runTestEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Opus Agent", avatarSeed: "setup:opus" })),
+      runCauseEffect(service.createAgent({ ...CREATE_AGENT_INPUT, name: "Opus Agent", avatarSeed: "setup:opus" })),
     ).resolves.toMatchObject({
       provider: "claude",
       model: "claude-opus-5",
       reasoningEffort: "high",
     });
     // A recorded model the provider no longer lists is ignored, so a new agent still starts usable.
-    await runTestEffect(service.setPreferredProvider("claude", "claude-retired-9"));
+    await runCauseEffect(service.setPreferredProvider("claude", "claude-retired-9"));
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.createAgent({ ...CREATE_AGENT_INPUT, name: "Fallback Agent", avatarSeed: "setup:fallback" }),
       ),
     ).resolves.toMatchObject({
@@ -451,9 +451,9 @@ describe.sequential("AgentService: queue", () => {
       client: (provider) => new FakeAgentClient(provider),
     });
     service = agentService;
-    await runTestEffect(service.ensureProvider("opencode"));
+    await runCauseEffect(service.ensureProvider("opencode"));
 
-    await expect(runTestEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
+    await expect(runCauseEffect(service.createAgent(CREATE_AGENT_INPUT))).resolves.toMatchObject({
       provider: "opencode",
       model: "opencode/example-model",
     });
@@ -478,7 +478,7 @@ describe.sequential("AgentService: queue", () => {
       },
     });
     try {
-      await runTestEffect(service.initialize());
+      await runCauseEffect(service.initialize());
       expect(service.getStatus()).toMatchObject({
         phase: "blocked",
         providers: [
@@ -494,7 +494,7 @@ describe.sequential("AgentService: queue", () => {
       });
 
       process.env.OPENBOT_CODEX_PATH = codexPath;
-      await expect(runTestEffect(service.refreshProviders())).resolves.toMatchObject({
+      await expect(runCauseEffect(service.refreshProviders())).resolves.toMatchObject({
         phase: "ready",
         providers: [
           { id: "codex", state: "available" },
@@ -510,7 +510,7 @@ describe.sequential("AgentService: queue", () => {
       const codexClient = clients.get("codex");
       expect(codexClient?.running).toBe(true);
 
-      await runTestEffect(service.refreshProviders());
+      await runCauseEffect(service.refreshProviders());
 
       expect(clients.get("codex")).toBe(codexClient);
       expect(codexClient?.running).toBe(true);
@@ -542,11 +542,11 @@ describe.sequential("AgentService: queue", () => {
           if (holdMetadata && (method === "model/list" || method === "plugin/list")) await metadataReleased;
         }),
     });
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
     holdMetadata = true;
 
     const outcome = await Promise.race([
-      runTestEffect(service.refreshProviders()).then(() => "resolved" as const),
+      runCauseEffect(service.refreshProviders()).then(() => "resolved" as const),
       new Promise<"timed-out">((resolve) => setTimeout(() => resolve("timed-out"), 500)),
     ]);
     releaseMetadata?.();
@@ -567,9 +567,9 @@ describe.sequential("AgentService: queue", () => {
           if (method === "account/read" && ++accountReads === 2) throw new Error("Temporary account API failure");
         }),
     });
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
-    await runTestEffect(service.refreshProviders());
+    await runCauseEffect(service.refreshProviders());
 
     expect(service.getStatus().providers).toEqual(
       expect.arrayContaining([
@@ -589,7 +589,7 @@ describe.sequential("AgentService: queue", () => {
       Effect.fail(new StoredStateFailure({ cause: new Error("Queue write failed.") })),
     );
 
-    await expect(runTestEffect(service.createAgent(CREATE_AGENT_INPUT))).rejects.toThrow("Queue write failed.");
+    await expect(runCauseEffect(service.createAgent(CREATE_AGENT_INPUT))).rejects.toThrow("Queue write failed.");
 
     expect(service.listAgents()).toEqual([]);
     expect(store.database.listAgents()).toEqual([]);
@@ -608,7 +608,7 @@ describe.sequential("AgentService: queue", () => {
     });
     service = agentService;
     const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
-    await runTestEffect(sidebar.initialize());
+    await runCauseEffect(sidebar.initialize());
     const input = {
       operationId: randomUUID(),
       initialMessage: "Introduce yourself",
@@ -627,7 +627,7 @@ describe.sequential("AgentService: queue", () => {
       expect(mailbox.listQueue(agentId).deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
       throw new Error("Receipt write failed.");
     });
-    await expect(runTestEffect(service.saveProfile(input, sidebar))).rejects.toThrow("Receipt write failed.");
+    await expect(runCauseEffect(service.saveProfile(input, sidebar))).rejects.toThrow("Receipt write failed.");
     expect(service.listAgents()).toEqual([]);
     expect(store.database.listAgents()).toEqual([]);
     expect(mailbox.listQueue(failedAgentId).deliveries).toEqual([]);
@@ -635,8 +635,8 @@ describe.sequential("AgentService: queue", () => {
     expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
     await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
     failure.mockRestore();
-    const result = await runTestEffect(service.saveProfile(input, sidebar));
-    expect((await runTestEffect(service.saveProfile(input, sidebar))).agent.id).toBe(result.agent.id);
+    const result = await runCauseEffect(service.saveProfile(input, sidebar));
+    expect((await runCauseEffect(service.saveProfile(input, sidebar))).agent.id).toBe(result.agent.id);
     expect(service.listAgents()).toHaveLength(1);
     await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
     expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
@@ -646,11 +646,11 @@ describe.sequential("AgentService: queue", () => {
     "recovers profile creation before startup drains queues (committed: %s)",
     async (committed) => {
       const { store, mailbox } = stores(root);
-      await runTestEffect(store.initialize());
-      await runTestEffect(mailbox.initialize());
-      const existing = await runTestEffect(store.createAgent({ ...CREATE_AGENT_INPUT, name: "Keep this agent" }));
+      await runCauseEffect(store.initialize());
+      await runCauseEffect(mailbox.initialize());
+      const existing = await runCauseEffect(store.createAgent({ ...CREATE_AGENT_INPUT, name: "Keep this agent" }));
       const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
-      await runTestEffect(sidebar.initialize());
+      await runCauseEffect(sidebar.initialize());
       const input = {
         operationId: randomUUID(),
         initialMessage: "Introduce yourself",
@@ -663,8 +663,8 @@ describe.sequential("AgentService: queue", () => {
           sectionId: null,
         },
       };
-      const pending = await runTestEffect(store.createAgent(input.draft, input.operationId));
-      await runTestEffect(
+      const pending = await runCauseEffect(store.createAgent(input.draft, input.operationId));
+      await runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "user" },
           recipientAgentIds: [pending.id],
@@ -690,7 +690,7 @@ describe.sequential("AgentService: queue", () => {
         preferredProvider: "codex",
         clientFactory: () => client,
       });
-      await runTestEffect(service.initialize());
+      await runCauseEffect(service.initialize());
       expect(service.listAgents().some((agent) => agent.id === existing.id)).toBe(true);
       expect(service.listAgents().some((agent) => agent.id === pending.id)).toBe(committed);
       if (!committed) {
@@ -698,7 +698,7 @@ describe.sequential("AgentService: queue", () => {
         expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
         await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([existing.id]);
       }
-      const result = await runTestEffect(service.saveProfile(input, sidebar));
+      const result = await runCauseEffect(service.saveProfile(input, sidebar));
       if (committed) expect(result.agent.id).toBe(pending.id);
       else expect(result.agent.id).not.toBe(pending.id);
       expect(service.listAgents()).toHaveLength(2);
@@ -710,11 +710,11 @@ describe.sequential("AgentService: queue", () => {
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
-    const threadId = await runTestEffect(store.ensureThreadId("chief"));
+    await runCauseEffect(store.getOrCreate("chief"));
+    const threadId = await runCauseEffect(store.ensureThreadId("chief"));
 
     await expect(
-      runTestEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" })),
+      runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" })),
     ).rejects.toThrow("included Claude runtime");
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "gpt-6-luna",
@@ -726,10 +726,10 @@ describe.sequential("AgentService: queue", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { service: agentService, store } = await startService(root);
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("chief"));
 
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.updateAgent({
           agentId: "chief",
           provider: "claude",
@@ -760,13 +760,13 @@ describe.sequential("AgentService: queue", () => {
     });
     service = agentService;
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "First request" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First request" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
 
-    await runTestEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
     expect(service.listAgents().find((agent) => agent.id === "chief")?.threadId).toBe(publicThreadId);
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Second request" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Second request" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     const grokInput = clients.get("grok")?.requests.find((request) => request.method === "turn/start")?.params;
@@ -774,20 +774,20 @@ describe.sequential("AgentService: queue", () => {
     expect(firstInputText(grokInput)).toContain("Second request");
     const firstGrokSessionId = store.activeProviderSession("chief")?.externalSessionId;
 
-    await runTestEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Third request" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Third request" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[2]?.status === "completed");
     const claudeInput = clients.get("claude")?.requests.find((request) => request.method === "turn/start")?.params;
     expect(firstInputText(claudeInput)).toContain("GROK_DONE");
 
-    await runTestEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Fourth request" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Fourth request" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[3]?.status === "completed");
     const grokTurns = clients.get("grok")?.requests.filter((request) => request.method === "turn/start") ?? [];
     expect(firstInputText(grokTurns[1]?.params)).toContain("CLAUDE_DONE");
     expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstGrokSessionId);
 
-    const conversation = await runTestEffect(service.readConversation("chief"));
+    const conversation = await runCauseEffect(service.readConversation("chief"));
     expect(conversation.threadId).toBe(publicThreadId);
     expect(conversation.messages.map((message) => message.text)).toEqual(
       expect.arrayContaining(["CODEX_DONE", "GROK_DONE", "CLAUDE_DONE"]),
@@ -822,18 +822,18 @@ describe.sequential("AgentService: queue", () => {
       },
     });
     const warning = vi.spyOn(process.stderr, "write");
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Recover this request" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Recover this request" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
 
     expect(grokClient?.requests.filter((request) => request.method === "thread/start")).toHaveLength(1);
     expect(grokClient?.requests.filter((request) => request.method === "thread/resume")).toHaveLength(1);
     expect(grokClient?.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.filter((message) => message.author === "user"),
+      (await runCauseEffect(service.readConversation("chief"))).messages.filter((message) => message.author === "user"),
     ).toHaveLength(1);
     expect(
       warning.mock.calls.some(
@@ -868,26 +868,26 @@ describe.sequential("AgentService: queue", () => {
         },
       });
       const warning = vi.spyOn(process.stderr, "write");
-      await runTestEffect(service.initialize());
-      await runTestEffect(store.getOrCreate("chief"));
-      await runTestEffect(
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      await runCauseEffect(
         service.updateAgent({
           agentId: "chief",
           provider: target,
           model: target === "grok" ? "grok-4.5" : "opencode/example-model",
         }),
       );
-      await runTestEffect(service.sendMessage({ agentId: "chief", text: "First provider request" }));
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First provider request" }));
       await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
       const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
       const originalSessionId = store.activeProviderSession("chief")?.externalSessionId;
       if (!publicThreadId || !originalSessionId) throw new Error("The first provider session was not created.");
 
       rejectResume = true;
-      await runTestEffect(
+      await runCauseEffect(
         service.updateAgent({ agentId: "chief", description: "Force the provider session to reload." }),
       );
-      await runTestEffect(service.sendMessage({ agentId: "chief", text: "Continue after recovery" }));
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue after recovery" }));
       await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
       const sessions = store.database.listProviderSessions(publicThreadId);
@@ -923,12 +923,12 @@ describe.sequential("AgentService: queue", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a long result" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a long result" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
 
-    await runTestEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Continue from the result" }));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue from the result" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     const claudeTurn = clients.get("claude")?.requests.find((request) => request.method === "turn/start")?.params;
@@ -943,14 +943,14 @@ describe.sequential("AgentService: queue", () => {
   it("starts a new provider session without the history before a new chat", async () => {
     const { service: agentService, store, client } = await startService(root, { output: "FIRST_ANSWER" });
     service = agentService;
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Remember the word PELICAN" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Remember the word PELICAN" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const threadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!threadId || !firstSession) throw new Error("The first provider session was not created.");
 
-    await runTestEffect(service.clearAgentContext("chief"));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Which word did I give you?" }));
+    await runCauseEffect(service.clearAgentContext("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Which word did I give you?" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     expect(service.listAgents().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
@@ -961,7 +961,7 @@ describe.sequential("AgentService: queue", () => {
     const turns = client.requests.filter((request) => request.method === "turn/start");
     expect(firstInputText(turns[1]?.params)).toContain("Which word did I give you?");
     expect(firstInputText(turns[1]?.params)).not.toContain("PELICAN");
-    expect((await runTestEffect(service.readConversation("chief"))).messages.map((message) => message.text)).toEqual(
+    expect((await runCauseEffect(service.readConversation("chief"))).messages.map((message) => message.text)).toEqual(
       expect.arrayContaining(["Remember the word PELICAN", "Which word did I give you?"]),
     );
   });
@@ -969,8 +969,8 @@ describe.sequential("AgentService: queue", () => {
   it("starts a new thread with the persisted onboarding remit", async () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(
       service.updateAgent({
         agentId: "chief",
         title: "Research & writing",
@@ -978,7 +978,7 @@ describe.sequential("AgentService: queue", () => {
       }),
     );
 
-    await runTestEffect(
+    await runCauseEffect(
       service.sendMessage({
         agentId: "chief",
         text: "Focus on research and writing.",
@@ -1005,8 +1005,8 @@ describe.sequential("AgentService: queue", () => {
     const { service: agentService } = await startService(root);
     service = agentService;
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Start immediately" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Wait behind the first message" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start immediately" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Wait behind the first message" }));
 
     await waitFor(() => {
       const deliveries = service?.listQueue("chief").deliveries ?? [];
@@ -1032,19 +1032,19 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Question 1" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Question 2" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Question 3" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Question 4" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Question 1" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Question 2" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Question 3" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Question 4" }));
 
     await waitFor(() => {
       const deliveries = service?.listQueue("chief").deliveries ?? [];
       return deliveries.length === 4 && deliveries.every((delivery) => delivery.status === "completed");
     });
 
-    const conversation = await runTestEffect(service.readConversation("chief"));
+    const conversation = await runCauseEffect(service.readConversation("chief"));
     const turnMessages = conversation.messages.filter(
       (message) => message.author === "user" || message.author === "assistant",
     );
@@ -1084,19 +1084,19 @@ describe.sequential("AgentService: queue", () => {
     service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Start" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const active = events.find((event) => event.type === "turn-started");
     if (active?.type !== "turn-started") throw new Error("Turn did not start.");
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Run after the first task" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Run after the first task" }));
 
     const queue = service.listQueue("chief");
     expect(queue.deliveries.map((item) => item.status)).toEqual(["running", "queued"]);
     expect((await protocolMessages(logPath)).some((message) => message.method === "turn/steer")).toBe(false);
 
-    await runTestEffect(service.interrupt("chief", active.turnId));
+    await runCauseEffect(service.interrupt("chief", active.turnId));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
 
     await waitFor(
@@ -1129,8 +1129,8 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
     const events: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => events.push(event));
-    await Promise.all([runTestEffect(store.getOrCreate("chief")), runTestEffect(store.getOrCreate("worker"))]);
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
+    await Promise.all([runCauseEffect(store.getOrCreate("chief")), runCauseEffect(store.getOrCreate("worker"))]);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
     assert(chiefThreadId);
@@ -1192,9 +1192,9 @@ describe.sequential("AgentService: queue", () => {
       store,
     } = await startService(root, { provider: "codex", autoComplete: false });
     service = agentService;
-    await Promise.all([runTestEffect(store.getOrCreate("chief")), runTestEffect(store.getOrCreate("worker"))]);
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
-    await runTestEffect(service.sendMessage({ agentId: "worker", text: "Draft my report." }));
+    await Promise.all([runCauseEffect(store.getOrCreate("chief")), runCauseEffect(store.getOrCreate("worker"))]);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the report." }));
+    await runCauseEffect(service.sendMessage({ agentId: "worker", text: "Draft my report." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     await waitForQueue(service, "worker", (queue) => queue.deliveries[0]?.status === "running");
     const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -1226,13 +1226,13 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Start this turn" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start this turn" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const active = events.find((event) => event.type === "turn-started");
     if (active?.type !== "turn-started") throw new Error("Turn did not start.");
-    await runTestEffect(
+    await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "agent", agentId: "research" },
         recipientAgentIds: ["chief"],
@@ -1242,7 +1242,7 @@ describe.sequential("AgentService: queue", () => {
     const queued = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "queued");
     if (!queued) throw new Error("Queued delivery was not created.");
 
-    await runTestEffect(
+    await runCauseEffect(
       service.steerQueuedMessage({
         agentId: "chief",
         deliveryId: queued.id,
@@ -1301,8 +1301,8 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a mountain observatory." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a mountain observatory." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const started = events.find((event) => event.type === "turn-started");
@@ -1327,7 +1327,7 @@ describe.sequential("AgentService: queue", () => {
       }),
     );
     await waitFor(async () =>
-      (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.some(
+      (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.some(
         (message) => message.id === item.id && message.status === "streaming",
       ),
     );
@@ -1353,12 +1353,12 @@ describe.sequential("AgentService: queue", () => {
     );
 
     await waitFor(async () => {
-      const message = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.find(
+      const message = (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.find(
         (candidate) => candidate.id === item.id,
       );
       return message?.status === "completed" && Boolean(message.attachments?.[0]);
     });
-    const message = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const message = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (candidate) => candidate.id === item.id,
     );
     expect(message).toMatchObject({
@@ -1370,9 +1370,11 @@ describe.sequential("AgentService: queue", () => {
       },
       attachments: [{ kind: "image", previewKind: "image" }],
     });
-    await expect(runTestEffect(mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? ""))).resolves.toMatchObject({
-      mimeType: "image/png",
-    });
+    await expect(runCauseEffect(mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? ""))).resolves.toMatchObject(
+      {
+        mimeType: "image/png",
+      },
+    );
   });
 
   it("falls back to Codex base64 image results without persisting the encoded payload", async () => {
@@ -1390,8 +1392,8 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Make this image vivid." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Make this image vivid." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const client = clients.get("codex");
@@ -1422,18 +1424,20 @@ describe.sequential("AgentService: queue", () => {
     );
 
     await waitFor(async () => {
-      const message = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.find(
+      const message = (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.find(
         (candidate) => candidate.id === imageCall.id,
       );
       return message?.status === "completed" && Boolean(message.attachments?.[0]);
     });
-    const message = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const message = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (candidate) => candidate.id === imageCall.id,
     );
     expect(JSON.stringify(message)).not.toContain("iVBORw0KGgo");
-    await expect(runTestEffect(mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? ""))).resolves.toMatchObject({
-      mimeType: "image/png",
-    });
+    await expect(runCauseEffect(mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? ""))).resolves.toMatchObject(
+      {
+        mimeType: "image/png",
+      },
+    );
   });
 
   it("keeps failed and interrupted image generations visible in the conversation", async () => {
@@ -1451,8 +1455,8 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Generate two atmospheric studies." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Generate two atmospheric studies." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const client = clients.get("codex");
@@ -1492,7 +1496,8 @@ describe.sequential("AgentService: queue", () => {
     );
 
     await waitFor(async () => {
-      const messages = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages ?? [];
+      const messages =
+        (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages ?? [];
       return (
         messages.some(
           (message) =>
@@ -1502,7 +1507,7 @@ describe.sequential("AgentService: queue", () => {
         ) && messages.some((message) => message.id === interruptedCall.id && message.status === "interrupted")
       );
     });
-    const messages = (await runTestEffect(service.readConversation("chief"))).messages;
+    const messages = (await runCauseEffect(service.readConversation("chief"))).messages;
     expect(messages.find((message) => message.id === failedCall.id)?.imageGeneration?.prompt).toBe(
       "Generate two atmospheric studies.",
     );
@@ -1526,8 +1531,8 @@ describe.sequential("AgentService: queue", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Generate a cinematic still." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Generate a cinematic still." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const client = clients.get("codex");
@@ -1543,15 +1548,15 @@ describe.sequential("AgentService: queue", () => {
     };
     client.emit("notification", notification("item/started", { threadId, turnId: started.turnId, item }));
     await waitFor(async () => {
-      const message = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.find(
+      const message = (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.find(
         (candidate) => candidate.id === item.id,
       );
       return message?.status === "streaming";
     });
 
-    await runTestEffect(service.interrupt("chief", started.turnId));
+    await runCauseEffect(service.interrupt("chief", started.turnId));
     await waitFor(async () => {
-      const message = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.find(
+      const message = (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.find(
         (candidate) => candidate.id === item.id,
       );
       return message?.status === "interrupted";
@@ -1578,12 +1583,12 @@ describe.sequential("AgentService: queue", () => {
     );
 
     await waitFor(async () => {
-      const message = (await (service ? runTestEffect(service.readConversation("chief")) : undefined))?.messages.find(
+      const message = (await (service ? runCauseEffect(service.readConversation("chief")) : undefined))?.messages.find(
         (candidate) => candidate.id === item.id,
       );
       return message?.status === "interrupted" && !message.attachments?.length;
     });
-    const message = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const message = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (candidate) => candidate.id === item.id,
     );
     expect(message?.imageGeneration?.error).toBe("Image generation was interrupted.");
@@ -1603,10 +1608,10 @@ describe.sequential("AgentService: queue", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("chief"));
     // The CLI is being replaced, so every delivery that arrives now waits in the mailbox.
     let installing = false;
-    const update = runTestEffect(
+    const update = runCauseEffect(
       service.updateProviderCli("codex", () =>
         Effect.promise(() => {
           installing = true;
@@ -1617,7 +1622,7 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => installing);
 
     const actor = { id: "human", name: "Alex" };
-    await runTestEffect(
+    await runCauseEffect(
       service.channels.command(
         {
           type: "save",
@@ -1634,7 +1639,7 @@ describe.sequential("AgentService: queue", () => {
         actor,
       ),
     );
-    await runTestEffect(
+    await runCauseEffect(
       service.channels.command(
         {
           type: "send",
@@ -1649,14 +1654,14 @@ describe.sequential("AgentService: queue", () => {
       ),
     );
     await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.deliveryId));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Read the report" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Send the summary" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read the report" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Send the summary" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.length === 2);
 
     // The queue the user reads holds the two normal messages alone, so the order it sends can name
     // no more than those two, while the mailbox still holds the channel delivery in the same queue.
     const queued = service.listQueue("chief").deliveries.map((delivery) => delivery.id);
-    await runTestEffect(service.reorderQueue({ agentId: "chief", deliveryIds: [queued[1] ?? "", queued[0] ?? ""] }));
+    await runCauseEffect(service.reorderQueue({ agentId: "chief", deliveryIds: [queued[1] ?? "", queued[0] ?? ""] }));
 
     // The queue reads in position order, which is what the reorder writes.
     const positions = service
@@ -1673,10 +1678,10 @@ describe.sequential("AgentService: queue", () => {
   it("says which channel a message waits for, and runs it when that work ends", async () => {
     const { service: agentService, store, mailbox } = await startService(root);
     service = agentService;
-    await runTestEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("chief"));
 
     const actor = { id: "human", name: "Alex" };
-    await runTestEffect(
+    await runCauseEffect(
       service.channels.command(
         {
           type: "save",
@@ -1693,7 +1698,7 @@ describe.sequential("AgentService: queue", () => {
         actor,
       ),
     );
-    await runTestEffect(
+    await runCauseEffect(
       service.channels.command(
         {
           type: "send",
@@ -1710,7 +1715,7 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.turnId));
 
     // The channel turn runs on its own thread, so nothing in this agent's own chat reports it.
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Read the report" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Read the report" }));
     await waitForQueue(service, "chief", (queue) => queue.hold !== undefined);
 
     const held = service.listQueue("chief");
@@ -1726,14 +1731,14 @@ describe.sequential("AgentService: queue", () => {
     const [heldDelivery] = held.deliveries;
     assert(heldDelivery);
     const deliveryId = heldDelivery.id;
-    await runTestEffect(
+    await runCauseEffect(
       service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "channel-wait-edit" }),
     );
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
 
     const turnId = service.channels.store.assignments("channel-1")[0]?.turnId ?? "";
-    await runTestEffect(
+    await runCauseEffect(
       service.interrupt("chief", turnId, service.channels.store.context("channel-1", "chief").threadId),
     );
 
@@ -1744,7 +1749,7 @@ describe.sequential("AgentService: queue", () => {
     );
     expect(service.listQueue("chief").deliveries).toMatchObject([{ id: deliveryId, editing: true }]);
     expect(mailbox.nextQueued("chief")).toBeNull();
-    await runTestEffect(
+    await runCauseEffect(
       service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "channel-wait-edit" }),
     );
 
@@ -1760,9 +1765,9 @@ describe.sequential("AgentService: queue", () => {
     const { service: agentService } = await startService(root);
     service = agentService;
 
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Stop during startup" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Stop during startup" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "starting");
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
 
     // The drain ends before `stop` returns: the provider confirmed the turn, or the stop failed it.
     // Only the next boot's reconcile can find a confirmed turn interrupted.
@@ -1781,10 +1786,10 @@ describe.sequential("AgentService: queue", () => {
     const { service: agentService, store, mailbox } = await startService(root);
     service = agentService;
     await Promise.all([
-      runTestEffect(store.getOrCreate("sales-outbound")),
-      runTestEffect(store.getOrCreate("inbox-manager")),
+      runCauseEffect(store.getOrCreate("sales-outbound")),
+      runCauseEffect(store.getOrCreate("inbox-manager")),
     ]);
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the team" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Coordinate the team" }));
 
     await waitFor(async () => {
       const messages = await protocolMessages(logPath);
@@ -1800,13 +1805,13 @@ describe.sequential("AgentService: queue", () => {
     expect(sales.sender).toEqual({ kind: "agent", agentId: "chief" });
     expect(sales.text).toBe("Please prepare your reports.");
     expect(sales.attachments.map((item) => item.name)).toEqual(["generated-note.txt", "generated-image.png"]);
-    const managedNote = await runTestEffect(mailbox.resolveAttachment(sales.attachments[0]?.id ?? ""));
-    const managedImage = await runTestEffect(mailbox.resolveAttachment(sales.attachments[1]?.id ?? ""));
+    const managedNote = await runCauseEffect(mailbox.resolveAttachment(sales.attachments[0]?.id ?? ""));
+    const managedImage = await runCauseEffect(mailbox.resolveAttachment(sales.attachments[1]?.id ?? ""));
     expect(managedNote?.path).not.toBe(notePath);
     expect(managedImage?.path).not.toBe(imagePath);
     await expect(readFile(managedNote?.path ?? "", "utf8")).resolves.toBe("OPENBOT_SHARED_FILE_OK\n");
 
-    const chiefMessages = (await runTestEffect(service.readConversation("chief"))).messages;
+    const chiefMessages = (await runCauseEffect(service.readConversation("chief"))).messages;
     expect(chiefMessages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ exchange: expect.objectContaining({ direction: "outgoing" }) }),
@@ -1816,11 +1821,11 @@ describe.sequential("AgentService: queue", () => {
       chiefMessages.findIndex((message) => message.author === "assistant"),
     );
     await waitFor(async () =>
-      (await (service ? runTestEffect(service.readConversation("sales-outbound")) : undefined))?.messages.some(
+      (await (service ? runCauseEffect(service.readConversation("sales-outbound")) : undefined))?.messages.some(
         (message) => message.exchange?.direction === "incoming",
       ),
     );
-    expect((await runTestEffect(service.readConversation("sales-outbound"))).messages).toEqual(
+    expect((await runCauseEffect(service.readConversation("sales-outbound"))).messages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           senderAgentId: "chief",
@@ -1869,7 +1874,7 @@ describe.sequential("AgentService: queue", () => {
     const { store, mailbox } = stores(root);
     const sidebarPath = join(root, "sidebar-layout.json");
     const sidebar = new SidebarLayoutStore(sidebarPath);
-    await runTestEffect(sidebar.initialize());
+    await runCauseEffect(sidebar.initialize());
     const clients = new Map<AgentProvider, FakeAgentClient>();
     service = createTestService({
       store,
@@ -1883,27 +1888,27 @@ describe.sequential("AgentService: queue", () => {
       hostedSites: null,
       sidebarLayout: context === "unavailable" ? null : sidebar,
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(
       service.updateAgent({
         agentId: "chief",
         provider,
         model: provider === "codex" ? "gpt-5.6-luna" : provider === "claude" ? "claude-sonnet-5" : "grok-4.5",
       }),
     );
-    const layout = await runTestEffect(sidebar.mutate({ type: "create", name: "space1" }, new Set(["chief"])));
+    const layout = await runCauseEffect(sidebar.mutate({ type: "create", name: "space1" }, new Set(["chief"])));
     const sectionId = layout.sections[0]?.id;
     if (!sectionId) throw new Error("The section was not created.");
     const inherits = context === "assigned" || context === "rollback";
     if (inherits)
-      await runTestEffect(sidebar.mutate({ type: "assign", agentId: "chief", sectionId }, new Set(["chief"])));
+      await runCauseEffect(sidebar.mutate({ type: "assign", agentId: "chief", sectionId }, new Set(["chief"])));
     const originalAssignments = sidebar.getSnapshot().agentAssignments;
     let publishedAssignments = originalAssignments;
     sidebar.on("changed", (next) => {
       publishedAssignments = next.agentAssignments;
     });
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a research agent." }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a research agent." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get(provider);
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -1926,7 +1931,7 @@ describe.sequential("AgentService: queue", () => {
       initialMessage: "Research train routes to Berlin.",
     });
     const restored = new SidebarLayoutStore(sidebarPath);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     const expectedAssignments =
       context === "assigned" ? { ...originalAssignments, [createdAgentId]: sectionId } : originalAssignments;
     expect({
@@ -1962,8 +1967,8 @@ describe.sequential("AgentService: queue", () => {
       },
       hostedSites: null,
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a research teammate." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a research teammate." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -2035,10 +2040,10 @@ describe.sequential("AgentService: queue", () => {
       },
       hostedSites: null,
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.updateAgent({ agentId: "chief", model: "gpt-5.6-terra", reasoningEffort: "high" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a research team." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", model: "gpt-5.6-terra", reasoningEffort: "high" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a research team." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -2051,7 +2056,7 @@ describe.sequential("AgentService: queue", () => {
     expect((await create("Editor", { reasoningEffort: "low" })).error).toBeUndefined();
 
     const restored = stores(root).store;
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     const team = restored
       .list()
       .filter((agent) => agent.id !== "chief")
@@ -2082,9 +2087,9 @@ describe.sequential("AgentService: queue", () => {
       },
       hostedSites: null,
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("design", "Designer", "Design"));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Move the design teammate to Terra." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("design", "Designer", "Design"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Move the design teammate to Terra." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -2139,16 +2144,16 @@ describe.sequential("AgentService: queue", () => {
       hostedSites: null,
       approvalAutomation: { autoApproves: (agentId) => agentId === "design", turboEnabled: () => false },
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("design", "Designer", "Design"));
-    await runTestEffect(service.updateAgent({ agentId: "design", access: "workspace", computerUse: false }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("design", "Designer", "Design"));
+    await runCauseEffect(service.updateAgent({ agentId: "design", access: "workspace", computerUse: false }));
     const [envSecret, headerSecret, urlSecret] = [
       "synthetic-env-secret",
       "synthetic-header-secret",
       "synthetic-url-secret",
     ] as const;
     const server = { args: [], envPassthrough: [], workingDirectory: "", enabled: true, id: "" };
-    await runTestEffect(
+    await runCauseEffect(
       service.saveMcpServer({
         config: {
           ...server,
@@ -2161,7 +2166,7 @@ describe.sequential("AgentService: queue", () => {
         },
       }),
     );
-    await runTestEffect(
+    await runCauseEffect(
       service.saveMcpServer({
         config: {
           ...server,
@@ -2174,7 +2179,7 @@ describe.sequential("AgentService: queue", () => {
         },
       }),
     );
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Set up the design teammate." }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Set up the design teammate." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -2244,7 +2249,7 @@ describe.sequential("AgentService: queue", () => {
     const { store, mailbox } = stores(root);
     const sidebarPath = join(root, "sidebar-layout.json");
     const sidebar = new SidebarLayoutStore(sidebarPath);
-    await runTestEffect(sidebar.initialize());
+    await runCauseEffect(sidebar.initialize());
     const changes: unknown[] = [];
     sidebar.on("changed", (layout) => changes.push(layout));
     service = createTestService({
@@ -2259,8 +2264,8 @@ describe.sequential("AgentService: queue", () => {
       hostedSites: null,
       sidebarLayout: sidebar,
     });
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a research teammate." }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a research teammate." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -2285,7 +2290,7 @@ describe.sequential("AgentService: queue", () => {
     const agentId = getString(created, "id");
     if (!agentId) throw new Error("The tool did not return the created agent id.");
     expect(service.listQueue(agentId).deliveries).toHaveLength(1);
-    await runTestEffect(
+    await runCauseEffect(
       service.setAvatar(agentId, {
         mimeType: "image/png",
         bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -2319,7 +2324,7 @@ describe.sequential("AgentService: queue", () => {
       }),
     );
     const restoredAvatarStore = stores(root).store;
-    await runTestEffect(restoredAvatarStore.initialize());
+    await runCauseEffect(restoredAvatarStore.initialize());
     expect(restoredAvatarStore.list().find((agent) => agent.id === agentId)?.avatarUrl).toBe(customUrl);
     restoredAvatarStore.database.close();
     for (const fields of [
@@ -2370,7 +2375,7 @@ describe.sequential("AgentService: queue", () => {
     const renamed = await callOpenBotTool(client, threadId, "rename_section", { sectionId, name: "Travel" });
     expect(openBotToolPayload(renamed.result)).toMatchObject({ sections: [{ id: sectionId, name: "Travel" }] });
     const persistedSidebar = new SidebarLayoutStore(sidebarPath);
-    await runTestEffect(persistedSidebar.initialize());
+    await runCauseEffect(persistedSidebar.initialize());
     expect(persistedSidebar.getSnapshot()).toMatchObject({
       sections: [{ id: sectionId, name: "Travel" }],
       agentAssignments: { [agentId]: sectionId },
@@ -2393,10 +2398,10 @@ describe.sequential("AgentService: queue", () => {
     expect(openBotToolPayload(deleted.result).sections).toEqual([]);
     expect(openBotToolPayload(deleted.result).agentAssignments).toEqual({});
     expect(service.listAgents().some((agent) => agent.id === agentId)).toBe(true);
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
     service = null;
     const restored = stores(root);
-    await runTestEffect(restored.store.initialize());
+    await runCauseEffect(restored.store.initialize());
     expect(restored.store.list().find((agent) => agent.id === agentId)).toMatchObject({
       name: "Research Partner",
       title: "Research",
@@ -2423,15 +2428,15 @@ describe.sequential("AgentService: queue", () => {
     ]);
     const { service: agentService, store } = await startService(root);
     service = agentService;
-    await runTestEffect(store.getOrCreate("design", "Designer", "Design"));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Update the design teammate." }));
+    await runCauseEffect(store.getOrCreate("design", "Designer", "Design"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Update the design teammate." }));
 
     await waitFor(async () => {
       const messages = await protocolMessages(logPath);
       return messages.some((message) => message.id === "agent-tool-configured-1" && message.result);
     });
 
-    expect(await runTestEffect(store.getOrCreate("design"))).toMatchObject({
+    expect(await runCauseEffect(store.getOrCreate("design"))).toMatchObject({
       name: "Design Studio",
       title: "Product design",
       description: "Owns product interface and visual design.",

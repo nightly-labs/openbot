@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import opencodeAgents from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 import { createRemoteFileReceiver } from "../../packages/team-client/src/file-download";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
@@ -70,8 +71,8 @@ describe("TeamWebRtcHostGateway", () => {
     directories.push(directory);
     const bridge = new FakeBridge();
     const store = new TeamStore(join(directory, "team.json"));
-    await runRemoteWorkflow(store.initialize());
-    await runRemoteWorkflow(
+    await runCauseEffect(store.initialize());
+    await runCauseEffect(
       store.configureWithAccount("Test Host", {
         id: "owner-account",
         email: "owner@example.com",
@@ -170,7 +171,7 @@ describe("TeamWebRtcHostGateway", () => {
         }),
     });
 
-    const starting = runRemoteWorkflow(
+    const starting = runCauseEffect(
       gateway.start({
         hostId: "host-1",
         signalUrl: "wss://signal.example.test/v1/signal",
@@ -559,7 +560,7 @@ describe("TeamWebRtcHostGateway", () => {
         payload: event,
       });
     }
-    await runRemoteWorkflow(gateway.revokeSession("session-2"));
+    await runCauseEffect(gateway.revokeSession("session-2"));
     expect(closeLocalSession).toHaveBeenCalledExactlyOnceWith("session-2");
     expect(bridge.disconnectedPeers).toEqual(["peer-2"]);
     const beforeCachedReply = bridge.sent.length;
@@ -585,8 +586,8 @@ describe("TeamWebRtcHostGateway", () => {
     expect(closeSession).not.toHaveBeenCalled();
     bridge.emit("data", "peer-1", "rpc", duplicateRequest);
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toContain("peer-1"));
-    await runRemoteWorkflow(gateway.stop());
-    await runRemoteWorkflow(gateway.dispose());
+    await runCauseEffect(gateway.stop());
+    await runCauseEffect(gateway.dispose());
   });
 
   it("drops only the active WebRTC peer after a malformed known frame", async () => {
@@ -594,7 +595,7 @@ describe("TeamWebRtcHostGateway", () => {
     directories.push(directory);
     const bridge = new FakeBridge();
     const store = new TeamStore(join(directory, "team.json"));
-    await runRemoteWorkflow(store.initialize());
+    await runCauseEffect(store.initialize());
     const gateway = new TeamWebRtcHostGateway({
       bridge,
       store,
@@ -602,7 +603,7 @@ describe("TeamWebRtcHostGateway", () => {
       transferDirectory: join(directory, "transfers"),
     });
 
-    const starting = runRemoteWorkflow(
+    const starting = runCauseEffect(
       gateway.start({
         hostId: "host-1",
         signalUrl: "wss://signal.example.test/v1/signal",
@@ -625,8 +626,8 @@ describe("TeamWebRtcHostGateway", () => {
 
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toEqual(["peer-1"]));
     expect(bridge.connections).toHaveLength(1);
-    await runRemoteWorkflow(gateway.stop());
-    await runRemoteWorkflow(gateway.dispose());
+    await runCauseEffect(gateway.stop());
+    await runCauseEffect(gateway.dispose());
   });
 });
 

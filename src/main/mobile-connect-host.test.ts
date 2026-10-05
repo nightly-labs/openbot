@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
-
+import { runCauseEffect } from "../backend/effect-boundary";
 import { createHostedMobileConnect } from "./mobile-connect-host";
 
 const binding = { hostId: "host-a", fingerprint: "a".repeat(43) };
@@ -11,7 +11,7 @@ describe("createHostedMobileConnect", () => {
     const ticket = { qrData: "openbot://mobile-connect?ticket=test", expiresAt: Date.now() + 60_000 };
 
     await expect(
-      Effect.runPromise(
+      runCauseEffect(
         createHostedMobileConnect({
           centralAuth: {
             createMobileConnect: (host) =>
@@ -41,7 +41,7 @@ describe("createHostedMobileConnect", () => {
                 };
               }),
           },
-        }).pipe(Effect.mapError((error) => error.cause)),
+        }),
       ),
     ).resolves.toEqual(ticket);
     expect(operations).toEqual(["configure", "start", "ticket"]);
@@ -89,7 +89,7 @@ describe("createHostedMobileConnect", () => {
     const createMobileConnect = vi.fn();
 
     await expect(
-      Effect.runPromise(
+      runCauseEffect(
         createHostedMobileConnect({
           centralAuth: { createMobileConnect },
           host: {
@@ -105,7 +105,7 @@ describe("createHostedMobileConnect", () => {
                 phase: "online" as const,
               })),
           },
-        }).pipe(Effect.mapError((error) => error.cause)),
+        }),
       ),
     ).rejects.toThrow("Local development host is ready.");
     expect(createMobileConnect).not.toHaveBeenCalled();

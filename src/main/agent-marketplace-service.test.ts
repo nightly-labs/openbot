@@ -1,6 +1,7 @@
 import type { AgentSummary, MarketplaceAgentDetail } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { authDecode, type CentralAuthOperationError } from "./central-auth-effects";
 import { SkillMarketplaceFailure } from "./skill-marketplace-service";
@@ -123,13 +124,7 @@ describe("AgentMarketplaceService", () => {
         }),
       ),
     );
-    expect(
-      (
-        await Effect.runPromise(
-          marketplace.list({ category: "research" }).pipe(Effect.mapError((error) => error.cause)),
-        )
-      ).agents[0],
-    ).toMatchObject({
+    expect((await runCauseEffect(marketplace.list({ category: "research" }))).agents[0]).toMatchObject({
       category: "research",
       creatorAvatarUrl: "/v1/avatars/owner",
     });
@@ -138,9 +133,7 @@ describe("AgentMarketplaceService", () => {
 
   it("publishes only the public profile, approved skills, and routine definitions", async () => {
     const { marketplace } = service();
-    const preview = await Effect.runPromise(
-      marketplace.preview(agent.id).pipe(Effect.mapError((error) => error.cause)),
-    );
+    const preview = await runCauseEffect(marketplace.preview(agent.id));
 
     expect(preview).toEqual({
       agentId: agent.id,
@@ -161,10 +154,8 @@ describe("AgentMarketplaceService", () => {
 
   it("creates an independent agent and preserves active routines in the installer timezone", async () => {
     const { marketplace, agents, skills } = service();
-    await Effect.runPromise(
-      marketplace
-        .install({ listingId: detail.id, timezone: "America/New_York", receiptId: "receipt-1" })
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(
+      marketplace.install({ listingId: detail.id, timezone: "America/New_York", receiptId: "receipt-1" }),
     );
 
     expect(agents.createAgentProfile).toHaveBeenCalledWith(
@@ -193,11 +184,7 @@ describe("AgentMarketplaceService", () => {
   it("removes a partially created agent when a dependency fails", async () => {
     const { marketplace, agents } = service({ failSkill: true });
     await expect(
-      Effect.runPromise(
-        marketplace
-          .install({ listingId: detail.id, timezone: "Europe/Warsaw", receiptId: "receipt-2" })
-          .pipe(Effect.mapError((error) => error.cause)),
-      ),
+      runCauseEffect(marketplace.install({ listingId: detail.id, timezone: "Europe/Warsaw", receiptId: "receipt-2" })),
     ).rejects.toThrow("skill failed");
     expect(agents.deleteAgent).toHaveBeenCalledWith(agent.id);
     expect(agents.createRoutine).not.toHaveBeenCalled();
@@ -217,15 +204,13 @@ describe("AgentMarketplaceService", () => {
     const { marketplace, agents, skills } = service();
     agents.listAgents.mockReturnValue([installed]);
 
-    const result = await Effect.runPromise(
-      marketplace
-        .install({
-          listingId: detail.id,
-          agentId: agent.id,
-          timezone: "Europe/Warsaw",
-          receiptId: "receipt-update",
-        })
-        .pipe(Effect.mapError((error) => error.cause)),
+    const result = await runCauseEffect(
+      marketplace.install({
+        listingId: detail.id,
+        agentId: agent.id,
+        timezone: "Europe/Warsaw",
+        receiptId: "receipt-update",
+      }),
     );
 
     expect(agents.createAgentProfile).not.toHaveBeenCalled();

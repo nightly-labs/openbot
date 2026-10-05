@@ -30,6 +30,7 @@ import { elicitationOptions, elicitationValue, secretElicitationField } from "./
 import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { AgentProcessExitError, type AgentProvider, type DiagnosticOrigin } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
+import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { LineTooLongError, limitLineLength } from "./jsonl";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
@@ -65,7 +66,6 @@ import {
   providerFailure,
   providerResult,
   providerSync,
-  runProviderClientEffect,
 } from "./provider-client-effects";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
@@ -390,10 +390,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     this.#connection = new ClientSideConnection(
       () => ({
-        requestPermission: (params) => runProviderClientEffect(this.#requestPermission(params)),
+        requestPermission: (params) => runCauseEffect(this.#requestPermission(params)),
         sessionUpdate: (params) => this.#sessionUpdate(params),
-        createElicitation: (params) => runProviderClientEffect(this.#createElicitation(params)),
-        extMethod: (method, params) => runProviderClientEffect(this.#requestUserInput(method, params)),
+        createElicitation: (params) => runCauseEffect(this.#createElicitation(params)),
+        extMethod: (method, params) => runCauseEffect(this.#requestUserInput(method, params)),
       }),
       stream,
     );

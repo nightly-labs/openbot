@@ -58,6 +58,7 @@ import { McpGatewayFailed } from "../backend/agent/mcp-gateway";
 import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { MessagingService } from "../backend/messaging/messaging-service";
@@ -426,11 +427,7 @@ export async function createApplicationServices({
     performCriticalAction: async (action) => {
       if (!criticalActionTargets) throw new Error(sourceText("error.app.notReady"));
       const { agents, remoteServers } = criticalActionTargets;
-      await Effect.runPromise(
-        performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid).pipe(
-          Effect.mapError((error) => error.cause),
-        ),
-      );
+      await runCauseEffect(performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid));
     },
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
@@ -470,7 +467,7 @@ export async function createApplicationServices({
     try {
       do {
         profileRefreshAgain = false;
-        await Effect.runPromise(centralAuth.refreshProfile().pipe(Effect.mapError((error) => error.cause)));
+        await runCauseEffect(centralAuth.refreshProfile());
       } while (profileRefreshAgain && profileRefreshActive);
     } finally {
       profileRefreshing = false;
@@ -497,7 +494,7 @@ export async function createApplicationServices({
     centralAuth.stopProfileRefresh();
   });
   const store = new AgentStore(app.getPath("userData"), homedir());
-  await Effect.runPromise(store.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(store.initialize());
   const managedSkills = new ManagedSkillService(
     app.isPackaged
       ? join(process.resourcesPath, "managed-skills", "openbot-site-hosting", "SKILL.md")
@@ -540,9 +537,9 @@ export async function createApplicationServices({
     (serverId) => remoteServers.hostedServerStarting(serverId),
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
-  await Effect.runPromise(sidebarLayout.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(sidebarLayout.initialize());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
-  await Effect.runPromise(mailbox.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const teamWebRtcBridge = new TeamWebRtcBridge({
@@ -551,7 +548,7 @@ export async function createApplicationServices({
   });
   teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>
-    Effect.runPromise(teamWebRtcBridge.stop().pipe(Effect.mapError((error) => error.cause))),
+    runCauseEffect(teamWebRtcBridge.stop()),
   );
   // Only a hosted server: its machine is small, and one unit holds OpenBot and every agent process.
   const hostMemory = hostedServer
@@ -568,14 +565,8 @@ export async function createApplicationServices({
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
   });
-  teardown.push(TEARDOWN_ORDER.browser, "the browser", () =>
-    Effect.runPromise(browser.destroy().pipe(Effect.mapError((error) => error.cause))),
-  );
-  await Effect.runPromise(
-    browser
-      .restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId })))
-      .pipe(Effect.mapError((error) => error.cause)),
-  );
+  teardown.push(TEARDOWN_ORDER.browser, "the browser", () => runCauseEffect(browser.destroy()));
+  await runCauseEffect(browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId }))));
   const browserPictureInPicture = new BrowserPictureInPicture({
     // A value, deliberately: the window this is docked to is the one that exists now. The event
     // callback below is the opposite case and re-reads, because it fires long after a macOS window
@@ -597,7 +588,7 @@ export async function createApplicationServices({
   const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
   const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
-  const setupState = await Effect.runPromise(readSetupState(setupFile).pipe(Effect.mapError((error) => error.cause)));
+  const setupState = await runCauseEffect(readSetupState(setupFile));
   const analyticsPreference = await Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile));
   // Loaded before the first window and before the application menu is built, so every native
   // surface draws in the saved language on the first frame rather than switching after startup.
@@ -605,25 +596,23 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), LANGUAGE_PREFERENCE_FILE),
     systemLocale: app.getLocale(),
   });
-  await Effect.runPromise(language.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(language.load());
   const logoColor = new LogoColorService({ path: join(app.getPath("userData"), LOGO_COLOR_PREFERENCE_FILE) });
-  await Effect.runPromise(logoColor.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(logoColor.load());
   const notificationPreference = new NotificationPreferenceStore(
     join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
   );
-  await Effect.runPromise(notificationPreference.load().pipe(Effect.mapError((error) => error.cause)));
-  const updatePreference = await Effect.runPromise(
-    readUpdatePreference(updatePreferenceFile).pipe(Effect.mapError((error) => error.cause)),
-  );
+  await runCauseEffect(notificationPreference.load());
+  const updatePreference = await runCauseEffect(readUpdatePreference(updatePreferenceFile));
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
     path: approvalAutomationFile,
-    initial: await Effect.runPromise(
+    initial: await runCauseEffect(
       readApprovalAutomation(
         approvalAutomationFile,
         store.list().map((agent) => agent.id),
         join(app.getPath("userData"), LEGACY_APPROVAL_AUTOMATION_FILE),
-      ).pipe(Effect.mapError((error) => error.cause)),
+      ),
     ),
     knownAgentIds: () => store.list().map((agent) => agent.id),
   });
@@ -660,10 +649,10 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () =>
-    Effect.runPromise(providerRuntimes.stop().pipe(Effect.mapError((error) => error.cause))),
+    runCauseEffect(providerRuntimes.stop()),
   );
   // Before `new AgentService`, which reads every `executablePath` eagerly.
-  await Effect.runPromise(providerRuntimes.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(providerRuntimes.initialize());
   const secretCipher = safeStorageCipher("error.app.secretStorageUnavailable");
   const customProviders = new CustomProviderStore({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
@@ -671,18 +660,18 @@ export async function createApplicationServices({
   });
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
-  await Effect.runPromise(customProviders.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(customProviders.load());
   // The same reasons as the endpoints: before the service, and a file this build cannot read only
   // refuses the writes.
   const customAgents = new CustomAgentStore({
     path: join(app.getPath("userData"), CUSTOM_AGENTS_FILE),
     cipher: secretCipher,
   });
-  await Effect.runPromise(customAgents.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(customAgents.load());
   const providerDetectionSettings = new ProviderDetectionSettingsStore(
     join(app.getPath("userData"), PROVIDER_DETECTION_SETTINGS_FILE),
   );
-  await Effect.runPromise(providerDetectionSettings.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(providerDetectionSettings.load());
   const providerDetection = await Effect.runPromise(
     createProviderDetection({
       settings: providerDetectionSettings,
@@ -772,9 +761,9 @@ export async function createApplicationServices({
     apiUrl: centralAuthApiUrl,
     openExternal: (url) => shell.openExternal(url),
   });
-  await Effect.runPromise(githubConnector.load().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(githubConnector.load());
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () =>
-    Effect.runPromise(githubConnector.dispose().pipe(Effect.mapError((error) => error.cause))),
+    runCauseEffect(githubConnector.dispose()),
   );
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
@@ -807,13 +796,13 @@ export async function createApplicationServices({
       appImagePath: process.env.APPIMAGE,
       userDataPath: app.getPath("userData"),
     }),
-    endpoint: await Effect.runPromise(
+    endpoint: await runCauseEffect(
       resolveCuaDriverEndpoint({
         platform: process.platform,
         userDataPath: app.getPath("userData"),
         temporaryDirectory: tmpdir(),
         runtimeDirectory: process.env.XDG_RUNTIME_DIR,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     ),
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
@@ -824,9 +813,7 @@ export async function createApplicationServices({
   });
   // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
   // daemon: stopping it first would leave them reading a socket nothing answers.
-  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () =>
-    Effect.runPromise(cuaDriver.stop().pipe(Effect.mapError((error) => error.cause))),
-  );
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => runCauseEffect(cuaDriver.stop()));
   /*
    * The rim OpenBot draws over the window an agent works in.
    *
@@ -860,13 +847,11 @@ export async function createApplicationServices({
       const turnStartedAt = service.earliestRunningTurnStartedAt();
       if (turnStartedAt === null) return null;
       const session = liveSession(
-        await Effect.runPromise(computerUseReads.sessions().pipe(Effect.mapError((error) => error.cause))),
+        await runCauseEffect(computerUseReads.sessions()),
         (Date.now() - turnStartedAt) / 1000,
       );
       if (!session) return null;
-      const windows = await Effect.runPromise(
-        computerUseReads.listWindows().pipe(Effect.mapError((error) => error.cause)),
-      );
+      const windows = await runCauseEffect(computerUseReads.listWindows());
       const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
       return chooseTarget({
         windows,
@@ -984,9 +969,7 @@ export async function createApplicationServices({
         .pipe(Effect.mapError((error) => new AgentRemovalFailed({ cause: error.cause }))),
     tables,
   });
-  teardown.push(TEARDOWN_ORDER.service, "the agent service", () =>
-    Effect.runPromise(service.stop().pipe(Effect.mapError((error) => error.cause))),
-  );
+  teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   // Listens only while an agent allows local scripts; see `AutomationServer`.
   const automation = new AutomationServer({
     root: store.automationRoot,
@@ -1096,16 +1079,14 @@ export async function createApplicationServices({
     },
   });
   // Not awaited: a connection waits for Slack, and the app does not wait for it.
-  void Effect.runPromise(messaging.start().pipe(Effect.mapError((error) => error.cause))).catch((error) =>
+  void runCauseEffect(messaging.start()).catch((error) =>
     logger.warn("Messaging connections did not start.", toLogValue(error)),
   );
   teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => Effect.runPromise(messaging.stop()));
   if (developmentSlackCallbackPort > 0) {
     // As `openbot://` does for a packaged build, a finished install brings OpenBot to the front.
     const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, async (nonce, grant) => {
-      const received = await Effect.runPromise(
-        messaging.completeSlackWorkspace(nonce, grant).pipe(Effect.mapError((error) => error.cause)),
-      );
+      const received = await runCauseEffect(messaging.completeSlackWorkspace(nonce, grant));
       if (received) app.focus({ steal: true });
       return received;
     });
@@ -1113,8 +1094,8 @@ export async function createApplicationServices({
   }
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
   githubConnector.onAgentAccessChanged(() => {
-    void Effect.runPromise(service.notifyGitHubConnectorChanged().pipe(Effect.mapError((error) => error.cause))).catch(
-      (error) => logger.warn("Provider tools did not refresh.", toLogValue(error)),
+    void runCauseEffect(service.notifyGitHubConnectorChanged()).catch((error) =>
+      logger.warn("Provider tools did not refresh.", toLogValue(error)),
     );
   });
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no
@@ -1128,8 +1109,8 @@ export async function createApplicationServices({
   // provider session, so the driver stays quiet for a grant, for the warm-up below, and for the
   // stop at teardown, where the sessions are being left for the next run.
   cuaDriver.onMcpServerChanged(() => {
-    void Effect.runPromise(service.notifyComputerUseChanged().pipe(Effect.mapError((error) => error.cause))).catch(
-      (error) => logger.warn("Provider tools did not refresh.", toLogValue(error)),
+    void runCauseEffect(service.notifyComputerUseChanged()).catch((error) =>
+      logger.warn("Provider tools did not refresh.", toLogValue(error)),
     );
   });
   // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
@@ -1147,7 +1128,7 @@ export async function createApplicationServices({
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
   // nothing. It also tells no listener, because the sessions read back from the database were
   // written by a run that had this same entry.
-  const computerUseWarmUp = Effect.runPromise(cuaDriver.warmUp().pipe(Effect.mapError((error) => error.cause)));
+  const computerUseWarmUp = runCauseEffect(cuaDriver.warmUp());
   computerUseWarmUp.catch(() => undefined);
   // The warm-up tells no listener on purpose, so the rim has to read the result itself: a user who
   // granted the permissions has a running daemon from here on, and nothing else would start it.
@@ -1168,9 +1149,7 @@ export async function createApplicationServices({
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
-  await Effect.runPromise(
-    sidebarLayout.reconcileAgents(service.sidebarChatIds()).pipe(Effect.mapError((error) => error.cause)),
-  );
+  await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
 
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
@@ -1247,12 +1226,12 @@ export async function createApplicationServices({
     join(app.getPath("userData"), TEAM_FILE_V2),
     join(app.getPath("userData"), TEAM_FILE),
   );
-  await Effect.runPromise(teamStore.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(teamStore.initialize());
   slackIngressHostId = () => teamStore.getIdentity()?.serverId ?? null;
   slackIngress.reconnect();
   // After `teamStore.initialize()` and before `HostService`, which reads the account it activates.
   if (developmentRemoteRole) {
-    await Effect.runPromise(
+    await runCauseEffect(
       applyDevelopmentRemoteAccount({
         role: developmentRemoteRole,
         testClientEnabled: developmentTestClientEnabled,
@@ -1260,7 +1239,7 @@ export async function createApplicationServices({
         teamStore,
         setupFile,
         setupCompleted: setupState.completed,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
   }
   // At the same position. A failure leaves the host unconfigured and the app running, so the log
@@ -1278,9 +1257,9 @@ export async function createApplicationServices({
       ),
     );
   if (hostedServer) {
-    await Effect.runPromise(
-      signInHostedServer(hostedServer, centralAuthInitialization).pipe(Effect.mapError((error) => error.cause)),
-    ).catch((error) => logger.error("The hosted server could not sign in:", toLogValue(error)));
+    await runCauseEffect(signInHostedServer(hostedServer, centralAuthInitialization)).catch((error) =>
+      logger.error("The hosted server could not sign in:", toLogValue(error)),
+    );
   }
 
   const teamChatStore = new TeamChatStore(store.database);
@@ -1485,21 +1464,17 @@ export async function createApplicationServices({
         catch: (cause) => new RemoteWorkflowError({ cause }),
       }),
   });
-  teardown.push(TEARDOWN_ORDER.host, "the local host", () =>
-    Effect.runPromise(host.shutdown().pipe(Effect.mapError((error) => error.cause))),
-  );
+  teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
   const signedInState = centralAuth.getState();
   if (signedInState.status === "signed_in") {
-    await Effect.runPromise(
-      host.applySignedInAccount(signedInState.user).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(host.applySignedInAccount(signedInState.user));
   } else if (signedInState.status === "signed_out") {
     // Sign-out can settle before this service exists, leaving `forwardCentralAuth`
     // nothing to deactivate. Unbinding here is what stops a persisted
     // `activeAccountId` from keeping the last account's host configured - and
     // unconfigurable - while nobody is signed in. A still-loading or failed account
     // service keeps its host, and the event listener settles it.
-    await Effect.runPromise(host.applySignedInAccount(null).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(host.applySignedInAccount(null));
   }
   const analyticsPlatform = process.platform;
   if (analyticsPlatform !== "darwin" && analyticsPlatform !== "win32" && analyticsPlatform !== "linux") {
@@ -1605,21 +1580,19 @@ export async function createApplicationServices({
   // than at the next account check. The refresh itself belongs to the entry point, which owns the
   // account check and its coalescing; this only forwards the notice to it.
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
-  teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () =>
-    Effect.runPromise(remoteServers.stop().pipe(Effect.mapError((error) => error.cause))),
-  );
-  await Effect.runPromise(remoteServers.initialize().pipe(Effect.mapError((error) => error.cause)));
+  teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
+  await runCauseEffect(remoteServers.initialize());
   criticalActionTargets = { agents: service, remoteServers };
   // After `remoteServers.initialize()`. The client half polls for the host's connection file and
   // throws when it never appears, before any window is shown - see the module it lives in.
   if (developmentRemoteRole) {
-    await Effect.runPromise(
+    await runCauseEffect(
       startDevelopmentRemoteRole({
         role: developmentRemoteRole,
         testClientEnabled: developmentTestClientEnabled,
         host,
         remoteServers,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
@@ -1633,9 +1606,7 @@ export async function createApplicationServices({
       sendToRenderer(window, IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
   });
-  teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () =>
-    Effect.runPromise(browserView.stop().pipe(Effect.mapError((error) => error.cause))),
-  );
+  teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({
     createRemoteDesktopSession: (serverId) =>
       serverId === "local"
@@ -1875,7 +1846,7 @@ export async function createApplicationServices({
       await serverMode.close();
     });
   }
-  await Effect.runPromise(hostUpdateCoordinator.tick().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(hostUpdateCoordinator.tick());
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
     Effect.runPromise(hostUpdateCoordinator.stop()),

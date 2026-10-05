@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
 // The embedded browser and its picture-in-picture window.
 
 import { type BrowserDisplayState, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
@@ -8,6 +6,7 @@ import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/br
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import type { BrowserHost } from "../../backend/browser-host";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import type { BrowserViewClient } from "../browser-view-client";
 import {
@@ -59,33 +58,27 @@ export function browserIpcHandlers({
       open: payloadHandler(parseBrowserOpen, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>
-            Effect.runPromise(
-              browser
-                .open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus)
-                .pipe(Effect.mapError((error) => error.cause)),
+            runCauseEffect(
+              browser.open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus),
             ),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
-                  method: "POST",
-                  body: parsed,
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
+                method: "POST",
+                body: parsed,
+              }),
             ),
         }),
       ),
       activate: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => Effect.runPromise(browser.activate(tabId).pipe(Effect.mapError((error) => error.cause))),
+          local: () => runCauseEffect(browser.activate(tabId)),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
-                  method: "POST",
-                  body: { tabId },
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
             ),
         }),
       ),
@@ -93,21 +86,15 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () =>
             "url" in parsed
-              ? Effect.runPromise(
-                  browser.loadUrl(parsed.tabId, parsed.url).pipe(Effect.mapError((error) => error.cause)),
-                )
-              : Effect.runPromise(
-                  browser.navigate(parsed.tabId, parsed.direction).pipe(Effect.mapError((error) => error.cause)),
-                ),
+              ? runCauseEffect(browser.loadUrl(parsed.tabId, parsed.url))
+              : runCauseEffect(browser.navigate(parsed.tabId, parsed.direction)),
           remote: (serverId) => {
             if (!("url" in parsed)) {
-              return Effect.runPromise(
-                remoteServers
-                  .request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
-                    method: "POST",
-                    body: parsed,
-                  })
-                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              return runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
+                  method: "POST",
+                  body: parsed,
+                }),
               );
             }
             // An older host has no route that moves an existing tab to an address. The renderer
@@ -115,42 +102,36 @@ export function browserIpcHandlers({
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
-            return Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
-                  method: "POST",
-                  body: parsed,
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            return runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              }),
             );
           },
         }),
       ),
       reload: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => Effect.runPromise(browser.reload(tabId).pipe(Effect.mapError((error) => error.cause))),
+          local: () => runCauseEffect(browser.reload(tabId)),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
-                  method: "POST",
-                  body: { tabId },
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
             ),
         }),
       ),
       close: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => Effect.runPromise(browser.close(tabId).pipe(Effect.mapError((error) => error.cause))),
+          local: () => runCauseEffect(browser.close(tabId)),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
-                  method: "POST",
-                  body: { tabId },
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
             ),
         }),
       ),
@@ -158,11 +139,7 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.listTabs(),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+            runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)),
         }),
       ),
       getDisplayState: handler(() =>
@@ -172,17 +149,13 @@ export function browserIpcHandlers({
             // Without the capability the host can only list tabs, and nothing on that list says
             // which one is in front. The first tab is the guess this route exists to replace.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
-              const tabs = await Effect.runPromise(
-                remoteServers
-                  .request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)
-                  .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              const tabs = await runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
               );
               return { tabs, activeTabId: tabs[0]?.id ?? null };
             }
-            return Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            return runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState),
             );
           },
         }),
@@ -191,24 +164,18 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.getControlState(),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+            runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState)),
         }),
       ),
       capturePreview: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => Effect.runPromise(browser.capturePreview(tabId).pipe(Effect.mapError((error) => error.cause))),
+          local: () => runCauseEffect(browser.capturePreview(tabId)),
           remote: (serverId) =>
-            Effect.runPromise(
-              remoteServers
-                .request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
-                  method: "POST",
-                  body: { tabId },
-                })
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
+                method: "POST",
+                body: { tabId },
+              }),
             ),
         }),
       ),
@@ -218,14 +185,11 @@ export function browserIpcHandlers({
       // at coordinates that mean nothing there, and still showed the remote user nothing.
       // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
-        if (remoteServers.activeServerId === LOCAL_SERVER_ID)
-          await Effect.runPromise(browser.setVisible(parsed).pipe(Effect.mapError((error) => error.cause)));
+        if (remoteServers.activeServerId === LOCAL_SERVER_ID) await runCauseEffect(browser.setVisible(parsed));
       }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) =>
-        Effect.runPromise(browserView.start(tabId).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      stopLiveView: handler(() => Effect.runPromise(browserView.stop().pipe(Effect.mapError((error) => error.cause)))),
+      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => runCauseEffect(browserView.start(tabId))),
+      stopLiveView: handler(() => runCauseEffect(browserView.stop())),
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
         browserPictureInPicture.open(bounds),
       ),

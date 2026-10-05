@@ -8,6 +8,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { shell } from "electron";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -30,69 +31,57 @@ export function providerIpcHandlers({
   return {
     providers: {
       connectProvider: payloadHandler(parseProviderId, (provider) =>
-        Effect.runPromise(
-          service
-            .connectProvider(provider, async (value) => {
-              const url = new URL(value);
-              if (url.protocol !== "https:") throw new Error("Only HTTPS ChatGPT login links can open in the browser.");
-              await shell.openExternal(url.toString());
-            })
-            .pipe(Effect.mapError((error) => error.cause)),
+        runCauseEffect(
+          service.connectProvider(provider, async (value) => {
+            const url = new URL(value);
+            if (url.protocol !== "https:") throw new Error("Only HTTPS ChatGPT login links can open in the browser.");
+            await shell.openExternal(url.toString());
+          }),
         ),
       ),
       updateProviderCli: payloadHandler(parseManagedProviderId, async (provider) => {
-        await Effect.runPromise(
-          providerRuntimes.downloadAndWait(provider).pipe(Effect.mapError((error) => error.cause)),
-        );
+        await runCauseEffect(providerRuntimes.downloadAndWait(provider));
         return service.getStatus();
       }),
-      refreshAgentProviders: handler(() =>
-        Effect.runPromise(service.refreshProviders().pipe(Effect.mapError((error) => error.cause))),
-      ),
-      restartProvider: payloadHandler(parseProviderId, (provider) =>
-        Effect.runPromise(service.restartProvider(provider).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      refreshAgentProviders: handler(() => runCauseEffect(service.refreshProviders())),
+      restartProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.restartProvider(provider))),
       cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
         service.cancelProviderRestart(provider),
       ),
       // The code and the page it is typed on come back; nothing the code is later traded for does.
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
-        Effect.runPromise(service.startProviderCodeLogin(provider).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(service.startProviderCodeLogin(provider)),
       ),
       cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
-        Effect.runPromise(service.cancelProviderCodeLogin(provider).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(service.cancelProviderCodeLogin(provider)),
       ),
       // The key and the process that uses it change as one step, because the catalog the CLI
       // advertises is decided at spawn time: the service writes the key only when it can restart
       // the provider on it, and reports success only once the new process is up.
       setProviderApiKey: payloadHandler(parseProviderApiKeyInput, ({ provider, key }) =>
-        Effect.runPromise(
-          service
-            .changeProviderCredential(provider, () =>
-              credentials
-                .set(provider, key)
-                .pipe(
-                  Effect.mapError(
-                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
-                  ),
+        runCauseEffect(
+          service.changeProviderCredential(provider, () =>
+            credentials
+              .set(provider, key)
+              .pipe(
+                Effect.mapError(
+                  (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
                 ),
-            )
-            .pipe(Effect.mapError((error) => error.cause)),
+              ),
+          ),
         ),
       ),
       clearProviderApiKey: payloadHandler(parseProviderId, (provider) =>
-        Effect.runPromise(
-          service
-            .changeProviderCredential(provider, () =>
-              credentials
-                .clear(provider)
-                .pipe(
-                  Effect.mapError(
-                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
-                  ),
+        runCauseEffect(
+          service.changeProviderCredential(provider, () =>
+            credentials
+              .clear(provider)
+              .pipe(
+                Effect.mapError(
+                  (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
                 ),
-            )
-            .pipe(Effect.mapError((error) => error.cause)),
+              ),
+          ),
         ),
       ),
       // A status, never the key: see `setProviderApiKey` in the desktop API contract.
@@ -103,15 +92,9 @@ export function providerIpcHandlers({
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
-      download: payloadHandler(parseManagedProviderId, (parsed) =>
-        Effect.runPromise(providerRuntimes.download(parsed).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      cancel: payloadHandler(parseManagedProviderId, (parsed) =>
-        Effect.runPromise(providerRuntimes.cancel(parsed).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      checkForUpdates: handler(() =>
-        Effect.runPromise(providerRuntimes.checkForUpdates().pipe(Effect.mapError((error) => error.cause))),
-      ),
+      download: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.download(parsed))),
+      cancel: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.cancel(parsed))),
+      checkForUpdates: handler(() => runCauseEffect(providerRuntimes.checkForUpdates())),
     },
   };
 }

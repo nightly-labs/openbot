@@ -1,6 +1,7 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { AgentTemplateService } from "./agent-template-service";
 import { authDecode, type CentralAuthOperationError } from "./central-auth-effects";
 import { SkillMarketplaceFailure } from "./skill-marketplace-service";
@@ -105,11 +106,9 @@ describe("publishing an agent template", () => {
       service("Drafts product writing.", "---\nname: Notes\ndescription: x\n---\nBearer abcdefghijk"),
     ],
   ])("refuses a secret in %s and sends nothing", async (field, { templates, requests }) => {
-    await expect(
-      Effect.runPromise(
-        templates.publish({ agentId: agent.id, card: null }).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).rejects.toThrow(`Remove the secret or email address from ${field} before publishing.`);
+    await expect(runCauseEffect(templates.publish({ agentId: agent.id, card: null }))).rejects.toThrow(
+      `Remove the secret or email address from ${field} before publishing.`,
+    );
     expect(requests).toEqual([]);
   });
 });
@@ -122,17 +121,13 @@ describe("a published agent with a skill that cannot be published", () => {
       skillsFail: true,
     });
 
-    const preview = await Effect.runPromise(templates.preview(agent.id).pipe(Effect.mapError((error) => error.cause)));
+    const preview = await runCauseEffect(templates.preview(agent.id));
     expect(preview.publication?.templateId).toBe("Ab3_-xYz0123456789abcd");
     expect(preview.skillsError).toBe("Notes has local changes or needs repair before publishing.");
 
-    await Effect.runPromise(templates.unpublish(agent.id).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(templates.unpublish(agent.id));
     expect(requests).toContainEqual({ path: "/v1/agent-templates/Ab3_-xYz0123456789abcd", method: "DELETE" });
-    await expect(
-      Effect.runPromise(
-        templates.publish({ agentId: agent.id, card: null }).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).rejects.toThrow("local changes");
+    await expect(runCauseEffect(templates.publish({ agentId: agent.id, card: null }))).rejects.toThrow("local changes");
   });
 });
 
@@ -142,7 +137,7 @@ describe("a published agent whose avatar file cannot be read", () => {
   it("still previews as published, without the avatar", async () => {
     const { templates } = service("Drafts product writing.", undefined, { published: true, avatarUnreadable: true });
 
-    const preview = await Effect.runPromise(templates.preview(agent.id).pipe(Effect.mapError((error) => error.cause)));
+    const preview = await runCauseEffect(templates.preview(agent.id));
     expect(preview.publication?.templateId).toBe("Ab3_-xYz0123456789abcd");
     expect(preview.avatarImage).toBeNull();
   });
@@ -154,14 +149,12 @@ describe("installing an agent template", () => {
     const { templates, createAgentProfile } = service("Drafts product writing.", undefined, { published: true });
 
     await expect(
-      Effect.runPromise(
-        templates
-          .install({
-            templateId: "Ab3_-xYz0123456789abcd",
-            timezone: "Europe/Warsaw",
-            expectedUpdatedAt: "2026-09-25T09:00:00.000Z",
-          })
-          .pipe(Effect.mapError((error) => error.cause)),
+      runCauseEffect(
+        templates.install({
+          templateId: "Ab3_-xYz0123456789abcd",
+          timezone: "Europe/Warsaw",
+          expectedUpdatedAt: "2026-09-25T09:00:00.000Z",
+        }),
       ),
     ).rejects.toThrow("This agent changed after you opened it.");
     expect(createAgentProfile).not.toHaveBeenCalled();

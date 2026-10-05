@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { McpOAuthRecord } from "../backend/mcp-oauth-provider";
 import { McpOAuthStore } from "./mcp-oauth-store";
 
@@ -34,7 +35,7 @@ async function createStore(): Promise<{ path: string; store: McpOAuthStore }> {
 describe("McpOAuthStore", () => {
   it("reads back a saved sign-in in a new store", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
 
     const reopened = new McpOAuthStore(path, cipher);
     expect(await Effect.runPromise(reopened.load())).toBeNull();
@@ -44,7 +45,7 @@ describe("McpOAuthStore", () => {
 
   it("writes no token to disk", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
 
     // The file is what a backup tool or a support bundle picks up. `mcp-remote` kept these tokens
     // where OpenBot could not redact them; the point of holding them here is that it can.
@@ -56,17 +57,17 @@ describe("McpOAuthStore", () => {
 
   it.runIf(process.platform !== "win32")("keeps the file readable only by its owner", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
 
     expect((await stat(path)).mode & 0o777).toBe(0o600);
   });
 
   it("forgets one server and keeps the others", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
+    await runCauseEffect(store.write(NOTION, record("notion-access")));
 
-    await Effect.runPromise(store.clear(LINEAR).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.clear(LINEAR));
     const reopened = new McpOAuthStore(path, cipher);
     await Effect.runPromise(reopened.load());
     expect(reopened.read(LINEAR)).toBeNull();
@@ -79,8 +80,8 @@ describe("McpOAuthStore", () => {
     // side. Each change copies the records before it writes: unqueued, the second copy is taken
     // before the first commit and the rotated token of one server is written away by the other.
     await Promise.all([
-      Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause))),
-      Effect.runPromise(store.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause))),
+      runCauseEffect(store.write(LINEAR, record("linear-access"))),
+      runCauseEffect(store.write(NOTION, record("notion-access"))),
     ]);
 
     const reopened = new McpOAuthStore(path, cipher);
@@ -91,10 +92,10 @@ describe("McpOAuthStore", () => {
 
   it("treats an empty record as no record at all", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
 
     // How `invalidateCredentials("all")` arrives: nothing about the server is left to keep.
-    await Effect.runPromise(store.write(LINEAR, {}).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, {}));
     const reopened = new McpOAuthStore(path, cipher);
     await Effect.runPromise(reopened.load());
     expect(reopened.read(LINEAR)).toBeNull();
@@ -104,15 +105,13 @@ describe("McpOAuthStore", () => {
     const { path, store } = await createStore();
     // The SDK saves discovery state before it registers: a first sign-in writes this and
     // nothing else, and deleting it would send the code exchange back to default discovery.
-    await Effect.runPromise(
-      store
-        .write(LINEAR, {
-          discovery: {
-            authorizationServerUrl: "https://auth.example.com",
-            resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
-          },
-        })
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(
+      store.write(LINEAR, {
+        discovery: {
+          authorizationServerUrl: "https://auth.example.com",
+          resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+        },
+      }),
     );
 
     const reopened = new McpOAuthStore(path, cipher);
@@ -126,16 +125,14 @@ describe("McpOAuthStore", () => {
 
     // The sign-in that follows merges into the discovery the SDK saved before registering,
     // rather than replacing it: registration and tokens arrive as later writes to the same row.
-    await Effect.runPromise(
-      reopened
-        .write(LINEAR, {
-          discovery: {
-            authorizationServerUrl: "https://auth.example.com",
-            resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
-          },
-          client: { client_id: "client-abc", redirect_uris: ["openbot://mcp-auth"] },
-        })
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(
+      reopened.write(LINEAR, {
+        discovery: {
+          authorizationServerUrl: "https://auth.example.com",
+          resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+        },
+        client: { client_id: "client-abc", redirect_uris: ["openbot://mcp-auth"] },
+      }),
     );
     const reloaded = new McpOAuthStore(path, cipher);
     await Effect.runPromise(reloaded.load());
@@ -144,7 +141,7 @@ describe("McpOAuthStore", () => {
       client: { client_id: "client-abc" },
     });
 
-    await Effect.runPromise(reloaded.write(LINEAR, {}).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(reloaded.write(LINEAR, {}));
     const emptied = new McpOAuthStore(path, cipher);
     await Effect.runPromise(emptied.load());
     expect(emptied.read(LINEAR)).toBeNull();
@@ -167,8 +164,8 @@ describe("McpOAuthStore", () => {
 
   it("keeps an unreadable envelope when a server row is removed", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
+    await runCauseEffect(store.write(NOTION, record("notion-access")));
     const source = await readFile(path, "utf8");
     // A keychain that refuses once. The envelope is still good, and removing one server row must
     // not be what deletes every sign-in on the machine.
@@ -180,7 +177,7 @@ describe("McpOAuthStore", () => {
     });
     expect(await Effect.runPromise(refusing.load())).toBeInstanceOf(Error);
 
-    await Effect.runPromise(refusing.clear(LINEAR).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(refusing.clear(LINEAR));
     expect(await readFile(path, "utf8")).toBe(source);
 
     // And once the keychain answers again, both sign-ins are still there.
@@ -192,8 +189,8 @@ describe("McpOAuthStore", () => {
 
   it("refuses a registration while encrypted records cannot be read", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
+    await runCauseEffect(store.write(NOTION, record("notion-access")));
     const source = await readFile(path, "utf8");
     // A keychain that refuses once. `saveClientInformation` runs before the user signs in and
     // carries no tokens, so storing it would delete every unrelated credential even if the user
@@ -207,12 +204,10 @@ describe("McpOAuthStore", () => {
     expect(await Effect.runPromise(refusing.load())).toBeInstanceOf(Error);
 
     await expect(
-      Effect.runPromise(
-        refusing
-          .write("https://mcp.figma.com/mcp", {
-            client: { client_id: "new-client", redirect_uris: ["openbot://mcp-auth"] },
-          })
-          .pipe(Effect.mapError((error) => error.cause)),
+      runCauseEffect(
+        refusing.write("https://mcp.figma.com/mcp", {
+          client: { client_id: "new-client", redirect_uris: ["openbot://mcp-auth"] },
+        }),
       ),
     ).rejects.toThrow("The MCP sign-in file is unreadable.");
     expect(await readFile(path, "utf8")).toBe(source);
@@ -226,7 +221,7 @@ describe("McpOAuthStore", () => {
 
   it("reads the file again when the keychain has started answering", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
     let refuse = true;
     const recovering = new McpOAuthStore(path, {
       ...cipher,
@@ -239,9 +234,7 @@ describe("McpOAuthStore", () => {
     refuse = false;
 
     // The sign-in that follows is merged into what the file already held, rather than replacing it.
-    await Effect.runPromise(
-      recovering.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(recovering.write(NOTION, record("notion-access")));
     const reopened = new McpOAuthStore(path, cipher);
     await Effect.runPromise(reopened.load());
     expect(reopened.read(LINEAR)).toEqual(record("linear-access"));
@@ -254,7 +247,7 @@ describe("McpOAuthStore", () => {
     const store = new McpOAuthStore(path, cipher);
     await Effect.runPromise(store.load());
 
-    await Effect.runPromise(store.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(NOTION, record("notion-access")));
     const reopened = new McpOAuthStore(path, cipher);
     expect(await Effect.runPromise(reopened.load())).toBeNull();
     expect(reopened.read(NOTION)).toEqual(record("notion-access"));
@@ -262,7 +255,7 @@ describe("McpOAuthStore", () => {
 
   it("changes nothing when a write cannot be encrypted", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("first-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("first-access")));
     // The file is the source of truth for a hand-off: a token held only in memory would reach a
     // provider process after a failed save, and the next start would send a token nobody stored.
     const failing = new McpOAuthStore(path, {
@@ -273,16 +266,16 @@ describe("McpOAuthStore", () => {
     });
     await Effect.runPromise(failing.load());
 
-    await expect(
-      Effect.runPromise(failing.write(NOTION, record("notion-access")).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("System secret storage is unavailable.");
+    await expect(runCauseEffect(failing.write(NOTION, record("notion-access")))).rejects.toThrow(
+      "System secret storage is unavailable.",
+    );
     expect(failing.read(NOTION)).toBeNull();
     expect(failing.read(LINEAR)).toEqual(record("first-access"));
   });
 
   it("keeps the previous envelope when a write did not finish", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.write(LINEAR, record("linear-access")).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.write(LINEAR, record("linear-access")));
     // What a crash between the temporary write and the rename leaves behind. A partial write must
     // not cost the user the sign-in they already completed.
     await writeFile(`${path}.tmp`, '{"version":1,"serv', "utf8");

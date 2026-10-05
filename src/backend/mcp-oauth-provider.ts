@@ -1,5 +1,5 @@
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { type McpOperationError, mcpCall, mcpFailure, mcpSync, runMcpEffect } from "./mcp-effects";
+import { type McpOperationError, mcpCall, mcpFailure, mcpSync } from "./mcp-effects";
 /**
  * The OAuth client OpenBot is, for an http MCP server that asks its users to sign in.
  *
@@ -30,6 +30,7 @@ import {
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
+import { runCauseEffect } from "./effect-boundary";
 import { withTimeout } from "./with-timeout";
 
 /** What one server's sign-in leaves behind, and all of it: nothing else is kept between runs. */
@@ -487,7 +488,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   saveClientInformation(information: OAuthClientInformationFull): Promise<void> {
-    return runMcpEffect(
+    return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#registrationPending = false;
         this.recordSecret(information.client_secret);
@@ -503,7 +504,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   saveTokens(tokens: OAuthTokens): Promise<void> {
-    return runMcpEffect(
+    return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
         yield* this.#save({ tokens, obtainedAt: Date.now() });
@@ -533,7 +534,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * reason RFC 8252 says a native app must not do it.
    */
   redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    return runMcpEffect(
+    return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         // The probe moved on: a discovery slow enough to outlast it must not open a browser
         // afterwards for a grant nobody waits for.
@@ -556,7 +557,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * missed, and the exchange falls back to the MCP origin's token endpoint.
    */
   saveDiscoveryState(discovery: OAuthDiscoveryState): Promise<void> {
-    return runMcpEffect(
+    return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         yield* this.#save({
           discovery: {
@@ -588,7 +589,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * registration into one sign-in rather than a server the user can never connect again.
    */
   invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier" | "discovery"): Promise<void> {
-    return runMcpEffect(
+    return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         if (scope === "verifier" || scope === "discovery") {
           if (scope === "verifier") this.#codeVerifier = null;
@@ -707,7 +708,7 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * never say where it went.
  */
 export function secureOAuthFetch(signal?: AbortSignal): FetchLike {
-  return (input, init) => runMcpEffect(secureOAuthRequest(input, init, signal));
+  return (input, init) => runCauseEffect(secureOAuthRequest(input, init, signal));
 }
 
 const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (

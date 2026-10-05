@@ -16,14 +16,6 @@ export function providerCall<A>(operation: () => A | Promise<A>): Effect.Effect<
 }
 export const providerSync = <A>(operation: () => A) => Effect.try({ try: operation, catch: providerFailure });
 
-export async function runProviderClientEffect<A>(
-  operation: Effect.Effect<A, ProviderClientOperationError>,
-): Promise<A> {
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (Result.isFailure(result)) throw result.failure.cause;
-  return result.success;
-}
-
 /** Lets a native catch keep loop control and inspect the original operational error. */
 export function providerResult<A>(result: Result.Result<A, ProviderClientOperationError>): A {
   if (Result.isFailure(result)) throw result.failure.cause;

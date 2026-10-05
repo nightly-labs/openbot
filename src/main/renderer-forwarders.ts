@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 /**
  * The service events the main process relays to the renderer. They live here rather than in
  * the entry point because every one of them is the same three lines around a different channel, and
@@ -27,6 +26,7 @@ import type { AppTranslate } from "@openbot/i18n";
 import { notificationForAgentEvent } from "@openbot/team-client/agent-notifications";
 import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { HostAnalytics } from "./analytics";
 import { showRetainedNotification } from "./desktop-notifications";
 import type { HostService } from "./host-service";
@@ -97,11 +97,7 @@ export function createRendererForwarders({
       serverId === LOCAL_SERVER_ID
         ? (getAgentService()?.listAgents() ?? [])
         : remoteManager
-          ? await Effect.runPromise(
-              remoteManager
-                .request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
-                .pipe(Effect.mapError((error) => error.cause)),
-            )
+          ? await runCauseEffect(remoteManager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
           : [];
     const level = notifyLevel();
     const content = level ? notificationForAgentEvent(event, agents, getTranslate(), level) : null;

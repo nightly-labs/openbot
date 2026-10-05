@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { runTestEffect } from "./effect-test-runtime";
+
 // @vitest-environment node
 
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveAgentCommand } from "./acp-agent-command";
 import { scanAcpAgents } from "./acp-agent-scan";
+import { runCauseEffect } from "./effect-boundary";
 
 let root = "";
 let marker = "";
@@ -41,7 +42,7 @@ describe("scanAcpAgents", () => {
     await trap(bin, "evil-agent");
     await trap(join(root, "home", "tools"), "qwen");
 
-    const rows = await runTestEffect(
+    const rows = await runCauseEffect(
       scanAcpAgents({
         folders: [bin, "~/tools"],
         home: join(root, "home"),
@@ -59,7 +60,7 @@ describe("scanAcpAgents", () => {
   });
 
   it("finds nothing after its time", async () => {
-    const rows = await runTestEffect(
+    const rows = await runCauseEffect(
       scanAcpAgents({
         folders: [],
         takenIds: new Set(),

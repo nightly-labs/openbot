@@ -4,7 +4,7 @@ import { type AgentProfileDraft, AVATAR_HUES } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 import type { AgentClient } from "../agent-client";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 import { getString, type RequestId, type ResponseDecoder, type RpcError } from "../protocol";
 import { type ProviderClientOperationError, providerFailure } from "../provider-client-effects";
 import { generateProfile, profilePrompt } from "./profile-generation";
@@ -80,7 +80,7 @@ class ProfileClient extends EventEmitter implements AgentClient {
 it("returns editable generated fields and removes the disposable workspace and provider process", async () => {
   const client = new ProfileClient(JSON.stringify(draft));
   expect(
-    await runTestEffect(
+    await runCauseEffect(
       generateProfile(
         client,
         { ...model, supportedReasoningEfforts: ["medium"] },
@@ -98,7 +98,7 @@ it("returns editable generated fields and removes the disposable workspace and p
 it("spawns no process for a generation cancelled while its workspace was made", async () => {
   const client = new ProfileClient(JSON.stringify(draft));
   await expect(
-    runTestEffect(
+    runCauseEffect(
       generateProfile(
         client,
         { ...model, supportedReasoningEfforts: ["medium"] },
@@ -121,7 +121,7 @@ it.each([
 ])("rejects unusable generation without leaving its process running: %s", async (output) => {
   const client = new ProfileClient(output);
   await expect(
-    runTestEffect(
+    runCauseEffect(
       generateProfile(
         client,
         { ...model, supportedReasoningEfforts: ["medium"] },
@@ -137,7 +137,7 @@ it.each([
 it("denies provider tool requests instead of executing the setup prompt", async () => {
   const client = new ProfileClient("", true);
   await expect(
-    runTestEffect(
+    runCauseEffect(
       generateProfile(client, { ...model, supportedReasoningEfforts: ["medium"] }, { prompt: "Run a command" }, []),
     ),
   ).rejects.toThrow("attempted to use a tool");

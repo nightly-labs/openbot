@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 // OpenBot servers that the account server runs for the signed-in account.
 
 import {
@@ -8,6 +7,7 @@ import {
   parseDeleteHostedServerInput,
 } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedServerDesktopService } from "../hosted-server-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { requireString } from "./validation";
@@ -21,22 +21,17 @@ export function hostedServerIpcHandlers({
 }: HostedServerIpcDependencies): Pick<IpcGroupHandlers, "hostedServers"> {
   return {
     hostedServers: {
-      list: handler(() => Effect.runPromise(hostedServers.list().pipe(Effect.mapError((error) => error.cause)))),
-      plans: handler(() => Effect.runPromise(hostedServers.plans().pipe(Effect.mapError((error) => error.cause)))),
-      create: payloadHandler(parseCreate, (input) =>
-        Effect.runPromise(hostedServers.create(input).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      list: handler(() => runCauseEffect(hostedServers.list())),
+      plans: handler(() => runCauseEffect(hostedServers.plans())),
+      create: payloadHandler(parseCreate, (input) => runCauseEffect(hostedServers.create(input))),
       openCheckout: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) =>
-          Effect.runPromise(hostedServers.openCheckout(serverId).pipe(Effect.mapError((error) => error.cause))),
+        (serverId) => runCauseEffect(hostedServers.openCheckout(serverId)),
       ),
-      delete: payloadHandler(parseDelete, (input) =>
-        Effect.runPromise(hostedServers.delete(input).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      delete: payloadHandler(parseDelete, (input) => runCauseEffect(hostedServers.delete(input))),
       wake: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) => Effect.runPromise(hostedServers.wake(serverId).pipe(Effect.mapError((error) => error.cause))),
+        (serverId) => runCauseEffect(hostedServers.wake(serverId)),
       ),
     },
   };

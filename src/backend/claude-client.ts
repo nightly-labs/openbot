@@ -43,6 +43,7 @@ import {
   isClaudeLocalCommand,
   isClaudeTaskNotification,
 } from "./conversation-snapshots";
+import { runCauseEffect } from "./effect-boundary";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -77,7 +78,6 @@ import {
   providerFailure,
   providerResult,
   providerSync,
-  runProviderClientEffect,
 } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
@@ -597,7 +597,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = (toolName, toolInput, options) =>
-      runProviderClientEffect(
+      runCauseEffect(
         Effect.gen({ self: this }, function* () {
           if (config.profileGeneration) return { behavior: "deny", message: "Profile generation has no tools." };
           if (config.workspaceOnly) {
@@ -1266,7 +1266,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   #createOpenBotServers(threadId: string) {
     const call = (namespace: string, name: string, args: unknown) =>
-      runProviderClientEffect(this.#callDynamicTool(threadId, namespace, name, args));
+      runCauseEffect(this.#callDynamicTool(threadId, namespace, name, args));
     return {
       openbot_browser: createSdkMcpServer({
         name: OPENBOT_BROWSER_NAMESPACE,

@@ -44,13 +44,7 @@ import {
 } from "./browser-cdp";
 import { BrowserControlSessions } from "./browser-control-sessions";
 import { BrowserDiagnostics } from "./browser-diagnostics";
-import {
-  type BrowserOperationError,
-  browserCall,
-  browserFailure,
-  browserSync,
-  runBrowserEffect,
-} from "./browser-effects";
+import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
 import {
   type BrowserHostTab,
   type BrowserPreviewPage,
@@ -110,6 +104,7 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { runCauseEffect } from "./effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 
@@ -278,7 +273,7 @@ export class BrowserHost {
     );
     this.#configureSession();
     this.#idleTabSweep = setInterval(() => {
-      void runBrowserEffect(this.#sleepIdleTabs()).catch((error) =>
+      void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
         logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
       );
     }, IDLE_TAB_SWEEP_MS);
@@ -1672,7 +1667,7 @@ export class BrowserHost {
     contents.once("destroyed", () => {
       // Finish native destruction before removing the view and draining queued work.
       setImmediate(() => {
-        void runBrowserEffect(this.close(tab.id)).catch((error) =>
+        void runCauseEffect(this.close(tab.id)).catch((error) =>
           logger.warn("Unable to clean up browser tab", { error: toLogValue(error) }),
         );
       });
@@ -1689,7 +1684,7 @@ export class BrowserHost {
       // Enumeration walks every frame the tab has, and it is queued on the tab, so an unresponsive
       // one stops the tab for good -- and this runs off a navigation, where no caller's deadline
       // covers it.
-      void runBrowserEffect(
+      void runCauseEffect(
         this.#enqueue(tab.id, (queuedTab, keepQueueBlocked) =>
           boundEngineOperation(
             queuedTab,
@@ -1736,7 +1731,7 @@ export class BrowserHost {
       }
       if (!isCloseBrowserTabShortcut(input)) return;
       event.preventDefault();
-      setImmediate(() => void runBrowserEffect(this.close(tab.id)).catch(() => undefined));
+      setImmediate(() => void runCauseEffect(this.close(tab.id)).catch(() => undefined));
     });
     contents.on("context-menu", (event, params) => {
       const items = browserContextMenuItems({
@@ -1895,7 +1890,7 @@ export class BrowserHost {
           this.#emitChanged();
           this.#schedulePersist();
           const created = popup;
-          void runBrowserEffect(
+          void runCauseEffect(
             enqueueTabOperation(created, () => created.engine.setEnvironment(created.environment), true),
           ).catch((error) => {
             logger.warn("Unable to apply popup environment", { error: toLogValue(error) });
@@ -2222,7 +2217,7 @@ export class BrowserHost {
 
   #schedulePersist(): void {
     if (this.#destroying) return;
-    void runBrowserEffect(
+    void runCauseEffect(
       Effect.forkIn(
         this.#persistState().pipe(
           Effect.catch((error) =>

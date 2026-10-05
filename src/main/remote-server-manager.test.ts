@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { decodeBrowserPreviewFromHost, decodeBrowserTab } from "./remote-device-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import {
@@ -133,17 +134,11 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("fingerprint", fingerprint("attacker-public-key"));
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
-      await expect(
-        Effect.runPromise(
-          manager
-            .join({ inviteUrl: inviteUrl.toString() })
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).rejects.toThrow("identity");
+      await runCauseEffect(manager.initialize());
+      await expect(runCauseEffect(manager.join({ inviteUrl: inviteUrl.toString() }))).rejects.toThrow("identity");
       expect(acceptInvite).not.toHaveBeenCalled();
     } finally {
-      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -165,20 +160,14 @@ describe("remote server links", () => {
     inviteUrl.searchParams.set("fingerprint", "a".repeat(43));
     inviteUrl.searchParams.set("invite", "b".repeat(43));
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
       const input = { inviteUrl: inviteUrl.toString() };
-      await expect(
-        Effect.runPromise(
-          manager.previewInvite(input).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).rejects.toThrow("another OpenBot service");
-      await expect(
-        Effect.runPromise(manager.join(input).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
-      ).rejects.toThrow("another OpenBot service");
+      await expect(runCauseEffect(manager.previewInvite(input))).rejects.toThrow("another OpenBot service");
+      await expect(runCauseEffect(manager.join(input))).rejects.toThrow("another OpenBot service");
       expect(previewInvite).not.toHaveBeenCalled();
       expect(acceptInvite).not.toHaveBeenCalled();
     } finally {
-      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -260,12 +249,12 @@ describe("remote server links", () => {
     );
 
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
       expect(disconnect).toHaveBeenCalledWith(hostId);
       expect(manager.list().map((server) => server.id)).toEqual(["local"]);
       expect(manager.activeServerId).toBe("local");
     } finally {
-      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -278,18 +267,16 @@ describe("remote server links", () => {
     // No routes: reaching the dev host over HTTP at all fails the test by name.
     const team = stubTeamFetch();
 
-    const summary = await Effect.runPromise(
-      fixture.manager
-        .connectDevelopmentServer({
-          serverId: hostId,
-          serverName: "OpenBot Local Dev Host",
-          apiUrl: "http://localhost:63762",
-          fingerprint: "fingerprint",
-          publicKey: "public-key",
-          username: "openbot-dev-client",
-          sessionToken: "development-token",
-        })
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+    const summary = await runCauseEffect(
+      fixture.manager.connectDevelopmentServer({
+        serverId: hostId,
+        serverName: "OpenBot Local Dev Host",
+        apiUrl: "http://localhost:63762",
+        fingerprint: "fingerprint",
+        publicKey: "public-key",
+        username: "openbot-dev-client",
+        sessionToken: "development-token",
+      }),
     );
 
     expect(team.calls).toEqual([]);
@@ -416,7 +403,7 @@ describe("remote server links", () => {
     );
 
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
       expect(
         manager
           .list()
@@ -437,10 +424,8 @@ describe("remote server links", () => {
       expect(request).toHaveBeenCalledWith(betaId, "/v1/remote-screen/capabilities", {
         preserveSemanticTags: true,
       });
-      const invite = await Effect.runPromise(
-        manager
-          .createInvite(betaId, { role: "member", email: "friend@example.com" })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      const invite = await runCauseEffect(
+        manager.createInvite(betaId, { role: "member", email: "friend@example.com" }),
       );
       expect(sendTeamInviteEmail).toHaveBeenCalledWith({
         email: "friend@example.com",
@@ -452,33 +437,19 @@ describe("remote server links", () => {
         Effect.fail(new CentralAuthOperationError({ cause: new Error("SMTP unavailable") })),
       );
       await expect(
-        Effect.runPromise(
-          manager
-            .createInvite(betaId, { role: "member", email: "failed@example.com" })
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(manager.createInvite(betaId, { role: "member", email: "failed@example.com" })),
       ).rejects.toThrow("SMTP unavailable");
       expect(revokeInvite).toHaveBeenCalledWith("invite-1");
-      await Effect.runPromise(
-        manager.remove(alphaId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+      await runCauseEffect(manager.remove(alphaId));
       expect(removeMember).toHaveBeenCalledWith(alphaId, `${alphaId}-member`);
-      await Effect.runPromise(
-        manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+      await runCauseEffect(manager.syncRemoteHosts());
       expect(manager.list().some((server) => server.id === alphaId)).toBe(false);
-      await Effect.runPromise(
-        manager.remove(gammaId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
-      await Effect.runPromise(
-        manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+      await runCauseEffect(manager.remove(gammaId));
+      await runCauseEffect(manager.syncRemoteHosts());
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
       expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
-      const directoryChanged = vi.fn(() =>
-        Effect.runPromise(manager.syncRemoteHosts().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
-      );
+      const directoryChanged = vi.fn(() => runCauseEffect(manager.syncRemoteHosts()));
       manager.on("directoryInvalidated", directoryChanged);
       hosts = hosts.filter((host) => host.hostId !== betaId);
       transport.emit("error", betaId, "session_revoked", "The remote session was revoked.");
@@ -492,7 +463,7 @@ describe("remote server links", () => {
       await directoryChanged.mock.results[0]?.value;
       expect(manager.activeServerId).toBe("local");
     } finally {
-      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -592,15 +563,13 @@ describe("remote server links", () => {
     );
 
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
-      const authorization = await Effect.runPromise(
-        manager
-          .fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: new TextEncoder().encode(JSON.stringify({ grant: "viewer-grant" })),
-          })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      await runCauseEffect(manager.initialize());
+      const authorization = await runCauseEffect(
+        manager.fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: new TextEncoder().encode(JSON.stringify({ grant: "viewer-grant" })),
+        }),
       );
       expect(authorization.status).toBe(204);
       expect(requestResponse).toHaveBeenNthCalledWith(1, hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
@@ -611,19 +580,17 @@ describe("remote server links", () => {
       });
 
       await expect(
-        Effect.runPromise(
-          manager
-            .fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: new TextEncoder().encode(JSON.stringify({ grant: "expired" })),
-            })
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        runCauseEffect(
+          manager.fetchRemoteViewerResource(hostId, "/v1/remote-screen/sessions/desktop-1/authorize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: new TextEncoder().encode(JSON.stringify({ grant: "expired" })),
+          }),
         ),
       ).rejects.toThrow("Viewer grant expired.");
       expect(manager.list().find((server) => server.id === hostId)?.issue).toBeNull();
     } finally {
-      await Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -666,23 +633,17 @@ describe("remote server order", () => {
     );
 
     try {
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
       await rename(directory, unavailableDirectory);
-      await expect(
-        Effect.runPromise(
-          manager.select("server-1").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).rejects.toThrow();
+      await expect(runCauseEffect(manager.select("server-1"))).rejects.toThrow();
       expect(manager.activeServerId).toBe("local");
       await rename(unavailableDirectory, directory);
 
-      await expect(
-        Effect.runPromise(manager.select("local").pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause))),
-      ).resolves.toBeDefined();
+      await expect(runCauseEffect(manager.select("local"))).resolves.toBeDefined();
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.activeServerId).toBe("local");
     } finally {
-      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
       await rm(unavailableDirectory, { recursive: true, force: true });
     }
@@ -721,21 +682,15 @@ describe("remote server order", () => {
           getEmail: () => "person@example.com",
         },
       );
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
 
-      const reordered = await Effect.runPromise(
-        manager.reorder(["server-2", "server-1"]).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+      const reordered = await runCauseEffect(manager.reorder(["server-2", "server-1"]));
       expect(reordered.map((server) => server.id)).toEqual(["local", "server-2", "server-1"]);
       expect(reordered.find((server) => server.id === "server-1")?.active).toBe(true);
 
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.servers.map((server: { id: string }) => server.id)).toEqual(["server-2", "server-1"]);
-      await expect(
-        Effect.runPromise(
-          manager.reorder(["server-1"]).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).rejects.toThrow("incomplete");
+      await expect(runCauseEffect(manager.reorder(["server-1"]))).rejects.toThrow("incomplete");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -800,31 +755,21 @@ describe("remote server order", () => {
           getEmail: () => "person@example.com",
         },
       );
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
 
       await expect(
-        Effect.runPromise(
-          manager
-            .downloadSharedFile("~/OpenBot/Shared/report.csv", serverId)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(manager.downloadSharedFile("~/OpenBot/Shared/report.csv", serverId)),
       ).resolves.toEqual({
         bytes,
         name: "report.csv",
       });
       // A name that is not valid percent-encoding does not fail a download that has its bytes.
-      await expect(
-        Effect.runPromise(
-          manager
-            .downloadWorkspaceFile("chief", "app/page.tsx", serverId)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).resolves.toEqual({
+      await expect(runCauseEffect(manager.downloadWorkspaceFile("chief", "app/page.tsx", serverId))).resolves.toEqual({
         bytes,
         name: "page.tsx",
       });
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -844,17 +789,11 @@ describe("remote connection failures", () => {
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("http-protocol")], appVersion: "0.4.0" });
 
-    Effect.runPromise(
-      fixture.manager.startEventConnections().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "online" });
 
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request("http-protocol", "/v1/agents", (value) => value)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      ),
+      runCauseEffect(fixture.manager.request("http-protocol", "/v1/agents", (value) => value)),
     ).rejects.toThrow("could not safely use");
 
     expect(sockets[0]?.close).toHaveBeenCalledWith(1000, "Client stopped");
@@ -891,12 +830,10 @@ describe("remote connection failures", () => {
     });
 
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request(hostId, "/v1/agents", () => {
-            throw new Error("Unexpected agent payload.");
-          })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      runCauseEffect(
+        fixture.manager.request(hostId, "/v1/agents", () => {
+          throw new Error("Unexpected agent payload.");
+        }),
       ),
     ).rejects.toThrow("could not safely use");
 
@@ -910,9 +847,7 @@ describe("remote connection failures", () => {
     // Retrying by hand is the act the suspension was waiting for. A host still suspended after it
     // reads every later disconnect as the old failure and never reconnects on its own again.
     vi.spyOn(transport, "connect").mockReturnValue(Effect.succeed(undefined));
-    await Effect.runPromise(
-      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    await runCauseEffect(fixture.manager.retryConnection(hostId));
     transport.emit("disconnected", hostId);
     expect(fixture.server(hostId)).toMatchObject({ state: "offline" });
   });
@@ -943,12 +878,10 @@ describe("remote connection failures", () => {
       managerOptions: { webrtcTransport: transport },
     });
     await expect(
-      Effect.runPromise(
-        fixture.manager
-          .request(hostId, "/v1/agents", () => {
-            throw new Error("Old invalid payload.");
-          })
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+      runCauseEffect(
+        fixture.manager.request(hostId, "/v1/agents", () => {
+          throw new Error("Old invalid payload.");
+        }),
       ),
     ).rejects.toThrow("could not safely use");
     const roster = vi.fn();
@@ -959,9 +892,7 @@ describe("remote connection failures", () => {
         transport.emit("connected", hostId);
       }),
     );
-    await Effect.runPromise(
-      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    await runCauseEffect(fixture.manager.retryConnection(hostId));
     await vi.waitFor(() => expect(roster).toHaveBeenCalledWith(hostId, { type: "agents-changed", agents: [] }));
     expect(fixture.server(hostId)).toMatchObject({ state: "online", issue: null });
     expect(disconnect).not.toHaveBeenCalled();
@@ -992,9 +923,7 @@ describe("remote connection failures", () => {
       managerOptions: { webrtcTransport: transport },
     });
 
-    await Effect.runPromise(
-      fixture.manager.retryConnection(hostId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    await runCauseEffect(fixture.manager.retryConnection(hostId));
 
     expect(fixture.server(hostId)).toMatchObject({ state: "online" });
   });
@@ -1049,13 +978,9 @@ describe("remote connection failures", () => {
       appVersion: "0.4.0",
     });
 
-    Effect.runPromise(
-      fixture.manager.startEventConnections().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "online" });
-    const signedIn = Effect.runPromise(
-      fixture.manager.login({ serverId }).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    const signedIn = runCauseEffect(fixture.manager.login({ serverId }));
 
     // The probe is in flight, and the stream has already restarted on the new token: a second socket
     // exists. That order is the whole point -- the restart cannot come after the answer below.
@@ -1145,20 +1070,14 @@ describe("remote control capability discovery", () => {
           getEmail: () => "member@example.com",
         },
       );
-      await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      await runCauseEffect(manager.initialize());
 
-      await expect(
-        Effect.runPromise(
-          manager
-            .join({ inviteUrl: inviteUrl.toString() })
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ).resolves.toMatchObject({
+      await expect(runCauseEffect(manager.join({ inviteUrl: inviteUrl.toString() }))).resolves.toMatchObject({
         id: serverId,
         remoteDesktopAvailable: false,
         state: "online",
       });
-      Effect.runPromise(manager.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+      runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -1191,17 +1110,9 @@ describe("leaving a remote server", () => {
       appVersion: "0.4.0",
     });
     // A request negotiates the protocol first, as the app does before the user can open settings.
-    for (const id of servers)
-      await Effect.runPromise(
-        fixture.manager
-          .request(id, "/v1/agents", (value) => value)
-          .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+    for (const id of servers) await runCauseEffect(fixture.manager.request(id, "/v1/agents", (value) => value));
 
-    for (const id of servers)
-      await Effect.runPromise(
-        fixture.manager.remove(id).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-      );
+    for (const id of servers) await runCauseEffect(fixture.manager.remove(id));
 
     const sent = (path: string) =>
       teamFetch.requests(path).map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]);

@@ -14,6 +14,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "../../backend/routine-calendar";
 import {
   decodeAgentSummaries,
@@ -50,73 +51,68 @@ export function routineIpcHandlers({
       listRoutines: scopedHandler(parseAgentId, {
         local: (agentId) => service.listRoutines(agentId),
         remote: (agentId, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines)
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-          ),
+          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines)),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
+              method: "POST",
+              body: parsed,
+            }),
           ),
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
+          runCauseEffect(
+            remoteServers.request(
+              serverId,
+              TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
+              decodeRoutine,
+              {
                 method: "PATCH",
                 body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              },
+            ),
           ),
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
-        local: (parsed) =>
-          Effect.runPromise(service.deleteRoutine(parsed).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(service.deleteRoutine(parsed)),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeVoid, {
+          runCauseEffect(
+            remoteServers.request(
+              serverId,
+              TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
+              decodeVoid,
+              {
                 method: "DELETE",
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              },
+            ),
           ),
       }),
       testRoutine: scopedHandler(parseTestRoutine, {
-        local: (parsed) => Effect.runPromise(service.testRoutine(parsed).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(service.testRoutine(parsed)),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(
-                serverId,
-                TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
-                decodeRoutineRun,
-                { method: "POST" },
-              )
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(
+              serverId,
+              TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
+              decodeRoutineRun,
+              { method: "POST" },
+            ),
           ),
       }),
       listRoutineRuns: scopedHandler(parseListRoutineRuns, {
         local: (parsed) => service.listRoutineRuns(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(
-                serverId,
-                `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
-                decodeRoutineRuns,
-              )
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(
+              serverId,
+              `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
+              decodeRoutineRuns,
+            ),
           ),
       }),
       automationRunCommand: scopedHandler(parseTestRoutine, {
@@ -134,10 +130,8 @@ export function routineIpcHandlers({
 }
 
 function calendar(input: { from: string; to: string }, source: RoutineCalendarSource<RemoteWorkflowError>) {
-  return Effect.runPromise(
-    buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source).pipe(
-      Effect.mapError((error) => error.cause),
-    ),
+  return runCauseEffect(
+    buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source),
   );
 }
 

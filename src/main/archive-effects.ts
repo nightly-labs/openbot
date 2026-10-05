@@ -13,12 +13,6 @@ export function archiveCall<A>(operation: () => A | Promise<A>): Effect.Effect<A
 }
 export const archiveSync = <A>(operation: () => A) => Effect.try({ try: operation, catch: archiveFailure });
 
-export async function runArchiveEffect<A>(operation: Effect.Effect<A, ArchiveOperationError>): Promise<A> {
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (Result.isFailure(result)) throw result.failure.cause;
-  return result.success;
-}
-
 /** Lets a native catch keep loop control and inspect the original operational error. */
 export function archiveResult<A>(result: Result.Result<A, ArchiveOperationError>): A {
   if (Result.isFailure(result)) throw result.failure.cause;

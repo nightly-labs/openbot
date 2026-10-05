@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { BrowserOperationError } from "./browser-effects";
-import { runTestEffect } from "./effect-test-runtime";
+
 import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 // @vitest-environment node
 
@@ -16,6 +16,7 @@ import type { BrowserUploadHooks } from "./agent/browser-uploads";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import { AgentService, type AgentServiceOptions } from "./agent-service";
 import { AgentStore } from "./agent-store";
+import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import {
   type AppServerNotification,
@@ -96,7 +97,7 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
  * have set, and removes the temporary root.
  */
 export async function stopAgentTestFixture(root: string, service: AgentService | null): Promise<void> {
-  if (service) await runTestEffect(service.stop());
+  if (service) await runCauseEffect(service.stop());
   vi.useRealTimers();
   for (const [name, original] of originalProviderPaths) {
     if (original === undefined) delete process.env[name];
@@ -499,7 +500,7 @@ export async function startService(root: string, options: StartServiceOptions = 
       : {}),
     ...serviceOptions,
   });
-  await runTestEffect(service.initialize());
+  await runCauseEffect(service.initialize());
   return {
     service,
     client,

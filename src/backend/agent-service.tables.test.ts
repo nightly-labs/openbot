@@ -15,7 +15,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 
 let root: string;
 let service: AgentService | null = null;
@@ -46,9 +46,9 @@ async function startService(): Promise<{ client: FakeAgentClient; threadId: stri
       return client;
     },
   });
-  await runTestEffect(service.initialize());
-  await runTestEffect(store.getOrCreate("chief"));
-  await runTestEffect(service.sendMessage({ agentId: "chief", text: "Track the people I contacted." }));
+  await runCauseEffect(service.initialize());
+  await runCauseEffect(store.getOrCreate("chief"));
+  await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Track the people I contacted." }));
   await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
   const client = clients.get("codex");
   const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -71,7 +71,7 @@ describe.sequential("AgentService: shared data tools", () => {
     const read = await callOpenBotTool(client, threadId, "query_data", { sql: "SELECT name FROM people" });
     expect(openBotToolPayload(read.result)).toMatchObject({ rows: [["Ada"]] });
     // The agent that ran the CREATE owns the table, with no separate call to claim it.
-    expect(await (service ? runTestEffect(service.listTables()) : undefined)).toMatchObject([
+    expect(await (service ? runCauseEffect(service.listTables()) : undefined)).toMatchObject([
       { name: "people", ownerAgentId: "chief", rowCount: 1 },
     ]);
   });

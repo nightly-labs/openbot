@@ -1,9 +1,8 @@
 import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
-import { Effect } from "effect";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
 import type { RemoteServerManager } from "../remote-server-manager";
-import type { RemoteWorkflowError } from "../remote-service-effects";
 import { agentRequest } from "./agent-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
@@ -45,56 +44,34 @@ export function teamIpcHandlers({
   return {
     servers: {
       setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted, durationMs }) =>
-        Effect.runPromise(
-          remoteServers
-            .setMuted(serverId, muted, durationMs)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.setMuted(serverId, muted, durationMs)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       setNotificationLevel: payloadHandler(parseSetServerNotificationLevel, ({ serverId, level }) =>
-        Effect.runPromise(
-          remoteServers
-            .setNotificationLevel(serverId, level)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.setNotificationLevel(serverId, level)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       list: handler(() => withLocalHostSummary(remoteServers.list(), host.getStatus())),
       select: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.select(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.select(serverId)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       reorder: payloadHandler(parseReorderServers, (request) =>
-        Effect.runPromise(
-          remoteServers.reorder(request.serverIds).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ).then((servers) => withLocalHostSummary(servers, host.getStatus())),
-      ),
-      join: payloadHandler(parseJoinServer, (request) =>
-        Effect.runPromise(
-          remoteServers.join(request).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+        runCauseEffect(remoteServers.reorder(request.serverIds)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
         ),
       ),
-      previewInvite: payloadHandler(parseJoinServer, (request) =>
-        Effect.runPromise(
-          remoteServers.previewInvite(request).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ),
+      join: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.join(request))),
+      previewInvite: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.previewInvite(request))),
       takePendingInvite: handler(takePendingInvite),
-      login: payloadHandler(parseLoginServer, (request) =>
-        Effect.runPromise(
-          remoteServers.login(request).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ),
+      login: payloadHandler(parseLoginServer, (request) => runCauseEffect(remoteServers.login(request))),
       retryConnection: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.retryConnection(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.retryConnection(serverId)),
       ),
-      remove: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.remove(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ),
+      remove: payloadHandler(stringPayload("serverId"), (serverId) => runCauseEffect(remoteServers.remove(serverId))),
       getPresence: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.getPresence(),
@@ -104,198 +81,120 @@ export function teamIpcHandlers({
       getPresenceFor: payloadHandler(stringPayload("serverId"), (serverId) =>
         routeToServer(serverId, {
           local: () => host.getPresence(),
-          remote: (target) =>
-            Effect.runPromise(
-              remoteServers.getPresenceFor(target).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: (target) => runCauseEffect(remoteServers.getPresenceFor(target)),
         }),
       ),
       refreshIdentity: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.refreshIdentity(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.refreshIdentity(serverId)),
       ),
       listMembers: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.listMembers(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.listMembers(serverId)),
       ),
       updateMember: payloadHandler(agentRequest(parseUpdateTeamMember), ({ serverId, payload }) =>
-        Effect.runPromise(
-          remoteServers
-            .updateMember(serverId, payload)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.updateMember(serverId, payload)),
       ),
       removeMember: payloadHandler(agentRequest(stringPayload("memberId")), ({ serverId, payload }) =>
-        Effect.runPromise(
-          remoteServers
-            .removeMember(serverId, payload)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.removeMember(serverId, payload)),
       ),
       listInvites: payloadHandler(stringPayload("serverId"), (serverId) =>
-        Effect.runPromise(
-          remoteServers.listInvites(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.listInvites(serverId)),
       ),
       revokeInvite: payloadHandler(agentRequest(stringPayload("inviteId")), ({ serverId, payload }) =>
-        Effect.runPromise(
-          remoteServers
-            .revokeInvite(serverId, payload)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.revokeInvite(serverId, payload)),
       ),
       createInvite: payloadHandler(agentRequest(parseCreateTeamInvite), ({ serverId, payload }) =>
-        Effect.runPromise(
-          remoteServers
-            .createInvite(serverId, payload)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteServers.createInvite(serverId, payload)),
       ),
       setTyping: payloadHandler(parseSetTeamTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {
           local: () => host.setTyping(parsed),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers.setTyping(parsed).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.setTyping(parsed)),
         }),
       ),
       listDirectThreads: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.listDirectThreads(),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers.listDirectThreads().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.listDirectThreads()),
         }),
       ),
       readDirectConversation: payloadHandler(stringPayload("memberId"), (memberId) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.readDirectConversation(memberId),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers
-                .readDirectConversation(memberId)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.readDirectConversation(memberId)),
         }),
       ),
       readDirectConversationPage: payloadHandler(parseReadDirectConversationPage, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit),
           remote: () =>
-            Effect.runPromise(
-              remoteServers
-                .readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+            runCauseEffect(remoteServers.readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit)),
         }),
       ),
       sendDirectMessage: payloadHandler(parseSendDirectMessage, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.sendDirectMessage(parsed),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers
-                .sendDirectMessage(parsed)
-                .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.sendDirectMessage(parsed)),
         }),
       ),
       markDirectRead: payloadHandler(parseMarkDirectRead, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.markDirectRead(parsed),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers.markDirectRead(parsed).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.markDirectRead(parsed)),
         }),
       ),
       setDirectTyping: payloadHandler(parseDirectTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {
           local: () => host.setDirectTyping(parsed),
-          remote: () =>
-            Effect.runPromise(
-              remoteServers.setDirectTyping(parsed).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-            ),
+          remote: () => runCauseEffect(remoteServers.setDirectTyping(parsed)),
         }),
       ),
     },
     host: {
       getStatus: handler(() => host.getStatus()),
-      configure: payloadHandler(parseHostConfig, (config) =>
-        Effect.runPromise(host.configure(config).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      updateIdentity: payloadHandler(parseHostIdentity, (identity) =>
-        Effect.runPromise(host.updateIdentity(identity).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      configure: payloadHandler(parseHostConfig, (config) => runCauseEffect(host.configure(config))),
+      updateIdentity: payloadHandler(parseHostIdentity, (identity) => runCauseEffect(host.updateIdentity(identity))),
       getPresence: handler(() => host.getPresence()),
-      start: handler(() => Effect.runPromise(host.start().pipe(Effect.mapError((error) => error.cause)))),
-      stop: handler(() => Effect.runPromise(host.stop().pipe(Effect.mapError((error) => error.cause)))),
-      recheckScreenRecording: handler(() =>
-        Effect.runPromise(host.recheckScreenRecording().pipe(Effect.mapError((error) => error.cause))),
-      ),
-      listMembers: handler(() => Effect.runPromise(host.listMembers().pipe(Effect.mapError((error) => error.cause)))),
-      updateMember: payloadHandler(parseUpdateTeamMember, (update) =>
-        Effect.runPromise(host.updateMember(update).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      start: handler(() => runCauseEffect(host.start())),
+      stop: handler(() => runCauseEffect(host.stop())),
+      recheckScreenRecording: handler(() => runCauseEffect(host.recheckScreenRecording())),
+      listMembers: handler(() => runCauseEffect(host.listMembers())),
+      updateMember: payloadHandler(parseUpdateTeamMember, (update) => runCauseEffect(host.updateMember(update))),
       removeMember: payloadHandler(stringPayload("memberId"), (memberId) =>
-        Effect.runPromise(host.removeMember(memberId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(host.removeMember(memberId)),
       ),
       listSessions: handler(() => host.listSessions()),
       revokeSession: payloadHandler(stringPayload("sessionId"), (sessionId) =>
-        Effect.runPromise(host.revokeSession(sessionId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(host.revokeSession(sessionId)),
       ),
-      listInvites: handler(() => Effect.runPromise(host.listInvites().pipe(Effect.mapError((error) => error.cause)))),
+      listInvites: handler(() => runCauseEffect(host.listInvites())),
       revokeInvite: payloadHandler(stringPayload("inviteId"), (inviteId) =>
-        Effect.runPromise(host.revokeInvite(inviteId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(host.revokeInvite(inviteId)),
       ),
-      createInvite: payloadHandler(parseCreateTeamInvite, (invite) =>
-        Effect.runPromise(host.createInvite(invite).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      createInvite: payloadHandler(parseCreateTeamInvite, (invite) => runCauseEffect(host.createInvite(invite))),
     },
     remoteDesktop: {
       checkSetup: payloadHandler(stringPayload("serverId"), (serverId) =>
         routeToServer(serverId, {
-          local: () => Effect.runPromise(host.checkRemoteDesktopSetup().pipe(Effect.mapError((error) => error.cause))),
-          remote: (target) =>
-            Effect.runPromise(
-              remoteServers.checkRemoteDesktopSetup(target).pipe(Effect.mapError((error) => error.cause)),
-            ),
+          local: () => runCauseEffect(host.checkRemoteDesktopSetup()),
+          remote: (target) => runCauseEffect(remoteServers.checkRemoteDesktopSetup(target)),
         }),
       ),
       openSetup: payloadHandler(parseRemoteDesktopSetupAction, (action) =>
-        Effect.runPromise(host.openRemoteDesktopSetup(action).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(host.openRemoteDesktopSetup(action)),
       ),
       test: payloadHandler(parseRemoteDesktopTest, (input) =>
         routeToServer(input.serverId, {
-          local: () =>
-            Effect.runPromise(
-              host.testLocalRemoteDesktop(input.sessionId, input.action).pipe(Effect.mapError((error) => error.cause)),
-            ),
-          remote: () =>
-            Effect.runPromise(remoteServers.testRemoteDesktop(input).pipe(Effect.mapError((error) => error.cause))),
+          local: () => runCauseEffect(host.testLocalRemoteDesktop(input.sessionId, input.action)),
+          remote: () => runCauseEffect(remoteServers.testRemoteDesktop(input)),
         }),
       ),
       list: handler(() => remoteDesktop.list()),
-      connect: payloadHandler(parseRemoteDesktopConnect, (request) =>
-        Effect.runPromise(
-          remoteDesktop.connect(request).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
-      ),
+      connect: payloadHandler(parseRemoteDesktopConnect, (request) => runCauseEffect(remoteDesktop.connect(request))),
       selectDisplay: payloadHandler(parseRemoteDesktopDisplay, (request) =>
-        Effect.runPromise(
-          remoteDesktop
-            .selectDisplay(request.serverId, request.displayId)
-            .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteDesktop.selectDisplay(request.serverId, request.displayId)),
       ),
       disconnect: payloadHandler(stringPayload("sessionId"), (sessionId) =>
-        Effect.runPromise(
-          remoteDesktop.disconnect(sessionId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-        ),
+        runCauseEffect(remoteDesktop.disconnect(sessionId)),
       ),
     },
   };

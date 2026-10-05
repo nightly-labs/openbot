@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { redactText } from "@openbot/logging";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 
 /** A reversible stand-in for `safeStorage`, as in the provider key tests. */
@@ -25,7 +26,7 @@ async function createStore(): Promise<{ path: string; store: MessagingCredential
 describe("MessagingCredentialStore", () => {
   it("keeps the tokens encrypted, private to the owner, and out of every log line", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("connection-1", TOKENS).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("connection-1", TOKENS));
 
     const source = await readFile(path, "utf8");
     expect(source).not.toContain("storedbottokenvalue");
@@ -46,15 +47,15 @@ describe("MessagingCredentialStore", () => {
     expect(await Effect.runPromise(store.load())).toBeInstanceOf(Error);
     expect(store.status("connection-1")).toBe("unreadable");
 
-    await Effect.runPromise(store.set("connection-1", TOKENS).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("connection-1", TOKENS));
     expect(store.status("connection-1")).toBe("saved");
   });
 
   it("drops the tokens of connections that no longer exist", async () => {
     const { store } = await createStore();
-    await Effect.runPromise(store.set("kept", TOKENS).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.set("gone", TOKENS).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.retain(new Set(["kept"])).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("kept", TOKENS));
+    await runCauseEffect(store.set("gone", TOKENS));
+    await runCauseEffect(store.retain(new Set(["kept"])));
     expect(store.status("gone")).toBe("missing");
     expect(store.status("kept")).toBe("saved");
   });

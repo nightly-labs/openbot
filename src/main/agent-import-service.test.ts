@@ -14,7 +14,7 @@ import { Effect } from "effect";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { AgentLifecycleFailed } from "../backend/agent-service";
-import { runTestEffect } from "../backend/effect-test-runtime";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { AgentImportService } from "./agent-import-service";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { SkillMarketplaceFailure } from "./skill-marketplace-service";
@@ -214,7 +214,7 @@ describe("AgentImportService", () => {
       "export/agents/research/files/notes/plan.md": encode("# Plan"),
     });
 
-    const preview = await runTestEffect(service.stage(path));
+    const preview = await runCauseEffect(service.stage(path));
     expect(preview.agents).toEqual([
       expect.objectContaining({
         key: "research",
@@ -228,7 +228,7 @@ describe("AgentImportService", () => {
       }),
     ]);
 
-    const result = await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
+    const result = await runCauseEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(result.skipped).toEqual([]);
     const [agent] = result.agents;
     expect(agent).toMatchObject({ name: "Research", title: "Analyst", description: "You are research." });
@@ -238,7 +238,7 @@ describe("AgentImportService", () => {
     expect(memories).toEqual([{ agentId, text: "The user reports in EUR." }]);
     expect(avatars.get(agentId)).toEqual({ mimeType: "image/png", bytes: PNG });
     expect(await readFile(join(workspace, "imported/notes/plan.md"), "utf8")).toBe("# Plan");
-    const [skill] = await runTestEffect(library.list());
+    const [skill] = await runCauseEffect(library.list());
     expect(skill).toMatchObject({ name: "Web brief", version: 1 });
     expect(installLocal).toHaveBeenCalledWith({ agentId, skillId: skill?.id, revision: 1 });
     // The copy that was published is not left in the workspace for the agent to find.
@@ -246,13 +246,13 @@ describe("AgentImportService", () => {
   });
 
   it("marks an agent whose name is already on the server, without a warning", async () => {
-    const first = await runTestEffect(
+    const first = await runCauseEffect(
       service.stage(await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) }, "b.zip")),
     );
     expect(first.agents[0]?.nameExists).toBe(false);
-    await runTestEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
+    await runCauseEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
 
-    const again = await runTestEffect(
+    const again = await runCauseEffect(
       service.stage(
         await exportFile(
           { "openbot-import.json": manifest([manifestAgent("research"), manifestAgent("sales")]) },
@@ -294,7 +294,7 @@ describe("AgentImportService", () => {
       );
 
     it("imports a group chat as a channel with its lead, memories and routines", async () => {
-      const preview = await runTestEffect(service.stage(await exportWith([desk()])));
+      const preview = await runCauseEffect(service.stage(await exportWith([desk()])));
       expect(decodeAgentImportPreview(preview)?.channels).toEqual([
         {
           key: "desk",
@@ -307,7 +307,7 @@ describe("AgentImportService", () => {
         },
       ]);
 
-      const result = await runTestEffect(
+      const result = await runCauseEffect(
         service.apply({
           token: preview.token,
           keys: ["gauff", "iga", "wta"],
@@ -336,8 +336,8 @@ describe("AgentImportService", () => {
     });
 
     it("imports a channel with the agents that imported, even one, and skips one with none", async () => {
-      const first = await runTestEffect(service.stage(await exportWith([desk()], "first.zip")));
-      const result = await runTestEffect(
+      const first = await runCauseEffect(service.stage(await exportWith([desk()], "first.zip")));
+      const result = await runCauseEffect(
         service.apply({ token: first.token, keys: ["gauff", "wta"], channelKeys: ["desk"] }),
       );
       expect(agentsOf(channels[0])).toEqual(["Gauff", "Wta"]);
@@ -345,12 +345,12 @@ describe("AgentImportService", () => {
       expect(result.warnings).toEqual([expect.stringContaining("its lead was not imported")]);
 
       // A group chat with one other agent is still a channel, as OpenBot allows.
-      const second = await runTestEffect(
+      const second = await runCauseEffect(
         service.stage(
           await exportWith([desk(), desk({ key: "pair", members: ["iga", "wta"], lead: null })], "second.zip"),
         ),
       );
-      const alone = await runTestEffect(
+      const alone = await runCauseEffect(
         service.apply({ token: second.token, keys: ["gauff"], channelKeys: ["desk", "pair"] }),
       );
       expect(alone.channels).toEqual([{ id: channels[1]?.id, name: "Tennis desk" }]);
@@ -363,8 +363,8 @@ describe("AgentImportService", () => {
 
     it("removes a channel whose step fails and keeps its agents", async () => {
       failChannelMemory = true;
-      const preview = await runTestEffect(service.stage(await exportWith([desk()])));
-      const result = await runTestEffect(
+      const preview = await runCauseEffect(service.stage(await exportWith([desk()])));
+      const result = await runCauseEffect(
         service.apply({
           token: preview.token,
           keys: ["gauff", "iga", "wta"],
@@ -379,7 +379,7 @@ describe("AgentImportService", () => {
     });
 
     it("leaves out members that are not in the export and rejects a repeated key", async () => {
-      const preview = await runTestEffect(
+      const preview = await runCauseEffect(
         service.stage(
           await exportWith([
             desk({ members: ["gauff", "ghost", "iga"], lead: "ghost" }),
@@ -399,7 +399,7 @@ describe("AgentImportService", () => {
         "Tennis desk: members that are not agents in this export are left out.",
         "Tennis desk: the channel is skipped because none of its agents are in the export.",
       ]);
-      await expect(runTestEffect(service.stage(await exportWith([desk(), desk()], "twice.zip")))).rejects.toThrow(
+      await expect(runCauseEffect(service.stage(await exportWith([desk(), desk()], "twice.zip")))).rejects.toThrow(
         'Two channels use the key "desk".',
       );
     });
@@ -411,12 +411,12 @@ describe("AgentImportService", () => {
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
     for (const name of ["first.zip", "second.zip"]) {
-      const preview = await runTestEffect(service.stage(await exportFile(files, name)));
+      const preview = await runCauseEffect(service.stage(await exportFile(files, name)));
       expect(
-        (await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }))).skipped,
+        (await runCauseEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }))).skipped,
       ).toEqual([]);
     }
-    const skills = await runTestEffect(library.list());
+    const skills = await runCauseEffect(library.list());
     expect(skills).toHaveLength(1);
     expect(skills[0]?.version).toBe(2);
   });
@@ -436,7 +436,7 @@ describe("AgentImportService", () => {
     ],
   ])("rejects an export with %s", async (_label, extra, message) => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), ...extra });
-    await expect(runTestEffect(service.stage(path))).rejects.toThrow(message);
+    await expect(runCauseEffect(service.stage(path))).rejects.toThrow(message);
   });
 
   it("imports an export that lists its folders as entries", async () => {
@@ -445,44 +445,44 @@ describe("AgentImportService", () => {
       "agents/research/files/": new Uint8Array(),
       "agents/research/files/plan.md": encode("# Plan"),
     });
-    const preview = await runTestEffect(service.stage(path));
-    const result = await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
+    const preview = await runCauseEffect(service.stage(path));
+    const result = await runCauseEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(result.skipped).toEqual([]);
     expect(await readFile(join(result.agents[0]?.workspacePath ?? "", "imported/plan.md"), "utf8")).toBe("# Plan");
   });
 
   it("rejects an export that changed after the preview", async () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
-    const preview = await runTestEffect(service.stage(path));
+    const preview = await runCauseEffect(service.stage(path));
     await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), "extra.txt": encode("x") });
     await expect(
-      runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })),
+      runCauseEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })),
     ).rejects.toThrow("changed");
     expect(agents).toEqual([]);
   });
 
   it("rejects a manifest it cannot read", async () => {
     const newer = await exportFile({ "openbot-import.json": manifest([manifestAgent("a")], { version: 2 }) }, "v2.zip");
-    await expect(runTestEffect(service.stage(newer))).rejects.toThrow("newer export skill");
+    await expect(runCauseEffect(service.stage(newer))).rejects.toThrow("newer export skill");
     const long = await exportFile(
       { "openbot-import.json": manifest([manifestAgent("a", { name: "x".repeat(81) })]) },
       "long.zip",
     );
-    await expect(runTestEffect(service.stage(long))).rejects.toThrow('Agent "a" has an invalid name.');
+    await expect(runCauseEffect(service.stage(long))).rejects.toThrow('Agent "a" has an invalid name.');
     const outside = await exportFile(
       { "openbot-import.json": manifest([manifestAgent("a", { files: "agents/b/files" })]) },
       "outside.zip",
     );
-    await expect(runTestEffect(service.stage(outside))).rejects.toThrow('Agent "a" has an invalid files path.');
+    await expect(runCauseEffect(service.stage(outside))).rejects.toThrow('Agent "a" has an invalid files path.');
     // Grok Bot still writing the file: the zip ends before its directory.
     const whole = zipSync({ "openbot-import.json": manifest([manifestAgent("a")]) });
     const partial = join(root, "partial.zip");
     await writeFile(partial, whole.subarray(0, Math.floor(whole.length / 2)));
-    await expect(runTestEffect(service.stage(partial))).rejects.toThrow(
+    await expect(runCauseEffect(service.stage(partial))).rejects.toThrow(
       "If Grok Bot is still saving it, wait and choose it again.",
     );
     const missing = await exportFile({ "notes.txt": encode("x") }, "missing.zip");
-    await expect(runTestEffect(service.stage(missing))).rejects.toThrow("must contain openbot-import.json");
+    await expect(runCauseEffect(service.stage(missing))).rejects.toThrow("must contain openbot-import.json");
   });
 
   it("skips a routine with an invalid schedule and says so", async () => {
@@ -500,9 +500,9 @@ describe("AgentImportService", () => {
         }),
       ]),
     });
-    const preview = await runTestEffect(service.stage(path));
+    const preview = await runCauseEffect(service.stage(path));
     expect(preview.warnings).toEqual([expect.stringContaining('routine "Broken" is skipped')]);
-    await runTestEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
+    await runCauseEffect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] }));
     expect(routines).toEqual([
       expect.objectContaining({
         name: "Every half hour",
@@ -521,8 +521,8 @@ describe("AgentImportService", () => {
       "agents/broken/skills/good/SKILL.md": encode(SKILL),
       "agents/broken/skills/bad/SKILL.md": encode("No frontmatter."),
     });
-    const preview = await runTestEffect(service.stage(path));
-    const result = await runTestEffect(
+    const preview = await runCauseEffect(service.stage(path));
+    const result = await runCauseEffect(
       service.apply({ token: preview.token, keys: ["broken", "research"], channelKeys: [] }),
     );
     expect(result.agents.map((agent) => agent.name)).toEqual(["Research"]);
@@ -530,7 +530,7 @@ describe("AgentImportService", () => {
       { key: "broken", name: "Broken", reason: "SKILL.md must begin with YAML frontmatter." },
     ]);
     expect(agents.map((agent) => agent.name)).toEqual(["Research"]);
-    expect(await runTestEffect(library.list())).toEqual([]);
+    expect(await runCauseEffect(library.list())).toEqual([]);
   });
 
   it("imports every agent when a file is already there, and keeps both copies", async () => {
@@ -540,13 +540,13 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest(keys.map((key) => manifestAgent(key, { files: `agents/${key}/files` }))),
       ...Object.fromEntries(keys.map((key) => [`agents/${key}/files/${template}`, encode(`# ${key}`)])),
     });
-    const preview = await runTestEffect(service.stage(path));
+    const preview = await runCauseEffect(service.stage(path));
     // On a disk that ignores case, `PULL_REQUEST_TEMPLATE.md` in the same export is this file.
     const existing = join(root, "workspaces", "agent-3", "imported", template);
     await mkdir(join(existing, ".."), { recursive: true });
     await writeFile(existing, "# existing");
 
-    const result = await runTestEffect(service.apply({ token: preview.token, keys, channelKeys: [] }));
+    const result = await runCauseEffect(service.apply({ token: preview.token, keys, channelKeys: [] }));
     expect(result.agents.map((agent) => agent.name)).toEqual(["Research", "Sales", "Marketing", "Support", "Legal"]);
     expect(result.skipped).toEqual([]);
     expect(result.warnings).toEqual([
@@ -561,49 +561,49 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
-    const first = await runTestEffect(service.stage(await exportFile(files, "first.zip")));
-    await runTestEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
+    const first = await runCauseEffect(service.stage(await exportFile(files, "first.zip")));
+    await runCauseEffect(service.apply({ token: first.token, keys: ["research"], channelKeys: [] }));
     installLocal.mockRejectedValueOnce(new Error("Install failed."));
-    const second = await runTestEffect(service.stage(await exportFile(files, "second.zip")));
+    const second = await runCauseEffect(service.stage(await exportFile(files, "second.zip")));
     expect(
-      (await runTestEffect(service.apply({ token: second.token, keys: ["research"], channelKeys: [] }))).skipped,
+      (await runCauseEffect(service.apply({ token: second.token, keys: ["research"], channelKeys: [] }))).skipped,
     ).toHaveLength(1);
-    expect((await runTestEffect(library.list())).map((skill) => skill.version)).toEqual([1]);
+    expect((await runCauseEffect(library.list())).map((skill) => skill.version)).toEqual([1]);
   });
 
   it("accepts a token once, and not after it is discarded", async () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
-    const used = await runTestEffect(service.stage(path));
-    await runTestEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] }));
+    const used = await runCauseEffect(service.stage(path));
+    await runCauseEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] }));
     await expect(
-      runTestEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] })),
+      runCauseEffect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] })),
     ).rejects.toThrow("no longer open");
 
-    const discarded = await runTestEffect(service.stage(path));
-    await runTestEffect(service.discard(discarded.token));
+    const discarded = await runCauseEffect(service.stage(path));
+    await runCauseEffect(service.discard(discarded.token));
     await expect(
-      runTestEffect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })),
+      runCauseEffect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })),
     ).rejects.toThrow("no longer open");
   });
 
   it("keeps a member's upload to that member and removes its file when it closes", async () => {
     const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
     const uploads = join(root, "uploads");
-    const applied = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
+    const applied = await runCauseEffect(service.stageUpload(async () => bytes, "member-a"));
     const input = { token: applied.token, keys: ["research"], channelKeys: [] };
     // Another member, and the local user, read the token as closed and cannot release it.
-    await expect(runTestEffect(service.apply(input, member("member-b")))).rejects.toThrow("no longer open");
-    await expect(runTestEffect(service.apply(input))).rejects.toThrow("no longer open");
-    await runTestEffect(service.discard(applied.token, "member-b"));
-    await runTestEffect(service.discard(applied.token));
+    await expect(runCauseEffect(service.apply(input, member("member-b")))).rejects.toThrow("no longer open");
+    await expect(runCauseEffect(service.apply(input))).rejects.toThrow("no longer open");
+    await runCauseEffect(service.discard(applied.token, "member-b"));
+    await runCauseEffect(service.discard(applied.token));
     expect(await readdir(uploads)).toHaveLength(1);
-    expect((await runTestEffect(service.apply(input, member("member-a")))).agents.map((agent) => agent.name)).toEqual([
+    expect((await runCauseEffect(service.apply(input, member("member-a")))).agents.map((agent) => agent.name)).toEqual([
       "Research",
     ]);
     expect(await readdir(uploads)).toEqual([]);
 
-    const discarded = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
-    await runTestEffect(service.discard(discarded.token, "member-a"));
+    const discarded = await runCauseEffect(service.stageUpload(async () => bytes, "member-a"));
+    await runCauseEffect(service.discard(discarded.token, "member-a"));
     await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
   });
 
@@ -612,11 +612,11 @@ describe("AgentImportService", () => {
     const uploads = join(root, "uploads");
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const staged = await runTestEffect(service.stageUpload(async () => bytes, "member-a"));
+      const staged = await runCauseEffect(service.stageUpload(async () => bytes, "member-a"));
       expect(await readdir(uploads)).toHaveLength(1);
       vi.advanceTimersByTime(30 * 60_000);
       await expect(
-        runTestEffect(service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a"))),
+        runCauseEffect(service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a"))),
       ).rejects.toThrow("no longer open");
     } finally {
       vi.useRealTimers();
@@ -627,9 +627,9 @@ describe("AgentImportService", () => {
   it("refuses a fifth upload before it reads the body", async () => {
     const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
     for (const owner of ["member-a", "member-b", "member-c", "member-d"])
-      await runTestEffect(service.stageUpload(async () => bytes, owner));
+      await runCauseEffect(service.stageUpload(async () => bytes, owner));
     const read = vi.fn(async () => bytes);
-    await expect(runTestEffect(service.stageUpload(read, "member-e"))).rejects.toThrow("reading other exports");
+    await expect(runCauseEffect(service.stageUpload(read, "member-e"))).rejects.toThrow("reading other exports");
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -638,14 +638,14 @@ describe("AgentImportService", () => {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
-    const local = await runTestEffect(service.stage(await exportFile(files)));
-    await runTestEffect(service.apply({ token: local.token, keys: ["research"], channelKeys: [] }));
-    const upload = await runTestEffect(service.stageUpload(async () => zipSync(files), "member-a"));
-    const result = await runTestEffect(
+    const local = await runCauseEffect(service.stage(await exportFile(files)));
+    await runCauseEffect(service.apply({ token: local.token, keys: ["research"], channelKeys: [] }));
+    const upload = await runCauseEffect(service.stageUpload(async () => zipSync(files), "member-a"));
+    const result = await runCauseEffect(
       service.apply({ token: upload.token, keys: ["research"], channelKeys: [] }, member("member-a")),
     );
 
-    const [skill] = await runTestEffect(library.list());
+    const [skill] = await runCauseEffect(library.list());
     expect(skill?.version).toBe(1);
     expect(installLocal).toHaveBeenLastCalledWith({ agentId: result.agents[0]?.id, skillId: skill?.id, revision: 1 });
     expect(result.warnings).toEqual([expect.stringContaining("already has the skill")]);

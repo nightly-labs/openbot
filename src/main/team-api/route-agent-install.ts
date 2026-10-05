@@ -3,7 +3,8 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import type { Effect } from "effect";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentMarketplaceFailure } from "../agent-marketplace-service";
 import type { AgentTemplateFailure } from "../agent-template-service";
 import { parseInstallAgentTemplate } from "../ipc/agent-template-handlers";
@@ -53,7 +54,7 @@ export async function routeAgentInstall(
 
 async function answer(json: TeamApiRequestContext["json"], add: Install): Promise<RouteOutcome> {
   try {
-    const { agent } = await Effect.runPromise(add().pipe(Effect.mapError((error) => error.cause)));
+    const { agent } = await runCauseEffect(add());
     return json(200, { agentId: agent.id, name: agent.name });
   } catch (error) {
     // A withdrawn listing, a newer template or a signed-out host is a sentence for the admin, not a host fault.

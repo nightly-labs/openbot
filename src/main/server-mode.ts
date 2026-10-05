@@ -23,9 +23,10 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CentralAuthState } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { HostService } from "./host-service";
-import { RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
+import { RemoteWorkflowError } from "./remote-service-effects";
 
 const CONTROL_SOCKET_FILE = "control.sock";
 const MAX_BODY_BYTES = 4096;
@@ -177,15 +178,13 @@ export class ServerMode {
       case "GET /v1/status":
         return this.#status();
       case "POST /v1/login/start":
-        return runRemoteWorkflow(this.#startLogin(body.get("email") ?? "", body.get("name")));
+        return runCauseEffect(this.#startLogin(body.get("email") ?? "", body.get("name")));
       case "POST /v1/login/verify":
-        return runRemoteWorkflow(
-          this.#verifyLogin(body.get("challenge") ?? "", body.get("code") ?? "", body.get("name")),
-        );
+        return runCauseEffect(this.#verifyLogin(body.get("challenge") ?? "", body.get("code") ?? "", body.get("name")));
       case "POST /v1/name":
-        return runRemoteWorkflow(this.#rename(body.get("name") ?? ""));
+        return runCauseEffect(this.#rename(body.get("name") ?? ""));
       case "POST /v1/logout":
-        await runRemoteWorkflow(
+        await runCauseEffect(
           this.#options.centralAuth.logout().pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause }))),
         );
         return this.#status();

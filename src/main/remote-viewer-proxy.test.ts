@@ -3,6 +3,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { assert, describe, expect, it } from "vitest";
 import WebSocket from "ws";
+import { runCauseEffect } from "../backend/effect-boundary";
 import {
   decodeRemoteDesktopSignalBinary,
   decodeRemoteDesktopSignalControl,
@@ -28,11 +29,7 @@ describe("RemoteViewerProxy", () => {
             ),
         ),
     });
-    const viewerUrl = await Effect.runPromise(
-      proxy
-        .viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer")
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     expect(new URL(viewerUrl).hostname).toBe("127.0.0.1");
     const html = await (await fetch(viewerUrl)).text();
     const [localPrefix] = new URL(viewerUrl).pathname.split("/v1/");
@@ -58,17 +55,13 @@ describe("RemoteViewerProxy", () => {
     const tokenPath = viewer.pathname.split("/host-1/")[0];
     expect((await fetch(`${viewer.origin}${tokenPath}/%/x`)).status).toBe(404);
     socket.close();
-    await Effect.runPromise(proxy.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+    await runCauseEffect(proxy.stop());
   });
 
   it("closes only the affected viewer when desktop forwarding fails", async () => {
     const transport = new FailingFrameTransport();
     const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
-    const viewerUrl = await Effect.runPromise(
-      proxy
-        .viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer")
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     const socketUrl = new URL(viewerUrl);
     socketUrl.protocol = "ws:";
     socketUrl.pathname = socketUrl.pathname.replace(/\/viewer$/u, "/stream");
@@ -78,17 +71,13 @@ describe("RemoteViewerProxy", () => {
     socket.send("offer-text");
     const [code] = await once(socket, "close");
     expect(code).toBe(1011);
-    await Effect.runPromise(proxy.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+    await runCauseEffect(proxy.stop());
   });
 
   it("closes a viewer when its open desktop forwarding queue exceeds the limit", async () => {
     const transport = new SlowFrameTransport();
     const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
-    const viewerUrl = await Effect.runPromise(
-      proxy
-        .viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer")
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    const viewerUrl = await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer"));
     const socketUrl = new URL(viewerUrl);
     socketUrl.protocol = "ws:";
     socketUrl.pathname = socketUrl.pathname.replace(/\/viewer$/u, "/stream");
@@ -101,7 +90,7 @@ describe("RemoteViewerProxy", () => {
     const [code] = await closed;
     expect(code).toBe(1009);
     transport.release();
-    await Effect.runPromise(proxy.stop().pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)));
+    await runCauseEffect(proxy.stop());
   });
 });
 

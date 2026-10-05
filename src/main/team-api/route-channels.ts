@@ -7,8 +7,8 @@ import {
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import {
   parseCreateChannelMemory,
   parseCreateChannelRoutine,
@@ -70,7 +70,7 @@ export async function routeChannels(
       throw new HttpError(400, sourceText("error.team.channelDeleteUnsupported"));
     if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteChannels"));
     const body = await readJson(request);
-    await Effect.runPromise(channels.deleteChannel(channelId(body)).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(channels.deleteChannel(channelId(body)));
     return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents);
@@ -79,11 +79,7 @@ export async function routeChannels(
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
   return json(
     200,
-    await Effect.runPromise(
-      channels
-        .command(input, { id: member.id, name: member.name ?? "Team member" })
-        .pipe(Effect.mapError((error) => error.cause)),
-    ),
+    await runCauseEffect(channels.command(input, { id: member.id, name: member.name ?? "Team member" })),
   );
 }
 
@@ -118,12 +114,7 @@ async function routeChannelSettings(
       agents.deleteChannelRoutine(parseDeleteChannelRoutine(body));
       return empty(204);
     case CHANNEL_ROUTES.routineTest:
-      return json(
-        201,
-        await Effect.runPromise(
-          agents.testChannelRoutine(parseTestChannelRoutine(body)).pipe(Effect.mapError((error) => error.cause)),
-        ),
-      );
+      return json(201, await runCauseEffect(agents.testChannelRoutine(parseTestChannelRoutine(body))));
     default:
       return json(200, agents.listChannelRoutineRuns(parseListChannelRoutineRuns(body)));
   }

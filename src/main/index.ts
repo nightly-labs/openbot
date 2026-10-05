@@ -18,6 +18,7 @@ import {
   screen,
   shell,
 } from "electron";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -367,9 +368,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
         logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
       );
     if (services)
-      void Effect.runPromise(
-        services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)),
-      ).catch((error) =>
+      void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
       );
     if (services)
@@ -386,9 +385,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
         logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
       );
     if (services)
-      void Effect.runPromise(
-        services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)),
-      ).catch((error) =>
+      void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)),
       );
     if (services)
@@ -462,8 +459,7 @@ function registerIpcHandlers({
       approvalAutomation,
       language,
       logoColor,
-      initializeAgent: () =>
-        Effect.runPromise(agentInitialization.start().pipe(Effect.mapError((error) => error.cause))),
+      initializeAgent: () => runCauseEffect(agentInitialization.start()),
       appVariant,
       getMainWindow,
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
@@ -565,7 +561,7 @@ function requestDesktopNotificationPermission(
   preference: ApplicationServices["notificationPreference"],
   translate: ApplicationServices["language"]["translate"],
 ): Promise<void> {
-  return Effect.runPromise(
+  return runCauseEffect(
     requestNotificationPermission({
       platform: process.platform,
       preference,
@@ -573,7 +569,7 @@ function requestDesktopNotificationPermission(
         if (!Notification.isSupported()) return;
         showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
       },
-    }).pipe(Effect.mapError((error) => error.cause)),
+    }),
   );
 }
 
@@ -595,81 +591,76 @@ function forwardCentralAuth(state: CentralAuthState): void {
   // The file is left alone until `applySignedInAccount` records the switch.
   services?.host.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
   const generation = ++centralAuthGeneration;
-  void Effect.runPromise(
-    remoteAccountGate
-      .withPermit(
-        Effect.gen(function* () {
-          // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
-          // renderer was last told about may be activated; an earlier one would put a host the
-          // user has already left back within reach.
-          if (generation !== centralAuthGeneration) return;
-          const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
-          if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId && services) {
-            // Best-effort, like every other network step here: a bridge disconnect that
-            // rejects must not stop the local host from leaving the previous account.
-            yield* services.remoteServers
-              .disconnectRemoteSessions()
+  void runCauseEffect(
+    remoteAccountGate.withPermit(
+      Effect.gen(function* () {
+        // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
+        // renderer was last told about may be activated; an earlier one would put a host the
+        // user has already left back within reach.
+        if (generation !== centralAuthGeneration) return;
+        const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
+        if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId && services) {
+          // Best-effort, like every other network step here: a bridge disconnect that
+          // rejects must not stop the local host from leaving the previous account.
+          yield* services.remoteServers
+            .disconnectRemoteSessions()
+            .pipe(
+              Effect.catch((error) =>
+                Effect.sync(() =>
+                  logger.error("Unable to disconnect the previous account's remote sessions:", toLogValue(error.cause)),
+                ),
+              ),
+            );
+        }
+        // Rechecked after the disconnect: another account can be announced while it awaits,
+        // and activating this one now would put its host back within the newer account's reach.
+        if (generation !== centralAuthGeneration) return;
+        activeRemotePrincipalId = nextPrincipalId;
+        if (state.status !== "signed_in") {
+          if (state.status === "signed_out" && services) {
+            // Stopping is best-effort; unbinding the host is not, so a failed teardown
+            // must not leave the signed-out account's host bound.
+            yield* services.host
+              .stop(false)
               .pipe(
                 Effect.catch((error) =>
                   Effect.sync(() =>
-                    logger.error(
-                      "Unable to disconnect the previous account's remote sessions:",
-                      toLogValue(error.cause),
-                    ),
+                    logger.error("Unable to stop the host while signing out:", toLogValue(error.cause)),
                   ),
                 ),
               );
+            yield* services.host.applySignedInAccount(null);
           }
-          // Rechecked after the disconnect: another account can be announced while it awaits,
-          // and activating this one now would put its host back within the newer account's reach.
-          if (generation !== centralAuthGeneration) return;
-          activeRemotePrincipalId = nextPrincipalId;
-          if (state.status !== "signed_in") {
-            if (state.status === "signed_out" && services) {
-              // Stopping is best-effort; unbinding the host is not, so a failed teardown
-              // must not leave the signed-out account's host bound.
-              yield* services.host
-                .stop(false)
-                .pipe(
-                  Effect.catch((error) =>
-                    Effect.sync(() =>
-                      logger.error("Unable to stop the host while signing out:", toLogValue(error.cause)),
-                    ),
-                  ),
-                );
-              yield* services.host.applySignedInAccount(null);
-            }
+          return;
+        }
+        const host = services?.host ?? null;
+        // The local host is rebound before the joined-server list is synchronized, and the
+        // network failure is contained: this account must not end up signed in while the
+        // previous account's host is still selected and possibly online.
+        if (host) {
+          yield* host.applySignedInAccount(state.user);
+          if (generation !== centralAuthGeneration) {
+            // Another account was announced while this one was being activated. Its own queued
+            // callback binds it; until then no host answers for either.
+            host.unbindChangedAccount(null);
             return;
           }
-          const host = services?.host ?? null;
-          // The local host is rebound before the joined-server list is synchronized, and the
-          // network failure is contained: this account must not end up signed in while the
-          // previous account's host is still selected and possibly online.
-          if (host) {
-            yield* host.applySignedInAccount(state.user);
-            if (generation !== centralAuthGeneration) {
-              // Another account was announced while this one was being activated. Its own queued
-              // callback binds it; until then no host answers for either.
-              host.unbindChangedAccount(null);
-              return;
-            }
-            services?.analytics.flushPending();
-          }
-          if (services)
-            yield* services.remoteServers
-              .syncRemoteHosts()
-              .pipe(
-                Effect.catch((error) =>
-                  Effect.sync(() => logger.error("Unable to synchronize the joined servers:", toLogValue(error.cause))),
-                ),
-              );
-          // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
-          if (host && services?.serverMode) yield* services.serverMode.publish();
-          else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
-            yield* host.start();
-        }),
-      )
-      .pipe(Effect.mapError((error) => error.cause)),
+          services?.analytics.flushPending();
+        }
+        if (services)
+          yield* services.remoteServers
+            .syncRemoteHosts()
+            .pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.error("Unable to synchronize the joined servers:", toLogValue(error.cause))),
+              ),
+            );
+        // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
+        if (host && services?.serverMode) yield* services.serverMode.publish();
+        else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
+          yield* host.start();
+      }),
+    ),
   ).catch((error) => {
     logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
   });
@@ -957,11 +948,8 @@ if (!hasSingleInstanceLock) {
       const teamIdentity = teamStore.getIdentity();
       if (built.serverMode) {
         const serverModeControl = built.serverMode;
-        void Effect.runPromise(
-          built.centralAuthInitialization.pipe(
-            Effect.flatMap(() => serverModeControl.publish()),
-            Effect.mapError((error) => error.cause),
-          ),
+        void runCauseEffect(
+          built.centralAuthInitialization.pipe(Effect.flatMap(() => serverModeControl.publish())),
         ).catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
       } else if (
         shouldAutoStartHost({
@@ -970,18 +958,13 @@ if (!hasSingleInstanceLock) {
           remoteRole: developmentRemoteRole,
         })
       ) {
-        void Effect.runPromise(
-          built.centralAuthInitialization.pipe(
-            Effect.flatMap(() => host.start()),
-            Effect.mapError((error) => error.cause),
-          ),
-        ).catch((error) => logger.error("Unable to republish this OpenBot:", toLogValue(error)));
+        void runCauseEffect(built.centralAuthInitialization.pipe(Effect.flatMap(() => host.start()))).catch((error) =>
+          logger.error("Unable to republish this OpenBot:", toLogValue(error)),
+        );
       }
-      void Effect.runPromise(built.agentInitialization.start().pipe(Effect.mapError((error) => error.cause))).catch(
-        (error) => {
-          logger.error("Unable to initialize the local agent backend:", toLogValue(error));
-        },
-      );
+      void runCauseEffect(built.agentInitialization.start()).catch((error) => {
+        logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+      });
 
       const directoryRefresh = createRemoteDirectoryRefresh(() => {
         const generation = centralAuthGeneration;
@@ -1085,8 +1068,7 @@ function forceExitAfterShutdownDeadline(): void {
 }
 
 async function prepareForUpdateInstall(): Promise<void> {
-  if (services)
-    await Effect.runPromise(services.browser.flushPersistentStorage().pipe(Effect.mapError((error) => error.cause)));
+  if (services) await runCauseEffect(services.browser.flushPersistentStorage());
   await prepareForShutdown();
 }
 

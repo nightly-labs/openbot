@@ -17,7 +17,7 @@ import {
 } from "../agent-service-test-harness";
 import { attachmentFailure } from "../attachment-effects";
 import { browserFailure } from "../browser-effects";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 import type { DynamicToolCallParams } from "../protocol";
 import { BrowserUploads } from "./browser-uploads";
 
@@ -90,13 +90,13 @@ async function startService(browser: ReturnType<typeof uploadBrowser>["browser"]
       return client;
     },
   });
-  await runTestEffect(service.initialize());
-  await runTestEffect(service.sendMessage({ agentId: "chief", text: "Upload a file" }));
+  await runCauseEffect(service.initialize());
+  await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Upload a file" }));
   await waitFor(() => Boolean(store.activeProviderSession("chief")));
   const client = clients.get("codex");
   const threadId = store.activeProviderSession("chief")?.externalSessionId;
   if (!client || !threadId) throw new Error("The browser upload thread was not created.");
-  return { client, threadId, workspacePath: (await runTestEffect(store.getOrCreate("chief"))).workspacePath };
+  return { client, threadId, workspacePath: (await runCauseEffect(store.getOrCreate("chief"))).workspacePath };
 }
 
 async function upload(
@@ -164,7 +164,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     documentChanged("tab", new Set(["some-other-document"]));
     await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [source] });
     await expect(readFile(stagedPath, "utf8")).resolves.toBe("kept");
-    if (service) await runTestEffect(service.stop());
+    if (service) await runCauseEffect(service.stop());
     await waitFor(() => missing(stagedPath));
   });
 
@@ -189,7 +189,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [first] });
     await expect(readFile(staged[0]?.path ?? "", "utf8")).resolves.toBe("first");
     await expect(readFile(staged[1]?.path ?? "", "utf8")).resolves.toBe("second");
-    if (service) await runTestEffect(service.stop());
+    if (service) await runCauseEffect(service.stop());
     await waitFor(() => missing(staged[0]?.path ?? ""));
     await waitFor(() => missing(staged[1]?.path ?? ""));
   });
@@ -288,7 +288,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
       arguments: { tabId: "tab", target: { kind: "css", selector: "input" }, paths: [source] },
     };
 
-    const result = await runTestEffect(uploads.uploadFiles("chief", params));
+    const result = await runCauseEffect(uploads.uploadFiles("chief", params));
 
     expect(result.success).toBe(false);
     expect(result.contentItems[0]).toEqual({
@@ -311,7 +311,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await upload(client, threadId, "second", { selector: "#two", paths: [source] });
     const stagedPaths = staged.map((entry) => entry.path);
 
-    if (service) await runTestEffect(service.stop());
+    if (service) await runCauseEffect(service.stop());
 
     for (const path of stagedPaths) await expect(readFile(path)).rejects.toThrow();
   });

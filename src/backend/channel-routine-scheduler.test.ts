@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { runTestEffect } from "./effect-test-runtime";
+
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -11,6 +11,7 @@ import { stores } from "./agent-service-test-harness";
 import { ChannelRoutineScheduler, channelRunStatusForTasks } from "./channel-routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelService } from "./channel-service";
+import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 
 let root: string;
@@ -30,10 +31,10 @@ beforeEach(async () => {
   generate.mockImplementation(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
   root = await mkdtemp(join(tmpdir(), "openbot-channel-routines-"));
   data = stores(root);
-  await runTestEffect(data.store.initialize());
-  await runTestEffect(data.mailbox.initialize());
-  await runTestEffect(data.store.getOrCreate("agent-a"));
-  await runTestEffect(data.store.getOrCreate("agent-b"));
+  await runCauseEffect(data.store.initialize());
+  await runCauseEffect(data.mailbox.initialize());
+  await runCauseEffect(data.store.getOrCreate("agent-a"));
+  await runCauseEffect(data.store.getOrCreate("agent-b"));
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
@@ -47,7 +48,7 @@ beforeEach(async () => {
     },
   });
   scheduler = newScheduler();
-  await runTestEffect(
+  await runCauseEffect(
     service.command(
       {
         type: "save",
@@ -75,7 +76,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await runTestEffect(service.stop());
+  await runCauseEffect(service.stop());
   data.store.database.close();
   await rm(root, { recursive: true, force: true });
 });
@@ -97,7 +98,7 @@ function currentRun(runId: string, from: ChannelRoutineScheduler = scheduler): C
 
 /** Fires the routine and waits for the request to reach a member. */
 async function fire(): Promise<ChannelRoutineRun> {
-  const run = await runTestEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+  const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
   await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
   return run;
 }
@@ -117,15 +118,15 @@ async function begin(taskId: string, turnId: string): Promise<void> {
       .at(-1),
   );
   const deliveryId = required(assignment.deliveryId);
-  await runTestEffect(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
-  await runTestEffect(data.mailbox.markStarting(deliveryId));
-  await runTestEffect(data.mailbox.markRunning(deliveryId, turnId));
-  await runTestEffect(service.accepted(deliveryId, `session-${taskId}`, turnId));
+  await runCauseEffect(service.prepare(required(data.mailbox.getDelivery(deliveryId))));
+  await runCauseEffect(data.mailbox.markStarting(deliveryId));
+  await runCauseEffect(data.mailbox.markRunning(deliveryId, turnId));
+  await runCauseEffect(service.accepted(deliveryId, `session-${taskId}`, turnId));
 }
 
 async function finish(turnId: string, status: "completed" | "failed"): Promise<void> {
   const assignment = required(service.store.assignments("channel-1").find((item) => item.turnId === turnId));
-  await runTestEffect(data.mailbox.markTerminal(required(assignment.deliveryId), status));
+  await runCauseEffect(data.mailbox.markTerminal(required(assignment.deliveryId), status));
   const threadId = service.store.context("channel-1", assignment.agentId).threadId;
   service.event({ type: "turn-completed", agentId: assignment.agentId, threadId, turnId, status });
 }
@@ -183,8 +184,8 @@ describe("ChannelRoutineScheduler", () => {
   });
 
   it("stays open until every task of the fan-out is done", async () => {
-    await runTestEffect(data.store.getOrCreate("agent-c"));
-    await runTestEffect(
+    await runCauseEffect(data.store.getOrCreate("agent-c"));
+    await runCauseEffect(
       service.command(
         {
           type: "save",
@@ -204,7 +205,7 @@ describe("ChannelRoutineScheduler", () => {
     const run = await fire();
     const rootTask = required(service.store.tasks("channel-1")[0]);
     await begin(rootTask.id, "turn-root");
-    await runTestEffect(
+    await runCauseEffect(
       service.tool("channel-1", "agent-a", "turn-root", "child-1", "channel_assign", {
         recipientAgentId: "agent-b",
         task: "Collect the numbers",
@@ -222,7 +223,7 @@ describe("ChannelRoutineScheduler", () => {
     expect(child.requestMessageId).toBe(run.requestMessageId);
     await begin(child.id, "turn-child");
     expect(currentRun(run.id).status).toBe("running");
-    await runTestEffect(
+    await runCauseEffect(
       service.tool("channel-1", "agent-b", "turn-child", "result-1", "channel_result", { text: "The numbers" }),
     );
     await finish("turn-child", "completed");
@@ -249,7 +250,7 @@ describe("ChannelRoutineScheduler", () => {
     await begin(rootTask.id, "turn-1");
     await finish("turn-1", "failed");
     expect(currentRun(run.id).status).toBe("failed");
-    await runTestEffect(
+    await runCauseEffect(
       service.command(
         {
           type: "resume",
@@ -269,13 +270,13 @@ describe("ChannelRoutineScheduler", () => {
 
   it("waits for a human when the lead cannot route, then follows the resumed task", async () => {
     generate.mockImplementation(() => Effect.succeed(JSON.stringify({ question: "Which report do you mean?" })));
-    const run = await runTestEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("needs-attention"));
     expect(currentRun(run.id).error).toBe("Which report do you mean?");
 
     generate.mockImplementation(() => Effect.succeed(JSON.stringify({ agentId: "agent-a" })));
     const paused = required(service.store.tasks("channel-1")[0]);
-    await runTestEffect(
+    await runCauseEffect(
       service.command(
         {
           type: "resume",
@@ -292,7 +293,7 @@ describe("ChannelRoutineScheduler", () => {
   });
 
   it("keeps a run open while its request command is still in flight", async () => {
-    const pending = runTestEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+    const pending = runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     // The run row is written before its command commits, and other channel work publishes in that
     // window. The reconcile of that publish reads a request that no task holds yet, which is not
     // the same as a request that every task has dropped.
@@ -315,7 +316,7 @@ describe("ChannelRoutineScheduler", () => {
         .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
     ).toBeUndefined();
 
-    await runTestEffect(scheduler.resumePendingRuns());
+    await runCauseEffect(scheduler.resumePendingRuns());
 
     await vi.waitFor(() =>
       expect(service.store.tasks("channel-1").some((task) => task.requestMessageId === "request-after-restart")).toBe(
@@ -328,14 +329,14 @@ describe("ChannelRoutineScheduler", () => {
         .get(`channels:routine:${routine.id}:channel-routine-run:${run.id}`),
     ).toMatchObject({ command_id: `channels:routine:${routine.id}:channel-routine-run:${run.id}` });
 
-    await runTestEffect(scheduler.resumePendingRuns());
+    await runCauseEffect(scheduler.resumePendingRuns());
     expect(
       service.store.tasks("channel-1").filter((task) => task.requestMessageId === "request-after-restart"),
     ).toHaveLength(1);
   });
 
   it("keeps tracking a request the lead merged into another task", async () => {
-    const open = await runTestEffect(
+    const open = await runCauseEffect(
       service.command(
         {
           type: "send",
@@ -356,7 +357,7 @@ describe("ChannelRoutineScheduler", () => {
     // routine's own root task and moves its request id onto a task with a different id, which is
     // why the run tracks the request message and not the root task.
     generate.mockImplementation(() => Effect.succeed(JSON.stringify({ taskId: existing.id })));
-    const run = await runTestEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
+    const run = await runCauseEffect(scheduler.test({ channelId: "channel-1", routineId: routine.id }));
     await vi.waitFor(() => {
       const merged = required(service.store.tasks("channel-1").find((item) => item.id === existing.id));
       expect(merged.requestMessageId).toBe(run.requestMessageId);
@@ -378,11 +379,11 @@ describe("ChannelRoutineScheduler", () => {
     data.store.database.connection
       .prepare("UPDATE projection_channel_routine_runs SET status = 'running' WHERE run_id = ?")
       .run(run.id);
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
     data.store.database.close();
 
     const reopened = new OpenBotDatabase(userDataPath);
-    await runTestEffect(reopened.initialize());
+    await runCauseEffect(reopened.initialize());
     const restarted = new ChannelService(reopened, data.mailbox, {
       agents: () => [],
       generate,
@@ -399,7 +400,7 @@ describe("ChannelRoutineScheduler", () => {
     cold.reconcileAll();
     expect(currentRun(run.id, cold).status).toBe("succeeded");
     expect(errors).toEqual([]);
-    await runTestEffect(restarted.stop());
+    await runCauseEffect(restarted.stop());
     reopened.close();
     // The shared afterEach closes the original handle; reopening is enough for it to be a no-op.
     data.store.database.close();

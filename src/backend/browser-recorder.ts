@@ -4,13 +4,8 @@ import { join } from "node:path";
 import type { BrowserRecordingArtifact } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import { BrowserWindow, type WebContents } from "electron";
-import {
-  type BrowserOperationError,
-  browserCall,
-  browserFailure,
-  browserSync,
-  runBrowserEffect,
-} from "./browser-effects";
+import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
+import { runCauseEffect } from "./effect-boundary";
 
 const MAX_RECORDING_MS = 5 * 60 * 1_000;
 const MAX_RECORDING_BYTES = 100 * 1024 * 1024;
@@ -157,7 +152,7 @@ export class BrowserRecorder {
             this.#sessions.set(tabId, session);
             recorderWindow.on("closed", () => {
               if (this.#sessions.get(tabId) !== session) return;
-              void runBrowserEffect(this.#discardSession(session, false)).catch(() => undefined);
+              void runCauseEffect(this.#discardSession(session, false)).catch(() => undefined);
             });
             recorderWindow.webContents.on("page-title-updated", (_event, title) => {
               if (!title.startsWith("openbot-recorder:stopped:")) return;
@@ -165,7 +160,7 @@ export class BrowserRecorder {
               session.stoppedReason = parseStoppedReason(reason);
               this.#onStateChanged(tabId, false);
               if (session.discarding || session.finalizing) return;
-              void runBrowserEffect(this.#finalizeSession(session, session.stoppedReason)).catch(() => undefined);
+              void runCauseEffect(this.#finalizeSession(session, session.stoppedReason)).catch(() => undefined);
             });
             yield* Effect.gen({ self: this }, function* () {
               recorderWindow.webContents.session.protocol.handle("https", async (request) => {
@@ -176,7 +171,7 @@ export class BrowserRecorder {
                     .withPermit(this.#writeChunk(session, chunk))
                     .pipe(Effect.uninterruptible);
                   try {
-                    await runBrowserEffect(writing);
+                    await runCauseEffect(writing);
                     return new Response(null, { status: 204 });
                   } catch (error) {
                     session.writeError = error instanceof Error ? error : new Error(String(error));

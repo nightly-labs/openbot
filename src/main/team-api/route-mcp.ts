@@ -1,7 +1,7 @@
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { MCP_ROUTES, mcpRequest } from "@openbot/contracts/team-protocol/mcp-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import {
   parseRemoveMcpServer,
   parseSaveMcpServer,
@@ -48,39 +48,17 @@ export async function routeMcpServers(
     // The local save starts the runtime download; the host route shares it, or a first server
     // added remotely never gets the runtime its test and its spawn need.
     toolRuntimes?.startToolRuntimes();
-    return json(
-      200,
-      await Effect.runPromise(
-        mcpServers.saveMcpServer(parseSaveMcpServer(body)).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    );
+    return json(200, await runCauseEffect(mcpServers.saveMcpServer(parseSaveMcpServer(body))));
   }
-  if (remove)
-    return json(
-      200,
-      await Effect.runPromise(
-        mcpServers.removeMcpServer(parseRemoveMcpServer(body)).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    );
+  if (remove) return json(200, await runCauseEffect(mcpServers.removeMcpServer(parseRemoveMcpServer(body))));
   if (test) {
     const parsed = parseTestMcpServer(body);
-    if (toolRuntimes)
-      await Effect.runPromise(
-        prepareToolRuntimeForTest(parsed.config, toolRuntimes).pipe(Effect.mapError((error) => error.cause)),
-      );
+    if (toolRuntimes) await runCauseEffect(prepareToolRuntimeForTest(parsed.config, toolRuntimes));
     // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
     // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back.
-    return json(
-      200,
-      await Effect.runPromise(
-        mcpServers.testMcpServer(parsed, { storedCredentials: true }).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    );
+    return json(200, await runCauseEffect(mcpServers.testMcpServer(parsed, { storedCredentials: true })));
   }
   const toggled = parseSetMcpServerEnabled(body);
   if (toggled.enabled) toolRuntimes?.startToolRuntimes();
-  return json(
-    200,
-    await Effect.runPromise(mcpServers.setMcpServerEnabled(toggled).pipe(Effect.mapError((error) => error.cause))),
-  );
+  return json(200, await runCauseEffect(mcpServers.setMcpServerEnabled(toggled)));
 }

@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { localSkillTools } from "../local-skill-tools";
 import {
   parseCreateLocalSkill,
@@ -10,6 +9,7 @@ import {
 
 import type { AppTranslate } from "@openbot/i18n";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseInstallSkill,
@@ -34,48 +34,20 @@ export function skillIpcHandlers({
 }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
-      localList: handler(() =>
-        Effect.runPromise(
-          localSkillTools(skills)
-            .list()
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
-      ),
-      localGet: payloadHandler(parseReadLocalSkill, (input) =>
-        Effect.runPromise(
-          localSkillTools(skills)
-            .get(input)
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
-      ),
+      localList: handler(() => runCauseEffect(localSkillTools(skills).list())),
+      localGet: payloadHandler(parseReadLocalSkill, (input) => runCauseEffect(localSkillTools(skills).get(input))),
       localCreate: payloadHandler(parseCreateLocalSkill, (input) =>
-        Effect.runPromise(
-          localSkillTools(skills)
-            .create(input)
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(localSkillTools(skills).create(input)),
       ),
       localRevise: payloadHandler(parseReviseLocalSkill, (input) =>
-        Effect.runPromise(
-          localSkillTools(skills)
-            .revise(input)
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(localSkillTools(skills).revise(input)),
       ),
       localInstall: payloadHandler(parseInstallLocalSkill, (input) =>
-        Effect.runPromise(
-          localSkillTools(skills)
-            .install(input)
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(localSkillTools(skills).install(input)),
       ),
-      list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) =>
-        Effect.runPromise(skills.list(query).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      get: payloadHandler(stringPayload("skillId"), (skillId) =>
-        Effect.runPromise(skills.get(skillId).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      listMine: handler(() => Effect.runPromise(skills.listMine().pipe(Effect.mapError((error) => error.cause)))),
+      list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
+      get: payloadHandler(stringPayload("skillId"), (skillId) => runCauseEffect(skills.get(skillId))),
+      listMine: handler(() => runCauseEffect(skills.listMine())),
       choosePackage: handler(async () => {
         const mainWindow = getMainWindow();
         const options: OpenDialogOptions = {
@@ -86,25 +58,15 @@ export function skillIpcHandlers({
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
           : await dialog.showOpenDialog(options);
-        return result.canceled || !result.filePaths[0]
-          ? null
-          : Effect.runPromise(skills.stage(result.filePaths[0]).pipe(Effect.mapError((error) => error.cause)));
+        return result.canceled || !result.filePaths[0] ? null : runCauseEffect(skills.stage(result.filePaths[0]));
       }),
-      submit: payloadHandler(parseSubmitSkill, (submission) =>
-        Effect.runPromise(skills.submit(submission).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      submit: payloadHandler(parseSubmitSkill, (submission) => runCauseEffect(skills.submit(submission))),
       listInstalled: payloadHandler(stringPayload("agentId"), (agentId) =>
-        Effect.runPromise(skills.listInstalled(agentId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(skills.listInstalled(agentId)),
       ),
-      install: payloadHandler(parseInstallSkill, (installation) =>
-        Effect.runPromise(skills.install(installation).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      uninstall: payloadHandler(parseUninstallSkill, (removal) =>
-        Effect.runPromise(skills.uninstall(removal).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      setEnabled: payloadHandler(parseSetEnabledSkill, (change) =>
-        Effect.runPromise(skills.setEnabled(change).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      install: payloadHandler(parseInstallSkill, (installation) => runCauseEffect(skills.install(installation))),
+      uninstall: payloadHandler(parseUninstallSkill, (removal) => runCauseEffect(skills.uninstall(removal))),
+      setEnabled: payloadHandler(parseSetEnabledSkill, (change) => runCauseEffect(skills.setEnabled(change))),
     },
   };
 }

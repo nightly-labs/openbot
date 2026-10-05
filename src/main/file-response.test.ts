@@ -3,8 +3,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { fileResponse } from "./file-response";
-import { runRemoteWorkflow } from "./remote-service-effects";
 
 describe("fileResponse", () => {
   it("serves the whole file with the given headers", async () => {
@@ -13,7 +13,7 @@ describe("fileResponse", () => {
     const bytes = randomBytes(300_000);
     await writeFile(path, bytes);
 
-    const response = await runRemoteWorkflow(
+    const response = await runCauseEffect(
       fileResponse(path, { "Content-Type": "image/png", "X-Content-Type-Options": "nosniff" }),
     );
 
@@ -26,12 +26,12 @@ describe("fileResponse", () => {
   it("rejects a file that cannot be opened, so the protocol can answer 404", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-file-response-"));
 
-    await expect(runRemoteWorkflow(fileResponse(join(directory, "missing.png"), {}))).rejects.toThrow(/ENOENT/);
+    await expect(runCauseEffect(fileResponse(join(directory, "missing.png"), {}))).rejects.toThrow(/ENOENT/);
   });
 
   it("rejects a directory instead of a body that fails after the headers", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-file-response-"));
 
-    await expect(runRemoteWorkflow(fileResponse(directory, {}))).rejects.toThrow("Not a regular file.");
+    await expect(runCauseEffect(fileResponse(directory, {}))).rejects.toThrow("Not a regular file.");
   });
 });

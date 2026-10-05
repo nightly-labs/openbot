@@ -18,10 +18,11 @@ import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Result, Schema, Scope } from "effect";
 import type * as Ws from "ws";
 import { z } from "zod";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { recordRestartActivity } from "../backend/restart-activity";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
-import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import {
   RemoteRuntimeStartError,
   type RemoteRuntimeStartStage,
@@ -417,7 +418,7 @@ export class RemoteScreenGateway {
           response.end();
           return;
         }
-        void runRemoteWorkflow(this.handleHttp(request, response, url)).catch(() => {
+        void runCauseEffect(this.handleHttp(request, response, url)).catch(() => {
           response.destroy();
         });
       });

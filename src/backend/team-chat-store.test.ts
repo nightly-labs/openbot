@@ -1,10 +1,10 @@
-import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 import { directThreadId, TeamChatStore } from "./team-chat-store";
 
@@ -19,7 +19,7 @@ describe("TeamChatStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-direct-chat-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await runTestEffect(database.initialize());
+    await runCauseEffect(database.initialize());
     const chat = new TeamChatStore(database);
 
     const sent = chat.sendMessage({
@@ -61,7 +61,7 @@ describe("TeamChatStore", () => {
     database.close();
 
     const restoredDatabase = new OpenBotDatabase(root);
-    await runTestEffect(restoredDatabase.initialize());
+    await runCauseEffect(restoredDatabase.initialize());
     const restored = new TeamChatStore(restoredDatabase);
     expect(restored.readConversation("member-alice", "member-bob").messages).toHaveLength(2);
     expect(restored.listThreads("member-alice")[0]).toMatchObject({
@@ -76,7 +76,7 @@ describe("TeamChatStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-direct-chat-large-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await runTestEffect(database.initialize());
+    await runCauseEffect(database.initialize());
     const chat = new TeamChatStore(database);
     const first = chat.sendMessage({
       clientMessageId: "message-00000",

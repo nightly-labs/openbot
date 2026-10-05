@@ -25,7 +25,7 @@ import {
   waitFor,
 } from "../agent-service-test-harness";
 import { browserCall, browserFailure } from "../browser-effects";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 
 let root: string;
 let service: AgentService | null = null;
@@ -55,8 +55,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -95,7 +95,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.reason).toHaveLength(AGENT_RUNTIME_TEXT_LIMIT);
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.truncated).toBe(true);
 
-    await runTestEffect(service.respondToApproval({ requestId: "approval-command", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "approval-command", decision: "accept" }));
     expect(client.responses).toEqual([{ id: "approval-command", result: { decision: "accept" } }]);
     expect(events).toContainEqual({
       type: "agent-input-resolved",
@@ -120,7 +120,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "approval").length === 2);
-    await runTestEffect(service.respondToApproval({ requestId: "approval-permissions", decision: "decline" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "approval-permissions", decision: "decline" }));
     expect(client.responses.at(-1)).toEqual({
       id: "approval-permissions",
       result: { permissions: {}, scope: "turn" },
@@ -141,8 +141,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Use Telegram" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Use Telegram" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -184,7 +184,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
 
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToPrompt({
         requestId: "computer-use-always",
         answers: { "mcp-elicitation-decision": ["Always allow"] },
@@ -209,7 +209,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 2);
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToPrompt({
         requestId: "computer-use-decline",
         answers: { "mcp-elicitation-decision": ["Don't allow"] },
@@ -266,7 +266,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
 
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToPrompt({
         requestId: "plugin-api-key",
         answers: { apiKey: ["phx_test-key"], region: ["eu"] },
@@ -276,7 +276,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       id: "plugin-api-key",
       result: { action: "accept", content: { apiKey: "phx_test-key", region: "eu" }, _meta: null },
     });
-    const keyMessage = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const keyMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "plugin-api-key",
     );
     expect(keyMessage?.text).not.toContain("phx_test-key");
@@ -303,7 +303,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
-    await runTestEffect(service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } }));
+    await runCauseEffect(service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } }));
     expect(client.responses.at(-1)).toEqual({
       id: "skipped-required-field",
       result: { action: "decline", content: null, _meta: null },
@@ -352,7 +352,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
     // The card submits the displayed label, but the schema asks for the const behind it.
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } }),
     );
     expect(client.responses.at(-1)).toEqual({
@@ -397,8 +397,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask me a question" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask me a question" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -443,7 +443,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     );
     expect(runtimeSnapshot.pendingPrompts[0]?.questions[0]?.options?.[0]?.label).toBe(optionLabel);
     expect(client.responses).toHaveLength(0);
-    const pendingMessage = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const pendingMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "question-call",
     );
     expect(pendingMessage).toMatchObject({
@@ -453,7 +453,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     expect(runtimeSnapshot.latestMessages).not.toContainEqual(expect.objectContaining({ id: pendingMessage?.id }));
 
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToPrompt({
         requestId: "question-call",
         answers: { favorite: [optionLabel], token: ["super-secret"] },
@@ -483,7 +483,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     }
     expect(JSON.parse(content.text)).toEqual({ favorite: [optionLabel], token: ["super-secret"] });
 
-    const resolvedMessage = (await runTestEffect(service.readConversation("chief"))).messages.find(
+    const resolvedMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "question-call",
     );
     expect(resolvedMessage?.questionPrompt?.resolution).toEqual({
@@ -520,9 +520,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 2);
-    await runTestEffect(service.respondToPrompt({ requestId: "skipped-question-call", answers: { favorite: [] } }));
+    await runCauseEffect(service.respondToPrompt({ requestId: "skipped-question-call", answers: { favorite: [] } }));
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "skipped-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "answered", responses: { favorite: { status: "skipped" } } });
@@ -542,9 +542,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 3);
-    await runTestEffect(service.respondToPrompt({ requestId: "cancelled-question-call", answers: {} }));
+    await runCauseEffect(service.respondToPrompt({ requestId: "cancelled-question-call", answers: {} }));
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "cancelled-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "cancelled" });
@@ -644,27 +644,27 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
     await expect(
-      runTestEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { typo: ["Yes"] } })),
+      runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { typo: ["Yes"] } })),
     ).rejects.toThrow("does not match an active question");
     expect(client.responses.some((response) => response.id === "retry-question-call")).toBe(false);
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toBeNull();
     client.responseError = new Error("Provider process is not running.");
     await expect(
-      runTestEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } })),
+      runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } })),
     ).rejects.toThrow("Provider process is not running.");
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toBeNull();
     client.responseError = null;
-    await runTestEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } }));
+    await runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } }));
     expect(
-      (await runTestEffect(service.readConversation("chief"))).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "answered", responses: { retry: { status: "answered", answers: ["Yes"] } } });
@@ -688,13 +688,13 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       throw new Error("Database write failed.");
     });
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
       ),
     ).resolves.toBeUndefined();
     expect(client.responses.filter((response) => response.id === "persistence-question-call")).toHaveLength(1);
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
       ),
     ).rejects.toThrow("no longer active");
@@ -745,8 +745,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Open a protected page" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Open a protected page" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -831,7 +831,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(events.filter((event) => event.type === "browser-takeover-requested")).toHaveLength(1);
     expect(control).toEqual(["begin:protected-tab"]);
 
-    await runTestEffect(service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" }));
+    await runCauseEffect(service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" }));
     await waitFor(() => client.responses.length === 4);
     expect(openBotToolPayload(client.responses[3]?.result)).toEqual({
       status: "completed",
@@ -864,7 +864,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
         (event) => event.type === "browser-takeover-requested" && event.request.requestId === "takeover-cancel",
       ),
     );
-    await runTestEffect(service.respondToBrowserTakeover({ requestId: "takeover-cancel", decision: "cancel" }));
+    await runCauseEffect(service.respondToBrowserTakeover({ requestId: "takeover-cancel", decision: "cancel" }));
     await waitFor(() => client.responses.length === 5);
     expect(openBotToolPayload(client.responses[4]?.result)).toEqual({ status: "cancelled" });
     // Cancelling returns the tab as surely as completing does.
@@ -885,8 +885,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Need a legacy approval" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need a legacy approval" }));
     await waitFor(() => clients.get("codex")?.requests.some((request) => request.method === "turn/start"));
     const client = clients.get("codex");
     if (!client) throw new Error("Codex client was not created.");
@@ -900,7 +900,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     await waitFor(() => events.some((event) => event.type === "approval" && event.approval.requestId === 42));
     expect(client.responses).toHaveLength(0);
-    await runTestEffect(service.respondToApproval({ requestId: 42, decision: "decline" }));
+    await runCauseEffect(service.respondToApproval({ requestId: 42, decision: "decline" }));
     expect(client.responses.at(-1)).toEqual({
       id: 42,
       result: { decision: { denied: { rejection: "The user declined this action." } } },
@@ -912,9 +912,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: { conversationId, turnId: "turn-legacy", reason: "Update the file." },
     });
     await waitFor(() => events.some((event) => event.type === "approval" && event.approval.requestId === 43));
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
     expect(events).toContainEqual({ type: "agent-input-resolved", kind: "approval", requestId: 43, agentId: "chief" });
-    await expect(runTestEffect(service.respondToApproval({ requestId: 43, decision: "accept" }))).rejects.toThrow(
+    await expect(runCauseEffect(service.respondToApproval({ requestId: 43, decision: "accept" }))).rejects.toThrow(
       "This approval is no longer active.",
     );
   });
@@ -934,8 +934,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Ask, then end the turn" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask, then end the turn" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -998,8 +998,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1066,8 +1066,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1101,10 +1101,10 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    await runTestEffect(store.getOrCreate("chief"));
-    const agent = await runTestEffect(service.updateAgent({ agentId: "chief", access: "workspace" }));
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Write outside the workspace" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const agent = await runCauseEffect(service.updateAgent({ agentId: "chief", access: "workspace" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Write outside the workspace" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1155,8 +1155,8 @@ it.each(["submitted", "takeover"] as const)(
     service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(structuredClone(event)));
-    await runTestEffect(service.initialize());
-    await runTestEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -1186,11 +1186,11 @@ it.each(["submitted", "takeover"] as const)(
     const requestId = service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.requestId;
     if (!requestId) throw new Error("Missing authentication request.");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.respondToBrowserSecret({ requestId, agentId: "other-agent", decision: "submit", secret: "729104" }),
       ),
     ).rejects.toThrow("no longer active");
-    const response = runTestEffect(
+    const response = runCauseEffect(
       service.respondToBrowserSecret({
         requestId,
         agentId: "chief",
@@ -1200,7 +1200,7 @@ it.each(["submitted", "takeover"] as const)(
     );
     await waitFor(() => submit.mock.calls.length === 1);
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
       ),
     ).rejects.toThrow("no longer active");
@@ -1211,11 +1211,11 @@ it.each(["submitted", "takeover"] as const)(
     expect(JSON.stringify(client.responses)).not.toContain("729104");
     if (outcome === "takeover") {
       expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.requiresReload).toBe(true);
-      await runTestEffect(service.respondToBrowserTakeover({ requestId, decision: "complete" }));
+      await runCauseEffect(service.respondToBrowserTakeover({ requestId, decision: "complete" }));
     }
     expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
     await expect(
-      runTestEffect(
+      runCauseEffect(
         service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
       ),
     ).rejects.toThrow("no longer active");
@@ -1236,8 +1236,8 @@ it("returns the secure input refusal so the agent can request takeover", async (
   service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
   const events: AgentEvent[] = [];
   service.on("event", (event) => events.push(structuredClone(event)));
-  await runTestEffect(service.initialize());
-  await runTestEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
+  await runCauseEffect(service.initialize());
+  await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
   await waitFor(() => events.some((event) => event.type === "turn-started"));
   const started = events.find((event) => event.type === "turn-started");
   const threadId = store.activeProviderSession("chief")?.externalSessionId;

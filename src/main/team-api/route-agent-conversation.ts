@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 // Reading and writing one agent's conversation, as one member sees it.
 //
 // Everything here is filtered by what the client said it understands. A marker type a released
@@ -10,6 +9,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isMessageReaction } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -45,22 +45,18 @@ export async function routeAgentConversation(
   const { method, url, request, member, protocol, capabilities, json, empty } = context;
 
   if (method === "GET" && action === "conversation") {
-    const conversation = await Effect.runPromise(
-      agents.readConversationFor(agentId, member.id).pipe(Effect.mapError((error) => error.cause)),
-    );
+    const conversation = await runCauseEffect(agents.readConversationFor(agentId, member.id));
     return json(200, conversationForCapabilities(conversation, capabilities));
   }
   if (method === "GET" && action === "conversation-page") {
-    const page = await Effect.runPromise(
-      agents
-        .readConversationPageFor(
-          agentId,
-          member.id,
-          pageAnchor(url),
-          pageLimit(url),
-          markerExclusionsForCapabilities(capabilities),
-        )
-        .pipe(Effect.mapError((error) => error.cause)),
+    const page = await runCauseEffect(
+      agents.readConversationPageFor(
+        agentId,
+        member.id,
+        pageAnchor(url),
+        pageLimit(url),
+        markerExclusionsForCapabilities(capabilities),
+      ),
     );
     return json(200, page);
   }
@@ -72,26 +68,19 @@ export async function routeAgentConversation(
       throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
-    return json(
-      200,
-      await Effect.runPromise(
-        agents.markConversationUnread(agentId, member.id).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    );
+    return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id)));
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
     return json(
       200,
-      await Effect.runPromise(
-        agents
-          .markConversationRead(
-            agentId,
-            member.id,
-            nullableString(body, "throughMessageId"),
-            markerExclusionsForCapabilities(capabilities),
-          )
-          .pipe(Effect.mapError((error) => error.cause)),
+      await runCauseEffect(
+        agents.markConversationRead(
+          agentId,
+          member.id,
+          nullableString(body, "throughMessageId"),
+          markerExclusionsForCapabilities(capabilities),
+        ),
       ),
     );
   }
@@ -99,18 +88,16 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     return json(
       202,
-      await Effect.runPromise(
-        agents
-          .sendMessage(
-            {
-              agentId,
-              text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-              attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-              replyToMessageId: nullableString(body, "replyToMessageId"),
-            },
-            memberSender(member),
-          )
-          .pipe(Effect.mapError((error) => error.cause)),
+      await runCauseEffect(
+        agents.sendMessage(
+          {
+            agentId,
+            text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+            attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+            replyToMessageId: nullableString(body, "replyToMessageId"),
+          },
+          memberSender(member),
+        ),
       ),
     );
   }
@@ -119,14 +106,12 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     const emoji = body.emoji;
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
-    await Effect.runPromise(
-      agents
-        .setMessageReaction({
-          agentId,
-          messageId: stringField(body, "messageId"),
-          emoji,
-        })
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(
+      agents.setMessageReaction({
+        agentId,
+        messageId: stringField(body, "messageId"),
+        emoji,
+      }),
     );
     return empty(204);
   }

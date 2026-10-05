@@ -1,7 +1,7 @@
-import { Effect } from "effect";
 // The Slack workspaces where this computer's agents answer. Tokens only travel towards the host; no
 // result carries one.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import {
@@ -26,22 +26,18 @@ export function messagingIpcHandlers({ messaging }: MessagingIpcDependencies): P
   return {
     messaging: {
       getSlackOverview: handler(() => messaging.slackOverview()),
-      connectSlackWorkspace: handler(() =>
-        Effect.runPromise(messaging.connectSlackWorkspace().pipe(Effect.mapError((error) => error.cause))),
-      ),
+      connectSlackWorkspace: handler(() => runCauseEffect(messaging.connectSlackWorkspace())),
       disconnectSlackWorkspace: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
-        Effect.runPromise(
-          messaging.disconnectSlackWorkspace(workspaceId).pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(messaging.disconnectSlackWorkspace(workspaceId)),
       ),
       reconnectSlackWorkspace: payloadHandler(parseSlackWorkspaceInput, ({ workspaceId }) =>
-        Effect.runPromise(messaging.reconnect(workspaceId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(messaging.reconnect(workspaceId)),
       ),
       setSlackEnabled: payloadHandler(parseSetSlackEnabledInput, ({ workspaceId, enabled }) =>
-        Effect.runPromise(messaging.setEnabled(workspaceId, enabled).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(messaging.setEnabled(workspaceId, enabled)),
       ),
       addSlackOrchestrator: payloadHandler(parseAddSlackOrchestratorInput, (input) =>
-        Effect.runPromise(messaging.addOrchestrator(input).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(messaging.addOrchestrator(input)),
       ),
     },
   };

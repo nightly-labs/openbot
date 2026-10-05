@@ -17,7 +17,8 @@ import type { RemoteDesktopDisplay, RemoteDesktopIceServer } from "@openbot/cont
 import { Effect } from "effect";
 import { assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { desktopCall, runDesktopEffect } from "./remote-desktop-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { desktopCall } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import {
   allocateSunshineBasePort,
@@ -411,7 +412,7 @@ async function createStartedRuntime(
     spawnProcess: harness.spawn,
   });
   try {
-    await runDesktopEffect(runtime.start());
+    await runCauseEffect(runtime.start());
     if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
     return { runtime, harness };
   } catch (error) {
@@ -422,7 +423,7 @@ async function createStartedRuntime(
 }
 
 async function disposeRuntime(runtime: SunshineMoonlightRuntime, harness: Harness): Promise<void> {
-  await runDesktopEffect(runtime.stop()).catch(() => undefined);
+  await runCauseEffect(runtime.stop()).catch(() => undefined);
   await harness.closeAll();
   await rm(harness.stateDirectory, { recursive: true, force: true });
 }
@@ -487,9 +488,9 @@ describe("sunshine port family helpers", () => {
   });
 
   it("hands out disjoint families from the allocator and releases them", async () => {
-    const first = await runDesktopEffect(allocateSunshineBasePort());
+    const first = await runCauseEffect(allocateSunshineBasePort());
     try {
-      const second = await runDesktopEffect(allocateSunshineBasePort());
+      const second = await runCauseEffect(allocateSunshineBasePort());
       try {
         expect(sunshinePortFamiliesOverlap(first, second)).toBe(false);
       } finally {
@@ -501,9 +502,9 @@ describe("sunshine port family helpers", () => {
   });
 
   it("hands out disjoint Moonlight WebRTC ranges", async () => {
-    const first: MoonlightWebRtcPortRange = await runDesktopEffect(allocateWebRtcPortRange());
+    const first: MoonlightWebRtcPortRange = await runCauseEffect(allocateWebRtcPortRange());
     try {
-      const second: MoonlightWebRtcPortRange = await runDesktopEffect(allocateWebRtcPortRange());
+      const second: MoonlightWebRtcPortRange = await runCauseEffect(allocateWebRtcPortRange());
       try {
         expect(first.min).not.toBe(second.min);
         expect(first.max - first.min).toBe(31);
@@ -516,7 +517,7 @@ describe("sunshine port family helpers", () => {
   });
 
   it("closes failed UDP probes before trying another WebRTC range", async () => {
-    const first = await runDesktopEffect(allocateWebRtcPortRange());
+    const first = await runCauseEffect(allocateWebRtcPortRange());
     releaseWebRtcPortRange(first);
     const occupied = dgram.createSocket("udp4");
     const sockets: dgram.Socket[] = [];
@@ -538,7 +539,7 @@ describe("sunshine port family helpers", () => {
         occupied.bind(first.min, "127.0.0.1", resolve);
       });
       const allocator = await import("./sunshine-moonlight-runtime");
-      const next = await runDesktopEffect(allocator.allocateWebRtcPortRange());
+      const next = await runCauseEffect(allocator.allocateWebRtcPortRange());
       try {
         expect(next.min).not.toBe(first.min);
         expect(failed.size).toBeGreaterThan(0);
@@ -558,7 +559,7 @@ describe("sunshine port family helpers", () => {
   });
 
   it("reserves unused WebRTC ranges across independent processes", async () => {
-    const first = await runDesktopEffect(allocateWebRtcPortRange());
+    const first = await runCauseEffect(allocateWebRtcPortRange());
     try {
       const output = execFileSync(
         "bun",
@@ -672,7 +673,7 @@ describe("Sunshine port isolation", () => {
       const second = await createStartedRuntime();
       try {
         const secondBaseUrl = second.runtime.state?.baseUrl ?? "";
-        await runDesktopEffect(first.runtime.stop());
+        await runCauseEffect(first.runtime.stop());
         expect(first.runtime.state).toBeNull();
         expect(second.runtime.state).not.toBeNull();
         const authenticate = await fetch(`${secondBaseUrl}/api/authenticate`, {
@@ -681,7 +682,7 @@ describe("Sunshine port isolation", () => {
         expect(authenticate.ok).toBe(true);
         await expect(fetch(first.runtime.state?.baseUrl ?? "http://127.0.0.1:1/")).rejects.toThrow();
         // Restarting the stopped runtime must not disturb the survivor either.
-        await runDesktopEffect(first.runtime.start());
+        await runCauseEffect(first.runtime.start());
         expect(first.runtime.state).not.toBeNull();
         const stillThere = await fetch(`${secondBaseUrl}/api/authenticate`, {
           headers: { [second.harness.authHeader]: "openbot-remote-slot-1" },
@@ -698,12 +699,12 @@ describe("Sunshine port isolation", () => {
   it("recreates persisted hosts after another runtime claims the old port", async () => {
     const first = await createStartedRuntime();
     const oldPort = first.runtime.sunshineHttpPort;
-    await runDesktopEffect(first.runtime.stop());
+    await runCauseEffect(first.runtime.stop());
     await first.harness.closeAll();
     const other = await createStartedRuntime();
     try {
       first.harness.observedSunshineHttpPorts = [];
-      await runDesktopEffect(first.runtime.start());
+      await runCauseEffect(first.runtime.start());
       expect(first.runtime.sunshineHttpPort).not.toBe(oldPort);
       expect(new Set(first.harness.observedSunshineHttpPorts)).toEqual(new Set([first.runtime.sunshineHttpPort]));
       const denied = await fetch(`${first.runtime.state?.baseUrl}/api/authenticate`, {
@@ -745,18 +746,18 @@ describe("Sunshine runtime lifecycle", () => {
           // A Sunshine that never answers: the start waits for it until the stop ends it.
           const child = new FakeChild();
           children.push(child);
-          queueMicrotask(() => stops.push(runDesktopEffect(runtime.stop())));
+          queueMicrotask(() => stops.push(runCauseEffect(runtime.stop())));
           return child;
         }
         const child = harness.spawn(executable, args, options);
         children.push(child);
         if (executable === TEST_PATHS.moonlightWebServer && stopAt === executable)
-          stops.push(runDesktopEffect(runtime.stop()));
+          stops.push(runCauseEffect(runtime.stop()));
         return child;
       },
     });
     try {
-      await expect(runDesktopEffect(runtime.start())).rejects.toThrow();
+      await expect(runCauseEffect(runtime.start())).rejects.toThrow();
       await Promise.all(stops);
 
       expect(stops).toHaveLength(1);

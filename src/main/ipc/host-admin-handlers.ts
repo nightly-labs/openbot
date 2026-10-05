@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import type { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // The server name, logo and app update of one server's host. On a joined server the request goes to
 // the host, which answers only an owner or admin and makes the change with the account signed in there.
@@ -18,6 +18,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -57,11 +58,7 @@ export function hostAdminIpcHandlers({
   function remoteUpdate(serverId: string, route: string, body: HostUpdateBody): Promise<HostUpdateStatus> {
     if (!remoteServers.supportsCapability(serverId, HOST_UPDATE_CAPABILITY))
       throw new Error(sourceText("error.team.hostUpdateUnsupported"));
-    return Effect.runPromise(
-      remoteServers
-        .request(serverId, route, decodeHostUpdateStatus, { method: "POST", body })
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostUpdateStatus, { method: "POST", body }));
   }
   // This computer updates from Settings. The renderer shows the tab for a joined server only.
   const localUpdate = (): never => {
@@ -71,9 +68,7 @@ export function hostAdminIpcHandlers({
     hostAdmin: {
       updateIdentity: scopedHandler(parseHostIdentity, {
         local: async (input) => {
-          const status = await Effect.runPromise(
-            host.updateIdentity(input).pipe(Effect.mapError((error) => error.cause)),
-          );
+          const status = await runCauseEffect(host.updateIdentity(input));
           const summary = withLocalHostSummary(remoteServers.list(), status).find(
             (server) => server.id === LOCAL_SERVER_ID,
           );
@@ -83,18 +78,14 @@ export function hostAdminIpcHandlers({
         remote: async (input, serverId) => {
           if (!remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
             throw new Error(sourceText("error.host.identityLocalOnly"));
-          await Effect.runPromise(
-            remoteServers
-              .request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
-                method: "POST",
-                body: wireIdentity(input),
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          await runCauseEffect(
+            remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
+              method: "POST",
+              body: wireIdentity(input),
+            }),
           );
           // The host has published the change before it answered, so this reads the new name and logo.
-          return Effect.runPromise(
-            remoteServers.refreshIdentity(serverId).pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-          );
+          return runCauseEffect(remoteServers.refreshIdentity(serverId));
         },
       }),
       getUpdateStatus: scopedQueryHandler({

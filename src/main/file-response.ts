@@ -1,6 +1,7 @@
 import { open } from "node:fs/promises";
 import { Effect } from "effect";
-import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 
 const CHUNK_BYTES = 64 * 1_024;
 
@@ -29,7 +30,7 @@ export const fileResponse = Effect.fn("FileResponse.open")(function* (path: stri
         });
         const body = new ReadableStream<Uint8Array>({
           pull: (controller) =>
-            runRemoteWorkflow(
+            runCauseEffect(
               pull(controller).pipe(
                 Effect.catch((error) =>
                   Effect.gen(function* () {
@@ -39,7 +40,7 @@ export const fileResponse = Effect.fn("FileResponse.open")(function* (path: stri
                 ),
               ),
             ),
-          cancel: () => runRemoteWorkflow(close()),
+          cancel: () => runCauseEffect(close()),
         });
         // Media elements need the length to show a duration.
         const response = new Response(body, { headers: { ...headers, "Content-Length": String(stats.size) } });

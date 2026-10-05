@@ -5,7 +5,8 @@ import { join } from "node:path";
 import type { CentralAuthState, HostStatus } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { ServerMode, takeServerModeEnvironment } from "./server-mode";
 
 const SESSION_TOKEN = "session-token-that-must-stay-in-main";
@@ -177,7 +178,7 @@ describe("ServerMode control socket", () => {
     expect(verified.text).toContain("account=signed_in\n");
 
     // The entry point and the start retry can both call this at the same time.
-    await Promise.all([runRemoteWorkflow(mode.publish()), runRemoteWorkflow(mode.publish())]);
+    await Promise.all([runCauseEffect(mode.publish()), runCauseEffect(mode.publish())]);
     expect(host.configure).toHaveBeenCalledOnce();
     const status = await send("GET", "/v1/status");
     expect(status.text).toContain("server=online\nserver_name=Lab Server\n");
@@ -191,7 +192,7 @@ describe("ServerMode control socket", () => {
     host.configure.mockReturnValueOnce(
       Effect.fail(new RemoteWorkflowError({ cause: new Error("Refused.\naccount=x") })),
     );
-    await expect(runRemoteWorkflow(mode.publish())).rejects.toThrow("Refused.");
+    await expect(runCauseEffect(mode.publish())).rejects.toThrow("Refused.");
 
     // A message with a line break stays one line, so it cannot add a key.
     const status = await send("GET", "/v1/status");

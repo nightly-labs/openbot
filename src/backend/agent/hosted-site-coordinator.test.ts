@@ -17,7 +17,7 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 import { HostedSiteOperationFailed } from "./hosted-site-coordinator";
 
 let root: string;
@@ -73,9 +73,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       });
       const events: AgentEvent[] = [];
       service.on("event", (event) => events.push(event));
-      await runTestEffect(service.initialize());
-      const agent = await runTestEffect(store.getOrCreate("chief"));
-      await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Change my site." }));
+      await runCauseEffect(service.initialize());
+      const agent = await runCauseEffect(store.getOrCreate("chief"));
+      await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Change my site." }));
       await waitFor(() => events.some((event) => event.type === "turn-started"));
       const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
       const turnId = events.find((event) => event.type === "turn-started")?.turnId;
@@ -101,7 +101,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         events.some((event) => event.type === "approval" && event.approval.requestId === "declined-site"),
       );
       expect(hostedSites[action]).not.toHaveBeenCalled();
-      await runTestEffect(service.respondToApproval({ requestId: "declined-site", decision: "decline" }));
+      await runCauseEffect(service.respondToApproval({ requestId: "declined-site", decision: "decline" }));
       expect(hostedSites[action]).not.toHaveBeenCalled();
       // Turbo overrides even a disabled per-agent preference.
       turbo = true;
@@ -117,7 +117,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       expect(events.some((event) => event.type === "approval")).toBe(false);
       expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
       expect(
-        (await runTestEffect(service.readConversation(agent.id))).messages
+        (await runCauseEffect(service.readConversation(agent.id))).messages
           .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
           .filter((event) => event.status !== "cancelled"),
       ).toEqual([
@@ -135,7 +135,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       await waitFor(() => events.some((event) => event.type === "approval"));
       expect(hostedSites[action]).toHaveBeenCalledTimes(1);
       expect(client.responses.some((response) => response.id === "manual-site")).toBe(false);
-      await runTestEffect(service.respondToApproval({ requestId: "manual-site", decision: "accept" }));
+      await runCauseEffect(service.respondToApproval({ requestId: "manual-site", decision: "accept" }));
       await waitFor(() => client.responses.some((response) => response.id === "manual-site"));
       expect(hostedSites[action]).toHaveBeenCalledTimes(2);
     },
@@ -178,9 +178,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -242,17 +242,17 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       }
       return appendConversationMessage(input);
     });
-    const accepted = runTestEffect(
+    const accepted = runCauseEffect(
       service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" }),
     );
     await expect(
-      runTestEffect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })),
+      runCauseEffect(service.respondToApproval({ requestId: "publish-site-approval", decision: "accept" })),
     ).rejects.toThrow("no longer active");
     await accepted;
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(openBotToolPayload(client.responses[0]?.result)).toMatchObject({ id: "site-1", status: "active" });
     expect(
-      (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+      (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
         (message) => hostedSiteConversationEvent(message) ?? [],
       ),
     ).toEqual([
@@ -284,7 +284,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
     failRunningAppend = true;
-    await runTestEffect(
+    await runCauseEffect(
       service.respondToApproval({ requestId: "publish-site-persistence-failure", decision: "accept" }),
     );
     failRunningAppend = false;
@@ -310,13 +310,13 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     expect(events.findLast((event) => event.type === "approval")).toMatchObject({
       approval: { reason: `Delete ${hostedSite.hostname} from openbot.site.` },
     });
-    await runTestEffect(service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "delete-site-approval", decision: "decline" }));
     expect(hostedSites.delete).not.toHaveBeenCalled();
     expect(client.errors.at(-1)).toMatchObject({
       id: "delete-site-approval",
       error: { message: "The user declined this hosted site change." },
     });
-    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+    const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
@@ -324,7 +324,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       { action: "publish", status: "succeeded" },
       { action: "delete", status: "cancelled" },
     ]);
-    expect((await runTestEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(0);
+    expect((await runCauseEffect(service.readConversationPageFor(agent.id, "member-1"))).readState?.unreadCount).toBe(
+      0,
+    );
     expect(service.searchConversationMessages(hostedSite.title, agent.id).total).toBe(0);
   });
 
@@ -365,9 +367,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Update and remove my site." }));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Update and remove my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -392,7 +394,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await runTestEffect(service.respondToApproval({ requestId: "replace-site-approval", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "replace-site-approval", decision: "accept" }));
     expect(hostedSites.replace).toHaveBeenCalledTimes(1);
     expect(client.errors.at(-1)).toMatchObject({
       id: "replace-site-approval",
@@ -412,10 +414,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await runTestEffect(service.respondToApproval({ requestId: "delete-site-success", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "delete-site-success", decision: "accept" }));
     expect(hostedSites.delete).toHaveBeenCalledTimes(1);
 
-    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+    const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map(({ action, status }) => ({ action, status }))).toEqual([
@@ -464,9 +466,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -500,12 +502,12 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     const pendingSpy = vi.spyOn(store.database, "recordPendingHostedSiteTerminalEvent").mockImplementation(() => {
       throw new Error("The terminal outbox is temporarily unavailable.");
     });
-    await runTestEffect(service.respondToApproval({ requestId: "publish-site-durable-result", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "publish-site-durable-result", decision: "accept" }));
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(client.responses).toHaveLength(0);
     expect(
-      (await runTestEffect(service.readConversation(agent.id))).messages
+      (await runCauseEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running"]);
@@ -519,13 +521,13 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     ]);
 
     appendSpy.mockRestore();
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
     service = createTestService({ store, mailbox });
-    await runTestEffect(service.initialize());
+    await runCauseEffect(service.initialize());
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(
-      (await runTestEffect(service.readConversation(agent.id))).messages
+      (await runCauseEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running", "succeeded"]);
@@ -570,9 +572,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Delete my old site." }));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Delete my old site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -592,10 +594,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       },
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
-    await runTestEffect(service.respondToApproval({ requestId: "delete-legacy-site", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "delete-legacy-site", decision: "accept" }));
 
     expect(hostedSites.delete).toHaveBeenCalledTimes(1);
-    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+    const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map((marker) => marker.status)).toEqual(["running", "succeeded"]);
@@ -610,8 +612,8 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
   it("interrupts an unfinished hosted site marker after restart", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
     const threadId = store.ensureThreadIdNow(agent.id);
     const details = { siteId: null, title: "Restarted deploy", hostname: null, url: null };
     store.database.appendConversationMessage({
@@ -639,10 +641,10 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       event: { action: "publish", status: "running", operationId: "operation-restart", ...details },
     });
 
-    await runTestEffect(service.stop());
+    await runCauseEffect(service.stop());
     service = createTestService({ store, mailbox });
-    await runTestEffect(service.initialize());
-    const markers = (await runTestEffect(service.readConversation(agent.id))).messages.flatMap(
+    await runCauseEffect(service.initialize());
+    const markers = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
     );
     expect(markers.map((marker) => marker.status)).toEqual(["running", "interrupted"]);
@@ -686,9 +688,9 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await runTestEffect(service.initialize());
-    const agent = await runTestEffect(store.getOrCreate("chief"));
-    await runTestEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Publish my site." }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const client = clients.get("codex");
     const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -713,11 +715,11 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
     await waitFor(() => service?.getRuntimeSnapshot().pendingApprovals.length === 1);
     client.responseError = new Error("The provider connection closed.");
-    await runTestEffect(service.respondToApproval({ requestId: "publish-site-response-failure", decision: "accept" }));
+    await runCauseEffect(service.respondToApproval({ requestId: "publish-site-response-failure", decision: "accept" }));
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
     expect(
-      (await runTestEffect(service.readConversation(agent.id))).messages
+      (await runCauseEffect(service.readConversation(agent.id))).messages
         .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
         .map((marker) => marker.status),
     ).toEqual(["running", "succeeded"]);

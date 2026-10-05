@@ -1,6 +1,6 @@
-import { Effect } from "effect";
 // The application updater, its preferences, and the restart an admin of a joined server asked for.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { IdleRestart } from "../idle-restart";
 import type { RequestedUpdate } from "../requested-update";
 import { readUpdatePreference } from "../update-preference-store";
@@ -24,16 +24,12 @@ export function updateIpcHandlers({
   return {
     update: {
       getStatus: handler(() => updater.getStatus()),
-      check: handler(() => Effect.runPromise(updater.checkForUpdates().pipe(Effect.mapError((error) => error.cause)))),
-      download: handler(() =>
-        Effect.runPromise(updater.downloadUpdate().pipe(Effect.mapError((error) => error.cause))),
-      ),
-      install: handler(() => Effect.runPromise(updater.installUpdate().pipe(Effect.mapError((error) => error.cause)))),
-      getPreference: handler(() =>
-        Effect.runPromise(readUpdatePreference(updatePreferenceFile).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      check: handler(() => runCauseEffect(updater.checkForUpdates())),
+      download: handler(() => runCauseEffect(updater.downloadUpdate())),
+      install: handler(() => runCauseEffect(updater.installUpdate())),
+      getPreference: handler(() => runCauseEffect(readUpdatePreference(updatePreferenceFile))),
       setPreference: payloadHandler(parseUpdatePreference, (parsed) =>
-        Effect.runPromise(requestedUpdate.setPreference(parsed).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(requestedUpdate.setPreference(parsed)),
       ),
       cancelScheduledRestart: handler(() => {
         requestedUpdate.cancel();

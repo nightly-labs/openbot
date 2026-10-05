@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DEFAULT_PROVIDER_DETECTION_SETTINGS } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
 
 let root = "";
@@ -38,7 +39,7 @@ describe("ProviderDetectionSettingsStore", () => {
     const store = await loaded();
     expect(store.get()).toEqual(DEFAULT_PROVIDER_DETECTION_SETTINGS);
 
-    await Effect.runPromise(store.set(settings).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set(settings));
 
     expect((await loaded()).get()).toEqual(settings);
   });
@@ -51,9 +52,7 @@ describe("ProviderDetectionSettingsStore", () => {
     const store = await loaded();
 
     expect(store.get()).toEqual(DEFAULT_PROVIDER_DETECTION_SETTINGS);
-    await expect(
-      Effect.runPromise(store.set(settings).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow();
+    await expect(runCauseEffect(store.set(settings))).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe(newer);
   });
 

@@ -1,9 +1,10 @@
 import { Effect } from "effect";
-import { runTestEffect } from "./effect-test-runtime";
+
 // @vitest-environment node
 
 import type { RoutineCalendarOwner, RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "./effect-boundary";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "./routine-calendar";
 
 const OWNER: RoutineCalendarOwner = { kind: "agent", agentId: "chief" };
@@ -68,7 +69,7 @@ describe("routine calendar", () => {
         run("2026-09-20T07:00:00.000Z", "succeeded"),
       ],
     );
-    const calendar = await runTestEffect(
+    const calendar = await runCauseEffect(
       buildRoutineCalendar(
         range("2026-10-01T00:00:00.000Z", "2026-10-04T00:00:00.000Z"),
         new Date("2026-10-02T06:00:00.000Z"),
@@ -85,7 +86,7 @@ describe("routine calendar", () => {
 
   it("plans the runs of a paused routine and keeps the local time across a daylight-saving change", async () => {
     const { calendarSource, runs } = source([routine({ kind: "daily", time: "09:00" }, false)]);
-    const calendar = await runTestEffect(
+    const calendar = await runCauseEffect(
       buildRoutineCalendar(
         range("2026-10-24T00:00:00.000Z", "2026-10-27T00:00:00.000Z"),
         new Date("2026-10-23T00:00:00.000Z"),
@@ -108,7 +109,7 @@ describe("routine calendar", () => {
       [routine({ kind: "daily", time: "25:99" })],
       [run("2026-10-01T07:00:00.000Z", "succeeded")],
     );
-    const calendar = await runTestEffect(
+    const calendar = await runCauseEffect(
       buildRoutineCalendar(
         range("2026-10-01T00:00:00.000Z", "2026-10-08T00:00:00.000Z"),
         new Date("2026-10-02T00:00:00.000Z"),
@@ -123,7 +124,7 @@ describe("routine calendar", () => {
     const { calendarSource } = source([
       routine({ kind: "interval", amount: 3, unit: "minutes", anchorAt: "2026-10-01T00:00:00.000Z" }),
     ]);
-    const calendar = await runTestEffect(
+    const calendar = await runCauseEffect(
       buildRoutineCalendar(
         range("2026-10-02T00:00:00.000Z", "2026-10-09T00:00:00.000Z"),
         new Date("2026-10-01T00:00:00.000Z"),

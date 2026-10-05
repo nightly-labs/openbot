@@ -5,6 +5,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { requestNotificationPermission } from "./desktop-notifications";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 
@@ -35,10 +36,10 @@ describe("notification permission request", () => {
     await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: store, showWelcome }));
     expect(showWelcome).not.toHaveBeenCalled();
 
-    await Effect.runPromise(store.set({ desktopNotifications: true }).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set({ desktopNotifications: true }));
     await Effect.runPromise(requestNotificationPermission({ platform: "darwin", preference: store, showWelcome }));
     expect(showWelcome).toHaveBeenCalledTimes(1);
-    await Effect.runPromise(store.set({ desktopNotifications: false }).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set({ desktopNotifications: false }));
     const restarted = await loadedStore(path);
     expect(restarted.get()).toEqual({ desktopNotifications: false });
     expect(restarted.permissionRequested()).toBe(true);

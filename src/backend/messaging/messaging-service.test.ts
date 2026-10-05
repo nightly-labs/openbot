@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { runTestEffect } from "../effect-test-runtime";
+
 // @vitest-environment node
 
 // End to end on the real modules: `AgentService` with its SQLite database and mailbox, the
@@ -28,6 +28,7 @@ import {
   stopAgentTestFixture,
   waitFor,
 } from "../agent-service-test-harness";
+import { runCauseEffect } from "../effect-boundary";
 import { SidebarLayoutStore } from "../sidebar-layout-store";
 import { type MessagingCredentials, MessagingService } from "./messaging-service";
 import type { MessagingIngress } from "./messaging-types";
@@ -72,7 +73,7 @@ class FakeSlack {
       type === "events_api"
         ? JSON.stringify({ type: "event_callback", api_app_id: this.appId, event_id: randomUUID(), ...payload })
         : new URLSearchParams({ payload: JSON.stringify(payload) }).toString();
-    const answer = await runTestEffect(
+    const answer = await runCauseEffect(
       messaging?.deliverSlack("T1", {
         kind: type === "events_api" ? "events" : "interactivity",
         retryNum: null,
@@ -245,7 +246,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await runTestEffect(messaging?.stop() ?? Effect.succeed(undefined));
+  await runCauseEffect(messaging?.stop() ?? Effect.succeed(undefined));
   messaging = null;
   await slack.stop();
   await stopAgentTestFixture(root, service);
@@ -259,12 +260,12 @@ afterEach(async () => {
 async function connected(options: { autoComplete?: boolean; orchestrator?: boolean } = {}) {
   const started = await startService(root, { provider: "codex", autoComplete: options.autoComplete ?? true });
   service = started.service;
-  const agent: AgentSummary = await runTestEffect(started.store.getOrCreate("slack-agent"));
+  const agent: AgentSummary = await runCauseEffect(started.store.getOrCreate("slack-agent"));
   const credentials = new MemoryCredentials();
   const events: AgentEvent[] = [];
   started.service.on("event", (event) => events.push(event));
   sidebar = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-  await runTestEffect(sidebar.initialize());
+  await runCauseEffect(sidebar.initialize());
   messaging = new MessagingService({
     sidebar,
     threads: started.service.messaging,
@@ -285,7 +286,7 @@ async function connected(options: { autoComplete?: boolean; orchestrator?: boole
   });
   const store = started.service.messaging.store;
   const { connectionId } = store.ensureConnection("slack", "T1", "Test workspace");
-  await runTestEffect(
+  await runCauseEffect(
     credentials.set(connectionId, { botToken: BOT_TOKEN, botUserId: "UBOT", appId: "A1", workspaceId: "T1" }),
   );
   store.updateConnection(connectionId, {
@@ -293,7 +294,7 @@ async function connected(options: { autoComplete?: boolean; orchestrator?: boole
     appId: "A1",
     orchestratorAgentId: options.orchestrator === false ? null : agent.id,
   });
-  await runTestEffect(messaging.start());
+  await runCauseEffect(messaging.start());
   await waitFor(() => workspace()?.state === "connected");
   return { ...started, agent, credentials, events, overview: workspace() };
 }
@@ -344,7 +345,7 @@ describe.sequential("Slack messaging end to end", () => {
 
     // Nothing of the Slack thread reaches the public chat, the queue, or a client event.
     expect(
-      (await runTestEffect(service?.readConversation(agent.id) ?? Effect.succeed(undefined)))?.messages ?? [],
+      (await runCauseEffect(service?.readConversation(agent.id) ?? Effect.succeed(undefined)))?.messages ?? [],
     ).toEqual([]);
     expect(service?.listQueue(agent.id).deliveries).toEqual([]);
     expect(events.filter((event) => event.type === "conversation" && JSON.stringify(event).includes("hello"))).toEqual(
@@ -438,11 +439,11 @@ describe.sequential("Slack messaging end to end", () => {
   it("stops on a token Slack no longer accepts, and keeps the workspace when an agent is deleted", async () => {
     const { agent, credentials } = await connected();
     slack.rejectBotToken = true;
-    await runTestEffect(messaging?.reconnect("T1") ?? Effect.succeed(undefined));
+    await runCauseEffect(messaging?.reconnect("T1") ?? Effect.succeed(undefined));
     await waitFor(() => workspace()?.state === "invalid_token");
     slack.rejectBotToken = false;
 
-    await runTestEffect(service?.deleteAgent(agent.id) ?? Effect.succeed(undefined));
+    await runCauseEffect(service?.deleteAgent(agent.id) ?? Effect.succeed(undefined));
     expect(credentials.values.size).toBe(1);
     expect(workspace()?.orchestratorAgentId).toBeNull();
     report.deletion = { credentialsLeft: credentials.values.size };
@@ -457,10 +458,10 @@ describe.sequential("Slack messaging end to end", () => {
     expect(turnStarts(client)).toEqual([]);
 
     // The orchestrator is a new agent with its remit and the facts it starts with.
-    const added = await runTestEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined));
+    const added = await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined));
     const orchestratorId = added?.agentId ?? "";
     expect(
-      (await runTestEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined)))?.agentId,
+      (await runCauseEffect(messaging?.addOrchestrator({ workspaceId: "T1" }) ?? Effect.succeed(undefined)))?.agentId,
     ).toBe(orchestratorId);
     // It sits in the sidebar's Integrations section, which the screen shows collapsed.
     const layout = sidebar?.getSnapshot();
@@ -487,7 +488,7 @@ describe.sequential("Slack messaging end to end", () => {
 
   it("brings a teammate's answer to a request from Slack back to the Slack thread", async () => {
     const { agent, client, store } = await connected({ autoComplete: false });
-    const research = await runTestEffect(store.getOrCreate("research"));
+    const research = await runCauseEffect(store.getOrCreate("research"));
     const started: Array<{ threadId: string; turnId: string }> = [];
     client.on("notification", (event: { method: string; params: unknown }) => {
       const params = paramsRecord(event.params);
@@ -544,10 +545,10 @@ describe.sequential("Slack messaging end to end", () => {
 
     // Chief's own chat shows neither the request nor the answer; Research's chat has the request.
     expect(
-      (await runTestEffect(service?.readConversation(agent.id) ?? Effect.succeed(undefined)))?.messages ?? [],
+      (await runCauseEffect(service?.readConversation(agent.id) ?? Effect.succeed(undefined)))?.messages ?? [],
     ).toEqual([]);
     const researchChat =
-      (await runTestEffect(service?.readConversation(research.id) ?? Effect.succeed(undefined)))?.messages ?? [];
+      (await runCauseEffect(service?.readConversation(research.id) ?? Effect.succeed(undefined)))?.messages ?? [];
     expect(researchChat.some((message) => message.text.includes("Check the latest news."))).toBe(true);
     // The person's message shows how its own turn ended, once.
     const done = slack.calls.filter(

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import type { Effect } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // Publishing a local directory to a hosted site, and the sites of one server.
 //
@@ -13,6 +13,7 @@ import { HOSTED_SITES_CAPABILITY, HOSTED_SITES_ROUTES } from "@openbot/contracts
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -61,16 +62,14 @@ export function hostedSiteIpcHandlers({
   return {
     hostedSites: {
       list: scopedQueryHandler({
-        local: () => Effect.runPromise(hostedSites.list().pipe(Effect.mapError((error) => error.cause))),
+        local: () => runCauseEffect(hostedSites.list()),
         remote: (serverId) => {
           requireRemoteSupport(serverId);
-          return Effect.runPromise(
-            remoteServers
-              .request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
-                method: "POST",
-                body: {},
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          return runCauseEffect(
+            remoteServers.request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
+              method: "POST",
+              body: {},
+            }),
           );
         },
       }),
@@ -85,24 +84,17 @@ export function hostedSiteIpcHandlers({
           : await dialog.showOpenDialog(options);
         return result.canceled ? null : (result.filePaths[0] ?? null);
       }),
-      publish: payloadHandler(parsePublishHostedSite, (site) =>
-        Effect.runPromise(hostedSites.publish(site).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      replace: payloadHandler(parseReplaceHostedSite, (site) =>
-        Effect.runPromise(hostedSites.replace(site).pipe(Effect.mapError((error) => error.cause))),
-      ),
+      publish: payloadHandler(parsePublishHostedSite, (site) => runCauseEffect(hostedSites.publish(site))),
+      replace: payloadHandler(parseReplaceHostedSite, (site) => runCauseEffect(hostedSites.replace(site))),
       delete: scopedHandler(parseDeleteHostedSite, {
-        local: ({ siteId }) =>
-          Effect.runPromise(hostedSites.delete(siteId).pipe(Effect.mapError((error) => error.cause))),
+        local: ({ siteId }) => runCauseEffect(hostedSites.delete(siteId)),
         remote: ({ siteId }, serverId) => {
           requireRemoteSupport(serverId);
-          return Effect.runPromise(
-            remoteServers
-              .request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
-                method: "POST",
-                body: { siteId },
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          return runCauseEffect(
+            remoteServers.request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
+              method: "POST",
+              body: { siteId },
+            }),
           );
         },
       }),

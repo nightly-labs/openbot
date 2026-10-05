@@ -5,7 +5,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Exit, Scope } from "effect";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 import { normalizePastedCode, parseCliCodePrompt, startCliCodeLogin } from "./cli-code-login";
 
 // What the pinned CLIs printed with no browser, in an ubuntu:24.04 container (Grok 1.0.22 on
@@ -66,7 +66,7 @@ describe("startCliCodeLogin", () => {
   function start(options: Parameters<typeof startCliCodeLogin>[0]) {
     const scope = Scope.makeUnsafe();
     scopes.push(scope);
-    return runTestEffect(startCliCodeLogin(options).pipe(Effect.provideService(Scope.Scope, scope)));
+    return runCauseEffect(startCliCodeLogin(options).pipe(Effect.provideService(Scope.Scope, scope)));
   }
 
   beforeAll(async () => {
@@ -107,19 +107,19 @@ process.stdin.on("data", (chunk) => {
 
   it.skipIf(process.platform !== "linux")("types a pasted code into the CLI's prompt on a terminal", async () => {
     const started = await login();
-    expect(await runTestEffect(started.prompt)).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
+    expect(await runCauseEffect(started.prompt)).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
     started.submit("good-code");
-    await expect(runTestEffect(started.done)).resolves.toBeUndefined();
+    await expect(runCauseEffect(started.done)).resolves.toBeUndefined();
   });
 
   it.skipIf(process.platform !== "linux")(
     "reports a refused code without quoting it, and masks it in logs",
     async () => {
       const started = await login();
-      await runTestEffect(started.prompt);
+      await runCauseEffect(started.prompt);
       const code = "refused-code-7Hq2#state";
       started.submit(code);
-      await expect(runTestEffect(started.done)).rejects.toThrow(sourceText("error.provider.codeLoginRefused"));
+      await expect(runCauseEffect(started.done)).rejects.toThrow(sourceText("error.provider.codeLoginRefused"));
       expect(redactText(`Login failed: ${code}`)).not.toContain(code);
     },
   );
@@ -136,8 +136,8 @@ process.stdin.on("data", (chunk) => {
       env: {},
       timeoutMs: 200,
     });
-    await expect(runTestEffect(started.done)).rejects.toThrow("timed out");
-    await expect(runTestEffect(started.prompt)).rejects.toThrow();
+    await expect(runCauseEffect(started.done)).rejects.toThrow("timed out");
+    await expect(runCauseEffect(started.prompt)).rejects.toThrow();
     expect(started.child.killed).toBe(true);
   });
 });

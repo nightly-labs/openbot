@@ -5,14 +5,10 @@ import type { HookCallbackMatcher, Options, SdkPluginConfig } from "@anthropic-a
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
+import { runCauseEffect } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import { isPathInside } from "./path-containment";
-import {
-  type ProviderClientOperationError,
-  providerCall,
-  providerFailure,
-  runProviderClientEffect,
-} from "./provider-client-effects";
+import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 /**
  * Workspace only for Claude has two parts, because the Claude sandbox covers Bash and nothing else.
@@ -92,9 +88,7 @@ export function claudeWorkspaceHooks(cwd: string, roots: readonly string[]): Non
     hooks: [
       async (input) => {
         if (input.hook_event_name !== "PreToolUse") return {};
-        const target = await runProviderClientEffect(
-          claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots),
-        );
+        const target = await runCauseEffect(claudeWriteOutsideRoots(input.tool_name, input.tool_input, cwd, roots));
         if (!target) return {};
         return {
           hookSpecificOutput: {

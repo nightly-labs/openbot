@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { restartActivityGeneration } from "../backend/restart-activity";
-import { runRemoteWorkflow } from "./remote-service-effects";
+
 // @vitest-environment node
 
 import { createServer, type IncomingMessage } from "node:http";
@@ -16,6 +16,7 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { BrowserViewportInput } from "../backend/browser-cdp";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { BrowserViewGateway } from "./browser-view-gateway";
 
 const requireModule = createRequire(import.meta.url);
@@ -83,7 +84,7 @@ describe("the live browser view on a host", () => {
     // The member's pointer is a fraction of the frame they watched; the host's page is in pixels.
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("keeps a click on the last frame the member saw when a newer frame is dropped", async () => {
@@ -145,7 +146,7 @@ describe("the live browser view on a host", () => {
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.resume();
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("expands a point with the frame the member named, not the newest one", async () => {
@@ -196,7 +197,7 @@ describe("the live browser view on a host", () => {
     // The frame the member named, not the newest one: expanding with frame 2 puts this at (200, 75).
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("keeps a point on the frame still showing, and drops it once a newer frame is named", async () => {
@@ -258,7 +259,7 @@ describe("the live browser view on a host", () => {
       ]),
     );
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("forgets frames older than the one the member has drawn, without a click", async () => {
@@ -316,7 +317,7 @@ describe("the live browser view on a host", () => {
       ]),
     );
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("does not keep a frame size for a client that never acknowledges frames", async () => {
@@ -367,7 +368,7 @@ describe("the live browser view on a host", () => {
     socket.send(encodeBrowserViewInput({ ...point }));
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("closes a view whose client stops acknowledging frames", async () => {
@@ -399,7 +400,7 @@ describe("the live browser view on a host", () => {
     await closed;
     expect(frames.length).toBeLessThanOrEqual(121);
     expect(gateway.activeViewCount()).toBe(0);
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("keeps the view open while drawn frames are acknowledged inside the backlog", async () => {
@@ -453,7 +454,7 @@ describe("the live browser view on a host", () => {
     }
     expect(socket.readyState).toBe(webSockets.WebSocket.OPEN);
     socket.close();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("closes invalidated views and rejects reuse of their session", async () => {
@@ -489,7 +490,7 @@ describe("the live browser view on a host", () => {
     });
     const failure = await new Promise<string>((resolve) => retry.once("error", (error) => resolve(error.message)));
     expect(failure).toContain("401");
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("refuses a socket that names neither the session nor its member", async () => {
@@ -512,7 +513,7 @@ describe("the live browser view on a host", () => {
       const failure = await new Promise<string>((resolve) => socket.once("error", (error) => resolve(error.message)));
       expect(failure).toContain("401");
     }
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("counts only views with a live socket", async () => {
@@ -537,7 +538,7 @@ describe("the live browser view on a host", () => {
     socket.close();
     await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
     expect(restartActivityGeneration()).toBeGreaterThan(before);
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 
   it("releases a session after an abrupt stream disconnect", async () => {
@@ -566,7 +567,7 @@ describe("the live browser view on a host", () => {
     expect(() =>
       gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-2" }),
     ).not.toThrow();
-    await runRemoteWorkflow(gateway.stop());
+    await runCauseEffect(gateway.stop());
   });
 });
 

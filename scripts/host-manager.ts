@@ -1,6 +1,6 @@
 import { chown, lstat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { Effect } from "effect";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { HostManager } from "../src/main/host-manager";
 import {
   HOST_MANAGER_DIRECTORY,
@@ -35,11 +35,7 @@ async function main(): Promise<void> {
     throw new Error("Host Manager requires an Apple Silicon Mac.");
   const uid = process.getuid?.();
   if (process.argv[2] === "--relaunch" && process.argv.length === 3 && uid !== undefined && uid >= 501) {
-    await Effect.runPromise(
-      relaunchManagedTenant(uid, { ...macHostOperations(), open: openSharedApplication }).pipe(
-        Effect.mapError((error) => error.cause),
-      ),
-    );
+    await runCauseEffect(relaunchManagedTenant(uid, { ...macHostOperations(), open: openSharedApplication }));
     return;
   }
   if (uid !== 0) throw new Error("Host maintenance requires root.");
@@ -51,7 +47,7 @@ async function main(): Promise<void> {
     await macHostOperations().installedVersion();
     await ensureHostDirectory("/Library/Application Support/OpenBot", 0o755);
     await ensureHostDirectory(directory, 0o755);
-    if (await Effect.runPromise(readHostConfig().pipe(Effect.mapError((error) => error.cause))))
+    if (await runCauseEffect(readHostConfig()))
       throw new Error(
         "Host configuration already exists. Stop the daemon before an administrator changes registration.",
       );
@@ -64,18 +60,16 @@ async function main(): Promise<void> {
       const info = await lstat(path);
       if (info.uid !== uid || !info.isDirectory()) throw new Error("Tenant directory setup failed.");
     }
-    await Effect.runPromise(
+    await runCauseEffect(
       writeProtocolJson(join(directory, "state.json"), {
         phase: "idle",
         cycle: "",
         version: null,
         updatedAt: Date.now(),
         error: null,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
-    await Effect.runPromise(
-      writeProtocolJson(join(directory, "config.json"), config).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(writeProtocolJson(join(directory, "config.json"), config));
     return;
   }
   // launchd owns daemon lifetime and serialization. Do not allow a second interactive coordinator.
@@ -84,7 +78,7 @@ async function main(): Promise<void> {
   await verifyHostPath(directory);
   const manager = new HostManager(directory, macHostOperations());
   const run = (): void => {
-    void Effect.runPromise(manager.tick().pipe(Effect.mapError((error) => error.cause))).catch(() => {
+    void runCauseEffect(manager.tick()).catch(() => {
       process.stderr.write("Host Manager control write failed. Check root-owned host paths.\n");
       process.exit(1);
     });

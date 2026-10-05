@@ -5,7 +5,7 @@ import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentService } from "./agent-service";
 import { startAgentTestFixture, startService, stopAgentTestFixture, waitFor } from "./agent-service-test-harness";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 
 // Hard caps for one conversation, about 30% above the values measured when each cap was set. A red
 // test means a change made a turn or a read do more work. Make the change cheaper, or raise the cap
@@ -66,7 +66,7 @@ describe("transfer budget", () => {
     const turn = async (index: number, text: string) => {
       resetStatements();
       events.length = 0;
-      await runTestEffect(started.service.sendMessage({ agentId: "chief", text }));
+      await runCauseEffect(started.service.sendMessage({ agentId: "chief", text }));
       await waitFor(() => started.service.listQueue("chief").deliveries[index]?.status === "completed");
       return { statements: statements(), eventBytes: jsonBytes(events) };
     };
@@ -76,7 +76,7 @@ describe("transfer budget", () => {
     measured.laterTurnEventBytes = later.eventBytes;
 
     resetStatements();
-    const snapshot = await runTestEffect(service.readConversation("chief"));
+    const snapshot = await runCauseEffect(service.readConversation("chief"));
     measured.readConversationStatements = statements();
     measured.conversationSnapshotBytes = jsonBytes(snapshot);
 

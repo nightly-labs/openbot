@@ -2,8 +2,8 @@
 import { chmod, link, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { HostManager, type HostManagerOperations } from "../src/main/host-manager";
 import { hostStateSchema, readOwnedJson, writeProtocolJson } from "../src/main/host-update-files";
 import { relaunchManagedTenant } from "../src/main/host-update-relaunch";
@@ -68,11 +68,7 @@ async function fixture() {
   directories.push(directory);
   await mkdir(join(directory, "tenants"), { mode: 0o755 });
   await mkdir(join(directory, "tenants", String(uid)), { mode: 0o700 });
-  await Effect.runPromise(
-    writeProtocolJson(join(directory, "config.json"), { managed: true, tenants: [uid] }).pipe(
-      Effect.mapError((error) => error.cause),
-    ),
-  );
+  await runCauseEffect(writeProtocolJson(join(directory, "config.json"), { managed: true, tenants: [uid] }));
   let now = 1_000_000;
   let running = [{ uid, pid: 123 }];
   let installed = "0.1.0";
@@ -89,8 +85,8 @@ async function fixture() {
   const manager = new HostManager(directory, operations, { hostUid: uid, now: () => now });
   const state = () => readOwnedJson(join(directory, "state.json"), uid, hostStateSchema);
   const status = async (safe = true, idleSince = 1_000_000, currentVersion = "0.1.0") => {
-    const current = await Effect.runPromise(state().pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(
+    const current = await runCauseEffect(state());
+    await runCauseEffect(
       writeProtocolJson(join(directory, "tenants", String(uid), "status.json"), {
         uid,
         pid: 123,
@@ -100,13 +96,13 @@ async function fixture() {
         currentVersion,
         cycle: current.cycle,
         healthy: true,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
   };
   const idle = async () => {
     for (let step = 0; step <= 60; step += 1) {
       await status();
-      await Effect.runPromise(manager.tick().pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(manager.tick());
       now += 5000;
     }
   };
@@ -133,23 +129,20 @@ async function fixture() {
 describe("privileged host update lifecycle", () => {
   it("stages without a tenant download and installs only after five minutes and actual exit", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     expect(f.operations.stageLatest).toHaveBeenCalledOnce();
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("waiting");
+    expect((await runCauseEffect(f.state())).phase).toBe("waiting");
     await f.idle();
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("stopping");
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    expect((await runCauseEffect(f.state())).phase).toBe("stopping");
+    await runCauseEffect(f.manager.tick());
     expect(f.install).not.toHaveBeenCalled();
     f.setRunning([]);
-    await Promise.all([
-      Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause))),
-      Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause))),
-    ]);
+    await Promise.all([runCauseEffect(f.manager.tick()), runCauseEffect(f.manager.tick())]);
     expect(f.install).toHaveBeenCalledOnce();
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("released");
+    expect((await runCauseEffect(f.state())).phase).toBe("released");
     await f.status(true, 1_000_000, "0.2.0");
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("idle");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("idle");
   });
 
   it("keeps the old application available when staging fails", async () => {
@@ -157,161 +150,141 @@ describe("privileged host update lifecycle", () => {
     f.operations.stageLatest = async () => {
       throw new Error("offline");
     };
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("aborted");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("aborted");
     expect(f.install).not.toHaveBeenCalled();
   });
 
   it("does not publish success before the bundle version matches", async () => {
     const f = await fixture();
     f.install.mockImplementation(async () => undefined);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await f.idle();
     f.setRunning([]);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("failed");
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("failed");
+    await runCauseEffect(f.manager.tick());
     expect(f.install).toHaveBeenCalledOnce();
   });
 
   it("blocks for a registered tenant with missing, malformed, symlinked or stale status", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     const path = join(f.directory, "tenants", String(uid), "status.json");
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await writeFile(path, "invalid");
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await rm(path);
     await symlink(join(f.directory, "config.json"), path);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await rm(path);
     await f.status();
     f.advance(300_000);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("waiting");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("waiting");
     expect(f.install).not.toHaveBeenCalled();
   });
 
   it("starts a new grace period after a busy report or a missed heartbeat", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await f.status();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     f.advance(290_000);
     await f.status(false);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     f.advance(10_000);
     await f.status(true, 1_300_000);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("waiting");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("waiting");
     f.advance(300_000);
     await f.status(true, 1_300_000);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("waiting");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("waiting");
   });
 
   it("does not let an unregistered running user disappear from participation", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     f.setRunning([
       { uid, pid: 123 },
       { uid: uid + 1, pid: 456 },
     ]);
     await f.idle();
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("waiting");
+    expect((await runCauseEffect(f.state())).phase).toBe("waiting");
   });
 
   it("does not coordinate when disabled", async () => {
     const f = await fixture();
-    await Effect.runPromise(
-      writeProtocolJson(join(f.directory, "config.json"), { managed: false, tenants: [uid] }).pipe(
-        Effect.mapError((error) => error.cause),
-      ),
-    );
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(writeProtocolJson(join(f.directory, "config.json"), { managed: false, tenants: [uid] }));
+    await runCauseEffect(f.manager.tick());
     expect(f.operations.stageLatest).not.toHaveBeenCalled();
   });
 
   it("holds an interrupted installation for administrator recovery", async () => {
     const f = await fixture();
-    await Effect.runPromise(
+    await runCauseEffect(
       writeProtocolJson(join(f.directory, "state.json"), {
         phase: "installing",
         cycle: "interrupted",
         version: "0.2.0",
         updatedAt: 1,
         error: null,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).phase).toBe("failed");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).phase).toBe("failed");
     expect(f.install).not.toHaveBeenCalled();
   });
 
   it("reports shutdown and post-restart health timeouts", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await f.idle();
     f.advance(120_001);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).error).toContain(
-      "shutdown timed out",
-    );
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).version).toBe("0.1.0");
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).error).toContain("shutdown timed out");
+    expect((await runCauseEffect(f.state())).version).toBe("0.1.0");
     expect(f.install).not.toHaveBeenCalled();
     const open = vi.fn(async () => undefined);
     f.setRunning([{ uid: uid + 1, pid: 456 }]);
-    await Effect.runPromise(
-      relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid).pipe(
-        Effect.mapError((error) => error.cause),
-      ),
-    );
+    await runCauseEffect(relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid));
     expect(open).toHaveBeenCalledOnce();
     const healthy = await fixture();
-    await Effect.runPromise(healthy.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(healthy.manager.tick());
     await healthy.idle();
     healthy.setRunning([]);
-    await Effect.runPromise(healthy.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(healthy.manager.tick());
     healthy.advance(600_001);
-    await Effect.runPromise(healthy.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(healthy.state().pipe(Effect.mapError((error) => error.cause)))).error).toContain(
-      "health reports",
-    );
+    await runCauseEffect(healthy.manager.tick());
+    expect((await runCauseEffect(healthy.state())).error).toContain("health reports");
   });
 
   it("does not restart an aborted shutdown when the existing app cannot be verified", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     await f.idle();
     f.operations.installedVersion = async () => {
       throw new Error("signature verification failed");
     };
     f.advance(120_001);
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
-    expect((await Effect.runPromise(f.state().pipe(Effect.mapError((error) => error.cause)))).version).toBeNull();
+    await runCauseEffect(f.manager.tick());
+    expect((await runCauseEffect(f.state())).version).toBeNull();
     const open = vi.fn(async () => undefined);
     f.setRunning([]);
-    await Effect.runPromise(
-      relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid).pipe(
-        Effect.mapError((error) => error.cause),
-      ),
-    );
+    await runCauseEffect(relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid));
     expect(open).not.toHaveBeenCalled();
     expect(f.install).not.toHaveBeenCalled();
   });
 
   it("rejects hard links instead of reading tenant content through them", async () => {
     const f = await fixture();
-    await Effect.runPromise(f.manager.tick().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(f.manager.tick());
     const config = join(f.directory, "config.json");
     await link(config, join(f.directory, "linked.json"));
-    await expect(
-      Effect.runPromise(
-        readOwnedJson(join(f.directory, "linked.json"), uid, hostStateSchema).pipe(
-          Effect.mapError((error) => error.cause),
-        ),
-      ),
-    ).rejects.toThrow("ownership");
+    await expect(runCauseEffect(readOwnedJson(join(f.directory, "linked.json"), uid, hostStateSchema))).rejects.toThrow(
+      "ownership",
+    );
     expect(await readFile(config, "utf8")).toContain('"managed":true');
   });
 
@@ -329,19 +302,17 @@ describe("privileged host update lifecycle", () => {
   it("relaunches only the missing tenant, in either UID order", async () => {
     const f = await fixture();
     const otherUid = uid + 1;
-    await Effect.runPromise(
-      writeProtocolJson(join(f.directory, "config.json"), { managed: true, tenants: [uid, otherUid] }).pipe(
-        Effect.mapError((error) => error.cause),
-      ),
+    await runCauseEffect(
+      writeProtocolJson(join(f.directory, "config.json"), { managed: true, tenants: [uid, otherUid] }),
     );
-    await Effect.runPromise(
+    await runCauseEffect(
       writeProtocolJson(join(f.directory, "state.json"), {
         phase: "released",
         cycle: "release-1",
         version: "0.2.0",
         updatedAt: 1,
         error: null,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
     for (const [runningUid, missingUid] of [
       [uid, otherUid],
@@ -353,13 +324,9 @@ describe("privileged host update lifecycle", () => {
         installedVersion: async () => "0.2.0",
         open,
       };
-      await Effect.runPromise(
-        relaunchManagedTenant(runningUid, operations, f.directory, uid).pipe(Effect.mapError((error) => error.cause)),
-      );
+      await runCauseEffect(relaunchManagedTenant(runningUid, operations, f.directory, uid));
       expect(open).not.toHaveBeenCalled();
-      await Effect.runPromise(
-        relaunchManagedTenant(missingUid, operations, f.directory, uid).pipe(Effect.mapError((error) => error.cause)),
-      );
+      await runCauseEffect(relaunchManagedTenant(missingUid, operations, f.directory, uid));
       expect(open).toHaveBeenCalledOnce();
     }
   });
@@ -368,32 +335,28 @@ describe("privileged host update lifecycle", () => {
     const f = await fixture();
     const open = vi.fn(async () => undefined);
     const operations = { runningTenants: async () => [], installedVersion: async () => "0.1.0", open };
-    await Effect.runPromise(
+    await runCauseEffect(
       writeProtocolJson(join(f.directory, "state.json"), {
         phase: "released",
         cycle: "release-1",
         version: "0.2.0",
         updatedAt: 1,
         error: null,
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
-    await expect(
-      Effect.runPromise(
-        relaunchManagedTenant(uid, operations, f.directory, uid).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).rejects.toThrow("does not match");
-    await Effect.runPromise(
+    await expect(runCauseEffect(relaunchManagedTenant(uid, operations, f.directory, uid))).rejects.toThrow(
+      "does not match",
+    );
+    await runCauseEffect(
       writeProtocolJson(join(f.directory, "state.json"), {
         phase: "failed",
         cycle: "release-1",
         version: "0.2.0",
         updatedAt: 1,
         error: "Failed",
-      }).pipe(Effect.mapError((error) => error.cause)),
+      }),
     );
-    await Effect.runPromise(
-      relaunchManagedTenant(uid, operations, f.directory, uid).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(relaunchManagedTenant(uid, operations, f.directory, uid));
     expect(open).not.toHaveBeenCalled();
   });
 

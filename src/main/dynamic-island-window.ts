@@ -15,6 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import type { BrowserWindow, Display, Rectangle } from "electron";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -104,11 +105,7 @@ export class DynamicIslandWindowController {
   async setPreference(preference: DynamicIslandPreference): Promise<DynamicIslandPreference> {
     let savedPreference: DynamicIslandPreference | undefined;
     const mutation = this.#preferenceMutation.then(async () => {
-      savedPreference = await Effect.runPromise(
-        writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          Effect.mapError((error) => error.cause),
-        ),
-      );
+      savedPreference = await runCauseEffect(writeDynamicIslandPreference(this.#options.preferencePath, preference));
       this.#preference = savedPreference;
       await this.reconcileWindow();
       this.publishPreference();

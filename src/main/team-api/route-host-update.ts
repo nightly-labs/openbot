@@ -7,7 +7,7 @@ import {
   HOST_UPDATE_WAIT_REASONS,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { RequestedUpdateRefusal } from "../requested-update";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -33,34 +33,17 @@ export async function routeHostUpdate(
   requireAdmin(member);
   try {
     if (url.pathname === HOST_UPDATE_ROUTES.status) return json(200, wireSnapshot(update.snapshot()));
-    if (url.pathname === HOST_UPDATE_ROUTES.check)
-      return json(
-        200,
-        wireSnapshot(await Effect.runPromise(update.check().pipe(Effect.mapError((error) => error.cause)))),
-      );
+    if (url.pathname === HOST_UPDATE_ROUTES.check) return json(200, wireSnapshot(await runCauseEffect(update.check())));
     if (url.pathname === HOST_UPDATE_ROUTES.cancel) return json(200, wireSnapshot(update.cancel()));
     const body = await readJson(request);
     if (url.pathname === HOST_UPDATE_ROUTES.settings)
       return json(
         200,
-        wireSnapshot(
-          await Effect.runPromise(
-            update
-              .changeSettings(settingsChange(body.autoDownload, body.autoInstall))
-              .pipe(Effect.mapError((error) => error.cause)),
-          ),
-        ),
+        wireSnapshot(await runCauseEffect(update.changeSettings(settingsChange(body.autoDownload, body.autoInstall)))),
       );
     const mode = restartMode(body.restart);
     const name = (member.name ?? member.username).slice(0, 128);
-    return json(
-      200,
-      wireSnapshot(
-        await Effect.runPromise(
-          update.start({ id: member.id, name }, mode).pipe(Effect.mapError((error) => error.cause)),
-        ),
-      ),
-    );
+    return json(200, wireSnapshot(await runCauseEffect(update.start({ id: member.id, name }, mode))));
   } catch (error) {
     if (error instanceof RequestedUpdateRefusal)
       throw new HttpError(error.reason === "disabled" ? 403 : 409, error.message);

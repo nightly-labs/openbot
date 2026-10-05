@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { resolveRemoteDesktopRuntime } from "../src/main/remote-desktop-runtime-artifact";
 import { RemoteScreenGateway } from "../src/main/remote-screen-gateway";
 
@@ -51,7 +52,7 @@ const server = createServer((request, response) => {
     response.end("Not found");
     return;
   }
-  void Effect.runPromise(gateway.handleHttp(request, response, url).pipe(Effect.mapError((error) => error.cause)));
+  void runCauseEffect(gateway.handleHttp(request, response, url));
 });
 server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -66,16 +67,14 @@ await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolve
 const { port } = z.object({ port: z.number().int() }).parse(server.address());
 const origin = `http://127.0.0.1:${port}`;
 for (let index = 0; index < clientCount; index += 1) {
-  const session = await Effect.runPromise(
-    gateway
-      .createSession({
-        serverId: "local-e2e-server",
-        memberId: `local-e2e-member-${index + 1}`,
-        teamSessionId: `local-e2e-team-session-${index + 1}`,
-        teamSessionExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
-        publicHttpBaseUrl: origin,
-      })
-      .pipe(Effect.mapError((error) => error.cause)),
+  const session = await runCauseEffect(
+    gateway.createSession({
+      serverId: "local-e2e-server",
+      memberId: `local-e2e-member-${index + 1}`,
+      teamSessionId: `local-e2e-team-session-${index + 1}`,
+      teamSessionExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      publicHttpBaseUrl: origin,
+    }),
   );
   const viewerUrl = `${session.viewerUrl}#${session.viewerGrant}`;
   // Machine-readable: the E2E runner parses OPENBOT_REMOTE_E2E_URL lines.
@@ -87,7 +86,7 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
-  await Effect.runPromise(gateway.stop().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(gateway.stop());
   await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
   await rm(stateDirectory, { force: true, recursive: true });
 }

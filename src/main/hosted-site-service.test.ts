@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { authCall, authDecode, type CentralAuthOperationError } from "./central-auth-effects";
 import { type HostedSiteAuthClient, HostedSiteDesktopService, prepareSite } from "./hosted-site-service";
 
@@ -19,7 +20,7 @@ describe("hosted site preparation", () => {
     await writeFile(join(root, "index.html"), "<h1>Hello</h1>");
     await writeFile(join(root, "style.css"), "body { color: white; }");
 
-    const site = await Effect.runPromise(prepareSite(root, [root]).pipe(Effect.mapError((error) => error.cause)));
+    const site = await runCauseEffect(prepareSite(root, [root]));
 
     expect(site.framework).toBe("vanilla");
     expect(site.files.map((file) => file.path)).toEqual(["index.html", "style.css"]);
@@ -40,7 +41,7 @@ describe("hosted site preparation", () => {
     await writeFile(join(root, "dist", "index.html"), "<h1>Astro</h1>");
     await writeFile(join(root, "astro.config.mjs"), 'export default { output: "static" };');
 
-    const site = await Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)));
+    const site = await runCauseEffect(prepareSite(root));
 
     expect(site.framework).toBe("astro");
     expect(site.files.map((file) => file.path)).toEqual(["index.html"]);
@@ -55,18 +56,14 @@ describe("hosted site preparation", () => {
     );
     await writeFile(join(root, "astro.config.mjs"), 'export default { output: "server", adapter: cloudflare() };');
 
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "static output",
-    );
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("static output");
   });
 
   it("requires Astro to have an existing dist directory", async () => {
     const root = await fixture();
     await writeFile(join(root, "package.json"), JSON.stringify({ dependencies: { astro: "5.0.0" } }));
 
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "existing dist",
-    );
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("existing dist");
   });
 
   it("rejects an Astro dist symlink that escapes the project", async () => {
@@ -76,9 +73,7 @@ describe("hosted site preparation", () => {
     await writeFile(join(outside, "index.html"), "not from this project");
     await symlink(outside, join(root, "dist"));
 
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "real directory",
-    );
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("real directory");
   });
 
   it("rejects symlinks and paths outside the allowed roots", async () => {
@@ -88,12 +83,8 @@ describe("hosted site preparation", () => {
     await writeFile(join(outside, "secret.txt"), "secret");
     await symlink(join(outside, "secret.txt"), join(root, "secret.txt"));
 
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "Symlinks",
-    );
-    await expect(
-      Effect.runPromise(prepareSite(outside, [root]).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("workspace");
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("Symlinks");
+    await expect(runCauseEffect(prepareSite(outside, [root]))).rejects.toThrow("workspace");
   });
 
   it("rejects a selected source directory that is a symlink", async () => {
@@ -104,18 +95,14 @@ describe("hosted site preparation", () => {
     await writeFile(join(target, "index.html"), "ok");
     await symlink(target, alias);
 
-    await expect(
-      Effect.runPromise(prepareSite(alias, [workspace]).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("Symlinks");
+    await expect(runCauseEffect(prepareSite(alias, [workspace]))).rejects.toThrow("Symlinks");
   });
 
   it("enforces the 20 file limit", async () => {
     const root = await fixture();
     await writeFile(join(root, "index.html"), "ok");
     for (let index = 0; index < 20; index += 1) await writeFile(join(root, `file-${index}.txt`), "x");
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "20 files",
-    );
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("20 files");
   });
 
   it.each(["service-account.json", "private-key.txt", "server.js"])("rejects unsafe file %s", async (name) => {
@@ -123,9 +110,7 @@ describe("hosted site preparation", () => {
     await writeFile(join(root, "index.html"), "ok");
     await writeFile(join(root, name), "not safe");
 
-    await expect(Effect.runPromise(prepareSite(root).pipe(Effect.mapError((error) => error.cause)))).rejects.toThrow(
-      "private keys",
-    );
+    await expect(runCauseEffect(prepareSite(root))).rejects.toThrow("private keys");
   });
 });
 
@@ -149,12 +134,8 @@ describe("hosted site upload recovery", () => {
     const service = new HostedSiteDesktopService(auth);
     const input = { sourcePath: root, title: "Recovery page", description: "Recover a publication response." };
 
-    await expect(
-      Effect.runPromise(service.publish(input).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("response was lost");
-    await expect(
-      Effect.runPromise(service.publish(input).pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toMatchObject({ id: "site-1" });
+    await expect(runCauseEffect(service.publish(input))).rejects.toThrow("response was lost");
+    await expect(runCauseEffect(service.publish(input))).resolves.toMatchObject({ id: "site-1" });
 
     expect(publicationAttempts).toBe(3);
     expect(new Set(publicationKeys).size).toBe(1);
@@ -187,12 +168,8 @@ describe("hosted site upload recovery", () => {
     const service = new HostedSiteDesktopService(auth);
     const input = { sourcePath: root, title: "Recovery page", description: "Recover an activation response." };
 
-    await expect(
-      Effect.runPromise(service.publish(input).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("activation response was lost");
-    await expect(
-      Effect.runPromise(service.publish(input).pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toMatchObject({ id: "site-1" });
+    await expect(runCauseEffect(service.publish(input))).rejects.toThrow("activation response was lost");
+    await expect(runCauseEffect(service.publish(input))).resolves.toMatchObject({ id: "site-1" });
 
     expect(publicationAttempts).toBe(1);
     expect(fileAttempts).toBe(1);
@@ -211,14 +188,13 @@ describe("hosted sites of a joined server", () => {
     });
     const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
 
-    await expect(
-      Effect.runPromise(service.listServerSites().pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toMatchObject({ sites: [{ id: "site-1" }], used: 1 });
+    await expect(runCauseEffect(service.listServerSites())).resolves.toMatchObject({
+      sites: [{ id: "site-1" }],
+      used: 1,
+    });
     // A Worker before server scopes lists no unfinished upload, so a site that the list does not show is refused.
-    await expect(
-      Effect.runPromise(service.deleteServerSite("site-unlinked").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("Site not found");
-    await Effect.runPromise(service.deleteServerSite("site-1").pipe(Effect.mapError((error) => error.cause)));
+    await expect(runCauseEffect(service.deleteServerSite("site-unlinked"))).rejects.toThrow("Site not found");
+    await runCauseEffect(service.deleteServerSite("site-1"));
     expect(requests).toEqual([
       "GET /v1/sites/ host-1",
       "GET /v1/sites/ host-1",
@@ -227,12 +203,8 @@ describe("hosted sites of a joined server", () => {
     ]);
 
     const unregistered = new HostedSiteDesktopService(auth);
-    await expect(
-      Effect.runPromise(unregistered.listServerSites().pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("not registered");
-    await expect(
-      Effect.runPromise(unregistered.deleteServerSite("site-1").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("not registered");
+    await expect(runCauseEffect(unregistered.listServerSites())).rejects.toThrow("not registered");
+    await expect(runCauseEffect(unregistered.deleteServerSite("site-1"))).rejects.toThrow("not registered");
     expect(requests).toHaveLength(4);
   });
 
@@ -245,12 +217,8 @@ describe("hosted sites of a joined server", () => {
     });
     const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
 
-    await expect(
-      Effect.runPromise(service.listServerSites().pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("not supported");
-    await expect(
-      Effect.runPromise(service.deleteServerSite("site-1").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("not supported");
+    await expect(runCauseEffect(service.listServerSites())).rejects.toThrow("not supported");
+    await expect(runCauseEffect(service.deleteServerSite("site-1"))).rejects.toThrow("not supported");
     expect(deletes).toEqual([]);
   });
 });

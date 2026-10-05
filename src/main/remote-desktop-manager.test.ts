@@ -1,6 +1,7 @@
 import type { RemoteDesktopSession } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { remoteCall } from "./remote-service-effects";
@@ -38,9 +39,7 @@ describe("RemoteDesktopManager.connect", () => {
       );
     });
 
-    await expect(
-      Effect.runPromise(manager.connect({ serverId: "remote-1" }).pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toEqual({
+    await expect(runCauseEffect(manager.connect({ serverId: "remote-1" }))).resolves.toEqual({
       status: "refused",
       errorCode: "host_permissions_required",
       message: "The host has not allowed OpenBot to record its screen.",
@@ -53,17 +52,18 @@ describe("RemoteDesktopManager.connect", () => {
       throw new RemoteProtocolError("host_update_required", "Update OpenBot on the host.");
     });
 
-    await expect(
-      Effect.runPromise(manager.connect({ serverId: "remote-1" }).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("Update OpenBot on the host.");
+    await expect(runCauseEffect(manager.connect({ serverId: "remote-1" }))).rejects.toThrow(
+      "Update OpenBot on the host.",
+    );
   });
 
   it("answers a session the host opened", async () => {
     const manager = createManager(async () => structuredClone(session));
 
-    await expect(
-      Effect.runPromise(manager.connect({ serverId: "remote-1" }).pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toEqual({ status: "connected", session });
+    await expect(runCauseEffect(manager.connect({ serverId: "remote-1" }))).resolves.toEqual({
+      status: "connected",
+      session,
+    });
     expect(manager.list()).toEqual([session]);
   });
 });

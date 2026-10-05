@@ -1,4 +1,3 @@
-import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
@@ -6,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
+import { runCauseEffect } from "./effect-boundary";
 
 let root = "";
 
@@ -37,7 +37,7 @@ describe("resolveAgentCommand", () => {
       "goose\nid",
       " goose",
     ]) {
-      await expect(runTestEffect(resolveAgentCommand(command, { searchPath: [root] })), command).rejects.toThrow();
+      await expect(runCauseEffect(resolveAgentCommand(command, { searchPath: [root] })), command).rejects.toThrow();
     }
     await expect(stat(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
@@ -45,16 +45,16 @@ describe("resolveAgentCommand", () => {
   it("finds a bare name in the given folders, and a path in the home folder", async () => {
     const goose = await executable("goose");
     expect(
-      await runTestEffect(resolveAgentCommand("goose", { searchPath: ["relative/bin", root], platform: "darwin" })),
+      await runCauseEffect(resolveAgentCommand("goose", { searchPath: ["relative/bin", root], platform: "darwin" })),
     ).toBe(goose);
-    expect(await runTestEffect(resolveAgentCommand("~/goose", { home: root, platform: "darwin" }))).toBe(goose);
-    expect(await runTestEffect(resolveAgentCommand(goose, { platform: "darwin" }))).toBe(goose);
-    expect(await runTestEffect(resolveAgentCommand("qwen", { searchPath: [root], platform: "darwin" }))).toBeNull();
+    expect(await runCauseEffect(resolveAgentCommand("~/goose", { home: root, platform: "darwin" }))).toBe(goose);
+    expect(await runCauseEffect(resolveAgentCommand(goose, { platform: "darwin" }))).toBe(goose);
+    expect(await runCauseEffect(resolveAgentCommand("qwen", { searchPath: [root], platform: "darwin" }))).toBeNull();
   });
 
   it("does not take a file that cannot run", async () => {
     await writeFile(join(root, "notes"), "text");
-    expect(await runTestEffect(resolveAgentCommand("notes", { searchPath: [root], platform: "darwin" }))).toBeNull();
+    expect(await runCauseEffect(resolveAgentCommand("notes", { searchPath: [root], platform: "darwin" }))).toBeNull();
   });
 });
 

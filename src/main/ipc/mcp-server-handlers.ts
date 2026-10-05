@@ -16,6 +16,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -118,11 +119,7 @@ export function mcpServerIpcHandlers({
   // of every configuration, so a `FromHost` twin would be the same checks under a second name.
   function remoteList(serverId: string, path: string, body: unknown): Promise<McpServerConfig[]> {
     requireRemoteSupport(serverId);
-    return Effect.runPromise(
-      remoteServers
-        .request(serverId, path, decodeMcpServerConfigs, { method: "POST", body })
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    return runCauseEffect(remoteServers.request(serverId, path, decodeMcpServerConfigs, { method: "POST", body }));
   }
 
   return {
@@ -132,29 +129,24 @@ export function mcpServerIpcHandlers({
         // The one read route, and the only one the host answers to a GET.
         remote: (serverId) => {
           requireRemoteSupport(serverId);
-          return Effect.runPromise(
-            remoteServers
-              .request(serverId, MCP_ROUTES.list, decodeMcpServerConfigs)
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-          );
+          return runCauseEffect(remoteServers.request(serverId, MCP_ROUTES.list, decodeMcpServerConfigs));
         },
       }),
       saveMcpServer: scopedHandler(parseSaveMcpServer, {
         local: (parsed) => {
           startToolRuntimes();
-          return Effect.runPromise(service.saveMcpServer(parsed).pipe(Effect.mapError((error) => error.cause)));
+          return runCauseEffect(service.saveMcpServer(parsed));
         },
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
       }),
       removeMcpServer: scopedHandler(parseRemoveMcpServer, {
-        local: (parsed) =>
-          Effect.runPromise(service.removeMcpServer(parsed).pipe(Effect.mapError((error) => error.cause))),
+        local: (parsed) => runCauseEffect(service.removeMcpServer(parsed)),
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
       }),
       setMcpServerEnabled: scopedHandler(parseSetMcpServerEnabled, {
         local: (parsed) => {
           if (parsed.enabled) startToolRuntimes();
-          return Effect.runPromise(service.setMcpServerEnabled(parsed).pipe(Effect.mapError((error) => error.cause)));
+          return runCauseEffect(service.setMcpServerEnabled(parsed));
         },
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.toggle, parsed),
       }),
@@ -165,27 +157,23 @@ export function mcpServerIpcHandlers({
         // remote branch below carries no such flag; the route it reaches spends the host's stored
         // credentials instead, and still opens nothing.
         local: async (parsed) => {
-          await Effect.runPromise(
+          await runCauseEffect(
             prepareToolRuntimeForTest(parsed.config, {
               startToolRuntimes,
               ensureToolRuntimesReady,
               toolRuntimes,
-            }).pipe(Effect.mapError((error) => error.cause)),
+            }),
           );
-          return Effect.runPromise(
-            service.testMcpServer(parsed, { interactive: true }).pipe(Effect.mapError((error) => error.cause)),
-          );
+          return runCauseEffect(service.testMcpServer(parsed, { interactive: true }));
         },
         remote: (parsed, serverId) => {
           requireRemoteSupport(serverId);
-          return Effect.runPromise(
-            remoteServers
-              .request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {
-                method: "POST",
-                body: parsed,
-                timeoutMs: REMOTE_TEST_TIMEOUT_MS,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          return runCauseEffect(
+            remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {
+              method: "POST",
+              body: parsed,
+              timeoutMs: REMOTE_TEST_TIMEOUT_MS,
+            }),
           );
         },
       }),

@@ -15,6 +15,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 
@@ -173,20 +174,16 @@ describe("TeamWebRtcClientTransport", () => {
     const transport = createTransport(bridge);
     transport.pinHostKey("host-1", hostKeys.publicKey);
     try {
-      await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
-      const pending = Effect.runPromise(
-        transport
-          .request("host-1", "/v1/agents/research", { method: "DELETE" })
-          .pipe(Effect.mapError((error) => error.cause)),
-      );
+      await runCauseEffect(transport.connect("host-1"));
+      const pending = runCauseEffect(transport.request("host-1", "/v1/agents/research", { method: "DELETE" }));
       const failure = expect(pending).rejects.toMatchObject({ code: "remote_disconnected", status: 503 });
       await vi.waitFor(() => expect(sentRequestId(authentication.send)).not.toBeNull());
       const sentBeforeStop = authentication.send.mock.calls.length;
-      await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(transport.stop());
       await failure;
       expect(authentication.send.mock.calls.length).toBe(sentBeforeStop);
     } finally {
-      await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(transport.stop());
     }
   });
 
@@ -248,10 +245,8 @@ describe("TeamWebRtcClientTransport", () => {
       downloadHostLogo: () => authCall(async () => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
       transferDirectory: join(tmpdir(), "openbot-webrtc-client-test"),
     });
-    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
-    await expect(
-      Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("pinned device key");
+    await runCauseEffect(transport.listHosts());
+    await expect(runCauseEffect(transport.connect("host-1"))).rejects.toThrow("pinned device key");
     expect(startSession).not.toHaveBeenCalled();
     transport.pinHostKey("host-1", hostKeys.publicKey);
     const protocolError = vi.fn();
@@ -266,9 +261,7 @@ describe("TeamWebRtcClientTransport", () => {
     expect(disconnectBridge).not.toHaveBeenCalled();
     expect(protocolError).not.toHaveBeenCalled();
 
-    const initialConnection = Effect.runPromise(
-      transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const initialConnection = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     expect(bridge.send).not.toHaveBeenCalledWith("host-1", "events", expect.any(String));
     authentication.confirmNext();
@@ -294,7 +287,7 @@ describe("TeamWebRtcClientTransport", () => {
     );
     bridge.emit("disconnected", "host-1");
     expect(transport.isConnected("host-1")).toBe(false);
-    const reconnection = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const reconnection = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(authentication.pendingConfirmations).toHaveLength(1));
     authentication.confirmNext();
     await reconnection;
@@ -309,9 +302,7 @@ describe("TeamWebRtcClientTransport", () => {
       "events",
       JSON.stringify({ version: 2, type: "event-ack", throughSequence: 0 }),
     );
-    const malformedRequest = Effect.runPromise(
-      transport.request("host-1", "/v1/agents").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const malformedRequest = runCauseEffect(transport.request("host-1", "/v1/agents"));
     const malformedRejection = expect(malformedRequest).rejects.toMatchObject({ code: "protocol_error" });
     await vi.waitFor(() => expect(bridge.send).toHaveBeenCalledWith("host-1", "rpc", expect.any(String)));
     bridge.emit(
@@ -329,7 +320,7 @@ describe("TeamWebRtcClientTransport", () => {
     await malformedRejection;
     expect(protocolError).toHaveBeenCalledWith("host-1", "protocol_error", expect.any(String));
     await vi.waitFor(() => expect(bridge.disconnect).toHaveBeenCalledWith("host-1"));
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("stays connected on a session that expires further out than a timer can be set", async () => {
@@ -349,17 +340,17 @@ describe("TeamWebRtcClientTransport", () => {
       startSession: () =>
         authCall(async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: 8_640_000_000_000_000 })),
     });
-    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.listHosts());
     transport.pinHostKey("host-1", hostKeys.publicKey);
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     try {
-      await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(transport.connect("host-1"));
       await vi.advanceTimersByTimeAsync(5);
       expect(disconnectBridge).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("cancels a connection before a delayed session start can restore it", async () => {
@@ -420,15 +411,15 @@ describe("TeamWebRtcClientTransport", () => {
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    const connection = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const connection = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(startSession).toHaveBeenCalledOnce());
-    await Effect.runPromise(transport.disconnect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.disconnect("host-1"));
     resolveSession({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 });
 
     await expect(connection).rejects.toThrow("cancelled");
     expect(connectBridge).not.toHaveBeenCalled();
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("does not reuse a remote session after the signed-in principal changes", async () => {
@@ -493,13 +484,13 @@ describe("TeamWebRtcClientTransport", () => {
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.connect("host-1"));
     principalId = "user-2";
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.connect("host-1"));
 
     expect(startSession).toHaveBeenCalledTimes(2);
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("replaces a logical session before it expires", async () => {
@@ -563,15 +554,15 @@ describe("TeamWebRtcClientTransport", () => {
     });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.connect("host-1"));
     bridge.emit("disconnected", "host-1");
     nowSpy.mockReturnValue(now + 80_000);
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.connect("host-1"));
 
     expect(startSession).toHaveBeenCalledTimes(2);
     expect(issueTicket).toHaveBeenNthCalledWith(2, "session-2", expect.stringContaining("PUBLIC KEY"));
     expect(endSession).toHaveBeenCalledWith("session-1");
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
     nowSpy.mockRestore();
   });
 
@@ -589,15 +580,13 @@ describe("TeamWebRtcClientTransport", () => {
     const authentication = mockAuthenticatedSend(bridge);
     vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = createTransport(bridge);
-    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.listHosts());
     transport.pinHostKey("host-1", hostKeys.publicKey);
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.connect("host-1"));
 
     // `GET /v1/agents/:id/usage` is one of the routes carried by the V3 codec, so its body is the
     // adapter's to accept -- and a number where the shape says otherwise is not something it can.
-    const pending = Effect.runPromise(
-      transport.request("host-1", "/v1/agents/research/usage").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const pending = runCauseEffect(transport.request("host-1", "/v1/agents/research/usage"));
     const rejection = expect(pending).rejects.toMatchObject({ code: "protocol_error" });
     await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
     bridge.emit(
@@ -613,7 +602,7 @@ describe("TeamWebRtcClientTransport", () => {
     );
 
     await rejection;
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("carries channel payloads and revision events outside the released base adapter", async () => {
@@ -626,12 +615,10 @@ describe("TeamWebRtcClientTransport", () => {
     const authentication = mockAuthenticatedSend(bridge);
     vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
     const transport = createTransport(bridge);
-    await Effect.runPromise(transport.listHosts().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.listHosts());
     transport.pinHostKey("host-1", hostKeys.publicKey);
-    await Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
-    const pending = Effect.runPromise(
-      transport.request("host-1", "/v1/channels").pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(transport.connect("host-1"));
+    const pending = runCauseEffect(transport.request("host-1", "/v1/channels"));
     await vi.waitFor(() => expect(sentRequestId(authentication.send)).toBeTruthy());
     const channels = [
       {
@@ -688,7 +675,7 @@ describe("TeamWebRtcClientTransport", () => {
       );
       expect(event).toHaveBeenCalledWith("host-1", payload);
     }
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 
   it("rejects every concurrent caller when the bridge connection fails", async () => {
@@ -722,9 +709,9 @@ describe("TeamWebRtcClientTransport", () => {
     const transport = createTransport(bridge, { startSession, issueTicket, endSession });
     transport.pinHostKey("host-1", hostKeys.publicKey);
 
-    const first = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const first = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledOnce());
-    const second = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const second = runCauseEffect(transport.connect("host-1"));
     rejectBridge(new Error("bridge failed"));
     const results = await Promise.allSettled([first, second]);
 
@@ -734,7 +721,7 @@ describe("TeamWebRtcClientTransport", () => {
     );
     // A failed attempt keeps its session, so a retry against an offline host costs one ticket.
     expect(endSession).not.toHaveBeenCalled();
-    const retry = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const retry = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledTimes(2));
     rejectBridge(new Error("bridge failed"));
     await expect(retry).rejects.toThrow("bridge failed");
@@ -745,19 +732,17 @@ describe("TeamWebRtcClientTransport", () => {
     // A temporary account API failure keeps the session; only an ended session is replaced.
     const apiError = (status: number) => Object.assign(new Error(`status ${status}`), { status });
     issueTicket.mockReturnValueOnce(Effect.fail(new CentralAuthOperationError({ cause: apiError(503) })));
-    await expect(
-      Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("status 503");
+    await expect(runCauseEffect(transport.connect("host-1"))).rejects.toThrow("status 503");
     expect(startSession).toHaveBeenCalledOnce();
     expect(endSession).not.toHaveBeenCalled();
     issueTicket.mockReturnValueOnce(Effect.fail(new CentralAuthOperationError({ cause: apiError(403) })));
-    const replaced = Effect.runPromise(transport.connect("host-1").pipe(Effect.mapError((error) => error.cause)));
+    const replaced = runCauseEffect(transport.connect("host-1"));
     await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledTimes(3));
     rejectBridge(new Error("bridge failed"));
     await expect(replaced).rejects.toThrow("bridge failed");
     expect(endSession).toHaveBeenCalledWith("session-1");
     expect(startSession).toHaveBeenCalledTimes(2);
 
-    await Effect.runPromise(transport.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transport.stop());
   });
 });

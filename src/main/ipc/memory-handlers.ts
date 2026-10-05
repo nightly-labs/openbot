@@ -1,9 +1,8 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
 // An agent's long-lived memories: the notes it carries between threads.
 
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { decodeAgentMemories, decodeAgentMemory } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
@@ -25,54 +24,47 @@ export function memoryIpcHandlers({
       listMemories: scopedHandler(parseAgentId, {
         local: (agentId) => service.listMemories(agentId),
         remote: (agentId, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeAgentMemories)
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-          ),
+          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeAgentMemories)),
       }),
       createMemory: scopedHandler(parseCreateAgentMemory, {
         local: (parsed) => service.createMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.memories(parsed.agentId), decodeAgentMemory, {
-                method: "POST",
-                body: { text: parsed.text },
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(parsed.agentId), decodeAgentMemory, {
+              method: "POST",
+              body: { text: parsed.text },
+            }),
           ),
       }),
       updateMemory: scopedHandler(parseUpdateAgentMemory, {
         local: (parsed) => service.updateMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId), decodeAgentMemory, {
+          runCauseEffect(
+            remoteServers.request(
+              serverId,
+              TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId),
+              decodeAgentMemory,
+              {
                 method: "PATCH",
                 body: { text: parsed.text },
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+              },
+            ),
           ),
       }),
       deleteMemory: scopedHandler(parseDeleteAgentMemory, {
         local: (parsed) => service.deleteMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId), decodeVoid, {
-                method: "DELETE",
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId), decodeVoid, {
+              method: "DELETE",
+            }),
           ),
       }),
       clearMemories: scopedHandler(parseAgentId, {
         local: (agentId) => service.clearMemories(agentId),
         remote: (agentId, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeVoid, { method: "DELETE" })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeVoid, { method: "DELETE" }),
           ),
       }),
     },

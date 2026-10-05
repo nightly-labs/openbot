@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { runTestEffect } from "../backend/effect-test-runtime";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { LifecycleGate } from "./lifecycle-gate";
 
 describe("LifecycleGate", () => {
@@ -13,9 +13,9 @@ describe("LifecycleGate", () => {
       });
 
     await Promise.all([
-      runTestEffect(gate.stop(record("stop"))),
-      runTestEffect(gate.start(record("start"))),
-      runTestEffect(gate.stop(record("stop"))),
+      runCauseEffect(gate.stop(record("stop"))),
+      runCauseEffect(gate.start(record("start"))),
+      runCauseEffect(gate.stop(record("stop"))),
     ]);
 
     expect(calls).toEqual(["stop", "start", "stop"]);
@@ -25,7 +25,7 @@ describe("LifecycleGate", () => {
     const gate = new LifecycleGate<void, never>();
     const calls: string[] = [];
     let endStart = (): void => undefined;
-    const start = runTestEffect(
+    const start = runCauseEffect(
       gate.start(() =>
         Effect.callback<void>((resume) => {
           calls.push("start");
@@ -33,14 +33,14 @@ describe("LifecycleGate", () => {
         }),
       ),
     );
-    const secondStart = runTestEffect(
+    const secondStart = runCauseEffect(
       gate.start(() =>
         Effect.sync(() => {
           calls.push("second start");
         }),
       ),
     );
-    const stop = runTestEffect(
+    const stop = runCauseEffect(
       gate.stop(
         () =>
           Effect.sync(() => {

@@ -1,7 +1,7 @@
-import { Effect } from "effect";
 // The cloud account: email sign-in, profile, and the mobile devices connected to it.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CentralAuthManager } from "../central-auth-manager";
 import type { HostService } from "../host-service";
 import { createHostedMobileConnect } from "../mobile-connect-host";
@@ -19,43 +19,25 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
   return {
     auth: {
       getState: handler(() => centralAuth.getState()),
-      retry: handler(() => Effect.runPromise(centralAuth.retry().pipe(Effect.mapError((error) => error.cause)))),
+      retry: handler(() => runCauseEffect(centralAuth.retry())),
       requestEmailCode: payloadHandler(stringPayload("email", INPUT_LIMITS.email), (email) =>
-        Effect.runPromise(centralAuth.requestEmailCode(email).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(centralAuth.requestEmailCode(email)),
       ),
       verifyEmailCode: payloadHandler(parseEmailCodeVerification, (verification) =>
-        Effect.runPromise(
-          centralAuth
-            .verifyEmailCode(verification.challengeId, verification.code)
-            .pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(centralAuth.verifyEmailCode(verification.challengeId, verification.code)),
       ),
-      updateName: payloadHandler(parseProfileName, (name) =>
-        Effect.runPromise(centralAuth.updateName(name).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      updateAvatar: payloadHandler(parseAvatarImage, (parsed) =>
-        Effect.runPromise(centralAuth.updateAvatar(parsed).pipe(Effect.mapError((error) => error.cause))),
-      ),
-      createMobileConnect: handler(() =>
-        Effect.runPromise(
-          createHostedMobileConnect({ centralAuth, host }).pipe(Effect.mapError((error) => error.cause)),
-        ),
-      ),
-      listMobileConnectedDevices: handler(() =>
-        Effect.runPromise(centralAuth.listMobileConnectedDevices().pipe(Effect.mapError((error) => error.cause))),
-      ),
-      listAccountSessions: handler(() =>
-        Effect.runPromise(centralAuth.listAccountSessions().pipe(Effect.mapError((error) => error.cause))),
-      ),
+      updateName: payloadHandler(parseProfileName, (name) => runCauseEffect(centralAuth.updateName(name))),
+      updateAvatar: payloadHandler(parseAvatarImage, (parsed) => runCauseEffect(centralAuth.updateAvatar(parsed))),
+      createMobileConnect: handler(() => runCauseEffect(createHostedMobileConnect({ centralAuth, host }))),
+      listMobileConnectedDevices: handler(() => runCauseEffect(centralAuth.listMobileConnectedDevices())),
+      listAccountSessions: handler(() => runCauseEffect(centralAuth.listAccountSessions())),
       revokeAccountSession: payloadHandler(stringPayload("sessionId", INPUT_LIMITS.identifier), (sessionId) =>
-        Effect.runPromise(centralAuth.revokeAccountSession(sessionId).pipe(Effect.mapError((error) => error.cause))),
+        runCauseEffect(centralAuth.revokeAccountSession(sessionId)),
       ),
       revokeMobileConnectedDevice: payloadHandler(stringPayload("sessionId", INPUT_LIMITS.identifier), (sessionId) =>
-        Effect.runPromise(
-          centralAuth.revokeMobileConnectedDevice(sessionId).pipe(Effect.mapError((error) => error.cause)),
-        ),
+        runCauseEffect(centralAuth.revokeMobileConnectedDevice(sessionId)),
       ),
-      logout: handler(() => Effect.runPromise(centralAuth.logout().pipe(Effect.mapError((error) => error.cause)))),
+      logout: handler(() => runCauseEffect(centralAuth.logout())),
     },
   };
 }

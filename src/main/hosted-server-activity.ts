@@ -1,6 +1,7 @@
 import type { HostedServerActivityReport } from "@openbot/contracts/hosted-servers";
 import { Deferred, Effect } from "effect";
-import { type RemoteWorkflowError, runRemoteWorkflow } from "./remote-service-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 
 /**
  * A hosted server tells the Worker that it is in use (a client works with it or an agent works) and
@@ -46,7 +47,7 @@ export class HostedServerActivity {
   start(): void {
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void runRemoteWorkflow(this.tick()).catch((error) =>
+      void runCauseEffect(this.tick()).catch((error) =>
         this.#options.onError("The hosted server activity report failed.", error),
       );
     }, SAMPLE_INTERVAL_MS);

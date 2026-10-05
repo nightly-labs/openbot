@@ -29,6 +29,7 @@ import { join } from "node:path";
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { expect, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { RemoteHostSummary } from "./central-auth-records";
 import { RemoteServerManager } from "./remote-server-manager";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
@@ -245,7 +246,7 @@ export async function createRemoteManager(options: RemoteManagerOptions = {}): P
     server: (serverId = servers[0]?.id ?? "") => manager.list().find((server) => server.id === serverId),
   };
   openFixtures.push(fixture);
-  await Effect.runPromise(manager.initialize().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(manager.initialize());
   return fixture;
 }
 

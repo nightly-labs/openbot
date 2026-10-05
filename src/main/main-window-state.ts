@@ -3,6 +3,7 @@ import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { Deferred, Effect } from "effect";
 import type { Rectangle } from "electron";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
@@ -149,15 +150,12 @@ export function createMainWindowBoundsRecorder({
   let write: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
 
   function queueWrite(): Promise<void> {
-    if (!bounds)
-      return write
-        ? Effect.runPromise(Deferred.await(write).pipe(Effect.mapError((error) => error.cause)))
-        : Promise.resolve();
+    if (!bounds) return write ? runCauseEffect(Deferred.await(write)) : Promise.resolve();
     const pending = { ...bounds };
     const previous = write;
     const done = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     write = done;
-    return Effect.runPromise(
+    return runCauseEffect(
       (previous ? Deferred.await(previous) : Effect.void).pipe(
         Effect.catch((error) =>
           Effect.sync(() => reportError("Unable to save the previous main window position:", error.cause)),
@@ -165,14 +163,13 @@ export function createMainWindowBoundsRecorder({
         Effect.andThen(writeBounds(pending)),
         Effect.onExit((exit) => Deferred.done(done, exit)),
         Effect.uninterruptible,
-        Effect.mapError((error) => error.cause),
       ),
     );
   }
 
   return {
     async restoreMainWindowBounds() {
-      bounds = await Effect.runPromise(readBounds().pipe(Effect.mapError((error) => error.cause))).catch((error) => {
+      bounds = await runCauseEffect(readBounds()).catch((error) => {
         reportError("Unable to restore the main window position:", error);
         return null;
       });

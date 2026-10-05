@@ -1,12 +1,5 @@
 import { Deferred, Effect, Exit, Result, Schema } from "effect";
-import {
-  type ArchiveOperationError,
-  archiveCall,
-  archiveFailure,
-  archiveResult,
-  archiveSync,
-  runArchiveEffect,
-} from "./archive-effects";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveResult, archiveSync } from "./archive-effects";
 // Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
 // of a joined client with `agent-import-v1`.
 //
@@ -42,6 +35,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { unzipSync, zipSync } from "fflate";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { isPathInside } from "../backend/path-containment";
 import {
   AGENT_IMPORT_MANIFEST,
@@ -266,7 +260,7 @@ export class AgentImportService {
     };
     if (temporary) {
       slot.expiry = setTimeout(() => {
-        void runArchiveEffect(this.#drop(token, slot));
+        void runCauseEffect(this.#drop(token, slot));
       }, UPLOAD_TTL_MS);
       slot.expiry.unref();
     }

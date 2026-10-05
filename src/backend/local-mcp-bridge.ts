@@ -14,7 +14,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Deferred, Effect, Exit } from "effect";
-import { type McpOperationError, mcpCall, mcpFailure, mcpResult, mcpSync, runMcpEffect } from "./mcp-effects";
+import { runCauseEffect } from "./effect-boundary";
+import { type McpOperationError, mcpCall, mcpFailure, mcpResult, mcpSync } from "./mcp-effects";
 import type { DynamicToolResult } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 
@@ -171,7 +172,7 @@ export class LocalMcpBridge {
   ): Effect.fn.Return<void, McpOperationError> {
     let retained = false;
     yield* Effect.acquireUseRelease(
-      mcpSync(() => createServer((request, response) => void runMcpEffect(this.#handle(request, response)))),
+      mcpSync(() => createServer((request, response) => void runCauseEffect(this.#handle(request, response)))),
       (server) =>
         Effect.gen({ self: this }, function* () {
           yield* mcpCall(
@@ -227,7 +228,7 @@ export class LocalMcpBridge {
       })),
     }));
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) =>
-      runMcpEffect(
+      runCauseEffect(
         Effect.gen({ self: this }, function* (): Effect.fn.Return<CallToolResult, McpOperationError> {
           const tool = route.namespace.tools.find((candidate) => candidate.name === params.name);
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));

@@ -1,10 +1,9 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
 // What a channel remembers: the notes every member of it carries into a turn.
 
 import { decodeChannelMemories, decodeChannelMemory } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
@@ -30,61 +29,51 @@ export function channelMemoryIpcHandlers({
       listChannelMemories: scopedHandler(parseChannelId, {
         local: (channelId) => service.listChannelMemories(channelId),
         remote: (channelId, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
-                method: "POST",
-                body: { channelId },
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
+              method: "POST",
+              body: { channelId },
+            }),
           ),
       }),
       createChannelMemory: scopedHandler(parseCreateChannelMemory, {
         local: (parsed) => service.createChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
+              method: "POST",
+              body: parsed,
+            }),
           ),
       }),
       updateChannelMemory: scopedHandler(parseUpdateChannelMemory, {
         local: (parsed) => service.updateChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
+              method: "POST",
+              body: parsed,
+            }),
           ),
       }),
       deleteChannelMemory: scopedHandler(parseDeleteChannelMemory, {
         local: (parsed) => service.deleteChannelMemory(parsed),
         remote: (parsed, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
-                method: "POST",
-                body: parsed,
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
+              method: "POST",
+              body: parsed,
+            }),
           ),
       }),
       clearChannelMemories: scopedHandler(parseChannelId, {
         local: (channelId) => service.clearChannelMemories(channelId),
         remote: (channelId, serverId) =>
-          Effect.runPromise(
-            remoteServers
-              .request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
-                method: "POST",
-                body: { channelId },
-              })
-              .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
+              method: "POST",
+              body: { channelId },
+            }),
           ),
       }),
     },

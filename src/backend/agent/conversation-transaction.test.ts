@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentStore } from "../agent-store";
-import { runTestEffect } from "../effect-test-runtime";
+import { runCauseEffect } from "../effect-boundary";
 import { CONVERSATION_SNAPSHOT_IDLE_MS, ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
 
 let root: string;
@@ -32,8 +32,8 @@ function threadRowCount(): number {
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-conversation-transaction-"));
   store = new AgentStore(join(root, "user-data"), join(root, "home"));
-  await runTestEffect(store.initialize());
-  await runTestEffect(store.getOrCreate(AGENT_ID, "Design Studio", "Product design"));
+  await runCauseEffect(store.initialize());
+  await runCauseEffect(store.getOrCreate(AGENT_ID, "Design Studio", "Product design"));
   runtime = new ConversationRuntime(
     store,
     () => undefined,

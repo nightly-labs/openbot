@@ -3,6 +3,7 @@ import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { RemoteTeamDirectory } from "./remote-team-directory";
 
 function legacyHost() {
@@ -30,11 +31,7 @@ function legacyHost() {
 describe("RemoteTeamDirectory", () => {
   it("refuses permanent links on legacy HTTP hosts instead of minting single-use", async () => {
     await expect(
-      Effect.runPromise(
-        legacyHost()
-          .createInvite("server-1", { role: "member", permanent: true })
-          .pipe(Effect.mapError((error) => error.cause)),
-      ),
+      runCauseEffect(legacyHost().createInvite("server-1", { role: "member", permanent: true })),
     ).rejects.toThrow("does not support permanent invitation links");
   });
 });

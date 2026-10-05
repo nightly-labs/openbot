@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentService } from "./agent-service";
 import { startAgentTestFixture, startService, stopAgentTestFixture } from "./agent-service-test-harness";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 import { restartActivityGeneration } from "./restart-activity";
 
 let root: string;
@@ -21,16 +21,16 @@ describe.sequential("AgentService: restart activity", () => {
   it("reports idle with nothing queued and no provider work", async () => {
     const started = await startService(root, { provider: "codex" });
     service = started.service;
-    await runTestEffect(started.store.getOrCreate("chief"));
+    await runCauseEffect(started.store.getOrCreate("chief"));
     expect(service.hasActiveWork()).toEqual([]);
   });
 
   it("reports queued work right after a message arrives", async () => {
     const started = await startService(root, { provider: "codex" });
     service = started.service;
-    await runTestEffect(started.store.getOrCreate("chief"));
+    await runCauseEffect(started.store.getOrCreate("chief"));
     const before = restartActivityGeneration();
-    await runTestEffect(
+    await runCauseEffect(
       started.mailbox.enqueue({
         sender: { kind: "user" },
         recipientAgentIds: ["chief"],

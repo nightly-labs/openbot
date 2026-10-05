@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { runDesktopEffect } from "./remote-desktop-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 
 describe("resolveRemoteDesktopRuntime", () => {
@@ -15,7 +15,7 @@ describe("resolveRemoteDesktopRuntime", () => {
       writeFile(join(root, "streamer"), "streamer"),
     ]);
     await expect(
-      runDesktopEffect(
+      runCauseEffect(
         resolveRemoteDesktopRuntime({
           isPackaged: false,
           resourcesPath: root,

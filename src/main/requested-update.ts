@@ -23,7 +23,8 @@ import type {
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Scope } from "effect";
-import { RemoteWorkflowError, remoteDecode, runRemoteWorkflow } from "./remote-service-effects";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import type { RestartReadiness } from "./update-readiness";
 
 export type RequestedUpdateRefusalReason = "disabled" | "managed" | "unsupported" | "restarting";
@@ -110,7 +111,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #publishing = false;
   readonly #workScope = Scope.makeUnsafe();
   readonly #onStatus = (status: UpdateStatus) => {
-    void runRemoteWorkflow(this.#advance(status));
+    void runCauseEffect(this.#advance(status));
   };
 
   constructor(options: RequestedUpdateOptions) {
@@ -275,7 +276,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     this.#clearTimer();
     this.#timer = setTimeout(() => {
       this.#timer = null;
-      void runRemoteWorkflow(this.#attemptEffect());
+      void runCauseEffect(this.#attemptEffect());
     }, delayMs);
     this.#timer.unref?.();
   }

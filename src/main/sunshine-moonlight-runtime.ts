@@ -16,14 +16,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { LifecycleGate } from "./lifecycle-gate";
-import {
-  desktopCall,
-  desktopFailure,
-  desktopSync,
-  type RemoteDesktopOperationError,
-  runDesktopEffect,
-} from "./remote-desktop-effects";
+import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
@@ -1085,7 +1080,7 @@ export class SunshineMoonlightRuntime {
             response.writeHead(401).end();
             return;
           }
-          void runDesktopEffect(
+          void runCauseEffect(
             this.#options.getIceServers().pipe(
               Effect.flatMap((servers) =>
                 desktopSync(() => {

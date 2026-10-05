@@ -1,5 +1,5 @@
-import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import { remoteCall } from "./remote-service-effects";
 
@@ -15,30 +15,20 @@ describe("RemoteAttachmentCache", () => {
     const other = vi.fn(async () => attachment("b"));
 
     await Promise.all([
-      Effect.runPromise(
-        cache.get("one", "file", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-      ),
-      Effect.runPromise(
-        cache.get("one", "file", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-      ),
+      runCauseEffect(cache.get("one", "file", () => remoteCall(download))),
+      runCauseEffect(cache.get("one", "file", () => remoteCall(download))),
     ]);
-    await expect(
-      Effect.runPromise(
-        cache.get("one", "file", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).resolves.toMatchObject({ name: "a" });
-    await expect(
-      Effect.runPromise(
-        cache.get("two", "file", () => remoteCall(other)).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).resolves.toMatchObject({ name: "b" });
+    await expect(runCauseEffect(cache.get("one", "file", () => remoteCall(download)))).resolves.toMatchObject({
+      name: "a",
+    });
+    await expect(runCauseEffect(cache.get("two", "file", () => remoteCall(other)))).resolves.toMatchObject({
+      name: "b",
+    });
     expect(download).toHaveBeenCalledOnce();
     expect(other).toHaveBeenCalledOnce();
 
     now = 10 * 60_000;
-    await Effect.runPromise(
-      cache.get("one", "file", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(cache.get("one", "file", () => remoteCall(download)));
     expect(download).toHaveBeenCalledTimes(2);
   });
 
@@ -46,42 +36,26 @@ describe("RemoteAttachmentCache", () => {
     const cache = new RemoteAttachmentCache();
     let finish: (value: RemoteAttachment) => void = () => undefined;
     const slow = vi.fn(() => new Promise<RemoteAttachment>((resolve) => (finish = resolve)));
-    const pending = Effect.runPromise(
-      cache.get("one", "late", () => remoteCall(slow)).pipe(Effect.mapError((error) => error.cause)),
-    );
-    await Effect.runPromise(
-      cache
-        .get("one", "early", () => remoteCall(async () => attachment("e")))
-        .pipe(Effect.mapError((error) => error.cause)),
-    );
+    const pending = runCauseEffect(cache.get("one", "late", () => remoteCall(slow)));
+    await runCauseEffect(cache.get("one", "early", () => remoteCall(async () => attachment("e"))));
 
     cache.forget("one");
     finish(attachment("l"));
     await pending;
 
     const again = vi.fn(async () => attachment("x"));
-    await Effect.runPromise(
-      cache.get("one", "late", () => remoteCall(again)).pipe(Effect.mapError((error) => error.cause)),
-    );
-    await Effect.runPromise(
-      cache.get("one", "early", () => remoteCall(again)).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(cache.get("one", "late", () => remoteCall(again)));
+    await runCauseEffect(cache.get("one", "early", () => remoteCall(again)));
     expect(again).toHaveBeenCalledTimes(2);
   });
 
   it("does not keep a failed download", async () => {
     const cache = new RemoteAttachmentCache();
     await expect(
-      Effect.runPromise(
-        cache
-          .get("one", "file", () => remoteCall(async () => Promise.reject(new Error("offline"))))
-          .pipe(Effect.mapError((error) => error.cause)),
-      ),
+      runCauseEffect(cache.get("one", "file", () => remoteCall(async () => Promise.reject(new Error("offline"))))),
     ).rejects.toThrow("offline");
     const download = vi.fn(async () => attachment("a"));
-    await Effect.runPromise(
-      cache.get("one", "file", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(cache.get("one", "file", () => remoteCall(download)));
     expect(download).toHaveBeenCalledOnce();
   });
 
@@ -89,30 +63,14 @@ describe("RemoteAttachmentCache", () => {
     const cache = new RemoteAttachmentCache();
     const megabytes = 16 * 1024 * 1024;
     for (const id of ["a", "b", "c", "d"])
-      await Effect.runPromise(
-        cache
-          .get("one", id, () => remoteCall(async () => attachment(id, megabytes)))
-          .pipe(Effect.mapError((error) => error.cause)),
-      );
-    await Effect.runPromise(
-      cache
-        .get("one", "a", () => remoteCall(async () => attachment("a")))
-        .pipe(Effect.mapError((error) => error.cause)),
-    );
-    await Effect.runPromise(
-      cache
-        .get("one", "e", () => remoteCall(async () => attachment("e", megabytes)))
-        .pipe(Effect.mapError((error) => error.cause)),
-    );
+      await runCauseEffect(cache.get("one", id, () => remoteCall(async () => attachment(id, megabytes))));
+    await runCauseEffect(cache.get("one", "a", () => remoteCall(async () => attachment("a"))));
+    await runCauseEffect(cache.get("one", "e", () => remoteCall(async () => attachment("e", megabytes))));
 
     const download = vi.fn(async () => attachment("z"));
-    await Effect.runPromise(
-      cache.get("one", "a", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(cache.get("one", "a", () => remoteCall(download)));
     expect(download).not.toHaveBeenCalled();
-    await Effect.runPromise(
-      cache.get("one", "b", () => remoteCall(download)).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(cache.get("one", "b", () => remoteCall(download)));
     expect(download).toHaveBeenCalledOnce();
   });
 });

@@ -25,7 +25,7 @@ import {
   stopAgentTestFixture,
   waitFor,
 } from "../backend/agent-service-test-harness";
-import { runTestEffect } from "../backend/effect-test-runtime";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { type MessagingCredentials, MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { SlackIngress } from "./slack-ingress";
@@ -223,7 +223,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  if (messaging) await runTestEffect(messaging.stop());
+  if (messaging) await runCauseEffect(messaging.stop());
   messaging = null;
   if (ingress) await Effect.runPromise(ingress.dispose());
   ingress = null;
@@ -237,7 +237,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
   it("connects a workspace, receives its events through Signal, and disconnects it", async () => {
     const started = await startService(root, { provider: "codex", autoComplete: true });
     service = started.service;
-    await runTestEffect(started.store.getOrCreate("slack-agent"));
+    await runCauseEffect(started.store.getOrCreate("slack-agent"));
     const credentials = new MemoryCredentials();
     const authorizations: Array<{ hostNonce: string; hostPublicKey: string }> = [];
     const unlinked: string[] = [];
@@ -278,12 +278,12 @@ describe.sequential("OpenBot Slack app end to end", () => {
       },
       slackOrigin: slack.origin,
     });
-    await runTestEffect(messaging.start());
+    await runCauseEffect(messaging.start());
 
     // The install: the bot token comes back sealed to this connect's key, and only this run opens it.
     const connect = async () => {
       if (!messaging) throw new Error("Messaging service is missing.");
-      await runTestEffect(messaging.connectSlackWorkspace());
+      await runCauseEffect(messaging.connectSlackWorkspace());
       const authorization = authorizations.at(-1);
       if (!authorization) throw new Error("The connect did not start.");
       const grant = await sealSlackWorkspaceGrant(authorization.hostPublicKey, authorization.hostNonce, {
@@ -293,12 +293,12 @@ describe.sequential("OpenBot Slack app end to end", () => {
         workspaceId: "T1",
         workspaceName: "Test workspace",
       });
-      expect(await runTestEffect(messaging.completeSlackWorkspace("another-nonce", grant))).toBe(false);
-      expect(await runTestEffect(messaging.completeSlackWorkspace(authorization.hostNonce, grant))).toBe(true);
+      expect(await runCauseEffect(messaging.completeSlackWorkspace("another-nonce", grant))).toBe(false);
+      expect(await runCauseEffect(messaging.completeSlackWorkspace(authorization.hostNonce, grant))).toBe(true);
     };
     await connect();
     const connection = () => messaging?.slackOverview().connections[0];
-    const { agentId: orchestratorId } = await runTestEffect(messaging.addOrchestrator({ workspaceId: "T1" }));
+    const { agentId: orchestratorId } = await runCauseEffect(messaging.addOrchestrator({ workspaceId: "T1" }));
     await waitFor(() => connection()?.state === "connected");
     expect(connection()).toMatchObject({ workspaceId: "T1", workspaceName: "Test workspace", credentials: "saved" });
     // The socket told Signal its workspaces with a new route ticket after the connect.
@@ -339,7 +339,7 @@ describe.sequential("OpenBot Slack app end to end", () => {
     expect(connection()?.orchestratorAgentId).toBe(orchestratorId);
 
     // Disconnect revokes the bot token, forgets it, and unlinks the workspace.
-    await runTestEffect(messaging.disconnectSlackWorkspace("T1"));
+    await runCauseEffect(messaging.disconnectSlackWorkspace("T1"));
     expect(slack.of("auth.revoke").map((call) => call.token)).toEqual([BOT_TOKEN]);
     expect(credentials.values.size).toBe(0);
     expect(unlinked).toEqual(["T1", "T1"]);

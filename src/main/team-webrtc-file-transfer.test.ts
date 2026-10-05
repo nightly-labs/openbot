@@ -9,8 +9,8 @@ import {
   encodeTeamProtocolV2FileChunk,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
-import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { restartActivityGeneration } from "../backend/restart-activity";
 import { remoteCall } from "./remote-service-effects";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -61,8 +61,8 @@ describe("TeamWebRtcFileTransfer", () => {
       fileOpen("transfer-1", 4, createHash("sha256").update("test").digest("hex")),
     );
     await vi.waitFor(() => expect(bridge.sent).toHaveLength(1));
-    await Effect.runPromise(first.stop().pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(second.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(first.stop());
+    await runCauseEffect(second.stop());
   });
 
   it("resumes at the last exact offset and verifies SHA-256", async () => {
@@ -72,9 +72,7 @@ describe("TeamWebRtcFileTransfer", () => {
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new TextEncoder().encode("hello-world");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const complete = Effect.runPromise(
-      transfers.receive("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const complete = runCauseEffect(transfers.receive("host-1", "transfer-1"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
     bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes.slice(0, 5)));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
@@ -87,22 +85,18 @@ describe("TeamWebRtcFileTransfer", () => {
     );
 
     await expect(complete).resolves.toMatchObject({ transferId: "transfer-1", size: bytes.byteLength });
-    await expect(
-      Effect.runPromise(transfers.consume("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause))),
-    ).resolves.toMatchObject({ bytes });
+    await expect(runCauseEffect(transfers.consume("host-1", "transfer-1"))).resolves.toMatchObject({ bytes });
     expect(bridge.sent.some((message) => isString(message.data) && message.data.includes('"receivedThrough":5'))).toBe(
       true,
     );
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("rejects a non-contiguous offset", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
-    const waiting = Effect.runPromise(
-      transfers.receive("host-1", "transfer-2").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const waiting = runCauseEffect(transfers.receive("host-1", "transfer-2"));
     bridge.emit(
       "data",
       "host-1",
@@ -111,7 +105,7 @@ describe("TeamWebRtcFileTransfer", () => {
     );
     bridge.emit("data", "host-1", "files", chunk("transfer-2", 2, new Uint8Array([1, 2])));
     await expect(waiting).rejects.toThrow("offset");
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("reports a moving transfer and goes quiet after pickup", async () => {
@@ -122,9 +116,7 @@ describe("TeamWebRtcFileTransfer", () => {
     const bytes = new TextEncoder().encode("hello-world");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const before = restartActivityGeneration();
-    const complete = Effect.runPromise(
-      transfers.receive("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const complete = runCauseEffect(transfers.receive("host-1", "transfer-1"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
     await vi.waitFor(() => expect(transfers.hasActiveTransfers()).toBe(true));
     bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes));
@@ -135,10 +127,10 @@ describe("TeamWebRtcFileTransfer", () => {
       encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-1" }),
     );
     await expect(complete).resolves.toMatchObject({ transferId: "transfer-1" });
-    await Effect.runPromise(transfers.consume("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.consume("host-1", "transfer-1"));
     expect(transfers.hasActiveTransfers()).toBe(false);
     expect(restartActivityGeneration()).toBeGreaterThan(before);
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("disconnects an authenticated peer after an unidentifiable file frame", async () => {
@@ -148,16 +140,14 @@ describe("TeamWebRtcFileTransfer", () => {
     bridge.emit("data", "host-1", "files", "not-a-file-frame");
 
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toEqual(["host-1"]));
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("rejects a completed file with the wrong hash", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
-    const waiting = Effect.runPromise(
-      transfers.receive("host-1", "transfer-3").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const waiting = runCauseEffect(transfers.receive("host-1", "transfer-3"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-3", 4, "0".repeat(64)));
     bridge.emit("data", "host-1", "files", chunk("transfer-3", 0, new TextEncoder().encode("test")));
     bridge.emit(
@@ -167,7 +157,7 @@ describe("TeamWebRtcFileTransfer", () => {
       encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-3" }),
     );
     await expect(waiting).rejects.toThrow("hash");
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("keeps a malformed peer frame isolated from other hosts", async () => {
@@ -175,12 +165,8 @@ describe("TeamWebRtcFileTransfer", () => {
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
     transfers.setPeerAuthenticated("host-2", true);
-    const first = Effect.runPromise(
-      transfers.receive("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause)),
-    );
-    const second = Effect.runPromise(
-      transfers.receive("host-2", "transfer-2").pipe(Effect.mapError((error) => error.cause)),
-    );
+    const first = runCauseEffect(transfers.receive("host-1", "transfer-1"));
+    const second = runCauseEffect(transfers.receive("host-2", "transfer-2"));
     bridge.emit(
       "data",
       "host-1",
@@ -204,7 +190,7 @@ describe("TeamWebRtcFileTransfer", () => {
 
     await expect(first).rejects.toThrow("offset");
     await expect(second).resolves.toMatchObject({ peerId: "host-2", transferId: "transfer-2" });
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("settles a pending receive when the transfer service stops", async () => {
@@ -215,12 +201,10 @@ describe("TeamWebRtcFileTransfer", () => {
       const bridge = new FakeBridge();
       const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
       transfers.setPeerAuthenticated("host-1", true);
-      const waiting = Effect.runPromise(
-        transfers.receive("host-1", "transfer-1").pipe(Effect.mapError((error) => error.cause)),
-      );
+      const waiting = runCauseEffect(transfers.receive("host-1", "transfer-1"));
       expect(vi.getTimerCount()).toBe(1);
 
-      await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(transfers.stop());
 
       expect(vi.getTimerCount()).toBe(0);
       await expect(waiting).rejects.toThrow("The WebRTC file transport stopped.");
@@ -235,10 +219,8 @@ describe("TeamWebRtcFileTransfer", () => {
     bridge.onReconnect = () => transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 1024 * 1024);
     bytes.fill(7);
-    const sending = Effect.runPromise(
-      transfers
-        .send("host-1", { name: "large.bin", mimeType: "application/octet-stream", bytes })
-        .pipe(Effect.mapError((error) => error.cause)),
+    const sending = runCauseEffect(
+      transfers.send("host-1", { name: "large.bin", mimeType: "application/octet-stream", bytes }),
     );
     transfers.setPeerAuthenticated("host-1", true);
     const transferId = await sending;
@@ -246,7 +228,7 @@ describe("TeamWebRtcFileTransfer", () => {
     expect(bridge.openTransferIds).toEqual([transferId, transferId]);
     expect(bridge.firstOffsetAfterReconnect).toBe(bridge.resumeAcknowledged);
     expect(bridge.acknowledged).toBe(bytes.byteLength);
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("uses the last acknowledged progress instead of a fixed whole-transfer deadline", async () => {
@@ -262,17 +244,15 @@ describe("TeamWebRtcFileTransfer", () => {
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 60 * 1024 + 1);
 
-    const transferId = await Effect.runPromise(
-      transfers
-        .send("host-1", {
-          name: "slow.bin",
-          mimeType: "application/octet-stream",
-          bytes,
-        })
-        .pipe(Effect.mapError((error) => error.cause)),
+    const transferId = await runCauseEffect(
+      transfers.send("host-1", {
+        name: "slow.bin",
+        mimeType: "application/octet-stream",
+        bytes,
+      }),
     );
     expect(transferId).toBe(bridge.transferId);
-    await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(transfers.stop());
   });
 
   it("releases quota for file declarations that make no progress", async () => {
@@ -301,7 +281,7 @@ describe("TeamWebRtcFileTransfer", () => {
         receivedThrough: 0,
       });
     } finally {
-      await Effect.runPromise(transfers.stop().pipe(Effect.mapError((error) => error.cause)));
+      await runCauseEffect(transfers.stop());
     }
   });
 });

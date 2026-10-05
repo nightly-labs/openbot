@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Effect } from "effect";
 import { afterEach, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
 
@@ -55,7 +55,7 @@ for (const cancel of [false, true]) {
         if (status.state === "connected") connected.resolve();
       });
       try {
-        await Effect.runPromise(service.connect().pipe(Effect.mapError((error) => error.cause)));
+        await runCauseEffect(service.connect());
         await vi.advanceTimersByTimeAsync(1_000);
         await arrived.promise;
         if (cancel) service.cancel();
@@ -66,15 +66,15 @@ for (const cancel of [false, true]) {
           await connected.promise;
           expect(await readFile(join(tools, "token"), "utf8")).toBe("test-access-token");
           expect(store.read()?.accessToken).toBe("test-access-token");
-          await Effect.runPromise(service.disconnect().pipe(Effect.mapError((error) => error.cause)));
+          await runCauseEffect(service.disconnect());
         }
-        await Effect.runPromise(service.dispose().pipe(Effect.mapError((error) => error.cause)));
+        await runCauseEffect(service.dispose());
         expect(store.read()).toBeNull();
         await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
         await expect(readFile(join(tools, "token"))).rejects.toMatchObject({ code: "ENOENT" });
       } finally {
         token.resolve(new Response(null, { status: 500 }));
-        await Effect.runPromise(service.dispose().pipe(Effect.mapError((error) => error.cause)));
+        await runCauseEffect(service.dispose());
         await rm(directory, { recursive: true, force: true });
       }
     },

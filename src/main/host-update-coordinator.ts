@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { Deferred, Effect } from "effect";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { restartActivityGeneration } from "../backend/restart-activity";
 import {
   HOST_HEARTBEAT_TIMEOUT_MS,
@@ -13,7 +14,7 @@ import {
   verifyTenantDirectory,
   writeProtocolJson,
 } from "./host-update-files";
-import { RemoteWorkflowError, remoteCall, runRemoteWorkflow } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import type { RestartReadiness } from "./update-readiness";
 
 interface HostUpdateCoordinatorOptions {
@@ -49,7 +50,7 @@ export class HostUpdateCoordinator {
     if ((this.#options.platform ?? process.platform) !== "darwin") return;
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void runRemoteWorkflow(this.tick()).catch(() =>
+      void runCauseEffect(this.tick()).catch(() =>
         this.#options.onDiagnostic?.("Host status exchange failed. Contact the host administrator."),
       );
     }, HOST_POLL_MS);

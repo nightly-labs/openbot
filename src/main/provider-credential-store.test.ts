@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { ProviderCredentialStore } from "./provider-credential-store";
 
 /**
@@ -27,7 +28,7 @@ async function createStore(): Promise<{ path: string; store: ProviderCredentialS
 describe("ProviderCredentialStore", () => {
   it("reads back a saved key in a new store", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "zen-key-value"));
 
     const reopened = new ProviderCredentialStore(path, cipher);
     await Effect.runPromise(reopened.load());
@@ -39,7 +40,7 @@ describe("ProviderCredentialStore", () => {
 
   it("writes no plaintext to disk", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "zen-key-value"));
 
     // The file is the one artifact a backup tool, a sync client, or a support bundle can pick up,
     // so the key must not be readable in it under any encoding the file uses.
@@ -50,7 +51,7 @@ describe("ProviderCredentialStore", () => {
 
   it.runIf(process.platform !== "win32")("keeps the file readable only by its owner", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "zen-key-value"));
 
     const info = await stat(path);
     expect(info.mode & 0o777).toBe(0o600);
@@ -81,7 +82,7 @@ describe("ProviderCredentialStore", () => {
     const store = new ProviderCredentialStore(path, cipher);
     await Effect.runPromise(store.load());
 
-    await Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "zen-key-value"));
     expect(store.status("opencode")).toBe("saved");
     const reopened = new ProviderCredentialStore(path, cipher);
     expect(await Effect.runPromise(reopened.load())).toBeNull();
@@ -94,15 +95,15 @@ describe("ProviderCredentialStore", () => {
     const store = new ProviderCredentialStore(path, cipher);
     await Effect.runPromise(store.load());
 
-    await Effect.runPromise(store.clear("opencode").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.clear("opencode"));
     expect(store.status("opencode")).toBe("missing");
     await expect(stat(path)).rejects.toThrow();
   });
 
   it("changes nothing when a save cannot be written", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "first-key").pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.set("codex", "codex-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "first-key"));
+    await runCauseEffect(store.set("codex", "codex-key-value"));
     // The key file is the source of truth for a spawn: a key held only in memory would reach a CLI
     // after a failed save, and a removal the file never saw would make a retry do nothing.
     const failing = new ProviderCredentialStore(path, {
@@ -113,19 +114,17 @@ describe("ProviderCredentialStore", () => {
     });
     await Effect.runPromise(failing.load());
 
-    await expect(
-      Effect.runPromise(failing.set("opencode", "second-key").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("System secret storage is unavailable.");
+    await expect(runCauseEffect(failing.set("opencode", "second-key"))).rejects.toThrow(
+      "System secret storage is unavailable.",
+    );
     expect(failing.get("opencode")).toBe("first-key");
-    await expect(
-      Effect.runPromise(failing.clear("opencode").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow("System secret storage is unavailable.");
+    await expect(runCauseEffect(failing.clear("opencode"))).rejects.toThrow("System secret storage is unavailable.");
     expect(failing.get("opencode")).toBe("first-key");
   });
 
   it("keeps the previous key when a write did not finish", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "first-key").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "first-key"));
     // What a crash between the temporary write and the rename leaves behind. The saved key has to
     // survive it, so `load` must read the renamed envelope and never the half-written temporary
     // file: a partial write must not take a paid account away from the user.
@@ -138,10 +137,10 @@ describe("ProviderCredentialStore", () => {
 
   it("clears one provider and keeps the others", async () => {
     const { path, store } = await createStore();
-    await Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(store.set("codex", "codex-key-value").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.set("opencode", "zen-key-value"));
+    await runCauseEffect(store.set("codex", "codex-key-value"));
 
-    await Effect.runPromise(store.clear("opencode").pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.clear("opencode"));
     expect(store.get("opencode")).toBeNull();
     expect(store.get("codex")).toBe("codex-key-value");
 
@@ -155,8 +154,8 @@ describe("ProviderCredentialStore", () => {
     const { path, store } = await createStore();
     // Each provider's save runs in its own provider queue, so two saves can overlap here.
     await Promise.all([
-      Effect.runPromise(store.set("opencode", "zen-key-value").pipe(Effect.mapError((error) => error.cause))),
-      Effect.runPromise(store.set("codex", "codex-key-value").pipe(Effect.mapError((error) => error.cause))),
+      runCauseEffect(store.set("opencode", "zen-key-value")),
+      runCauseEffect(store.set("codex", "codex-key-value")),
     ]);
 
     const reopened = new ProviderCredentialStore(path, cipher);

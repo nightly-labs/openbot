@@ -1,4 +1,3 @@
-import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -7,6 +6,7 @@ import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "./effect-boundary";
 import { McpServerStore } from "./mcp-server-store";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -32,7 +32,7 @@ describe("McpServerStore", () => {
     database.close();
 
     const reopened = new OpenBotDatabase(database.userDataPath);
-    await runTestEffect(reopened.initialize());
+    await runCauseEffect(reopened.initialize());
     const [config] = new McpServerStore(reopened).list();
     expect(config).toEqual({ ...saved, id: saved.id });
     expect(config?.args).toEqual(["--database", "./openbot.db", "--verbose"]);
@@ -193,6 +193,6 @@ async function setup(): Promise<{ database: OpenBotDatabase; store: McpServerSto
   const root = await mkdtemp(join(tmpdir(), "openbot-mcp-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await runTestEffect(database.initialize());
+  await runCauseEffect(database.initialize());
   return { database, store: new McpServerStore(database) };
 }

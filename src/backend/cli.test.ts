@@ -1,4 +1,3 @@
-import { runTestEffect } from "./effect-test-runtime";
 // @vitest-environment node
 
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -26,6 +25,7 @@ import {
   runInLoginShell,
   windowsFallbackPaths,
 } from "./cli";
+import { runCauseEffect } from "./effect-boundary";
 
 const originalAppData = process.env.APPDATA;
 const originalLocalAppData = process.env.LOCALAPPDATA;
@@ -81,7 +81,7 @@ describe("bundled Codex resolution", () => {
     const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
 
     await expect(
-      runTestEffect(resolveCodexCli({ systemCandidates: [system], bundledExecutable: bundled })),
+      runCauseEffect(resolveCodexCli({ systemCandidates: [system], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
       version: "0.149.1",
@@ -95,7 +95,7 @@ describe("bundled Codex resolution", () => {
     const bundled = await createExecutable("bundled-codex", "codex-cli 0.149.1");
 
     await expect(
-      runTestEffect(resolveCodexCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
+      runCauseEffect(resolveCodexCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
       version: "0.149.1",
@@ -130,7 +130,7 @@ describe("bundled Claude resolution", () => {
     const bundled = await createExecutable("bundled-claude", "2.1.246 (Claude Code)");
 
     await expect(
-      runTestEffect(resolveClaudeCli({ systemCandidates: [system], bundledExecutable: bundled })),
+      runCauseEffect(resolveClaudeCli({ systemCandidates: [system], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
       version: "2.1.246",
@@ -144,7 +144,7 @@ describe("bundled Claude resolution", () => {
     const bundled = await createExecutable("bundled-claude", "2.1.246 (Claude Code)");
 
     await expect(
-      runTestEffect(resolveClaudeCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
+      runCauseEffect(resolveClaudeCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
       version: "2.1.246",
@@ -174,17 +174,17 @@ describe("login shell discovery", () => {
     // An interactive bash in OpenBot's group stops the whole group with SIGTTIN when another
     // lookup holds the terminal (#766).
     const shell = { command: "/bin/sh", args: ["-c"] };
-    const [pid, group] = (await runTestEffect(runInLoginShell('echo "$$ $(ps -o pgid= -p $$)"', shell)))
+    const [pid, group] = (await runCauseEffect(runInLoginShell('echo "$$ $(ps -o pgid= -p $$)"', shell)))
       .trim()
       .split(/\s+/u);
     expect(group).toBe(pid);
-    await expect(runTestEffect(runInLoginShell("exit 3", shell))).rejects.toThrow("code 3");
+    await expect(runCauseEffect(runInLoginShell("exit 3", shell))).rejects.toThrow("code 3");
   });
 
   it.runIf(process.platform !== "win32")("finds the path after a profile that prints a greeting", async () => {
     // A `.bashrc` that prints text hid every system CLI on Linux (#1073).
     const shell = { command: "/bin/sh", args: ["-c"] };
-    const stdout = await runTestEffect(runInLoginShell("echo 'Welcome back'; echo; command -v sh", shell));
+    const stdout = await runCauseEffect(runInLoginShell("echo 'Welcome back'; echo; command -v sh", shell));
     expect(commandPathFromShellOutput(stdout)).toMatch(/^\/.*\/sh$/u);
     expect(commandPathFromShellOutput("Welcome back\nalias ll='ls -l'\n")).toBeNull();
   });
@@ -226,7 +226,7 @@ describe("bundled Grok CLI resolution", () => {
     await chmod(executable, 0o700);
     process.env.OPENBOT_GROK_PATH = executable;
 
-    await expect(runTestEffect(resolveGrokCli({ bundledExecutable: null }))).resolves.toEqual({
+    await expect(runCauseEffect(resolveGrokCli({ bundledExecutable: null }))).resolves.toEqual({
       executable,
       version: "1.0.5",
       source: "system",
@@ -235,7 +235,9 @@ describe("bundled Grok CLI resolution", () => {
 
   it("does not fabricate an installed Grok CLI when the configured executable is missing", async () => {
     process.env.OPENBOT_GROK_PATH = join(tmpdir(), `missing-grok-${Date.now()}`);
-    await expect(runTestEffect(resolveGrokCli({ bundledExecutable: null }))).rejects.toMatchObject({ code: "missing" });
+    await expect(runCauseEffect(resolveGrokCli({ bundledExecutable: null }))).rejects.toMatchObject({
+      code: "missing",
+    });
   });
 
   it.runIf(process.platform !== "win32")("falls back when the system CLI is outdated or invalid", async () => {
@@ -244,7 +246,7 @@ describe("bundled Grok CLI resolution", () => {
     const bundled = await createExecutable("bundled-grok", "grok 1.0.5");
 
     await expect(
-      runTestEffect(resolveGrokCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
+      runCauseEffect(resolveGrokCli({ systemCandidates: [outdated, invalid], bundledExecutable: bundled })),
     ).resolves.toEqual({
       executable: bundled,
       version: "1.0.5",
@@ -258,7 +260,7 @@ describe("managed CLI selection", () => {
     const system = await createExecutable("system-grok", "grok 1.0.5");
     const managed = await createExecutable("managed-grok", "grok 1.0.22");
     process.env.OPENBOT_GROK_PATH = system;
-    await expect(runTestEffect(resolveGrokCli({ bundledExecutable: managed }))).resolves.toMatchObject({
+    await expect(runCauseEffect(resolveGrokCli({ bundledExecutable: managed }))).resolves.toMatchObject({
       executable: system,
       source: "system",
     });
@@ -267,7 +269,7 @@ describe("managed CLI selection", () => {
   it.runIf(process.platform !== "win32")("uses the system CLI when the managed copy is missing", async () => {
     const system = await createExecutable("system-grok", "grok 1.0.5");
     await expect(
-      runTestEffect(resolveGrokCli({ systemCandidates: [system], bundledExecutable: `${system}-missing` })),
+      runCauseEffect(resolveGrokCli({ systemCandidates: [system], bundledExecutable: `${system}-missing` })),
     ).resolves.toMatchObject({ executable: system, source: "system" });
   });
 });
@@ -293,8 +295,8 @@ describe("Windows CLI fallback paths", () => {
 
   it.runIf(process.platform === "win32")("runs npm command shims when the user profile contains a space", async () => {
     await createWindowsNpmShims();
-    await expect(runTestEffect(resolveCodexCli())).resolves.toMatchObject({ version: "0.144.1" });
-    await expect(runTestEffect(resolveClaudeCli())).resolves.toMatchObject({ version: "2.1.232", source: "system" });
+    await expect(runCauseEffect(resolveCodexCli())).resolves.toMatchObject({ version: "0.144.1" });
+    await expect(runCauseEffect(resolveClaudeCli())).resolves.toMatchObject({ version: "2.1.232", source: "system" });
   });
 
   it.runIf(process.platform === "win32")("reports a CLI that exists but cannot start", async () => {
@@ -305,7 +307,7 @@ describe("Windows CLI fallback paths", () => {
     await writeFile(join(appData, "npm", "codex.cmd"), "@echo off\r\nexit /b 1\r\n");
     useIsolatedWindowsEnvironment(appData, join(root, "missing-local-app-data"));
 
-    await expect(runTestEffect(resolveCodexCli())).rejects.toMatchObject({
+    await expect(runCauseEffect(resolveCodexCli())).rejects.toMatchObject({
       code: "invalid",
       message: "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
     });
@@ -413,13 +415,13 @@ describe("OpenCode CLI resolution", () => {
   it.runIf(process.platform !== "win32")("uses the installed CLI and reports a missing override", async () => {
     const executable = await createExecutable("opencode", "1.3.13");
     process.env.OPENBOT_OPENCODE_PATH = executable;
-    await expect(runTestEffect(resolveOpencodeCli())).resolves.toEqual({
+    await expect(runCauseEffect(resolveOpencodeCli())).resolves.toEqual({
       executable,
       version: "1.3.13",
       source: "system",
     });
     process.env.OPENBOT_OPENCODE_PATH = join(executable, "missing");
-    await expect(runTestEffect(resolveOpencodeCli())).rejects.toMatchObject({
+    await expect(runCauseEffect(resolveOpencodeCli())).rejects.toMatchObject({
       code: "missing",
       message: "OpenCode is not downloaded. Download it in OpenBot to continue.",
     });
@@ -429,7 +431,7 @@ describe("OpenCode CLI resolution", () => {
     const system = await createExecutable("opencode", "1.3.13");
     const managed = await createExecutable("opencode", "1.18.30");
     await expect(
-      runTestEffect(resolveOpencodeCli({ systemCandidates: [system], bundledExecutable: managed })),
+      runCauseEffect(resolveOpencodeCli({ systemCandidates: [system], bundledExecutable: managed })),
     ).resolves.toEqual({
       executable: managed,
       version: "1.18.30",
@@ -444,7 +446,7 @@ describe("OpenCode CLI resolution", () => {
   it.runIf(process.platform !== "win32")("keeps a system install when nothing is downloaded", async () => {
     const system = await createExecutable("opencode", "1.3.13");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         resolveOpencodeCli({ systemCandidates: [system], bundledExecutable: join(system, "not-downloaded") }),
       ),
     ).resolves.toEqual({ executable: system, version: "1.3.13", source: "system" });
@@ -454,7 +456,7 @@ describe("OpenCode CLI resolution", () => {
     const override = await createExecutable("opencode", "1.3.13");
     const managed = await createExecutable("opencode", "1.18.30");
     process.env.OPENBOT_OPENCODE_PATH = override;
-    await expect(runTestEffect(resolveOpencodeCli({ bundledExecutable: managed }))).resolves.toEqual({
+    await expect(runCauseEffect(resolveOpencodeCli({ bundledExecutable: managed }))).resolves.toEqual({
       executable: override,
       version: "1.3.13",
       source: "system",
@@ -464,13 +466,13 @@ describe("OpenCode CLI resolution", () => {
   it("reports a CLI that cannot be started apart from one that is absent", async () => {
     const broken = await createExecutable("opencode", "not a version");
     await expect(
-      runTestEffect(resolveOpencodeCli({ systemCandidates: [broken], bundledExecutable: null })),
+      runCauseEffect(resolveOpencodeCli({ systemCandidates: [broken], bundledExecutable: null })),
     ).rejects.toMatchObject({
       code: "invalid",
       message: "OpenCode could not start. Run `opencode --version` in a terminal.",
     });
     await expect(
-      runTestEffect(resolveOpencodeCli({ systemCandidates: [], bundledExecutable: null })),
+      runCauseEffect(resolveOpencodeCli({ systemCandidates: [], bundledExecutable: null })),
     ).rejects.toMatchObject({
       code: "missing",
     });

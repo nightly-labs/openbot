@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { resolveRemoteDesktopRuntime } from "../src/main/remote-desktop-runtime-artifact";
 import { SunshineMoonlightRuntime } from "../src/main/sunshine-moonlight-runtime";
 
@@ -40,7 +41,7 @@ const runtime = new SunshineMoonlightRuntime({
 });
 
 try {
-  const state = await Effect.runPromise(runtime.start().pipe(Effect.mapError((error) => error.cause)));
+  const state = await runCauseEffect(runtime.start());
   if (!state.baseUrl.startsWith("http://127.0.0.1:")) throw new Error("Moonlight Web did not bind to loopback.");
   if (state.hostIds.length !== 4 || !state.hostIds.every(Number.isInteger) || !Number.isInteger(state.desktopAppId)) {
     throw new Error("Moonlight Web did not pair with the Sunshine Desktop application.");
@@ -54,6 +55,6 @@ try {
     `Remote desktop runtime is ready on loopback (hosts ${state.hostIds.join(", ")}, app ${state.desktopAppId}).`,
   );
 } finally {
-  await Effect.runPromise(runtime.stop().pipe(Effect.mapError((error) => error.cause)));
+  await runCauseEffect(runtime.stop());
   await rm(stateDirectory, { recursive: true, force: true });
 }

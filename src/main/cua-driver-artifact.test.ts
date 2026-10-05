@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { runTestEffect } from "../backend/effect-test-runtime";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { type CuaDriverArtifactInput, resolveCuaDriver } from "./cua-driver-artifact";
 
 let root: string;
@@ -34,18 +34,18 @@ beforeEach(async () => {
 
 describe("resolveCuaDriver", () => {
   it("returns null when this computer has no driver", async () => {
-    await expect(runTestEffect(resolveCuaDriver(input()))).resolves.toBeNull();
+    await expect(runCauseEffect(resolveCuaDriver(input()))).resolves.toBeNull();
   });
 
   it("finds the checkout build before anything a machine installed", async () => {
     const built = await writeExecutable("source", "build", "cua-driver", "darwin", "arm64", "cua-driver");
     await writeExecutable("home", ".local", "bin", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input()))).resolves.toBe(built);
+    await expect(runCauseEffect(resolveCuaDriver(input()))).resolves.toBe(built);
   });
 
   it("finds the packaged resources copy", async () => {
     const packaged = await writeExecutable("resources", "cua-driver", "darwin", "arm64", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input({ isPackaged: true })))).resolves.toBe(packaged);
+    await expect(runCauseEffect(resolveCuaDriver(input({ isPackaged: true })))).resolves.toBe(packaged);
   });
 
   it("reads nothing but the packaged copy, so a release runs the driver it shipped", async () => {
@@ -53,7 +53,7 @@ describe("resolveCuaDriver", () => {
     const pinned = await writeExecutable("pinned", "cua-driver");
     await writeExecutable("home", ".local", "bin", "cua-driver");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         resolveCuaDriver(input({ isPackaged: true, overrides: [pinned], pathVariable: join(root, "pinned") })),
       ),
     ).resolves.toBe(packaged);
@@ -62,35 +62,37 @@ describe("resolveCuaDriver", () => {
   it("reports no driver for a packaged build that shipped without one", async () => {
     const pinned = await writeExecutable("pinned", "cua-driver");
     await writeExecutable("home", ".local", "bin", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input({ isPackaged: true, overrides: [pinned] })))).resolves.toBeNull();
+    await expect(
+      runCauseEffect(resolveCuaDriver(input({ isPackaged: true, overrides: [pinned] }))),
+    ).resolves.toBeNull();
   });
 
   it("prefers an override over the checkout build", async () => {
     await writeExecutable("source", "build", "cua-driver", "darwin", "arm64", "cua-driver");
     const pinned = await writeExecutable("pinned", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input({ overrides: [pinned] })))).resolves.toBe(pinned);
+    await expect(runCauseEffect(resolveCuaDriver(input({ overrides: [pinned] })))).resolves.toBe(pinned);
   });
 
   it("takes the first override that exists", async () => {
     const second = await writeExecutable("second", "cua-driver");
     await expect(
-      runTestEffect(resolveCuaDriver(input({ overrides: [join(root, "missing", "cua-driver"), second] }))),
+      runCauseEffect(resolveCuaDriver(input({ overrides: [join(root, "missing", "cua-driver"), second] }))),
     ).resolves.toBe(second);
   });
 
   it("ignores a relative override", async () => {
-    await expect(runTestEffect(resolveCuaDriver(input({ overrides: ["./cua-driver"] })))).resolves.toBeNull();
+    await expect(runCauseEffect(resolveCuaDriver(input({ overrides: ["./cua-driver"] })))).resolves.toBeNull();
   });
 
   it("falls back to the install script's directory", async () => {
     const installed = await writeExecutable("home", ".local", "bin", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input()))).resolves.toBe(installed);
+    await expect(runCauseEffect(resolveCuaDriver(input()))).resolves.toBe(installed);
   });
 
   it("reads the driver's own install directory before the default one", async () => {
     await writeExecutable("home", ".local", "bin", "cua-driver");
     const elsewhere = await writeExecutable("opt", "bin", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input({ installDirectory: join(root, "opt", "bin") })))).resolves.toBe(
+    await expect(runCauseEffect(resolveCuaDriver(input({ installDirectory: join(root, "opt", "bin") })))).resolves.toBe(
       elsewhere,
     );
   });
@@ -98,7 +100,7 @@ describe("resolveCuaDriver", () => {
   it("scans PATH last", async () => {
     const onPath = await writeExecutable("usr", "local", "bin", "cua-driver");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         resolveCuaDriver(input({ pathVariable: `${join(root, "empty")}:${join(root, "usr", "local", "bin")}` })),
       ),
     ).resolves.toBe(onPath);
@@ -109,7 +111,7 @@ describe("resolveCuaDriver", () => {
     await mkdir(join(root, "home", ".local", "bin"), { recursive: true });
     await writeFile(path, "not executable");
     await chmod(path, 0o644);
-    await expect(runTestEffect(resolveCuaDriver(input()))).resolves.toBeNull();
+    await expect(runCauseEffect(resolveCuaDriver(input()))).resolves.toBeNull();
   });
 
   // The driver is one program on three desktops. The build directory is named for the target, and
@@ -124,13 +126,13 @@ describe("resolveCuaDriver", () => {
     { platform: "win32", architecture: "arm64", name: "cua-driver.exe" },
   ] as const)("finds the $platform $architecture build", async ({ platform, architecture, name }) => {
     const built = await writeExecutable("source", "build", "cua-driver", platform, architecture, name);
-    await expect(runTestEffect(resolveCuaDriver(input({ platform, architecture })))).resolves.toBe(built);
+    await expect(runCauseEffect(resolveCuaDriver(input({ platform, architecture })))).resolves.toBe(built);
   });
 
   it("reads the per-user program directory the Windows installer writes to", async () => {
     const installed = await writeExecutable("local", "Programs", "Cua", "cua-driver", "bin", "cua-driver.exe");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         resolveCuaDriver(input({ platform: "win32", architecture: "x64", localAppDataDirectory: join(root, "local") })),
       ),
     ).resolves.toBe(installed);
@@ -141,7 +143,7 @@ describe("resolveCuaDriver", () => {
   it("still reads the Windows layout the driver used before v0.2.14", async () => {
     const installed = await writeExecutable("local", "Programs", "trycua", "cua-driver-rs", "bin", "cua-driver.exe");
     await expect(
-      runTestEffect(
+      runCauseEffect(
         resolveCuaDriver(input({ platform: "win32", architecture: "x64", localAppDataDirectory: join(root, "local") })),
       ),
     ).resolves.toBe(installed);
@@ -151,7 +153,7 @@ describe("resolveCuaDriver", () => {
   // `~/.local/bin`, so a cleared `~/.local/bin` must not read as "no driver".
   it("reads the macOS application bundle", async () => {
     const installed = await writeExecutable("apps", "CuaDriver.app", "Contents", "MacOS", "cua-driver");
-    await expect(runTestEffect(resolveCuaDriver(input({ applicationsDirectory: join(root, "apps") })))).resolves.toBe(
+    await expect(runCauseEffect(resolveCuaDriver(input({ applicationsDirectory: join(root, "apps") })))).resolves.toBe(
       installed,
     );
   });
@@ -161,10 +163,10 @@ describe("resolveCuaDriver", () => {
   it("returns null for a target the driver is not published for", async () => {
     await writeExecutable("source", "build", "cua-driver", "linux", "ppc64", "cua-driver");
     await expect(
-      runTestEffect(resolveCuaDriver(input({ platform: "linux", architecture: "ppc64" }))),
+      runCauseEffect(resolveCuaDriver(input({ platform: "linux", architecture: "ppc64" }))),
     ).resolves.toBeNull();
     await expect(
-      runTestEffect(resolveCuaDriver(input({ platform: "freebsd", architecture: "x64" }))),
+      runCauseEffect(resolveCuaDriver(input({ platform: "freebsd", architecture: "x64" }))),
     ).resolves.toBeNull();
   });
 });

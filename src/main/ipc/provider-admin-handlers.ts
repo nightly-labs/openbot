@@ -30,6 +30,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -76,21 +77,13 @@ export function providerAdminIpcHandlers({
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
       throw new Error(sourceText("error.provider.localOnly"));
-    return Effect.runPromise(
-      remoteServers
-        .request(serverId, path, decoder, { method: "POST", body })
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
   /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
-    return Effect.runPromise(
-      remoteServers
-        .request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)
-        .pipe(Effect.mapError((error: RemoteWorkflowError) => error.cause)),
-    );
+    return runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost));
   }
 
   /** The runtime routes of the host: `providers-v2` includes Gemini, and `providers-v1` does not. */
@@ -117,8 +110,7 @@ export function providerAdminIpcHandlers({
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) =>
-          Effect.runPromise(service.startProviderCodeLogin(provider).pipe(Effect.mapError((error) => error.cause))),
+        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider)),
         remote: (provider, serverId) =>
           remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),
@@ -131,8 +123,7 @@ export function providerAdminIpcHandlers({
         },
       }),
       cancelCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) =>
-          Effect.runPromise(service.cancelProviderCodeLogin(provider).pipe(Effect.mapError((error) => error.cause))),
+        local: (provider) => runCauseEffect(service.cancelProviderCodeLogin(provider)),
         remote: (provider, serverId) =>
           remoteChange(serverId, signInRoutes(serverId, provider).codeLoginCancel, { provider }),
       }),
@@ -145,37 +136,31 @@ export function providerAdminIpcHandlers({
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
         local: ({ provider, key }) =>
-          Effect.runPromise(
-            service
-              .changeProviderCredential(provider, () =>
-                credentials
-                  .set(provider, key)
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
-                    ),
+          runCauseEffect(
+            service.changeProviderCredential(provider, () =>
+              credentials
+                .set(provider, key)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
                   ),
-              )
-              .pipe(Effect.mapError((error) => error.cause)),
+                ),
+            ),
           ),
         remote: (input, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeySet, input),
       }),
       clearApiKey: scopedHandler(parseProviderId, {
         local: (provider) =>
-          Effect.runPromise(
-            service
-              .changeProviderCredential(provider, () =>
-                credentials
-                  .clear(provider)
-                  .pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
-                    ),
+          runCauseEffect(
+            service.changeProviderCredential(provider, () =>
+              credentials
+                .clear(provider)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
                   ),
-              )
-              .pipe(Effect.mapError((error) => error.cause)),
+                ),
+            ),
           ),
         remote: (provider, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyClear, { provider }),
       }),
@@ -185,16 +170,15 @@ export function providerAdminIpcHandlers({
           remote(serverId, runtimeRoutes(serverId).runtimesStatus, {}, decodeProviderRuntimeSnapshot),
       }),
       downloadRuntime: scopedHandler(parseManagedProviderId, {
-        local: (provider) =>
-          Effect.runPromise(runtimes.download(provider).pipe(Effect.mapError((error) => error.cause))),
+        local: (provider) => runCauseEffect(runtimes.download(provider)),
         remote: runtime("runtimesDownload"),
       }),
       cancelRuntime: scopedHandler(parseManagedProviderId, {
-        local: (provider) => Effect.runPromise(runtimes.cancel(provider).pipe(Effect.mapError((error) => error.cause))),
+        local: (provider) => runCauseEffect(runtimes.cancel(provider)),
         remote: runtime("runtimesCancel"),
       }),
       checkRuntimeUpdates: scopedQueryHandler({
-        local: () => Effect.runPromise(runtimes.checkForUpdates().pipe(Effect.mapError((error) => error.cause))),
+        local: () => runCauseEffect(runtimes.checkForUpdates()),
         remote: (serverId) =>
           remote(serverId, runtimeRoutes(serverId).runtimesCheck, {}, decodeProviderRuntimeSnapshot),
       }),
@@ -203,12 +187,12 @@ export function providerAdminIpcHandlers({
         remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeCustomProviderSummaries),
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
-        local: (input) => Effect.runPromise(customProviders.save(input).pipe(Effect.mapError((error) => error.cause))),
+        local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) =>
           remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeCustomProviderResult),
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
-        local: ({ id }) => Effect.runPromise(customProviders.remove(id).pipe(Effect.mapError((error) => error.cause))),
+        local: ({ id }) => runCauseEffect(customProviders.remove(id)),
         remote: (input, serverId) =>
           remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeCustomProviderResult),
       }),

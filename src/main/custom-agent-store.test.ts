@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SaveCustomAgentInput } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { CustomAgentStore } from "./custom-agent-store";
 import type { CustomProviderCipher } from "./custom-provider-store";
 
@@ -58,7 +59,7 @@ async function loaded(cipher: CustomProviderCipher = testCipher()): Promise<Cust
 describe("CustomAgentStore", () => {
   it("gives a fresh instance the agent back, and never lists or writes a value in plaintext", async () => {
     const store = await loaded();
-    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.save(input()));
 
     const reopened = await loaded();
     expect(await Effect.runPromise(reopened.list())).toEqual([
@@ -81,7 +82,7 @@ describe("CustomAgentStore", () => {
 
   it("keeps the ciphertext byte for byte when an edit keeps every value", async () => {
     const store = await loaded();
-    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.save(input()));
     const before = JSON.parse(await readFile(path, "utf8")).agents[0].secret;
 
     // A computer whose keychain is gone must not lose values a later keychain could still open.
@@ -92,18 +93,16 @@ describe("CustomAgentStore", () => {
         },
       }),
     );
-    await Effect.runPromise(
-      locked
-        .save(
-          input({
-            name: "Goose 2",
-            env: [
-              { name: "GOOSE_PROVIDER", value: null },
-              { name: "OPENAI_API_KEY", value: null },
-            ],
-          }),
-        )
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(
+      locked.save(
+        input({
+          name: "Goose 2",
+          env: [
+            { name: "GOOSE_PROVIDER", value: null },
+            { name: "OPENAI_API_KEY", value: null },
+          ],
+        }),
+      ),
     );
 
     const after = JSON.parse(await readFile(path, "utf8")).agents[0];
@@ -113,18 +112,16 @@ describe("CustomAgentStore", () => {
 
   it("takes a kept value and a new value together", async () => {
     const store = await loaded();
-    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
-    await Effect.runPromise(
-      store
-        .save(
-          input({
-            env: [
-              { name: "GOOSE_PROVIDER", value: "openai" },
-              { name: "OPENAI_API_KEY", value: null },
-            ],
-          }),
-        )
-        .pipe(Effect.mapError((error) => error.cause)),
+    await runCauseEffect(store.save(input()));
+    await runCauseEffect(
+      store.save(
+        input({
+          env: [
+            { name: "GOOSE_PROVIDER", value: "openai" },
+            { name: "OPENAI_API_KEY", value: null },
+          ],
+        }),
+      ),
     );
 
     expect((await loaded()).configs()[0]?.env).toEqual([
@@ -135,29 +132,23 @@ describe("CustomAgentStore", () => {
 
   it("refuses a kept value that main does not hold, and writes nothing", async () => {
     const store = await loaded();
-    await expect(
-      Effect.runPromise(
-        store
-          .save(input({ env: [{ name: "OPENAI_API_KEY", value: null }] }))
-          .pipe(Effect.mapError((error) => error.cause)),
-      ),
-    ).rejects.toThrow("OPENAI_API_KEY");
+    await expect(runCauseEffect(store.save(input({ env: [{ name: "OPENAI_API_KEY", value: null }] })))).rejects.toThrow(
+      "OPENAI_API_KEY",
+    );
     expect(await Effect.runPromise(store.list())).toEqual([]);
     await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("refuses a value when the keychain cannot store it", async () => {
     const store = await loaded(testCipher({ canPersist: () => false }));
-    await expect(
-      Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow();
-    await Effect.runPromise(store.save(input({ env: [] })).pipe(Effect.mapError((error) => error.cause)));
+    await expect(runCauseEffect(store.save(input()))).rejects.toThrow();
+    await runCauseEffect(store.save(input({ env: [] })));
     expect((await Effect.runPromise(store.list()))[0]?.envNames).toEqual([]);
   });
 
   it("gives a check the saved value of the agent it names", async () => {
     const store = await loaded();
-    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.save(input()));
     expect(store.checkEnv([{ name: "OPENAI_API_KEY", value: null }], "goose")).toEqual({
       OPENAI_API_KEY: "sk-agent-secret",
     });
@@ -172,18 +163,14 @@ describe("CustomAgentStore", () => {
 
     const store = await loaded();
     expect(await Effect.runPromise(store.list())).toEqual([]);
-    await expect(
-      Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow();
-    await expect(
-      Effect.runPromise(store.remove("future").pipe(Effect.mapError((error) => error.cause))),
-    ).rejects.toThrow();
+    await expect(runCauseEffect(store.save(input()))).rejects.toThrow();
+    await expect(runCauseEffect(store.remove("future"))).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe(newer);
   });
 
   it("keeps an agent whose values this computer cannot open, without its values", async () => {
     const store = await loaded();
-    await Effect.runPromise(store.save(input()).pipe(Effect.mapError((error) => error.cause)));
+    await runCauseEffect(store.save(input()));
 
     const other = await loaded(
       testCipher({

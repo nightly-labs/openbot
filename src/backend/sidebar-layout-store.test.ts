@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 const roots: string[] = [];
@@ -17,7 +17,7 @@ async function createStore(): Promise<{ root: string; path: string; store: Sideb
   roots.push(root);
   const path = join(root, "sidebar-layout.json");
   const store = new SidebarLayoutStore(path);
-  await runTestEffect(store.initialize());
+  await runCauseEffect(store.initialize());
   return { root, path, store };
 }
 
@@ -25,14 +25,14 @@ describe("SidebarLayoutStore", () => {
   it("persists empty sections through rename, reconciliation, reload, and deletion", async () => {
     const { path, store } = await createStore();
     const agents = new Set<string>();
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Product" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Product" }, agents));
     const sectionId = created.sections[0]?.id ?? "";
-    const withReference = await runTestEffect(store.mutate({ type: "create", name: "Reference" }, agents));
+    const withReference = await runCauseEffect(store.mutate({ type: "create", name: "Reference" }, agents));
     const referenceId = withReference.sections[1]?.id ?? "";
-    await runTestEffect(store.mutate({ type: "rename", sectionId, name: "Core" }, agents));
-    await runTestEffect(store.reconcileAgents(agents));
+    await runCauseEffect(store.mutate({ type: "rename", sectionId, name: "Core" }, agents));
+    await runCauseEffect(store.reconcileAgents(agents));
     const restored = new SidebarLayoutStore(path);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.getSnapshot()).toMatchObject({
       sections: [
         { id: sectionId, name: "Core" },
@@ -40,9 +40,9 @@ describe("SidebarLayoutStore", () => {
       ],
       order: [SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, sectionId, referenceId],
     });
-    await runTestEffect(restored.mutate({ type: "delete", sectionId }, agents));
+    await runCauseEffect(restored.mutate({ type: "delete", sectionId }, agents));
     const deleted = new SidebarLayoutStore(path);
-    await runTestEffect(deleted.initialize());
+    await runCauseEffect(deleted.initialize());
     expect(deleted.getSnapshot()).toMatchObject({
       sections: [{ id: referenceId, name: "Reference" }],
       order: [SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, referenceId],
@@ -53,18 +53,18 @@ describe("SidebarLayoutStore", () => {
     const { path, store } = await createStore();
     const agents = new Set(["chief", "research"]);
 
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
     const section = created.sections[0];
     expect(section).toBeDefined();
     expect(created.order).toEqual([SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID, section?.id]);
     expect(created.agentAssignments).toEqual({ chief: section?.id });
 
-    await runTestEffect(store.mutate({ type: "rename", sectionId: section?.id ?? "", name: "Core" }, agents));
-    await runTestEffect(store.mutate({ type: "move", sectionId: section?.id ?? "", direction: "up" }, agents));
-    await runTestEffect(store.mutate({ type: "assign", agentId: "research", sectionId: section?.id ?? "" }, agents));
+    await runCauseEffect(store.mutate({ type: "rename", sectionId: section?.id ?? "", name: "Core" }, agents));
+    await runCauseEffect(store.mutate({ type: "move", sectionId: section?.id ?? "", direction: "up" }, agents));
+    await runCauseEffect(store.mutate({ type: "assign", agentId: "research", sectionId: section?.id ?? "" }, agents));
 
     const restored = new SidebarLayoutStore(path);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.getSnapshot()).toMatchObject({
       revision: 4,
       sections: [{ id: section?.id, name: "Core" }],
@@ -78,31 +78,31 @@ describe("SidebarLayoutStore", () => {
   it("persists agent order inside a section", async () => {
     const { path, store } = await createStore();
     const agents = new Set(["chief", "research", "sales"]);
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
     const sectionId = created.sections[0]?.id ?? "";
-    await runTestEffect(store.mutate({ type: "assign", agentId: "research", sectionId }, agents));
+    await runCauseEffect(store.mutate({ type: "assign", agentId: "research", sectionId }, agents));
 
-    const moved = await runTestEffect(
+    const moved = await runCauseEffect(
       store.mutate({ type: "move-agent", agentId: "research", sectionId, beforeAgentId: "chief" }, agents),
     );
     expect(moved.agentOrder).toEqual(["research", "chief", "sales"]);
 
     const restored = new SidebarLayoutStore(path);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.getSnapshot().agentOrder).toEqual(["research", "chief", "sales"]);
   });
 
   it("places a duplicate after its source in the same section", async () => {
     const { store } = await createStore();
     const agents = new Set(["chief", "chief-copy", "research", "sales"]);
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Core", agentId: "chief" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Core", agentId: "chief" }, agents));
     const sectionId = created.sections[0]?.id ?? "";
-    await runTestEffect(store.mutate({ type: "assign", agentId: "research", sectionId }, agents));
-    await runTestEffect(
+    await runCauseEffect(store.mutate({ type: "assign", agentId: "research", sectionId }, agents));
+    await runCauseEffect(
       store.mutate({ type: "move-agent", agentId: "sales", sectionId: null, beforeAgentId: null }, agents),
     );
 
-    const duplicated = await runTestEffect(
+    const duplicated = await runCauseEffect(
       store.placeDuplicateAfter("chief", "chief-copy", ["chief", "chief-copy", "research", "sales"]),
     );
 
@@ -124,7 +124,7 @@ describe("SidebarLayoutStore", () => {
     );
 
     const restored = new SidebarLayoutStore(path);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
     expect(restored.getSnapshot().agentOrder).toEqual([]);
     expect(restored.getSnapshot().agentAssignments).toEqual({
       chief: "11111111-1111-4111-8111-111111111111",
@@ -134,28 +134,28 @@ describe("SidebarLayoutStore", () => {
   it("keeps names unique and validates agents", async () => {
     const { store } = await createStore();
     const agents = new Set(["chief"]);
-    await runTestEffect(store.mutate({ type: "create", name: "Demo" }, agents));
+    await runCauseEffect(store.mutate({ type: "create", name: "Demo" }, agents));
 
-    await expect(runTestEffect(store.mutate({ type: "create", name: " demo " }, agents))).rejects.toThrow(
+    await expect(runCauseEffect(store.mutate({ type: "create", name: " demo " }, agents))).rejects.toThrow(
       "Section names must be unique",
     );
     await expect(
-      runTestEffect(store.mutate({ type: "create", name: "Other", agentId: "missing" }, agents)),
+      runCauseEffect(store.mutate({ type: "create", name: "Other", agentId: "missing" }, agents)),
     ).rejects.toThrow("Unknown agent");
     await expect(
-      runTestEffect(store.mutate({ type: "assign", agentId: "missing", sectionId: null }, agents)),
+      runCauseEffect(store.mutate({ type: "assign", agentId: "missing", sectionId: null }, agents)),
     ).rejects.toThrow("Unknown agent");
   });
 
   it("moves a section across multiple order positions in one revision", async () => {
     const { store } = await createStore();
     const agents = new Set<string>();
-    await runTestEffect(store.mutate({ type: "create", name: "One" }, agents));
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Two" }, agents));
+    await runCauseEffect(store.mutate({ type: "create", name: "One" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Two" }, agents));
     const firstId = created.sections[0]?.id ?? "";
     const secondId = created.sections[1]?.id ?? "";
 
-    const moved = await runTestEffect(
+    const moved = await runCauseEffect(
       store.mutate({ type: "move", sectionId: secondId, direction: "up", steps: 2 }, agents),
     );
 
@@ -166,10 +166,10 @@ describe("SidebarLayoutStore", () => {
   it("deletes only the section and returns its agents to Unassigned", async () => {
     const { store } = await createStore();
     const agents = new Set(["chief"]);
-    const created = await runTestEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
+    const created = await runCauseEffect(store.mutate({ type: "create", name: "Demo", agentId: "chief" }, agents));
     const sectionId = created.sections[0]?.id ?? "";
 
-    const deleted = await runTestEffect(store.mutate({ type: "delete", sectionId }, agents));
+    const deleted = await runCauseEffect(store.mutate({ type: "delete", sectionId }, agents));
     expect(deleted.sections).toEqual([]);
     expect(deleted.order).toEqual([SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID]);
     expect(deleted.agentAssignments).toEqual({});
@@ -179,13 +179,13 @@ describe("SidebarLayoutStore", () => {
     const { store } = await createStore();
     const agents = new Set(["chief", "research"]);
     const [first, second] = await Promise.all([
-      runTestEffect(store.mutate({ type: "create", name: "One", agentId: "chief" }, agents)),
-      runTestEffect(store.mutate({ type: "create", name: "Two", agentId: "research" }, agents)),
+      runCauseEffect(store.mutate({ type: "create", name: "One", agentId: "chief" }, agents)),
+      runCauseEffect(store.mutate({ type: "create", name: "Two", agentId: "research" }, agents)),
     ]);
 
     expect(first.revision).toBe(1);
     expect(second.revision).toBe(2);
-    const cleaned = await runTestEffect(store.removeAgent("chief"));
+    const cleaned = await runCauseEffect(store.removeAgent("chief"));
     expect(cleaned.revision).toBe(3);
     expect(cleaned.agentAssignments).not.toHaveProperty("chief");
     expect(cleaned.agentAssignments).toHaveProperty("research");
@@ -195,11 +195,11 @@ describe("SidebarLayoutStore", () => {
     const { store } = await createStore();
     const legacyId = "bot-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
     const currentId = "agent-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
-    const created = await runTestEffect(
+    const created = await runCauseEffect(
       store.mutate({ type: "create", name: "Research", agentId: legacyId }, new Set([legacyId, "chief"])),
     );
     const sectionId = created.agentAssignments[legacyId];
-    const ordered = await runTestEffect(
+    const ordered = await runCauseEffect(
       store.mutate(
         { type: "move-agent", agentId: legacyId, sectionId: sectionId ?? null, beforeAgentId: null },
         new Set([legacyId, "chief"]),
@@ -210,7 +210,7 @@ describe("SidebarLayoutStore", () => {
     // This layout is a JSON file outside the database, so v13 renamed the agent in SQLite and left the
     // sidebar filing it under the old id. Reading that as "the agent is gone" throws away the group the
     // user put it in and its position, with nothing to undo it.
-    const reconciled = await runTestEffect(store.reconcileAgents(new Set([currentId, "chief"])));
+    const reconciled = await runCauseEffect(store.reconcileAgents(new Set([currentId, "chief"])));
 
     expect(reconciled.agentAssignments[currentId]).toBe(sectionId);
     expect(reconciled.agentOrder).toContain(currentId);
@@ -218,10 +218,10 @@ describe("SidebarLayoutStore", () => {
     // v13 declines to rename onto an id that is taken, so both agents can be in the roster at once -- and
     // then the old spelling belongs to the agent that still answers to it, not to its twin.
     const collided = await createStore();
-    await runTestEffect(
+    await runCauseEffect(
       collided.store.mutate({ type: "create", name: "Research", agentId: legacyId }, new Set([legacyId])),
     );
-    const kept = await runTestEffect(collided.store.reconcileAgents(new Set([currentId, legacyId])));
+    const kept = await runCauseEffect(collided.store.reconcileAgents(new Set([currentId, legacyId])));
 
     expect(kept.agentAssignments).toHaveProperty(legacyId);
     expect(kept.agentAssignments).not.toHaveProperty(currentId);
@@ -232,19 +232,19 @@ describe("SidebarLayoutStore", () => {
     // gets the file rejected on the next launch and resets every section the user made.
     const merged = await createStore();
     const both = new Set([legacyId, currentId]);
-    const filed = await runTestEffect(
+    const filed = await runCauseEffect(
       merged.store.mutate({ type: "create", name: "Research", agentId: currentId }, both),
     );
     const group = filed.agentAssignments[currentId];
-    await runTestEffect(merged.store.mutate({ type: "create", name: "Archive", agentId: legacyId }, both));
-    const ranked = await runTestEffect(
+    await runCauseEffect(merged.store.mutate({ type: "create", name: "Archive", agentId: legacyId }, both));
+    const ranked = await runCauseEffect(
       merged.store.mutate(
         { type: "move-agent", agentId: currentId, sectionId: group ?? null, beforeAgentId: null },
         both,
       ),
     );
     expect(ranked.agentOrder).toEqual(expect.arrayContaining([legacyId, currentId]));
-    const deduped = await runTestEffect(merged.store.reconcileAgents(new Set([currentId])));
+    const deduped = await runCauseEffect(merged.store.reconcileAgents(new Set([currentId])));
 
     expect(deduped.agentOrder).toEqual([currentId]);
     // The section the user picked under the spelling the roster uses is the one that survives, whichever
@@ -257,7 +257,7 @@ describe("SidebarLayoutStore", () => {
     await writeFile(path, '{"version":1,"revision":"bad"}\n');
 
     const restored = new SidebarLayoutStore(path);
-    await runTestEffect(restored.initialize());
+    await runCauseEffect(restored.initialize());
 
     expect(restored.getSnapshot()).toEqual({
       revision: 0,

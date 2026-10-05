@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 // Bytes leaving the machine: draft attachments, shared files and workspace files.
 //
 // These four routes are the only ones that write a body themselves instead of going through
@@ -23,6 +22,7 @@ import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents, TeamApiMailbox } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -82,11 +82,7 @@ export async function routeFiles(
     }
     const [attachment] = await attachmentUploads.use(async () => {
       const bytes = await readBinary(request, ATTACHMENT_LIMITS.fileBytes);
-      return Effect.runPromise(
-        agents
-          .prepareImportedAttachments([], [{ name, mimeType, bytes }])
-          .pipe(Effect.mapError((error) => error.cause)),
-      );
+      return runCauseEffect(agents.prepareImportedAttachments([], [{ name, mimeType, bytes }]));
     });
     if (!attachment) throw new Error("The attachment was not prepared.");
     return json(201, attachment);
@@ -95,15 +91,11 @@ export async function routeFiles(
   if (attachmentMatch) {
     const attachmentId = pathIdentifier(attachmentMatch[1], "attachmentId");
     if (method === "DELETE") {
-      await Effect.runPromise(
-        agents.discardDraftAttachment(attachmentId).pipe(Effect.mapError((error) => error.cause)),
-      );
+      await runCauseEffect(agents.discardDraftAttachment(attachmentId));
       return empty(204);
     }
     if (method === "GET") {
-      const attachment = await Effect.runPromise(
-        mailbox.resolveAttachment(attachmentId).pipe(Effect.mapError((error) => error.cause)),
-      );
+      const attachment = await runCauseEffect(mailbox.resolveAttachment(attachmentId));
       if (!attachment) throw new HttpError(404, sourceText("error.team.attachmentNotFound"));
       return sendFile(response, attachment.path, null, (size) => ({
         "Content-Type": attachment.mimeType || "application/octet-stream",
@@ -117,9 +109,7 @@ export async function routeFiles(
     if (!sharedPath || sharedPath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid shared file path is required.");
     }
-    const sharedFile = await Effect.runPromise(
-      agents.resolveSharedFile(sharedPath).pipe(Effect.mapError((error) => error.cause)),
-    );
+    const sharedFile = await runCauseEffect(agents.resolveSharedFile(sharedPath));
     if (sharedFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.sharedFileTooLarge"));
     }
@@ -140,9 +130,7 @@ export async function routeFiles(
     if (!workspacePath || workspacePath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid workspace file path is required.");
     }
-    const workspaceFile = await Effect.runPromise(
-      agents.resolveWorkspaceFile(agentId, workspacePath).pipe(Effect.mapError((error) => error.cause)),
-    );
+    const workspaceFile = await runCauseEffect(agents.resolveWorkspaceFile(agentId, workspacePath));
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.workspaceFileTooLarge"));
     }

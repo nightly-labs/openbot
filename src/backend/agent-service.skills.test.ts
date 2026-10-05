@@ -16,7 +16,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
-import { runTestEffect } from "./effect-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 
 let root: string;
 let service: AgentService | null = null;
@@ -62,16 +62,16 @@ describe.sequential("local skill provider tools", () => {
         preferredModel: null,
         localSkillTools: () => api,
       });
-      await runTestEffect(service.initialize());
-      await runTestEffect(store.getOrCreate("chief"));
-      await runTestEffect(
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      await runCauseEffect(
         service.updateAgent({
           agentId: "chief",
           provider,
           model: provider === "codex" ? "gpt-5.6-luna" : "claude-sonnet-5",
         }),
       );
-      await runTestEffect(service.sendMessage({ agentId: "chief", text: "Create a skill for weekly summaries." }));
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create a skill for weekly summaries." }));
       await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
       const client = clients.get(provider);
       const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -163,7 +163,7 @@ describe.sequential("local skill provider tools", () => {
         queue.deliveries.every((delivery) => delivery.status === "completed"),
       );
       const actor = { id: "human", name: "Alex" };
-      await runTestEffect(
+      await runCauseEffect(
         service.channels.command(
           {
             type: "save",
@@ -180,7 +180,7 @@ describe.sequential("local skill provider tools", () => {
           actor,
         ),
       );
-      await runTestEffect(
+      await runCauseEffect(
         service.channels.command(
           {
             type: "send",

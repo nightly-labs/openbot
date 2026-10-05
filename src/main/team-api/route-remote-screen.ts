@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { parseRemoteDesktopTest } from "../ipc/server-inputs";
 // Remote control of this machine's screen: capabilities, a session, and the display it shows.
 //
@@ -10,6 +9,7 @@ import { parseRemoteDesktopTest } from "../ipc/server-inputs";
 
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { RemoteScreenError } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 import type { TeamApiRemoteScreen } from "./dependencies";
@@ -43,19 +43,14 @@ export async function routeRemoteScreen(
     const body = await readJson(request);
     if (Object.keys(body).length !== 0)
       throw new RemoteScreenError(400, "protocol_mismatch", "Invalid remote desktop setup request.");
-    return json(200, await Effect.runPromise(remoteScreen.checkSetup().pipe(Effect.mapError((error) => error.cause))));
+    return json(200, await runCauseEffect(remoteScreen.checkSetup()));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.test) {
     if (!remoteScreen?.test)
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.desktopTestUnavailable"));
     const body = await readJson(request);
     const input = parseRemoteDesktopTest({ ...body, serverId: "host" });
-    return json(
-      200,
-      await Effect.runPromise(
-        remoteScreen.test(input.sessionId, member.id, input.action).pipe(Effect.mapError((error) => error.cause)),
-      ),
-    );
+    return json(200, await runCauseEffect(remoteScreen.test(input.sessionId, member.id, input.action)));
   }
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.remoteScreen.capabilities) {
@@ -70,16 +65,14 @@ export async function routeRemoteScreen(
     }
     return json(
       201,
-      await Effect.runPromise(
-        remoteScreen
-          .createSession({
-            serverId: identity.serverId,
-            memberId: member.id,
-            teamSessionId: sessionId,
-            teamSessionExpiresAt: sessionExpiresAt,
-            publicHttpBaseUrl: publicHttpBaseUrl(request),
-          })
-          .pipe(Effect.mapError((error) => error.cause)),
+      await runCauseEffect(
+        remoteScreen.createSession({
+          serverId: identity.serverId,
+          memberId: member.id,
+          teamSessionId: sessionId,
+          teamSessionExpiresAt: sessionExpiresAt,
+          publicHttpBaseUrl: publicHttpBaseUrl(request),
+        }),
       ),
     );
   }
@@ -88,9 +81,7 @@ export async function routeRemoteScreen(
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
     const body = await readJson(request);
-    await Effect.runPromise(
-      remoteScreen.selectDisplay(stringField(body, "displayId")).pipe(Effect.mapError((error) => error.cause)),
-    );
+    await runCauseEffect(remoteScreen.selectDisplay(stringField(body, "displayId")));
     return empty(204);
   }
   const remoteScreenSessionMatch = url.pathname.match(/^\/v1\/remote-screen\/sessions\/([^/]+)$/);
@@ -99,11 +90,7 @@ export async function routeRemoteScreen(
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
     const closedSessionId = pathIdentifier(remoteScreenSessionMatch[1], "sessionId");
-    if (
-      !(await Effect.runPromise(
-        remoteScreen.closeMemberSession(closedSessionId, member.id).pipe(Effect.mapError((error) => error.cause)),
-      ))
-    ) {
+    if (!(await runCauseEffect(remoteScreen.closeMemberSession(closedSessionId, member.id)))) {
       throw new RemoteScreenError(404, "session_expired", sourceText("error.remote.controlSessionNotFound"));
     }
     return empty(204);

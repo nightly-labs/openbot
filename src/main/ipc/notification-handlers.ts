@@ -1,9 +1,9 @@
-import { Effect } from "effect";
 // The desktop notification switch and the test notification Settings offers.
 
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { Notification } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { notificationSettingsUrl, showRetainedNotification } from "../desktop-notifications";
 import type { NotificationPreferenceStore } from "../notification-preference-store";
 import { parseNotificationPreference } from "./app-inputs";
@@ -27,9 +27,7 @@ export function notificationIpcHandlers({
     notifications: {
       getPreference: handler(() => notificationPreference.get()),
       setPreference: payloadHandler(parseNotificationPreference, async (preference) => {
-        const saved = await Effect.runPromise(
-          notificationPreference.set(preference).pipe(Effect.mapError((error) => error.cause)),
-        );
+        const saved = await runCauseEffect(notificationPreference.set(preference));
         // A user who had the switch off at first start was never asked; turning it on asks now.
         await requestPermission();
         return saved;
