@@ -1397,6 +1397,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   async #applyAgentUpdate(input: UpdateAgentInput, initiatingAgentId?: string): Promise<AgentSummary> {
     this.#conversation.requireKnownAgent(input.agentId);
     const previous = this.#store.list().find((agent) => agent.id === input.agentId);
+    const wasHeld = !this.#usageLimits.mayDrain(input.agentId);
     const requestedModel = input.model
       ? this.#endpoints
           .available()
@@ -1478,6 +1479,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // own, and it is written from the same profile.
     if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
+    // A plan limit belongs to a provider and a model. On another one the queue may run again, and
+    // nothing else would start it before the limit it left resets.
+    if (wasHeld && this.#usageLimits.mayDrain(agent.id)) {
+      this.#emitRuntimeSnapshot();
+      this.#drain.scheduleDrain(agent.id);
+    }
     return agent;
   }
 

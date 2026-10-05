@@ -101,6 +101,24 @@ describe.sequential("AgentService: usage limit", () => {
     expect(events.filter((event) => event.type === "usage-limit-reached")).toHaveLength(1);
   });
 
+  it("runs the held queue at once when the agent moves to another model of the same provider", async () => {
+    const client = new PlanClient("codex");
+    const started = await startService(root, { provider: "codex", client: () => client });
+    service = started.service;
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    const receipt = await service.sendMessage({ agentId: "chief", text: "Write the morning plan." });
+    await waitFor(() => events.some((event) => event.type === "usage-limit-reached"));
+    client.limit = null;
+    const current = started.store.list().find((agent) => agent.id === "chief")?.model;
+    await service.updateAgent({ agentId: "chief", model: current === "gpt-5.4" ? "gpt-5.5" : "gpt-5.4" });
+
+    const delivery = () => started.mailbox.getDelivery(receipt.deliveries[0]?.id ?? "")?.delivery;
+    await waitFor(() => delivery()?.status === "completed");
+    expect(service.getRuntimeSnapshot().usageLimits).toEqual([]);
+  });
+
   it("fails a refused turn that already ran a command, so the command does not run twice", async () => {
     const client = new PlanClient("codex");
     client.act = true;
