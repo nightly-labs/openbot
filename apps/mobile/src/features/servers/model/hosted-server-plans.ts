@@ -131,6 +131,8 @@ export function newestHostedServerInSetup(
       server.state !== "creating" &&
       server.state !== "starting" &&
       server.state !== "waking" &&
+      // A running server that this phone does not list yet is in its last step, connecting.
+      server.state !== "running" &&
       server.state !== "error"
     )
       continue;
