@@ -237,18 +237,16 @@ export const MountPad: Story = {
 export const ColourFamilies: Story = {
   render: () => (
     <ProseColumn>
-      {["OpenBot 101", "WTF Is OpenBot?", "One agent, many providers", "Run the team server yourself"].map(
-        (title) => (
-          <ArticleImage
-            src={pickAModel}
-            alt="The model picker open on the ChatGPT tab, showing the installed Codex CLI version and a list of GPT models."
-            width={1440}
-            height={1484}
-            mountOn={title}
-            caption={title}
-          />
-        ),
-      )}
+      {["OpenBot 101", "WTF Is OpenBot?", "One agent, many providers", "Run the team server yourself"].map((title) => (
+        <ArticleImage
+          src={pickAModel}
+          alt="The model picker open on the ChatGPT tab, showing the installed Codex CLI version and a list of GPT models."
+          width={1440}
+          height={1484}
+          mountOn={title}
+          caption={title}
+        />
+      ))}
     </ProseColumn>
   ),
 };

@@ -150,7 +150,7 @@ export class ChannelStore {
       return {
         ...channel,
         unreadCount: Number(row.unread ?? 0),
-        activeTasks: Number(row["running"] ?? 0),
+        activeTasks: Number(row.running ?? 0),
         lastMessage: latest
           ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
           : null,
