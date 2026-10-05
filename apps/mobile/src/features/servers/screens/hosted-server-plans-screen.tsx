@@ -123,6 +123,7 @@ export function HostedServerPlansScreen() {
   async function refreshList(source: HostedServerCalls): Promise<void> {
     const list = await source.list().catch(() => null);
     if (!list) return;
+    hostedRequestKeys.settle(list.servers);
     setLoad((current) => (current.kind === "ready" ? { ...current, list } : current));
   }
 

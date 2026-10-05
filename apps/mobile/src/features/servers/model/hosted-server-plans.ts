@@ -118,7 +118,8 @@ export function hostedSetupSettled(status: HostedSetupStatus): boolean {
 
 /**
  * A paid server that this phone does not list yet, so the sheet opens on its setup and not on the
- * plans again. A listed server that wakes is not a new server.
+ * plans again. A server that failed before it was listed opens too, so the user gets its Retry action
+ * and does not buy a second server. A listed server that wakes is not a new server.
  */
 export function newestHostedServerInSetup(
   servers: readonly HostedServerSummary[],
@@ -126,7 +127,13 @@ export function newestHostedServerInSetup(
 ): HostedServerSummary | null {
   let newest: HostedServerSummary | null = null;
   for (const server of servers) {
-    if (server.state !== "creating" && server.state !== "starting" && server.state !== "waking") continue;
+    if (
+      server.state !== "creating" &&
+      server.state !== "starting" &&
+      server.state !== "waking" &&
+      server.state !== "error"
+    )
+      continue;
     if (listedIds.has(server.serverId)) continue;
     if (!newest || server.createdAt > newest.createdAt) newest = server;
   }

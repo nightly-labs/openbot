@@ -11,6 +11,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import {
   closeHostedCheckout,
+  hostedRequestKeys,
   knownHostedServer,
   openHostedCheckout,
   rememberHostedServer,
@@ -113,6 +114,9 @@ export function HostedServerSetupScreen() {
           statusRef.current === "connecting" ? refreshServersRef.current().catch(() => undefined) : undefined,
         ]);
         if (!active || !list) return;
+        // The plans page stays mounted under this page. A key whose server was paid or removed is
+        // forgotten now, so "Choose a plan" does not send the key of an expired server again.
+        hostedRequestKeys.settle(list.servers);
         const next = list.servers.find((entry) => entry.serverId === serverId);
         // An unpaid server is removed when its payment page expires.
         if (!next) {
