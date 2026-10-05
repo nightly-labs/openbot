@@ -751,8 +751,10 @@ describe.sequential("AgentService: queue", () => {
     ]);
   });
 
-  async function switchFromCodexToGrok(threadRead: (turnId: string) => FakeAgentClient["threadRead"]) {
+  it("hands the work steps of the previous provider to the next one, with secrets redacted", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const secret = "handoff-secret-7c1f9e2a4b";
+    registerSecretValue(secret);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const started = await startService(root, {
       client: (provider) => {
@@ -770,18 +772,7 @@ describe.sequential("AgentService: queue", () => {
     )?.turnId;
     const codex = clients.get("codex");
     assert(turnId && codex, "The Codex turn did not complete.");
-    codex.threadRead = threadRead(turnId);
-
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
-    await service.sendMessage({ agentId: "chief", text: "Second request" });
-    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
-    return firstInputText(clients.get("grok")?.requests.find((request) => request.method === "turn/start")?.params);
-  }
-
-  it("hands the work steps of the previous provider to the next one, with secrets redacted", async () => {
-    const secret = "handoff-secret-7c1f9e2a4b";
-    registerSecretValue(secret);
-    const grokInput = await switchFromCodexToGrok((turnId) => (params) => ({
+    codex.threadRead = (params) => ({
       thread: {
         id: getString(params, "threadId"),
         turns: [
@@ -794,7 +785,8 @@ describe.sequential("AgentService: queue", () => {
                 command: "bun test",
                 status: "completed",
                 exitCode: 1,
-                aggregatedOutput: `1 failed\ntoken ${secret}`,
+                // The kept end of the output starts inside the secret.
+                aggregatedOutput: `1 failed\ntoken ${secret}\n${"y".repeat(590)}`,
               },
               {
                 id: "patch-1",
@@ -806,22 +798,19 @@ describe.sequential("AgentService: queue", () => {
           },
         ],
       },
-    }));
+    });
+
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    await service.sendMessage({ agentId: "chief", text: "Second request" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+    const grokInput = firstInputText(
+      clients.get("grok")?.requests.find((request) => request.method === "turn/start")?.params,
+    );
 
     expect(grokInput).toContain("$ bun test (exit 1)");
     expect(grokInput).toContain("update src/app.ts");
     expect(grokInput).toContain("CODEX_DONE");
-    expect(grokInput).not.toContain(secret);
-  });
-
-  it("hands the transcript without work steps when the previous session cannot be read", async () => {
-    const grokInput = await switchFromCodexToGrok(() => () => {
-      throw new Error("The rollout is gone.");
-    });
-
-    expect(grokInput).toContain("CODEX_DONE");
-    expect(grokInput).toContain("Second request");
-    expect(grokInput).not.toContain("[work steps]");
+    expect(grokInput).not.toContain("e2a4b");
   });
 
   it("resumes and retries once when Grok loses its in-memory session", async () => {

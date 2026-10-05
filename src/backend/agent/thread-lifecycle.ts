@@ -770,11 +770,15 @@ export class ThreadLifecycle {
   }
 
   /**
-   * The work steps of the newest earlier sessions, by turn id. Only the newest few are read: each
-   * read can start that provider's CLI again, and the steps of older turns mostly fall in the part
-   * of the handoff that is summarized without them. A read that fails leaves its steps out.
+   * The work steps of the newest earlier sessions, for the turns the transcript keeps. Only the
+   * newest few are read: each read can start that provider's CLI again, and the steps of older
+   * turns mostly fall in the part of the handoff that is summarized without them. A read that
+   * fails leaves its steps out.
    */
-  async #earlierWorkSteps(sessions: readonly ProviderSession[]): Promise<Map<string, string>> {
+  async #earlierWorkSteps(
+    sessions: readonly ProviderSession[],
+    turnIds: ReadonlySet<string>,
+  ): Promise<Map<string, string>> {
     const read = this.#readProviderTurns;
     const steps = new Map<string, string>();
     if (!read) return steps;
@@ -787,6 +791,7 @@ export class ThreadLifecycle {
       ),
     );
     for (const turn of turns.flat()) {
+      if (!turnIds.has(turn.turnId)) continue;
       const rendered = renderTurnSteps(turn.items);
       if (rendered) steps.set(turn.turnId, rendered);
     }
@@ -819,18 +824,18 @@ export class ThreadLifecycle {
     if (messages.length === 0) return null;
 
     const agentNames = agentNamesById(this.#store.list());
-    const workSteps = await this.#earlierWorkSteps(sessions);
     const lastOfTurn = new Map<string, number>();
     messages.forEach((message, index) => {
       if (message.turnId) lastOfTurn.set(message.turnId, index);
     });
-    // A turn's steps go with its last message: before the answer they led to, or after the request
-    // when the turn ended without one. Steps of a turn that is not in the transcript are left out.
+    const workSteps = await this.#earlierWorkSteps(sessions, new Set(lastOfTurn.keys()));
+    // A turn's steps go with its last message: before the answer they led to, or after the request,
+    // from the user or from another agent, when the turn ended without one.
     const rendered = messages.map((message, index) => {
       const text = renderHandoffMessage(message, agentNames);
       const steps = message.turnId && lastOfTurn.get(message.turnId) === index ? workSteps.get(message.turnId) : null;
       if (!steps) return text;
-      return message.author === "user" ? `${text}\n${steps}` : `${steps}\n${text}`;
+      return message.author === "assistant" ? `${steps}\n${text}` : `${text}\n${steps}`;
     });
     const budgetTokens = 60_000;
     const fullText = rendered.join("\n\n");

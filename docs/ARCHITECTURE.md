@@ -943,10 +943,13 @@ assistant messages after the last context-reset marker, with attachment names on
 no tool steps, so `ThreadLifecycle` also reads the three newest earlier sessions with `thread/read`
 on their own providers. It starts a stopped CLI for this. From the turns that match a transcript
 message, `renderTurnSteps` adds a work log: commands with exit code and output tail, changed file
-paths, tool calls, searches and progress notes. The log is redacted and limited for each turn.
-Reasoning, diffs, images and other provider-private state stay with the provider that made them. If a
-read fails, the handoff goes without that session's steps. Codex returns tool steps from
-`thread/read`; Claude returns only notes, and ACP providers return what their session replay holds.
+paths, tool calls, searches and progress notes. Each field is redacted before it is cut, and each
+turn has a size limit. Reasoning, diffs, images and other provider-private state stay with the
+provider that made them. The start and the read share a 10-second limit; when the read fails, the
+handoff goes without that session's steps. Codex returns tool steps from its stored rollout. Claude
+returns only notes. The read sends no `cwd`, as the boot backfill does, so an ACP session that its
+process no longer holds is not opened again and gives no steps. The read uses the shared provider
+process, so a session that ran in a Workspace only process also gives no steps.
 
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path

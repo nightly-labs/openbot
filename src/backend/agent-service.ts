@@ -148,6 +148,7 @@ import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
+import { withTimeout } from "./with-timeout";
 import {
   type ResolvedSharedFile,
   type ResolvedWorkspaceFile,
@@ -584,14 +585,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpAuthorization: (config) => this.#mcp.authorization(config),
       ...(credentials.agentEnvironment ? { agentEnvironment: credentials.agentEnvironment } : {}),
       // The previous provider's CLI stops a minute after no agent uses it, so it is started again. The
-      // read is shorter than a request's usual wait: the first turn on the new provider waits for it.
-      readProviderTurns: async (provider, threadId) => {
-        await this.#providers.ensureProvider(provider);
-        const client = this.#providers.clientFor(provider);
-        return client
-          ? client.request("thread/read", { threadId, includeTurns: true }, decodeProviderTurns, 10_000)
-          : [];
-      },
+      // first turn on the new provider waits for the start and the read, so both share one short
+      // limit. No `cwd` is sent, as in the boot backfill: a replaced ACP session is not opened again.
+      readProviderTurns: (provider, threadId) =>
+        withTimeout(
+          (async () => {
+            await this.#providers.ensureProvider(provider);
+            const client = this.#providers.clientFor(provider);
+            return client ? client.request("thread/read", { threadId, includeTurns: true }, decodeProviderTurns) : [];
+          })(),
+          10_000,
+          "The earlier provider session could not be read in time.",
+        ),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
