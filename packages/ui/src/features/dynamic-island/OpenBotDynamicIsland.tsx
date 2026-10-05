@@ -1071,19 +1071,35 @@ function FailureContent(props: {
       status={t("island.status.failed")}
       description={props.item.detail ?? t("island.failure.fallback")}
       action={
-        <Button
-          size="sm"
-          onClick={() =>
-            props.onAction({
-              type: "open-failure",
-              serverId: props.serverId,
-              agentId: props.item.agent.id,
-              turnId: props.item.turnId,
-            })
-          }
-        >
-          <ExternalLink aria-hidden="true" /> {t("island.action.openDetails")}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              props.onAction({
+                type: "dismiss-failure",
+                serverId: props.serverId,
+                agentId: props.item.agent.id,
+                turnId: props.item.turnId,
+              })
+            }
+          >
+            {t("island.action.dismiss")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() =>
+              props.onAction({
+                type: "open-failure",
+                serverId: props.serverId,
+                agentId: props.item.agent.id,
+                turnId: props.item.turnId,
+              })
+            }
+          >
+            <ExternalLink aria-hidden="true" /> {t("island.action.openDetails")}
+          </Button>
+        </>
       }
     />
   );

@@ -32,6 +32,7 @@ export const messages = {
   "island.action.decline": "Recusar",
   "island.action.approve": "Aprovar",
   "island.action.later": "Mais tarde",
+  "island.action.dismiss": "Dispensar",
   "island.action.answerInOpenBot": "Responder no OpenBot",
   "island.failure.fallback": "A tarefa parou antes de terminar.",
   "island.failure.title": "A tarefa falhou",

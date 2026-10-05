@@ -32,6 +32,7 @@ export const messages = defineMessages("island", {
   "island.action.decline": "Decline",
   "island.action.approve": "Approve",
   "island.action.later": "Later",
+  "island.action.dismiss": "Dismiss",
   "island.action.answerInOpenBot": "Answer in OpenBot",
   "island.action.expand": "Expand {label}",
   "island.action.collapse": "Collapse {label}",
