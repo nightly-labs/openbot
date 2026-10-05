@@ -130,7 +130,10 @@ export class BrowserCdpEngine {
     fields: { password: boolean; oneTimeCode: boolean };
   }> {
     const generation = this.#navigationGeneration;
-    const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
+    // A submitter that overrides the form to GET is part of it, so a page cannot add one while the
+    // vault read waits.
+    const fingerprintFields = `[this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method, [...(this.form?.elements ?? [])].some((element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post')]`;
+    const fingerprint = `function() { return JSON.stringify(${fingerprintFields}); }`;
     const nodes = await this.#lease(async (send) => {
       const inputs = [];
       for (const target of targets) inputs.push(await this.#resolveElement(send, target, Date.now() + 10_000));
@@ -230,7 +233,7 @@ export class BrowserCdpEngine {
                 return new Promise((resolve, reject) => {
                   const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
                   const check = () => {
-                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify(${fingerprintFields}) !== expected) return finish('Authentication target changed.');
                     if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
                   };
                   const observer = new MutationObserver(check);

@@ -124,36 +124,47 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await browser.close(tab.id);
       }
     }
-    const staleTab = await browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent");
-    try {
-      const handoff = await browser.prepareSecret({
-        namespace: "openbot_browser",
-        tool: "submit_secret",
-        threadId: "secret-thread",
-        ownerAgentId: "secret-agent",
-        turnId: "secret-turn",
-        callId: "stale",
-        arguments: {
-          tabId: staleTab.id,
-          method: "otp",
-          targets: [{ kind: "css", selector: "#code" }],
-          submission: "on_input",
-        },
-      });
-      const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
-      if (!contents) throw new Error("Missing stale-target fixture.");
-      await contents.executeJavaScript("document.querySelector('#code').name = 'changed'; true");
-      let rejected = false;
+    // A target that changes while the secret waits takes no value, also when a page adds a submitter
+    // that would send the form as GET.
+    for (const [selector, method, change] of [
+      ["#code", "otp", "document.querySelector('#code').name = 'changed'"],
+      [
+        "#post-password",
+        "password",
+        "const button = document.createElement('button'); button.setAttribute('formmethod', 'get'); document.querySelector('#post-password').form.append(button)",
+      ],
+    ] as const) {
+      const staleTab = await browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent");
       try {
-        await handoff.submit("729104");
-      } catch {
-        rejected = true;
+        const handoff = await browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: `stale-${selector}`,
+          arguments: {
+            tabId: staleTab.id,
+            method,
+            targets: [{ kind: "css", selector }],
+            submission: "on_input",
+          },
+        });
+        const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
+        if (!contents) throw new Error("Missing stale-target fixture.");
+        await contents.executeJavaScript(`${change}; true`);
+        let rejected = false;
+        try {
+          await handoff.submit(method === "otp" ? "729104" : "fixture-password-729104");
+        } catch {
+          rejected = true;
+        }
+        if (!rejected) throw new Error(`A changed authentication target ${selector} was accepted.`);
+        if ((await contents.executeJavaScript(`document.querySelector('${selector}').value`)) !== "")
+          throw new Error(`A changed authentication target ${selector} received a value.`);
+      } finally {
+        await browser.close(staleTab.id);
       }
-      if (!rejected) throw new Error("A changed authentication target was accepted.");
-      if ((await contents.executeJavaScript("document.querySelector('#code').value")) !== "")
-        throw new Error("A changed authentication target received a value.");
-    } finally {
-      await browser.close(staleTab.id);
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {
