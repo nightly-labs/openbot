@@ -322,7 +322,7 @@ describe.sequential("AgentService: queue", () => {
 
     await expect(
       service.createAgent({ ...CREATE_AGENT_INPUT, provider: "opencode", model: "opencode/no-such-model" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "opencode/no-such-model" is unavailable: OpenCode does not list it.');
     expect(service.listAgents()).toEqual([]);
   });
 

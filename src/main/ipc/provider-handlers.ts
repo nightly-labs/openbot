@@ -40,6 +40,10 @@ export function providerIpcHandlers({
         return service.getStatus();
       }),
       refreshAgentProviders: handler(() => service.refreshProviders()),
+      restartProvider: payloadHandler(parseProviderId, (provider) => service.restartProvider(provider)),
+      cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
+        service.cancelProviderRestart(provider),
+      ),
       // The code and the page it is typed on come back; nothing the code is later traded for does.
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) => service.startProviderCodeLogin(provider)),
       cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) => service.cancelProviderCodeLogin(provider)),

@@ -29,11 +29,16 @@ function RootComponent() {
   return <Outlet />;
 }
 
+const NO_SCRIPT_STYLE = "<style>[data-revealed=false],[data-revealed=false] *{opacity:1!important}</style>";
+
 function RootDocument(props: { children: JSX.Element }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Text waits at opacity 0 for a script to reveal it. Without scripts,
+            show it as it is, so the page can still be read. */}
+        <noscript innerHTML={NO_SCRIPT_STYLE} />
       </head>
       <body>
         {props.children}

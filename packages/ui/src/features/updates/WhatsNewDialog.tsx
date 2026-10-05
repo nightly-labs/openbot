@@ -249,6 +249,7 @@ function WhatsNewGroupSection(props: { group: WhatsNewGroup; onToggle: () => voi
           aria-expanded={expanded() ? "true" : "false"}
           aria-controls={expanded() ? listId : undefined}
           data-expanded={expanded() ? "true" : undefined}
+          data-cuelume-tap={expanded() ? "close" : "open"}
           onClick={toggle}
         >
           {expanded()

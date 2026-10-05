@@ -213,6 +213,48 @@ export const RoutineRunSummary: Story = {
   ),
 };
 
+export const AgentMessageGroup: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Agent message group
+      </Heading>
+      <Text tone="secondary">Consecutive messages with other agents show as one row that opens.</Text>
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Agent message group">
+        <ChatActionMarker
+          marker={{
+            kind: "agent-message-group",
+            timestamp,
+            messages: [
+              { id: "group-1", marker: agentMarker([{ agentId: "research", status: "completed" }], "completed") },
+              {
+                id: "group-2",
+                marker: {
+                  ...agentMarker([{ agentId: "chief", status: "completed" }], "completed"),
+                  direction: "incoming",
+                  sourceAgentId: "research",
+                },
+              },
+              {
+                id: "group-3",
+                marker: agentMarker(
+                  [
+                    { agentId: "sales", status: "completed" },
+                    { agentId: "social", status: "running" },
+                  ],
+                  "in-progress",
+                ),
+              },
+            ],
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+        />
+      </section>
+    </main>
+  ),
+};
+
 const timestamp = "2026-09-01T08:00:00.000Z";
 const routineStatuses: Array<Extract<ChatActionMarkerModel, { kind: "routine-run" }>["status"]> = [
   "queued",

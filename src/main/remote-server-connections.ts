@@ -36,7 +36,10 @@ interface MutableStatus {
   issue: ServerConnectionIssue | null;
   connectionSequence: number;
   hostRestart: ServerSummary["hostRestart"];
+  hostedSleep: HostedSleep;
 }
+
+type HostedSleep = NonNullable<ServerSummary["hostedSleep"]> | null;
 
 export class RemoteServerConnections {
   readonly #appVersion: string | null;
@@ -60,7 +63,20 @@ export class RemoteServerConnections {
       issue: status?.issue ?? null,
       connectionSequence: status?.connectionSequence ?? 0,
       hostRestart: status?.hostRestart ?? null,
+      hostedSleep: status?.hostedSleep ?? null,
     };
+  }
+
+  hostedSleepFor(serverId: string): HostedSleep {
+    return this.#statuses.get(serverId)?.hostedSleep ?? null;
+  }
+
+  /** Whether the account service stopped this hosted server for no use, or starts it now. Answers whether it changed. */
+  setHostedSleep(serverId: string, hostedSleep: HostedSleep): boolean {
+    const status = this.#mutable(serverId);
+    if (status.hostedSleep === hostedSleep) return false;
+    status.hostedSleep = hostedSleep;
+    return true;
   }
 
   // Raw, unlike `statusFor`: negotiation has to be able to tell "never asked the host" from "asked
@@ -133,6 +149,7 @@ export class RemoteServerConnections {
     status.compatibility = null;
     status.issue = null;
     status.hostRestart = null;
+    status.hostedSleep = null;
     status.connectionSequence += 1;
   }
 
@@ -205,6 +222,7 @@ export class RemoteServerConnections {
       issue: null,
       connectionSequence: 0,
       hostRestart: null,
+      hostedSleep: null,
     };
     this.#statuses.set(serverId, status);
     return status;

@@ -15,6 +15,7 @@ import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { recordRestartActivity } from "./restart-activity";
 import { collapseMissedOccurrences } from "./routine-schedule";
+import type { RoutineHoldWindow } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
 export interface ChannelRoutineHooks {
@@ -151,8 +152,8 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return run;
   }
 
-  skipMissed(now: Date): void {
-    this.#routines.skipMissed(now);
+  skipMissed(now: Date, held?: RoutineHoldWindow): void {
+    this.#routines.skipMissed(now, held);
   }
 
   /** The earliest channel routine, for the shared timer to compare against the other owners. */

@@ -406,11 +406,26 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   });
 
   let serversRead = 0;
+  /** The server whose MCP servers `servers` holds. Null before the first read ends, and while a new read runs. */
+  const [serversReadFor, setServersReadFor] = createSignal<string | null>(null);
   async function readServers(serverId: string) {
     const request = ++serversRead;
+    setServersReadFor(null);
     const configs = await run(() => calls().mcp.listMcpServers(serverId));
-    if (configs && request === serversRead) setServers(configs);
+    if (!configs || request !== serversRead) return;
+    setServers(configs);
+    setServersReadFor(serverId);
   }
+  /**
+   * True when each app shows what the host holds: its MCP servers and, for a plugin with skills, the
+   * agent's skills. Before that an installed app reads as idle. A failed read stays false.
+   */
+  const appStatesRead = () => {
+    if (props.pluginServerId && serversReadFor() !== props.pluginServerId) return false;
+    const agentId = pluginAgentId();
+    if (!agentId || !props.plugins?.some((plugin) => plugin.skills.length > 0)) return true;
+    return skills.read[agentId] === "loaded";
+  };
   /* The apps read the host's MCP servers while the window is open, and again for another host. */
   createEffect(
     () => (props.open ? props.pluginServerId : undefined),
@@ -719,6 +734,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
 
   return {
     model,
+    appStatesRead,
     connecting,
     uninstalling,
     uninstallPlan,

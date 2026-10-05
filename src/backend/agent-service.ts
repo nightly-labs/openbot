@@ -78,7 +78,12 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { CONTEXT_RESET_ITEM_TYPE, isContextResetMarker, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import {
+  agentAutomationAllowed,
+  CONTEXT_RESET_ITEM_TYPE,
+  isContextResetMarker,
+  workspaceAccessEnforced,
+} from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -106,6 +111,7 @@ import { MemoryHold } from "./agent/memory-hold";
 import {
   creationModel,
   type ModelChoice,
+  modelUnavailableError,
   type ProviderPreference,
   startingChoice,
   startingModel,
@@ -126,6 +132,7 @@ import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
+import { automationRunCommand } from "./automation-command";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
@@ -138,6 +145,7 @@ import type { PasswordVault } from "./password-vault";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
+import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import {
@@ -953,6 +961,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routineTimer.resume();
   }
 
+  /** Holds routine firing while a restart of the app waits for the agents. See RoutineTimer.hold. */
+  holdRoutines(): void {
+    this.#routineTimer.hold();
+  }
+
+  releaseRoutines(): void {
+    this.#routineTimer.release();
+  }
+
   listRoutines(agentId: string): Routine[] {
     return this.#routines.list(agentId);
   }
@@ -971,6 +988,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   testRoutine(input: TestRoutineInput): Promise<RoutineRun> {
     return this.#routines.test(input);
+  }
+
+  /** A run that a local script starts through the automation server. Only for agents that allow it. */
+  async runRoutineFromAutomation(input: TestRoutineInput & { payload: string }): Promise<RoutineRun> {
+    this.#requireAutomationAllowed(input.agentId);
+    if (input.payload.length > INPUT_LIMITS.automationPayload) {
+      throw new Error(sourceText("error.agent.automationPayloadTooLong", { limit: INPUT_LIMITS.automationPayload }));
+    }
+    return this.#routines.runWithPayload(input);
+  }
+
+  /** The command the user copies to run a routine from a local script. */
+  automationRunCommand(input: TestRoutineInput): string {
+    this.#requireAutomationAllowed(input.agentId);
+    if (!this.#routines.list(input.agentId).some((routine) => routine.id === input.routineId)) {
+      throw new Error(sourceText("error.backend.routineGone"));
+    }
+    return automationRunCommand({
+      root: this.#store.automationRoot,
+      agentId: input.agentId,
+      routineId: input.routineId,
+      payload: "",
+      platform: process.platform,
+    });
+  }
+
+  #requireAutomationAllowed(agentId: string): void {
+    const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+    if (!agent || !agentAutomationAllowed(agent)) throw new Error(sourceText("error.agent.automationOff"));
   }
 
   listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
@@ -1152,7 +1198,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * the record keeps the built-in default.
    */
   newAgentProvider(input: Pick<CreateAgentInput, "provider" | "model"> = {}): AgentProvider | null {
-    return (creationModel(input, this.#endpoints.available()) ?? this.#startingChoice())?.provider ?? null;
+    return (
+      (creationModel(input, this.#endpoints.available(), this.#providers.status().providers) ?? this.#startingChoice())
+        ?.provider ?? null
+    );
   }
 
   /** The provider and model setup or Settings recorded. */
@@ -1176,7 +1225,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       await this.#prepareAgentWorkspace(agent);
       // A named pair lands before the initial message is queued: a provider change afterwards is
       // rejected while the delivery or turn is active, so a follow-up update could never apply it.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -1250,7 +1299,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // A template, a marketplace agent and an imported one name no model. They start where a new
       // agent does; with nothing listed yet they keep the record's own, because no message waits.
       // The Slack orchestrator names the model the user picked.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       const starting = requested ? null : this.#startingChoice();
       if (requested)
         agent = await this.#store.updateAgent({
@@ -1303,7 +1352,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           .available()
           .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
       : undefined;
-    if (input.model && !requestedModel) throw new Error(sourceText("error.agent.modelUnavailable"));
+    if (input.model && !requestedModel) {
+      // A change of model alone stays on the agent's provider, so that provider is the one to explain.
+      const provider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
+      throw modelUnavailableError(
+        input.model,
+        provider,
+        this.#endpoints.available(),
+        this.#providers.status().providers ?? [],
+      );
+    }
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
     if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
       throw new Error(sourceText("error.agent.modelProviderMismatch"));
@@ -1330,7 +1388,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
       input.access !== undefined ||
-      input.computerUse !== undefined;
+      input.computerUse !== undefined ||
+      input.allowAutomation !== undefined;
     const agent = await this.#store.updateAgent(
       { ...input, ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}) },
       initiatingAgentId,
@@ -1443,7 +1502,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.channels.deleteChannel(channelId);
   }
 
-  async initialize(): Promise<void> {
+  /** `heldRoutines`: the routines that came due in this window, while a restart waited, run once. */
+  async initialize(options: { heldRoutines?: RoutineHoldWindow | undefined } = {}): Promise<void> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
@@ -1453,8 +1513,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();
-    this.#routines.skipMissed(new Date());
-    this.#channelRoutines.skipMissed(new Date());
+    this.#routines.skipMissed(new Date(), options.heldRoutines);
+    this.#channelRoutines.skipMissed(new Date(), options.heldRoutines);
     this.#initialized = true;
     this.#memoryHold.start();
     await this.#providers.start();
@@ -1479,6 +1539,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   refreshProvider(provider: AgentProvider): Promise<AgentStatus> {
     return this.#providers.refreshProvider(provider);
+  }
+
+  /** See `ProviderRuntime.restartProviderWhenIdle`. */
+  restartProvider(provider: AgentProvider): Promise<AgentStatus> {
+    return this.#providers.restartProviderWhenIdle(provider);
+  }
+
+  cancelProviderRestart(provider: AgentProvider): AgentStatus {
+    return this.#providers.cancelProviderRestart(provider);
   }
 
   connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {

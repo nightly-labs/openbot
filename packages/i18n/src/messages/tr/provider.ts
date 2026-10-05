@@ -36,6 +36,8 @@ export const messages = {
   "provider.action.restart": "Yeniden başlat",
   "provider.action.updateTo": "{version} sürümüne güncelle",
   "provider.action.checkForUpdates": "Güncellemeleri denetle",
+  "provider.lastError": "Son hata: {detail}",
+  "provider.action.copyDiagnostics": "Tanılama bilgilerini kopyala",
   "provider.action.install": "Yükle",
   "provider.action.signIn": "Giriş yap",
   "provider.action.signInWithCode": "Kod ile giriş yap",

@@ -88,6 +88,11 @@ function grokRateLimits(value: unknown): AccountRateLimitsReadResult {
   };
 }
 
+/**
+ * Grok's billing service writes proto3 JSON, which omits a zero scalar: a period with no usage yet
+ * has no `creditUsagePercent`, and a `$0` Cent arrives as `{}`. The Grok CLI reads both as 0, so a
+ * current period with no percentage and no deprecated `monthlyLimit` above $0 means 0% used.
+ */
 function grokCreditUsagePercent(config: DynamicRecord): number | null {
   if (config.creditUsagePercent !== undefined) {
     return isNumber(config.creditUsagePercent) && Number.isFinite(config.creditUsagePercent)
@@ -95,14 +100,18 @@ function grokCreditUsagePercent(config: DynamicRecord): number | null {
       : null;
   }
   const limit = grokCentValue(config, "monthlyLimit");
+  if (limit === undefined || limit === 0) return 0;
   const used = grokCentValue(config, "used");
-  if (limit === null || limit <= 0 || used === null) return null;
-  return Math.max(0, Math.min(100, (used / limit) * 100));
+  if (limit === null || limit < 0 || used === null) return null;
+  return Math.max(0, Math.min(100, ((used ?? 0) / limit) * 100));
 }
 
-function grokCentValue(config: DynamicRecord, key: string): number | null {
+/** `undefined` when the field is absent, `null` when it is malformed. */
+function grokCentValue(config: DynamicRecord, key: string): number | null | undefined {
+  if (config[key] === undefined) return undefined;
   const cent = getRecord(config, key);
   if (!cent) return null;
+  if (cent.val === undefined) return 0;
   return isNumber(cent.val) && Number.isFinite(cent.val) ? cent.val : null;
 }
 

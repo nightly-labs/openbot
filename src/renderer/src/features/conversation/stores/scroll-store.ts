@@ -18,6 +18,7 @@ import {
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { groupAgentMessageMarkers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeRoutineRunMessages } from "../routine-run-timeline";
 
@@ -54,7 +55,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
-  const timelineMessages = createMemo(() =>
+  const drawnMessages = createMemo(() =>
     summarizeRoutineRunMessages(
       deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
     ),
@@ -68,9 +69,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const firstUnreadMessageId = deps.props.firstUnreadMessageId;
     const start = deps.props.messages.findIndex((message) => message.id === firstUnreadMessageId);
     if (start < 0) return firstUnreadMessageId;
-    const drawn = new Set(timelineMessages().map((message) => message.id));
+    const drawn = new Set(drawnMessages().map((message) => message.id));
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
+  /* A group of agent messages stops at the unread divider, so the divider keeps its row. */
+  const timelineMessages = createMemo(() => groupAgentMessageMarkers(drawnMessages(), unreadBoundaryMessageId()));
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),

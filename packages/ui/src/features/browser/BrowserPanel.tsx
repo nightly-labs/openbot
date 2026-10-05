@@ -161,6 +161,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       class="no-drag browser-hide"
       aria-label={t("browser.hide")}
       title={t("browser.hide")}
+      data-cuelume-tap="close"
       onClick={props.onBack}
     >
       <Minimize2 aria-hidden="true" />
@@ -276,6 +277,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                         <span
                           class="browser-tab-close"
                           aria-hidden="true"
+                          data-cuelume-close=""
+                          data-cuelume-emphasis="subtle"
                           title={
                             tab().title
                               ? t("browser.tab.closeNamed", { name: tab().title })
@@ -332,6 +335,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               aria-label={t("browser.goBack")}
               class="browser-toolbar-button"
               disabled={!props.activeTab}
+              data-cuelume-tap="navigate"
               onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "back")}
             >
               <BrowserBackIcon />
@@ -342,6 +346,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               aria-label={t("browser.goForward")}
               class="browser-toolbar-button"
               disabled={!props.activeTab}
+              data-cuelume-tap="navigate"
               onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "forward")}
             >
               <BrowserForwardIcon />
@@ -399,6 +404,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               variant="ghost"
               size="icon-xs"
               aria-label={t("browser.popupBlocked.dismiss")}
+              data-cuelume-tap="close"
               onClick={() => {
                 const failure = popupFailure();
                 if (failure) setDismissedPopupFailures((ids) => new Set([...ids, failure.id]));

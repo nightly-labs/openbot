@@ -3,9 +3,9 @@ import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverHasStorage } from "../files/storage-usage";
@@ -37,7 +37,7 @@ export function ConversationHeader() {
     if (!save) return undefined;
     return (next: boolean) => {
       void save(next).catch((error) => {
-        toast.error(
+        actionToast.error(
           next
             ? errorMessage(error, t("conversation.header.grantFailed", { name }))
             : t("settings.autoApprove.revokeFailed", { name }),

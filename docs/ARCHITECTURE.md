@@ -334,6 +334,22 @@ Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
 would refuse.
 
+## Local script runs
+
+`src/main/automation-server.ts` is a loopback HTTP listener through which a local script runs a
+routine of an agent that allows it. [docs/automation.md](automation.md) has the routes and the
+commands. The listener runs only while at least one agent has `allowAutomation`, and binds
+`127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
+(folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+
+A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
+kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
+crash. The flag is in `agent_json` and needs no migration; a profile without it is off. Only the user
+changes it, on the computer that runs the agent: the Team API parser and the agent profile tools do
+not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
+on, the developer instructions name the two file paths, never the token.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
@@ -899,7 +915,7 @@ environment values, URLs, or headers, because they can hold secrets. `install_lo
 it they act on the caller. `uninstall_skill` never removes skill files that the user changed.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
-user widens them again, and only the user changes auto-approve and MCP servers. A new agent gets
+user widens them again, and only the user changes auto-approve, MCP servers and local script runs. A new agent gets
 the access and Computer Use limits of the agent that creates it, so a Workspace-only agent cannot
 get around its sandbox through a teammate. There is no creation step for skills or routines in
 the UI.
@@ -991,7 +1007,7 @@ The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
 Break down the funnel by `acquisition_source`, then `source_platform` once schema version 8
 events reach OpenPanel. Historical events do not contain the new platform property.
 
-The `/download/*` Worker handlers fall back to the releases page when the GitHub manifest cannot be
+The `/download/<os>/latest` Worker handler falls back to the releases page when the GitHub manifest cannot be
 read. That fallback is written to the Worker log, not to OpenPanel: a server event has no session,
 and the landing dashboards are defined on sessions.
 
@@ -1091,8 +1107,8 @@ A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `delet
 attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
 It keeps a path that another live record uses, and it deletes only a real path under the Transfers
 folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
-shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
-`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote`,
+`logs/update` and `logs/providers` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
 
 `storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
 exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen
@@ -1894,6 +1910,12 @@ waits in the Worker while a server is stopped; the client keeps it and connects 
 sandbox. On a hosted server only, main reads the memory of the machine, and the backend holds new
 turns while it is low and limits the turns that run at the same time. See
 [hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
+
+A self-hosted server uses the same Linux build, scripts and units on the owner's own computer, with
+`/opt/OpenBot/hosted/mode` set to `self`. It has no claim: main starts in server mode
+(`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
+a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
+sign-in. See [self-hosted servers](self-hosted-server.md).
 
 ## Shared UI package
 

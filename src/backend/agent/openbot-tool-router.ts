@@ -12,9 +12,11 @@ import type {
 import {
   agentComputerUseEnabled,
   isMessageReaction,
+  marketplaceSuggestionItemType,
   skillConversationEventItemType,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -655,6 +657,31 @@ export class OpenBotToolRouter {
 
     const tableResult = await handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
     if (tableResult) return tableResult;
+
+    if (params.tool === "suggest_marketplace_app") {
+      const args = params.arguments;
+      if (!isRecord(args) || !isString(args.app) || !isPluginSlug(args.app)) {
+        throw new Error("app must be a Marketplace plugin slug, or github.");
+      }
+      const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+      snapshot.messages.push({
+        id: randomUUID(),
+        turnId: params.turnId,
+        author: "system",
+        source: "system",
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        itemType: marketplaceSuggestionItemType({ appId: args.app }),
+        // The card reads the app from the item type. A client without the card shows this line.
+        text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
+      });
+      const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
+        appId: args.app,
+      });
+      this.#conversation.setSnapshot(senderAgentId, persisted);
+      this.#conversation.publishConversation(persisted);
+      return openBotToolResult({ status: "suggested", app: args.app });
+    }
 
     if (params.tool === "react_to_user_message") {
       const args = params.arguments;

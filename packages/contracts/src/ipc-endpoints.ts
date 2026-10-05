@@ -79,6 +79,7 @@ import type {
   ExternalDestination,
   HostUpdateSettingsChange,
   HostUpdateStatus,
+  IdleRestartTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
   SaveSetupInput,
@@ -236,6 +237,8 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   Routine,
+  RoutineCalendar,
+  RoutineCalendarInput,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -430,6 +433,13 @@ export const IPC_ENDPOINTS = {
   providers: {
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     refreshAgentProviders: request<undefined, AgentStatus>()("app:refresh-agent-providers"),
+    /**
+     * Restarts one provider's process after the turns that run on it end, and reads its version,
+     * account and models again. It answers when the restart is scheduled; the provider's status has
+     * `restartPending` until it is done. `cancelProviderRestart` removes one that still waits.
+     */
+    restartProvider: request<AgentProviderId, AgentStatus>()("app:restart-provider"),
+    cancelProviderRestart: request<AgentProviderId, AgentStatus>()("app:cancel-provider-restart"),
     /**
      * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
      * so the version they end on is whatever that updater fetches, which owes nothing to the version
@@ -694,6 +704,9 @@ export const IPC_ENDPOINTS = {
     getPreference: request<undefined, UpdatePreference>()("update:get-preference"),
     setPreference: request<UpdatePreferenceChange, UpdatePreference>()("update:set-preference"),
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
+    // The user of this computer restarts OpenBot, or installs the update, when no work runs.
+    restartWhenIdle: request<IdleRestartTarget, UpdateStatus>()("update:restart-when-idle"),
+    cancelIdleRestart: request<undefined, UpdateStatus>()("update:cancel-idle-restart"),
     event: event<UpdateStatus>()("update:event"),
     // A preference that an admin of a joined server changed on this computer.
     preference: event<UpdatePreference>()("update:preference-event"),
@@ -780,6 +793,10 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<DeleteRoutineInput, void>()("agent:delete-routine"),
     testRoutine: scopedRequest<TestRoutineInput, RoutineRun>()("agent:test-routine"),
     listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
+    /** The shell command a local script uses to run the routine. It names the token file, not the token. */
+    automationRunCommand: scopedRequest<TestRoutineInput, string>()("agent:automation-run-command"),
+    // Every routine of the host, of agents and channels, with its runs in a range.
+    routineCalendar: scopedRequest<RoutineCalendarInput, RoutineCalendar>()("agent:routine-calendar"),
   },
   channelMemories: {
     listChannelMemories: scopedRequest<string, ChannelMemory[]>()("agent:channel-memories:list"),

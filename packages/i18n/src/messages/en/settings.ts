@@ -57,6 +57,19 @@ export const messages = defineMessages("settings", {
   "settings.testNotification.openSettingsFailed": "Could not open the system settings.",
   "settings.taskSound.title": "Play a sound when a task finishes",
   "settings.taskSound.description": "Use a short sound for completed tasks.",
+  "settings.soundFeedback.title": "Action sounds",
+  "settings.soundFeedback.description": "Use short sounds to confirm what you do, such as sending a message.",
+  "settings.soundTheme.label": "Sound theme",
+  "settings.soundTheme.off": "Off",
+  "settings.soundTheme.offHint": "Silent",
+  "settings.soundTheme.warm": "Warm",
+  "settings.soundTheme.warmHint": "Glass and wood",
+  "settings.soundTheme.mech": "Mechanical",
+  "settings.soundTheme.mechHint": "Clicks and latches",
+  "settings.soundTheme.bubble": "Bubbly",
+  "settings.soundTheme.bubbleHint": "Drips and pops",
+  "settings.soundTheme.press": "Clicky",
+  "settings.soundTheme.pressHint": "Key switches",
   "settings.notch.title": "Behavior",
   "settings.notch.show.title": "Show status in the MacBook notch",
   "settings.notch.show.description": "Show agent activity and items that need attention at the top of each display.",
@@ -228,6 +241,14 @@ export const messages = defineMessages("settings", {
   "settings.updates.autoInstall.title": "Install updates automatically",
   "settings.updates.autoInstall.description":
     "OpenBot restarts into a downloaded update when the agents are idle. Members of your servers are disconnected for a short time.",
+  // Restart OpenBot, or install a downloaded update, when no agent works.
+  "settings.updates.idleRestart.title": "Restart OpenBot",
+  "settings.updates.idleRestart.relaunchDescription":
+    "OpenBot restarts when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.updateDescription":
+    "OpenBot installs {target} when no agent works. New routine runs wait until then.",
+  "settings.updates.idleRestart.relaunch": "Restart when idle",
+  "settings.updates.idleRestart.update": "Install when idle",
   "settings.updates.allowRemote.title": "Allow updates from server admins",
   "settings.updates.allowRemote.description":
     "Owners and admins of this server can download an update and restart OpenBot on this computer.",
@@ -257,7 +278,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB memory, {disk} GB storage",
   "settings.hostedServers.creating": "Creating…",
   "settings.hostedServers.usageNote":
-    "A server stops after 15 minutes with no use, and starts again for a message or a scheduled routine. Its agents and routines work when this computer is off.",
+    "A server stops about 15 minutes after the last message or change, also when an app is open. A key press or click in the app, a message, or a scheduled routine starts it again. Its agents and routines work when this computer is off.",
   "settings.hostedServers.empty": "You do not have a hosted server yet.",
   "settings.hostedServers.state.awaitingPayment": "Waiting for payment",
   "settings.hostedServers.state.planEnded": "Plan ended",

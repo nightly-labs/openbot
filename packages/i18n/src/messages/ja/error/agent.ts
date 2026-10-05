@@ -21,6 +21,14 @@ export const messages = {
   "error.agent.initialMessageTooLong": "最初のメッセージが長すぎます。",
   "error.agent.setupCleanupFailed": "エージェントのセットアップに失敗し、不完全なエージェントを削除できませんでした。",
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
+  "error.agent.modelProviderNotConnected":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelListEmpty":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
+  "error.agent.modelListEmptyNoError":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。",
+  "error.agent.modelNotInProviderList":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} のモデル一覧にありません。",
   "error.agent.modelProviderMismatch": "選択したモデルはそのプロバイダーのものではありません。",
   "error.agent.modelNotListed": "モデル「{model}」は使用できません。使用できるモデル: {models}。",
   "error.agent.providerNotListed":

@@ -394,6 +394,7 @@ describe("hosted servers", () => {
     context.stripe.failCancel = false;
     await context.service.delete(owner, server.serverId, "Cloud one");
     expect(context.stripe.cancelled).toEqual(["sub_1"]);
+    await expect(context.service.status(owner, server.serverId)).rejects.toMatchObject({ status: 404 });
     expect(context.boatCalls.find((call) => call.method === "DELETE")?.path).toBe("/sandboxes/bx_1");
 
     // A payment that finishes after the owner deleted the server is cancelled, and makes no sandbox.
@@ -786,6 +787,13 @@ describe("hosted servers", () => {
 
     context.clock.now += MINUTE;
     await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "archiving"));
+    await expect(context.service.status(stranger, server.serverId)).rejects.toMatchObject({ status: 404 });
+    await expect(context.service.status(member, server.serverId)).resolves.toEqual({
+      serverId: server.serverId,
+      state: "stopping",
+      error: null,
+      sleeping: false,
+    });
     await expect(context.service.wake(stranger, server.serverId)).rejects.toMatchObject({ status: 404 });
     await expect(context.service.wake(member, server.serverId)).resolves.toMatchObject({ state: "stopping" });
     expect(resumes()).toBe(0);
@@ -857,6 +865,22 @@ describe("hosted servers", () => {
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", observed_state: "stopped" });
     expect(calls("/sandboxes/bx_1/resume")).toHaveLength(0);
     expect(context.boatCalls.some((call) => call.method === "DELETE")).toBe(false);
+
+    // A client asks whether the server sleeps. The answer changes nothing, so the server stays asleep.
+    const row = () =>
+      context.database
+        .prepare(
+          "SELECT desired_state, observed_state, last_active_at, updated_at FROM hosted_servers WHERE server_id = ?",
+        )
+        .get(server.serverId);
+    const before = row();
+    expect(before).toMatchObject({ desired_state: "idle" });
+    await expect(context.service.status(owner, server.serverId)).resolves.toMatchObject({
+      state: "stopped",
+      sleeping: true,
+    });
+    expect(row()).toEqual(before);
+    expect(calls("/sandboxes/bx_1/resume")).toHaveLength(0);
 
     await expect(context.service.wake(owner, server.serverId)).resolves.toMatchObject({ state: "waking" });
     expect(calls("/sandboxes/bx_1/resume").map((call) => call.body)).toEqual([{ ttlSeconds: LEASE }]);

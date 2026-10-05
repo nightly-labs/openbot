@@ -1,4 +1,4 @@
-import { Bot, Hash, Server, Store, UsersRound } from "@openbot/ui";
+import { Bot, CalendarClock, Hash, Server, Store, UsersRound } from "@openbot/ui";
 import type {
   GlobalSearchAction,
   GlobalSearchFile,
@@ -16,6 +16,7 @@ import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
 import { navItems } from "./features/settings/settings-tabs";
+import { useUsage } from "./features/usage/usage-context";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 
@@ -35,6 +36,7 @@ export function useGlobalSearchSources(open: () => boolean) {
   const { activeServer } = useServers();
   const { openServerSettings } = useServerSettings();
   const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
+  const { openSchedule } = useUsage();
   const [routines, setRoutines] = createSignal<GlobalSearchRoutine[]>([]);
   const [routinesLoading, setRoutinesLoading] = createSignal(false);
   let routineRequest = 0;
@@ -136,6 +138,15 @@ export function useGlobalSearchSources(open: () => boolean) {
         icon: Store,
         run: () => setSkillsMarketplaceOpen(true),
       });
+      if (server) {
+        list.push({
+          id: "schedule",
+          label: t("routine.calendar.open"),
+          group: "actions",
+          icon: CalendarClock,
+          run: () => openSchedule(server.id, globalSearchOpener()),
+        });
+      }
       for (const item of navItems) {
         // Hosted servers shows only for an account with hosting, which the dialog checks when it opens.
         if (item.value === "hosted-servers" || (item.value === "dynamic-island" && !isMac)) continue;

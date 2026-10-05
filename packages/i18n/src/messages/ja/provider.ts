@@ -37,6 +37,8 @@ export const messages = {
   "provider.action.restart": "再起動",
   "provider.action.updateTo": "{version} にアップデート",
   "provider.action.checkForUpdates": "アップデートを確認",
+  "provider.lastError": "最後のエラー: {detail}",
+  "provider.action.copyDiagnostics": "診断情報をコピー",
   "provider.action.install": "インストール",
   "provider.action.signIn": "サインイン",
   "provider.action.signInWithCode": "コードでログイン",

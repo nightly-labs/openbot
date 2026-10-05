@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type AgentSummary,
+  agentAutomationAllowed,
   agentComputerUseEnabled,
   agentProviderDescriptor,
   isContextResetMarker,
@@ -505,8 +506,15 @@ export class ThreadLifecycle {
           Object.keys(disabled).sort(),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
-          // Only a sandboxed agent adds a value: a full-access session keeps the fingerprint it had.
-          [agent.name, agent.title, agent.description, ...(workspaceAccessEnforced(agent) ? ["workspace"] : [])],
+          // Only a sandboxed agent, or one that allows local scripts, adds a value: Codex keeps the
+          // developer instructions of a loaded session, and other sessions keep the fingerprint they had.
+          [
+            agent.name,
+            agent.title,
+            agent.description,
+            ...(workspaceAccessEnforced(agent) ? ["workspace"] : []),
+            ...(agentAutomationAllowed(agent) ? ["automation"] : []),
+          ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
         ]),
       )
@@ -555,9 +563,13 @@ export class ThreadLifecycle {
 
   /** The developer instructions of a session start or resume, with what is connected now. */
   #instructions(agent: AgentSummary): string {
-    return developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id), {
-      passwordVault: this.#passwordVaultConnected(),
-    });
+    return developerInstructions(
+      agent,
+      this.#store.sharedRoot,
+      this.#memories.listFor(agent.id),
+      this.#store.automationRoot,
+      { passwordVault: this.#passwordVaultConnected() },
+    );
   }
 
   /**

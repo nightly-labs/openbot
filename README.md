@@ -74,6 +74,35 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
+#### Linux server with no screen
+
+To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with
+systemd), install it from a terminal and sign in with an email code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+sudo openbot login
+```
+
+Then use it from the desktop app, the iPhone app or `openbot.run/app`. See
+[self-hosted servers](docs/self-hosted-server.md) for the options and the `openbot` commands.
+
+#### Docker
+
+The same server runs as a container (`linux/amd64` and `linux/arm64`). The seccomp profile lets the
+Electron sandbox stay on:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+docker run -d --name openbot --restart unless-stopped \
+  --security-opt seccomp=seccomp.json --security-opt no-new-privileges:true \
+  --shm-size 1g --stop-timeout 60 -v openbot-data:/data \
+  ghcr.io/nightly-labs/openbot:latest
+docker exec -it openbot openbot login
+```
+
+See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits.
+
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
 > warning. Check the release checksum or GitHub build attestation before you run the installer.
@@ -496,7 +525,8 @@ described above.
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
 signed and notarized macOS ARM64 and x64 release, an unsigned Windows x64 release, and unsigned Linux x64
-and arm64 AppImages in GitHub Actions.
+and arm64 AppImages in GitHub Actions. After the release is published, the workflow pushes the Docker
+image to `ghcr.io/nightly-labs/openbot`.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account
 popover. Release signing secrets and the complete procedure are documented in
 [docs/RELEASING.md](docs/RELEASING.md).

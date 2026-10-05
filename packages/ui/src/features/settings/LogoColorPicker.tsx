@@ -36,6 +36,7 @@ export function LogoColorPicker(props: LogoColorPickerProps): JSX.Element {
             class={["logo-color-choice", { "logo-color-choice-selected": props.value === color }]}
             aria-label={t(COLOR_LABEL_KEYS[color])}
             aria-pressed={props.value === color ? "true" : "false"}
+            data-cuelume-tap="select"
             onClick={() => props.onChange(color)}
           >
             <span class="logo-color-swatch" style={{ background: APP_LOGO_COLOR_HEX[color] }} />

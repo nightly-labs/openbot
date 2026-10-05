@@ -306,6 +306,45 @@ describe("SignalService", () => {
     expect(service.metrics().activePeerConnections).toBe(1);
   });
 
+  it("registers no peer when the socket closes while the ticket is verified", async () => {
+    const tokens = fakeTokens();
+    // One connection per account, so a peer that outlives its socket refuses the next real device.
+    const service = new SignalService(tokens, 1);
+    const host = socket("host");
+    await hello(service, host, "host-ticket", "host");
+    const accepted = service.metrics().acceptedConnections;
+
+    // Hold the next verification open, so the socket can close in the middle of it.
+    const verifyTicket = tokens.verifyTicket;
+    const verification = deferred();
+    tokens.verifyTicket = vi.fn(async (token: string) => {
+      await verification.promise;
+      return await verifyTicket(token);
+    });
+
+    const client = socket("client");
+    service.connect(client);
+    const authenticating = service.receive(
+      client,
+      JSON.stringify({ type: "hello", version: 1, peer: "client", token: "client-ticket" }),
+    );
+    expect(tokens.verifyTicket).toHaveBeenCalledOnce();
+
+    // The teardown runs first. It finds no peer, because `#authenticate` has not registered one yet.
+    service.disconnect(client);
+    verification.resolve();
+    await authenticating;
+
+    expect(service.metrics().acceptedConnections).toBe(accepted);
+    expect(host.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(false);
+
+    // The account keeps its own connection limit for a device that is really there.
+    const phone = socket("phone");
+    await hello(service, phone, "second-client-ticket", "client");
+    expect(phone.messages.some((message) => message.includes('"type":"ready"'))).toBe(true);
+    expect(host.messages.filter((message) => message.includes('"type":"peer-ready"'))).toHaveLength(1);
+  });
+
   it("limits unauthenticated sockets and revokes one logical session", async () => {
     const service = new SignalService(fakeTokens(), 8, 1);
     const pending = socket("pending", "192.0.2.10");
@@ -391,6 +430,15 @@ function socket(id: string, ip = `192.0.2.${id.length}`): TestSignalSocket {
     },
   };
   return target;
+}
+
+/** A promise that the test opens by hand, so the code under test waits at a known point. */
+function deferred() {
+  let open: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, resolve: () => open() };
 }
 
 async function hello(service: SignalService, target: SignalSocket, token: string, peer: "host" | "client") {

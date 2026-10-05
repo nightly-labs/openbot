@@ -13,7 +13,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
   answer:
     "For most people, OpenBot is the better choice: your agents use the AI plans you already pay for, such as ChatGPT, Claude, Gemini or Grok, or your own model. They run on your own computer, and the app is free and needs no account. Choose Grok Bot only if you want a cloud computer to run your Bots, so that you keep no computer of your own on.",
   chooseOpenBot: [
-    "You already pay for ChatGPT, Claude, Gemini or Grok, or you run your own model.",
+    "You already pay for ChatGPT, Claude, Gemini, Grok or Cursor, or you run your own model.",
     "Your files and chats must stay on your own computer.",
     "You want to reach your agents from your phone while they work on your own computer or server.",
     "You want a free app that works without an account.",
@@ -30,7 +30,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
       icon: "cpu",
       topic: "Models and plans",
       openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival: "Cursor manages model selection.",
       better: "openbot",
     },
@@ -46,9 +46,8 @@ export const GROK_BOT_COMPARISON: Comparison = {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot. Only that computer must stay on, not your laptop.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival: "Cloud work continues when you close the app or your laptop. You keep no computer on.",
-      better: "rival",
     },
     {
       icon: "phone",
@@ -83,6 +82,14 @@ export const GROK_BOT_COMPARISON: Comparison = {
       better: "openbot",
     },
     {
+      icon: "globe",
+      topic: "Where you can use it",
+      openbot:
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      rival:
+        "xAI publishes no list of countries for Grok Bot. Its cloud computers run in the United States. The desktop app is in more than 20 languages.",
+    },
+    {
       icon: "devices",
       topic: "Apps",
       openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
@@ -102,7 +109,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       title: "Models and the plans you pay for",
       openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
         "Grok Bot gives you a managed environment: Cursor manages model selection and the computer. It comes with paid Cursor plans and SuperGrok subscriptions, so you pay for the plan that Grok Bot is part of. There is less to set up, and less of the environment is yours to change.",
       better: "openbot",
@@ -110,7 +117,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
         "Grok Bot works from a persistent cloud computer that Cursor hosts. One computer belongs to each account, and all of its Bots share it: files, browser sessions and signed-in accounts. Closing the app or your laptop does not stop cloud work.",
       better: "openbot",
@@ -133,7 +140,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other.",
       rival:
         "Grok Bot needs cloud data storage, and its computers run in the United States. With Privacy Mode on, customer data is not used for training. Connector tokens are never stored on the computer, and Cursor keeps a record of Bot actions for 90 days.",
       better: "openbot",
@@ -153,7 +160,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
       answer:
-        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key. OpenBot adds no charge of its own.",
+        "Yes. OpenBot signs in to each provider tool with your own account: your ChatGPT plan for Codex, your Claude plan for Claude Code, and a Google AI Pro or Ultra plan for Gemini. Grok CLI uses your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
     },
     {
       question: "Can I use my own model with OpenBot?",
@@ -163,7 +170,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       question: "Can OpenBot use Grok models?",
       answer:
-        "Yes. OpenBot can run Grok CLI as the provider of an agent, next to Codex, Claude Code and OpenCode. Grok CLI then sends that agent's requests to xAI.",
+        "Yes. OpenBot can run Grok CLI as the provider of an agent, next to Codex, Claude Code, Cursor CLI and OpenCode. Grok CLI then sends that agent's requests to xAI.",
     },
     {
       question: "Does Grok Bot run on my computer?",
@@ -178,7 +185,7 @@ export const GROK_BOT_COMPARISON: Comparison = {
     {
       question: "Do agents keep working when my laptop is closed?",
       answer:
-        "Yes, with both. With OpenBot, run it on a desktop or a server that stays on, and connect from your laptop or phone. Only that computer must stay on. With Grok Bot, closing the app or your laptop does not stop cloud work.",
+        "Yes, with both. With OpenBot, run it on a desktop or a server that stays on, or on a hosted OpenBot server, and connect from your laptop or phone. Only that computer must stay on. With Grok Bot, closing the app or your laptop does not stop cloud work.",
     },
     {
       question: "Does OpenBot have a mobile app?",
@@ -197,9 +204,10 @@ export const GROK_BOT_COMPARISON: Comparison = {
     { label: "Grok Bot computer and apps", url: `${GROK_BOT_DOCS}/computer-and-apps` },
     { label: "Grok Bot chat and collaboration", url: `${GROK_BOT_DOCS}/chat-and-collaboration` },
     { label: "Grok Bot for teams and enterprises", url: `${GROK_BOT_DOCS}/teams-and-enterprises` },
+    { label: "Grok Bot settings and languages", url: `${GROK_BOT_DOCS}/settings-and-notifications` },
     { label: "Grok Bot security", url: `${GROK_BOT_DOCS}/security` },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

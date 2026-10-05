@@ -1,5 +1,6 @@
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
+import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { createHostedBilling } from "./hosted-billing";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
@@ -29,6 +30,8 @@ export function createWorkerHandler(
         Partial<Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN">>,
       context?: WorkerExecutionContext,
     ) {
+      const hostRedirect = canonicalHostRedirect(request);
+      if (hostRedirect) return hostRedirect;
       const localSiteResponse = await serveLocalHostedSite(request, bindings);
       if (localSiteResponse) return localSiteResponse;
       try {
@@ -49,7 +52,9 @@ export function createWorkerHandler(
         }
         throw error;
       }
-      const response = Promise.resolve(fetchHandler(request));
+      const response = Promise.resolve(fetchHandler(request)).then((result) =>
+        permanentTrailingSlashRedirect(request, result),
+      );
       if (context && isEmailSignInStart(request)) {
         context.waitUntil(
           response.then(

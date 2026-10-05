@@ -201,6 +201,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
               tooltip={t("common.close")}
               variant="ghost"
               disabled={busy()}
+              data-cuelume-tap="close"
               onClick={requestClose}
             >
               <X />

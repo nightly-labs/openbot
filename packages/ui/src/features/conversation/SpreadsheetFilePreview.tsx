@@ -330,6 +330,7 @@ export function SpreadsheetFilePreview(props: SpreadsheetFilePreviewProps) {
                         variant="outline"
                         type="button"
                         aria-pressed={activeSheet() === index() ? "true" : "false"}
+                        data-cuelume-tap="select"
                         onClick={() => setActiveSheet(index())}
                       >
                         {current.name}

@@ -49,6 +49,7 @@ import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
+import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
@@ -62,6 +63,8 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   access?: AgentAccess;
   // Absent on every agent stored before the setting existed, which keeps Computer Use on.
   computerUse?: boolean;
+  // Absent on every agent stored before the setting existed, which keeps automation off.
+  allowAutomation?: boolean;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -130,6 +133,7 @@ export class AgentStore {
   readonly #downloadsRoot: string;
   readonly #avatarsRoot: string;
   readonly #duplicationsRoot: string;
+  readonly #automationRoot: string;
   readonly #profileCreationRecovery: ProfileCreationRecovery;
   readonly #database: OpenBotDatabase;
   #state: StoredState = { version: 2, examplesInitialized: false, agents: [] };
@@ -145,6 +149,7 @@ export class AgentStore {
     this.#downloadsRoot = join(openbotRoot, "Downloads");
     this.#avatarsRoot = join(userDataPath, "avatars", "agents");
     this.#duplicationsRoot = join(userDataPath, "agent-duplications");
+    this.#automationRoot = automationRoot(userDataPath);
     this.#database = database;
     this.#profileCreationRecovery = new ProfileCreationRecovery(
       join(userDataPath, "agent-profile-creations"),
@@ -162,6 +167,11 @@ export class AgentStore {
 
   get downloadsRoot(): string {
     return this.#downloadsRoot;
+  }
+
+  /** Where the automation server writes its URL and token files. */
+  get automationRoot(): string {
+    return this.#automationRoot;
   }
 
   async initialize(): Promise<void> {
@@ -541,6 +551,10 @@ export class AgentStore {
     if (input.computerUse !== undefined) {
       if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
       next.computerUse = input.computerUse;
+    }
+    if (input.allowAutomation !== undefined) {
+      if (!isBoolean(input.allowAutomation)) throw new Error("Invalid automation value.");
+      next.allowAutomation = input.allowAutomation;
     }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
@@ -1354,6 +1368,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
     (record.access === undefined || isAgentAccess(record.access)) &&
     (record.computerUse === undefined || isBoolean(record.computerUse)) &&
+    (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1408,6 +1423,10 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
   const computerUse =
     value.computerUse === undefined || isBoolean(value.computerUse) ? value.computerUse : reset("computerUse", true);
+  const allowAutomation =
+    value.allowAutomation === undefined || isBoolean(value.allowAutomation)
+      ? value.allowAutomation
+      : reset("allowAutomation", undefined);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1439,6 +1458,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
     ...(computerUse === undefined ? {} : { computerUse }),
+    ...(allowAutomation === undefined ? {} : { allowAutomation }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };

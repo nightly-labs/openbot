@@ -63,6 +63,7 @@ export const messages = {
   "onboarding.next.finishing": "{provider} はまだ設定中です。",
   "onboarding.next.downloadError":
     "{provider} をダウンロードできませんでした。続行するにはダウンロードを再試行してください。",
+  "onboarding.next.downloadErrorReason": "{provider} をセットアップできませんでした: {reason}",
   "onboarding.next.notDownloaded": "続行するには {provider} をダウンロードしてください。",
   "onboarding.next.connecting": "{provider} は接続中です。",
   "onboarding.next.connect": "続行するには {provider} を接続してください。",
@@ -84,6 +85,8 @@ export const messages = {
   "onboarding.meet.addToPrompt": "プロンプトに追加",
   "onboarding.meet.sendMessage": "メッセージを送信",
   "onboarding.computer.title": "OpenBot がコンピューターを操作する場合があります",
+  "onboarding.sounds.title": "好きな音を選びましょう",
+  "onboarding.sounds.description": "メッセージの送信などの操作を短い音でお知らせします。",
   "onboarding.jobs.title": "各エージェントに仕事を任せましょう",
   "onboarding.jobs.description": "目的を絞ったエージェントから始めて、仕事に合わせてチームを作りましょう。",
   "onboarding.jobs.example": "エージェントの仕事の例",

@@ -228,6 +228,20 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
+    name: "suggest_marketplace_app",
+    description:
+      "Show the user a card in this conversation for one Marketplace app that the task needs and that is not in your tools. The user connects it, opens its listing, or dismisses the card; nothing connects without the user. Keep your normal answer.",
+    shape: {
+      app: z
+        .string()
+        .min(1)
+        .max(63)
+        .describe(
+          "The plugin slug: its name in lower case with hyphens, such as notion or linear. Use github for GitHub.",
+        ),
+    },
+  },
+  {
     name: "react_to_user_message",
     description:
       "Add one emoji reaction to the current user message for an obvious positive or negative emotional moment, including wins, affection, gratitude, humor, sadness, disappointment, frustration, empathy, or strong approval. An emoji in the written answer does not count as a reaction. Skip neutral messages and never use the reaction instead of the normal answer.",

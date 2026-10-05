@@ -3,10 +3,10 @@ import {
   type GitHubConnectorRepositories,
   type GitHubConnectorStatus,
 } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { GitHubConnectorPanelProps } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, onSettled } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { type GitHubConnectorPort, githubConnectorPort } from "./github-connector-port";
 
 export interface GitHubConnectorController {
@@ -112,7 +112,7 @@ export function createGitHubConnector(
       })
       .catch((error: unknown) => {
         const { t, errorMessage } = currentText();
-        toast.error(t("connector.github.actionFailed"), {
+        actionToast.error(t("connector.github.actionFailed"), {
           description: errorMessage(error, t("connector.github.actionFailed")),
         });
       })

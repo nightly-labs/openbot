@@ -10,6 +10,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   ConfirmDialog,
+  CopyButton,
   Item,
   ItemActions,
   ItemContent,
@@ -18,9 +19,11 @@ import {
   ItemTitle,
   Pencil,
   Plus,
+  RotateCcw,
   SettingsSection,
   Text,
   Trash2,
+  X,
 } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -42,6 +45,18 @@ export interface CustomAgentSettingsApi {
   remove: (id: string) => Promise<CustomProviderRestart>;
   /** One trial start. Rejects with the reason the agent did not answer. */
   check: (input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>;
+  /**
+   * Restarts the process group of the custom agents after their tasks stop. Without it the section
+   * offers no restart.
+   */
+  restart?: (() => Promise<void>) | undefined;
+  cancelRestart?: (() => Promise<void>) | undefined;
+  /** A restart waits for the tasks of the custom agents to stop. */
+  restartPending?: boolean | undefined;
+  /** The last failure of the custom agents, kept until a model list fetched after it succeeds. */
+  lastError?: string | null | undefined;
+  /** What "Copy diagnostics" puts on the clipboard. */
+  diagnostics?: string | undefined;
 }
 
 /**
@@ -81,7 +96,7 @@ export function checkResult(result: CustomAgentCheckResult): AcpAgentCheck {
 
 /** The user's own ACP agents in Settings: the list, and the form that adds or changes one. */
 export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [form, setForm] = createSignal<AgentForm | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [submitError, setSubmitError] = createSignal<string | null>(null);
@@ -150,16 +165,40 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
       title={t("customProvider.agents.title")}
       description={t("customProvider.agents.description")}
       actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={removing() !== null}
-          onClick={() => open({ draft: emptyCustomAcpAgentDraft() })}
-        >
-          <Plus size={14} aria-hidden="true" />
-          {t("customProvider.agents.add")}
-        </Button>
+        <>
+          <Show when={props.api.restart && (props.api.agents.length > 0 || props.api.restartPending)}>
+            <Show
+              when={props.api.restartPending}
+              fallback={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={removing() !== null}
+                  onClick={() => void props.api.restart?.()}
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                  {t("customProvider.agents.restart")}
+                </Button>
+              }
+            >
+              <Button type="button" variant="ghost" size="sm" onClick={() => void props.api.cancelRestart?.()}>
+                <X size={14} aria-hidden="true" />
+                {t("customProvider.agents.cancelRestart")}
+              </Button>
+            </Show>
+          </Show>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={removing() !== null}
+            onClick={() => open({ draft: emptyCustomAcpAgentDraft() })}
+          >
+            <Plus size={14} aria-hidden="true" />
+            {t("customProvider.agents.add")}
+          </Button>
+        </>
       }
     >
       <Show
@@ -204,6 +243,30 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
             )}
           </For>
         </ItemGroup>
+      </Show>
+      <Show when={props.api.lastError}>
+        {(lastError) => (
+          <>
+            <Text tone="warning" variant="caption" role="status">
+              {t("provider.lastError", { detail: sourceText(lastError()) })}
+            </Text>
+            <Show when={props.api.diagnostics}>
+              {(diagnostics) => (
+                <CopyButton
+                  class="custom-agents-copy-diagnostics"
+                  value={diagnostics()}
+                  label={t("provider.action.copyDiagnostics")}
+                  copiedLabel={t("common.copied")}
+                />
+              )}
+            </Show>
+          </>
+        )}
+      </Show>
+      <Show when={props.api.restartPending}>
+        <Text tone="muted" variant="caption" role="status">
+          {t("customProvider.agents.restartPending")}
+        </Text>
       </Show>
       <Show when={note()}>
         {(message) => (

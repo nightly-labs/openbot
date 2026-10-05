@@ -93,6 +93,17 @@ export interface HostedServerSummary {
   updatedAt: string;
 }
 
+/**
+ * The state of one hosted server, for its owner and its members. `sleeping`: the Worker stopped the
+ * server because nobody used it. A client then waits for the user's next input before it wakes it.
+ */
+export interface HostedServerStatus {
+  serverId: string;
+  state: HostedServerState;
+  error: HostedServerError | null;
+  sleeping: boolean;
+}
+
 export interface HostedServerList {
   /** False when this account cannot create hosted servers, or when the account server has no billing. */
   available: boolean;
@@ -152,6 +163,24 @@ export function parseHostedServerSummary(value: unknown): HostedServerSummary | 
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
+}
+
+/** Returns null for a value that is not a hosted server status. */
+export function parseHostedServerStatus(value: unknown): HostedServerStatus | null {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.serverId) ||
+    !isString(value.state) ||
+    !(value.error === null || isString(value.error)) ||
+    !isBoolean(value.sleeping)
+  ) {
+    return null;
+  }
+  // As in the summary: a state that a newer Worker added shows as an error.
+  const state: HostedServerState = isHostedServerState(value.state) ? value.state : "error";
+  const error: HostedServerError | null =
+    state !== value.state ? "provider_error" : isOneOf(HOSTED_SERVER_ERRORS, value.error) ? value.error : null;
+  return { serverId: value.serverId, state, error, sleeping: value.sleeping };
 }
 
 /**

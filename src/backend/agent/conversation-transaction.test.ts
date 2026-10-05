@@ -116,6 +116,62 @@ describe("conversation transactions", () => {
     expect(runtime.snapshot(AGENT_ID)?.messages).toEqual([message]);
   });
 
+  it("runs every post-commit effect after one of them throws", () => {
+    const ran: string[] = [];
+    const queueEffect =
+      (name: string, fail = false) =>
+      () => {
+        ran.push(name);
+        if (fail) throw new Error(`${name} failed`);
+      };
+
+    expect(() =>
+      withDatabaseTransaction(
+        store.database,
+        () => {
+          withDatabaseTransaction(store.database, () => undefined, undefined, queueEffect("first", true));
+          withDatabaseTransaction(store.database, () => undefined, undefined, queueEffect("second"));
+          return undefined;
+        },
+        undefined,
+        queueEffect("owner"),
+      ),
+    ).toThrow("first failed");
+
+    // The rows are durable, so a failure in one effect must not skip the effects queued after it.
+    expect(ran).toEqual(["first", "second", "owner"]);
+  });
+
+  it("reports every post-commit failure when more than one effect throws", () => {
+    const queueEffect = (message: string) => () => {
+      throw new Error(message);
+    };
+
+    let thrown: unknown;
+    try {
+      withDatabaseTransaction(
+        store.database,
+        () => {
+          withDatabaseTransaction(store.database, () => undefined, undefined, queueEffect("first failed"));
+          withDatabaseTransaction(store.database, () => undefined, undefined, queueEffect("second failed"));
+          return undefined;
+        },
+        undefined,
+        queueEffect("owner failed"),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AggregateError);
+    const errors = thrown instanceof AggregateError ? thrown.errors : [];
+    expect(errors.map((error) => (error instanceof Error ? error.message : String(error)))).toEqual([
+      "first failed",
+      "second failed",
+      "owner failed",
+    ]);
+  });
+
   it("restores the snapshot and the thread identity when the body throws", () => {
     const before = structuredClone(runtime.ensureSnapshot(AGENT_ID, null));
     expect(before.threadId).toBeNull();

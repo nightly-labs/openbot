@@ -27,6 +27,18 @@ const mixedRows = accountUsageProviderRows({
 });
 
 const oneProviderRows = mixedRows.filter((row) => row.provider === "codex");
+const unreportedRows = accountUsageProviderRows(
+  {
+    limits: [
+      {
+        id: "codex",
+        primary: null,
+        secondary: { usedPercent: 42, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+    ],
+  },
+  [{ id: "grok", state: "available" }],
+);
 const warningRows: AccountUsageProviderRow[] = mixedRows.map((row) =>
   row.provider === "claude" ? { ...row, remainingPercent: 29, windowLabel: "Weekly", tone: "warning" } : row,
 );
@@ -65,6 +77,14 @@ export const OneProvider: Story = {
 
 export const Warning: Story = {
   args: { rows: warningRows },
+};
+
+export const UnreportedProvider: Story = {
+  args: { rows: unreportedRows },
+};
+
+export const RefreshingUnreportedProvider: Story = {
+  args: { rows: unreportedRows, loading: true },
 };
 
 export const Loading: Story = {

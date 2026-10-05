@@ -53,6 +53,7 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
           type="button"
           class="browser-toolbar-button"
           aria-label={t("files.conversation.close")}
+          data-cuelume-tap="close"
           onClick={() => props.onClose()}
         >
           <X class="browser-toolbar-icon" />

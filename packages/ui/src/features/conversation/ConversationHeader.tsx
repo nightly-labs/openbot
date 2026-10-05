@@ -81,6 +81,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               aria-expanded={control().visible ? "true" : "false"}
               disabled={!control().enabled}
               onClick={(event) => control().onOpen(event.currentTarget)}
+              data-cuelume-tap="open"
             >
               <RemoteDesktopIcon />
               <Show when={control().active}>
@@ -98,6 +99,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               aria-label={t(files().open ? "conversation.header.hideFiles" : "conversation.header.showFiles")}
               aria-expanded={files().open ? "true" : "false"}
               onClick={() => files().onToggle()}
+              data-cuelume-tap={files().open ? "close" : "open"}
             >
               <Folder aria-hidden="true" class="size-[14px]" />
             </Button>
@@ -112,6 +114,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               aria-label={t("conversation.header.publish")}
               aria-haspopup="dialog"
               onClick={() => publish().onOpen()}
+              data-cuelume-tap="open"
             >
               <Upload aria-hidden="true" class="size-[14px]" />
             </Button>
@@ -135,6 +138,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
             aria-expanded={props.browser?.open ? "true" : "false"}
             disabled={props.browser?.disabled}
             onClick={() => props.browser?.onToggle()}
+            data-cuelume-tap={props.browser?.open ? "close" : "open"}
           >
             <ComputerIcon />
             <Show when={props.browser?.acting}>

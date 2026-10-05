@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { teeLogLines } from "@openbot/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentProcessExitError, type AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -1228,6 +1229,45 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", state: "available", message }),
     );
+  });
+
+  it("keeps an MCP secret out of the provider log when a usage read fails", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) =>
+        new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
+          if (method === "account/rateLimits/read") throw new Error("Usage refused abcdef123456");
+        }),
+      bundledExecutables: {},
+    });
+    await service.initialize();
+    new McpServerStore(store.database).save({
+      id: "",
+      name: "Filesystem",
+      transport: "stdio",
+      enabled: true,
+      command: "/bin/echo",
+      args: [],
+      env: [{ key: "API_KEY", value: "abcdef123456" }],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "",
+      headers: [],
+    });
+    const lines: string[] = [];
+    const removeTee = teeLogLines(["provider-runtime"], (line) => lines.push(line));
+    try {
+      await service.getUsage();
+    } finally {
+      removeTee();
+    }
+
+    const failure = lines.find((line) => line.includes("Could not read provider usage."));
+    expect(failure).toContain("Usage refused");
+    expect(failure).not.toContain("abcdef123456");
   });
 
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {

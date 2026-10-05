@@ -73,6 +73,7 @@ import {
 } from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
+import { AutomationServer } from "./automation-server";
 import { BillingDesktopService } from "./billing-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
@@ -112,6 +113,7 @@ import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { IdleRestart } from "./idle-restart";
 import { LanguageService } from "./language-service";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -140,6 +142,7 @@ import { OnePasswordConnectorStore } from "./onepassword-connector-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
+import { startProviderLog } from "./provider-log";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -149,6 +152,8 @@ import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -223,11 +228,13 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 
 const TEARDOWN_ORDER = {
   updater: 10,
+  idleRestart: 11,
   hostUpdateCoordinator: 12,
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
   hostedServerMemory: 16,
+  serverMode: 17,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -248,11 +255,15 @@ const TEARDOWN_ORDER = {
   mcpOAuthRedirect: 105,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
+  // Before the agent service, so no script starts a run while the service stops.
+  automation: 108,
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
-  onePasswordConnector: 108,
+  onePasswordConnector: 109,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
+  // After the service, so the lines its providers write while they stop are kept.
+  providerLog: 121,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -269,6 +280,8 @@ export interface ApplicationServiceContext {
   developmentTestClientEnabled: boolean;
   /** Set only in a hosted server VM. */
   hostedServer: HostedServerEnvironment | null;
+  /** Set only in a self-hosted server that `install-server.sh` installed. */
+  serverMode: ServerModeEnvironment | null;
   /** Set only by `bun run dev --hosting=test`. */
   hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
@@ -302,6 +315,8 @@ export interface ApplicationServices {
   hostUpdateCoordinator: HostUpdateCoordinator;
   /** The update restart that an admin of a joined server asked for (`host-update-v1`). */
   requestedUpdate: RequestedUpdate;
+  /** The restart that the user of this computer asked for, when no work runs. */
+  idleRestart: IdleRestart;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -320,6 +335,8 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   hostedServers: HostedServerDesktopService;
+  /** The terminal control of a self-hosted server. Null in every other build. */
+  serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -375,6 +392,7 @@ export async function createApplicationServices({
   developmentRemoteRole,
   developmentTestClientEnabled,
   hostedServer,
+  serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   macHapticFeedback,
   teardown,
@@ -384,6 +402,12 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // First, so the provider lines of the whole startup reach the file.
+  teardown.push(
+    TEARDOWN_ORDER.providerLog,
+    "the provider log",
+    startProviderLog(join(app.getPath("userData"), "logs")),
+  );
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -499,6 +523,7 @@ export async function createApplicationServices({
     (serverId) => {
       if (!remoteServers.list().some((server) => server.id === serverId)) remoteServers.invalidateDirectory();
     },
+    (serverId) => remoteServers.hostedServerStarting(serverId),
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -547,6 +572,7 @@ export async function createApplicationServices({
   const setupFile = join(app.getPath("userData"), SETUP_FILE);
   const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
+  const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
   // Loaded before the first window and before the application menu is built, so every native
@@ -900,6 +926,17 @@ export async function createApplicationServices({
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // Listens only while an agent allows local scripts; see `AutomationServer`.
+  const automation = new AutomationServer({
+    root: store.automationRoot,
+    listAgents: () => service.listAgents(),
+    listRoutines: (agentId) => service.listRoutines(agentId),
+    runRoutine: (input) => service.runRoutineFromAutomation(input),
+  });
+  service.on("event", (event) => {
+    if (event.type === "agents-changed") void automation.sync();
+  });
+  teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => automation.stop());
   /*
    * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
    * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
@@ -1074,7 +1111,7 @@ export async function createApplicationServices({
       caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
         join(userData, name),
       ),
-      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update"), join(userData, "logs", "providers")],
       runtimes: providerRuntimeRoot({
         appData: app.getPath("appData"),
         userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -1375,7 +1412,10 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
-      onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),
+      hostedServers: {
+        unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
+        wake: (serverId) => hostedServers.wake(serverId),
+      },
       webrtcTransport: new TeamWebRtcClientTransport({
         bridge: teamWebRtcBridge,
         listHosts: () => centralAuth.listRemoteHosts(),
@@ -1503,6 +1543,7 @@ export async function createApplicationServices({
           return siblings;
         }
       : undefined,
+    currentUid: typeof process.getuid === "function" ? process.getuid() : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -1516,7 +1557,8 @@ export async function createApplicationServices({
     // from the moment the runtime exists, so this waits only for what is left of it, and a
     // failure here must not keep the agents down.
     await computerUseWarmUp.catch(() => undefined);
-    await service.initialize();
+    await service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
+    await automation.sync();
   });
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
@@ -1555,6 +1597,29 @@ export async function createApplicationServices({
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () => remoteUpdate.dispose());
+  const idleRestart = new IdleRestart({
+    updater,
+    describeReadiness: describeRestartReadiness,
+    holdRoutines: () => service.holdRoutines(),
+    releaseRoutines: () => service.releaseRoutines(),
+    recordHold: (window) => {
+      try {
+        if (window) writeRoutineHold(routineHoldFile, window);
+        else clearRoutineHold(routineHoldFile);
+      } catch (error) {
+        // The restart goes on: the next start then skips the held routines as missed.
+        logger.warn("The routine hold could not be saved.", toLogValue(error));
+      }
+    },
+    relaunch: () => {
+      // A development build only quits: its supervisor stops the stack, and a relaunched Electron
+      // would run outside it with no renderer server.
+      if (app.isPackaged) app.relaunch();
+      app.quit();
+    },
+    log: (message) => logger.info(message),
+  });
+  teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -1573,12 +1638,14 @@ export async function createApplicationServices({
     );
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
-      // A live Slack connection counts: stopped, the server could not hear the next message.
+      // A live Slack connection counts: stopped, the server could not hear the next message. An open
+      // browser view does not: a view that the user forgot would keep the server running. Input in
+      // the view counts as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
         messaging.hasLiveConnection() ||
-        host.describeRestartBlockers().length > 0 ||
-        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+        host.describeRestartBlockers().some((reason) => reason !== "browser-view") ||
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientUseAt() ?? 0) < CLIENT_USE_WINDOW_MS),
       nextRunAt: () => {
         const dueAt = service.nextRoutineDueAt();
         return dueAt ? Date.parse(dueAt) : null;
@@ -1595,6 +1662,35 @@ export async function createApplicationServices({
     teardown.push(TEARDOWN_ORDER.hostedServerActivity, "the hosted server activity report", () =>
       hostedServerActivity.stop(),
     );
+  }
+  const serverMode = serverModeEnvironment
+    ? new ServerMode({
+        environment: serverModeEnvironment,
+        version: app.getVersion(),
+        centralAuth,
+        host,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      })
+    : null;
+  if (serverMode) {
+    // Without the socket the server still runs, and the log says why nobody can sign it in.
+    await serverMode
+      .listen()
+      .catch((error) => logger.error("The server control socket did not start:", toLogValue(error)));
+    // Nobody presses Retry on a server either. A server that is signed out has nothing to publish.
+    const serverStartRetry = new HostedServerStartRetry({
+      hostPhase: () => host.getStatus().phase,
+      startHost: async () => {
+        if (centralAuth.getState().status === "error") await centralAuth.retry();
+        await serverMode.publish();
+      },
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    serverStartRetry.start();
+    teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
+      serverStartRetry.stop();
+      await serverMode.close();
+    });
   }
   await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
@@ -1627,6 +1723,7 @@ export async function createApplicationServices({
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
+    idleRestart,
     describeRestartReadiness,
     sidebarLayout,
     host,
@@ -1637,6 +1734,7 @@ export async function createApplicationServices({
     hostedSites,
     billing,
     hostedServers,
+    serverMode,
     customProviders,
     customProviderChanges,
     customAgentChanges,

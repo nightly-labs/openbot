@@ -887,6 +887,7 @@ function LocalFileLink(props: {
         props.kind === "shared" ? t("chat.file.openShared", { name }) : t("chat.file.openWorkspace", { name })
       }
       title={props.path}
+      data-cuelume-tap="open"
       onClick={() => props.onOpen(props.path)}
     >
       <AttachmentReferenceVisual name={name} />

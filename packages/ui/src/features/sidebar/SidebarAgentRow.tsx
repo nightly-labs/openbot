@@ -79,6 +79,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
         aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}. ${rowProps.agent.preview}${stateLabel() ? `. ${stateLabel()}` : ""}`}
         title={routineLabel() || undefined}
         aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
+        data-cuelume-navigate=""
         onClick={(event: MouseEvent) => {
           if (!sidebarClickIsSuppressed(event)) props.onSelectAgent(rowProps.agent.id);
         }}

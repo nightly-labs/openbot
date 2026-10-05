@@ -78,7 +78,7 @@ interface TestServer {
   transport: string;
   url?: string;
   command?: string;
-  args?: string[];
+  args?: unknown[];
   auth?: Array<{
     id: string;
     kind: string;
@@ -191,6 +191,20 @@ describe("plugin catalog validation", () => {
       auth: [{ id: "oauth", kind: "link", label: "Sign in" }],
     });
     expect(() => validatePlugin("example", stdioSignIn, false, updatedAt)).toThrow("sign-in needs an http server");
+  });
+
+  /* A typed mistake in a manifest must stop the build. An empty arg list would start the server
+     with no arguments, so the listing would ship a command that cannot work. */
+  it("refuses a stdio arg that is not a string", () => {
+    const numberArg = pluginWithServer({
+      name: "example",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "resend-mcp", 8080],
+    });
+    expect(() => validatePlugin("example", numberArg, false, updatedAt)).toThrow(
+      "Plugin example server args must all be strings",
+    );
   });
 
   /* Plain http sends what the agent reads in the clear. Only a server on this computer may use it,

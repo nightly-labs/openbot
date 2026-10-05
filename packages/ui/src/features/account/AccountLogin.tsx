@@ -573,6 +573,7 @@ export function AccountLogin(props: AccountLoginProps) {
                       variant="ghost"
                       size="sm"
                       disabled={pendingAction() !== null}
+                      data-cuelume-tap="navigate"
                       onClick={() => void resetEmail()}
                     >
                       <ArrowLeft size={14} aria-hidden="true" />

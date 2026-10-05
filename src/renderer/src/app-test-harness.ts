@@ -666,6 +666,7 @@ export function installOpenbotStub(): void {
       updateRoutine: notStubbed("agent.updateRoutine"),
       deleteRoutine: notStubbed("agent.deleteRoutine"),
       testRoutine: notStubbed("agent.testRoutine"),
+      automationRunCommand: notStubbed("agent.automationRunCommand"),
       saveMcpServer: notStubbed("agent.saveMcpServer"),
       removeMcpServer: notStubbed("agent.removeMcpServer"),
       setMcpServerEnabled: notStubbed("agent.setMcpServerEnabled"),
@@ -765,6 +766,7 @@ export function installOpenbotStub(): void {
       listMemories: vi.fn().mockResolvedValue([]),
       listRoutines: vi.fn().mockResolvedValue([]),
       listRoutineRuns: vi.fn().mockResolvedValue([]),
+      routineCalendar: vi.fn().mockResolvedValue({ routines: [], runs: [] }),
       listTables: vi.fn().mockResolvedValue([]),
       deleteTable: vi.fn().mockResolvedValue(undefined),
       createMemory: vi.fn().mockImplementation(async (input) => ({

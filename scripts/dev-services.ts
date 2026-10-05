@@ -356,12 +356,12 @@ async function main(): Promise<void> {
   // as the services have started.
   const closeSlackTunnels = slack ? await attachSlackTunnels(specs, projectRoot) : null;
 
-  // After the lock, because seeding a profile takes long enough that a sibling
-  // worktree should not wait behind it to choose its own ports.
-  const seed = developmentProfileToSeed(specs);
-  if (seed) seedDevelopmentProfile(seed.profile, seed.env);
-
   try {
+    // After the lock, because seeding a profile takes long enough that a sibling
+    // worktree should not wait behind it to choose its own ports.
+    const seed = developmentProfileToSeed(specs);
+    if (seed) seedDevelopmentProfile(seed.profile, seed.env);
+
     await runDevelopmentServices(specs, stack);
   } catch (error) {
     closeSlackTunnels?.();

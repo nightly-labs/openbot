@@ -33,6 +33,8 @@ export const messages = {
   "provider.action.restart": "Reiniciar",
   "provider.action.updateTo": "Atualizar para {version}",
   "provider.action.checkForUpdates": "Buscar atualizações",
+  "provider.lastError": "Último erro: {detail}",
+  "provider.action.copyDiagnostics": "Copiar diagnóstico",
   "provider.action.install": "Instalar",
   "provider.action.signIn": "Entrar",
   "provider.action.signInWithCode": "Entrar com código",

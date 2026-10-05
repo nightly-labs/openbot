@@ -17,7 +17,14 @@ export function Toaster(props: ToasterProps): JSX.Element {
   let layer: HTMLDivElement | undefined;
   onSettled(() => {
     if (!layer) return;
-    const updateVisibility = () => setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+    const updateVisibility = () => {
+      setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+      // solid-sonner renders the close button, so mark it here for the close cue.
+      for (const button of layer?.querySelectorAll("[data-close-button]:not([data-cuelume-close])") ?? []) {
+        button.setAttribute("data-cuelume-close", "");
+        button.setAttribute("data-cuelume-emphasis", "subtle");
+      }
+    };
     // Track mounted toasts so native content stays behind their exit animation too.
     const observer = new MutationObserver(updateVisibility);
     observer.observe(layer, { childList: true, subtree: true });

@@ -10,6 +10,7 @@ import { WorkspaceConversation } from "./features/conversation/WorkspaceConversa
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { SchedulePanel } from "./features/schedule/SchedulePanel";
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
@@ -51,7 +52,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
 
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
-    if (server?.kind !== "remote") return null;
+    // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
+    if (server?.kind !== "remote" || server.hostedSleep) return null;
     return server.state === "incompatible" || server.issue != null ? server : null;
   });
   const activePeopleEnabled = createMemo(
@@ -75,12 +77,23 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       usage={
         <Show when={usage.state.serverId}>
           {(serverId) => (
-            <AgentUsagePanel
-              serverId={serverId()}
-              hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
-              agentId={usage.state.agentId}
-              onBack={usage.closeUsage}
-            />
+            <Show
+              when={usage.state.view === "schedule"}
+              fallback={
+                <AgentUsagePanel
+                  serverId={serverId()}
+                  hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
+                  agentId={usage.state.agentId}
+                  onBack={usage.closeUsage}
+                />
+              }
+            >
+              <SchedulePanel
+                serverId={serverId()}
+                hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
+                onBack={usage.closeUsage}
+              />
+            </Show>
           )}
         </Show>
       }

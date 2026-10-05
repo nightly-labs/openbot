@@ -1,7 +1,7 @@
 import type { DynamicIslandAction } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, onSettled, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { withoutAgent } from "../../app-message-projection";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -111,7 +111,7 @@ export function DynamicIslandBridge() {
     if (platform.landingPreview) return;
     return dynamicIslandPort().dynamicIsland.onAction((action) => {
       void handleDynamicIslandAction(action).catch((error) => {
-        toast.error(t("island.error.openRemoteTitle"), {
+        actionToast.error(t("island.error.openRemoteTitle"), {
           description: errorMessage(error, t("island.error.openRemote")),
         });
       });

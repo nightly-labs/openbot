@@ -1,9 +1,10 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
+import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
@@ -150,7 +151,14 @@ function SkillsMarketplace(props: {
   githubConnector: GitHubConnectorController | undefined;
   onePasswordConnector: OnePasswordConnectorController | undefined;
 }) {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
+  const {
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    pendingPluginSlug,
+    setPendingPluginSlug,
+    pendingPluginConnect,
+    setPendingPluginConnect,
+  } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
@@ -167,7 +175,11 @@ function SkillsMarketplace(props: {
       onOpenAgent={selectAgent}
       onAgentInstalled={openInstalledMarketplaceAgent}
       pluginSlug={pendingPluginSlug()}
-      onPluginSlugConsumed={() => setPendingPluginSlug(null)}
+      pluginConnect={pendingPluginConnect()}
+      onPluginSlugConsumed={() => {
+        setPendingPluginSlug(null);
+        setPendingPluginConnect(false);
+      }}
       githubConnector={props.githubConnector}
       onePasswordConnector={props.onePasswordConnector}
     />
@@ -266,6 +278,8 @@ function ServerSettings(props: {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    restartProvider,
+    cancelProviderRestart,
     codeLogin,
     providerKeys,
     hostCustomProviders,
@@ -281,6 +295,19 @@ function ServerSettings(props: {
     save: localAgents.saveCustomAgent,
     remove: localAgents.deleteCustomAgent,
     check: localAgents.checkCustomAgent,
+    // One process group runs every custom agent, so its restart is the restart of all of them.
+    get restartPending() {
+      return agentStatus().providers?.some((provider) => provider.id === "acp" && provider.restartPending) === true;
+    },
+    get lastError() {
+      return agentStatus().providers?.find((provider) => provider.id === "acp")?.lastError;
+    },
+    get diagnostics() {
+      const status = agentStatus().providers?.find((provider) => provider.id === "acp");
+      return status ? providerDiagnosticsText(status) : undefined;
+    },
+    restart: () => restartProvider("acp"),
+    cancelRestart: () => cancelProviderRestart("acp"),
   };
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -398,6 +425,8 @@ function ServerSettings(props: {
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
+      onRestartProvider: local ? restartProvider : undefined,
+      onCancelProviderRestart: local ? cancelProviderRestart : undefined,
       get providerDetection() {
         return local ? detection.detection() : undefined;
       },
@@ -429,7 +458,7 @@ function ServerSettings(props: {
       },
       (error: unknown) => {
         const text = currentText();
-        toast.error(text.t("server.select.failedTitle"), {
+        actionToast.error(text.t("server.select.failedTitle"), {
           description: text.errorMessage(error, text.t("server.select.failedDescription")),
         });
         openServerSettings(server.id, null, "providers");
@@ -573,6 +602,8 @@ function AppSettings(props: AccountProps) {
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onCancelScheduledRestart={updates.cancelScheduledRestart}
+        onRestartWhenIdle={updates.restartWhenIdle}
+        onCancelIdleRestart={updates.cancelIdleRestart}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}

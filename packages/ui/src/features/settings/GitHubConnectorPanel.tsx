@@ -526,7 +526,14 @@ function DisconnectDialog(props: { open: boolean; login: string; onConfirm: () =
           <Button type="button" variant="ghost" onClick={props.onClose}>
             {t("connector.github.keepConnected")}
           </Button>
-          <Button type="button" variant="destructive" class="github-connector-confirm" onClick={props.onConfirm}>
+          <Button
+            type="button"
+            variant="destructive"
+            class="github-connector-confirm"
+            data-cuelume-tap="close"
+            data-cuelume-emphasis="strong"
+            onClick={props.onConfirm}
+          >
             <Link2Off aria-hidden="true" />
             {t("connector.github.disconnect")}
           </Button>

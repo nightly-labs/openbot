@@ -66,6 +66,8 @@ export function MarketplaceOverlay(props: {
   onAgentInstalled: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   /** The listing a plugin link named. Closing the marketplace forgets it too. */
   pluginSlug?: string | null | undefined;
+  /** The person pressed Connect for `pluginSlug` on a chat card. */
+  pluginConnect?: boolean | undefined;
   onPluginSlugConsumed: () => void;
   /** This computer's GitHub connection. Absent in the web client and on a joined server. */
   githubConnector?: GitHubConnectorController | undefined;
@@ -122,6 +124,7 @@ export function MarketplaceOverlay(props: {
           onAgentInstalled={props.onAgentInstalled}
           plugins={MARKETPLACE_PLUGINS}
           initialPluginSlug={props.pluginSlug ?? undefined}
+          initialPluginConnect={props.pluginConnect}
           onInitialPluginSlugConsumed={props.onPluginSlugConsumed}
           /* A plugin's app is an MCP server, which the host holds. A joined server takes one over
              `mcp-servers-v1` from an admin, as the agents list does; a member browses the listings

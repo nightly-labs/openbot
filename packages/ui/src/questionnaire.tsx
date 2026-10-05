@@ -154,6 +154,7 @@ function QuestionnaireChoice(props: QuestionnaireChoiceProps): JSX.Element {
       data-slot="questionnaire-choice"
       data-checked={props.checked ? "" : undefined}
       data-disabled={props.disabled ? "" : undefined}
+      data-cuelume-select=""
       class={cx("ui-questionnaire-choice", props.class)}
       {...others}
     >
@@ -209,6 +210,7 @@ function QuestionnairePrevious(props: QuestionnaireNavigationProps): JSX.Element
   return (
     <Button
       data-slot="questionnaire-previous"
+      data-cuelume-tap="navigate"
       type="button"
       variant={props.variant ?? "ghost"}
       disabled={context.disabled || context.first || Boolean(props.disabled)}
@@ -226,6 +228,7 @@ function QuestionnaireSkip(props: QuestionnaireNavigationProps): JSX.Element {
   return (
     <Button
       data-slot="questionnaire-skip"
+      data-cuelume-tap="navigate"
       type="button"
       variant={props.variant ?? "ghost"}
       disabled={context.disabled || Boolean(props.disabled)}
@@ -243,6 +246,7 @@ function QuestionnaireCancel(props: QuestionnaireNavigationProps): JSX.Element {
   return (
     <Button
       data-slot="questionnaire-cancel"
+      data-cuelume-tap="close"
       type="button"
       variant={props.variant ?? "ghost"}
       disabled={context.disabled || Boolean(props.disabled)}
@@ -260,6 +264,7 @@ function QuestionnaireNext(props: QuestionnaireNavigationProps): JSX.Element {
   return (
     <Button
       data-slot="questionnaire-next"
+      data-cuelume-tap="navigate"
       type="button"
       aria-disabled={context.disabled || context.last || props.disabled ? "true" : undefined}
       disabled={context.disabled || context.last || Boolean(props.disabled)}

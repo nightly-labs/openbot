@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { createIdleRestartToast } from "./idle-restart-toast";
 import { createScheduledUpdateToast } from "./scheduled-update-toast";
 import { updatesPort } from "./updates-port";
 
@@ -91,7 +92,20 @@ const Updates = createSimpleContext({
 
     createScheduledUpdateToast({ status, cancel: cancelScheduledRestart });
 
-    return { status, runAction, cancelScheduledRestart };
+    /** Restarts OpenBot when no work runs. A downloaded update is installed by the same restart. */
+    async function restartWhenIdle(): Promise<void> {
+      const current = status();
+      const target = current.phase === "ready" && current.managedByHost !== true ? "update" : "relaunch";
+      setStatus(await updatesPort().update.restartWhenIdle(target));
+    }
+
+    async function cancelIdleRestart(): Promise<void> {
+      setStatus(await updatesPort().update.cancelIdleRestart());
+    }
+
+    createIdleRestartToast({ status, cancel: cancelIdleRestart });
+
+    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart };
   },
 });
 

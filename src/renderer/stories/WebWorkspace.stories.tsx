@@ -218,3 +218,35 @@ export const CheckoutReturn: Story = {
     hostingReturn: { serverId: NEW_SERVER_ID, paid: true },
   },
 };
+
+/** A hosted server that stopped because nobody used it. A key press or a click wakes it. */
+const sleepingRuntime: WebRuntimeFactory = (...args) => ({
+  ...createMockWebRuntime(...args),
+  connect: async () => {
+    throw new Error("The host is not available.");
+  },
+});
+
+const sleepingFetch: typeof fetch = async (input, init) => {
+  const url = String(input instanceof Request ? input.url : input);
+  if (url.endsWith("/preview-host/status"))
+    return Response.json({ serverId: "preview-host", state: "stopped", error: null, sleeping: true });
+  if (url.endsWith("/preview-host/wake"))
+    return Response.json({
+      serverId: "preview-host",
+      name: "Preview computer",
+      size: "small",
+      plan: "starter",
+      interval: "month",
+      currency: "eur",
+      state: "waking",
+      error: null,
+      createdAt: "2026-09-29T09:30:00.000Z",
+      updatedAt: "2026-09-29T09:34:00.000Z",
+    });
+  return fetch(input, init);
+};
+
+export const HostedServerAsleep: Story = {
+  args: { createRuntime: sleepingRuntime, accountFetch: sleepingFetch },
+};

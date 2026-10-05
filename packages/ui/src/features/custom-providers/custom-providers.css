@@ -338,6 +338,12 @@ input.custom-acp-code {
   margin-inline-start: calc(var(--openbot-space-2) * -1);
 }
 
+/* Under the last error it belongs to, at the start of the line like that text. */
+.ui-button.custom-agents-copy-diagnostics {
+  justify-self: start;
+  margin-inline-start: calc(var(--openbot-space-2) * -1);
+}
+
 /* The lists in the detection settings, below the switch card. */
 .detected-providers-settings {
   display: flex;

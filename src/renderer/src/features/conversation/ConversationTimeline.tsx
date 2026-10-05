@@ -15,11 +15,13 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { planItems, planTitle } from "../../app-message-projection";
+import { groupedMessageIds } from "./agent-message-timeline";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
 
 /**
@@ -171,6 +173,9 @@ export function ConversationTimeline() {
     const routine = props.routines?.find((candidate) => candidate.id === cardMarker.routineId);
     return routine && { action: cardMarker.action, routine, agentId };
   };
+  /** A suggestion this client can draw is a card. One for an app it does not know keeps the marker. */
+  const suggestionMarker = (marker: ChatActionMarkerModel) =>
+    marker.kind === "marketplace-suggestion" && marketplaceSuggestionKnown(marker.appId) ? marker : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
@@ -343,6 +348,7 @@ export function ConversationTimeline() {
                       </Show>
                       <article
                         data-chat-search-message={message()?.id}
+                        data-chat-search-group={groupedMessageIds(message())}
                         class={{ "chat-action-entry-animated": animateEntrance }}
                       >
                         <Show when={message()?.actionMarker ?? initialActionMarker}>
@@ -350,16 +356,30 @@ export function ConversationTimeline() {
                             <Show
                               when={routineCard(message() ?? initialMessage, marker())}
                               fallback={
-                                <ChatActionMarker
-                                  onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
-                                  marker={marker()}
-                                  agents={props.agents}
-                                  announce={animateEntrance}
-                                  routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
-                                  onSelectAgent={props.onSelectAgent}
-                                  onOpenRoutine={openRoutineSettings}
-                                  onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                />
+                                <Show
+                                  when={suggestionMarker(marker())}
+                                  fallback={
+                                    <ChatActionMarker
+                                      onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
+                                      marker={marker()}
+                                      agents={props.agents}
+                                      announce={animateEntrance}
+                                      routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
+                                      onSelectAgent={props.onSelectAgent}
+                                      onOpenRoutine={openRoutineSettings}
+                                      onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                    />
+                                  }
+                                >
+                                  {(suggestion) => (
+                                    <MarketplaceSuggestionChatCard
+                                      messageId={message()?.id ?? initialMessage.id}
+                                      appId={suggestion().appId}
+                                      localServer={props.server?.kind === "local"}
+                                      onOpenMarketplaceApp={props.onOpenMarketplaceApp}
+                                    />
+                                  )}
+                                </Show>
                               }
                             >
                               {(card) => {

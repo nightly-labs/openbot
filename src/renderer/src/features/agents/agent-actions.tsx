@@ -1,7 +1,7 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { toast } from "@openbot/ui";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { currentText } from "@openbot/ui/text";
+import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
@@ -127,7 +127,7 @@ const AgentActions = createSimpleContext({
           ...(properties ?? {}),
         });
         const { t, errorMessage } = currentText();
-        toast.error(t("agent.error.duplicateTitle"), {
+        actionToast.error(t("agent.error.duplicateTitle"), {
           description: errorMessage(error, t("agent.error.duplicateFailed")),
         });
         throw error;

@@ -28,6 +28,9 @@ interface TextControlOptions extends ControlOptions {
 
 export type InputProps = ComponentProps<"input"> & TextControlOptions;
 
+/** Input types where a keystroke edits the text. Password is not here: bind() skips it. */
+const TYPED_INPUT_TYPES = new Set<string>(["text", "search", "email", "url", "tel", "number"]);
+
 export function Input(props: InputProps): JSX.Element {
   const local = props;
   const field = useContext(FieldContext);
@@ -48,9 +51,17 @@ export function Input(props: InputProps): JSX.Element {
     "defaultValue",
   );
   const describedBy = () => [local["aria-describedby"], field?.describedBy].filter(Boolean).join(" ") || undefined;
+  // A text field plays a keystroke cue. A radio plays select when its value changes.
+  const typeCue = () => {
+    const type = local.type;
+    return type === undefined || (typeof type === "string" && TYPED_INPUT_TYPES.has(type)) ? "" : undefined;
+  };
+  const selectCue = () => (local.type === "radio" ? "" : undefined);
   if (!("value" in props)) {
     return (
       <input
+        data-cuelume-type={typeCue()}
+        data-cuelume-select={selectCue()}
         {...inputProps}
         defaultValue={local.defaultValue}
         class={cx("ui-input", local.class)}
@@ -69,6 +80,8 @@ export function Input(props: InputProps): JSX.Element {
   }
   return (
     <input
+      data-cuelume-type={typeCue()}
+      data-cuelume-select={selectCue()}
       {...inputProps}
       value={local.value}
       class={cx("ui-input", local.class)}
@@ -111,6 +124,7 @@ export function Textarea(props: TextareaProps): JSX.Element {
   if (!("value" in props)) {
     return (
       <textarea
+        data-cuelume-type=""
         {...textareaProps}
         defaultValue={local.defaultValue}
         class={cx("ui-textarea", local.class)}
@@ -129,6 +143,7 @@ export function Textarea(props: TextareaProps): JSX.Element {
   }
   return (
     <textarea
+      data-cuelume-type=""
       {...textareaProps}
       value={local.value}
       class={cx("ui-textarea", local.class)}
@@ -155,6 +170,7 @@ export function NativeSelect(props: NativeSelectProps): JSX.Element {
   const describedBy = () => [local["aria-describedby"], field?.describedBy].filter(Boolean).join(" ") || undefined;
   return (
     <select
+      data-cuelume-select=""
       {...others}
       class={cx("ui-native-select", local.class)}
       data-size={local.size ?? "md"}

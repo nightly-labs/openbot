@@ -20,6 +20,14 @@ export const messages = {
   "error.agent.initialMessageTooLong": "A mensagem inicial é muito longa.",
   "error.agent.setupCleanupFailed": "A configuração do agente falhou e não foi possível remover o agente incompleto.",
   "error.agent.modelUnavailable": "O modelo selecionado para o agente está indisponível.",
+  "error.agent.modelProviderNotConnected":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não está conectado.',
+  "error.agent.modelListEmpty":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não listou nenhum modelo. Último erro: {detail}',
+  "error.agent.modelListEmptyNoError":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não listou nenhum modelo.',
+  "error.agent.modelNotInProviderList":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não o lista.',
   "error.agent.modelProviderMismatch": "O modelo selecionado não pertence a esse provedor.",
   "error.agent.modelNotListed": 'O modelo "{model}" não está disponível. Modelos disponíveis: {models}.',
   "error.agent.providerNotListed":

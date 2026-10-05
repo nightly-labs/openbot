@@ -3,8 +3,8 @@ import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CompareArticlePage } from "../src/components/compare/CompareArticlePage";
 import { CompareIndexPage } from "../src/components/compare/CompareIndexPage";
-import { ComparisonPage } from "../src/components/compare/ComparisonPage";
 import { ArticleGradient } from "../src/components/content/ArticleGradient";
 import { ArticleClip, ArticleGif } from "../src/components/content/ArticleMedia";
 import { ArticlePage } from "../src/components/content/ArticlePage";
@@ -14,7 +14,7 @@ import { COMPARISONS } from "../src/content/compare";
 import { landingAnalytics } from "../src/lib/analytics";
 import { articleGradient } from "../src/lib/article-gradient";
 import { COMPARE_COLLECTION } from "../src/lib/compare";
-import { CONTENT_COLLECTIONS, HEADER_COLLECTIONS } from "../src/lib/content";
+import { CONTENT_COLLECTIONS, HEADER_COLLECTIONS, PROSE_COLLECTIONS } from "../src/lib/content";
 import {
   articleArtPath,
   articlePath,
@@ -110,7 +110,7 @@ function stubMotionPreference(reduced: boolean, finePointer = false): string[] {
 // registry is held to the index, article and not-found behaviour of the ones before
 // it without anyone writing a second copy of these tests. Comparisons have their own
 // pages and their own block below.
-describe.each(HEADER_COLLECTIONS.map((collection) => [collection.name, collection] as const))(
+describe.each(PROSE_COLLECTIONS.map((collection) => [collection.name, collection] as const))(
   "%s",
   (_name, collection) => {
     it("offers every published article as a link to its page", () => {
@@ -194,17 +194,19 @@ describe("Compare", () => {
   // for, so a comparison must not render as a title with nothing under it.
   it("shows the title, the table and the questions of every comparison", () => {
     for (const article of COMPARE_COLLECTION.articles) {
-      const comparison = COMPARISONS[article.slug];
-      if (!comparison) throw new Error(`${article.slug} must have comparison data.`);
-      renderPage(() => <ComparisonPage collection={COMPARE_COLLECTION} article={article} comparison={comparison} />);
+      const page = COMPARISONS[article.slug];
+      if (!page) throw new Error(`${article.slug} must have comparison data.`);
+      renderPage(() => <CompareArticlePage collection={COMPARE_COLLECTION} article={article} page={page} />);
 
       expect(screen.getByRole("heading", { level: 1, name: article.title })).toBeInTheDocument();
       const body = within(screen.getByRole("article"));
-      const table = body.getByRole("table");
-      for (const row of comparison.rows) {
-        expect(within(table).getByRole("rowheader", { name: row.topic })).toBeInTheDocument();
+      // A page can also have a benchmark table; the comparison table is the one that compares.
+      const table = body.getByRole("table", { name: /compared, as checked on/ });
+      const rowHeaders = page.kind === "roundup" ? page.apps.map((app) => app.name) : page.rows.map((row) => row.topic);
+      for (const name of rowHeaders) {
+        expect(within(table).getByRole("rowheader", { name })).toBeInTheDocument();
       }
-      for (const entry of comparison.faq) {
+      for (const entry of page.faq) {
         expect(body.getByText(entry.question)).toBeInTheDocument();
       }
 
@@ -225,8 +227,9 @@ describe("landing header", () => {
       { name: "Plugins", index: PLUGIN_INDEX_ROUTE },
     ];
     for (const section of sections) {
-      const trigger = navigation.getByRole("button", { name: section.name });
-      fireEvent.click(trigger);
+      const trigger = navigation.getByRole("link", { name: section.name });
+      expect(trigger).toHaveAttribute("href", section.index);
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
       flush();
 
       expect(trigger).toHaveAttribute("aria-expanded", "true");

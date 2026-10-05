@@ -7,8 +7,8 @@
 
 import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
-import type { ContentImageJob, ContentImageLockup } from "./content-images";
-import { RIVAL_MARK_SHAPES } from "./src/components/compare/rival-mark-shapes";
+import type { ContentImageJob, ContentImageLockup, ContentImageMark } from "./content-images";
+import { RIVAL_MARK_SHAPES, type RivalMarkName } from "./src/components/compare/rival-mark-shapes";
 import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
 
 declare global {
@@ -20,7 +20,7 @@ declare global {
 /** `--openbot-bg-canvas`, as the RGB channels of the scrim. */
 const SCRIM_COLOR = "26, 26, 26";
 const TITLE_MAX_LINES = 3;
-/** Under a lockup there is room for two lines. */
+/** Under a lockup or a row of marks there is room for two lines. */
 const TITLE_MAX_LINES_WITH_LOCKUP = 2;
 /** `--openbot-logo-production` and `--openbot-logo-eye`. */
 const LOGO_BACKGROUND = "#d6adf2";
@@ -28,6 +28,12 @@ const LOGO_EYE = "#040007";
 const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
+
+/**
+ * Lossy, for the artwork only: a smooth gradient loses nothing a reader can see,
+ * and the file is about 3% of the PNG. Bump `GENERATOR_VERSION` when this changes.
+ */
+const WEBP_QUALITY = 0.9;
 
 async function renderContentImage(job: ContentImageJob): Promise<string> {
   const host = document.createElement("div");
@@ -67,10 +73,13 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     if (job.title && job.withTitle) {
       drawScrim(context, job);
       if (job.lockup) drawLockup(context, job, job.lockup);
+      else if (job.markRow) drawMarkRow(context, job, job.markRow);
       drawTitle(context, job);
     }
 
-    return canvas.toDataURL("image/png");
+    return job.fileName.endsWith(".webp")
+      ? canvas.toDataURL("image/webp", WEBP_QUALITY)
+      : canvas.toDataURL("image/png");
   } finally {
     mount.dispose();
     host.remove();
@@ -109,7 +118,7 @@ function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): voi
 
   context.textBaseline = "alphabetic";
   context.font = `600 ${titleSize}px ${FONT_FAMILY}`;
-  const maxLines = job.lockup ? TITLE_MAX_LINES_WITH_LOCKUP : TITLE_MAX_LINES;
+  const maxLines = job.lockup || job.markRow ? TITLE_MAX_LINES_WITH_LOCKUP : TITLE_MAX_LINES;
   const lines = wrapText(context, job.title, width - padding * 2, maxLines);
 
   // The block is anchored to the bottom, so a one-line and a three-line title
@@ -147,42 +156,19 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   const plateHeight = padY * 2 + logoSize + nameGap + nameSize * 1.2;
   const x = Math.round(job.width * 0.06);
   const y = 64 * unit;
-  const radius = 24 * unit;
-
-  // The frost: what is under the plate, blurred. A copy, because a canvas that
-  // draws itself through a filter reads the pixels it is writing.
-  const under = document.createElement("canvas");
-  under.width = job.width;
-  under.height = job.height;
-  under.getContext("2d")?.drawImage(context.canvas, 0, 0);
-  context.save();
-  roundedRect(context, x, y, plateWidth, plateHeight, radius);
-  context.clip();
-  context.filter = `blur(${24 * unit}px) saturate(1.4)`;
-  context.drawImage(under, 0, 0);
-  context.filter = "none";
-  context.fillStyle = "rgba(14, 14, 18, 0.26)";
-  context.fillRect(x, y, plateWidth, plateHeight);
-  context.restore();
-
-  context.save();
-  roundedRect(context, x + 0.75, y + 0.75, plateWidth - 1.5, plateHeight - 1.5, radius);
-  context.strokeStyle = "rgba(255, 255, 255, 0.14)";
-  context.lineWidth = 1.5;
-  context.stroke();
-  context.restore();
+  drawPlate(context, job, x, y, plateWidth, plateHeight);
 
   const logoTop = y + padY;
   const left = x + padX + (column - logoSize) / 2;
   const right = x + padX + column + vsMargin * 2 + vsWidth + (column - logoSize) / 2;
-  drawOpenBotMark(context, left, logoTop, logoSize);
-  drawRivalMark(context, lockup, right, logoTop, logoSize);
+  drawMark(context, lockup.left?.mark ?? "openbot", left, logoTop, logoSize);
+  drawMark(context, lockup.rivalMark, right, logoTop, logoSize);
 
   context.font = `500 ${nameSize}px ${FONT_FAMILY}`;
   context.fillStyle = "rgba(255, 255, 255, 0.86)";
   context.textAlign = "center";
   const nameBaseline = logoTop + logoSize + nameGap + nameSize * 0.9;
-  context.fillText("OpenBot", left + logoSize / 2, nameBaseline);
+  context.fillText(lockup.left?.name ?? "OpenBot", left + logoSize / 2, nameBaseline);
   context.fillText(lockup.rivalName, right + logoSize / 2, nameBaseline);
 
   // The hairline, broken around "vs".
@@ -204,6 +190,67 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   context.fillText("vs", center, middle);
   context.textAlign = "start";
   context.textBaseline = "alphabetic";
+}
+
+/** The roundup's lockup: one frosted plate with the mark of every app in a row, at the same place. */
+function drawMarkRow(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  marks: readonly ContentImageMark[],
+): void {
+  const unit = job.width / 1200;
+  const pad = 32 * unit;
+  const gap = 20 * unit;
+  const x = Math.round(job.width * 0.06);
+  const y = 64 * unit;
+  // As large as fits in the width of the title, and no larger than the lockup's marks.
+  const available = job.width - x * 2 - pad * 2 - gap * (marks.length - 1);
+  const size = Math.min(128 * unit, available / marks.length);
+  drawPlate(context, job, x, y, pad * 2 + size * marks.length + gap * (marks.length - 1), pad * 2 + size);
+  marks.forEach((mark, index) => {
+    drawMark(context, mark, x + pad + index * (size + gap), y + pad, size);
+  });
+}
+
+/** The frosted plate under the marks, with a hairline edge. */
+function drawPlate(
+  context: CanvasRenderingContext2D,
+  job: ContentImageJob,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  const unit = job.width / 1200;
+  const radius = 24 * unit;
+
+  // The frost: what is under the plate, blurred. A copy, because a canvas that
+  // draws itself through a filter reads the pixels it is writing.
+  const under = document.createElement("canvas");
+  under.width = job.width;
+  under.height = job.height;
+  under.getContext("2d")?.drawImage(context.canvas, 0, 0);
+  context.save();
+  roundedRect(context, x, y, width, height, radius);
+  context.clip();
+  context.filter = `blur(${24 * unit}px) saturate(1.4)`;
+  context.drawImage(under, 0, 0);
+  context.filter = "none";
+  context.fillStyle = "rgba(14, 14, 18, 0.26)";
+  context.fillRect(x, y, width, height);
+  context.restore();
+
+  context.save();
+  roundedRect(context, x + 0.75, y + 0.75, width - 1.5, height - 1.5, radius);
+  context.strokeStyle = "rgba(255, 255, 255, 0.14)";
+  context.lineWidth = 1.5;
+  context.stroke();
+  context.restore();
+}
+
+function drawMark(context: CanvasRenderingContext2D, mark: ContentImageMark, x: number, y: number, size: number): void {
+  if (mark === "openbot") drawOpenBotMark(context, x, y, size);
+  else drawRivalMark(context, mark, x, y, size);
 }
 
 /** `AppLogo`: the rounded square and the two scribbled eyes. */
@@ -232,19 +279,19 @@ function drawOpenBotMark(context: CanvasRenderingContext2D, x: number, y: number
 
 function drawRivalMark(
   context: CanvasRenderingContext2D,
-  lockup: ContentImageLockup,
+  mark: RivalMarkName,
   x: number,
   y: number,
   size: number,
 ): void {
-  const shape = RIVAL_MARK_SHAPES[lockup.rivalMark];
+  const shape = RIVAL_MARK_SHAPES[mark];
   const [minX, minY, boxWidth, boxHeight] = shape.viewBox;
   context.save();
   context.translate(x, y);
   context.scale(size / boxWidth, size / boxHeight);
   context.translate(-minX, -minY);
   context.fillStyle = "#ffffff";
-  context.fill(new Path2D(shape.path), "evenodd");
+  context.fill(new Path2D(shape.path), shape.fillRule ?? "evenodd");
   context.restore();
 }
 

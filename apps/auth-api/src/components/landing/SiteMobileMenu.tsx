@@ -105,7 +105,8 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
           <For each={SITE_NAVIGATION_SECTIONS}>
             {(section, index) => (
               <section class="site-sheet-section" style={{ "--site-sheet-index": index() }}>
-                <h2 class="site-sheet-heading">{section.label}</h2>
+                {/* Not a heading: the sheet is in every page's HTML before the page's own h1. */}
+                <p class="site-sheet-heading">{section.label}</p>
                 <SiteNavigationPanel section={section} live={live()} />
               </section>
             )}

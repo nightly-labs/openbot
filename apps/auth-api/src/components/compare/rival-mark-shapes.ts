@@ -8,23 +8,65 @@
 // Manus is the glyph from its brand page (manus.im/brand), without the word mark.
 // Claude Cowork has no mark of its own: from September 2026 it rolls out inside
 // Claude, so it is the Claude mark. Devin is the mark from devin.ai, not the Cognition logo.
+// ChatGPT dots is the ring from chatgpt.com/features/dots, not the OpenAI logo.
+// Codex, Claude Code and Cursor use the marks that the provider logos draw: Codex has
+// no mark apart from the OpenAI blossom. Antigravity is the arch from the icon.svg that
+// Google LLC gave to the ACP registry (agentclientprotocol/registry, antigravity-acp).
 
-import { CLAUDE_PATH } from "@openbot/brand/provider-logo-shape";
+import { CLAUDE_PATH, CODEX_PATH, CURSOR_PATH } from "@openbot/brand/provider-logo-shape";
 
-export type RivalMarkName = "claude-cowork" | "devin" | "grok-bot" | "hermes-agent" | "manus" | "muse" | "openclaw";
+export type RivalMarkName =
+  | "antigravity"
+  | "chatgpt-dots"
+  | "claude-code"
+  | "claude-cowork"
+  | "codex"
+  | "cursor"
+  | "devin"
+  | "grok-bot"
+  | "hermes-agent"
+  | "manus"
+  | "muse"
+  | "openclaw";
 
 export interface RivalMarkShape {
   /** `[x, y, width, height]`, as an SVG `viewBox`. */
   viewBox: readonly [number, number, number, number];
-  /** One path, filled even-odd: the holes show what is behind the mark. */
+  /** One path, filled even-odd unless `fillRule` says otherwise: the holes show what is behind the mark. */
   path: string;
+  /** For a path drawn for the default SVG fill, where an inner shape overlaps an outer one. */
+  fillRule?: "nonzero";
 }
 
 export const RIVAL_MARK_SHAPES: Record<RivalMarkName, RivalMarkShape> = {
+  // icon.svg of antigravity-acp in the ACP registry, by Google LLC: the arch in one colour.
+  antigravity: {
+    viewBox: [-0.5, -0.5, 17, 17],
+    path: "M14.1452 14.6818C14.9937 15.3182 16.2664 14.894 15.0997 13.7273C11.5998 10.3333 12.3421 1 7.99366 1C3.64518 1 4.3876 10.3333 0.887603 13.7273C-0.385123 15 0.993664 15.3182 1.84215 14.6818C5.13002 12.4545 4.9179 8.5303 7.99366 8.5303C11.0694 8.5303 10.8573 12.4545 14.1452 14.6818Z",
+  },
+  // dots-o-updated.svg from chatgpt.com/features/dots: a disc with a round hole.
+  "chatgpt-dots": {
+    viewBox: [0, 0, 81, 81],
+    path: "M40.0391 0C62.152 0 80.0781 17.9261 80.0781 40.0391C80.0781 62.152 62.152 80.0781 40.0391 80.0781C17.9261 80.0781 0 62.152 0 40.0391C0 17.9261 17.9261 0 40.0391 0ZM40.0391 24.1992C31.2907 24.1992 24.1992 31.2907 24.1992 40.0391C24.1992 48.7874 31.2907 55.8789 40.0391 55.8789C48.7874 55.8789 55.8789 48.7874 55.8789 40.0391C55.8789 31.2907 48.7874 24.1992 40.0391 24.1992Z",
+  },
   // The Claude mark that the provider logos also draw (claude.ai/favicon.svg).
+  "claude-code": {
+    viewBox: [0, 0, 248, 248],
+    path: CLAUDE_PATH,
+  },
   "claude-cowork": {
     viewBox: [0, 0, 248, 248],
     path: CLAUDE_PATH,
+  },
+  codex: {
+    viewBox: [0, 0, 256, 260],
+    path: CODEX_PATH,
+    fillRule: "nonzero",
+  },
+  cursor: {
+    viewBox: [0, 0, 24, 24],
+    path: CURSOR_PATH,
+    fillRule: "nonzero",
   },
   // devin.ai/favicon.svg, one path.
   devin: {

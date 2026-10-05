@@ -60,20 +60,23 @@ export function AccountUsageDetails(props: {
               <li
                 class="account-usage-provider"
                 data-usage-tone={row.tone}
-                aria-label={accountUsageRowLabel(row, text)}
+                aria-label={accountUsageRowLabel(row, text, props.loading)}
               >
                 <ProviderLogo provider={row.provider} class="account-usage-provider-logo" />
                 <span class="account-usage-provider-copy">
                   <strong class="account-usage-provider-name">{row.name}</strong>
                   <span class="account-usage-provider-meta">
-                    {row.windowLabel ?? t("account.usage.window.limit")}
+                    {row.windowLabel ??
+                      (props.loading ? t("account.usage.window.limit") : t("account.usage.notReported"))}
                     <Show when={row.resetsAtLabel}>{(label) => <> · {label()}</>}</Show>
                   </span>
                 </span>
                 <strong class="account-usage-provider-remaining">
-                  {row.remainingPercent === null
-                    ? "—"
-                    : t("account.usage.percentLeft", { percent: row.remainingPercent })}
+                  {row.remainingPercent !== null
+                    ? t("account.usage.percentLeft", { percent: row.remainingPercent })
+                    : props.loading
+                      ? t("account.usage.value.loading")
+                      : t("account.usage.value.unavailable")}
                 </strong>
               </li>
             )}

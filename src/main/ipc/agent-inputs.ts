@@ -36,6 +36,7 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  type RoutineCalendarInput,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
@@ -257,6 +258,18 @@ export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
 
 export function parseTestRoutine(value: unknown): TestRoutineInput {
   return parseDeleteRoutine(value);
+}
+
+/** The range is a whole number of instants the host reads in one pass, so its length is limited. */
+export function parseRoutineCalendar(value: unknown): RoutineCalendarInput {
+  if (!isObject(value)) throw new Error("Invalid routine calendar request.");
+  const from = new Date(requireString(value.from, "from"));
+  const to = new Date(requireString(value.to, "to"));
+  const length = to.getTime() - from.getTime();
+  if (Number.isNaN(length) || length <= 0 || length > INPUT_LIMITS.routineCalendarDays * 86_400_000) {
+    throw new Error("Invalid routine calendar range.");
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {
@@ -508,6 +521,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.computerUse !== undefined) {
     if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
     result.computerUse = value.computerUse;
+  }
+  if (value.allowAutomation !== undefined) {
+    if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
+    result.allowAutomation = value.allowAutomation;
   }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");

@@ -40,6 +40,8 @@ import {
   type GitHubConnectorStatus,
   type HostedSiteList,
   type HostedSiteSummary,
+  IDLE_RESTART_TARGETS,
+  type IdleRestart,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
@@ -210,7 +212,7 @@ export function decodeAccountSessions(value: unknown): AccountSession[] {
 
 export function decodeUpdateStatus(value: unknown): UpdateStatus {
   const status = decodeRecord(value, "update status");
-  const { phase, errorCode, managedByHost, scheduledRestart } = status;
+  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart } = status;
   if (!isOneOf(UPDATE_PHASES, phase)) throw new Error("Invalid phase.");
   if (errorCode !== null && !isOneOf(["check_failed", "download_failed", "install_failed"] as const, errorCode)) {
     throw new Error("Invalid errorCode.");
@@ -226,7 +228,17 @@ export function decodeUpdateStatus(value: unknown): UpdateStatus {
     errorCode,
     ...(managedByHost === undefined ? {} : { managedByHost }),
     ...(scheduledRestart === undefined ? {} : { scheduledRestart: decodeScheduledUpdateRestart(scheduledRestart) }),
+    ...(idleRestart === undefined ? {} : { idleRestart: decodeIdleRestart(idleRestart) }),
   };
+}
+
+function decodeIdleRestart(value: unknown): IdleRestart {
+  const restart = decodeRecord(value, "idle restart");
+  const { target, waitingFor, error } = restart;
+  if (!isOneOf(IDLE_RESTART_TARGETS, target)) throw new Error("Invalid target.");
+  if (!Array.isArray(waitingFor) || !waitingFor.every(isString)) throw new Error("Invalid waitingFor.");
+  if (error !== undefined && !isString(error)) throw new Error("Invalid error.");
+  return { target, waitingFor: [...waitingFor], ...(error === undefined ? {} : { error }) };
 }
 
 export function decodeUpdatePreference(value: unknown): UpdatePreference {

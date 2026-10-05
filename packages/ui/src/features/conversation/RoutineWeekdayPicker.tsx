@@ -83,6 +83,7 @@ function ManyWeekdays(props: { days: number[]; onChange: (days: number[]) => voi
               class={["routine-day", { "routine-day-selected": selected() }]}
               aria-label={routineWeekdayName(day, text)}
               aria-pressed={selected() ? "true" : "false"}
+              data-cuelume-tap="toggle"
               // The last day stays on, and saying so beats a click that does nothing.
               title={selected() && props.days.length === 1 ? text.t("routine.weekday.oneRequired") : undefined}
               onClick={() => props.onChange(toggleRoutineDay(props.days, day))}

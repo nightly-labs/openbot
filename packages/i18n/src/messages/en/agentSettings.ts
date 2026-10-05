@@ -96,6 +96,8 @@ export const messages = defineMessages("agentSettings", {
     "Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Let this agent control apps on this computer",
+  "agentSettings.automation.title": "Local scripts",
+  "agentSettings.automation.description": "Let scripts on this computer run this agent's routines",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });

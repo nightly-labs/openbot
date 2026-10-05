@@ -231,6 +231,9 @@ export class TeamWebRtcFileTransfer {
         this.#waiters.delete(key);
         reject(new Error(sourceText("error.remote.fileTransferTimeout")));
       }, timeoutMs);
+      // A pending receive is the caller's wait, not work on the event loop, so the timer must not
+      // hold the process open. `stop()` clears it.
+      timer.unref?.();
       this.#waiters.set(key, { resolve, reject, timer });
     });
   }
@@ -263,6 +266,14 @@ export class TeamWebRtcFileTransfer {
     this.#bridge.off("disconnected", this.#onDisconnected);
     for (const timer of this.#expirationTimers.values()) clearTimeout(timer);
     this.#expirationTimers.clear();
+    // The file never arrives after a stop, so a waiter must not keep its caller waiting. Reject
+    // before the drain below: an in-flight frame then finds no waiter to settle a second time.
+    const stopped = new Error(sourceText("error.remote.fileTransportStopped"));
+    for (const waiter of this.#waiters.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(stopped);
+    }
+    this.#waiters.clear();
     await this.#chain.catch(() => undefined);
     await Promise.all([...this.#incoming.values()].map((transfer) => transfer.file.close().catch(() => undefined)));
     await Promise.all(

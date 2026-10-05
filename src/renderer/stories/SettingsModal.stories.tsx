@@ -8,6 +8,7 @@ import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
 import { createMockBilling } from "../src/preview/mock-billing";
 import { createMockOpenBot } from "./mock-openbot";
+import { previewStorySoundSettings } from "./sound-feedback-fixture";
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;
 const storyAccount: CentralAuthUser = {
@@ -99,7 +100,10 @@ function SettingsModalStory(props: {
           open={open()}
           onOpenChange={setOpen}
           value={value()}
-          onValueChange={setValue}
+          onValueChange={(next) => {
+            previewStorySoundSettings(value(), next);
+            setValue(next);
+          }}
           appInfo={storyAppInfo}
           updateStatus={updateStatus()}
           onCancelScheduledRestart={async () => {

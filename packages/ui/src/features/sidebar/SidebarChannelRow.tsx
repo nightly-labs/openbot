@@ -62,6 +62,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
           ]}
           aria-label={`${rowProps.channel.name}${title() ? `, ${title()}` : ""}. ${preview()}`}
           aria-pressed={active() ? "true" : "false"}
+          data-cuelume-navigate=""
           onClick={(event: MouseEvent) => {
             if (!sidebarClickIsSuppressed(event)) props.onSelectChannel?.(rowProps.channel.id);
           }}

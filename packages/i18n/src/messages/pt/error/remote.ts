@@ -29,6 +29,14 @@ export const messages = {
   "error.remote.localTestListenerUnavailable": "O serviço de escuta do teste local está indisponível.",
   "error.remote.localTestNotFound": "Sessão de teste local não encontrada.",
   "error.remote.runtimeUnavailable": "O ambiente de execução da área de trabalho remota não está disponível.",
+  "error.remote.sunshineStartFailed":
+    "O Sunshine não iniciou no host. Verifique os logs da área de trabalho remota no host e tente de novo.",
+  "error.remote.moonlightStartFailed":
+    "O Moonlight Web não iniciou no host. Verifique os logs da área de trabalho remota no host e tente de novo.",
+  "error.remote.pairingFailed":
+    "O Moonlight não conseguiu parear com o Sunshine no host. Tente de novo. Se o problema continuar, reinicie o OpenBot no host.",
+  "error.remote.runtimeStartFailed":
+    "O ambiente de execução da área de trabalho remota não iniciou no host. Verifique os logs da área de trabalho remota no host e tente de novo.",
   "error.remote.hostUnreachable": "Não é possível acessar o computador anfitrião.",
   "error.remote.signInToHostAgain": "Entre neste computador anfitrião novamente.",
   "error.remote.invalidData": "O computador anfitrião retornou dados inválidos.",

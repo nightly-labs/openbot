@@ -109,6 +109,7 @@ export function RichMessageText(props: RichMessageTextProps) {
                 data-file-tone={attachmentReferenceTone(name)}
                 aria-label={attachment ? t("chat.file.openAttached", { name }) : t("chat.file.openShared", { name })}
                 aria-describedby={tooltipId}
+                data-cuelume-tap="open"
                 onPointerEnter={(event) => openTooltip(event.currentTarget, name, true)}
                 onMouseEnter={(event) => openTooltip(event.currentTarget, name, true)}
                 onPointerLeave={(event) => closeTooltip(event.currentTarget)}
@@ -166,6 +167,8 @@ export function RichMessageText(props: RichMessageTextProps) {
                 <a
                   class="message-citation-mark"
                   href={part.citation.url}
+                  data-cuelume-navigate=""
+                  data-cuelume-emphasis="subtle"
                   aria-label={t("chat.citation.open", { number: part.citation.number, label: part.citation.label })}
                   aria-describedby={tooltipId}
                   onPointerEnter={(event) => openTooltip(event.currentTarget, part.citation?.label ?? "")}
@@ -200,6 +203,8 @@ export function RichMessageText(props: RichMessageTextProps) {
               <a
                 class="message-citation-ref"
                 href={citation.url}
+                data-cuelume-navigate=""
+                data-cuelume-emphasis="subtle"
                 aria-label={t("chat.citation.openSource", { number: citation.number, label: citation.label })}
                 onClick={(event) => {
                   event.preventDefault();
@@ -267,6 +272,8 @@ export function MessageLink(props: {
     <a
       class="message-link"
       href={props.url}
+      data-cuelume-navigate=""
+      data-cuelume-emphasis="subtle"
       title={props.title ?? props.url}
       onClick={(event) => {
         event.preventDefault();

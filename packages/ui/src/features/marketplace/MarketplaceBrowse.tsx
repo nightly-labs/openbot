@@ -83,6 +83,7 @@ function NoMatch(props: {
                     type="button"
                     variant="outline"
                     size="sm"
+                    data-cuelume-tap="select"
                     onClick={() =>
                       nav().set((draft) => {
                         draft.tab = tab;
@@ -154,6 +155,7 @@ function ListingPanel(props: {
                 type="button"
                 variant="outline"
                 class="marketplace-load-more"
+                data-cuelume-tap="navigate"
                 loading={props.listing.loadingMore()}
                 onClick={props.listing.loadMore}
               >

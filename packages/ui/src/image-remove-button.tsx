@@ -18,6 +18,7 @@ export function ImageRemoveButton(props: ImageRemoveButtonProps) {
       class={cx("ui-image-remove-button", props.class)}
       aria-label={props.label}
       title={props.label}
+      data-cuelume-tap="close"
       disabled={props.disabled}
       onClick={props.onClick}
     >

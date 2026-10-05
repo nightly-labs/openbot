@@ -82,6 +82,7 @@ import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
@@ -114,6 +115,7 @@ const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
+const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, process.platform);
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
   selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
@@ -399,6 +401,7 @@ function registerIpcHandlers({
   analyticsPreferenceFile,
   updatePreferenceFile,
   requestedUpdate,
+  idleRestart,
   approvalAutomation,
   agentAdminSettings,
   language,
@@ -487,7 +490,7 @@ function registerIpcHandlers({
         ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
         : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
     }),
-    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate }),
+    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate, idleRestart }),
     ...notificationIpcHandlers({
       notificationPreference,
       translate: language.translate,
@@ -630,7 +633,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
       } catch (error) {
         logger.error("Unable to synchronize the joined servers:", toLogValue(error));
       }
-      if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole })) await host.start();
+      // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
+      if (host && services?.serverMode) await services.serverMode.publish();
+      else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
+        await host.start();
     })
     .catch((error) => {
       logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
@@ -795,6 +801,7 @@ if (!hasSingleInstanceLock) {
         developmentRemoteRole,
         developmentTestClientEnabled,
         hostedServer,
+        serverMode,
         hostingDeveloperKey,
         macHapticFeedback,
         teardown,
@@ -916,7 +923,12 @@ if (!hasSingleInstanceLock) {
       powerMonitor.on("resume", () => routineWake.resume());
       teardown.push(0, "routine wake", () => routineWake.dispose());
       const teamIdentity = teamStore.getIdentity();
-      if (
+      if (built.serverMode) {
+        const serverModeControl = built.serverMode;
+        void built.centralAuthInitialization
+          .then(() => serverModeControl.publish())
+          .catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
+      } else if (
         shouldAutoStartHost({
           configured: Boolean(teamIdentity),
           enabledOnLaunch: teamIdentity?.enabledOnLaunch ?? false,

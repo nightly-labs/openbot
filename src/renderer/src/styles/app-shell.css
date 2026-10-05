@@ -1123,6 +1123,19 @@ textarea {
   color: var(--openbot-text-muted);
 }
 
+/* A hosted server that sleeps because nobody used it, or that wakes. The view stays usable. */
+.sidebar-server-name > .sidebar-server-name-sleep {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.sidebar-server-name > .sidebar-server-name-sleep[data-state="waking"] {
+  color: var(--openbot-accent);
+  animation: server-sleep-waking 1200ms ease-in-out infinite;
+}
+
 @keyframes sidebar-server-mark-in {
   from {
     opacity: 0;
@@ -1214,6 +1227,19 @@ textarea {
 .server-menu-muted {
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
+}
+
+.server-menu-sleep {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+}
+
+.server-menu-sleep[data-state="waking"] {
+  background: var(--openbot-accent);
+  animation: server-sleep-waking 1200ms ease-in-out infinite;
 }
 
 .server-menu .server-menu-layout-chevron {
@@ -3877,6 +3903,25 @@ textarea {
   color: var(--openbot-text-secondary);
   background: var(--openbot-bg-sidebar);
   border-radius: var(--openbot-radius-sm);
+}
+
+/* A hosted server that sleeps for no use: muted. One that wakes after the user's input: a pulsing accent. */
+@keyframes server-sleep-waking {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-menu-sleep[data-state="waking"],
+  .sidebar-server-name > .sidebar-server-name-sleep[data-state="waking"] {
+    animation: none;
+  }
 }
 
 /* A server menu item with a second line, such as "Muted until 14:30", like Discord's. */
