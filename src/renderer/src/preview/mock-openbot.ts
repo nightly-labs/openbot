@@ -381,6 +381,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     active: boolean;
     timezone: string;
     schedule: RoutineSchedule;
+    limitPolicy?: Routine["limitPolicy"];
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -391,6 +392,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       instruction: input.instruction.trim(),
       active: input.active,
       timezone: input.timezone,
+      limitPolicy: input.limitPolicy ?? "wait",
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -1213,6 +1215,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.name === undefined ? {} : { name: input.name.trim() }),
           ...(input.instruction === undefined ? {} : { instruction: input.instruction.trim() }),
           ...(input.active === undefined ? {} : { active: input.active }),
+          ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.schedule === undefined
             ? {}
             : {
