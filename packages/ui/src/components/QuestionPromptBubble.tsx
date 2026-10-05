@@ -4,6 +4,7 @@ import {
   Badge,
   Bubble,
   BubbleContent,
+  Button,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -473,6 +474,18 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                         <Spinner size="sm" />
                         {t("common.sending")}
                       </span>
+                    </Show>
+                    {/* A software keyboard has no modifier chord, so the modifier mode needs a button. */}
+                    <Show when={(props.sendShortcut ?? "enter") !== "enter"}>
+                      <Button
+                        type="button"
+                        size="xs"
+                        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
+                        disabled={busy() || !customDrafts()[current().id]?.trim()}
+                        onClick={() => commitCustomAnswer(current(), pageProps.index)}
+                      >
+                        {t("prompt.question.submitAnswer")}
+                      </Button>
                     </Show>
                     <Questionnaire.Skip size="xs">{t("prompt.question.skip")}</Questionnaire.Skip>
                   </div>

@@ -204,6 +204,19 @@ describe("QuestionPromptBubble", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
   });
 
+  it("submits a custom answer with the button in modifier mode, for a software keyboard", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      { id: "token", header: "Token", question: "Which token?", isSecret: true, options: null },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} sendShortcut="ctrl-enter" onSubmit={onSubmit} />);
+
+    await fireEvent.input(screen.getByLabelText(/Custom answer/), { target: { value: "secret-value" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ token: ["secret-value"] }));
+  });
+
   it("leaves Enter that commits an IME composition to the browser", async () => {
     const onSubmit = vi.fn(async () => true);
     const customQuestion: AgentPromptQuestion[] = [

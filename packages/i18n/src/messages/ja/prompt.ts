@@ -19,6 +19,7 @@ export const messages = {
   "prompt.customPlaceholder": "自分の回答を入力してください",
   "prompt.question.customAnswerFor": "独自の回答: {question}",
   "prompt.question.skip": "スキップ",
+  "prompt.question.submitAnswer": "回答を送信",
   "prompt.question.emptyTitle": "待機中の質問はありません。",
   "prompt.question.emptyBody": "別の判断が必要になると、エージェントが続行します。",
   "prompt.choice.hint": "合うものを選ぶか、自分で入力してください。",
