@@ -701,6 +701,12 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
+          // A spent plan refused the routing turn and now holds the lead. The task is not paused for
+          // a human: it stays queued, and the reset wakes the channel again.
+          if (lead && this.hooks.usageLimited?.(lead.id)) {
+            this.#dropForLimit(channelId, task);
+            continue;
+          }
           channel = this.store.get(channelId);
           const detail =
             error instanceof ChannelRoutingError ? error.message : "Routing failed. Choose a member or try again.";

@@ -119,7 +119,7 @@ import {
 } from "./agent/model-choice";
 import { OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { ProfileClients } from "./agent/profile-clients";
-import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
+import { GenerationUsageLimitError, generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { QueueControls } from "./agent/queue-controls";
@@ -643,14 +643,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           .find((item) => item.provider === lead.provider && item.id === lead.model);
         if (!model) throw new Error(sourceText("error.backend.channelLeadModelUnavailable"));
         const client = this.#providers.createProfileClient(lead.provider);
-        return this.#profileClients.run(client, (cancelled) =>
-          generateTextWithoutTools(
-            client,
-            { ...model, defaultReasoningEffort: lead.reasoningEffort },
-            prompt,
-            cancelled,
-          ),
-        );
+        try {
+          return await this.#profileClients.run(client, (cancelled) =>
+            generateTextWithoutTools(
+              client,
+              { ...model, defaultReasoningEffort: lead.reasoningEffort },
+              prompt,
+              cancelled,
+            ),
+          );
+        } catch (error) {
+          // A routing turn can be the first one a spent plan refuses. It holds the lead's model the
+          // way a refused member turn does, and the channel keeps the task queued for the reset.
+          if (error instanceof GenerationUsageLimitError)
+            this.#usageLimits.reached(lead.id, error.resetsAt, lead.model);
+          throw error;
+        }
       },
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       awaitDrain: (agentId) => this.#drain.taskFor(agentId),
@@ -1484,6 +1492,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (wasHeld && this.#usageLimits.mayDrain(agent.id)) {
       this.#emitRuntimeSnapshot();
       this.#drain.scheduleDrain(agent.id);
+      // A channel task that the hold gave back waits in its channel, not in this queue.
+      this.channels.wake();
     }
     return agent;
   }
