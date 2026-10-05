@@ -5,7 +5,16 @@ import { describe, expect, it, vi } from "vitest";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import type { AgentClient } from "./agent-client";
 import { CustomAcpAgentsClient, type CustomAgentConfig } from "./custom-acp-agents-client";
-import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
+import {
+  type AppServerNotification,
+  type AppServerRequest,
+  decodeRecordResponse,
+  getRecord,
+  getString,
+  type RequestId,
+  type ResponseDecoder,
+  type RpcError,
+} from "./protocol";
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -78,15 +87,23 @@ function router(configs: CustomAgentConfig[] = [config("goose"), config("qwen")]
 
 const record = (value: unknown) => value;
 
+/** The routed id of a new session. */
+async function startThread(client: CustomAcpAgentsClient, model: string, cwd = FOLDER): Promise<string> {
+  const response = await client.request("thread/start", { model, cwd }, decodeRecordResponse);
+  const id = getString(getRecord(response, "thread"), "id");
+  if (id === null) throw new Error("thread/start must give a thread id.");
+  return id;
+}
+
 describe("CustomAcpAgentsClient", () => {
   it("keeps two agents' equal session ids apart, and gives each process its own id and model", async () => {
     const { client, children } = router();
-    const goose = await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
-    const qwen = await client.request("thread/start", { model: "qwen/qwen3-coder", cwd: FOLDER }, record);
-    expect(goose).toMatchObject({ thread: { id: "goose:s1" } });
-    expect(qwen).toMatchObject({ thread: { id: "qwen:s1" } });
+    const goose = await startThread(client, "goose/default");
+    const qwen = await startThread(client, "qwen/qwen3-coder");
+    expect(goose).toMatch(/^goose:[0-9a-f]{12}:s1$/);
+    expect(qwen).toMatch(/^qwen:[0-9a-f]{12}:s1$/);
 
-    await client.request("turn/start", { threadId: "qwen:s1", model: "qwen/qwen3-coder", input: [] }, record);
+    await client.request("turn/start", { threadId: qwen, model: "qwen/qwen3-coder", input: [] }, record);
     expect(children.get(`qwen@${FOLDER}`)?.requests.at(-1)).toEqual({
       method: "turn/start",
       params: { threadId: "s1", model: "qwen3-coder", input: [] },
@@ -100,19 +117,54 @@ describe("CustomAcpAgentsClient", () => {
 
   it("starts one process for each folder of an agent, and lists models on a process of its own", async () => {
     const { client, children } = router([config("goose")]);
-    await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
-    await client.request("thread/start", { model: "goose/default", cwd: "/other" }, record);
+    const work = await startThread(client, "goose/default");
+    const other = await startThread(client, "goose/default", "/other");
     await client.request("model/list", {}, record);
 
     expect([...children.keys()]).toEqual([`goose@${FOLDER}`, "goose@/other", "goose@models"]);
     const listedOn = [...children].filter(([, child]) => child.requests.some((entry) => entry.method === "model/list"));
     expect(listedOn.map(([key]) => key)).toEqual(["goose@models"]);
+
+    // Both processes gave `s1`, and each turn still reaches the folder that opened its session.
+    expect(work).not.toBe(other);
+    await client.request("turn/start", { threadId: work, input: [] }, record);
+    await client.request("turn/start", { threadId: other, input: [] }, record);
+    for (const key of [`goose@${FOLDER}`, "goose@/other"]) {
+      expect(children.get(key)?.requests.filter((entry) => entry.method === "turn/start")).toEqual([
+        { method: "turn/start", params: { threadId: "s1", input: [] } },
+      ]);
+    }
+  });
+
+  it("resumes a session saved with no folder in its id, and keeps that id", async () => {
+    const { client, children } = router([config("goose")]);
+    const seen: AppServerNotification[] = [];
+    client.on("notification", (notification) => seen.push(notification));
+
+    await client.request("thread/resume", { threadId: "goose:s9", model: "goose/default", cwd: FOLDER }, record);
+    const goose = children.get(`goose@${FOLDER}`);
+    expect(goose?.requests.at(-1)).toEqual({ method: "thread/resume", params: { threadId: "s9", cwd: FOLDER } });
+    goose?.emit("notification", { method: "item/agentMessage/delta", params: { threadId: "s9" } });
+    expect(seen.map((notification) => notification.params)).toEqual([{ threadId: "goose:s9" }]);
+
+    await client.request("turn/start", { threadId: "goose:s9", input: [] }, record);
+    expect(goose?.requests.at(-1)).toEqual({ method: "turn/start", params: { threadId: "s9", input: [] } });
+  });
+
+  it("resumes a session with a folder in its id after a restart", async () => {
+    const saved = await startThread(router([config("goose")]).client, "goose/default");
+    const { client, children } = router([config("goose")]);
+    await client.request("thread/resume", { threadId: saved, model: "goose/default", cwd: FOLDER }, record);
+    expect(children.get(`goose@${FOLDER}`)?.requests.at(-1)).toEqual({
+      method: "thread/resume",
+      params: { threadId: "s1", cwd: FOLDER },
+    });
   });
 
   it("answers each agent's request on its own process, with its own id", async () => {
     const { client, children } = router();
-    await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
-    await client.request("thread/start", { model: "qwen/default", cwd: FOLDER }, record);
+    const gooseThread = await startThread(client, "goose/default");
+    const qwenThread = await startThread(client, "qwen/default");
     const goose = children.get(`goose@${FOLDER}`);
     const qwen = children.get(`qwen@${FOLDER}`);
     const seen: AppServerRequest[] = [];
@@ -120,7 +172,7 @@ describe("CustomAcpAgentsClient", () => {
 
     goose?.emit("request", { method: "session/request_permission", id: 1, params: { threadId: "s1" } });
     qwen?.emit("request", { method: "session/request_permission", id: 1, params: { threadId: "s1" } });
-    expect(seen.map((request) => request.params)).toEqual([{ threadId: "goose:s1" }, { threadId: "qwen:s1" }]);
+    expect(seen.map((request) => request.params)).toEqual([{ threadId: gooseThread }, { threadId: qwenThread }]);
     expect(new Set(seen.map((request) => request.id)).size).toBe(2);
 
     const [forGoose, forQwen] = seen;
@@ -134,9 +186,9 @@ describe("CustomAcpAgentsClient", () => {
 
   it("reads a session of another agent than the model as missing, so the caller hands over", async () => {
     const { client } = router();
-    await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
+    const goose = await startThread(client, "goose/default");
     const error = await client
-      .request("turn/start", { threadId: "goose:s1", model: "qwen/default", input: [] }, record)
+      .request("turn/start", { threadId: goose, model: "qwen/default", input: [] }, record)
       .catch((reason: unknown) => reason);
     expect(isMissingProviderSessionError(error, "acp")).toBe(true);
   });
@@ -193,7 +245,7 @@ describe("CustomAcpAgentsClient", () => {
     const { client, children, models } = router([{ ...config("goose"), env: [{ name: "MY_TOKEN", value: token }] }]);
     const diagnostics: string[] = [];
     client.on("diagnostic", (message) => diagnostics.push(message));
-    await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
+    const thread = await startThread(client, "goose/default");
     const goose = children.get(`goose@${FOLDER}`);
     if (!goose) throw new Error("The process must start.");
     goose.answers["turn/start"] = () => {
@@ -203,9 +255,7 @@ describe("CustomAcpAgentsClient", () => {
       throw new Error(`bad token ${token}`);
     });
 
-    await expect(client.request("turn/start", { threadId: "goose:s1" }, record)).rejects.toThrow(
-      "bad token [redacted]",
-    );
+    await expect(client.request("turn/start", { threadId: thread }, record)).rejects.toThrow("bad token [redacted]");
     await client.request("model/list", {}, record);
     goose.emit("diagnostic", `stderr ${token}`);
     const exited = new Promise<Error>((resolve) => client.once("exit", resolve));

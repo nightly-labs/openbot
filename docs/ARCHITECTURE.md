@@ -1383,9 +1383,11 @@ refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one
 for each agent and working folder, which it starts when a thread first needs it: an agent can serve
 one folder for each process (Command Code refuses a session in a second folder). `model/list` uses
 one more process for each agent, in a private temporary folder, so the probe session never opens on
-a process that serves a thread. It adds the prefix `<agentId>:` to session ids and to the ids of
-requests that an agent sends, and removes it on the way back, so two agents that give the same
-session id stay apart. A thread on another agent than its model reads as a missing session, and the
+a process that serves a thread. A session id gets the prefix `<agentId>:<folderTag>:` (12 hex
+characters of the SHA-256 of the folder), so two agents, or two folders of one agent, that give the
+same session id stay apart; a session saved before this keeps its `<agentId>:<sessionId>` id, and
+the folder of its resume finds its process. Requests that an agent sends get an id of the router's
+own. A thread on another agent than its model reads as a missing session, and the
 runtime hands the conversation over as for a provider switch. When a process that serves a thread
 exits, the router exits, and every custom agent restarts. When a model list process exits, the
 next list starts another.
