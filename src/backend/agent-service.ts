@@ -1491,13 +1491,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // own, and it is written from the same profile.
     if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
-    // A plan limit belongs to a provider and a model. On another one the queue may run again, and
-    // nothing else would start it before the limit it left resets.
-    if (wasHeld && this.#usageLimits.mayDrain(agent.id)) {
-      this.#emitRuntimeSnapshot();
+    // A plan limit belongs to a provider and a model, so a model change can end a hold or start one.
+    // Leaving a hold, nothing else would start the queue before the limit it left resets. Entering
+    // one, the queue is settled as at any other start of a hold.
+    const isHeld = !this.#usageLimits.mayDrain(agent.id);
+    if (wasHeld !== isHeld) this.#emitRuntimeSnapshot();
+    if (wasHeld && !isHeld) {
       this.#drain.scheduleDrain(agent.id);
       // A channel task that the hold gave back waits in its channel, not in this queue.
       this.channels.wake();
+    } else if (!wasHeld && isHeld) {
+      void this.#settleHeldQueues([agent.id]).catch((error) =>
+        this.#emitError("usage_limit_hold_failed", error, agent.id),
+      );
     }
     return agent;
   }
