@@ -935,9 +935,17 @@ button.chat-action-target:active,
   white-space: nowrap;
 }
 
+/* The files of an update sit at the start edge, where an agent's own files sit. */
 .chat-action-attachments {
-  width: min(560px, 92%);
-  margin: var(--openbot-space-2) auto 0;
+  margin-top: var(--openbot-space-2);
+}
+
+.chat-row-unavailable {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

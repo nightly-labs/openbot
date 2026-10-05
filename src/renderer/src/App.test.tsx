@@ -1005,6 +1005,113 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByText("Sales Outbound reports that the pipeline is ready.")).toBeInTheDocument();
   });
 
+  it("keeps each row on its own message when a snapshot reorders the middle of the chat", async () => {
+    const file = (id: string, name: string) => ({
+      id,
+      name,
+      size: 18_000,
+      kind: "file" as const,
+      mimeType: "text/markdown",
+      previewKind: "text" as const,
+      previewUrl: null,
+    });
+    const update = (createdAt: string): ConversationSnapshot["messages"][number] => ({
+      id: "delivery-update-1",
+      author: "agent",
+      source: "agent",
+      senderAgentId: "sales-outbound",
+      text: "RAW_COLLABORATOR_UPDATE",
+      createdAt,
+      status: "completed",
+      attachments: [file("attachment-update", "product_hunt.md")],
+      exchange: {
+        direction: "incoming",
+        messageId: "update-1",
+        senderAgentId: "sales-outbound",
+        recipientAgentIds: ["chief"],
+        replyToMessageId: null,
+        expectsReply: false,
+        deliveries: [
+          { id: "delivery-update-1", recipientAgentId: "chief", status: "completed", position: null, error: null },
+        ],
+      },
+    });
+    const summary = (createdAt: string): ConversationSnapshot["messages"][number] => ({
+      id: "assistant-summary-1",
+      author: "assistant",
+      text: "The deck is attached.",
+      createdAt,
+      status: "completed",
+      attachments: [file("attachment-deck", "deck.md")],
+    });
+    const snapshot = (revision: number, middle: ConversationSnapshot["messages"]): ConversationSnapshot => ({
+      agentId: "chief",
+      threadId: "thread-chief",
+      activeTurnId: null,
+      revision,
+      messages: [
+        {
+          id: "user-1",
+          author: "user",
+          text: "Collect the launch files.",
+          createdAt: "2026-08-12T10:00:00.000Z",
+          status: "completed",
+        },
+        ...middle,
+        {
+          id: "assistant-done-1",
+          author: "assistant",
+          text: "Both files are ready.",
+          createdAt: "2026-08-12T10:00:09.000Z",
+          status: "completed",
+        },
+      ],
+    });
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) =>
+      agentId === "chief"
+        ? snapshot(1, [update("2026-08-12T10:00:01.000Z"), summary("2026-08-12T10:00:02.000Z")])
+        : { agentId, threadId: `thread-${agentId}`, activeTurnId: null, revision: 1, messages: [] },
+    );
+
+    render(() => <App />);
+    expect(await screen.findByText("The deck is attached.")).toBeInTheDocument();
+
+    /*
+     * A row that reads its message by a stale index draws its neighbour for one tick: the update's
+     * raw text in a bubble, and no summary. The observer sees every painted state, not only the last.
+     */
+    const wrongStates = new Set<string>();
+    const observer = new MutationObserver(() => {
+      const text = document.body.textContent ?? "";
+      if (text.includes("RAW_COLLABORATOR_UPDATE")) wrongStates.add("raw update text shown");
+      if (!text.includes("The deck is attached.")) wrongStates.add("summary missing");
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    // Same count, same first and last message: only the middle of the list moves.
+    emitAgentEvent?.({
+      type: "conversation",
+      snapshot: snapshot(2, [summary("2026-08-12T10:00:01.000Z"), update("2026-08-12T10:00:02.000Z")]),
+    });
+
+    // The update now draws below the summary.
+    await waitFor(() =>
+      expect(
+        screen.getByText("The deck is attached.").compareDocumentPosition(screen.getByText("Update from")) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy(),
+    );
+    const deckMessage = screen
+      .getAllByRole("article", { name: "Message from Chief" })
+      .find((article) => within(article).queryByText("The deck is attached."));
+    if (!deckMessage) throw new Error("The summary has no message row");
+    expect(within(deckMessage).getByText("deck.md")).toBeInTheDocument();
+    expect(within(deckMessage).queryByText("product_hunt.md")).not.toBeInTheDocument();
+    expect(screen.getAllByText("product_hunt.md")).toHaveLength(1);
+    expect(screen.getAllByText("deck.md")).toHaveLength(1);
+    observer.disconnect();
+    expect([...wrongStates]).toEqual([]);
+  });
+
   it("does not let a late history refresh overwrite a newer streamed snapshot", async () => {
     let resolveHistory: ((snapshot: ConversationSnapshot) => void) | undefined;
     vi.mocked(window.openbot.agent.readConversation).mockImplementation(
