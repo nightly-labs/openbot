@@ -251,6 +251,12 @@ export class BrowserCdpEngine {
           } else if (submission === "enter") {
             const last = nodes.inputs.at(-1);
             if (!last) throw new Error("Authentication target changed.");
+            // An input handler can change the form after the fill; the click branch checks the same.
+            if (
+              (await this.#callOnNode(send, last.backendNodeId, fingerprint, [])) !==
+              nodes.fingerprints[nodes.inputs.length - 1]
+            )
+              throw new Error("Authentication target changed.");
             await send("DOM.focus", { backendNodeId: last.backendNodeId });
             await dispatchShortcut(send, "Enter");
           }
