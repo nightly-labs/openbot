@@ -201,6 +201,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="hosted-server"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="search-agents"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

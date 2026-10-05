@@ -5,6 +5,16 @@ import type { Locale } from "expo-localization";
 // and would crash a build without it on import.
 const localization = requireOptionalNativeModule<{ getLocales(): Locale[] }>("ExpoLocalization");
 
+/** The currency and region of the phone's first locale, such as `PLN` and `PL`. Null when unknown. */
+export function phoneCurrencyAndRegion(): { currency: string | null; region: string | null } {
+  try {
+    const locale = localization?.getLocales()[0];
+    return { currency: locale?.currencyCode ?? null, region: locale?.regionCode ?? null };
+  } catch {
+    return { currency: null, region: null };
+  }
+}
+
 /** The phone's languages in the user's order, such as `["pl-PL", "en-US"]`. Empty when unknown. */
 export function phoneLanguages(): string[] {
   try {

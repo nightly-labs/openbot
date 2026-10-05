@@ -7,6 +7,11 @@ import { type ReactNode, useEffect, useState } from "react";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
+import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import {
+  refreshHostedServerAvailability,
+  useHostedServerAvailability,
+} from "@/features/servers/model/hosted-server-checkout";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
 import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
@@ -85,6 +90,12 @@ export function ServerDrawerContent({
     setEditing(false);
     setDragging(false);
   }, [open]);
+
+  // As on desktop, the plus button opens the plans when the account can create hosted servers.
+  const canCreateServer = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  useEffect(() => {
+    if (open) void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
+  }, [open, session]);
 
   function move(serverId: string, targetIndex: number) {
     const next = moveServerId(remoteIds, serverId, targetIndex);
@@ -233,11 +244,11 @@ export function ServerDrawerContent({
           </ServerDrawerIconButton>
         ) : (
           <ServerDrawerIconButton
-            accessibilityLabel={t("mobile.server.drawer.join")}
+            accessibilityLabel={canCreateServer ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
             color={mutedColor}
             fallbackVariant="filled"
             systemName="plus"
-            onPress={() => onNavigate("/add-server")}
+            onPress={() => onNavigate(canCreateServer ? "/hosted-server" : "/add-server")}
           >
             <Plus color={mutedColor} size={18} strokeWidth={2} />
           </ServerDrawerIconButton>
