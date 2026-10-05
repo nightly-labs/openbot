@@ -643,7 +643,7 @@ describe("remote server order", () => {
       const persisted = JSON.parse(await readFile(statePath, "utf8"));
       expect(persisted.activeServerId).toBe("local");
     } finally {
-      runCauseEffect(manager.stop());
+      void runCauseEffect(manager.stop());
       await rm(directory, { recursive: true, force: true });
       await rm(unavailableDirectory, { recursive: true, force: true });
     }
@@ -769,7 +769,7 @@ describe("remote server order", () => {
         name: "page.tsx",
       });
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      runCauseEffect(manager.stop());
+      void runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -789,7 +789,7 @@ describe("remote connection failures", () => {
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("http-protocol")], appVersion: "0.4.0" });
 
-    runCauseEffect(fixture.manager.startEventConnections());
+    void runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "online" });
 
     await expect(
@@ -978,7 +978,7 @@ describe("remote connection failures", () => {
       appVersion: "0.4.0",
     });
 
-    runCauseEffect(fixture.manager.startEventConnections());
+    void runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "online" });
     const signedIn = runCauseEffect(fixture.manager.login({ serverId }));
 
@@ -1077,7 +1077,7 @@ describe("remote control capability discovery", () => {
         remoteDesktopAvailable: false,
         state: "online",
       });
-      runCauseEffect(manager.stop());
+      void runCauseEffect(manager.stop());
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
