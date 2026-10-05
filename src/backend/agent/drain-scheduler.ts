@@ -312,6 +312,9 @@ export class DrainScheduler {
     // Released in the `finally` when no turn starts: a start that fails uses no provider memory.
     const releaseReservation = this.#memory.reserveTurn();
     let turnMayRun = false;
+    // The model this start asks for. The agent can move to another one while `turn/start` waits, and
+    // a plan limit belongs to the model the provider refused.
+    let requestedModel: string | null = null;
     try {
       for (const item of batch) await this.#mailbox.markStarting(item.delivery.id);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -332,6 +335,7 @@ export class DrainScheduler {
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
+      requestedModel = agent.model;
       // The endpoint was removed while this agent was busy, so no other model could be given to it
       // then. The old process would still answer on the removed endpoint, with the credentials it
       // started with, until it restarts. Thrown rather than failed here: the catch below also ends
@@ -499,11 +503,11 @@ export class DrainScheduler {
           for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           // After the restore, so a routine set to skip finds its run back in the queue.
-          this.#usageLimits.reached(delivery.recipientAgentId, null);
+          this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
           return;
         }
         // Before the requeue, so the channel does not assign the task to this agent again at once.
-        this.#usageLimits.reached(delivery.recipientAgentId, null);
+        this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
         if (this.#hooks.requeueChannelDelivery(delivery.id)) {
           await this.#mailbox.markTerminal(delivery.id, "interrupted", null);
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
