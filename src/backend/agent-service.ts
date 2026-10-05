@@ -1791,7 +1791,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery) throw new Error(sourceText("error.agent.queuedMessageCreateFailed"));
-    this.#routines.noteSenderTimezone(agent.id, timezone);
+    if (timezone !== undefined) this.#routines.noteDeliveryTimezone(delivery.delivery.id, timezone);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     this.#mailboxSync.syncMailboxMessages(snapshot);
     await this.#store.updatePreview(

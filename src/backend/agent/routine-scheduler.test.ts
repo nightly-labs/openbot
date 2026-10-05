@@ -44,25 +44,32 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     });
     await service.initialize();
     await store.getOrCreate("design", "Design Studio", "Product design");
-    await service.sendMessage({ agentId: "chief", text: "Manage our routines." }, undefined, "Pacific/Auckland");
-    await waitFor(() => Boolean(store.activeProviderSession("chief")));
+    const receipt = await service.sendMessage(
+      { agentId: "chief", text: "Manage our routines." },
+      undefined,
+      "Pacific/Auckland",
+    );
+    const turnId = () => mailbox.getDelivery(receipt.deliveries[0]?.id ?? "")?.delivery.turnId ?? undefined;
+    await waitFor(() => Boolean(store.activeProviderSession("chief") && turnId()));
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
     if (!client || !threadId) throw new Error("The routine tool test thread did not start.");
 
-    const ownCreate = await callOpenBotTool(client, threadId, "create_routine", {
-      name: "Morning brief",
-      instruction: "Prepare the daily brief.",
-      schedule: { kind: "daily", time: "09:00" },
-    });
+    const ownCreate = await callOpenBotTool(
+      client,
+      threadId,
+      "create_routine",
+      { name: "Morning brief", instruction: "Prepare the daily brief.", schedule: { kind: "daily", time: "09:00" } },
+      turnId(),
+    );
     expect(ownCreate.error).toBeUndefined();
     const ownRoutine = openBotToolPayload(ownCreate.result);
     expect(ownRoutine).toMatchObject({
       agentId: "chief",
       name: "Morning brief",
       active: true,
-      // The sender's zone, not the host's.
+      // The zone of the person whose message the turn runs, not the host's.
       timezone: "Pacific/Auckland",
     });
 

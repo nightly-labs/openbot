@@ -141,7 +141,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default. Without a timezone, it uses the timezone of the person who last wrote to this agent, or the host timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
+      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default. Without a timezone, it uses the timezone of the person whose message this turn answers, or the host timezone when that is unknown. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
