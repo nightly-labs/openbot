@@ -2339,8 +2339,8 @@ describe.sequential("AgentService: queue", () => {
     expect(rejected.result).toMatchObject({ success: false });
     const failure = openBotToolPayload(rejected.result).error;
     expect(failure).toContain("description");
-    expect(failure).toContain("2000");
-    expect(failure).toContain("2001");
+    expect(failure).toContain(`at most ${INPUT_LIMITS.agentDescription} characters`);
+    expect(failure).toContain(`received ${description.length}`);
     expect(failure).not.toContain("private-profile-text");
     expect(store.list().find((agent) => agent.id === "design")).toEqual(original);
 
@@ -2352,7 +2352,7 @@ describe.sequential("AgentService: queue", () => {
     });
     expect(creation.error).toBeUndefined();
     expect(creation.result).toMatchObject({ success: false });
-    expect(openBotToolPayload(creation.result).error).toContain("2001");
+    expect(openBotToolPayload(creation.result).error).toContain(`received ${description.length}`);
     expect(service.listAgents()).toEqual(beforeCreation);
 
     const unknownField = await callOpenBotTool(client, threadId, "update_profile", {

@@ -16,7 +16,7 @@ const profileFields = {
     .string()
     .max(INPUT_LIMITS.agentDescription)
     .describe(
-      `Standing instructions, at most ${INPUT_LIMITS.agentDescription} characters. Shorten longer instructions before calling this tool. An invalid request saves no profile changes.`,
+      `Standing instructions, at most ${INPUT_LIMITS.agentDescription} characters. Shorten longer instructions before calling this tool.`,
     ),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
   avatarHue: z.literal(AVATAR_HUES).nullable(),
