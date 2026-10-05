@@ -1766,9 +1766,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * `sender` is the person the host saw send it. It is not part of `SendMessageInput`: the caller of
-   * that input, a renderer or a Team API body, never names who it is.
+   * that input, a renderer or a Team API body, never names who it is. `timezone` is the zone of a
+   * Team API member's client, when it sent one.
    */
-  /** `timezone` is the sending client's zone, which a Team API member's client sends. */
   async sendMessage(
     input: SendMessageInput,
     sender?: ConversationMessageSender,

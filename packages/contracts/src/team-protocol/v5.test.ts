@@ -145,7 +145,7 @@ describe("Team protocol v5", () => {
     expect(() => encodeTeamProtocolV5CurrentHttpResponse("GET", queuePath, 200, malformed)).toThrow("reply mark");
   });
 
-  it("carries the sender's timezone on a message; v4 drops it, and an unknown zone fails closed", () => {
+  it("carries the sender's timezone on a message; v4 and an unknown zone drop it, a malformed one fails closed", () => {
     const path = "/v1/agents/chief/messages";
     const input = { text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null, timezone: "Europe/Warsaw" };
     const wire = JSON.parse(encodeTeamProtocolV5CurrentHttpRequest("POST", path, input));
@@ -157,9 +157,10 @@ describe("Team protocol v5", () => {
     // An older host keeps its own zone, as it always did.
     expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire)).not.toHaveProperty("timezone");
 
-    expect(() => encodeTeamProtocolV5CurrentHttpRequest("POST", path, { ...input, timezone: "Mars/Olympus" })).toThrow(
-      "Invalid message timezone.",
-    );
+    // Zone data that is newer on the client than on the host must not stop the message.
+    expect(
+      decodeTeamProtocolV5CurrentHttpRequest("POST", path, { ...wire, timezone: "Mars/Olympus" }),
+    ).not.toHaveProperty("timezone");
     expect(() => decodeTeamProtocolV5CurrentHttpRequest("POST", path, { ...wire, timezone: 7 })).toThrow(
       "Invalid message timezone.",
     );

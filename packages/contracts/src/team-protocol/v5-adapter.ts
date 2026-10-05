@@ -140,23 +140,20 @@ function withExchangeExpectsReply(
  * The sender's `timezone` rides beside the frozen message projection: the shipped key list drops it,
  * so an older host never reads it and keeps its own zone for a routine the agent creates.
  *
- * A present value must name a zone. The host uses it as a schedule default, so a value it cannot read
- * would only fail later, inside the agent's tool call. Fail closed instead.
+ * A present value that is not a bounded string is malformed and fails closed. A string this runtime
+ * cannot resolve is dropped instead: the client's time zone data can be newer than the host's, and
+ * an unknown zone must not stop the message, only the schedule default it would give.
  */
 function messageTimezone(source: unknown): TeamProtocolV5BaseJsonObject {
   if (!isDynamicRecord(source) || source.timezone === undefined) return {};
-  if (!isTimezone(source.timezone)) throw new Error("Invalid message timezone.");
-  return { timezone: source.timezone };
-}
-
-function isTimezone(value: unknown): value is string {
-  if (!isString(value) || value.length > 128) return false;
+  const timezone = source.timezone;
+  if (!isString(timezone) || timezone.length > 128) throw new Error("Invalid message timezone.");
   try {
-    new Intl.DateTimeFormat("en", { timeZone: value });
-    return true;
+    new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
-    return false;
+    return {};
   }
+  return { timezone };
 }
 
 function encodeQueueSnapshot(json: string, source: unknown): string {
