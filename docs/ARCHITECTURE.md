@@ -1380,11 +1380,15 @@ The provider `acp` runs ACP programs that the user saves. The model id names the
 `<agentId>/<model>`, or `<agentId>/default` for an agent that lists no models. So `agent_json` does
 not change, and the agent id pattern (`CUSTOM_AGENT_ID_PATTERN`) has no `_`, which `isAgentModel`
 refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one `AcpAgentClient`
-for each agent, which it starts when a thread first needs it. It adds the prefix `<agentId>:` to
-session ids and to the ids of requests that an agent sends, and removes it on the way back, so two
-agents that give the same session id stay apart. A thread on another agent than its model reads as
-a missing session, and the runtime hands the conversation over as for a provider switch. When a
-process that serves a thread exits, the router exits, and every custom agent restarts.
+for each agent and working folder, which it starts when a thread first needs it: an agent can serve
+one folder for each process (Command Code refuses a session in a second folder). `model/list` uses
+one more process for each agent, in a private temporary folder, so the probe session never opens on
+a process that serves a thread. It adds the prefix `<agentId>:` to session ids and to the ids of
+requests that an agent sends, and removes it on the way back, so two agents that give the same
+session id stay apart. A thread on another agent than its model reads as a missing session, and the
+runtime hands the conversation over as for a provider switch. When a process that serves a thread
+exits, the router exits, and every custom agent restarts. When a model list process exits, the
+next list starts another.
 
 `src/main/custom-agent-store.ts` keeps `custom-agents.json`: env names in plain text and all env
 values in one `safeStorage` ciphertext. `list()` returns summaries; only the backend gets the

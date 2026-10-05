@@ -484,12 +484,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
         () => savedCustomAgents(context),
-        (config, executable) => customAgentChild(config, executable, timeout, context, confinement, false),
+        (config, executable, folder) =>
+          customAgentChild(config, executable, folder, timeout, context, confinement, false),
       ),
     createProfileClient: (_cli, timeout, context) =>
       new CustomAcpAgentsClient(
         () => savedCustomAgents(context),
-        (config, executable) => customAgentChild(config, executable, timeout, context, undefined, true),
+        (config, executable, folder) => customAgentChild(config, executable, folder, timeout, context, undefined, true),
       ),
     authState: () => ({ kind: "acp", email: null }),
     validateAccount: () => undefined,
@@ -500,10 +501,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
  * The ACP process of one custom agent. It is given the MCP servers and the confinement as a built-in
  * ACP provider is, and a model check of its own: a model of this agent is served while the agent is
  * saved. `CustomEndpoints.serves` is not used, because it knows only the custom endpoints.
+ *
+ * A process for a working folder lists its models in that folder: an agent that serves one folder
+ * for each process refuses any other. Only the process that lists the catalogue (`folder` null)
+ * uses the empty discovery folder.
  */
 function customAgentChild(
   config: CustomAgentConfig,
   executable: string,
+  folder: string | null,
   timeout: number,
   context: ProviderClientContext,
   confinement: ProcessConfinement | undefined,
@@ -515,7 +521,7 @@ function customAgentChild(
     provider: "acp",
     label: config.name,
     allowNoModels: true,
-    discoveryCwd: () => customAgentDiscoveryFolder(config.id),
+    discoveryCwd: () => folder ?? customAgentDiscoveryFolder(config.id),
     redactValues: () => values,
     argv: config.args,
     env,
