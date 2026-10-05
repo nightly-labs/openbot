@@ -6,6 +6,7 @@ export const messages = {
   "mobile.server.drawer.remote": "リモート",
   "mobile.server.drawer.options": "オプション",
   "mobile.server.drawer.routines": "ルーティン",
+  "mobile.server.drawer.usage": "使用量",
   "mobile.server.drawer.editOrder": "順序を編集",
   "mobile.server.drawer.serverOptions": "サーバーのオプション",
   "mobile.server.drawer.moveUp": "上へ移動",
@@ -140,4 +141,11 @@ export const messages = {
   "mobile.server.members.revokeTitle": "招待を取り消しますか？",
   "mobile.server.members.revokeBody": "この招待は使用できなくなります。",
   "mobile.server.members.revoke": "取り消す",
+  "mobile.server.usage.agents": "エージェント",
+  "mobile.server.usage.agentLine": "トークン数 {tokens} · {cost} · {percent}",
+  "mobile.server.usage.noAgents": "この期間にはエージェントの使用量が記録されていません。",
+  "mobile.server.usage.allAgents": "すべてのエージェント",
+  "mobile.server.usage.agent": "エージェント",
+  "mobile.server.usage.unsupported":
+    "このホストは使用量の分析に対応していません。この画面を使うには、ホストを更新してください。",
 } as const satisfies PartialTranslation<typeof source>;

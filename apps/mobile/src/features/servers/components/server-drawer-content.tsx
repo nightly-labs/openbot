@@ -74,6 +74,7 @@ export function ServerDrawerContent({
   const menuActions: MenuAction[] = [
     { id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" },
     { id: "routines", title: t("mobile.server.drawer.routines"), image: "calendar" },
+    { id: "usage", title: t("mobile.server.drawer.usage"), image: "chart.bar" },
   ];
   if (canReorder)
     menuActions.push({ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" });
@@ -98,6 +99,7 @@ export function ServerDrawerContent({
 
   const openOptions = (serverId: string) => onNavigate({ pathname: "/server-settings", params: { serverId } });
   const openRoutines = (serverId: string) => onNavigate({ pathname: "/server-routines", params: { serverId } });
+  const openUsage = (serverId: string) => onNavigate({ pathname: "/server-usage", params: { serverId } });
 
   function renderRow(serverItem: MobileServer, width?: number) {
     const selected = serverItem.id === activeServerId;
@@ -109,6 +111,7 @@ export function ServerDrawerContent({
         : [
             { name: "options", label: t("mobile.server.drawer.serverOptions") },
             { name: "routines", label: t("mobile.server.drawer.routines") },
+            { name: "usage", label: t("mobile.server.drawer.usage") },
           ]),
       ...(remoteIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
       ...(remoteIndex >= 0 && remoteIndex < remoteIds.length - 1
@@ -126,6 +129,7 @@ export function ServerDrawerContent({
           const action = event.nativeEvent.actionName;
           if (action === "options") openOptions(serverItem.id);
           if (action === "routines") openRoutines(serverItem.id);
+          if (action === "usage") openUsage(serverItem.id);
           if (action === "moveUp") move(serverItem.id, remoteIndex - 1);
           if (action === "moveDown") move(serverItem.id, remoteIndex + 1);
         }}
@@ -180,6 +184,7 @@ export function ServerDrawerContent({
         onPressAction={(event) => {
           if (event.nativeEvent.event === "options") openOptions(serverItem.id);
           if (event.nativeEvent.event === "routines") openRoutines(serverItem.id);
+          if (event.nativeEvent.event === "usage") openUsage(serverItem.id);
           if (event.nativeEvent.event === "reorder") setEditing(true);
         }}
       >

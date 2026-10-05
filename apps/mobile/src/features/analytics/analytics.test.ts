@@ -419,6 +419,7 @@ it("instruments message commands without sending their contents or changing the 
     loadAgentMemories: unexpected,
     loadAgentRoutines: unexpected,
     loadRoutineCalendar: unexpected,
+    loadHostAnalytics: unexpected,
     searchMessages: unexpected,
     loadAgentAnalytics: unexpected,
     loadAgentSkills: unexpected,

@@ -6,6 +6,7 @@ export const messages = {
   "mobile.server.drawer.remote": "Uzak",
   "mobile.server.drawer.options": "Seçenekler",
   "mobile.server.drawer.routines": "Rutinler",
+  "mobile.server.drawer.usage": "Kullanım",
   "mobile.server.drawer.editOrder": "Sırayı düzenle",
   "mobile.server.drawer.serverOptions": "Sunucu seçenekleri",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
@@ -147,4 +148,11 @@ export const messages = {
   "mobile.server.members.revokeTitle": "Davet iptal edilsin mi?",
   "mobile.server.members.revokeBody": "Bu davet artık çalışmayacak.",
   "mobile.server.members.revoke": "İptal et",
+  "mobile.server.usage.agents": "Ajanlar",
+  "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
+  "mobile.server.usage.noAgents": "Bu aralıkta ajan kullanımı kaydedilmedi.",
+  "mobile.server.usage.allAgents": "Tüm ajanlar",
+  "mobile.server.usage.agent": "Ajan",
+  "mobile.server.usage.unsupported":
+    "Bu ana makine kullanım analizlerini desteklemiyor. Bu görünümü kullanmak için ana makineyi güncelleyin.",
 } as const satisfies PartialTranslation<typeof source>;

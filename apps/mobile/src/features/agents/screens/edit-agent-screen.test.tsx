@@ -231,6 +231,8 @@ const workspace = {
   loadAgentMemories: vi.fn<() => Promise<AgentMemory[]>>(async () => []),
   loadAgentRoutines: vi.fn<() => Promise<Routine[]>>(async () => []),
   loadAgentAnalytics: vi.fn<() => Promise<AgentAnalytics | null>>(async () => null),
+  // A host without `host-analytics` answers null, and the agent page reads the agent report.
+  loadHostAnalytics: vi.fn(async () => null),
   loadAgentSkills: vi.fn<(agentId: string, serverId: string, manage?: boolean) => Promise<InstalledSkill[] | null>>(
     async () => [],
   ),
@@ -466,27 +468,75 @@ vi.mock("@/features/chat/components/chat-glass-icon-button", () => ({
   ),
 }));
 vi.mock("@/shared/components/sheet-scroll-edge-effect", () => ({ SheetScrollEdgeEffect: () => null }));
+// The SVG chart and its gestures run on the device. This harness selects a day by its date.
+vi.mock("@/features/agents/components/usage-chart", () => ({
+  useUsageSeriesColor: () => () => "accent",
+  UsageChart: ({ dates, onSelect }: { dates: string[]; onSelect: (index: number) => void }) => (
+    <div>
+      {dates.map((date, index) => (
+        <button key={date} type="button" aria-label={date} onClick={() => onSelect(index)} />
+      ))}
+    </div>
+  ),
+}));
+vi.mock("@/features/agents/components/usage-segments", () => ({
+  UsageSegments: ({
+    options,
+    value,
+    onChange,
+  }: {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <div>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={option.value === value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
 vi.mock("@expo/ui/community/datetime-picker", () => ({
   DateTimePicker: ({
     value,
+    mode,
     disabled,
     onChange,
   }: {
     value: Date;
+    mode: "date" | "time";
     disabled: boolean;
     onChange: (event: { type: string }, value: Date) => void;
-  }) => (
-    <input
-      aria-label="Time"
-      type="time"
-      disabled={disabled}
-      value={`${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`}
-      onChange={(event) => {
-        const [hours, minutes] = event.target.value.split(":").map(Number);
-        onChange({ type: "set" }, new Date(2000, 0, 1, hours, minutes));
-      }}
-    />
-  ),
+  }) =>
+    mode === "date" ? (
+      <input
+        aria-label="Date"
+        type="date"
+        value={`${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`}
+        onChange={(event) => {
+          const [year = 1970, month = 1, day = 1] = event.target.value.split("-").map(Number);
+          onChange({ type: "set" }, new Date(year, month - 1, day, 12));
+        }}
+      />
+    ) : (
+      <input
+        aria-label="Time"
+        type="time"
+        disabled={disabled}
+        value={`${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`}
+        onChange={(event) => {
+          const [hours, minutes] = event.target.value.split(":").map(Number);
+          onChange({ type: "set" }, new Date(2000, 0, 1, hours, minutes));
+        }}
+      />
+    ),
 }));
 vi.mock("uniwind", () => ({ useUniwind: () => ({ theme: "light" }) }));
 vi.mock("@expo/ui", () => {
@@ -1100,7 +1150,7 @@ it("shows host memories, routine status, and usage on separate pages", async () 
   await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
   expect(screen.getByText("$0.0200")).toBeTruthy();
   expect(screen.getByText("Test model")).toBeTruthy();
-  await click("2026-09-09: 42 tokens");
+  await click("2026-09-09");
   expect(screen.getByText(/42 tokens · \$0.0200 · 1 sessions/)).toBeTruthy();
   await click("7 days");
   await waitFor(() =>
@@ -1113,24 +1163,24 @@ it("shows host memories, routine status, and usage on separate pages", async () 
   await waitFor(() =>
     expect(workspace.loadAgentAnalytics).toHaveBeenLastCalledWith(analyticsRange(original.id, 365), original.serverId),
   );
-  await click("Custom range");
-  await edit("Start date", "2024-01-01");
-  await edit("End date", "2024-01-31");
-  await click("Apply range");
-  await waitFor(() =>
+  // A picked date moves the other one when the range would be longer than 367 days or inverted.
+  const pickDate = async (index: number, value: string) => {
+    const picker = screen.getAllByLabelText("Date")[index];
+    if (!picker) throw new Error(`No date picker at ${index}.`);
+    await act(() => fireEvent.change(picker, { target: { value } }));
+  };
+  const customRange = (startDate: string, endDate: string) =>
     expect(workspace.loadAgentAnalytics).toHaveBeenLastCalledWith(
-      { ...analyticsRange(original.id), startDate: "2024-01-01", endDate: "2024-01-31" },
+      { ...analyticsRange(original.id), startDate, endDate },
       original.serverId,
-    ),
-  );
-  const requests = workspace.loadAgentAnalytics.mock.calls.length;
-  await edit("End date", "2023-12-31");
-  await click("Apply range");
-  expect(screen.getByText(/Enter valid dates in YYYY-MM-DD/)).toBeTruthy();
-  expect(workspace.loadAgentAnalytics).toHaveBeenCalledTimes(requests);
-  await edit("End date", "2025-12-31");
-  await click("Apply range");
-  expect(workspace.loadAgentAnalytics).toHaveBeenCalledTimes(requests);
+    );
+  await click("Custom");
+  await pickDate(0, "2024-01-01");
+  await waitFor(() => customRange("2024-01-01", "2025-01-01"));
+  await pickDate(1, "2024-01-31");
+  await waitFor(() => customRange("2024-01-01", "2024-01-31"));
+  await pickDate(1, "2023-12-01");
+  await waitFor(() => customRange("2023-12-01", "2023-12-01"));
 });
 
 it("edits appearance separately from the main form", async () => {

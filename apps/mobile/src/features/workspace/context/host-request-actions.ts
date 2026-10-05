@@ -30,6 +30,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/que
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { readHostAnalytics } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
@@ -70,6 +71,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemories"
   | "loadAgentRoutines"
   | "loadRoutineCalendar"
+  | "loadHostAnalytics"
   | "searchMessages"
   | "loadAgentSkills"
   | "setAgentSkillEnabled"
@@ -226,6 +228,12 @@ export function createHostRequestActions({
           serverId,
           capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
         ),
+      ),
+    loadHostAnalytics: (input, serverId) =>
+      readHostAnalytics(
+        (method, path, decode) => request(method, path, decode, undefined, serverId),
+        capabilities.get(serverId) ?? [],
+        input,
       ),
     searchMessages: (query, serverId, cursor) =>
       request(

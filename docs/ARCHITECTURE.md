@@ -1072,6 +1072,12 @@ Tool and media fees are outside the estimate. Stored estimates retain their pric
 Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
 inert until Back, so conversation drafts and settings survive navigation. Agent settings opens
 the same report with an agent filter. Host changes clear the filter and stale responses are rejected.
+The iPhone app opens Usage from the server menu in a sheet. It reads the same route through
+`readHostAnalytics` in `@openbot/team-client` and shows the per-agent rows; a row or the header
+filter narrows the report to one agent. The agent Usage page reads the same route with the agent
+filter, so its chart has the provider split too; a host without `host-analytics` gets the
+agent-scoped route and one area. The series pivot is in `@openbot/team-client/usage-series`, which
+the desktop chart also reads.
 
 `host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
 The host queries its local usage tables once for the date range and optional agent filter; it does
@@ -1080,7 +1086,7 @@ host-wide response carries per-agent rows that the client labels from the agent 
 reads. The same pass also groups by day and provider, which is what lets the chart draw one area
 per provider over a shared baseline; a cell carries only the token count and the cost estimate,
 because those are the two measures the chart reads. Both arrays are on the host report only, which
-is why the agent-scoped route, its codec and the mobile screen are unchanged. Session and turn identities include agent and provider. HTTP and
+is why the agent-scoped route and its codec are unchanged. Session and turn identities include agent and provider. HTTP and
 WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
 contracts. All authenticated team members can read these aggregates; no additional analytics data
 is stored by the account service or Signal service.

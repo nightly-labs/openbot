@@ -27,7 +27,8 @@
     "./dynamic-island-coordinator": "./src/dynamic-island-coordinator.ts",
     "./dynamic-island-presentation": "./src/dynamic-island-presentation.ts",
     "./live-activity-props": "./src/live-activity-props.ts",
-    "./live-activity-seal": "./src/live-activity-seal.ts"
+    "./live-activity-seal": "./src/live-activity-seal.ts",
+    "./usage-series": "./src/usage-series.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"

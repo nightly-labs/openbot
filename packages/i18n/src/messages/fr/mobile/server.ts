@@ -6,6 +6,7 @@ export const messages = {
   "mobile.server.drawer.remote": "Distant",
   "mobile.server.drawer.options": "Options",
   "mobile.server.drawer.routines": "Routines",
+  "mobile.server.drawer.usage": "Utilisation",
   "mobile.server.drawer.editOrder": "Modifier l’ordre",
   "mobile.server.drawer.serverOptions": "Options du serveur",
   "mobile.server.drawer.moveUp": "Monter",
@@ -144,4 +145,11 @@ export const messages = {
   "mobile.server.members.revokeTitle": "Révoquer l’invitation ?",
   "mobile.server.members.revokeBody": "Cette invitation ne fonctionnera plus.",
   "mobile.server.members.revoke": "Révoquer",
+  "mobile.server.usage.agents": "Agents",
+  "mobile.server.usage.agentLine": "jetons : {tokens} · {cost} · {percent}",
+  "mobile.server.usage.noAgents": "Aucune utilisation d’agent enregistrée sur cette période.",
+  "mobile.server.usage.allAgents": "Tous les agents",
+  "mobile.server.usage.agent": "Agent",
+  "mobile.server.usage.unsupported":
+    "Cet hôte ne prend pas en charge les statistiques d’utilisation. Mettez à jour l’hôte pour utiliser cette vue.",
 } as const satisfies PartialTranslation<typeof source>;

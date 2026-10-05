@@ -5,6 +5,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.drawer.remote": "Remote",
   "mobile.server.drawer.options": "Options",
   "mobile.server.drawer.routines": "Routines",
+  "mobile.server.drawer.usage": "Usage",
   "mobile.server.drawer.editOrder": "Edit order",
   "mobile.server.drawer.serverOptions": "Server options",
   "mobile.server.drawer.moveUp": "Move up",
@@ -138,4 +139,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.members.revokeTitle": "Revoke invitation?",
   "mobile.server.members.revokeBody": "This invitation will stop working.",
   "mobile.server.members.revoke": "Revoke",
+  "mobile.server.usage.agents": "Agents",
+  "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
+  "mobile.server.usage.noAgents": "No agent usage recorded in this range.",
+  "mobile.server.usage.allAgents": "All agents",
+  "mobile.server.usage.agent": "Agent",
+  "mobile.server.usage.unsupported": "This host does not support usage analytics. Update the host to use this view.",
 });

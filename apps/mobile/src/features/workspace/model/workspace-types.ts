@@ -16,6 +16,8 @@ import type {
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  HostAnalytics,
+  HostAnalyticsInput,
   InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
@@ -156,6 +158,8 @@ export interface MobileWorkspaceContextValue {
   /** Every routine of the server, of agents and channels, with its runs in the range. */
   loadRoutineCalendar: (input: RoutineCalendarInput, serverId: string) => Promise<RoutineCalendar>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  /** Null when the host does not advertise `host-analytics`. Without an agent ID, the report covers every agent. */
+  loadHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
   /**
    * Null when the host does not advertise `installed-skills`. With `manage`, reads the
    * `skills-admin-v1` list, which has the enabled state and origin; the host refuses a member.
