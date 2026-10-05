@@ -1595,9 +1595,12 @@ it("saves the selected monthly day and wall-clock time", async () => {
   await edit("Routine name", "Monthly check");
   await edit("Routine instructions", "Check updates");
   await edit("Time zone", "Europe/Warsaw");
-  await act(() => fireEvent.change(screen.getByDisplayValue("Every day"), { target: { value: "monthly" } }));
+  await act(() => fireEvent.change(screen.getByDisplayValue("Daily"), { target: { value: "monthly" } }));
   await act(() => fireEvent.change(screen.getByLabelText("Time"), { target: { value: "17:45" } }));
-  await act(() => fireEvent.change(screen.getByDisplayValue("1"), { target: { value: "22" } }));
+  // A new monthly run starts on today's date, as on desktop.
+  await act(() =>
+    fireEvent.change(screen.getByDisplayValue(String(new Date().getDate())), { target: { value: "22" } }),
+  );
   await click("Save changes");
   expect(workspace.createAgentRoutine).toHaveBeenCalledWith(
     expect.objectContaining({ timezone: "Europe/Warsaw", schedule: { kind: "monthly", day: 22, time: "17:45" } }),

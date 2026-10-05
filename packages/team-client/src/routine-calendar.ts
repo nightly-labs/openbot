@@ -1,6 +1,6 @@
 // The routine calendar: every routine of a host, of agents and channels, with its runs in a range.
-// A past run comes from the run history, a later one from the schedule. The local host and a remote
-// one give the same source, so both calendars place runs with the same schedule code.
+// A past run comes from the run history, a later one from the schedule. The local host, a remote
+// one and the phone give the same source, so every calendar places runs with the same schedule code.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -37,8 +37,8 @@ export async function buildRoutineCalendar(
     // History reaches back from now, so a range that ends before the oldest run kept here has no history.
     const history =
       range.from.getTime() < now.getTime() ? await source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage) : [];
-    // Planning does not wait, so the main process gets a turn between routines.
-    await new Promise((resolve) => setImmediate(resolve));
+    // Planning does not wait, so the event loop gets a turn between routines.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     return routineRuns(routine, history, range, now);
   });
   return {

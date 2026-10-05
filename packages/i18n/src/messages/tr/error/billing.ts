@@ -1,4 +1,9 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/billing";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  // Masaüstü ve web istemcilerinin oluşturduğu faturalandırma hataları.
+  "error.billing.invalidRequest": "Faturalandırma isteği geçersiz.",
+  "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",
+  "error.billing.notStripePage": "Faturalandırma sayfası bir Stripe sayfası değil.",
+} as const satisfies PartialTranslation<typeof source>;

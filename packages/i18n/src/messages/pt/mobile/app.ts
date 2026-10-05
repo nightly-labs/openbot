@@ -23,6 +23,8 @@ export const messages = {
   "mobile.app.route.members": "Membros",
   "mobile.app.route.hostedServerPlans": "Servidor na nuvem",
   "mobile.app.route.hostedServerSetup": "Configuração",
+  "mobile.app.route.routines": "Rotinas",
+  "mobile.app.route.routine": "Rotina",
   "mobile.app.route.message": "Mensagem",
   "mobile.app.messageActions.reply": "Responder",
   "mobile.app.messageActions.selectText": "Selecionar texto",

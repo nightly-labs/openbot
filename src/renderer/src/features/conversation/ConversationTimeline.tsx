@@ -15,6 +15,7 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { planItems, planTitle } from "../../app-message-projection";
+import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
@@ -626,6 +627,7 @@ export function ConversationTimeline() {
                 <QuestionPromptBubble
                   questions={entry.prompt.questions}
                   elementRef={setRequiredInteractionElement}
+                  sendShortcut={deviceSendShortcut(props.platform)}
                   onSubmit={props.onAnswerPrompt}
                   onResolutionPresented={() =>
                     props.onPromptResolutionPresented?.(

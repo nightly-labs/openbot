@@ -16,6 +16,7 @@ import {
 } from "@openbot/ui";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
+import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
@@ -24,6 +25,7 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, replayActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
+import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import type { WebAccountCalls } from "./web-account";
 
 const TABS = ["profile", "preferences"] as const;
@@ -63,6 +65,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const { t } = useText();
   const [activeTab, setActiveTab] = createSignal<WebAccountSettingsTab>("profile");
   const [completionSound, setCompletionSound] = createSignal(isCompletionSoundEnabled());
+  const sendShortcutMode = useSendShortcutMode();
   // Playback reads the stored value on each event, so the switch follows a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
@@ -136,6 +139,20 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
         <Tabs.Content value="preferences" class="settings-modal-tab-panel" data-tab="preferences">
           <SettingsSection title={t("settings.appBehavior.title")}>
             <ItemGroup class="settings-modal-card">
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.sendShortcut.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.sendShortcut.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <SendShortcutSelect
+                    value={sendShortcutMode()}
+                    onChange={(mode) => setSendShortcutMode(mode)}
+                    devicePlatform={currentDevicePlatform()}
+                    {...(modalElement ? { mount: modalElement } : {})}
+                  />
+                </ItemActions>
+              </Item>
               <Item class="settings-modal-row">
                 <ItemContent>
                   <ItemTitle>{t("settings.language.title")}</ItemTitle>

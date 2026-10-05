@@ -20,12 +20,12 @@ import type {
 import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { AgentRoutineStore } from "../agent-routine-store";
 import type { AgentStore } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";
-import { collapseMissedOccurrences, RoutineInputError } from "../routine-schedule";
 import type { RoutineHoldWindow } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";

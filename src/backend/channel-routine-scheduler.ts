@@ -11,10 +11,10 @@ import type {
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { recordRestartActivity } from "./restart-activity";
-import { collapseMissedOccurrences } from "./routine-schedule";
 import type { RoutineHoldWindow } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 

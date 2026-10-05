@@ -1,14 +1,21 @@
-// The one client of the provider `acp`: a router over one ACP process for each custom agent.
+// The one client of the provider `acp`: a router over the ACP processes of the custom agents.
 //
 // The rest of the backend sees one provider with one catalogue. A model id names the custom agent
-// (`<customAgentId>/<agentModel>`), and a session id that leaves here names it too
-// (`<customAgentId>:<agentSessionId>`), so a turn, a resume or an answer finds the process that owns
-// it. Two agents can give the same session id; the prefix keeps them apart.
+// (`<customAgentId>/<agentModel>`), and a session id that leaves here names it and its folder too
+// (`<customAgentId>:<folderTag>:<agentSessionId>`), so a turn, a resume or an answer finds the
+// process that owns it. Two agents, or two folders of one agent, can give the same session id; the
+// prefix keeps them apart. A session saved before folders had processes of their own has no folder
+// tag (`<customAgentId>:<agentSessionId>`), and keeps that id when it is resumed.
 //
-// A process starts when its agent is first needed. Its model list is kept, so a list that fails
-// later answers with the last one, and an agent that never listed stays out of the catalogue: an
-// empty answer would move the agents on it to another model.
+// A process serves one agent in one working folder, and starts when that pair is first needed. An
+// agent can refuse a session in a second folder (Command Code serves one folder for each process),
+// so two folders never share a process. The models come from one more process for each agent, in a
+// folder apart from every workspace, so a model list never opens a session on a process that serves
+// a thread. The list is kept, so a list that fails later answers with the last one, and an agent
+// that never listed stays out of the catalogue: an empty answer would move the agents on it to
+// another model.
 
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { CUSTOM_AGENT_DEFAULT_MODEL, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { isAgentModel } from "@openbot/contracts/ipc";
@@ -42,8 +49,15 @@ export interface CustomAgentConfig {
 /** The saved custom agents, read when a process starts. */
 export type CustomAgentSource = () => readonly CustomAgentConfig[];
 
-/** Builds the ACP client of one agent, on the file its command resolved to. */
-export type CustomAgentChildFactory = (config: CustomAgentConfig, executable: string) => AgentClient;
+/**
+ * Builds the ACP client of one agent, on the file its command resolved to, for the sessions of one
+ * working folder. `null` is the process that lists the agent's models.
+ */
+export type CustomAgentChildFactory = (
+  config: CustomAgentConfig,
+  executable: string,
+  folder: string | null,
+) => AgentClient;
 
 const MODEL_LIST_TIMEOUT_MS = 5_000;
 
@@ -56,17 +70,51 @@ interface ClientEvents {
 
 type ModelEntry = ModelListResponse["data"][number];
 
-/** `<agentId>:<sessionId>`, or null for an id that no custom agent gave. */
-function splitCustomAgentSessionId(value: string): { agentId: string; sessionId: string } | null {
+/** The custom agent that a routed session id names, or null for an id that no custom agent gave. */
+function sessionAgent(value: string): string | null {
   const colon = value.indexOf(":");
   if (colon <= 0 || colon === value.length - 1) return null;
   const agentId = value.slice(0, colon);
-  return customAgentIdOfModel(`${agentId}/x`) === agentId ? { agentId, sessionId: value.slice(colon + 1) } : null;
+  return customAgentIdOfModel(`${agentId}/x`) === agentId ? agentId : null;
+}
+
+/**
+ * A stable tag of one working folder. Each folder has a process of its own, and two processes can
+ * give the same session id, so a new session id names the folder too: `<agentId>:<tag>:<sessionId>`.
+ */
+function folderTag(folder: string): string {
+  return createHash("sha256").update(folder).digest("hex").slice(0, 12);
+}
+
+/**
+ * The agent's own id of a routed session in `folder`. A session saved when one process served every
+ * folder has no tag: `<agentId>:<sessionId>`.
+ */
+function ownSessionId(threadId: string, agentId: string, folder: string): string {
+  const tagged = `${agentId}:${folderTag(folder)}:`;
+  return threadId.startsWith(tagged) ? threadId.slice(tagged.length) : threadId.slice(agentId.length + 1);
+}
+
+/** The process that holds a session, and the session's id in that process. */
+interface HeldSession {
+  readonly child: AgentClient;
+  readonly sessionId: string;
 }
 
 /** Read as a missing session by `isMissingProviderSessionError`, so the caller opens a new one. */
 function unknownSession(threadId: string): Error {
   return new Error(`Unknown ACP session: ${threadId}`);
+}
+
+/** The key of one agent's process for one folder, or for its model list when `folder` is null. */
+function childKey(agentId: string, folder: string | null): string {
+  return `${agentId}\0${folder ?? ""}`;
+}
+
+function requiredCwd(params: unknown): string {
+  const cwd = getString(params, "cwd");
+  if (!cwd) throw new Error("cwd is required.");
+  return cwd;
 }
 
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
@@ -75,6 +123,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
   readonly #children = new Map<string, Promise<AgentClient>>();
+  /** The process that opened or loaded each session, by the routed id that the caller knows. */
+  readonly #sessions = new Map<string, HeldSession>();
   /**
    * Which process sent each request that waits for an answer, and its own id. Two processes can use
    * the same id, so the router gives each request an id of its own.
@@ -103,15 +153,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this.#running = false;
     const children = [...this.#children.values()];
     this.#children.clear();
+    this.#sessions.clear();
     this.#requests.clear();
     await Promise.all(children.map((child) => child.then((client) => client.stop()).catch(() => undefined)));
   }
 
   async releaseThread(externalThreadId: string): Promise<void> {
-    const routed = splitCustomAgentSessionId(externalThreadId);
-    if (!routed) return;
-    const child = await this.#children.get(routed.agentId)?.catch(() => null);
-    await child?.releaseThread?.(routed.sessionId);
+    const held = this.#sessions.get(externalThreadId);
+    await held?.child.releaseThread?.(held.sessionId);
   }
 
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
@@ -141,48 +190,73 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         return decoder({ data: await this.#listModels(params, timeoutMs ?? MODEL_LIST_TIMEOUT_MS) });
       case "thread/start": {
         const agentId = this.#modelAgent(params);
-        const child = await this.#child(agentId);
+        const cwd = requiredCwd(params);
+        const child = await this.#child(agentId, cwd);
         const response = await child.request(method, forChild(params, null), decodeRecordResponse, timeoutMs);
-        return decoder(withThreadId(response, agentId));
+        return decoder(
+          withThreadId(response, (sessionId) => {
+            const threadId = `${agentId}:${folderTag(cwd)}:${sessionId}`;
+            this.#sessions.set(threadId, { child, sessionId });
+            return threadId;
+          }),
+        );
       }
       case "thread/resume": {
-        const routed = this.#routed(params);
-        const child = await this.#child(routed.agentId);
-        const response = await child.request(
-          method,
-          forChild(params, routed.sessionId),
-          decodeRecordResponse,
-          timeoutMs,
-        );
-        return decoder(withThreadId(response, routed.agentId));
+        const threadId = getString(params, "threadId") ?? "";
+        const agentId = this.#routedAgent(params);
+        const cwd = requiredCwd(params);
+        const child = await this.#child(agentId, cwd);
+        const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
+        // Held before the agent answers, so what it sends while it loads the session reaches the
+        // caller under the id the caller knows, a saved id with no folder tag included.
+        this.#sessions.set(threadId, held);
+        try {
+          const response = await child.request(
+            method,
+            forChild(params, held.sessionId),
+            decodeRecordResponse,
+            timeoutMs,
+          );
+          return decoder(withThreadId(response, () => threadId));
+        } catch (error) {
+          if (this.#sessions.get(threadId) === held) this.#sessions.delete(threadId);
+          throw error;
+        }
       }
       case "thread/read": {
         const threadId = getString(params, "threadId") ?? "";
-        const routed = splitCustomAgentSessionId(threadId);
+        const agentId = sessionAgent(threadId);
         // A read has nothing to recover: a session of an agent that is gone has no turns to show.
-        if (!routed || !this.#source().some((config) => config.id === routed.agentId)) {
+        if (!agentId || !this.#source().some((config) => config.id === agentId)) {
           return decoder({ thread: { id: threadId, turns: [] } });
         }
-        const child = await this.#child(routed.agentId);
-        const response = await child.request(
+        const cwd = getString(params, "cwd");
+        // Only the process of the session's folder can load it. With no folder, nothing can.
+        const held =
+          this.#sessions.get(threadId) ??
+          (cwd ? { child: await this.#child(agentId, cwd), sessionId: ownSessionId(threadId, agentId, cwd) } : null);
+        if (!held) return decoder({ thread: { id: threadId, turns: [] } });
+        const response = await held.child.request(
           method,
-          forChild(params, routed.sessionId),
+          forChild(params, held.sessionId),
           decodeRecordResponse,
           timeoutMs,
         );
-        return decoder(withThreadId(response, routed.agentId));
+        return decoder(withThreadId(response, () => threadId));
       }
       case "turn/start":
       case "turn/steer": {
-        const routed = this.#routed(params);
-        const child = await this.#child(routed.agentId);
-        return child.request(method, forChild(params, routed.sessionId), decoder, timeoutMs);
+        const threadId = getString(params, "threadId") ?? "";
+        this.#routedAgent(params);
+        // A session that no process holds is missing, and the caller resumes it in its folder.
+        const held = this.#sessions.get(threadId);
+        if (!held) throw unknownSession(threadId);
+        return held.child.request(method, forChild(params, held.sessionId), decoder, timeoutMs);
       }
       case "turn/interrupt": {
-        const routed = splitCustomAgentSessionId(getString(params, "threadId") ?? "");
-        const child = routed ? await this.#children.get(routed.agentId)?.catch(() => null) : null;
-        if (!routed || !child) return decoder({});
-        return child.request(method, forChild(params, routed.sessionId), decoder, timeoutMs);
+        const held = this.#sessions.get(getString(params, "threadId") ?? "");
+        if (!held) return decoder({});
+        return held.child.request(method, forChild(params, held.sessionId), decoder, timeoutMs);
       }
       case "thread/compact/start":
         return decoder({});
@@ -215,50 +289,67 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   }
 
   /**
-   * The agent and its own session id. A session of another agent than the model names is missing
-   * for this turn: the user switched agents, and the caller opens a session on the new one, with the
-   * conversation handed over.
+   * The agent that the session in `params` belongs to. A session of another agent than the model
+   * names is missing for this turn: the user switched agents, and the caller opens a session on the
+   * new one, with the conversation handed over.
    */
-  #routed(params: unknown): { agentId: string; sessionId: string } {
+  #routedAgent(params: unknown): string {
     const threadId = getString(params, "threadId") ?? "";
-    const routed = splitCustomAgentSessionId(threadId);
-    if (!routed) throw unknownSession(threadId);
+    const agentId = sessionAgent(threadId);
+    if (!agentId) throw unknownSession(threadId);
     const model = getString(params, "model");
-    if (model && customAgentIdOfModel(model) !== routed.agentId) throw unknownSession(threadId);
-    return routed;
+    if (model && customAgentIdOfModel(model) !== agentId) throw unknownSession(threadId);
+    return agentId;
   }
 
-  /** One started, initialized process for each agent, however many callers ask for it at once. */
-  #child(agentId: string): Promise<AgentClient> {
-    const existing = this.#children.get(agentId);
+  /**
+   * The id that the caller knows for a session of `child`. A session that the router does not hold
+   * yet, such as one that `session/new` is still opening, gets the id that `thread/start` gives it.
+   */
+  #routedSessionId(child: AgentClient, prefix: string, sessionId: string): string {
+    for (const [threadId, held] of this.#sessions) {
+      if (held.child === child && held.sessionId === sessionId) return threadId;
+    }
+    return `${prefix}:${sessionId}`;
+  }
+
+  /**
+   * One started, initialized process for each agent and folder, however many callers ask for it at
+   * once. The folder `null` is the process that lists the agent's models.
+   */
+  #child(agentId: string, folder: string | null): Promise<AgentClient> {
+    const key = childKey(agentId, folder);
+    const existing = this.#children.get(key);
     if (existing) return existing;
-    const starting = this.#startChild(agentId);
-    this.#children.set(agentId, starting);
+    const starting = this.#startChild(agentId, folder, key);
+    this.#children.set(key, starting);
     starting.catch(() => {
-      if (this.#children.get(agentId) === starting) this.#children.delete(agentId);
+      if (this.#children.get(key) === starting) this.#children.delete(key);
     });
     return starting;
   }
 
-  async #startChild(agentId: string): Promise<AgentClient> {
+  async #startChild(agentId: string, folder: string | null, key: string): Promise<AgentClient> {
     const config = this.#source().find((candidate) => candidate.id === agentId);
     if (!config) throw new Error(sourceText("error.provider.customAgentMissing"));
     assertAgentArgs(config.args);
     const executable = await this.#resolve(config.command);
     if (!executable) throw new Error(sourceText("error.provider.customAgentNotFound", { command: config.command }));
     assertWindowsScriptArgs(executable, config.args);
-    const child = this.#createChild(config, executable);
+    const child = this.#createChild(config, executable, folder);
+    const prefix = folder === null ? agentId : `${agentId}:${folderTag(folder)}`;
+    const route = (sessionId: string) => this.#routedSessionId(child, prefix, sessionId);
     child.on("notification", (notification) => {
-      this.emit("notification", withRoutedThreadId(notification, agentId));
+      this.emit("notification", withRoutedThreadId(notification, route));
     });
     child.on("request", (request) => {
       this.#nextRequestId += 1;
       const id = `${agentId}:${this.#nextRequestId}`;
       this.#requests.set(id, { child, id: request.id });
-      this.emit("request", withRoutedThreadId({ ...request, id }, agentId));
+      this.emit("request", withRoutedThreadId({ ...request, id }, route));
     });
     child.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
-    child.once("exit", (error) => this.#childExited(agentId, child, this.#redactError(error)));
+    child.once("exit", (error) => this.#childExited(key, folder, child, this.#redactError(error)));
     child.start();
     try {
       await child.request("initialize", {}, decodeRecordResponse);
@@ -271,13 +362,18 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 
   /**
    * One agent's process ended on its own. The runtime replaces the whole router, which is how the
-   * other providers recover as well: the threads of every custom agent are loaded again.
+   * other providers recover as well: the threads of every custom agent are loaded again. A process
+   * that only lists models holds no thread, so it is forgotten, and the next list starts another.
    */
-  #childExited(agentId: string, child: AgentClient, error: Error): void {
-    void this.#children
-      .get(agentId)
+  #childExited(key: string, folder: string | null, child: AgentClient, error: Error): void {
+    const entry = this.#children.get(key);
+    void entry
       ?.then((current) => {
         if (current !== child || !this.#running) return;
+        if (folder === null) {
+          if (this.#children.get(key) === entry) this.#children.delete(key);
+          return;
+        }
         this.#running = false;
         this.emit("exit", error);
       })
@@ -311,7 +407,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       configs.map(async (config) => {
         try {
           const response = await withTimeout(
-            this.#child(config.id).then((child) =>
+            this.#child(config.id, null).then((child) =>
               child.request("model/list", params, decodeModelListResponse, timeoutMs),
             ),
             timeoutMs,
@@ -359,16 +455,17 @@ function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   };
 }
 
-function withRoutedThreadId<T extends { params: unknown }>(message: T, agentId: string): T {
+function withRoutedThreadId<T extends { params: unknown }>(message: T, route: (sessionId: string) => string): T {
   const { params } = message;
   if (!isRecord(params)) return message;
   const threadId = getString(params, "threadId");
-  return threadId === null ? message : { ...message, params: { ...params, threadId: `${agentId}:${threadId}` } };
+  return threadId === null ? message : { ...message, params: { ...params, threadId: route(threadId) } };
 }
 
-function withThreadId(response: DynamicRecord, agentId: string): DynamicRecord {
+/** The response with the routed id of the session that the agent named. */
+function withThreadId(response: DynamicRecord, route: (sessionId: string) => string): DynamicRecord {
   const thread = getRecord(response, "thread");
   const id = getString(thread, "id");
   if (!thread || id === null) return response;
-  return { ...response, thread: { ...thread, id: `${agentId}:${id}` } };
+  return { ...response, thread: { ...thread, id: route(id) } };
 }

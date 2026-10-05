@@ -366,9 +366,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request],
   );
 
+  /** The open channels of each server that the routine calendar last read its owners from. */
+  const calendarChannels = useRef(new Map<string, string>());
   const channelStore = useMemo(
     () =>
       new MobileChannelStore(request, (serverId, channels) => {
+        // The calendar leaves out archived channels. Message streaming also sends `channels-changed`,
+        // so the calendar reloads only when the set of open channels changes: an archive, a restore,
+        // a new channel or a deleted one.
+        const open = channels
+          .filter((channel) => !channel.archived)
+          .map((channel) => channel.id)
+          .sort()
+          .join("\n");
+        const previous = calendarChannels.current.get(serverId);
+        calendarChannels.current.set(serverId, open);
+        if (previous !== undefined && previous !== open)
+          void queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === "server-routines" && query.queryKey[4] === serverId,
+          });
         const pinned = preferencesRef.current[serverId]?.pinnedChannels;
         if (!pinned?.length) return;
         const available = new Set(channels.map((channel) => channel.id));
@@ -383,7 +399,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
         }
       }),
-    [request, preferenceStore],
+    [request, preferenceStore, queryClient],
   );
   useEffect(() => () => channelStore.dispose(), [channelStore]);
   useEffect(() => channelStore.setActive(foreground), [channelStore, foreground]);
@@ -661,6 +677,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       if (event.type === "queue-changed" || event.type === "queue-invalidated") {
         void applyMobileQueueEvent(queryClient, serverId, event);
+      }
+      if (
+        event.type === "routines-changed" ||
+        event.type === "channel-routines-changed" ||
+        event.type === "agents-changed" ||
+        // A routine run ends as a turn: its slot changes from planned to its outcome.
+        (event.type === "turn-completed" && event.origin === "routine")
+      ) {
+        void queryClient.invalidateQueries({
+          queryKey: ["server-routines", session.apiUrl, session.user.id, sessionScope, serverId],
+        });
       }
       if (
         event.type === "channels-changed" ||

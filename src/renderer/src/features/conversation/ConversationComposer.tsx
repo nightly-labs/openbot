@@ -27,6 +27,7 @@ import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
+import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
 import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
 
@@ -312,6 +313,7 @@ export function ConversationComposer() {
                 updateTeamTyping(text);
               }}
               onSubmit={submitComposer}
+              sendShortcut={deviceSendShortcut(props.platform)}
               onPickerOpenChange={setPickerOpen}
               onPasteFiles={(files) => {
                 if (props.runtime?.importFiles) void props.runtime.importFiles(files);
@@ -475,6 +477,19 @@ export function ConversationComposer() {
                         : voicePhase() === "recording"
                           ? t("composer.send.voice")
                           : t("composer.send.message")
+                    }
+                    aria-keyshortcuts={
+                      voicePhase() === "recording" ? undefined : sendShortcutAriaKey(deviceSendShortcut(props.platform))
+                    }
+                    title={
+                      voicePhase() === "recording"
+                        ? undefined
+                        : t(
+                            sendShortcutHintKey(
+                              deviceSendShortcut(props.platform),
+                              editingDeliveryId() ? "save" : "send",
+                            ),
+                          )
                     }
                     data-cuelume-emphasis="normal"
                     disabled={

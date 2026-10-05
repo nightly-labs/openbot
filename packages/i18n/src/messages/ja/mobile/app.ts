@@ -23,6 +23,8 @@ export const messages = {
   "mobile.app.route.members": "メンバー",
   "mobile.app.route.hostedServerPlans": "クラウドサーバー",
   "mobile.app.route.hostedServerSetup": "セットアップ",
+  "mobile.app.route.routines": "ルーティン",
+  "mobile.app.route.routine": "ルーティン",
   "mobile.app.route.message": "メッセージ",
   "mobile.app.messageActions.reply": "返信",
   "mobile.app.messageActions.selectText": "テキストを選択",

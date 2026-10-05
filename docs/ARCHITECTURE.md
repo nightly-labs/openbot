@@ -17,7 +17,7 @@ packages/
   contracts/         Process and network boundary types, limits, and pure validation
   i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
-  team-client/       Shared team connection, recovery, WebRTC framing, and Dynamic Island state
+  team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
@@ -940,16 +940,26 @@ the replacement is bound, reloaded after restart, and removed after a turn accep
 
 The same handoff carries a chat to another provider after a provider switch. It holds the user and
 assistant messages after the last context-reset marker, with attachment names only. OpenBot stores
-no tool steps, so `ThreadLifecycle` also reads the three newest earlier sessions with `thread/read`
-on their own providers. It starts a stopped CLI for this. From the turns that match a transcript
-message, `renderTurnSteps` adds a work log: commands with exit code and output tail, changed file
-paths, tool calls, searches and progress notes. Each field is redacted before it is cut, and each
-turn has a size limit. Reasoning, diffs, images and other provider-private state stay with the
-provider that made them. The start and the read share a 10-second limit; when the read fails, the
-handoff goes without that session's steps. Codex returns tool steps from its stored rollout. Claude
-returns only notes. The read sends no `cwd`, as the boot backfill does, so an ACP session that its
-process no longer holds is not opened again and gives no steps. The read uses the shared provider
-process, so a session that ran in a Workspace only process also gives no steps.
+no tool steps, so the work log comes from the providers. At the switch, before the old sessions are
+retired, `ThreadLifecycle.readWorkSteps` reads each active session with `thread/read` through the
+client that holds it, with a 10-second limit. The switch then checks again that no turn started.
+Only after the switch is stored, `saveWorkSteps` writes the rendered steps of the 60 newest turns to
+`provider-work-steps/<sha256(session id)>` (mode 0600), or `{}` for a session with none. The sessions
+are retired before the write, so a turn that starts during it keeps its new session and reads the
+provider instead. The file is
+deleted and reconciled with the other session files, and a file that does not parse counts as no
+capture. A session without a capture, such as one that no client held, is read when the
+handoff is built: only the three newest, on their own providers, with a stopped CLI started again
+and one 10-second limit for the start and the read. From the turns that match a transcript message,
+`renderTurnSteps` adds a work log: commands with exit code and output tail, changed file paths, tool
+calls, searches and progress notes. Each field is redacted before it is cut, and each turn has a
+size limit. Reasoning, diffs, images and other provider-private state stay with the provider that
+made them. A failed capture or read leaves that session's steps out. Codex returns tool steps from
+its stored rollout. Claude returns only notes. An ACP agent keeps only the text and thinking of its
+turns, so it also gives only notes, and only while its process holds the session: the handoff read
+sends no `cwd`, as the boot backfill does, so a session that the process released is not opened
+again. That handoff read uses the shared provider process, so a session that ran in a Workspace only
+process gives no steps unless the switch captured it.
 
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path
@@ -1393,11 +1403,17 @@ The provider `acp` runs ACP programs that the user saves. The model id names the
 `<agentId>/<model>`, or `<agentId>/default` for an agent that lists no models. So `agent_json` does
 not change, and the agent id pattern (`CUSTOM_AGENT_ID_PATTERN`) has no `_`, which `isAgentModel`
 refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one `AcpAgentClient`
-for each agent, which it starts when a thread first needs it. It adds the prefix `<agentId>:` to
-session ids and to the ids of requests that an agent sends, and removes it on the way back, so two
-agents that give the same session id stay apart. A thread on another agent than its model reads as
-a missing session, and the runtime hands the conversation over as for a provider switch. When a
-process that serves a thread exits, the router exits, and every custom agent restarts.
+for each agent and working folder, which it starts when a thread first needs it: an agent can serve
+one folder for each process (Command Code refuses a session in a second folder). `model/list` uses
+one more process for each agent, in a private temporary folder, so the probe session never opens on
+a process that serves a thread. A session id gets the prefix `<agentId>:<folderTag>:` (12 hex
+characters of the SHA-256 of the folder), so two agents, or two folders of one agent, that give the
+same session id stay apart; a session saved before this keeps its `<agentId>:<sessionId>` id, and
+the folder of its resume finds its process. Requests that an agent sends get an id of the router's
+own. A thread on another agent than its model reads as a missing session, and the
+runtime hands the conversation over as for a provider switch. When a process that serves a thread
+exits, the router exits, and every custom agent restarts. When a model list process exits, the
+next list starts another.
 
 `src/main/custom-agent-store.ts` keeps `custom-agents.json`: env names in plain text and all env
 values in one `safeStorage` ciphertext. `list()` returns summaries; only the backend gets the

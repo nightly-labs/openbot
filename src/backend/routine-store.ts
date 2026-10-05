@@ -5,18 +5,18 @@ import { isRoutineSchedule } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
+  nextRoutineOccurrence,
+  normalizeRoutineSchedule,
+  RoutineInputError,
+  validateRoutineSchedule,
+} from "@openbot/team-client/routine-schedule";
+import {
   databaseRows,
   optionalStringColumn,
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import {
-  nextRoutineOccurrence,
-  normalizeRoutineSchedule,
-  RoutineInputError,
-  validateRoutineSchedule,
-} from "./routine-schedule";
 
 /**
  * Three table names, one owner column and one handle column are the whole difference between an
