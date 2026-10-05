@@ -17,7 +17,7 @@ function renderComposer(
   agents: AgentProfile[] = [],
   skills: InstalledSkill[] = [],
   mcpServers: McpServerConfig[] = [],
-  sendShortcut?: "enter" | "meta-enter" | "ctrl-enter",
+  sendShortcut: "enter" | "meta-enter" | "ctrl-enter" = "enter",
 ) {
   const onSubmit = vi.fn();
   const onValueChange = vi.fn();

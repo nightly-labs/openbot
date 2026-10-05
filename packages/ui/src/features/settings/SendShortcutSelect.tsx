@@ -9,8 +9,8 @@ interface SendShortcutOption {
   readonly labelKey: AppTextKey;
 }
 
-function sendShortcutOptions(devicePlatform: "darwin" | "win32" | "linux"): SendShortcutOption[] {
-  return SEND_SHORTCUT_MODES.map((id) => ({
+function sendShortcutOption(id: SendShortcutMode, devicePlatform: "darwin" | "win32" | "linux"): SendShortcutOption {
+  return {
     id,
     labelKey:
       id === "enter"
@@ -18,7 +18,7 @@ function sendShortcutOptions(devicePlatform: "darwin" | "win32" | "linux"): Send
         : devicePlatform === "darwin"
           ? "settings.sendShortcut.modEnterMac"
           : "settings.sendShortcut.modEnterWin",
-  }));
+  };
 }
 
 export interface SendShortcutSelectProps {
@@ -28,7 +28,7 @@ export interface SendShortcutSelectProps {
   devicePlatform: "darwin" | "win32" | "linux";
   disabled?: boolean;
   /** The dialog element the popover portals into, as the other Settings selects receive it. */
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
 }
 
 /**
@@ -37,8 +37,8 @@ export interface SendShortcutSelectProps {
  */
 export function SendShortcutSelect(props: SendShortcutSelectProps): JSX.Element {
   const { t } = useText();
-  const options = () => sendShortcutOptions(props.devicePlatform);
-  const selected = () => options().find((option) => option.id === props.value) ?? options()[0];
+  const options = () => SEND_SHORTCUT_MODES.map((id) => sendShortcutOption(id, props.devicePlatform));
+  const selected = () => sendShortcutOption(props.value, props.devicePlatform);
 
   return (
     <Select<SendShortcutOption>
@@ -47,7 +47,7 @@ export function SendShortcutSelect(props: SendShortcutSelectProps): JSX.Element 
       optionValue="id"
       optionTextValue={(option) => t(option.labelKey)}
       value={selected()}
-      disabled={props.disabled}
+      disabled={props.disabled ?? false}
       onChange={(option) => option && props.onChange(option.id)}
       placement="bottom-end"
       itemComponent={(itemProps) => (

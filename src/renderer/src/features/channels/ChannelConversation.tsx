@@ -79,7 +79,7 @@ const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPa
 export interface ChannelConversationProps {
   isOwnMessage: (authorId: string) => boolean;
   /** The device with the keyboard on desktop. Web leaves it empty and the browser is detected. */
-  platform?: "darwin" | "win32" | "linux";
+  platform?: "darwin" | "win32" | "linux" | undefined;
   /** Keyed by agent id. */
   pendingApprovals: Record<string, AgentApproval | undefined>;
   /** Keyed by agent id. */
