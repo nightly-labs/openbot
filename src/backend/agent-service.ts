@@ -672,6 +672,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
         !this.#usageLimits.mayDrain(agentId),
       usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
+      skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       steer: async (agentId, threadId, turnId, messageId, text) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
@@ -1819,17 +1820,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * reserve the host until the reset. A task of a channel routine set to skip is dropped instead.
    */
   #requeueChannelDelivery(deliveryId: string): boolean {
-    return this.channels.requeueForLimit(deliveryId, (task) =>
-      this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
-    );
+    return this.channels.requeueForLimit(deliveryId);
   }
 
   /**
-   * What a spent plan does to the queues it now holds. A channel task goes back to its channel. A
-   * routine set to skip leaves the queue, because its result is no use when late; cancelling the
-   * delivery settles the run.
+   * What a spent plan does to the queues it now holds. A channel task goes back to its channel, and
+   * a wake lets each channel drop the queued tasks of routines set to skip. A routine set to skip
+   * leaves the agent's queue too, because its result is no use when late; cancelling the delivery
+   * settles the run.
    */
   async #settleHeldQueues(agentIds: readonly string[]): Promise<void> {
+    this.channels.wake();
     for (const agentId of agentIds) {
       for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
         if (!this.channels.store.assignmentForDelivery(deliveryId) || !this.#requeueChannelDelivery(deliveryId))

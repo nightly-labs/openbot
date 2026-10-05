@@ -39,6 +39,11 @@ export interface ChannelHooks {
   busy(agentId: string): boolean;
   /** Whether a spent provider plan holds this agent, so a routing turn on its model would be refused. */
   usageLimited?(agentId: string): boolean;
+  /**
+   * Whether a task that a spent plan holds is dropped, because its routine has no use for a late
+   * result. It settles the routine run before the task is cancelled.
+   */
+  skipAtLimit?(task: ChannelTask): boolean;
   normalBusy?(): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
@@ -571,7 +576,10 @@ export class ChannelService {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
         // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
-        if (lead && this.hooks.usageLimited?.(lead.id)) continue;
+        if (lead && this.hooks.usageLimited?.(lead.id)) {
+          this.#dropForLimit(channelId, task);
+          continue;
+        }
         try {
           if (!lead) throw new ChannelRoutingError(sourceText("error.backend.channelLeadRequired"));
           // The channel summary that member turns already maintain stands in for the transcript.
@@ -705,6 +713,10 @@ export class ChannelService {
           this.publish(channelId);
           continue;
         }
+      }
+      if (task.ownerAgentId && this.hooks.usageLimited?.(task.ownerAgentId)) {
+        this.#dropForLimit(channelId, task);
+        continue;
       }
       if (!task.ownerAgentId || this.hooks.busy(task.ownerAgentId) || this.hooks.normalBusy?.()) continue;
       if (
@@ -904,17 +916,15 @@ export class ChannelService {
    * A spent provider plan holds the agent of this delivery. The task goes back to the queue with a
    * new revision and the assignment ends, so nothing reserves the host while the agent waits: the
    * pump assigns the task again once the agent takes turns. False when there is no active assignment
-   * to give back, or when a transfer is pending on it.
-   *
-   * `skip` decides for a task whose routine drops late work: it settles that run before the task is
-   * cancelled, so the publish below does not read the cancelled task as a finished run.
+   * to give back, or when a transfer is pending on it. A task whose routine drops late work is
+   * cancelled instead.
    */
-  requeueForLimit(deliveryId: string, skip: (task: ChannelTask) => boolean = () => false): boolean {
+  requeueForLimit(deliveryId: string): boolean {
     const assignment = this.store.assignmentForDelivery(deliveryId);
     if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
     const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
     const current = task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
-    const state = task && current && skip(task) ? "cancelled" : "queued";
+    const state = task && current && this.hooks.skipAtLimit?.(task) ? "cancelled" : "queued";
     this.store.update(this.store.get(assignment.channelId), {
       assignments: [{ ...assignment, state: "interrupted" }],
       tasks: task && current ? [{ ...task, state, revision: task.revision + 1, error: null }] : [],
@@ -923,6 +933,15 @@ export class ChannelService {
     this.publish(assignment.channelId);
     this.#releaseHeldAgents();
     return true;
+  }
+
+  /** A queued task that a spent plan holds, and whose routine drops late work, is cancelled. */
+  #dropForLimit(channelId: string, task: ChannelTask): void {
+    if (!this.hooks.skipAtLimit?.(task)) return;
+    this.store.update(this.store.get(channelId), {
+      tasks: [{ ...task, state: "cancelled", revision: task.revision + 1, error: null }],
+    });
+    this.publish(channelId);
   }
 
   restoreDeliveryLinks(): void {
