@@ -1397,6 +1397,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
       }
       await this.ensureProvider(requestedProvider);
+      // Before the sessions are retired below, while the previous provider still holds them.
+      const sessions = previous.threadId ? this.#store.database.listProviderSessions(previous.threadId) : [];
+      for (const session of sessions) {
+        if (session.state === "active") await this.#threads.captureWorkSteps(session);
+      }
     }
     const profileChanged =
       input.name !== undefined ||

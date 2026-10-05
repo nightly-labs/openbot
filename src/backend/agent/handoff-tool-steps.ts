@@ -112,3 +112,24 @@ export function renderTurnSteps(items: readonly DynamicRecord[]): string | null 
     .filter(Boolean)
     .join("\n");
 }
+
+/** How many of a session's newest turns with work steps a capture keeps. */
+const CAPTURED_TURNS = 60;
+
+/**
+ * The rendered steps of a session's turns, for the file a capture writes. Only redacted text is
+ * written: the raw output and diffs stay with the provider.
+ */
+export function encodeCapturedSteps(turns: readonly ProviderTurnSteps[]): string | null {
+  const steps = turns.flatMap((turn) => {
+    const rendered = renderTurnSteps(turn.items);
+    return rendered ? [[turn.turnId, rendered] as const] : [];
+  });
+  return steps.length > 0 ? JSON.stringify(Object.fromEntries(steps.slice(-CAPTURED_TURNS))) : null;
+}
+
+export function decodeCapturedSteps(text: string): Map<string, string> {
+  const parsed = JSON.parse(text);
+  if (!isRecord(parsed)) throw new Error("Invalid captured work steps.");
+  return new Map(Object.entries(parsed).filter((entry): entry is [string, string] => isString(entry[1])));
+}

@@ -751,7 +751,7 @@ describe.sequential("AgentService: queue", () => {
     ]);
   });
 
-  it("hands the work steps of the previous provider to the next one, with secrets redacted", async () => {
+  it("captures the work steps at the switch and hands them to the next provider, with secrets redacted", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const secret = "handoff-secret-7c1f9e2a4b";
     registerSecretValue(secret);
@@ -772,35 +772,48 @@ describe.sequential("AgentService: queue", () => {
     )?.turnId;
     const codex = clients.get("codex");
     assert(turnId && codex, "The Codex turn did not complete.");
-    codex.threadRead = (params) => ({
-      thread: {
-        id: getString(params, "threadId"),
-        turns: [
-          {
-            id: turnId,
-            items: [
-              {
-                id: "command-1",
-                type: "commandExecution",
-                command: "bun test",
-                status: "completed",
-                exitCode: 1,
-                // The kept end of the output starts inside the secret.
-                aggregatedOutput: `1 failed\ntoken ${secret}\n${"y".repeat(590)}`,
-              },
-              {
-                id: "patch-1",
-                type: "fileChange",
-                status: "completed",
-                changes: [{ path: "src/app.ts", kind: { type: "update" }, diff: "@@ -1 +1 @@" }],
-              },
-            ],
-          },
-        ],
-      },
-    });
+    // Answers once: the capture at the switch must be what the handoff uses. A provider that stopped
+    // after the switch, as an unused one does, has nothing to read.
+    let reads = 0;
+    codex.threadRead = (params) => {
+      reads += 1;
+      if (reads > 1) throw new Error("The previous provider stopped.");
+      return {
+        thread: {
+          id: getString(params, "threadId"),
+          turns: [
+            {
+              id: turnId,
+              items: [
+                {
+                  id: "command-1",
+                  type: "commandExecution",
+                  command: "bun test",
+                  status: "completed",
+                  exitCode: 1,
+                  // The kept end of the output starts inside the secret.
+                  aggregatedOutput: `1 failed\ntoken ${secret}\n${"y".repeat(590)}`,
+                },
+                {
+                  id: "patch-1",
+                  type: "fileChange",
+                  status: "completed",
+                  changes: [{ path: "src/app.ts", kind: { type: "update" }, diff: "@@ -1 +1 @@" }],
+                },
+              ],
+            },
+          ],
+        },
+      };
+    };
 
     await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const stepsDirectory = join(started.store.database.userDataPath, "provider-work-steps");
+    const [capture] = await readdir(stepsDirectory);
+    assert(capture, "The switch saved no work steps.");
+    const saved = await readFile(join(stepsDirectory, capture), "utf8");
+    expect(saved).toContain("bun test");
+    expect(saved).not.toContain("e2a4b");
     await service.sendMessage({ agentId: "chief", text: "Second request" });
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
     const grokInput = firstInputText(
@@ -811,6 +824,7 @@ describe.sequential("AgentService: queue", () => {
     expect(grokInput).toContain("update src/app.ts");
     expect(grokInput).toContain("CODEX_DONE");
     expect(grokInput).not.toContain("e2a4b");
+    expect(reads).toBe(1);
   });
 
   it("resumes and retries once when Grok loses its in-memory session", async () => {

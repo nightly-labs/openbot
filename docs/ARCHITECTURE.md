@@ -940,16 +940,22 @@ the replacement is bound, reloaded after restart, and removed after a turn accep
 
 The same handoff carries a chat to another provider after a provider switch. It holds the user and
 assistant messages after the last context-reset marker, with attachment names only. OpenBot stores
-no tool steps, so `ThreadLifecycle` also reads the three newest earlier sessions with `thread/read`
-on their own providers. It starts a stopped CLI for this. From the turns that match a transcript
-message, `renderTurnSteps` adds a work log: commands with exit code and output tail, changed file
-paths, tool calls, searches and progress notes. Each field is redacted before it is cut, and each
-turn has a size limit. Reasoning, diffs, images and other provider-private state stay with the
-provider that made them. The start and the read share a 10-second limit; when the read fails, the
-handoff goes without that session's steps. Codex returns tool steps from its stored rollout. Claude
-returns only notes. The read sends no `cwd`, as the boot backfill does, so an ACP session that its
-process no longer holds is not opened again and gives no steps. The read uses the shared provider
-process, so a session that ran in a Workspace only process also gives no steps.
+no tool steps, so the work log comes from the providers. At the switch, before the old sessions are
+retired, `ThreadLifecycle.captureWorkSteps` reads each active session with `thread/read` through the
+client that holds it, with a 10-second limit. It writes the rendered steps of the 60 newest turns to
+`provider-work-steps/<sha256(session id)>` (mode 0600), which is deleted and reconciled with the
+other session files. A session without a capture, such as one that no client held, is read when the
+handoff is built: only the three newest, on their own providers, with a stopped CLI started again
+and one 10-second limit for the start and the read. From the turns that match a transcript message,
+`renderTurnSteps` adds a work log: commands with exit code and output tail, changed file paths, tool
+calls, searches and progress notes. Each field is redacted before it is cut, and each turn has a
+size limit. Reasoning, diffs, images and other provider-private state stay with the provider that
+made them. A failed capture or read leaves that session's steps out. Codex returns tool steps from
+its stored rollout. Claude returns only notes. An ACP agent keeps only the text and thinking of its
+turns, so it also gives only notes, and only while its process holds the session: the handoff read
+sends no `cwd`, as the boot backfill does, so a session that the process released is not opened
+again. That handoff read uses the shared provider process, so a session that ran in a Workspace only
+process gives no steps unless the switch captured it.
 
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path
