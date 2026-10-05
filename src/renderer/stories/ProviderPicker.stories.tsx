@@ -1,5 +1,7 @@
+import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
+import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
@@ -204,4 +206,47 @@ export const CustomProviderSelected: Story = {
 
 export const CustomProviderReady: Story = {
   args: { options: withOpenCode("sign-in-required"), onAddCustomProvider: fn() },
+};
+
+/**
+ * Every provider row has a switch that turns the provider on or off in OpenBot. An off row shows
+ * only "Off" and the switch: OpenBot does not start, check or list that provider.
+ */
+const switchOptions: ProviderPickerOption[] = [
+  ...options,
+  { id: "cursor", name: "Cursor", state: "error", checkError: "The model list could not be read." },
+  { id: "opencode", name: "OpenCode", state: "available", email: null },
+];
+
+function ProviderSwitchStory(props: {
+  off: readonly AgentProviderId[];
+  usedBy?: Partial<Record<AgentProviderId, string[]>>;
+}) {
+  const [off, setOff] = createSignal<readonly AgentProviderId[]>(props.off);
+  return (
+    <ProviderPicker
+      {...args}
+      embedded
+      label={undefined}
+      hint={undefined}
+      allowUnavailableSelection
+      options={switchOptions.map((option) => ({
+        ...option,
+        off: off().includes(option.id),
+        usedBy: props.usedBy?.[option.id],
+      }))}
+      onSetProviderOn={(provider, on) => {
+        setOff((current) => (on ? current.filter((id) => id !== provider) : [...current, provider]));
+      }}
+    />
+  );
+}
+
+export const ProvidersOff: Story = {
+  render: () => <ProviderSwitchStory off={["cursor", "opencode"]} />,
+};
+
+/** Agents use Codex and Claude, so their switches stay on. Turning one off names its agents. */
+export const ProviderInUse: Story = {
+  render: () => <ProviderSwitchStory off={["cursor"]} usedBy={{ codex: ["Ada"], claude: ["Rex", "Mila"] }} />,
 };

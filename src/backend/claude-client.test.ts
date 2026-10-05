@@ -1173,6 +1173,43 @@ fi
     await client.stop();
   });
 
+  it("does not restore a context summary, an interrupt marker, or a local command as user messages", async () => {
+    const history: SessionMessage[] = [];
+    const { client, threadId } = await createHarness(history);
+    const entry = (type: "user" | "assistant", uuid: string, content: string): SessionMessage => ({
+      type,
+      uuid,
+      session_id: threadId,
+      parent_tool_use_id: null,
+      parent_agent_id: null,
+      message: { content: type === "user" ? content : [{ type: "text", text: content }] },
+    });
+    history.push(
+      // Claude writes its compaction summary as a user entry. The user did not write it.
+      entry(
+        "user",
+        "compact-summary",
+        "This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.\n\nSummary: ...",
+      ),
+      // The answer that follows the summary finishes a turn the app already published live.
+      entry("assistant", "continued-answer", "Already shown."),
+      entry("user", "interrupt-marker", "[Request interrupted by user]"),
+      // A slash command the user ran, and its output. The mailbox holds the command as the user sent it.
+      entry("user", "command", "<command-name>/compact</command-name>\n<command-message>compact</command-message>"),
+      entry("user", "command-output", "<local-command-stdout>Compacted </local-command-stdout>"),
+      entry("user", "next-turn", "Next question."),
+      entry("assistant", "next-answer", "Next answer."),
+    );
+
+    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
+    expect(items.map((item) => [item.type, item.type === "userMessage" ? item.content : item.text])).toEqual([
+      ["userMessage", [{ type: "text", text: "Next question." }]],
+      ["agentMessage", "Next answer."],
+    ]);
+    await client.stop();
+  });
+
   it("restores a turn whose last text gave way to thinking as commentary", async () => {
     const turnId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
     const history: SessionMessage[] = [];

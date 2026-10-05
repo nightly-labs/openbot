@@ -24,6 +24,11 @@
       "pattern": "openbot.run/*",
       "zone_id": "bac5e044ba951c390229f0e93673ebd3"
     },
+    // `www` has no origin. The Worker answers it only with a redirect to openbot.run.
+    {
+      "pattern": "www.openbot.run/*",
+      "zone_id": "bac5e044ba951c390229f0e93673ebd3"
+    },
     {
       "pattern": "api.openbot.run",
       "custom_domain": true

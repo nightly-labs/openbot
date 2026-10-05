@@ -30,6 +30,7 @@ export const messages = defineMessages("provider", {
   "provider.status.updateRequired": "Update required",
   "provider.status.unavailable": "Unavailable",
   "provider.status.checking": "Checking",
+  "provider.status.off": "Off",
 
   // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
   // badge: a saved key leaves the runtime "Connected" to speak for the row.
@@ -42,6 +43,8 @@ export const messages = defineMessages("provider", {
   "provider.action.restart": "Restart",
   "provider.action.updateTo": "Update to {version}",
   "provider.action.checkForUpdates": "Check for updates",
+  "provider.lastError": "Last error: {detail}",
+  "provider.action.copyDiagnostics": "Copy diagnostics",
   "provider.action.cancelRestart": "Cancel restart",
   "provider.restartPending": "Restarts after the current tasks stop",
   "provider.action.install": "Install",
@@ -56,6 +59,14 @@ export const messages = defineMessages("provider", {
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
   "provider.aria.moreActions": "More actions for {name}",
+
+  // The switch that turns a provider on or off in OpenBot. While an agent uses the provider, the
+  // switch stays on and the row names the agents.
+  "provider.aria.use": "Use {name} in OpenBot",
+  "provider.use.inUse": {
+    one: "{agents} uses {name}. Change the model of this agent, then turn {name} off.",
+    other: "{agents} use {name}. Change the model of these agents, then turn {name} off.",
+  },
 
   // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "Log in to {name} with a code",

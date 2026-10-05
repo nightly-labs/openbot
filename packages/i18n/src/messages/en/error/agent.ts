@@ -5,6 +5,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",
+  "error.agent.commitEffectsFailed": "The transaction committed, but its saved effects failed.",
   "error.agent.settingsLocalOnly": "Agent settings can only be changed on the computer that runs the agent.",
   "error.agent.skillsLocalOnly": "Skills can only be changed on the computer that runs the agent.",
   "error.agent.addLocalOnly": "Agents can only be added on the computer that runs them.",
@@ -19,6 +20,14 @@ export const messages = defineMessages("error.agent", {
   "error.agent.initialMessageTooLong": "Initial message is too long.",
   "error.agent.setupCleanupFailed": "Agent setup failed and the incomplete agent could not be removed.",
   "error.agent.modelUnavailable": "The selected agent model is unavailable.",
+  "error.agent.modelProviderNotConnected":
+    'The selected agent model "{model}" is unavailable: {provider} is not connected.',
+  "error.agent.modelListEmpty":
+    'The selected agent model "{model}" is unavailable: {provider} listed no models. Last error: {detail}',
+  "error.agent.modelListEmptyNoError":
+    'The selected agent model "{model}" is unavailable: {provider} listed no models.',
+  "error.agent.modelNotInProviderList":
+    'The selected agent model "{model}" is unavailable: {provider} does not list it.',
   "error.agent.modelProviderMismatch": "The selected model does not belong to that provider.",
   "error.agent.modelNotListed": 'Model "{model}" is not available. Available models: {models}.',
   "error.agent.providerNotListed":

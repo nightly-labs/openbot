@@ -5,7 +5,7 @@
   "description": "Run Codex and Claude side by side as persistent AI teammates, each with its own workspace, queue, and context.",
   "start_url": "/",
   "scope": "/",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#1a1a1a",
   "icons": [

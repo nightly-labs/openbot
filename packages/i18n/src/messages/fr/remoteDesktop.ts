@@ -13,6 +13,8 @@ export const messages = {
   "remoteDesktop.disconnect": "Déconnecter",
   "remoteDesktop.viewerTitle": "Bureau à distance Sunshine",
   "remoteDesktop.viewerLoadFailed": "Impossible de charger la visionneuse Moonlight.",
+  "remoteDesktop.streamNotReady":
+    "L’hôte n’a pas démarré le flux. Sunshine s’est peut-être arrêté sur l’hôte. Réessayez.",
   "remoteDesktop.hostOfflineTitle": "L’hôte est hors ligne",
   "remoteDesktop.hostOfflineMessage": "Reconnectez-vous à l’hôte avant d’ouvrir son bureau.",
   "remoteDesktop.openFailed": "Impossible d’ouvrir le bureau",

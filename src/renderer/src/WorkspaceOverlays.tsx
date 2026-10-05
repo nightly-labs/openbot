@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
@@ -10,6 +11,10 @@ import { useAuth } from "./features/account/account-context";
 import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
 import { createGitHubConnector, type GitHubConnectorController } from "./features/connectors/github-connector";
+import {
+  createOnePasswordConnector,
+  type OnePasswordConnectorController,
+} from "./features/connectors/onepassword-connector";
 import { createSlackConnector } from "./features/connectors/slack-connector";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
@@ -73,6 +78,9 @@ export function WorkspaceOverlays(props: AccountProps) {
   const github = createGitHubConnector();
   const githubFor = (server: ServerSummary | undefined) =>
     server?.kind === "local" && github.status().available ? github : undefined;
+  /* The 1Password connection of this computer. The browser that fills its logins runs here too. */
+  const onePassword = createOnePasswordConnector();
+  const onePasswordFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? onePassword : undefined);
   /* The overlays mount with the app. A first read that failed then must not hide GitHub for good, and
      the sign-in can change outside this window, so each window reads the status again when it opens. */
   createEffect(
@@ -84,11 +92,17 @@ export function WorkspaceOverlays(props: AccountProps) {
   return (
     <>
       <PermissionsReview account={props.account} />
-      <SkillsMarketplace githubConnector={githubFor(activeServer())} />
+      <SkillsMarketplace
+        githubConnector={githubFor(activeServer())}
+        onePasswordConnector={onePasswordFor(activeServer())}
+      />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
-      <ServerSettings githubConnector={githubFor(serverSettingsTarget())} />
+      <ServerSettings
+        githubConnector={githubFor(serverSettingsTarget())}
+        onePasswordConnector={onePasswordFor(serverSettingsTarget())}
+      />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
       <RemoteDesktop />
@@ -133,8 +147,18 @@ function PermissionsReview(props: AccountProps) {
  * serves `agent-install-v1`, otherwise to this computer. An agent of a joined server is updated from
  * its listing only when its host serves `agent-update-v1`.
  */
-function SkillsMarketplace(props: { githubConnector: GitHubConnectorController | undefined }) {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
+function SkillsMarketplace(props: {
+  githubConnector: GitHubConnectorController | undefined;
+  onePasswordConnector: OnePasswordConnectorController | undefined;
+}) {
+  const {
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    pendingPluginSlug,
+    setPendingPluginSlug,
+    pendingPluginConnect,
+    setPendingPluginConnect,
+  } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
@@ -151,8 +175,13 @@ function SkillsMarketplace(props: { githubConnector: GitHubConnectorController |
       onOpenAgent={selectAgent}
       onAgentInstalled={openInstalledMarketplaceAgent}
       pluginSlug={pendingPluginSlug()}
-      onPluginSlugConsumed={() => setPendingPluginSlug(null)}
+      pluginConnect={pendingPluginConnect()}
+      onPluginSlugConsumed={() => {
+        setPendingPluginSlug(null);
+        setPendingPluginConnect(false);
+      }}
       githubConnector={props.githubConnector}
+      onePasswordConnector={props.onePasswordConnector}
     />
   );
 }
@@ -227,7 +256,10 @@ function AddServer() {
  * Settings for one server, which is any server on the rail rather than the
  * active one - hence the target held by the domain instead of `activeServer()`.
  */
-function ServerSettings(props: { githubConnector: GitHubConnectorController | undefined }) {
+function ServerSettings(props: {
+  githubConnector: GitHubConnectorController | undefined;
+  onePasswordConnector: OnePasswordConnectorController | undefined;
+}) {
   const platform = usePlatform();
   const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
@@ -266,6 +298,13 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
     // One process group runs every custom agent, so its restart is the restart of all of them.
     get restartPending() {
       return agentStatus().providers?.some((provider) => provider.id === "acp" && provider.restartPending) === true;
+    },
+    get lastError() {
+      return agentStatus().providers?.find((provider) => provider.id === "acp")?.lastError;
+    },
+    get diagnostics() {
+      const status = agentStatus().providers?.find((provider) => provider.id === "acp");
+      return status ? providerDiagnosticsText(status) : undefined;
     },
     restart: () => restartProvider("acp"),
     cancelRestart: () => cancelProviderRestart("acp"),
@@ -506,6 +545,7 @@ function ServerSettings(props: { githubConnector: GitHubConnectorController | un
               : undefined
           }
           githubConnector={props.githubConnector}
+          onePasswordConnector={props.onePasswordConnector}
           // Slack is connected on the computer that runs the agents: Slack opens this computer's browser
           // and returns to its `openbot://` link.
           slackConnector={server().kind === "local" ? slack : undefined}

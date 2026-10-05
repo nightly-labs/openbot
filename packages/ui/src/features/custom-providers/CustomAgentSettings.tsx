@@ -10,6 +10,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   ConfirmDialog,
+  CopyButton,
   Item,
   ItemActions,
   ItemContent,
@@ -52,6 +53,10 @@ export interface CustomAgentSettingsApi {
   cancelRestart?: (() => Promise<void>) | undefined;
   /** A restart waits for the tasks of the custom agents to stop. */
   restartPending?: boolean | undefined;
+  /** The last failure of the custom agents, kept until a model list fetched after it succeeds. */
+  lastError?: string | null | undefined;
+  /** What "Copy diagnostics" puts on the clipboard. */
+  diagnostics?: string | undefined;
 }
 
 /**
@@ -91,7 +96,7 @@ export function checkResult(result: CustomAgentCheckResult): AcpAgentCheck {
 
 /** The user's own ACP agents in Settings: the list, and the form that adds or changes one. */
 export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [form, setForm] = createSignal<AgentForm | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [submitError, setSubmitError] = createSignal<string | null>(null);
@@ -238,6 +243,25 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
             )}
           </For>
         </ItemGroup>
+      </Show>
+      <Show when={props.api.lastError}>
+        {(lastError) => (
+          <>
+            <Text tone="warning" variant="caption" role="status">
+              {t("provider.lastError", { detail: sourceText(lastError()) })}
+            </Text>
+            <Show when={props.api.diagnostics}>
+              {(diagnostics) => (
+                <CopyButton
+                  class="custom-agents-copy-diagnostics"
+                  value={diagnostics()}
+                  label={t("provider.action.copyDiagnostics")}
+                  copiedLabel={t("common.copied")}
+                />
+              )}
+            </Show>
+          </>
+        )}
       </Show>
       <Show when={props.api.restartPending}>
         <Text tone="muted" variant="caption" role="status">

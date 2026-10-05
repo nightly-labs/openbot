@@ -97,6 +97,22 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(stored, snapshot([]), "claude").messages).toEqual([delivered]);
   });
 
+  it("removes imported Claude summaries, interrupt markers, and command output, and keeps every answer", () => {
+    const summary = "This session is being continued from a previous conversation that ran out of context.";
+    const kept = [
+      message("user-1", "user", "Plan it"),
+      message("turn-1:assistant", "assistant", "Done.", "agentMessage"),
+      { ...message("copy-1", "assistant", "Done.", "agentMessage"), turnId: "summary-1" },
+    ];
+    const stored = snapshot([
+      { ...message("summary-1", "user", `${summary}\n\nSummary: ...`), turnId: "summary-1" },
+      ...kept,
+      message("interrupt-1", "user", "[Request interrupted by user for tool use]"),
+      message("command-output-1", "user", "<local-command-stdout>Compacted </local-command-stdout>"),
+    ]);
+    expect(mergeProviderHistory(stored, snapshot([]), "claude").messages).toEqual(kept);
+  });
+
   it("finishes an interrupted Claude answer without adding its imported parts", () => {
     const answer = {
       ...message("turn-1:assistant", "assistant", "Before.Af", "agentMessage"),

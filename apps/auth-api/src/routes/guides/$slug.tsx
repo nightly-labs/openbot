@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/solid-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/solid-router";
 import { ArticlePage } from "../../components/content/ArticlePage";
 import { type CollectionArticle, findArticle } from "../../lib/content-collection";
 import { articleHead } from "../../lib/content-metadata";
@@ -13,7 +13,16 @@ export function loadGuide(slug: string): CollectionArticle {
 }
 
 export const Route = createFileRoute("/guides/$slug")({
-  loader: ({ params }) => loadGuide(params.slug),
+  loader: ({ params }) => {
+    if (params.slug === "write-a-guide-for-openbot") {
+      throw redirect({
+        href: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
+        statusCode: 308,
+      });
+    }
+
+    return loadGuide(params.slug);
+  },
   head: ({ loaderData, match }) =>
     loaderData ? articleHead(GUIDES_COLLECTION, loaderData, match.context.siteUrl) : {},
   component: GuideRoute,

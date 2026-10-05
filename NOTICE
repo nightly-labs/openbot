@@ -56,3 +56,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+This product includes the Windows and Linux brand icons from Font Awesome Free 6.7.2.
+Copyright 2024 Fonticons, Inc. (https://fontawesome.com)
+Licensed under the Creative Commons Attribution 4.0 International License
+(https://creativecommons.org/licenses/by/4.0/). The Linux icon is also included in a modified form,
+with only its contour and eyes, for small sizes.
+
+The Docker seccomp profile docker/seccomp.json is the default profile of moby/profiles
+(https://github.com/moby/profiles, commit 6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef), modified to
+allow the clone and unshare system calls. Its last rule marks the change.
+Copyright Docker, Inc. and the Moby authors.
+Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).

@@ -1,4 +1,5 @@
 import type {
+  AgentProviderId,
   AgentStatus,
   CustomProviderRestart,
   CustomProviderSummary,
@@ -115,6 +116,9 @@ function ServerProvidersStory(props: {
   detectionSettings?: ProviderDetectionSettingsValue;
   /** A server that the window has not selected: the section offers the switch. */
   inactive?: boolean;
+  /** Providers the user turned off. With it every provider row has the switch that turns one on or off. */
+  offProviders?: readonly AgentProviderId[];
+  providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
@@ -142,6 +146,7 @@ function ServerProvidersStory(props: {
     props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
   );
   const [detectionSettings, setDetectionSettings] = createSignal(props.detectionSettings);
+  const [offProviders, setOffProviders] = createSignal(props.offProviders);
   const detection = props.detection
     ? createStoryDetection(props.detection, {
         hidden: props.hiddenDetected,
@@ -240,6 +245,17 @@ function ServerProvidersStory(props: {
                   return detectionSettings();
                 },
                 onDetectionSettingsChange: setDetectionSettings,
+                get offProviders() {
+                  return offProviders();
+                },
+                providerUsers: props.providerUsers,
+                onSetProviderOn: props.offProviders
+                  ? (provider: AgentProviderId, on: boolean) => {
+                      setOffProviders((current = []) =>
+                        on ? current.filter((id) => id !== provider) : [...current, provider],
+                      );
+                    }
+                  : undefined,
               }
         }
       />
@@ -364,6 +380,20 @@ export const ProviderUpdateAvailable: Story = {
 
 export const ProviderUpdateRetry: Story = {
   render: () => <ServerProvidersStory providerUpdate providerUpdateFailure />,
+};
+
+/**
+ * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
+ * Codex and Claude, so those switches stay on.
+ */
+export const ProvidersOff: Story = {
+  render: () => (
+    <ServerProvidersStory
+      providerUpdate
+      offProviders={["cursor", "antigravity", "cline"]}
+      providerUsers={{ codex: ["Ada"], claude: ["Rex", "Mila"] }}
+    />
+  ),
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */

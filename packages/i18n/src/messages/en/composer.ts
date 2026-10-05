@@ -67,6 +67,7 @@ export const messages = defineMessages("composer", {
   "composer.error.saveEditLocally": "Could not save this edit on this computer.",
   "composer.error.editEnded": "The queue edit has ended.",
   "composer.error.keepAttachments": "Could not keep these attachments with the edit.",
+  "composer.error.attachmentLimit": "You can attach at most {limit} files.",
   "composer.error.queuedUnavailable": "This queued message is no longer available.",
   "composer.error.holdQueued": "Could not hold the queued message for editing.",
   "composer.error.cancelEdit": "Could not cancel the queue edit. Try again.",
@@ -75,6 +76,7 @@ export const messages = defineMessages("composer", {
   "composer.voice.noSpeechRecorded": "No speech was recorded.",
   "composer.voice.noSpeechDetected": "No speech was detected.",
   "composer.error.saveEditTryAgain": "Could not save this edit on this computer. Try again.",
+  "composer.error.saveUnconfirmed": "Save is not confirmed. Retry Save to check the result.",
   "composer.error.changeModel": "Could not change model. Try again.",
   "composer.error.changeEffort": "Could not change effort. Try again.",
 });

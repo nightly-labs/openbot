@@ -1287,10 +1287,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     if (this.#connections.setHostRestart(serverId, state === "none" ? null : { state, version })) this.#emitChanged();
   }
 
+  // Best effort, the same as the screen sharing flag. The host sends an identity whenever it changes,
+  // so a store that cannot be written must not turn one of them into an uncaught exception in the main
+  // process. The new name stays in memory and the next write of any field saves it.
   #applyServerIdentity(serverId: string, identity: { serverName: string; logoVersion: string | null }): void {
     void this.#store
       .update(serverId, { name: identity.serverName, logoVersion: identity.logoVersion })
-      .then(() => this.#emitChanged());
+      .then(() => this.#emitChanged())
+      .catch(() => undefined);
   }
 
   #emitChanged(): void {

@@ -13,6 +13,8 @@ export const messages = {
   "remoteDesktop.disconnect": "Desconectar",
   "remoteDesktop.viewerTitle": "Área de trabalho remota do Sunshine",
   "remoteDesktop.viewerLoadFailed": "Não foi possível carregar o visualizador Moonlight.",
+  "remoteDesktop.streamNotReady":
+    "O host não iniciou a transmissão. O Sunshine pode ter parado no host. Tente de novo.",
   "remoteDesktop.hostOfflineTitle": "O computador anfitrião está offline",
   "remoteDesktop.hostOfflineMessage": "Reconecte ao computador anfitrião antes de abrir sua área de trabalho.",
   "remoteDesktop.openFailed": "Não foi possível abrir a área de trabalho",

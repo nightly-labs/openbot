@@ -103,6 +103,7 @@ import { agentNamesById, displayMessageReferences } from "./agent/delivery-conte
 import { DeltaBuffer } from "./agent/delta-buffer";
 import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
+import { decodeProviderTurns } from "./agent/handoff-tool-steps";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
@@ -111,6 +112,7 @@ import { MemoryHold } from "./agent/memory-hold";
 import {
   creationModel,
   type ModelChoice,
+  modelUnavailableError,
   type ProviderPreference,
   startingChoice,
   startingModel,
@@ -136,16 +138,19 @@ import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
+import type { ProviderSession } from "./database/provider-sessions";
 import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
 import { MessagingThreads } from "./messaging/messaging-threads";
+import type { PasswordVault } from "./password-vault";
 import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
+import { withTimeout } from "./with-timeout";
 import {
   type ResolvedSharedFile,
   type ResolvedWorkspaceFile,
@@ -221,6 +226,8 @@ export interface AgentServiceOptions {
    * for the same reason as `computerUseMcpServer`: the user connects and disconnects while OpenBot runs.
    */
   githubConnector?: GitHubConnectorSource | null;
+  /** The 1Password vault the user shared with OpenBot, or `null`. The browser fills logins from it. */
+  passwordVault?: PasswordVault | null;
   /**
    * The memory of a hosted server, or `null` on each other computer. With it, no new turn starts
    * while memory is low, and only a fixed number of turns run at the same time.
@@ -500,6 +507,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
+      passwordVault: options.passwordVault,
     });
     this.#duplication = new DuplicationGate({
       store,
@@ -581,12 +589,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpToolRuntimes: () => this.#mcp.toolRuntimes(),
       mcpAuthorization: (config) => this.#mcp.authorization(config),
       ...(credentials.agentEnvironment ? { agentEnvironment: credentials.agentEnvironment } : {}),
+      // The previous provider's CLI stops a minute after no agent uses it, so it is started again. The
+      // first turn on the new provider waits for the start and the read, so both share one short
+      // limit. No `cwd` is sent, as in the boot backfill: a replaced ACP session is not opened again.
+      readProviderTurns: (provider, threadId) =>
+        withTimeout(
+          (async () => {
+            await this.#providers.ensureProvider(provider);
+            const client = this.#providers.clientFor(provider);
+            return client ? client.request("thread/read", { threadId, includeTurns: true }, decodeProviderTurns) : [];
+          })(),
+          10_000,
+          "The earlier provider session could not be read in time.",
+        ),
+      passwordVaultConnected: () => options.passwordVault?.connected() ?? false,
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
         logReleaseFailure: (provider, error) =>
           logger.warn("Could not close a replaced provider session.", { provider, error }),
         reportMcpDrops: (provider, drops) => this.#mcp.reportDrops(provider, drops),
+        logHandoffReadFailure: (provider, error) =>
+          logger.warn("Could not read the work steps of an earlier provider session.", { provider, error }),
       },
     });
     this.#boot = new BootRecovery({
@@ -1192,7 +1216,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * the record keeps the built-in default.
    */
   newAgentProvider(input: Pick<CreateAgentInput, "provider" | "model"> = {}): AgentProvider | null {
-    return (creationModel(input, this.#endpoints.available()) ?? this.#startingChoice())?.provider ?? null;
+    return (
+      (creationModel(input, this.#endpoints.available(), this.#providers.status().providers) ?? this.#startingChoice())
+        ?.provider ?? null
+    );
   }
 
   /** The provider and model setup or Settings recorded. */
@@ -1216,7 +1243,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       await this.#prepareAgentWorkspace(agent);
       // A named pair lands before the initial message is queued: a provider change afterwards is
       // rejected while the delivery or turn is active, so a follow-up update could never apply it.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -1290,7 +1317,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // A template, a marketplace agent and an imported one name no model. They start where a new
       // agent does; with nothing listed yet they keep the record's own, because no message waits.
       // The Slack orchestrator names the model the user picked.
-      const requested = creationModel(input, this.#endpoints.available());
+      const requested = creationModel(input, this.#endpoints.available(), this.#providers.status().providers);
       const starting = requested ? null : this.#startingChoice();
       if (requested)
         agent = await this.#store.updateAgent({
@@ -1343,25 +1370,47 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           .available()
           .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
       : undefined;
-    if (input.model && !requestedModel) throw new Error(sourceText("error.agent.modelUnavailable"));
+    if (input.model && !requestedModel) {
+      // A change of model alone stays on the agent's provider, so that provider is the one to explain.
+      const provider = input.provider ?? (previous ? providerForAgent(previous) : undefined);
+      throw modelUnavailableError(
+        input.model,
+        provider,
+        this.#endpoints.available(),
+        this.#providers.status().providers ?? [],
+      );
+    }
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
     if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
       throw new Error(sourceText("error.agent.modelProviderMismatch"));
     }
+    const captures: Array<readonly [ProviderSession, string]> = [];
     if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
       if (!input.model || !input.provider) {
         throw new Error("Changing provider requires an atomic provider and model selection.");
       }
-      const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
-      const activeTurn =
-        this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
-        (previous.threadId
-          ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
-          : null);
-      if (hasPendingWork || activeTurn) {
-        throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
-      }
+      const requireIdle = () => {
+        const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
+        const activeTurn =
+          this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
+          (previous.threadId
+            ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
+            : null);
+        if (hasPendingWork || activeTurn) {
+          throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
+        }
+      };
+      requireIdle();
       await this.ensureProvider(requestedProvider);
+      // Before the sessions are retired below, while the previous provider still holds them. The
+      // steps are saved only once the switch is stored: a switch that fails keeps the session.
+      const sessions = previous.threadId ? this.#store.database.listProviderSessions(previous.threadId) : [];
+      for (const session of sessions.filter((one) => one.state === "active")) {
+        const steps = await this.#threads.readWorkSteps(session);
+        if (steps !== null) captures.push([session, steps]);
+      }
+      // The reads and the provider start take time, and a message sent in it can start a turn.
+      requireIdle();
     }
     const profileChanged =
       input.name !== undefined ||
@@ -1378,7 +1427,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
     const activeSession = this.#store.activeProviderSession(agent.id);
     if (previous?.threadId && requestedProvider && requestedProvider !== providerForAgent(previous)) {
+      // Retire first, with no wait after the update: a turn that starts while a file is written
+      // binds a session of the new provider, and a later retirement would close that one too.
       this.#store.database.deactivateProviderSessions(previous.threadId);
+      for (const [session, steps] of captures) await this.#threads.saveWorkSteps(session, steps);
     } else if (activeSession && (input.model || input.reasoningEffort)) {
       this.#store.database.updateProviderSessionConfig(
         activeSession.id,
@@ -1753,9 +1805,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * `sender` is the person the host saw send it. It is not part of `SendMessageInput`: the caller of
-   * that input, a renderer or a Team API body, never names who it is.
+   * that input, a renderer or a Team API body, never names who it is. `timezone` is the zone of a
+   * Team API member's client, when it sent one.
    */
-  async sendMessage(input: SendMessageInput, sender?: ConversationMessageSender): Promise<QueuedMessageReceipt> {
+  async sendMessage(
+    input: SendMessageInput,
+    sender?: ConversationMessageSender,
+    timezone?: string,
+  ): Promise<QueuedMessageReceipt> {
     const validateRecipient = this.#mailbox.prepareDelivery([input.agentId]);
     if (this.#duplication.isPending(input.agentId))
       throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
@@ -1773,6 +1830,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery) throw new Error(sourceText("error.agent.queuedMessageCreateFailed"));
+    if (timezone !== undefined) this.#routines.noteDeliveryTimezone(delivery.delivery.id, timezone);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     this.#mailboxSync.syncMailboxMessages(snapshot);
     await this.#store.updatePreview(

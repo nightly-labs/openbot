@@ -1,7 +1,11 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 
+// Reached from any hosted site with that site's name in the query, so it is kept out of search.
 export const Route = createFileRoute("/report-site")({
+  head: () => ({
+    meta: [{ title: "Report a hosted site — OpenBot" }, { name: "robots", content: "noindex, nofollow" }],
+  }),
   validateSearch: (value) => ({
     hostname: isDynamicRecord(value) && isString(value.hostname) ? value.hostname : "",
   }),

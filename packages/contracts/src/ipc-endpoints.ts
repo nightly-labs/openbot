@@ -208,6 +208,7 @@ import type {
   SlackWorkspaceInput,
 } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type { OnePasswordConnectInput, OnePasswordConnectorStatus } from "./ipc-onepassword-connector";
 import type {
   DetectedModelServer,
   DiscoverModelsInput,
@@ -619,6 +620,22 @@ export const IPC_ENDPOINTS = {
     openVerification: request<undefined, void>()("github-connector:open-verification"),
     openInstall: request<undefined, void>()("github-connector:open-install"),
     changed: event<GitHubConnectorStatus>()("github-connector:changed"),
+  },
+  // The 1Password connection of this computer. Local only, like `githubConnector`. The token goes
+  // from the renderer to main once, in `connectWithToken`; every answer is the status only.
+  onePasswordConnector: {
+    status: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:status"),
+    // Looks again for the CLI and the 1Password app's CLI integration, for a page that opens or regains focus.
+    checkSetup: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:check-setup"),
+    // Downloads the CLI release that main pins, into a folder that OpenBot owns.
+    installCli: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:install-cli"),
+    // Opens the 1Password app, or its download page when it is not installed.
+    openApp: request<undefined, void>()("onepassword-connector:open-app"),
+    connect: request<OnePasswordConnectInput, OnePasswordConnectorStatus>()("onepassword-connector:connect"),
+    connectWithToken: request<string, OnePasswordConnectorStatus>()("onepassword-connector:connect-with-token"),
+    cancel: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:cancel"),
+    disconnect: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:disconnect"),
+    changed: event<OnePasswordConnectorStatus>()("onepassword-connector:changed"),
   },
   hostedSites: {
     // The sites of one server. A joined server answers through `hosted-sites-v1`.

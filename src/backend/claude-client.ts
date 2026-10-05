@@ -36,7 +36,12 @@ import {
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
-import { isClaudeTaskNotification } from "./conversation-snapshots";
+import {
+  isClaudeCompactionSummary,
+  isClaudeInterruptMarker,
+  isClaudeLocalCommand,
+  isClaudeTaskNotification,
+} from "./conversation-snapshots";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -1011,30 +1016,42 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
        so it is demoted as soon as the next one proves it was not the end of the turn. A restored
        thread otherwise reopens with the chat bubbles a live turn no longer draws. */
     let currentAnswer: ThreadItem | null = null;
+    /* Claude writes its compaction summary as a user entry, and the reply after it finishes a turn
+       the app already published live under that turn's own ID. Neither is restored. */
+    let skippingCompaction = false;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
       if (message.type === "user") {
-        if (!text) continue;
-        // A task notification still opens the turn that answers it, but the user did not write it.
+        if (!text || isClaudeInterruptMarker(text)) continue;
+        if (isClaudeCompactionSummary(text)) {
+          skippingCompaction = true;
+          current = null;
+          continue;
+        }
+        skippingCompaction = false;
+        /* A task notification or a slash command still opens the turn that answers it. The user did not
+           write that text: the mailbox already holds the command as the user sent it. */
         current = {
           id: message.uuid,
           status: "completed",
-          items: isClaudeTaskNotification(text)
-            ? []
-            : [
-                {
-                  id: message.uuid,
-                  type: "userMessage",
-                  clientId: message.uuid,
-                  content: [{ type: "text", text }],
-                },
-              ],
+          items:
+            isClaudeTaskNotification(text) || isClaudeLocalCommand(text)
+              ? []
+              : [
+                  {
+                    id: message.uuid,
+                    type: "userMessage",
+                    clientId: message.uuid,
+                    content: [{ type: "text", text }],
+                  },
+                ],
         };
         turns.push(current);
         currentThinking = null;
         currentAnswer = null;
       } else if (message.type === "assistant") {
+        if (skippingCompaction) continue;
         const thinking = messageThinking(message.message);
         const endsStep = messageToolCalls(message.message).length > 0;
         if (!thinking && !text && !endsStep) continue;

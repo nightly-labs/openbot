@@ -11,6 +11,9 @@ the requests that a client sends with no user action (polls, previews, mark-read
 it stops 15 to 30 minutes after the last action (see the cron interval below). The desktop and the web client then show the server
 as asleep, and the next key press or click wakes it.
 
+To run the same build on your own computer, see [self-hosted servers](self-hosted-server.md). It
+uses the scripts and units of this page with `mode` set to `self`.
+
 The Worker enables hosted servers only when it has the boat and Stripe secrets and
 `HOSTED_SERVER_TEMPLATE`, and only for the account IDs or emails in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
 allows each account; with no value, no account can create a server). Production sets `*` in

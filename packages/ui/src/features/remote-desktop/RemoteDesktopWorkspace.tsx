@@ -25,6 +25,8 @@ interface RemoteDesktopWorkspaceProps {
 }
 
 type ViewerState = "idle" | "connecting" | "connected" | "error";
+// Room for Moonlight's own WebRTC timeout and for the host to start the streams queued before this one.
+const STREAM_READY_TIMEOUT_MS = 60_000;
 type RemoteDisplay = RemoteDesktopSession["displays"][number];
 const viewerMessageSchema = z.object({
   source: z.literal("openbot-moonlight"),
@@ -91,6 +93,21 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       } else if (session.phase === "connected" || session.phase === "error") {
         setViewerState(session.phase);
       }
+    },
+  );
+
+  // The viewer says "connected" at the first frame, and "error" only for a fatal Moonlight line. A host
+  // whose Sunshine never sends a stream says nothing more, so a stream that is not ready in time fails.
+  createEffect(
+    () => (props.session && !props.connecting && viewerState() === "connecting" ? props.session.id : null),
+    (sessionId) => {
+      if (!sessionId) return;
+      const timer = setTimeout(() => {
+        setViewerState("error");
+        setViewerError(t("remoteDesktop.streamNotReady"));
+        props.onViewerState?.("error");
+      }, STREAM_READY_TIMEOUT_MS);
+      return () => clearTimeout(timer);
     },
   );
 

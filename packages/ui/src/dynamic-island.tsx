@@ -1,6 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { useText } from "./text";
 import { cx, mix, prefersReducedMotion } from "./utils";
 
 export type DynamicIslandViewState = "compact" | "expanded";
@@ -113,6 +114,7 @@ export const DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH = 38;
  */
 export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   const local = props;
+  const { t } = useText();
   const panelId = `dynamic-island-${createUniqueId()}`;
   let shell: HTMLDivElement | undefined;
   let sizeTarget: HTMLDivElement | undefined;
@@ -388,7 +390,7 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
             type="button"
             aria-controls={panelId}
             aria-expanded={isExpanded() ? "true" : "false"}
-            aria-label={`${isExpanded() ? "Collapse" : "Expand"} ${local.label}`}
+            aria-label={t(isExpanded() ? "island.action.collapse" : "island.action.expand", { label: local.label })}
             // A click that does not toggle gets no cue. The cue reads the state before the toggle.
             data-cuelume-open={local.pointerToggle === false ? undefined : isExpanded() ? "close" : ""}
             data-cuelume-emphasis="subtle"

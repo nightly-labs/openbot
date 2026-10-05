@@ -69,6 +69,9 @@ export interface RoutineHooks {
   isRunning(): boolean;
 }
 
+/** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
+const DELIVERY_TIMEZONE_LIMIT = 10_000;
+
 export interface RoutineSchedulerOptions {
   store: AgentStore;
   mailbox: MailboxStore;
@@ -104,6 +107,13 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   readonly #deletionAgents = new Set<string>();
   readonly #timer: RoutineTimer;
+  /**
+   * The timezone a member's client sent with a message, by delivery. A routine the agent creates in
+   * the turn that runs the message runs on that clock, not on the host's, and a later message from
+   * someone else cannot change it. Memory only: after a restart, the host zone applies. Past the cap,
+   * the oldest entry goes.
+   */
+  readonly #deliveryTimezones = new Map<string, string>();
 
   constructor(options: RoutineSchedulerOptions) {
     this.#store = options.store;
@@ -112,6 +122,22 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#hooks = options.hooks;
     this.#timer = options.timer;
     this.#routines = new AgentRoutineStore(options.store.database);
+  }
+
+  noteDeliveryTimezone(deliveryId: string, timezone: string): void {
+    this.#deliveryTimezones.set(deliveryId, timezone);
+    if (this.#deliveryTimezones.size <= DELIVERY_TIMEZONE_LIMIT) return;
+    const [oldest] = this.#deliveryTimezones.keys();
+    if (oldest !== undefined) this.#deliveryTimezones.delete(oldest);
+  }
+
+  /** The zone of the person whose message this turn runs, when their client sent one. */
+  #turnSenderTimezone(agentId: string, turnId: string): string | undefined {
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      const timezone = delivery.sender.kind === "user" ? this.#deliveryTimezones.get(delivery.id) : undefined;
+      if (timezone !== undefined) return timezone;
+    }
+    return undefined;
   }
 
   /** The scheduler's clause in the drain mute registry. */
@@ -339,7 +365,7 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       const timezone =
         args.timezone === undefined
-          ? localTimezone()
+          ? (this.#turnSenderTimezone(senderAgentId, params.turnId) ?? localTimezone())
           : routineToolString(args.timezone, "timezone", 128, "A routine timezone is required.");
       const name = routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required.");
       const key = name.trim().toLowerCase();

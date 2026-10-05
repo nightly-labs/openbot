@@ -7,6 +7,7 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isMessageReaction } from "@openbot/contracts/ipc";
+import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
@@ -91,6 +92,8 @@ export async function routeAgentConversation(
           replyToMessageId: nullableString(body, "replyToMessageId"),
         },
         memberSender(member),
+        // A V5 request carries it only after the codec checked it names a zone.
+        isString(body.timezone) ? body.timezone : undefined,
       ),
     );
   }

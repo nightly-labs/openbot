@@ -858,7 +858,9 @@ export class TeamApiServer {
           encodingOptions,
         ) ?? undefined;
       if (!completionSnapshot) continue;
-      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return;
+      // The snapshot is this client's own. It does not fit, so this client loses the snapshot and
+      // keeps the turn, and the clients after it in the loop still get the turn.
+      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
     }
   }

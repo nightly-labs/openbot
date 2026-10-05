@@ -5,6 +5,7 @@ import {
   AGENT_REASONING_EFFORTS,
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
+  isAvatarHue,
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
@@ -13,7 +14,13 @@ const profileFields = {
   title: z.string().max(INPUT_LIMITS.agentTitle),
   description: z.string().max(INPUT_LIMITS.agentDescription),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
-  avatarHue: z.literal(AVATAR_HUES).nullable(),
+  // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
+  avatarHue: z
+    .number()
+    .int()
+    .refine(isAvatarHue, "Invalid avatar hue.")
+    .nullable()
+    .describe(`One of ${AVATAR_HUES.join(", ")}, or null for an automatic hue.`),
 };
 
 export const createAgentToolSchema = z

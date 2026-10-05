@@ -1,0 +1,27 @@
+# OpenBot as a self-hosted server in Docker. See docs/docker.md.
+#
+#   curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/compose.yaml
+#   curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+#   docker compose up -d
+#   docker compose exec openbot openbot login
+services:
+  openbot:
+    # Use a version tag to choose when to upgrade. OpenBot never goes back to an older version.
+    image: ghcr.io/nightly-labs/openbot:latest
+    restart: unless-stopped
+    security_opt:
+      # The Docker default profile, with user namespaces for the Electron sandbox.
+      - seccomp=./seccomp.json
+      - no-new-privileges:true
+    # Chromium uses shared memory. The Docker default of 64 MB is too small.
+    shm_size: 1g
+    # OpenBot stops its agents and closes the database before it exits.
+    stop_grace_period: 60s
+    volumes:
+      - openbot-data:/data
+    # OpenBot only connects out. It needs no published port.
+    # environment:
+    #   XAI_API_KEY: ${XAI_API_KEY}
+
+volumes:
+  openbot-data:

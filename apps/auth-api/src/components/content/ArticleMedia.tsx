@@ -222,46 +222,6 @@ export function ArticleClip(props: ArticleClipProps) {
   );
 }
 
-export interface ArticleVideoProps extends ArticleMediaBase {
-  /** The imported MP4. */
-  src: string;
-  /** The frame to show before the reader presses play. */
-  poster: string;
-  /**
-   * The WebVTT file of what is said, imported with `?url`. It is required, not
-   * optional: a video that says something and cannot be read is a video half the
-   * readers are shut out of.
-   */
-  captions: string;
-  /** What the video shows, for a reader who cannot see it. */
-  label: string;
-}
-
-/**
- * A video the reader starts, with sound, controls and captions. Nothing of it is
- * downloaded until it is asked for, so the cost of one in an article is the poster.
- */
-export function ArticleVideo(props: ArticleVideoProps) {
-  return (
-    <ArticleFigure {...figureMount(props)}>
-      <video
-        class="post-media"
-        src={props.src}
-        poster={props.poster}
-        width={props.width}
-        height={props.height}
-        style={mediaShape(props)}
-        aria-label={props.label}
-        controls
-        playsinline
-        preload="none"
-      >
-        <track kind="captions" src={props.captions} srclang="en" label="English" default />
-      </video>
-    </ArticleFigure>
-  );
-}
-
 function figureMount(props: ArticleMediaBase): {
   caption?: JSX.Element;
   mountOn?: string;

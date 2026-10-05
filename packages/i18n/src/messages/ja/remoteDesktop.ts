@@ -13,6 +13,8 @@ export const messages = {
   "remoteDesktop.disconnect": "切断",
   "remoteDesktop.viewerTitle": "Sunshine リモートデスクトップ",
   "remoteDesktop.viewerLoadFailed": "Moonlight ビューアーを読み込めませんでした。",
+  "remoteDesktop.streamNotReady":
+    "ホストがストリームを開始しませんでした。ホストで Sunshine が停止した可能性があります。もう一度お試しください。",
   "remoteDesktop.hostOfflineTitle": "ホストはオフラインです",
   "remoteDesktop.hostOfflineMessage": "デスクトップを開く前にホストに再接続してください。",
   "remoteDesktop.openFailed": "デスクトップを開けませんでした",

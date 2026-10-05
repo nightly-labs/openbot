@@ -34,6 +34,7 @@ const HOSTING_FILES = [
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot",
   "openbot.service",
   "openbot-update.service",
   "openbot-update.timer",

@@ -51,6 +51,11 @@ export interface ConversationProps {
   notice?: JSX.Element;
   onOpenUsage?: (trigger: HTMLButtonElement) => void;
   onOpenMarketplace?: () => void;
+  /**
+   * Opens Marketplace at one app, from a suggestion card. `connect` is true only when the person
+   * pressed Connect or Install on the card: the page then starts the connect step.
+   */
+  onOpenMarketplaceApp?: (request: { appId: string; connect: boolean }) => void;
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"];
 
   agentStatus: AgentStatus;

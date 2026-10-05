@@ -167,7 +167,7 @@ vi.mock("./browser-cdp", () => ({
     destroy() {}
     invalidateReferences() {}
     async prepareSecret() {
-      return { enter: secretEntry, clear: secretClear };
+      return { enter: secretEntry, clear: secretClear, fields: { password: true, oneTimeCode: false } };
     }
     async evaluate() {
       return "page value";
@@ -903,6 +903,68 @@ describe("secure browser handoff", () => {
     return { tab, prepared, contents };
   }
 
+  // A vault fill without a card is allowed only where no agent script can listen to the fields.
+  it("marks the origin of a page where the agent ran its own script", async () => {
+    const before = await prepare("password", 0);
+    expect(before.prepared.agentScriptedOrigin).toBe(false);
+    before.prepared.cancel();
+
+    await host.handleDynamicTool({
+      namespace: "openbot_browser",
+      tool: "evaluate",
+      arguments: { tabId: before.tab.id, expression: "document.title" },
+      threadId: "thread",
+      ownerAgentId: "agent",
+      turnId: "turn",
+      callId: "evaluate",
+    });
+
+    const after = await prepare("password", 0);
+    expect(after.prepared.agentScriptedOrigin).toBe(true);
+    after.prepared.cancel();
+  });
+
+  it("marks the site that the script runs on when a navigation is queued before it", async () => {
+    const tab = await host.open("https://example.com/secure", "thread", "agent");
+    const call = (tool: "navigate" | "evaluate", args: { url: string } | { expression: string }) =>
+      host.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool,
+        arguments: { tabId: tab.id, ...args },
+        threadId: "thread",
+        ownerAgentId: "agent",
+        turnId: "turn",
+        callId: tool,
+      });
+    const passwordCard = (tabId: string) =>
+      host.prepareSecret({
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId: "thread",
+        ownerAgentId: "agent",
+        turnId: "turn",
+        callId: "secret",
+        arguments: {
+          tabId,
+          method: "password",
+          targets: [{ kind: "css", selector: "input" }],
+          submission: "on_input",
+        },
+      });
+
+    // Sent together, as overlapping provider requests are: the script runs after the navigation.
+    await Promise.all([call("navigate", { url: "https://example.org/login" }), call("evaluate", { expression: "1" })]);
+
+    const scripted = await passwordCard(tab.id);
+    expect(scripted.request.origin).toBe("https://example.org");
+    expect(scripted.agentScriptedOrigin).toBe(true);
+    scripted.cancel();
+    const untouched = await host.open("https://example.com/secure", "thread", "agent");
+    const clean = await passwordCard(untouched.id);
+    expect(clean.agentScriptedOrigin).toBe(false);
+    clean.cancel();
+  });
+
   it("prepares a password card when the provider supplies zero unused digits", async () => {
     const { prepared } = await prepare("password", 0);
     expect(prepared.request.method).toBe("password");
@@ -911,8 +973,12 @@ describe("secure browser handoff", () => {
     prepared.cancel();
   });
 
-  it.each(["otp", "authenticator"] as const)("rejects zero digits for %s", async (method) => {
-    await expect(prepare(method, 0)).rejects.toThrow();
+  it.each([
+    ["otp", 0],
+    ["authenticator", 0],
+    ["otp", 3],
+  ] as const)("rejects a %s code with %i digits", async (method, digits) => {
+    await expect(prepare(method, digits)).rejects.toThrow("4–12 digits");
     expect(secretEntry).not.toHaveBeenCalled();
   });
 

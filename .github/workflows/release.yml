@@ -731,9 +731,101 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The Docker image of each architecture (docs/docker.md). It unpacks the AppImage that the Linux
+  # job built and checked, and starts the image once before the release publishes. This job has no
+  # write token: `docker-publish` pushes the saved images after the GitHub Release exists.
+  docker:
+    name: Build Docker image ${{ matrix.platform }}
+    needs: [validate, linux]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            suffix: linux
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            suffix: linux-arm64
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download Linux release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ matrix.suffix }}
+          path: release-assets
+
+      - name: Check the AppImage against the release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release-assets && sha256sum --check --strict "SHA256SUMS-$SUFFIX.txt")
+          mkdir image
+          mv release-assets/*.AppImage image/OpenBot.AppImage
+        env:
+          SUFFIX: ${{ matrix.suffix }}
+
+      - name: Build the image
+        run: |
+          docker build --file docker/Dockerfile --platform "$PLATFORM" \
+            --build-arg "VERSION=$RELEASE_VERSION" --build-arg "REVISION=$GITHUB_SHA" \
+            --tag openbot:release image
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      # The image starts with the sandbox on, its control socket answers, and a stop lets OpenBot
+      # exit by itself. A signed-out server needs no account.
+      - name: Start and stop the image
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker logs openbot' ERR
+          docker run --detach --name openbot --shm-size 1g \
+            --security-opt seccomp=docker/seccomp.json --security-opt no-new-privileges:true openbot:release
+          # The socket opens before the account state loads, so wait for that state too.
+          status=
+          for _ in $(seq 1 120); do
+            if docker exec openbot test -S /run/openbot/control.sock; then
+              status=$(docker exec openbot openbot status)
+              grep -Fxq "Account: loading" <<<"$status" || break
+            fi
+            sleep 1
+          done
+          echo "$status"
+          grep -Fxq "OpenBot $RELEASE_VERSION" <<<"$status"
+          grep -Fxq "Account: signed out. Sign in with: openbot login" <<<"$status"
+          docker stop --time 60 openbot
+          test "$(docker inspect openbot --format '{{.State.ExitCode}}')" = 0
+
+      - name: Save the image
+        shell: bash
+        run: docker save openbot:release | gzip --fast > "openbot-image-$SUFFIX.tar.gz"
+        env:
+          SUFFIX: ${{ matrix.suffix }}
+
+      - name: Upload the image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-${{ matrix.suffix }}
+          path: openbot-image-${{ matrix.suffix }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
   publish:
     name: Publish GitHub Release
-    needs: [validate, macos, windows, linux]
+    needs: [validate, macos, windows, linux, docker]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -822,3 +914,62 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --title "OpenBot $RELEASE_TAG"
           fi
+
+  # Pushes the images that the `docker` job checked, after the GitHub Release exists, so `latest` on
+  # GHCR never names a release that did not publish. It runs no build code: it only loads, tags and
+  # pushes. Each architecture also keeps its own tag; the release tags name an index of both.
+  docker-publish:
+    name: Publish Docker image
+    needs: [validate, docker, publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      attestations: write
+      id-token: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+    steps:
+      - name: Download the amd64 image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docker-linux
+          path: images
+
+      - name: Download the arm64 image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docker-linux-arm64
+          path: images
+
+      - name: Push the image
+        id: push
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          for pair in linux:amd64 linux-arm64:arm64; do
+            suffix=${pair%%:*} architecture=${pair#*:}
+            gunzip --stdout "images/openbot-image-$suffix.tar.gz" | docker load
+            docker tag openbot:release "$IMAGE:$RELEASE_VERSION-$architecture"
+            docker push "$IMAGE:$RELEASE_VERSION-$architecture"
+            docker rmi openbot:release
+          done
+          docker buildx imagetools create \
+            --tag "$IMAGE:$RELEASE_VERSION" --tag "$IMAGE:latest" --tag "$IMAGE:sha-${GITHUB_SHA::7}" \
+            "$IMAGE:$RELEASE_VERSION-amd64" "$IMAGE:$RELEASE_VERSION-arm64"
+          digest=$(docker buildx imagetools inspect "$IMAGE:$RELEASE_VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      # The attestation goes to GHCR too, with the login of the step before.
+      - name: Attest Docker image provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

@@ -25,6 +25,11 @@ const SITE_POLICIES: readonly BrowserSitePolicy[] = [
     identity: "scrubbed",
     reason: "Allowlist refuses the build token; measured with --whatsapp-live.",
   },
+  {
+    hosts: ["canva.com"],
+    identity: "scrubbed",
+    reason: "Server answers the product token with an update-your-browser page; measured with --canva-live.",
+  },
 ];
 
 export function siteIdentityForUrl(url: string): BrowserSiteIdentity {

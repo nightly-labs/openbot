@@ -3,6 +3,7 @@ import {
   CONVERSATION_PLAN_ITEM_TYPE,
   hostedSiteConversationEvent,
   isContextResetMarker,
+  marketplaceSuggestionEvent,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -267,6 +268,8 @@ function chatActionMarker(
   if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };
   const skillEvent = skillConversationEvent(message);
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
+  const suggestion = marketplaceSuggestionEvent(message);
+  if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",

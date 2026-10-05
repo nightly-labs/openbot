@@ -457,6 +457,34 @@ export function resolveLogLevel(raw: string | undefined, fallback: LogLevel = "i
   return fallback;
 }
 
+// Sinks that also receive the lines of some loggers, such as a log file the app keeps for one area.
+// A logger reads this set at each write, so a module that created its logger at import time is
+// covered by a tee added later.
+const tees = new Set<{ prefixes: ReadonlySet<string>; sink: (line: string) => void }>();
+
+/**
+ * Sends each line that a logger with one of `prefixes` writes to `sink` as well, redacted and below
+ * the same level threshold. A sink that throws loses its line and nothing else. Returns the removal.
+ */
+export function teeLogLines(prefixes: readonly string[], sink: (line: string) => void): () => void {
+  const tee = { prefixes: new Set(prefixes), sink };
+  tees.add(tee);
+  return () => {
+    tees.delete(tee);
+  };
+}
+
+function writeTees(prefix: string, line: string): void {
+  for (const tee of tees) {
+    if (!tee.prefixes.has(prefix)) continue;
+    try {
+      tee.sink(line);
+    } catch {
+      // A log file must not become the failure it would have recorded.
+    }
+  }
+}
+
 export function createOpenBotLogger(prefix: string, sink?: (line: string) => void, level?: LogLevel): Logger {
   const threshold = LEVEL_RANK[level ?? resolveLogLevel(process.env.OPENBOT_LOG_LEVEL)];
   const out = sink ?? ((line: string) => process.stdout.write(`${line}\n`));
@@ -467,7 +495,11 @@ export function createOpenBotLogger(prefix: string, sink?: (line: string) => voi
     stream: (line: string) => void,
   ): ((message?: LogValue, ...params: LogValue[]) => void) => {
     if (LEVEL_RANK[logLevel] < threshold) return () => undefined;
-    return (message?: LogValue, ...params: LogValue[]) => stream(formatLine(label, prefix, message, params));
+    return (message?: LogValue, ...params: LogValue[]) => {
+      const line = formatLine(label, prefix, message, params);
+      stream(line);
+      writeTees(prefix, line);
+    };
   };
   return {
     trace: write("trace", "TRACE", out),

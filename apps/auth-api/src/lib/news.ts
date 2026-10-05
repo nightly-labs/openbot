@@ -15,7 +15,7 @@ export const NEWS_COLLECTION: ContentCollection<"news"> = {
   indexRoute: "/news",
   articleRoute: "/news/$slug",
   name: "News",
-  indexTitle: "News — OpenBot",
+  indexTitle: "OpenBot News: Updates on the Local AI Agent App",
   indexDescription:
     "Notes on building OpenBot: local-first storage, agents that outlive their provider, and how the pieces fit together.",
   feedTitle: "OpenBot news",

@@ -9,8 +9,15 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const logger = createOpenBotLogger("verify-linux-package");
 
-/** The files that a hosted server installs from a release (`RELEASE_FILES` in scripts/hosting/openbot-hosted-update). */
-const HOSTED_SCRIPTS = ["openbot-hosted-server", "openbot-hosted-env", "openbot-hosted-update"];
+/** The scripts that a server installs from a release (`RELEASE_FILES` in scripts/hosting/openbot-hosted-update). */
+const HOSTED_SCRIPTS = [
+  "openbot-hosted-server",
+  "openbot-hosted-env",
+  "openbot-hosted-update",
+  "openbot",
+  // Not installed on a server: `install-server.sh` runs it from the unpacked release.
+  "openbot-server-setup",
+];
 const HOSTED_UNITS = [
   "openbot.service",
   "openbot-update.service",

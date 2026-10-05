@@ -54,6 +54,11 @@ const Settings = createSimpleContext({
      */
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
     /**
+     * Set with the slug when the person pressed Connect on a suggestion card in the chat, so the
+     * page starts the connect step. A link never sets it.
+     */
+    const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
+    /**
      * The template an `openbot://agents/<id>` link named. The install dialog reads the template by
      * this id and installs only after the user presses Add agent.
      */
@@ -394,6 +399,8 @@ const Settings = createSimpleContext({
       setSkillsMarketplaceOpen,
       pendingPluginSlug,
       setPendingPluginSlug,
+      pendingPluginConnect,
+      setPendingPluginConnect,
       pendingAgentTemplateId,
       setPendingAgentTemplateId,
     };

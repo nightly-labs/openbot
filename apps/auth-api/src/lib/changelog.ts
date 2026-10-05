@@ -17,7 +17,7 @@ import {
 } from "./site-metadata";
 
 export const CHANGELOG_ROUTE = "/changelog";
-const CHANGELOG_TITLE = "Changelog — OpenBot";
+const CHANGELOG_TITLE = "OpenBot Changelog: Release Notes for Every Version";
 export const CHANGELOG_DESCRIPTION =
   "Every OpenBot release, newest first: new features, improvements and fixes, with what to do after you upgrade.";
 

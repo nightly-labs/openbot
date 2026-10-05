@@ -1,6 +1,6 @@
 import { Dynamic } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
-import { createTrackedEffect, For, Show } from "solid-js";
+import { createTrackedEffect, Show } from "solid-js";
 import { ARTICLE_BODIES } from "../../content";
 import { type ArticleReference, landingAnalytics } from "../../lib/analytics";
 import {
@@ -10,13 +10,12 @@ import {
   type ProseCollectionId,
   reportedArticlePath,
 } from "../../lib/content-collection";
-import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
-import { ArticleCard } from "./ArticleCard";
 import { ArticleGradient } from "./ArticleGradient";
 import { ContentCallToAction } from "./ContentCallToAction";
 import { createArticleReadDepth } from "./createArticleReadDepth";
+import { MoreArticles } from "./MoreArticles";
 import { ReadingProgress } from "./ReadingProgress";
 
 export interface ArticlePageProps {
@@ -26,12 +25,9 @@ export interface ArticlePageProps {
 }
 
 export function ArticlePage(props: ArticlePageProps) {
-  let more: HTMLElement | undefined;
   let articleBody: HTMLElement | undefined;
-  const revealed = createLandingReveal(() => more);
 
   const body = () => ARTICLE_BODIES[props.collection.id][props.article.slug];
-  const others = () => props.collection.articles.filter((article) => article.slug !== props.article.slug);
 
   const tracked = (): ArticleReference => ({ collection: props.collection.id, slug: props.article.slug });
 
@@ -108,23 +104,7 @@ export function ArticlePage(props: ArticlePageProps) {
 
         <ReadingProgress article={() => articleBody} title={props.article.title} slug={props.article.slug} />
 
-        <Show when={others().length > 0}>
-          <section
-            ref={more}
-            class="post-container post-more"
-            aria-labelledby="post-more-title"
-            data-revealed={revealed() ? "true" : "false"}
-          >
-            <h2 class="post-more-title" id="post-more-title">
-              {props.collection.moreTitle}
-            </h2>
-            <div class="post-grid">
-              <For each={others()}>
-                {(article, index) => <ArticleCard collection={props.collection} article={article} index={index()} />}
-              </For>
-            </div>
-          </section>
-        </Show>
+        <MoreArticles collection={props.collection} article={props.article} />
 
         <ContentCallToAction />
       </main>

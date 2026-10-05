@@ -8,6 +8,7 @@ import {
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import { createMemo, createSignal } from "solid-js";
 import { useI18n } from "../../../i18n-context";
 
@@ -25,6 +26,10 @@ interface GeneralStoreProps {
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** The joined server whose host runs these providers. Absent when this computer runs them. */
   providerHostName?: string | undefined;
+  /** The providers that the user turned off in OpenBot. */
+  offProviders?: readonly AgentProviderId[] | undefined;
+  /** The names of the agents that use each provider. */
+  providerUsers?: Partial<Record<AgentProviderId, readonly string[]>> | undefined;
 }
 
 /**
@@ -60,8 +65,12 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         connectionState: agent?.connectionState,
         restartPending: agent?.restartPending,
         checkError: agent?.checkError,
+        lastError: agent?.lastError,
+        diagnostics: agent ? providerDiagnosticsText(agent) : undefined,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
         keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,
+        off: props.offProviders?.includes(provider),
+        usedBy: props.providerUsers?.[provider],
         /*
          * A CLI the user installed themselves is the one the provider runs, whatever the managed
          * runtime holds, so the row reads it as ready on the version the provider reports. An

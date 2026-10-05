@@ -22,6 +22,7 @@ import {
   isAvatarHue,
   isAvatarSeed,
   isReasoningEffort,
+  MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
@@ -114,6 +115,8 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
 
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
+  // Paged history drops suggestions with routine events, so live events drop them the same way.
+  if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   if (itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX)) {
     return capabilities.has("routine-run-event-markers");
   }

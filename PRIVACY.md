@@ -78,11 +78,12 @@ and incomplete billing inputs remain marked as unavailable or partial.
 
 ## Product analytics
 
-The production website records anonymous page views using only the fixed paths `/` and `/join`. It
-also records download clicks, clicks on allowlisted public links, invitation validity, and open-app
-actions on invitation pages. The production desktop app records application, sign-in, onboarding,
-agent, message, turn, prompt, approval, queue, routine, team, browser, search, Remote Desktop, update,
-marketplace, memory, provider, voice transcription, reaction, maintenance, Hosted Site, and confirmed
+The production website records anonymous page views using only fixed paths: `/`, `/join`, the
+download pages, the news and guide indexes, and published articles. It also records download clicks,
+clicks on allowlisted public links, invitation validity, and open-app actions on invitation pages.
+The production desktop app records application, sign-in, onboarding, agent, message, turn, prompt,
+approval, queue, routine, team, browser, search, Remote Desktop, update, marketplace, memory,
+provider, voice transcription, reaction, maintenance, Hosted Site, and confirmed
 application-version-change actions. Event properties are limited to metadata such as counts, result
 states, timing, provider, model, reasoning effort, application version, operating system, and coarse
 failure codes.
@@ -365,6 +366,13 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The 1Password connection (Marketplace > 1Password) is kept in
+  `~/Library/Application Support/OpenBot/openbot-onepassword-connector-v1.json`, encrypted by the
+  operating system's secret storage. It holds the service account token and the account ID only.
+  OpenBot keeps the list of logins (titles and web addresses) in memory, never on disk. A password
+  or a one-time code is read from 1Password when the browser fills it, goes only to that page, and
+  is never sent to an agent, a provider, a log or a team member. The token and each filled value
+  are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
   provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
   origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
@@ -409,6 +417,15 @@ Network traffic can also occur when:
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
   the grant the browser returns, and to renew the token. Nothing about the user's agents,
   conversations or files is sent in those requests;
+- the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
+  pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
+  `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
+  data;
+- the user connects 1Password. Connect runs the user's own 1Password CLI (`op`) on this computer to
+  create the vault "Shared with OpenBot" and a service account that can read only it. OpenBot then
+  reads that vault from 1Password's servers with the token: the vault names, the login titles and
+  web addresses, and, when an agent signs in to a site, that login's username and password or code.
+  Nothing about the user's agents, conversations or files is sent to 1Password;
 - the user connects GitHub in Server settings. OpenBot asks `github.com` for a sign-in code and a
   token, renews the token, and reads the account name and the repositories of the OpenBot GitHub App
   from `api.github.com`. The GitHub page in Server settings loads the account picture from the
@@ -547,6 +564,12 @@ request does not include conversation history, saved memories, or workspace file
 The draft is reviewed before OpenBot saves it; generating a draft does not create
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
+
+When you change an agent's provider, the new provider receives the chat history with its first
+message. That history includes the work steps that the previous provider recorded: commands, the end
+of their output, changed file paths, tool names, searches and progress notes. OpenBot removes known
+secrets from these steps first. Command output can contain file contents. Reasoning, diffs and
+attachment contents are not sent.
 
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot

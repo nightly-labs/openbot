@@ -1,7 +1,7 @@
-import { AppLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
 import { COMPARISONS } from "../../content/compare";
+import type { ComparePage } from "../../content/compare/comparison";
 import { landingAnalytics } from "../../lib/analytics";
 import type { CollectionArticle, ContentCollection } from "../../lib/content-collection";
 import { ArticleGradient } from "../content/ArticleGradient";
@@ -10,7 +10,7 @@ import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
-import { RivalMark } from "./RivalMark";
+import { CompareMarkRow, CompareMarks } from "./CompareParts";
 
 export interface CompareIndexPageProps {
   collection: ContentCollection<"compare">;
@@ -76,19 +76,7 @@ function CompareCard(props: { collection: ContentCollection<"compare">; article:
           mode="hover"
           hoverTarget={() => root}
         />
-        <Show when={comparison()}>
-          {(entry) => (
-            <span class="compare-marks compare-marks-small">
-              <span class="compare-mark" data-side="openbot">
-                <AppLogo variant="production" class="compare-mark-logo" />
-              </span>
-              <span class="compare-vs">vs</span>
-              <span class="compare-mark" data-side="rival">
-                <RivalMark name={entry().rival.mark} class="compare-mark-logo compare-mark-rival" />
-              </span>
-            </span>
-          )}
-        </Show>
+        <Show when={comparison()}>{(page) => <CompareCardMarks page={page()} />}</Show>
       </div>
       <div class="compare-index-copy">
         <h2 class="compare-index-card-title">{props.article.title}</h2>
@@ -100,4 +88,32 @@ function CompareCard(props: { collection: ContentCollection<"compare">; article:
       </div>
     </Link>
   );
+}
+
+function CompareCardMarks(props: { page: ComparePage }) {
+  const page = props.page;
+  switch (page.kind) {
+    case "matchup":
+      return (
+        <CompareMarks
+          small
+          sides={[
+            { side: "a", ...page.products[0] },
+            { side: "b", ...page.products[1] },
+          ]}
+        />
+      );
+    case "roundup":
+      return <CompareMarkRow apps={page.apps} small />;
+    default:
+      return (
+        <CompareMarks
+          small
+          sides={[
+            { side: "openbot", name: "OpenBot" },
+            { side: "rival", name: page.rival.name, mark: page.rival.mark },
+          ]}
+        />
+      );
+  }
 }

@@ -239,7 +239,7 @@ export const messages = defineMessages("server", {
   "server.members.publishToInvite": "Publish the server in General to invite new people.",
   "server.members.saveIdentityFirst": "Save the server identity in General first.",
   "server.members.title": "Server members",
-  "server.members.count": { other: "{count} members" },
+  "server.members.count": { one: "{count} member", other: "{count} members" },
   "server.members.limitCount": { other: "{count} of {limit} members" },
   "server.members.search": "Search members",
   "server.members.noMatch": "No members match this search.",

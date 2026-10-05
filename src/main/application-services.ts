@@ -29,7 +29,7 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
@@ -137,10 +137,13 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { probeModels } from "./model-server-probe";
 import { NotificationPreferenceStore } from "./notification-preference-store";
+import { OnePasswordConnectorService } from "./onepassword-connector-service";
+import { OnePasswordConnectorStore } from "./onepassword-connector-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
-import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
+import { startProviderLog } from "./provider-log";
+import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -150,6 +153,7 @@ import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -204,6 +208,8 @@ const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
+/** The 1Password service account token of this computer, with the same cipher. */
+const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -228,6 +234,7 @@ const TEARDOWN_ORDER = {
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
   hostedServerMemory: 16,
+  serverMode: 17,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -250,9 +257,13 @@ const TEARDOWN_ORDER = {
   githubConnector: 107,
   // Before the agent service, so no script starts a run while the service stops.
   automation: 108,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  onePasswordConnector: 109,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
+  // After the service, so the lines its providers write while they stop are kept.
+  providerLog: 121,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -269,6 +280,8 @@ export interface ApplicationServiceContext {
   developmentTestClientEnabled: boolean;
   /** Set only in a hosted server VM. */
   hostedServer: HostedServerEnvironment | null;
+  /** Set only in a self-hosted server that `install-server.sh` installed. */
+  serverMode: ServerModeEnvironment | null;
   /** Set only by `bun run dev --hosting=test`. */
   hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
@@ -290,6 +303,7 @@ export interface ApplicationServices {
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   githubConnector: GitHubConnectorService;
+  onePasswordConnector: OnePasswordConnectorService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   browser: BrowserHost;
@@ -321,6 +335,8 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   hostedServers: HostedServerDesktopService;
+  /** The terminal control of a self-hosted server. Null in every other build. */
+  serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -376,6 +392,7 @@ export async function createApplicationServices({
   developmentRemoteRole,
   developmentTestClientEnabled,
   hostedServer,
+  serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   macHapticFeedback,
   teardown,
@@ -385,6 +402,12 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // First, so the provider lines of the whole startup reach the file.
+  teardown.push(
+    TEARDOWN_ORDER.providerLog,
+    "the provider log",
+    startProviderLog(join(app.getPath("userData"), "logs")),
+  );
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -710,6 +733,23 @@ export async function createApplicationServices({
   });
   await githubConnector.load();
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () => githubConnector.dispose());
+  /*
+   * The 1Password connection. The browser fills logins from it, so the agent service reads it. The
+   * login list is read from 1Password in the background; startup does not wait for it.
+   */
+  const onePasswordCliTarget = runtimeTarget(process.platform, process.arch);
+  const onePasswordConnector = new OnePasswordConnectorService({
+    store: new OnePasswordConnectorStore(join(app.getPath("userData"), ONEPASSWORD_CONNECTOR_FILE), secretCipher),
+    hostName: hostname(),
+    appVersion: app.getVersion(),
+    // Outside every root an agent can write, like the GitHub tool files.
+    cliInstall: onePasswordCliTarget
+      ? { directory: join(app.getPath("userData"), "provider-state", "1password-cli"), target: onePasswordCliTarget }
+      : null,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  await onePasswordConnector.load();
+  teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () => onePasswordConnector.dispose());
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -879,6 +919,7 @@ export async function createApplicationServices({
     // handing every provider a command it cannot start.
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
     githubConnector,
+    passwordVault: onePasswordConnector,
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
     deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
@@ -1070,7 +1111,7 @@ export async function createApplicationServices({
       caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
         join(userData, name),
       ),
-      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update"), join(userData, "logs", "providers")],
       runtimes: providerRuntimeRoot({
         appData: app.getPath("appData"),
         userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -1502,6 +1543,7 @@ export async function createApplicationServices({
           return siblings;
         }
       : undefined,
+    currentUid: typeof process.getuid === "function" ? process.getuid() : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -1621,6 +1663,35 @@ export async function createApplicationServices({
       hostedServerActivity.stop(),
     );
   }
+  const serverMode = serverModeEnvironment
+    ? new ServerMode({
+        environment: serverModeEnvironment,
+        version: app.getVersion(),
+        centralAuth,
+        host,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      })
+    : null;
+  if (serverMode) {
+    // Without the socket the server still runs, and the log says why nobody can sign it in.
+    await serverMode
+      .listen()
+      .catch((error) => logger.error("The server control socket did not start:", toLogValue(error)));
+    // Nobody presses Retry on a server either. A server that is signed out has nothing to publish.
+    const serverStartRetry = new HostedServerStartRetry({
+      hostPhase: () => host.getStatus().phase,
+      startHost: async () => {
+        if (centralAuth.getState().status === "error") await centralAuth.retry();
+        await serverMode.publish();
+      },
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    serverStartRetry.start();
+    teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
+      serverStartRetry.stop();
+      await serverMode.close();
+    });
+  }
   await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
@@ -1634,6 +1705,7 @@ export async function createApplicationServices({
     messaging,
     mcpOAuth,
     githubConnector,
+    onePasswordConnector,
     mailbox,
     storageUsage,
     browser,
@@ -1662,6 +1734,7 @@ export async function createApplicationServices({
     hostedSites,
     billing,
     hostedServers,
+    serverMode,
     customProviders,
     customProviderChanges,
     customAgentChanges,

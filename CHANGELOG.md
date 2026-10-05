@@ -6,6 +6,32 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-02
+
+### Added
+
+- Compare OpenBot with ChatGPT dots on openbot.run/compare.
+- Each comparison on openbot.run/compare has a "Where you can use it" row. It shows the countries
+  and languages of each product, and that OpenBot has no region lock.
+- A script on your computer can now run an agent's routine and give it a payload, for example to wake the agent when a long build ends. Turn on Local scripts in the agent's settings, then use Copy run command on a routine. The setting is off by default.
+- The openbot.run header menu has a Compare section, and each comparison links to the other comparisons.
+- Install OpenBot as a server on a Linux computer with no screen, such as a VPS, from a terminal:
+  `curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash`.
+  Sign it in with `sudo openbot login`, and use it from the desktop app, the iPhone app or
+  openbot.run/app. The `openbot` command also shows the status and the log, changes the server name,
+  installs updates, and removes OpenBot with `sudo openbot uninstall`. The install also works on Debian
+  12, Debian 13 and Ubuntu 26.04. See docs/self-hosted-server.md.
+- OpenBot writes provider diagnostics to `logs/providers/providers.log` in its data folder: state changes, CLI checks, start times, model list results and provider errors. OpenBot removes credentials from each line, and does not write environment values, tool output or conversation text to the file.
+- The provider settings show the last error of each provider until the provider lists its models again, with a "Copy diagnostics" action.
+
+### Changed
+
+- The comparisons on openbot.run/compare include Cursor CLI and hosted OpenBot servers in the EU,
+  Claude Cowork's move to cloud-only tasks on 6 October 2026, and Manus 2.0.
+- News, guide and comparison pages on openbot.run load faster: their artwork is WebP and about 3% of its old size.
+- Search results show fuller descriptions of the plugin pages and shorter descriptions of the comparison pages on openbot.run.
+- "The selected agent model is unavailable." now gives the cause: the provider is not connected, the provider listed no models (with its last error), or the provider does not list that model.
+
 ## [0.28.0] - 2026-10-02
 
 ### Added

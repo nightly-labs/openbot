@@ -125,8 +125,7 @@ export function mergeProviderHistory(
   provider?: AgentProviderId,
 ): ConversationSnapshot {
   if (provider === "claude") {
-    // Earlier builds imported Claude's task notifications as user messages. Nobody sent those.
-    const kept = { ...stored, messages: stored.messages.filter((message) => !isStoredClaudeTaskNotification(message)) };
+    const kept = { ...stored, messages: stored.messages.filter((message) => !isStoredClaudeNotice(message)) };
     return mergeConversationSnapshots(kept, reconcileClaudeHistory(kept, imported));
   }
   const importedIds = new Set(imported.messages.map((message) => message.id));
@@ -269,9 +268,33 @@ export function isClaudeTaskNotification(text: string): boolean {
   return text.startsWith("<task-notification>");
 }
 
-/** A message sent through the mailbox keeps its delivery. An imported notification has none. */
-function isStoredClaudeTaskNotification(message: ConversationMessage): boolean {
-  return message.author === "user" && !message.delivery && isClaudeTaskNotification(message.text);
+/** The SDK drops the transcript's `isCompactSummary` flag, so the summary's fixed opening identifies it. */
+export function isClaudeCompactionSummary(text: string): boolean {
+  return text.startsWith("This session is being continued from a previous conversation that ran out of context.");
+}
+
+/** Claude records a slash command that it runs itself, and the command's output, as user entries in these tags. */
+export function isClaudeLocalCommand(text: string): boolean {
+  return /^<(?:command-name|local-command-stdout|local-command-stderr)>/.test(text.trimStart());
+}
+
+/** Claude records a user interrupt as a user entry with this text. */
+export function isClaudeInterruptMarker(text: string): boolean {
+  return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
+}
+
+/* Earlier builds imported Claude's notices as user messages. Nobody sent those. The reply that
+   followed a compaction summary stays: no stored field proves which live answer it repeats.
+   A message sent through the mailbox keeps its delivery. An imported notice has none. */
+function isStoredClaudeNotice(message: ConversationMessage): boolean {
+  return (
+    message.author === "user" &&
+    !message.delivery &&
+    (isClaudeTaskNotification(message.text) ||
+      isClaudeLocalCommand(message.text) ||
+      isClaudeInterruptMarker(message.text) ||
+      isClaudeCompactionSummary(message.text))
+  );
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {

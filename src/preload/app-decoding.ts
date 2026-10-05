@@ -62,9 +62,11 @@ import {
   type MobileConnectTicket,
   type NotificationOpenedEvent,
   type NotificationPreference,
+  type OnePasswordConnectorStatus,
   type ProviderDetectionSettings,
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
+  parseOnePasswordConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   UPDATE_PHASES,
@@ -323,6 +325,12 @@ export function decodeGitHubConnectorRepositories(value: unknown): GitHubConnect
   const repositories = parseGitHubConnectorRepositories(value);
   if (!repositories) throw new Error("Invalid GitHub repository list response.");
   return repositories;
+}
+
+export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
+  const status = parseOnePasswordConnectorStatus(value);
+  if (!status) throw new Error("Invalid 1Password connector response.");
+  return status;
 }
 
 export function decodeBillingState(value: unknown): BillingState {

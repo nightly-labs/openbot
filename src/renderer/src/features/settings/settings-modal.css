@@ -537,6 +537,12 @@
   padding: var(--openbot-space-3) 0;
 }
 
+/* The row has no inline padding of its own here, so the message moves left to stay under the name. */
+.provider-picker-embedded .provider-picker-check-error.provider-picker-used-by {
+  margin-top: calc(-1 * var(--openbot-space-4));
+  padding: 0 0 var(--openbot-space-3) 54px;
+}
+
 .provider-picker-embedded .provider-picker-option + .provider-picker-option,
 .provider-picker-embedded .provider-picker-option-custom {
   border-top: 0;

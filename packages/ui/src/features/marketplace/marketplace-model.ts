@@ -10,6 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { GitHubConnectorPanelProps } from "../settings/GitHubConnectorPanel";
 import type { MarketplacePluginDetail, MarketplacePluginPrompt } from "../settings/marketplace-plugins";
+import type { OnePasswordConnectorPanelProps } from "../settings/OnePasswordConnectorPanel";
 import type { CatalogList, MarketplaceHomeCache } from "./marketplace-listing";
 
 /** An agent of the user's that a skill can go to. */
@@ -38,6 +39,7 @@ interface AppBase {
 export type MarketplaceApp =
   | (AppBase & { kind: "plugin"; category: SkillCategory; plugin: MarketplacePluginDetail })
   | (AppBase & { kind: "github"; category: SkillCategory })
+  | (AppBase & { kind: "onepassword"; category: SkillCategory })
   | (AppBase & { kind: "custom"; server: McpServerConfig });
 
 /**
@@ -88,6 +90,8 @@ export interface MarketplaceModel {
   openUrl: (url: string) => void;
   /** The GitHub connector page, when this computer has one. */
   github?: (() => GitHubConnectorPanelProps) | undefined;
+  /** The 1Password connector page, on the computer that runs OpenBot. */
+  onePassword?: (() => OnePasswordConnectorPanelProps) | undefined;
 
   /** The last failure, as a sentence. */
   error: () => string | null;

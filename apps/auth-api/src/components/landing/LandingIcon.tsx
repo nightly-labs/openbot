@@ -12,6 +12,7 @@ export type LandingIconName =
   | "cpu"
   | "devices"
   | "download"
+  | "folder"
   | "globe"
   | "heart"
   | "laptop"
@@ -50,6 +51,9 @@ export function LandingIcon(props: LandingIconProps) {
         </Match>
         <Match when={props.name === "contact"}>
           <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+        </Match>
+        <Match when={props.name === "folder"}>
+          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
         </Match>
         <Match when={props.name === "check"}>
           <path d="M20 6 9 17l-5-5" />
