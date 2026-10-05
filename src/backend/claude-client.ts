@@ -26,6 +26,8 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
+import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
+import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import {
@@ -118,6 +120,11 @@ interface ActiveTurn {
   assistantMessages: Map<string, string>;
   thinkingMessages: Map<string, string>;
   toolCalls: Map<string, string>;
+  /**
+   * Set when Claude refuses the turn for a spent plan window. The refusal arrives as an assistant
+   * message that only states the limit, so its text is held here and not published as the answer.
+   */
+  usageLimit: { resetsAt: number | null; text: string | null } | null;
 }
 
 interface ThreadRuntime {
@@ -164,6 +171,10 @@ interface ClaudeStreamMessage {
   total_cost_usd?: number;
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
+  is_error?: boolean;
+  /** Why an assistant message is a refusal, such as `rate_limit`. */
+  error?: string;
+  rate_limit_info?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -661,6 +672,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       assistantMessages: new Map<string, string>(),
       thinkingMessages: new Map<string, string>(),
       toolCalls: new Map<string, string>(),
+      usageLimit: null,
     };
     runtime.activeTurn = activeTurn;
     startClaudePlanTurn(runtime.plan);
@@ -721,6 +733,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #handleMessage(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
+    if (message.type === "rate_limit_event") {
+      const info = message.rate_limit_info;
+      const turn = runtime.activeTurn;
+      if (turn && isDynamicRecord(info) && info.status === "rejected") {
+        turn.usageLimit = { resetsAt: claudeResetSeconds(info.resetsAt), text: turn.usageLimit?.text ?? null };
+      }
+      return;
+    }
+
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
@@ -738,6 +759,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const turn = runtime.activeTurn;
       const text = messageText(message.message);
       if (!turn || !message.uuid) return;
+      if (message.error === "rate_limit" && (turn.usageLimit || isUsageLimitDiagnostic(text))) {
+        turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
+        return;
+      }
       const thinking = messageThinking(message.message);
       /* The deltas never announced this block, so its own order is all there is to say what came
          before it. Text the message placed there is narration, and only that much may go. */
@@ -818,6 +843,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
+      // A rejected window alone is not a failure: the request can still run on overage.
+      const limit = turn.usageLimit;
+      if (limit && (limit.text !== null || message.is_error === true || message.subtype !== "success")) {
+        this.emit("notification", {
+          method: USAGE_LIMIT_METHOD,
+          params: { threadId: runtime.id, turnId: turn.id, resetsAt: limit.resetsAt },
+        });
+        this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+        this.#completeTurn(runtime, "failed", limit.text ?? (errors.join("\n") || fallback || "Usage limit reached."));
+        return;
+      }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
       if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
@@ -1267,6 +1303,12 @@ function claudeUsageWindow(value: unknown, windowDurationMins: number): AccountR
     windowDurationMins,
     resetsAt: Number.isFinite(resetMilliseconds) ? resetMilliseconds / 1_000 : null,
   };
+}
+
+/** Claude reports a reset in epoch seconds. A value in milliseconds is converted, so both read the same. */
+function claudeResetSeconds(value: unknown): number | null {
+  if (!isNumber(value) || !Number.isFinite(value) || value <= 0) return null;
+  return value > 100_000_000_000 ? value / 1_000 : value;
 }
 
 function stringValue(value: unknown): string | null {

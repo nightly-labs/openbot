@@ -325,6 +325,19 @@ const V24_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider I
 // Migration 26 adds the Cline provider. Frozen with the migration, like V22.
 const V26_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),`;
 
+// Migration 27 adds what a routine does while the provider plan of its agent is spent. Frozen with the
+// migration. ADD COLUMN appends the declaration at the end of the stored CREATE statement, so the latest
+// schema puts it last as well. Both routine tables end with a column, not a table constraint.
+const V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL = `limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip'))`;
+
+const BASELINE_AGENT_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS agent_routines_agent`;
+
+const V19_CHANNEL_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS channel_routines_channel`;
+
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
 // test fakes an older version - meets its own tables.
@@ -379,16 +392,32 @@ const ANALYTICS_DATE_INDEX_SQL = `
 
 const LATEST_SCHEMA_SQL =
   substituteOnce(
-    substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
-    BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-    V26_PROVIDER_SESSIONS_CHECK_SQL,
+    substituteOnce(
+      substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+      BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
+      V26_PROVIDER_SESSIONS_CHECK_SQL,
+    ),
+    BASELINE_AGENT_ROUTINES_END_SQL,
+    withRoutineLimitPolicy(BASELINE_AGENT_ROUTINES_END_SQL),
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
-  CHANNEL_SETTINGS_SCHEMA_SQL +
+  substituteOnce(
+    CHANNEL_SETTINGS_SCHEMA_SQL,
+    V19_CHANNEL_ROUTINES_END_SQL,
+    withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
+  ) +
   MCP_SERVERS_SCHEMA_SQL +
   MESSAGING_SCHEMA_SQL;
+
+/** The end of a routine table with the migration 27 column after its last one. */
+function withRoutineLimitPolicy(tableEnd: string): string {
+  return tableEnd.replace(
+    "last_event_sequence INTEGER NOT NULL\n",
+    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}\n`,
+  );
+}
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -510,6 +539,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // The same rebuild as migrations 17, 22, 23 and 24, with foreign keys off for the same reason.
     disableForeignKeys: true,
     up: migrateProviderSessionsForCline,
+  },
+  {
+    version: 27,
+    // Adds a column with a constant default to two tables: no rebuild, so no foreign-key pause and no
+    // vacuum. Every existing routine keeps waiting, which is what it did before.
+    up: addRoutineLimitPolicy,
   },
 ];
 
@@ -784,6 +819,15 @@ function migrateProviderSessionsForCursor(db: DatabaseSync): void {
 }
 
 // Migration 26 adds the Cline provider with the same rebuild and the same skip.
+function addRoutineLimitPolicy(db: DatabaseSync): void {
+  for (const table of ["projection_agent_routines", "projection_channel_routines"]) {
+    // A development profile that ran this version before it shipped has the column already.
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some((column) => isDynamicRecord(column) && column.name === "limit_policy")) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}`);
+  }
+}
+
 function migrateProviderSessionsForCline(db: DatabaseSync): void {
   widenProviderSessionsCheck(db, "'cline'", V26_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v26");
 }

@@ -7,6 +7,15 @@ export const messages = defineMessages("notification", {
   "notification.needsApproval": "Needs your approval.",
   "notification.finished": "Finished working.",
   "notification.failed": "Stopped with an error.",
+  "notification.usageLimit.title": "{provider} account reached its limit",
+  "notification.usageLimit.body": {
+    one: "{count} agent waits. OpenBot will try again later.",
+    other: "{count} agents wait. OpenBot will try again later.",
+  },
+  "notification.usageLimit.bodyResets": {
+    one: "{count} agent waits. Resets {reset}.",
+    other: "{count} agents wait. Resets {reset}.",
+  },
   "notification.test": "Notifications are working.",
   "notification.welcome": "OpenBot will tell you here when an agent needs you.",
   // The toast region in each window.

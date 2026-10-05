@@ -230,6 +230,10 @@ export function isUsageLimitDiagnostic(message: string): boolean {
     /\b(?:exhausted|depleted|exceeded|insufficient|reached)\b.{0,80}\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b/iu.test(
       message,
     ) ||
-    /\bbilling hard limit (?:has been )?reached\b/iu.test(message)
+    /\bbilling hard limit (?:has been )?reached\b/iu.test(message) ||
+    // Claude's plan windows: "You've hit your session limit · resets 8:40pm", the weekly and the
+    // per-model ones. A short request-rate throttle says "rate limit" and is not matched.
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
+    /\b(?:session|weekly) limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message)
   );
 }

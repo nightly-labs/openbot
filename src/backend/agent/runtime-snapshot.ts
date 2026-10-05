@@ -15,6 +15,7 @@ import type { OpenBotDatabase } from "../openbot-database";
 import type { AttentionRegistry } from "./attention-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { TurnLifecycle } from "./turn-lifecycle";
+import type { UsageLimitGate } from "./usage-limit-gate";
 
 export function compactRuntimeQuestion(
   question: AgentPromptQuestion,
@@ -133,6 +134,7 @@ export interface RuntimeSnapshotSources {
   mailbox: Pick<MailboxStore, "listRuntimeWork">;
   turn: Pick<TurnLifecycle, "failedTurns">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
+  usageLimits: Pick<UsageLimitGate, "limitedAgents">;
 }
 
 /** The runtime view of every agent: active turns, queued work, latest messages and attention. */
@@ -143,6 +145,7 @@ export function buildRuntimeSnapshot({
   mailbox,
   turn,
   attention,
+  usageLimits,
 }: RuntimeSnapshotSources): AgentRuntimeSnapshot {
   const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
     id: agent.id,
@@ -196,5 +199,6 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
+    usageLimits: usageLimits.limitedAgents(),
   });
 }

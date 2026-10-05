@@ -29,10 +29,14 @@ export const SIDEBAR_WAIT_HINT = {
   takeover: "sidebar.waiting.hint.takeover",
 } as const satisfies Record<SidebarWaitReason, AppTextKey>;
 
-export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate): string {
+export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate, format: AppFormat): string {
   if (state.kind === "waiting") {
     const title = t(SIDEBAR_WAIT_TITLE[state.reason]);
     return state.detail ? t("sidebar.state.waitingDetail", { state: title, detail: state.detail }) : title;
+  }
+  if (state.kind === "limited") {
+    const reset = sidebarUsageResetTime(state.resetsAt, format);
+    return reset ? t("sidebar.state.usageLimitResets", { reset }) : t("sidebar.state.usageLimit");
   }
   if (state.kind === "working") return t("sidebar.state.working");
   if (state.kind === "responded") return t("sidebar.state.responded");
@@ -44,6 +48,16 @@ function routineStateLabel(phase: SidebarRoutinePhase, count: number, t: AppTran
   if (phase === "failed") return t("sidebar.state.routineFailed", { count });
   if (phase === "queued") return t("sidebar.state.routineWaiting", { count });
   return t("sidebar.state.routineRunning", { count });
+}
+
+/** When a plan limit resets: the time today, or the day and time later. Null when the provider gave none. */
+export function sidebarUsageResetTime(resetsAt: number | null, format: AppFormat): string | null {
+  if (resetsAt === null) return null;
+  const date = new Date(resetsAt * 1_000);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toDateString() === new Date().toDateString()
+    ? format.date(date, { hour: "numeric", minute: "2-digit" })
+    : format.date(date, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
 export function sidebarMessageTime(value: string, format: AppFormat): string {

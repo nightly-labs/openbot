@@ -83,6 +83,7 @@ function newScheduler(): ChannelRoutineScheduler {
       changed: () => undefined,
       emitError: (code) => errors.push(code),
       excludedChannels: () => new Set(),
+      usageLimited: () => false,
     },
   });
 }
@@ -378,7 +379,12 @@ describe("ChannelRoutineScheduler", () => {
     });
     const cold = new ChannelRoutineScheduler({
       channels: restarted,
-      hooks: { changed: () => undefined, emitError: (code) => errors.push(code), excludedChannels: () => new Set() },
+      hooks: {
+        changed: () => undefined,
+        emitError: (code) => errors.push(code),
+        excludedChannels: () => new Set(),
+        usageLimited: () => false,
+      },
     });
     cold.reconcileAll();
     expect(currentRun(run.id, cold).status).toBe("succeeded");

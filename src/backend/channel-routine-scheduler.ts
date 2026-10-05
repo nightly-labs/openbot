@@ -22,6 +22,8 @@ export interface ChannelRoutineHooks {
   changed(channelId: string): void;
   emitError(code: string, error: unknown): void;
   excludedChannels(): ReadonlySet<string>;
+  /** Whether a spent provider plan holds the queue of the channel's lead, who takes each routine request. */
+  usageLimited(channelId: string): boolean;
 }
 
 export interface ChannelRoutineSchedulerOptions {
@@ -177,6 +179,8 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
         // The trigger advances whether or not the fire succeeds, so a channel builds no backlog.
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changed.add(due.routine.channelId);
+        // A routine set to skip drops the occurrence while a spent plan would only make it wait.
+        if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
         await this.#fire(due.routine, due.triggerId, scheduledFor.toISOString());
       }
     } finally {

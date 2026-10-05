@@ -22,8 +22,8 @@ import {
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import type { AppTranslate } from "@openbot/i18n";
-import { notificationForAgentEvent } from "@openbot/team-client/agent-notifications";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
+import { notificationForAgentEvent, notificationForUsageLimit } from "@openbot/team-client/agent-notifications";
 import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { HostAnalytics } from "./analytics";
@@ -43,6 +43,8 @@ export interface RendererForwarderDependencies {
   showMainWindow: (window: BrowserWindow) => void;
   /** The language every desktop notification is written in, read at the moment one is raised. */
   getTranslate: () => AppTranslate;
+  /** The dates and numbers of a desktop notification, in the same language. */
+  getFormat: () => AppFormat;
   /** The Settings switch for every desktop notification, read at the moment one is raised. */
   desktopNotificationsEnabled: () => boolean;
 }
@@ -59,6 +61,7 @@ export function createRendererForwarders({
   getRemoteServerManager,
   showMainWindow,
   getTranslate,
+  getFormat,
   desktopNotificationsEnabled,
 }: RendererForwarderDependencies) {
   function forwardAgentEvent(serverId: string, event: AgentEvent, bufferedLive = false): void {
@@ -74,7 +77,13 @@ export function createRendererForwarders({
   }
 
   async function notifyAgentEvent(serverId: string, event: AgentEvent): Promise<void> {
-    if (event.type !== "turn-completed" && event.type !== "prompt" && event.type !== "approval") return;
+    if (
+      event.type !== "turn-completed" &&
+      event.type !== "prompt" &&
+      event.type !== "approval" &&
+      event.type !== "usage-limit-reached"
+    )
+      return;
     if (event.type === "turn-completed" && event.status !== "completed" && event.status !== "failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
@@ -96,7 +105,11 @@ export function createRendererForwarders({
         ? (getAgentService()?.listAgents() ?? [])
         : ((await getRemoteServerManager()?.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)) ?? []);
     const level = notifyLevel();
-    const content = level ? notificationForAgentEvent(event, agents, getTranslate(), level) : null;
+    const content = !level
+      ? null
+      : event.type === "usage-limit-reached"
+        ? notificationForUsageLimit(event, agents, getTranslate(), getFormat(), level)
+        : notificationForAgentEvent(event, agents, getTranslate(), level);
     if (!content) return;
     const notification = new Notification({ title: content.title, body: content.body });
     notification.on("click", () => {

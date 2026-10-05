@@ -68,6 +68,7 @@ export function AgentEventBridge() {
     setActiveTurns,
     setTurnProgress,
     setFailedTurns,
+    setUsageLimits,
     setQueues,
     setPendingPrompts,
     setPresentedPromptResolutions,
@@ -310,6 +311,7 @@ export function AgentEventBridge() {
       ),
     );
     setFailedTurns(Object.fromEntries(snapshot.failedTurns.map((turn) => [turn.agentId, turn.turnId])));
+    setUsageLimits(Object.fromEntries((snapshot.usageLimits ?? []).map((limit) => [limit.agentId, limit.resetsAt])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
     setPendingApprovals((current) => reconcileAttentionApprovals(current, snapshot));

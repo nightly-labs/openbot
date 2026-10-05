@@ -86,6 +86,8 @@ export interface ChannelConversationProps {
   pendingTakeovers: Record<string, BrowserTakeoverRequest | undefined>;
   browserTabs: BrowserTab[];
   onSelectAgent: (agentId: string) => void;
+  /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
+  localHost?: boolean;
 }
 
 export function ChannelConversation(props: ChannelConversationProps) {
@@ -129,7 +131,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
   });
   const routinesPort = createMemo(() => {
     const id = channelId();
-    return id ? channelRoutinesPort(id, runtime().agent) : null;
+    return id ? channelRoutinesPort(id, runtime().agent, props.localHost === true) : null;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.

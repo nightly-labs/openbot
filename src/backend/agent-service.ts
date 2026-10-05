@@ -130,6 +130,7 @@ import type { LocalSkillTools } from "./agent/skill-tools";
 import { isRequestTimeout, providerForAgent, providerLabel, type ToolUsageSignal } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
+import { UsageLimitGate } from "./agent/usage-limit-gate";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import type { AgentStore } from "./agent-store";
@@ -259,6 +260,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #images: ImageGenRuntime;
   readonly #threads: ThreadLifecycle;
   readonly #memoryHold: MemoryHold;
+  readonly #usageLimits: UsageLimitGate;
   readonly #drain: DrainScheduler;
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
@@ -372,6 +374,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
+        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId),
       },
     });
     this.#hostedSites = new HostedSiteCoordinator({
@@ -714,6 +717,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         emitError: (code, error) => this.#emitError(code, error),
         excludedChannels: () => new Set(),
+        usageLimited: (channelId) => {
+          const lead = this.channels.store.get(channelId).leadAgentId;
+          return lead !== null && !this.#usageLimits.mayDrain(lead);
+        },
       },
     });
     this.messaging = new MessagingThreads(store.database, mailbox, {
@@ -734,6 +741,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },
     });
+    this.#usageLimits = new UsageLimitGate({
+      store,
+      hooks: {
+        emit: (event) => this.#emit(event),
+        emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
+        scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
+        readUsage: (provider, model) => this.#providers.usage({ provider, model }),
+        held: (agentIds) => {
+          void this.#dropSkippedRoutineRuns(agentIds).catch((error) => this.#emitError("routine_skip_failed", error));
+        },
+      },
+    });
     this.#drain = new DrainScheduler({
       channels: this.channels,
       messaging: this.messaging,
@@ -748,6 +767,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       routines: this.#routines,
       threads: this.#threads,
       memory: this.#memoryHold,
+      usageLimits: this.#usageLimits,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
@@ -783,6 +803,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       compaction: this.#compaction,
       images: this.#images,
       deltas: this.#deltas,
+      usageLimits: this.#usageLimits,
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
@@ -900,6 +921,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox: this.#mailbox,
       turn: this.#turn,
       attention: this.#attention,
+      usageLimits: this.#usageLimits,
     });
   }
 
@@ -1696,6 +1718,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (session) this.#images.interrupt(agentId, session.externalSessionId, snapshot.activeTurnId);
     }
     this.#turn.dispose();
+    this.#usageLimits.dispose();
     this.#drain.dispose();
     this.#browser.clearControls();
     await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
@@ -1781,6 +1804,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
     return this.#queue.cancel(agentId, deliveryId);
+  }
+
+  /**
+   * A routine set to skip leaves the queue once a spent plan holds its agent: its result is no use
+   * when late. Cancelling the delivery settles the run as cancelled.
+   */
+  async #dropSkippedRoutineRuns(agentIds: readonly string[]): Promise<void> {
+    for (const agentId of agentIds) {
+      const skipped = new Set(
+        this.#routines
+          .listFor(agentId)
+          .filter((routine) => routine.limitPolicy === "skip")
+          .map((routine) => routine.id),
+      );
+      if (skipped.size === 0) continue;
+      for (const delivery of this.listQueue(agentId).deliveries) {
+        if (delivery.status !== "queued" || delivery.sender.kind !== "routine") continue;
+        if (skipped.has(delivery.sender.routineId)) await this.#queue.cancel(agentId, delivery.id);
+      }
+    }
   }
 
   /** A saved edit is the editor's text, so `sender` becomes the sender of the message. */

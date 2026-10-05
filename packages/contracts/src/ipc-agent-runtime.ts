@@ -7,7 +7,7 @@ import {
   isBrowserTakeoverRequest,
 } from "./ipc-approvals";
 import { isBoundedString, isIdentifier, isNullableBoundedString, isRequestId } from "./ipc-bounded-values";
-import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 export const AGENT_RUNTIME_TEXT_LIMIT = 240;
 export const AGENT_RUNTIME_QUESTION_HEADER_LIMIT = 80;
@@ -148,6 +148,11 @@ export interface AgentRuntimeSnapshot {
   pendingApprovals: AgentRuntimeApproval[];
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
   failedTurns: Array<{ agentId: string; turnId: string }>;
+  /**
+   * The agents whose queue waits for a provider plan limit to reset, in epoch seconds. Absent from
+   * a released Team API snapshot: its adapters project a fixed key list.
+   */
+  usageLimits?: Array<{ agentId: string; resetsAt: number | null }>;
 }
 
 export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSnapshot {
@@ -189,7 +194,18 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
       AGENT_RUNTIME_ATTENTION_LIMIT &&
     Array.isArray(value.failedTurns) &&
     value.failedTurns.length <= INPUT_LIMITS.agents &&
-    value.failedTurns.every((turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId))
+    value.failedTurns.every(
+      (turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId),
+    ) &&
+    (value.usageLimits === undefined ||
+      (Array.isArray(value.usageLimits) &&
+        value.usageLimits.length <= INPUT_LIMITS.agents &&
+        value.usageLimits.every(
+          (limit) =>
+            isDynamicRecord(limit) &&
+            isIdentifier(limit.agentId) &&
+            (limit.resetsAt === null || (isNumber(limit.resetsAt) && Number.isFinite(limit.resetsAt))),
+        )))
   );
 }
 

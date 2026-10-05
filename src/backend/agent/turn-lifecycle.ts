@@ -44,6 +44,7 @@ import {
   toThreadItem,
 } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
+import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
@@ -84,6 +85,7 @@ export interface TurnLifecycleOptions {
   compaction: ContextCompaction;
   images: ImageGenRuntime;
   deltas: DeltaBuffer;
+  usageLimits: UsageLimitGate;
   hooks: TurnHooks;
 }
 
@@ -108,6 +110,7 @@ export class TurnLifecycle {
   readonly #compaction: ContextCompaction;
   readonly #images: ImageGenRuntime;
   readonly #deltas: DeltaBuffer;
+  readonly #usageLimits: UsageLimitGate;
   readonly #hooks: TurnHooks;
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
@@ -121,11 +124,15 @@ export class TurnLifecycle {
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
+   * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
+   * and the echo of the user's message do not count.
    */
   readonly #runningTurns = new Map<
     string,
-    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean }
+    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean; acted: boolean }
   >();
+  /** Running turns a provider plan refused, with the reset in epoch seconds when the provider gave it. */
+  readonly #limitedTurns = new Map<string, number | null>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
   /**
@@ -146,6 +153,7 @@ export class TurnLifecycle {
     this.#compaction = options.compaction;
     this.#images = options.images;
     this.#deltas = options.deltas;
+    this.#usageLimits = options.usageLimits;
     this.#hooks = options.hooks;
   }
 
@@ -192,6 +200,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#limitedTurns.clear();
     this.#runningTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
@@ -252,7 +261,14 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
-        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now(), produced: false });
+        this.#runningTurns.set(turnId, {
+          client: source,
+          agentId,
+          threadId,
+          startedAt: Date.now(),
+          produced: false,
+          acted: false,
+        });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
@@ -277,7 +293,7 @@ export class TurnLifecycle {
         if (!turnId || !item) return;
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
+        this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
@@ -302,7 +318,7 @@ export class TurnLifecycle {
         const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
+        this.#markProduced(turnId, notification.method === "item/agentMessage/delta" && delta.trim() !== "");
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         let message = snapshot.messages.find((candidate) => candidate.id === itemId);
@@ -371,6 +387,12 @@ export class TurnLifecycle {
         this.#providers.refreshCodexUsage();
         return;
       }
+      case USAGE_LIMIT_METHOD: {
+        const turnId = getString(params, "turnId");
+        const resetsAt = isRecord(params) && typeof params.resetsAt === "number" ? params.resetsAt : null;
+        if (turnId && this.#runningTurns.has(turnId)) this.#limitedTurns.set(turnId, resetsAt);
+        return;
+      }
       case "error":
       case "warning": {
         // A notification that carries no `message` says only that something went wrong. The method
@@ -392,7 +414,14 @@ export class TurnLifecycle {
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
         }
-        if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
+        if (
+          error?.codexErrorInfo === "usageLimitExceeded" ||
+          isUsageLimitDiagnostic(message) ||
+          (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
+        ) {
+          if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+          }
           this.#providers.refreshUsageAfterLimit(source);
           return;
         }
@@ -412,12 +441,16 @@ export class TurnLifecycle {
       status === "failed" &&
       reportedError !== undefined &&
       isForeignReasoningError(reportedError);
+    const limited = status === "failed" && this.#limitedTurns.has(turnId);
+    const resetsAt = this.#limitedTurns.get(turnId) ?? null;
+    this.#limitedTurns.delete(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
     this.#memories.finishTurn(turnId, status);
-    // A refused session is closed below, so it is not compacted.
-    const shouldCompact = !refused && this.#compaction.reserve(agentId, threadId);
+    // A refused session is closed below, and a spent plan would refuse the summary turn too, so
+    // neither is compacted.
+    const shouldCompact = !refused && !limited && this.#compaction.reserve(agentId, threadId);
     this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     snapshot.activeTurnId = null;
@@ -433,6 +466,23 @@ export class TurnLifecycle {
       await this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
       return;
     }
+    // The plan refused the turn before it did anything that a second run would repeat, so its
+    // messages wait in the queue for the reset. A channel task pauses as for any other failure. The
+    // limit is recorded after the requeue, so a routine set to skip finds its run back in the queue.
+    if (
+      limited &&
+      running !== undefined &&
+      !running.acted &&
+      deliveries.length > 0 &&
+      !this.#conversation.isExecutionThread(snapshot.threadId)
+    ) {
+      await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+      this.#usageLimits.reached(agentId, resetsAt);
+      this.#hooks.scheduleDrain(agentId);
+      return;
+    }
+    if (limited) this.#usageLimits.reached(agentId, resetsAt);
+    else if (status === "completed") this.#usageLimits.completed(agentId);
     if (status === "failed") this.#failedTurns.set(agentId, turnId);
     else this.#failedTurns.delete(agentId);
     for (const message of snapshot.messages) {
@@ -519,8 +569,21 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
   ): Promise<void> {
+    for (const { delivery } of deliveries) this.#refusedRetries.add(delivery.id);
+    await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+    this.#hooks.dropRefusedSession(agentId, threadId);
+    this.#hooks.scheduleDrain(agentId);
+  }
+
+  /** Puts the deliveries of a turn the provider refused back at their place in the queue, and ends the turn as interrupted. */
+  async #requeueTurn(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    deliveries: readonly DeliveryContext[],
+  ): Promise<void> {
     for (const { delivery } of deliveries) {
-      this.#refusedRetries.add(delivery.id);
       await this.#mailbox.requeueRefused(delivery.id);
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
@@ -539,13 +602,13 @@ export class TurnLifecycle {
       status: "interrupted",
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
-    this.#hooks.dropRefusedSession(agentId, threadId);
-    this.#hooks.scheduleDrain(agentId);
   }
 
-  #markProduced(turnId: string): void {
+  #markProduced(turnId: string, acted: boolean): void {
     const running = this.#runningTurns.get(turnId);
-    if (running) running.produced = true;
+    if (!running) return;
+    running.produced = true;
+    if (acted) running.acted = true;
   }
 
   async #associateStartedTurn(agentId: string, turnId: string, snapshot: ConversationSnapshot): Promise<void> {
@@ -689,4 +752,14 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
+}
+
+/**
+ * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
+ * the provider's echo of the user's message are not repeated work.
+ */
+function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+  if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
+  if (item.type !== "agentMessage") return true;
+  return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
 }

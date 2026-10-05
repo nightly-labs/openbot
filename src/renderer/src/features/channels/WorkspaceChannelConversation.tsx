@@ -40,6 +40,7 @@ export function WorkspaceChannelConversation() {
       pendingTakeovers={pendingTakeovers()}
       browserTabs={browserTabs()}
       onSelectAgent={selectAgent}
+      localHost={activeServer()?.kind === "local"}
     />
   );
 }

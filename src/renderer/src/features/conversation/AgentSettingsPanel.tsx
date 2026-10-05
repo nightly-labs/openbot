@@ -63,7 +63,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   });
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
   const routinesPort = createMemo(() =>
-    agentRoutinesPort(props.agent.id, props.automationEditable === true && agentAutomationAllowed(props.agent)),
+    agentRoutinesPort(
+      props.agent.id,
+      props.automationEditable === true && agentAutomationAllowed(props.agent),
+      // Set only for the host on this computer, the one place the policy is kept.
+      props.automationEditable === true,
+    ),
   );
   const skillsMode = () => props.skillsMode ?? "mutable";
   const tableCalls = (): SharedTableCalls => props.adminCalls?.sharedTables ?? conversationPort().agent;
