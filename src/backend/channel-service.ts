@@ -905,15 +905,19 @@ export class ChannelService {
    * new revision and the assignment ends, so nothing reserves the host while the agent waits: the
    * pump assigns the task again once the agent takes turns. False when there is no active assignment
    * to give back, or when a transfer is pending on it.
+   *
+   * `skip` decides for a task whose routine drops late work: it settles that run before the task is
+   * cancelled, so the publish below does not read the cancelled task as a finished run.
    */
-  requeueForLimit(deliveryId: string): boolean {
+  requeueForLimit(deliveryId: string, skip: (task: ChannelTask) => boolean = () => false): boolean {
     const assignment = this.store.assignmentForDelivery(deliveryId);
     if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
     const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
     const current = task?.revision === assignment.taskRevision && (task.state === "queued" || task.state === "running");
+    const state = task && current && skip(task) ? "cancelled" : "queued";
     this.store.update(this.store.get(assignment.channelId), {
       assignments: [{ ...assignment, state: "interrupted" }],
-      tasks: task && current ? [{ ...task, state: "queued", revision: task.revision + 1, error: null }] : [],
+      tasks: task && current ? [{ ...task, state, revision: task.revision + 1, error: null }] : [],
     });
     this.resolveAssignmentTerminal(assignment.id);
     this.publish(assignment.channelId);

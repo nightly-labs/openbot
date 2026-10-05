@@ -26,7 +26,7 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
-import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
@@ -759,9 +759,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const turn = runtime.activeTurn;
       const text = messageText(message.message);
       if (!turn || !message.uuid) return;
-      if (message.error === "rate_limit" && (turn.usageLimit || isUsageLimitDiagnostic(text))) {
-        turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
-        return;
+      if (message.error === "rate_limit") {
+        // A spent balance does not reset, so it is not held: the turn fails with its own text.
+        if (isBalanceDiagnostic(text)) turn.usageLimit = null;
+        else if (turn.usageLimit || isPlanLimitDiagnostic(text)) {
+          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
+          return;
+        }
       }
       const thinking = messageThinking(message.message);
       /* The deltas never announced this block, so its own order is all there is to say what came
@@ -853,7 +857,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (
         limit &&
         !interrupted &&
-        (limit.text !== null || (message.subtype === "success" && message.is_error === true))
+        (limit.text !== null || (message.subtype === "success" && message.is_error === true)) &&
+        !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {
           method: USAGE_LIMIT_METHOD,

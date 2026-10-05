@@ -40,6 +40,8 @@ export interface DrainHooks {
    * generic redaction: it does not know which values this machine's MCP servers were given.
    */
   redactMcp(text: string): string;
+  /** Gives a channel task back to its channel after a spent plan refused it; false when it cannot go back. */
+  requeueChannelDelivery(deliveryId: string): boolean;
 }
 
 export interface DrainSchedulerOptions {
@@ -502,7 +504,7 @@ export class DrainScheduler {
         }
         // Before the requeue, so the channel does not assign the task to this agent again at once.
         this.#usageLimits.reached(delivery.recipientAgentId, null);
-        if (this.#channels?.requeueForLimit(delivery.id)) {
+        if (this.#hooks.requeueChannelDelivery(delivery.id)) {
           await this.#mailbox.markTerminal(delivery.id, "interrupted", null);
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           return;

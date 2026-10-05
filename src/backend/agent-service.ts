@@ -778,6 +778,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         isStopping: () => this.#stopping,
         servesModel: (model) => this.#endpoints.serves(model),
+        requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
       },
     });
     this.#browser.onControlChanged((state) => {
@@ -820,7 +821,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
-        requeueChannelDelivery: (deliveryId) => this.channels.requeueForLimit(deliveryId),
+        requeueChannelDelivery: (deliveryId) => this.#requeueChannelDelivery(deliveryId),
       },
     });
     this.#removal = new AgentRemoval({
@@ -1814,14 +1815,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * What a spent plan does to the queues it now holds. A channel task goes back to its channel, so
-   * its assignment does not reserve the host until the reset. A routine set to skip leaves the
-   * queue, because its result is no use when late; cancelling the delivery settles the run.
+   * Gives a channel task that a spent plan holds back to its channel, so its assignment does not
+   * reserve the host until the reset. A task of a channel routine set to skip is dropped instead.
+   */
+  #requeueChannelDelivery(deliveryId: string): boolean {
+    return this.channels.requeueForLimit(deliveryId, (task) =>
+      this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
+    );
+  }
+
+  /**
+   * What a spent plan does to the queues it now holds. A channel task goes back to its channel. A
+   * routine set to skip leaves the queue, because its result is no use when late; cancelling the
+   * delivery settles the run.
    */
   async #settleHeldQueues(agentIds: readonly string[]): Promise<void> {
     for (const agentId of agentIds) {
       for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
-        if (!this.channels.store.assignmentForDelivery(deliveryId) || !this.channels.requeueForLimit(deliveryId))
+        if (!this.channels.store.assignmentForDelivery(deliveryId) || !this.#requeueChannelDelivery(deliveryId))
           continue;
         await this.#mailbox.cancel(agentId, deliveryId);
         this.#mailboxSync.emitQueue(agentId);

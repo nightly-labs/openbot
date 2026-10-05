@@ -21,9 +21,12 @@ const errors: string[] = [];
 const generate = vi.fn(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
+/** Whether a spent plan holds the lead, as the usage-limit gate reports it. */
+let limited = false;
 
 beforeEach(async () => {
   errors.length = 0;
+  limited = false;
   generate.mockReset();
   generate.mockImplementation(async () => JSON.stringify({ agentId: "agent-a" }));
   root = await mkdtemp(join(tmpdir(), "openbot-channel-routines-"));
@@ -83,7 +86,7 @@ function newScheduler(): ChannelRoutineScheduler {
       changed: () => undefined,
       emitError: (code) => errors.push(code),
       excludedChannels: () => new Set(),
-      usageLimited: () => false,
+      usageLimited: () => limited,
     },
   });
 }
@@ -254,6 +257,27 @@ describe("ChannelRoutineScheduler", () => {
     // at the failure would report Failed for work the reader has since seen finish.
     await vi.waitFor(() => expect(currentRun(run.id).status).toBe("running"));
     expect(currentRun(run.id).error).toBeNull();
+  });
+
+  it("drops the work of a routine set to skip while a spent plan holds its channel", async () => {
+    routine = scheduler.update({ channelId: "channel-1", routineId: routine.id, limitPolicy: "skip" });
+    const run = await fire();
+    const assignment = required(service.store.assignments("channel-1")[0]);
+
+    // The hold gives the task back, and the routine drops it rather than run it late.
+    expect(
+      service.requeueForLimit(required(assignment.deliveryId), (task) =>
+        scheduler.skipAtLimit(task.channelId, task.requestMessageId),
+      ),
+    ).toBe(true);
+    expect(currentRun(run.id).status).toBe("cancelled");
+    expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "cancelled" })]);
+
+    // A run that arrives during the hold is dropped at once and sends no request.
+    limited = true;
+    const late = await scheduler.test({ channelId: "channel-1", routineId: routine.id });
+    expect(late.status).toBe("cancelled");
+    expect(service.store.tasks("channel-1")).toHaveLength(1);
   });
 
   it("waits for a human when the lead cannot route, then follows the resumed task", async () => {
