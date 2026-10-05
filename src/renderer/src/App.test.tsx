@@ -1096,7 +1096,9 @@ describe("OpenBot connected desktop shell", () => {
     // The update now draws below the summary.
     await waitFor(() =>
       expect(
-        screen.getByText("The deck is attached.").compareDocumentPosition(screen.getByText("Update from")) &
+        screen
+          .getByText("The deck is attached.")
+          .compareDocumentPosition(screen.getByRole("button", { name: "Open chat with Sales Outbound" })) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy(),
     );
