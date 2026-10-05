@@ -12,7 +12,7 @@ import {
 } from "@openbot/contracts/hosted-servers";
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Alert, Button, Chip, Skeleton, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -44,6 +44,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneCurrencyAndRegion } from "@/shared/lib/phone-languages";
+import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
 const PLAN_TEXT = {
@@ -192,21 +193,19 @@ export function HostedServerPlansScreen() {
     <PlansContent>
       <PlansHeader description={t("mobile.server.hosted.heroDescription")} />
 
-      <View className="gap-2">
-        <View className="flex-row items-center gap-3">
-          <BillingPeriodPicker interval={interval} disabled={creating} onChange={setBillingInterval} />
-          <CurrencyPicker currency={currency} disabled={creating} onChange={setCurrency} />
-        </View>
-        {discount > 0 ? (
-          <Typography.Paragraph
-            type="body-xs"
-            className={`px-1 ${interval === "year" ? "text-success-text" : "text-text-secondary"}`}
-          >
-            {interval === "year"
-              ? t("mobile.server.hosted.yearlySaved", { percent: discount })
-              : t("mobile.server.hosted.yearlyHint", { percent: discount })}
-          </Typography.Paragraph>
-        ) : null}
+      {isIOS ? <CurrencyMenu currency={currency} disabled={creating} onChange={setCurrency} /> : null}
+      <View className="flex-row items-center gap-3">
+        <BillingPeriodPicker
+          interval={interval}
+          yearlyLabel={
+            discount > 0
+              ? t("mobile.server.hosted.yearlyDiscount", { percent: discount })
+              : t("mobile.server.hosted.yearly")
+          }
+          disabled={creating}
+          onChange={setBillingInterval}
+        />
+        {isIOS ? null : <CurrencyPicker currency={currency} disabled={creating} onChange={setCurrency} />}
       </View>
 
       {limit !== null ? (
@@ -334,6 +333,40 @@ function OtherOptions({ disabled }: { disabled: boolean }) {
   );
 }
 
+/** iOS: the currency is a native menu in the sheet header, so the billing switch gets the full width. */
+function CurrencyMenu({
+  currency,
+  disabled,
+  onChange,
+}: {
+  currency: BillingCurrency;
+  disabled: boolean;
+  onChange: (currency: BillingCurrency) => void;
+}) {
+  const { t } = useText();
+  return (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Menu accessibilityLabel={t("mobile.server.hosted.currency")} disabled={disabled}>
+        <Stack.Toolbar.Label>{currency.toUpperCase()}</Stack.Toolbar.Label>
+        {BILLING_CURRENCIES.map((option) => (
+          <Stack.Toolbar.MenuAction
+            key={option}
+            isOn={option === currency}
+            onPress={() => {
+              if (option === currency) return;
+              void haptics.selection();
+              onChange(option);
+            }}
+          >
+            {option.toUpperCase()}
+          </Stack.Toolbar.MenuAction>
+        ))}
+      </Stack.Toolbar.Menu>
+    </Stack.Toolbar>
+  );
+}
+
+/** Android: the app has no header toolbar there, so the currency stays beside the billing switch. */
 function CurrencyPicker({
   currency,
   disabled,

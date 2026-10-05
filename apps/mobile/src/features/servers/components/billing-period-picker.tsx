@@ -8,7 +8,7 @@ import { useText } from "@/shared/lib/text";
 import type { BillingPeriodPickerProps } from "./billing-period-picker.types";
 
 /** Monthly or yearly billing, as the Material 3 single-choice segmented buttons. */
-export function BillingPeriodPicker({ interval, disabled, onChange }: BillingPeriodPickerProps) {
+export function BillingPeriodPicker({ interval, yearlyLabel, disabled, onChange }: BillingPeriodPickerProps) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   return (
@@ -26,7 +26,7 @@ export function BillingPeriodPicker({ interval, disabled, onChange }: BillingPer
             }}
           >
             <SegmentedButton.Label>
-              <Text>{option === "year" ? t("mobile.server.hosted.yearly") : t("mobile.server.hosted.monthly")}</Text>
+              <Text>{option === "year" ? yearlyLabel : t("mobile.server.hosted.monthly")}</Text>
             </SegmentedButton.Label>
           </SegmentedButton>
         ))}

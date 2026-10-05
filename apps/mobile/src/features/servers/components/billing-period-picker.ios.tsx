@@ -8,7 +8,7 @@ import { useText } from "@/shared/lib/text";
 import type { BillingPeriodPickerProps } from "./billing-period-picker.types";
 
 /** Monthly or yearly billing, as the native iOS segmented control. */
-export function BillingPeriodPicker({ interval, disabled, onChange }: BillingPeriodPickerProps) {
+export function BillingPeriodPicker({ interval, yearlyLabel, disabled, onChange }: BillingPeriodPickerProps) {
   const { t } = useText();
   const { theme } = useUniwind();
   return (
@@ -24,7 +24,7 @@ export function BillingPeriodPicker({ interval, disabled, onChange }: BillingPer
         }}
       >
         <Text modifiers={[tag("month")]}>{t("mobile.server.hosted.monthly")}</Text>
-        <Text modifiers={[tag("year")]}>{t("mobile.server.hosted.yearly")}</Text>
+        <Text modifiers={[tag("year")]}>{yearlyLabel}</Text>
       </Picker>
     </Host>
   );
