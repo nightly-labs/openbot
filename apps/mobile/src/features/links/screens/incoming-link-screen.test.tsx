@@ -71,11 +71,18 @@ vi.mock("expo-router", () => ({
 }));
 vi.mock("expo-router/react-navigation", () => ({ usePreventRemove: () => {} }));
 vi.mock("expo-web-browser", () => ({ openBrowserAsync: state.openBrowser }));
+vi.mock("expo-clipboard", () => ({
+  getStringAsync: async () => "",
+  getUrlAsync: async () => null,
+  hasStringAsync: async () => false,
+  hasUrlAsync: async () => false,
+}));
 vi.mock("heroui-native", () => ({
   Typography: {
     Heading: ({ children }: PropsWithChildren) => <h1>{children}</h1>,
     Paragraph: ({ children }: PropsWithChildren) => <p>{children}</p>,
   },
+  Spinner: () => null,
   Button: Object.assign(
     ({
       children,
@@ -93,15 +100,23 @@ vi.mock("heroui-native", () => ({
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => ["black", "white"] }));
 vi.mock("react-native", () => ({
   View: ({ children }: PropsWithChildren) => <div>{children}</div>,
-  Pressable: ({ children, onPress, disabled }: PropsWithChildren<{ onPress?: () => void; disabled?: boolean }>) => (
-    <button type="button" disabled={disabled} onClick={onPress}>
+  Pressable: ({
+    children,
+    onPress,
+    disabled,
+    accessibilityLabel,
+  }: PropsWithChildren<{ onPress?: () => void; disabled?: boolean; accessibilityLabel?: string }>) => (
+    <button type="button" aria-label={accessibilityLabel} disabled={disabled} onClick={onPress}>
       {children}
     </button>
   ),
   Keyboard: { dismiss: () => {} },
+  AppState: { addEventListener: () => ({ remove: () => {} }) },
 }));
 vi.mock("lucide-react-native", () => ({
   Bot: () => null,
+  CircleCheck: () => null,
+  ClipboardPaste: () => null,
   ScanLine: () => null,
   Server: () => null,
   UserPlus: () => null,

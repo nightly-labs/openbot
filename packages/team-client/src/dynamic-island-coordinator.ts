@@ -23,6 +23,8 @@ type ServerRuntime = DynamicIslandPresentationInput & {
   lastRecordedMessageIds: Map<string, string>;
   receivedConversations: Set<string>;
   resolvedPrompts: Map<string, string>;
+  /** The failed turn of each agent that the user dismissed from the island. The agent keeps its failed mark. */
+  dismissedFailures: Map<string, string>;
   rawMessageBodies: Map<string, string>;
   receivedRuntimeSnapshot: boolean;
 };
@@ -70,6 +72,10 @@ export class DynamicIslandCoordinator {
       if (prompt?.type === "prompt" && String(prompt.requestId) === requestId) pendingPrompts[agentId] = undefined;
       else resolvedPrompts.delete(agentId);
     }
+    const dismissedFailures = previous?.dismissedFailures ?? new Map();
+    for (const [agentId, turnId] of dismissedFailures) {
+      if (input.failedTurns[agentId] !== turnId) dismissedFailures.delete(agentId);
+    }
     const agentIds = new Set(input.agents.map((agent) => agent.id));
     const incomingMessageAnchors = activeMessageAnchors(input.liveMessages, previous?.incomingMessageAnchors);
     const completedAgents = new Set(previous?.completedAgents);
@@ -106,6 +112,7 @@ export class DynamicIslandCoordinator {
       lastRecordedMessageIds,
       receivedConversations: new Set([...receivedConversations, ...Object.keys(input.liveMessages)]),
       resolvedPrompts,
+      dismissedFailures,
       rawMessageBodies,
       receivedRuntimeSnapshot: previous?.receivedRuntimeSnapshot ?? false,
     });
@@ -280,15 +287,20 @@ export class DynamicIslandCoordinator {
     if (action.type === "open-failure" && runtime.failedTurns[action.agentId] === action.turnId) {
       delete runtime.failedTurns[action.agentId];
     }
+    if (action.type === "dismiss-failure" && runtime.failedTurns[action.agentId] === action.turnId) {
+      runtime.dismissedFailures.set(action.agentId, action.turnId);
+    }
   }
 
   presentation(serverOrder: readonly string[]): DynamicIslandPresentation {
     const text = this.#text();
     let attentionCount = 0;
     const ordered = serverOrder.flatMap((serverId) => {
-      const runtime = this.#servers.get(serverId);
-      if (runtime) attentionCount += countDynamicIslandAttention(runtime, text);
-      return runtime ? [createDynamicIslandPresentation(runtime, text)] : [];
+      const stored = this.#servers.get(serverId);
+      if (!stored) return [];
+      const runtime = { ...stored, failedTurns: undismissedFailures(stored) };
+      attentionCount += countDynamicIslandAttention(runtime, text);
+      return [createDynamicIslandPresentation(runtime, text)];
     });
     return selectDynamicIslandPresentation(ordered, attentionCount);
   }
@@ -313,6 +325,7 @@ export class DynamicIslandCoordinator {
       lastRecordedMessageIds: new Map(),
       receivedConversations: new Set(),
       resolvedPrompts: new Map(),
+      dismissedFailures: new Map(),
       rawMessageBodies: new Map(),
       receivedRuntimeSnapshot: false,
     };
@@ -407,6 +420,14 @@ export class DynamicIslandCoordinator {
     nextRuntime.incomingMessageAnchors = incomingMessageAnchors;
     nextRuntime.receivedRuntimeSnapshot = true;
   }
+}
+
+function undismissedFailures(runtime: ServerRuntime): ServerRuntime["failedTurns"] {
+  return Object.fromEntries(
+    Object.entries(runtime.failedTurns).filter(
+      ([agentId, turnId]) => runtime.dismissedFailures.get(agentId) !== turnId,
+    ),
+  );
 }
 
 function dynamicIslandMessageKey(agentId: string, messageId: string): string {

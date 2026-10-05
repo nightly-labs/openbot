@@ -25,6 +25,7 @@
     "./ipc": "./src/ipc.ts",
     "./ipc-skills": "./src/ipc-skills.ts",
     "./mobile-connect": "./src/mobile-connect.ts",
+    "./mobile-features": "./src/mobile-features.ts",
     "./plugin-links": "./src/plugin-links.ts",
     "./runtime-values": "./src/runtime-values.ts",
     "./ipc-decoding": "./src/ipc-decoding.ts",

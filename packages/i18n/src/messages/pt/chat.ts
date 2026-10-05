@@ -199,6 +199,7 @@ export const messages = {
   "chat.row.reactions": "Reações: {emoji}",
   "chat.row.agentReaction": "{name} reagiu com {emoji}",
   "chat.row.removeReaction": "Remover sua reação {emoji}",
+  "chat.row.unavailable": "Não foi possível mostrar esta mensagem",
   "chat.day.today": "Hoje {time}",
   "chat.day.yesterday": "Ontem {time}",
   "chat.day.date": "{date} {time}",
