@@ -546,6 +546,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // A closed idle session has no turn to stop.
         if (this.#threads.isReleased(threadId)) return decoder({});
         const thread = this.#requireThread(threadId);
+        // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
+        if (thread.activeTurn) thread.activeTurn.deferredPrompts.length = 0;
         this.#requireConnection().cancel({ sessionId: thread.id });
         return decoder({});
       }
@@ -1069,7 +1071,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // The reply to the earlier prompt is complete; the refused steer gets its own reply.
         this.#completeThought(thread, turn);
         this.#completeMessage(thread, turn, "final_answer");
-        response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred });
+        const answered = turn.receivedOutput;
+        turn.receivedOutput = false;
+        try {
+          response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred });
+        } catch (error) {
+          // The agent refused the steer again, so the earlier reply ends the turn.
+          this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(error)}`));
+          turn.receivedOutput = answered;
+          break;
+        }
       }
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
       // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
