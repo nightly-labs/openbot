@@ -309,7 +309,7 @@ export class SkillMarketplaceService {
     });
   }
 
-  publishedReferenceEffect(
+  private publishedReferenceEffect(
     agent: AgentSummary,
     entry: LockEntry,
   ): Effect.Effect<MarketplaceAgentSkill, SkillMarketplaceFailure> {
@@ -366,7 +366,7 @@ export class SkillMarketplaceService {
     return this.serialize(agent.id, this.writeResolvedEffect(agent, detail, bundle, replaceModified));
   }
 
-  writeResolvedEffect(
+  private writeResolvedEffect(
     agent: AgentSummary,
     detail: MarketplaceSkillDetail,
     bundle: Uint8Array,
@@ -445,7 +445,7 @@ export class SkillMarketplaceService {
   uninstall(input: UninstallSkillInput): Effect.Effect<void, SkillMarketplaceFailure> {
     return this.serialize(input.agentId, this.removeInstalledEffect(input));
   }
-  removeInstalledEffect(input: UninstallSkillInput): Effect.Effect<void, SkillMarketplaceFailure> {
+  private removeInstalledEffect(input: UninstallSkillInput): Effect.Effect<void, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(input.agentId));
       const lock = yield* readLock(agent.workspacePath);
@@ -472,7 +472,7 @@ export class SkillMarketplaceService {
   setEnabled(input: SetEnabledSkillInput): Effect.Effect<InstalledSkill, SkillMarketplaceFailure> {
     return this.serialize(input.agentId, this.changeEnabledEffect(input));
   }
-  changeEnabledEffect(input: SetEnabledSkillInput): Effect.Effect<InstalledSkill, SkillMarketplaceFailure> {
+  private changeEnabledEffect(input: SetEnabledSkillInput): Effect.Effect<InstalledSkill, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill, SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(input.agentId));
       const lock = yield* readLock(agent.workspacePath);
