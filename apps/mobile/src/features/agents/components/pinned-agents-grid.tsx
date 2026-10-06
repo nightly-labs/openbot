@@ -124,7 +124,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   return (
     <PinnedChatItem>
       {isAndroid ? (
-        <AgentAndroidMenu agent={agent} menuRef={menu}>
+        <AgentAndroidMenu agent={agent} menuRef={menu} style={{ width: "100%" }}>
           {link}
         </AgentAndroidMenu>
       ) : (

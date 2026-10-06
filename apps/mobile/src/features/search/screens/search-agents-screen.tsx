@@ -114,6 +114,9 @@ export function SearchAgentsScreen() {
           </GlassView>
         </View>
       }
+      // On Android the field is a React Native input in the sticky header. When it takes focus, the
+      // keyboard-aware scroll moves the results under the header. The Android sheet moves over the keyboard.
+      keyboardAware={!isAndroid}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}

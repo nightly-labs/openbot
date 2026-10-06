@@ -2,7 +2,7 @@ import { type MenuAction, type MenuComponentRef, MenuView } from "@expo/ui/commu
 import * as Clipboard from "expo-clipboard";
 import { Link, router } from "expo-router";
 import { type PropsWithChildren, type Ref, useRef } from "react";
-import { Alert } from "react-native";
+import { Alert, type StyleProp, type ViewStyle } from "react-native";
 import { useUniwind } from "uniwind";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
@@ -141,8 +141,9 @@ export function useAgentContextMenu(agent: MobileAgent) {
 export function AgentAndroidMenu({
   agent,
   menuRef,
+  style,
   children,
-}: PropsWithChildren<{ agent: MobileAgent; menuRef?: Ref<MenuComponentRef> }>) {
+}: PropsWithChildren<{ agent: MobileAgent; menuRef?: Ref<MenuComponentRef>; style?: StyleProp<ViewStyle> }>) {
   const { t } = useText();
   const { theme } = useUniwind();
   const {
@@ -190,6 +191,7 @@ export function AgentAndroidMenu({
   return (
     <MenuView
       ref={menuRef}
+      style={style}
       colorScheme={theme === "dark" ? "dark" : "light"}
       shouldOpenOnLongPress
       actions={actions}

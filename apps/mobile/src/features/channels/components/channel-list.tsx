@@ -204,6 +204,8 @@ export const ChannelListRow = memo(function ChannelListRow({
   const content = isAndroid ? (
     <MenuView
       ref={menu}
+      // A pinned item centers its child; the menu takes the item width, so the title can be cut.
+      style={{ width: "100%" }}
       colorScheme={theme}
       shouldOpenOnLongPress
       actions={[

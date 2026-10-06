@@ -2,6 +2,7 @@ import { router, useGlobalSearchParams, useSegments } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
 import { useEffect, useRef, useState } from "react";
+import { TextInput } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { AgentPinTransitionProvider } from "@/features/agents/components/agent-pin-transition";
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
@@ -13,7 +14,7 @@ import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
@@ -195,6 +196,21 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="section-form"
+          // Android: autoFocus focuses the name field while the sheet opens, and Android does not show
+          // the keyboard then. Focusing the field again after the opening shows it.
+          listeners={
+            isAndroid
+              ? {
+                  transitionEnd: (event) => {
+                    if (event.data.closing) return;
+                    const input = TextInput.State.currentlyFocusedInput();
+                    if (!input) return;
+                    input.blur();
+                    input.focus();
+                  },
+                }
+              : undefined
+          }
           options={{
             ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },

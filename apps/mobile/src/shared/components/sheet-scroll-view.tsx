@@ -18,6 +18,8 @@ interface SheetScrollViewProps extends PropsWithChildren {
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   showsVerticalScrollIndicator?: boolean;
+  /** False stops the scroll that keeps a focused field and the content above the keyboard. */
+  keyboardAware?: boolean;
 }
 
 export function SheetScrollView({
@@ -31,22 +33,22 @@ export function SheetScrollView({
   keyboardDismissMode,
   keyboardShouldPersistTaps,
   showsVerticalScrollIndicator = false,
+  keyboardAware = true,
 }: SheetScrollViewProps) {
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const headerShown = useContext(HeaderShownContext);
   const nativeHeader = isIOS && headerShown && !header;
   const showCustomEdge = scrollEdgeEffect && !nativeHeader;
-  // Android: the sheet leaves a drag that starts on a nested-scrolling list to that list. A list that
-  // cannot scroll never takes the drag, so the sheet would not close. Only a list that can scroll
-  // reports nested scrolling.
+  // Android: the sheet finds its scroll view only when it lays out, so nested scrolling is on from
+  // the first render. A drag that starts on the list then goes to the list, and at the top of the list
+  // a downward drag moves the sheet. A list that cannot scroll never takes the drag, so the content is
+  // always 1 point taller than the list.
   const [viewportHeight, setViewportHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const scrollable = contentHeight > viewportHeight + 1;
   const androidScrollProps = isAndroid
     ? {
-        nestedScrollEnabled: scrollable,
+        nestedScrollEnabled: true,
         onLayout: (event: LayoutChangeEvent) => setViewportHeight(event.nativeEvent.layout.height),
-        onContentSizeChange: (_width: number, height: number) => setContentHeight(height),
+        contentContainerStyle: viewportHeight > 0 ? { minHeight: viewportHeight + 1 } : undefined,
       }
     : null;
 
@@ -54,13 +56,13 @@ export function SheetScrollView({
     <View style={{ flex: 1 }}>
       <StyledKeyboardAwareScrollView
         className={className}
+        enabled={keyboardAware}
         bottomOffset={16}
         disableScrollOnKeyboardHide
         mode="insets"
         automaticallyAdjustKeyboardInsets={false}
         style={{ flex: 1 }}
         alwaysBounceVertical={false}
-        // Without nested scrolling the Android sheet takes every drag, and the list cannot scroll.
         {...androidScrollProps}
         overScrollMode="auto"
         contentInsetAdjustmentBehavior={

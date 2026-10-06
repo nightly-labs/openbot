@@ -33,7 +33,14 @@ export default function HostedServerLayout() {
       {/* Join draws its own title; the header keeps only the back button. */}
       <Stack.Screen name="join" options={{ title: "" }} />
       {/* The header stays, so the push does not hide the bar and move the join page under it. */}
-      <Stack.Screen name="scan" options={{ title: t("mobile.server.scan.title") }} />
+      {/* On Android the header is opaque elsewhere. Here the camera fills the page under it, as on iOS. */}
+      <Stack.Screen
+        name="scan"
+        options={{
+          title: t("mobile.server.scan.title"),
+          ...(isIOS ? null : { headerTransparent: true, headerStyle: { backgroundColor: "transparent" } }),
+        }}
+      />
     </Stack>
   );
 }
