@@ -13,6 +13,7 @@ import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { readBodyWithin } from "./http-body";
 
 const logger = createOpenBotLogger("automation");
 
@@ -286,15 +287,8 @@ function decodePathPart(value: string): string | null {
 
 /** The body as text, or null when it is larger than the limit. */
 async function readBody(request: IncomingMessage): Promise<string | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > BODY_LIMIT_BYTES) return null;
-    chunks.push(bytes);
-  }
-  return Buffer.concat(chunks).toString("utf8");
+  const body = await readBodyWithin(request, BODY_LIMIT_BYTES);
+  return body === null ? null : body.toString("utf8");
 }
 
 function send(response: ServerResponse, status: number, body: unknown): void {

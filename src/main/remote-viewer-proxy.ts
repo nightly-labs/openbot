@@ -13,6 +13,7 @@ import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/bro
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Semaphore } from "effect";
 import type * as Ws from "ws";
+import { readBodyWithin } from "./http-body";
 import { LifecycleGate } from "./lifecycle-gate";
 import {
   decodeRemoteDesktopSignalBinary,
@@ -354,15 +355,9 @@ export class RemoteViewerProxy {
 }
 
 async function readBody(request: IncomingMessage): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.byteLength;
-    if (size > MAX_REQUEST_BYTES) throw new Error("Remote viewer request is too large.");
-    chunks.push(bytes);
-  }
-  return Buffer.concat(chunks);
+  const body = await readBodyWithin(request, MAX_REQUEST_BYTES);
+  if (body === null) throw new Error("Remote viewer request is too large.");
+  return body;
 }
 
 function sendText(response: ServerResponse, status: number, body: string): void {
