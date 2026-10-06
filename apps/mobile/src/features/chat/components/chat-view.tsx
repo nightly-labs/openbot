@@ -4,7 +4,7 @@ import { router, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardController, KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -325,6 +325,17 @@ export function ChatView({
   useEffect(() => {
     menuOpenValue.set(attachments.menuOpen);
   }, [attachments.menuOpen, menuOpenValue]);
+  // The same for the voice mode: the edge swipe stops or cancels it, as the
+  // back button does, instead of leaving the chat with the spoken text.
+  const voiceOpenValue = useSharedValue(false);
+  useEffect(() => {
+    voiceOpenValue.set(voiceOpen);
+  }, [voiceOpen, voiceOpenValue]);
+  const voiceBack = useRef(voice.back);
+  useEffect(() => {
+    voiceBack.current = voice.back;
+  });
+  const leaveVoiceMode = useCallback(() => voiceBack.current(), []);
   const edgeBackGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -335,9 +346,10 @@ export function ChatView({
         .failOffsetY([-16, 16])
         .onEnd((event) => {
           if (menuOpenValue.get()) return;
-          if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(leaveConversation);
+          if (event.translationX < 48 && event.velocityX < 650) return;
+          scheduleOnRN(voiceOpenValue.get() ? leaveVoiceMode : leaveConversation);
         }),
-    [menuOpenValue],
+    [menuOpenValue, voiceOpenValue, leaveVoiceMode],
   );
 
   async function retryAcceptedHistory() {

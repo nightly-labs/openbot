@@ -580,8 +580,9 @@ export function ChatComposer({
   // The round button: Stop while it listens, Continue after.
   const voiceLabel =
     voice.stage === "listening" ? t("mobile.chat.composer.stopDictation") : t("mobile.chat.voice.continue");
-  // Also pressable while the recognizer starts: Stop then closes the voice mode.
-  const voicePressable = !voice.exit;
+  // Stop is pressable while the recognizer starts too, and then closes the
+  // voice mode. Continue waits until the chat can listen again.
+  const voicePressable = !voice.exit && (voice.stage === "listening" || voice.canResume);
 
   const focusInput = useCallback(() => {
     if (!disabled) inputRef.current?.focus();

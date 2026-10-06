@@ -25,6 +25,8 @@ export interface VoiceMode {
   split: SharedValue<number>;
   /** Send can take the transcript now. */
   canSend: boolean;
+  /** Continue can listen again: the chat is in front and online. */
+  canResume: boolean;
   open: () => void;
   /** Stops listening and keeps the text for review. */
   stop: () => void;
@@ -32,6 +34,8 @@ export interface VoiceMode {
   resume: () => void;
   send: () => void;
   cancel: () => void;
+  /** Android back, from the button or the edge swipe: stops listening, then cancels. */
+  back: () => void;
 }
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -68,9 +72,9 @@ export function useVoiceMode({
   const exitRef = useRef<VoiceExit | null>(null);
   const transcriptRef = useRef("");
   const finishing = useRef<Promise<void>>(Promise.resolve());
-  const sendRef = useRef({ sendable, onSend });
+  const sendRef = useRef({ enabled, sendable, onSend });
   useEffect(() => {
-    sendRef.current = { sendable, onSend };
+    sendRef.current = { enabled, sendable, onSend };
   });
   const presence = useSharedValue(0);
   const split = useSharedValue(0);
@@ -158,9 +162,12 @@ export function useVoiceMode({
   }, [finish, leave, moveTo, showReview]);
 
   const resume = useCallback(() => {
-    if (stageRef.current !== "review" || exitRef.current) return;
+    // The dictation stops a session only when `enabled` changes, so a session
+    // started while it is false would keep running.
+    if (stageRef.current !== "review" || exitRef.current || !sendRef.current.enabled) return;
     void finishing.current.then(() => {
-      if (stageRef.current !== "review" || exitRef.current || !start(transcriptRef.current)) return;
+      if (stageRef.current !== "review" || exitRef.current || !sendRef.current.enabled) return;
+      if (!start(transcriptRef.current)) return;
       moveTo("listening");
       split.set(timing(0, MERGE_MS));
     });
@@ -186,17 +193,20 @@ export function useVoiceMode({
     abort();
   }, [abort, leave, phase]);
 
-  // Android's back button leaves the voice mode before it leaves the chat:
-  // the first press stops listening, the next one cancels.
+  // Android back leaves the voice mode before it leaves the chat: the first
+  // press stops listening, the next one cancels.
+  const back = useCallback(() => {
+    if (stageRef.current === "listening") stop();
+    else cancel();
+  }, [stop, cancel]);
   useEffect(() => {
     if (stage === "closed") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (stageRef.current === "listening") stop();
-      else cancel();
+      back();
       return true;
     });
     return () => subscription.remove();
-  }, [stage, stop, cancel]);
+  }, [stage, back]);
 
   return {
     available: dictation.available,
@@ -208,10 +218,12 @@ export function useVoiceMode({
     presence,
     split,
     canSend: sendable && Boolean(transcript.trim()) && exit === null,
+    canResume: enabled && exit === null,
     open,
     stop,
     resume,
     send,
     cancel,
+    back,
   };
 }
