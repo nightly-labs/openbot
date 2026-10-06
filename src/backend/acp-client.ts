@@ -133,6 +133,11 @@ interface AcpTurn {
   thought: string;
   thoughtStarted: boolean;
   receivedOutput: boolean;
+  /**
+   * The partial reply and the harness error that cut it. It becomes the answer when no text comes
+   * after the error, because then the harness did not retry.
+   */
+  interruptedAnswer: string | null;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -1242,6 +1247,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thought: "",
       thoughtStarted: false,
       receivedOutput: false,
+      interruptedAnswer: null,
       answerOptional: isRecord(params) && params.answerOptional === true,
       messages: [],
       toolNames: new Map(),
@@ -1348,15 +1354,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       // A harness reports a dropped stream as answer text, and then sends the retried answer (#1471).
-      // The report gets its own muted item, so it is not joined to the answer around it.
+      // The report gets its own muted item, so it is not joined to the answer around it. When no
+      // retried answer comes, the partial reply and the report become the answer.
       if (HARNESS_ERROR_CHUNK.test(update.content.text)) {
+        const error = update.content.text.trim();
+        turn.receivedOutput = true;
+        turn.interruptedAnswer = [turn.text.trim() || turn.interruptedAnswer, error].filter(Boolean).join("\n\n");
         this.#completeThought(thread, turn);
-        this.#appendThought(thread, turn, update.content.text.trim());
+        this.#appendThought(thread, turn, error);
         this.#completeThought(thread, turn);
         return;
       }
       if (update.content.text) this.#completeThought(thread, turn);
-      if (update.content.text.trim()) turn.receivedOutput = true;
+      if (update.content.text.trim()) {
+        turn.receivedOutput = true;
+        turn.interruptedAnswer = null;
+      }
       turn.text += update.content.text;
       return;
     }
@@ -1401,6 +1414,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   // ACP cannot identify final text while streaming. Buffer unclassified text privately,
   // publishing commentary at a later step boundary or an answer when the prompt finishes.
   #completeMessage(thread: AcpThread, turn: AcpTurn, phase: "commentary" | "final_answer"): void {
+    if (phase === "final_answer") {
+      if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
+      turn.interruptedAnswer = null;
+    }
     if (!turn.text) return;
     const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
     turn.messages.push(item);
