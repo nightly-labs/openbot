@@ -17,6 +17,7 @@ import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
 import type { ApprovalAutomation } from "../approval-automation-store";
+import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { LanguageService } from "../language-service";
 import type { LogoColorService } from "../logo-color-service";
 import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
@@ -28,6 +29,7 @@ import {
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
   parseApprovalAutomation,
+  parseBusyMessageModePreference,
   parseExternalDestination,
   parseSetup,
 } from "./app-inputs";
@@ -67,6 +69,7 @@ export interface AppIpcDependencies {
   setupFile: string;
   analyticsPreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
+  busyMessageMode: BusyMessageModePreferenceStore;
   language: LanguageService;
   logoColor: LogoColorService;
   initializeAgent: () => Promise<void>;
@@ -84,6 +87,7 @@ export function appIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   approvalAutomation,
+  busyMessageMode,
   language,
   logoColor,
   initializeAgent,
@@ -116,6 +120,10 @@ export function appIpcHandlers({
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) => approvalAutomation.set(parsed)),
+      getBusyMessageModePreference: handler(() => busyMessageMode.get()),
+      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
+        busyMessageMode.set(parsed),
+      ),
       getAppLanguagePreference: handler(() => language.preference),
       setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) => language.set(parsed)),
       getAppLogoColorPreference: handler(() => logoColor.preference),

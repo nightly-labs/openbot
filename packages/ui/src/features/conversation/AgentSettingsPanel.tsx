@@ -12,9 +12,11 @@ import {
   type AvatarImageInput,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  type BusyMessageMode,
   type CustomAgentSummary,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
+  DEFAULT_BUSY_MESSAGE_MODE,
   type ProviderRuntimeStatus,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -83,6 +85,10 @@ export interface AgentSettingsPanelProps {
   computerUseEditable?: boolean;
   /** Local scripts reach only the computer that runs the agent, so a remote server hides the control. */
   automationEditable?: boolean;
+  /** The busy-message setting is local-only too: the Team API does not carry it. */
+  busyMessageModeEditable?: boolean;
+  /** The app default an agent without its own busy-message setting follows. */
+  defaultBusyMessageMode?: BusyMessageMode;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[];
@@ -145,6 +151,8 @@ interface AgentSettingsDraft {
   access: AgentAccess;
   computerUse: boolean;
   allowAutomation: boolean;
+  /** `default` follows the app setting. */
+  busyMessage: BusyMessageChoice;
   /** Widening to full access waits here for the confirmation. */
   confirmingFullAccess: boolean;
   runtime: AgentRuntimeSettings;
@@ -186,6 +194,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     access: DEFAULT_AGENT_ACCESS,
     computerUse: true,
     allowAutomation: false,
+    busyMessage: "default",
     confirmingFullAccess: false,
     runtime: untrack(() => ({ ...props.runtimeSettings })),
     saveError: null,
@@ -246,6 +255,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agent.access ?? DEFAULT_AGENT_ACCESS,
           String(agentComputerUseEnabled(agent)),
           String(agentAutomationAllowed(agent)),
+          agent.busyMessageMode ?? "default",
           runtimeSettings.provider,
           runtimeSettings.model,
           runtimeSettings.reasoningEffort,
@@ -281,6 +291,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
           state.computerUse = agentComputerUseEnabled(agent);
           state.allowAutomation = agentAutomationAllowed(agent);
+          state.busyMessage = agent.busyMessageMode ?? "default";
           if (agentChanged) state.confirmingFullAccess = false;
           state.runtime.provider = runtimeSettings.provider;
           state.runtime.model = runtimeSettings.model;
@@ -566,6 +577,27 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
     }
   }
+
+  async function saveBusyMessage(next: BusyMessageChoice): Promise<void> {
+    const agentId = props.agent.id;
+    const previous = draft.busyMessage;
+    setDraft((state) => {
+      state.busyMessage = next;
+    });
+    if (await saveAgentPatch({ busyMessageMode: next === "default" ? null : next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.busyMessage === next) {
+      setDraft((state) => {
+        state.busyMessage = previous;
+      });
+    }
+  }
+
+  const appBusyMessageMode = () => props.defaultBusyMessageMode ?? DEFAULT_BUSY_MESSAGE_MODE;
+  const busyMessageLabel = (choice: BusyMessageChoice) =>
+    t(choice === "default" ? APP_DEFAULT_BUSY_MESSAGE_LABEL[appBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
+  const steerUnsupported = () =>
+    (draft.busyMessage === "default" ? appBusyMessageMode() : draft.busyMessage) === "steer" &&
+    agentProviderDescriptor(draft.runtime.provider).steer !== "native";
 
   async function saveComputerUse(next: boolean): Promise<void> {
     const agentId = props.agent.id;
@@ -908,6 +940,31 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <SelectContent />
                 </Select>
               </Show>
+              <Show when={props.busyMessageModeEditable}>
+                <Select<BusyMessageChoice>
+                  class="agent-settings-runtime-select"
+                  options={[...BUSY_MESSAGE_CHOICES]}
+                  value={draft.busyMessage}
+                  onChange={(next) => {
+                    if (!next || next === draft.busyMessage) return;
+                    void saveBusyMessage(next);
+                  }}
+                  itemComponent={(item) => (
+                    <SelectItem item={item.item}>{busyMessageLabel(item.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger
+                    class="agent-settings-runtime-row"
+                    aria-label={t("agentSettings.runtime.busyMessageLabel")}
+                  >
+                    <span class="agent-settings-runtime-label">{t("agentSettings.runtime.busyMessage")}</span>
+                    <SelectValue<BusyMessageChoice>>
+                      {(state) => busyMessageLabel(state.selectedOption() ?? "default")}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </Show>
               <div class="agent-settings-runtime-path">
                 <span class="agent-settings-runtime-label">{t("agentSettings.runtime.workingDirectory")}</span>
                 <span>
@@ -933,6 +990,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 {t("agentSettings.runtime.workspaceUnlimited")}
               </Show>
             </Text>
+            <Show when={props.busyMessageModeEditable && steerUnsupported()}>
+              <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+                {t("agentSettings.busyMessage.steerUnsupported", {
+                  provider: agentProviderName(draft.runtime.provider),
+                })}
+              </Text>
+            </Show>
           </SettingsSection>
           <Show when={draft.saveError}>
             {(message) => (
@@ -1072,6 +1136,19 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
     current.reasoningEffort === settings.reasoningEffort
   );
 }
+
+const BUSY_MESSAGE_CHOICES = ["default", "queue", "steer"] as const;
+type BusyMessageChoice = (typeof BUSY_MESSAGE_CHOICES)[number];
+
+const BUSY_MESSAGE_LABEL = {
+  queue: "agentSettings.busyMessage.queue",
+  steer: "agentSettings.busyMessage.steer",
+} as const satisfies Record<BusyMessageMode, AppTextKey>;
+
+const APP_DEFAULT_BUSY_MESSAGE_LABEL = {
+  queue: "agentSettings.busyMessage.appDefaultQueue",
+  steer: "agentSettings.busyMessage.appDefaultSteer",
+} as const satisfies Record<BusyMessageMode, AppTextKey>;
 
 const ACCESS_LABEL = {
   workspace: "agentSettings.access.workspace",

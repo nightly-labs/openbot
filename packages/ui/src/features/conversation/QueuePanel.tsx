@@ -1,5 +1,6 @@
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { InstalledSkill, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
+import type { InstalledSkill, QueueDelivery, QueueHold, QueueSteerFallback } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, ConfirmDialog } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
@@ -500,6 +501,14 @@ export function QueuePanel(props: QueuePanelProps) {
                       <Show when={editing}>
                         <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
+                      <Show when={!editing && delivery.status === "queued" && delivery.steerFallback}>
+                        {(fallback) => (
+                          <span class="agent-queue-editing-badge" title={t(STEER_FALLBACK_REASON[fallback()])}>
+                            {t("queue.item.notSteered")}
+                            <span class="sr-only"> {t(STEER_FALLBACK_REASON[fallback()])}</span>
+                          </span>
+                        )}
+                      </Show>
                       <Button
                         variant="ghost"
                         type="button"
@@ -599,3 +608,8 @@ export function QueuePanel(props: QueuePanelProps) {
     </>
   );
 }
+
+const STEER_FALLBACK_REASON = {
+  "provider-unsupported": "queue.item.steerFallback.providerUnsupported",
+  "steer-failed": "queue.item.steerFallback.steerFailed",
+} as const satisfies Record<QueueSteerFallback, AppTextKey>;

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentProviderId,
+  BusyMessageModePreference,
   DeleteHostedSiteInput,
   DynamicIslandAction,
   DynamicIslandPreference,
@@ -35,6 +36,7 @@ import {
   isAgentProvider,
   isAppLanguage,
   isAppLogoColor,
+  isBusyMessageMode,
   isDynamicIslandAction,
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
@@ -84,6 +86,11 @@ export function parseApprovalAutomation(input: unknown): SetApprovalAutomationIn
     parsed.autoApprove = input.autoApprove;
   }
   return parsed;
+}
+
+export function parseBusyMessageModePreference(input: unknown): BusyMessageModePreference {
+  if (!isDynamicRecord(input) || !isBusyMessageMode(input.mode)) throw new Error("Busy message mode is required.");
+  return { mode: input.mode };
 }
 
 export function parseAppLanguagePreference(input: unknown): SetAppLanguagePreferenceInput {

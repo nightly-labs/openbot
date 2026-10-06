@@ -5,6 +5,7 @@ import type {
   DirectMessage,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
@@ -42,7 +43,8 @@ export function isRoutineEventItem(message: { itemType?: string }): boolean {
 
 /**
  * Whether a message is something the user has yet to see: it did not come from
- * them, and it is not one of the rows an agent writes about its own work.
+ * them, it is not a message between two agents, and it is not one of the rows an agent writes
+ * about its own work.
  *
  * The two shapes this applies to disagree on how the user is spelled - the IPC
  * message authors them `"user"`, the renderer projection `"you"` - so each gets
@@ -54,6 +56,7 @@ function isIncoming(message: { itemType?: string }, fromUser: boolean): boolean 
     !fromUser &&
     message.itemType !== "commentary" &&
     message.itemType !== "agent_attachment" &&
+    message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
     message.itemType !== "plan" &&
     !isRoutineEventItem(message)
   );

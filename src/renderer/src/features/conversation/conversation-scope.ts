@@ -199,7 +199,7 @@ export function createConversationViewScope(props: ConversationProps) {
     closeSidebarFilePreview,
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
-  const { installedSkills } = skills;
+  const { installedSkills, installedSkillsLoadFailed } = skills;
   const { mcpServers } = createMcpServersStore({ props });
   const composer = createComposerStore({
     props,
@@ -1142,6 +1142,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentDraft,
     currentConversationError,
     installedSkills,
+    installedSkillsLoadFailed,
     mcpServers,
     dropActive,
     editQueuedMessage,

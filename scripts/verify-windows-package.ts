@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { parse as parseYaml } from "yaml";
 
 const logger = createOpenBotLogger("verify-windows-package");
 
@@ -17,6 +18,8 @@ if (process.platform !== "win32") {
 }
 
 const requireUpdateMetadata = process.argv.includes("--require-update-metadata");
+// A tag build signs with `electron-builder.windows-signing.yml`. Local and dry-run builds stay unsigned.
+const requireSignature = process.argv.includes("--require-signature");
 const appPathArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
 const appPath = resolve(appPathArgument ?? "dist/win-unpacked");
 const executablePath = resolve(appPath, "OpenBot.exe");
@@ -71,10 +74,6 @@ if (machine !== 0x8664) {
   throw new Error(`Expected a Windows x64 executable, but its machine type is 0x${machine.toString(16)}.`);
 }
 
-for (const name of ["sunshine.exe", "web-server.exe", "streamer.exe"]) {
-  verifyAuthenticode(resolve(resourcesPath, "remote-desktop-runtime/win32/x64", name), "NotSigned");
-}
-
 const versionInfo = JSON.parse(
   runWindowsPowerShell(
     `$value = (Get-Item -LiteralPath '${powerShellLiteral(executablePath)}').VersionInfo; ` +
@@ -99,6 +98,29 @@ try {
 }
 if (updateMetadata !== null && !updateMetadata.includes("provider: github")) {
   throw new Error("The packaged update provider is not GitHub.");
+}
+
+const ownExecutables = [
+  executablePath,
+  whisperExecutablePath,
+  ...["sunshine.exe", "web-server.exe", "streamer.exe"].map((name) =>
+    resolve(resourcesPath, "remote-desktop-runtime/win32/x64", name),
+  ),
+];
+if (requireSignature) {
+  // An installed signed build accepts an update only from this publisher, so every executable must
+  // carry the name that app-update.yml gives to the updater.
+  const metadata = updateMetadata === null ? null : parseYaml(updateMetadata);
+  const publisherNames = isDynamicRecord(metadata) ? metadata.publisherName : undefined;
+  if (!Array.isArray(publisherNames) || publisherNames.length !== 1 || !isString(publisherNames[0])) {
+    throw new Error("app-update.yml must name exactly one publisher.");
+  }
+  const publisherName = publisherNames[0];
+  for (const path of [...ownExecutables, resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")]) {
+    verifyAuthenticode(path, "Valid", publisherName);
+  }
+} else {
+  for (const path of ownExecutables) verifyAuthenticode(path, "NotSigned");
 }
 
 const fuses = await getCurrentFuseWire(executablePath);
@@ -155,12 +177,23 @@ function runWindowsPowerShell(command: string): string {
   }).trim();
 }
 
-function verifyAuthenticode(path: string, expectedStatus: "NotSigned" | "Valid"): void {
-  const status = runWindowsPowerShell(
-    `(Get-AuthenticodeSignature -LiteralPath '${powerShellLiteral(path)}').Status.ToString()`,
+function verifyAuthenticode(path: string, expectedStatus: "NotSigned" | "Valid", publisherName?: string): void {
+  // Windows PowerShell writes the console code page by default, which would garble a non-ASCII name.
+  const signature = JSON.parse(
+    runWindowsPowerShell(
+      "[Console]::OutputEncoding = [Text.Encoding]::UTF8; " +
+        `$value = Get-AuthenticodeSignature -LiteralPath '${powerShellLiteral(path)}'; ` +
+        "[pscustomobject]@{ Status = $value.Status.ToString(); Subject = $value.SignerCertificate.Subject } | ConvertTo-Json -Compress",
+    ),
   );
-  if (status !== expectedStatus) {
-    throw new Error(`Unexpected runtime signature status for ${path}: ${status} (expected ${expectedStatus})`);
+  if (!isDynamicRecord(signature)) throw new Error(`Signature metadata is invalid for ${path}.`);
+  if (signature.Status !== expectedStatus) {
+    throw new Error(
+      `Unexpected signature status for ${path}: ${String(signature.Status)} (expected ${expectedStatus})`,
+    );
+  }
+  if (publisherName !== undefined && !String(signature.Subject).startsWith(`CN=${publisherName},`)) {
+    throw new Error(`Unexpected signer for ${path}: ${String(signature.Subject)} (expected CN=${publisherName})`);
   }
 }
 

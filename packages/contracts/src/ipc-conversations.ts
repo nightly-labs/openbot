@@ -62,6 +62,13 @@ export type ConversationPageAnchor =
 export interface ConversationPageInfo {
   hasOlder: boolean;
   olderCursor: string | null;
+  /**
+   * How many messages are older than the page, and the time of the oldest one. The chat's day rail
+   * draws the part that is not loaded from these. A host that does not send them leaves them out,
+   * and the Team API never carries them.
+   */
+  olderCount?: number;
+  oldestAt?: string;
 }
 
 export interface ReadConversationPageInput {

@@ -23,6 +23,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type BusyMessageModePreference,
   type CentralAuthIssue,
   type CentralAuthState,
   type CentralAuthUser,
@@ -47,6 +48,7 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isApprovalAutomationPreference,
+  isBusyMessageMode,
   isCustomAgentCheckResult,
   isCustomAgentResult,
   isCustomAgentSummary,
@@ -113,6 +115,12 @@ export const decodeApprovalAutomationPreference: (value: unknown) => ApprovalAut
   isApprovalAutomationPreference,
   "approval automation preference",
 );
+
+export function decodeBusyMessageModePreference(value: unknown): BusyMessageModePreference {
+  const preference = decodeRecord(value, "busy message mode preference");
+  if (!isBusyMessageMode(preference.mode)) throw new Error("Invalid busy message mode.");
+  return { mode: preference.mode };
+}
 
 export function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {
   const preference = decodeRecord(value, "language preference");

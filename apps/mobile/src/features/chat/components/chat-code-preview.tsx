@@ -10,6 +10,7 @@ import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated
 import { useUniwind } from "uniwind";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
+import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import HtmlPreview from "./html-preview.dom";
@@ -138,6 +139,7 @@ function HtmlCardPreview({ text, title, height }: { text: string; title: string;
         mode="card"
         background={String(background)}
         dom={{
+          ...expoGoDomOptions,
           style: { flex: 1 },
           containerStyle: { flex: 1 },
           pointerEvents: "none",

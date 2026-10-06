@@ -22,4 +22,8 @@ export const messages = {
   "queue.deleteHeld.body":
     "別のデバイスがこのメッセージを編集しています。エージェントはこのメッセージを受け取りません。",
   "queue.deleteHeld.keep": "残す",
+  "queue.item.notSteered": "未修正",
+  "queue.item.steerFallback.providerUnsupported":
+    "このプロバイダーは実行中のターンの方向を修正できないため、メッセージはキューで待ちます。",
+  "queue.item.steerFallback.steerFailed": "方向の修正に失敗したため、メッセージはキューで待ちます。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,6 +5,8 @@ export const messages = {
   // OpenBot hesap servisinden gelen hatalar.
   "error.auth.serviceUnavailable":
     "OpenBot hesap servisine ulaşamadı. API'nin çalıştığını kontrol edin, ardından tekrar deneyin.",
+  "error.auth.networkBlocked":
+    "Bu ağdaki bir güvenlik duvarı veya proxy, OpenBot'un {host} adresine ulaşmasını engelledi. Ağ yöneticinizden {host} adresine izin vermesini isteyin, ardından tekrar deneyin.",
   "error.auth.signInFirst": "Önce OpenBot'ta oturum açın.",
   "error.auth.signInRequired": "Oturum açılması gerekiyor.",
   "error.auth.accountChangedDuringRegister": "Bu sunucu kaydedilirken oturum açmış olan hesap değişti.",

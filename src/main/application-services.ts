@@ -77,6 +77,7 @@ import { AutomationServer } from "./automation-server";
 import { BillingDesktopService } from "./billing-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
+import { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
 import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
@@ -191,6 +192,7 @@ const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
+const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
@@ -325,6 +327,7 @@ export interface ApplicationServices {
   language: LanguageService;
   logoColor: LogoColorService;
   notificationPreference: NotificationPreferenceStore;
+  busyMessageMode: BusyMessageModePreferenceStore;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -588,6 +591,10 @@ export async function createApplicationServices({
     join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
   );
   await notificationPreference.load();
+  const busyMessageMode = new BusyMessageModePreferenceStore(
+    join(app.getPath("userData"), BUSY_MESSAGE_MODE_PREFERENCE_FILE),
+  );
+  await busyMessageMode.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
@@ -922,6 +929,7 @@ export async function createApplicationServices({
     passwordVault: onePasswordConnector,
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
+    busyMessageMode: () => busyMessageMode.get().mode,
     deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
     tables,
   });
@@ -1720,6 +1728,7 @@ export async function createApplicationServices({
     language,
     logoColor,
     notificationPreference,
+    busyMessageMode,
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,

@@ -5,7 +5,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Check, ChevronDown, ChevronRight } from "lucide-react-native";
+import { Check, ChevronDown, ChevronRight, X } from "lucide-react-native";
 import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -16,10 +16,11 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { BlurReveal } from "@/shared/components/blur-reveal";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { AgentTemplateNotFoundError, loadAgentTemplate } from "../api/agent-templates";
 import { forgetIncomingLink, readIncomingLink } from "../model/incoming-links";
@@ -119,16 +120,26 @@ function AgentTemplateInstall({ request }: { request?: string }) {
       contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
     >
-      <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button
-          icon={isIOS ? "xmark" : undefined}
+      {isAndroid ? (
+        <AndroidHeaderButton
+          placement="left"
+          icon={X}
           accessibilityLabel={t("common.close")}
           disabled={installing}
           onPress={close}
-        >
-          {isIOS ? t("common.close") : "×"}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+        />
+      ) : (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button
+            icon={isIOS ? "xmark" : undefined}
+            accessibilityLabel={t("common.close")}
+            disabled={installing}
+            onPress={close}
+          >
+            {isIOS ? t("common.close") : "×"}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
       <SheetSaveAction
         dirty={detail !== null}
         canSave={canInstall}

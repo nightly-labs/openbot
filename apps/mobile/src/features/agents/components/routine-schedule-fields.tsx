@@ -1,4 +1,4 @@
-import { Host, Picker, Switch } from "@expo/ui";
+import { Host, Switch } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -79,13 +80,14 @@ export function RoutineScheduleFields({
   ) => (
     <SettingsRow
       trailing={
-        <Host matchContents colorScheme={colorScheme}>
-          <Picker selectedValue={value} enabled={!disabled} onValueChange={(next: T) => change(next)}>
-            {options.map((option) => (
-              <Picker.Item key={option.value} label={option.label} value={option.value} />
-            ))}
-          </Picker>
-        </Host>
+        <SettingsPicker
+          value={value}
+          options={options}
+          enabled={!disabled}
+          dark={colorScheme === "dark"}
+          label={t(label)}
+          onChange={(next: T) => change(next)}
+        />
       }
     >
       <Typography.Paragraph>{t(label)}</Typography.Paragraph>

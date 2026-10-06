@@ -4,6 +4,8 @@ export const messages = defineMessages("error.auth", {
   // Errors from the OpenBot account service.
   "error.auth.serviceUnavailable":
     "OpenBot could not reach the account service. Check that the API is running, then try again.",
+  "error.auth.networkBlocked":
+    "A firewall or proxy on this network blocked OpenBot from reaching {host}. Ask your network administrator to allow {host}, then try again.",
   "error.auth.signInFirst": "Sign in to OpenBot first.",
   "error.auth.signInRequired": "Sign in is required.",
   "error.auth.accountChangedDuringRegister": "The signed-in account changed while this server was being registered.",

@@ -1,4 +1,3 @@
-import { Host, Picker } from "@expo/ui";
 import {
   BILLING_CURRENCIES,
   type BillingCurrency,
@@ -40,6 +39,7 @@ import {
   RECOMMENDED_HOSTED_PLAN,
 } from "@/features/servers/model/hosted-server-plans";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -387,22 +387,20 @@ function CurrencyPicker({
   disabled: boolean;
   onChange: (currency: BillingCurrency) => void;
 }) {
+  const { t } = useText();
   const { theme } = useUniwind();
   return (
-    <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-      <Picker<BillingCurrency>
-        selectedValue={currency}
-        enabled={!disabled}
-        onValueChange={(next) => {
-          void haptics.selection();
-          onChange(next);
-        }}
-      >
-        {BILLING_CURRENCIES.map((option) => (
-          <Picker.Item key={option} label={option.toUpperCase()} value={option} />
-        ))}
-      </Picker>
-    </Host>
+    <SettingsPicker<BillingCurrency>
+      value={currency}
+      options={BILLING_CURRENCIES.map((option) => ({ value: option, label: option.toUpperCase() }))}
+      enabled={!disabled}
+      dark={theme === "dark"}
+      label={t("mobile.server.hosted.currency")}
+      onChange={(next) => {
+        void haptics.selection();
+        onChange(next);
+      }}
+    />
   );
 }
 

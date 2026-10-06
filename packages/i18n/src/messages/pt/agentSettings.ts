@@ -92,4 +92,12 @@ export const messages = {
   "agentSettings.computerUse.description": "Permitir que este agente controle aplicativos neste computador",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo o processo do {provider} é executado em um ambiente isolado, por isso a gravação fora desses locais falha. Disponível somente no macOS.",
+  "agentSettings.runtime.busyMessage": "Durante o trabalho",
+  "agentSettings.runtime.busyMessageLabel": "Mensagens enquanto o agente trabalha",
+  "agentSettings.busyMessage.appDefaultQueue": "Padrão do app (Fila)",
+  "agentSettings.busyMessage.appDefaultSteer": "Padrão do app (Redirecionar)",
+  "agentSettings.busyMessage.queue": "Fila",
+  "agentSettings.busyMessage.steer": "Redirecionar",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} não pode redirecionar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -100,4 +100,12 @@ export const messages = {
   "agentSettings.computerUse.description": "Autoriser cet agent à contrôler les apps de cet ordinateur",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
+  "agentSettings.runtime.busyMessage": "Pendant le travail",
+  "agentSettings.runtime.busyMessageLabel": "Messages pendant le travail de l’agent",
+  "agentSettings.busyMessage.appDefaultQueue": "Par défaut de l’app (File d’attente)",
+  "agentSettings.busyMessage.appDefaultSteer": "Par défaut de l’app (Orienter)",
+  "agentSettings.busyMessage.queue": "File d’attente",
+  "agentSettings.busyMessage.steer": "Orienter",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
 } as const satisfies PartialTranslation<typeof source>;

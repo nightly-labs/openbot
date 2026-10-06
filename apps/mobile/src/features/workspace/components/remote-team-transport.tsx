@@ -16,6 +16,7 @@ import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
+import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
@@ -141,6 +142,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         active={foreground}
         commands={commands}
         dom={{
+          ...expoGoDomOptions,
           containerStyle: {
             flex: 0,
             height: 1,

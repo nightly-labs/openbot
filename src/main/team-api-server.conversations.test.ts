@@ -166,7 +166,8 @@ describe("TeamApiServer conversations", () => {
         ...localConversation,
         messages,
         references: {},
-        pageInfo: { hasOlder: false, olderCursor: null },
+        // The day rail's unloaded length is local IPC only; every released adapter drops it.
+        pageInfo: { hasOlder: false, olderCursor: null, olderCount: 40, oldestAt: "2026-09-01T00:00:00.000Z" },
         readState: {
           unreadCount: 0,
           firstUnreadMessageId: null,
@@ -347,6 +348,15 @@ describe("TeamApiServer conversations", () => {
       excludeRoutineRunEvents: false,
       excludeHostedSiteEvents: false,
     });
+    for (const capabilities of [TEAM_CURRENT_CAPABILITIES, TEAM_PROTOCOL_V1_CAPABILITIES]) {
+      const page = await jsonRequest(base, "/v1/agents/chief/conversation-page?limit=10", {
+        token: token,
+        capabilities: [...capabilities],
+      });
+      expect(page).toMatchObject({ pageInfo: { hasOlder: false, olderCursor: null } });
+      expect(page).not.toHaveProperty("pageInfo.olderCount");
+      expect(page).not.toHaveProperty("pageInfo.oldestAt");
+    }
     await expect(jsonRequest(base, "/v1/agents/conversation-reads", { token: token })).resolves.toEqual({
       chief: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "message-1" },
     });

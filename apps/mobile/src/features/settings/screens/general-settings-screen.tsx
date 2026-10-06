@@ -1,4 +1,3 @@
-import { Host, Picker, Switch } from "@expo/ui";
 import { APP_LANGUAGE_OPTIONS } from "@openbot/i18n/languages";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
@@ -7,6 +6,7 @@ import { useUniwind } from "uniwind";
 import { saveAnalyticsPreference, useAnalyticsPreference } from "@/features/analytics/preference";
 import { dictationLanguageOptions } from "@/features/chat/model/voice-dictation";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { saveAppLanguage, useAppLanguage } from "@/features/settings/model/app-language";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import {
@@ -31,28 +31,24 @@ function LanguageSection({ dark }: { dark: boolean }) {
     <SettingsSection title={t("mobile.settings.language.title")} footer={error ?? t("mobile.settings.language.footer")}>
       <SettingsRow
         trailing={
-          <Host matchContents colorScheme={dark ? "dark" : "light"}>
-            <Picker
-              selectedValue={language.value}
-              enabled={language.ready && !language.saving}
-              onValueChange={(next) => {
-                setError(null);
-                void haptics.selection();
-                void saveAppLanguage(next).catch(() => {
-                  setError(t("mobile.settings.saveFailed"));
-                  void haptics.notification("error");
-                });
-              }}
-            >
-              {APP_LANGUAGE_OPTIONS.map((option) => (
-                <Picker.Item
-                  key={option.id}
-                  label={option.id === "system" ? t("mobile.settings.language.system") : option.label}
-                  value={option.id}
-                />
-              ))}
-            </Picker>
-          </Host>
+          <SettingsPicker
+            value={language.value}
+            options={APP_LANGUAGE_OPTIONS.map((option) => ({
+              value: option.id,
+              label: option.id === "system" ? t("mobile.settings.language.system") : option.label,
+            }))}
+            enabled={language.ready && !language.saving}
+            dark={dark}
+            label={t("mobile.settings.language.row")}
+            onChange={(next) => {
+              setError(null);
+              void haptics.selection();
+              void saveAppLanguage(next).catch(() => {
+                setError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
         }
       >
         <Typography.Paragraph>{t("mobile.settings.language.row")}</Typography.Paragraph>
@@ -89,25 +85,24 @@ function DictationSection({ dark }: { dark: boolean }) {
     >
       <SettingsRow
         trailing={
-          <Host matchContents colorScheme={dark ? "dark" : "light"}>
-            <Picker
-              selectedValue={language.value}
-              enabled={language.ready && !language.saving}
-              onValueChange={(next) => {
-                setError(null);
-                void haptics.selection();
-                void saveDictationLanguage(next).catch(() => {
-                  setError(t("mobile.settings.saveFailed"));
-                  void haptics.notification("error");
-                });
-              }}
-            >
-              <Picker.Item label={t("mobile.settings.dictation.automatic")} value={AUTOMATIC_DICTATION_LANGUAGE} />
-              {options.map((option) => (
-                <Picker.Item key={option.value} label={option.label} value={option.value} />
-              ))}
-            </Picker>
-          </Host>
+          <SettingsPicker
+            value={language.value}
+            options={[
+              { value: AUTOMATIC_DICTATION_LANGUAGE, label: t("mobile.settings.dictation.automatic") },
+              ...options.map((option) => ({ value: option.value, label: option.label })),
+            ]}
+            enabled={language.ready && !language.saving}
+            dark={dark}
+            label={t("mobile.settings.dictation.language")}
+            onChange={(next) => {
+              setError(null);
+              void haptics.selection();
+              void saveDictationLanguage(next).catch(() => {
+                setError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
         }
       >
         <Typography.Paragraph>{t("mobile.settings.dictation.language")}</Typography.Paragraph>
@@ -132,14 +127,13 @@ function LiveActivitiesSection({ dark }: { dark: boolean }) {
       footer={error ?? t("mobile.settings.liveActivities.footer")}
     >
       <SettingsRow>
-        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme={dark ? "dark" : "light"}>
-          <Switch
-            value={preference.enabled}
-            disabled={!preference.ready || preference.saving}
-            label={t("mobile.settings.liveActivities.toggle")}
-            onValueChange={save}
-          />
-        </Host>
+        <SettingsSwitch
+          value={preference.enabled}
+          disabled={!preference.ready || preference.saving}
+          label={t("mobile.settings.liveActivities.toggle")}
+          dark={dark}
+          onValueChange={save}
+        />
       </SettingsRow>
       {error ? (
         <SettingsRow disabled={preference.saving} disclosure={false} onPress={() => save(preference.enabled)}>
@@ -187,24 +181,25 @@ export function GeneralSettingsScreen() {
       >
         <SettingsRow
           trailing={
-            <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-              <Picker
-                selectedValue={value}
-                enabled={ready && !saving}
-                onValueChange={(next) => {
-                  setError(null);
-                  void haptics.selection();
-                  void saveAppearance(next).catch(() => {
-                    setError(t("mobile.settings.appearance.saveFailed"));
-                    void haptics.notification("error");
-                  });
-                }}
-              >
-                <Picker.Item label={t("mobile.settings.appearance.system")} value="system" />
-                <Picker.Item label={t("mobile.settings.appearance.light")} value="light" />
-                <Picker.Item label={t("mobile.settings.appearance.dark")} value="dark" />
-              </Picker>
-            </Host>
+            <SettingsPicker
+              value={value}
+              options={[
+                { value: "system", label: t("mobile.settings.appearance.system") },
+                { value: "light", label: t("mobile.settings.appearance.light") },
+                { value: "dark", label: t("mobile.settings.appearance.dark") },
+              ]}
+              enabled={ready && !saving}
+              dark={theme === "dark"}
+              label={t("mobile.settings.appearance.theme")}
+              onChange={(next) => {
+                setError(null);
+                void haptics.selection();
+                void saveAppearance(next).catch(() => {
+                  setError(t("mobile.settings.appearance.saveFailed"));
+                  void haptics.notification("error");
+                });
+              }}
+            />
           }
         >
           <Typography.Paragraph>{t("mobile.settings.appearance.theme")}</Typography.Paragraph>
@@ -212,24 +207,19 @@ export function GeneralSettingsScreen() {
       </SettingsSection>
       <SettingsSection footer={agentColorError ?? t("mobile.settings.appearance.agentColorMessagesFooter")}>
         <SettingsRow>
-          <Host
-            matchContents={{ vertical: true }}
-            style={{ width: "100%" }}
-            colorScheme={theme === "dark" ? "dark" : "light"}
-          >
-            <Switch
-              value={agentColorMessages.enabled}
-              disabled={!agentColorMessages.ready || agentColorMessages.saving}
-              label={t("mobile.settings.appearance.agentColorMessages")}
-              onValueChange={(enabled) => {
-                setAgentColorError(null);
-                void saveAgentColorMessages(enabled).catch(() => {
-                  setAgentColorError(t("mobile.settings.saveFailed"));
-                  void haptics.notification("error");
-                });
-              }}
-            />
-          </Host>
+          <SettingsSwitch
+            value={agentColorMessages.enabled}
+            disabled={!agentColorMessages.ready || agentColorMessages.saving}
+            label={t("mobile.settings.appearance.agentColorMessages")}
+            dark={theme === "dark"}
+            onValueChange={(enabled) => {
+              setAgentColorError(null);
+              void saveAgentColorMessages(enabled).catch(() => {
+                setAgentColorError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
         </SettingsRow>
       </SettingsSection>
       <LanguageSection dark={theme === "dark"} />
@@ -239,18 +229,13 @@ export function GeneralSettingsScreen() {
         footer={hapticsError ?? t("mobile.settings.feedback.footer")}
       >
         <SettingsRow>
-          <Host
-            matchContents={{ vertical: true }}
-            style={{ width: "100%" }}
-            colorScheme={theme === "dark" ? "dark" : "light"}
-          >
-            <Switch
-              value={hapticsPreference.enabled}
-              disabled={!hapticsPreference.ready || hapticsPreference.saving}
-              label={t("mobile.settings.feedback.haptics")}
-              onValueChange={saveHaptics}
-            />
-          </Host>
+          <SettingsSwitch
+            value={hapticsPreference.enabled}
+            disabled={!hapticsPreference.ready || hapticsPreference.saving}
+            label={t("mobile.settings.feedback.haptics")}
+            dark={theme === "dark"}
+            onValueChange={saveHaptics}
+          />
         </SettingsRow>
         {hapticsError ? (
           <SettingsRow
@@ -268,18 +253,13 @@ export function GeneralSettingsScreen() {
         footer={analyticsError ?? t("mobile.settings.privacy.footer")}
       >
         <SettingsRow>
-          <Host
-            matchContents={{ vertical: true }}
-            style={{ width: "100%" }}
-            colorScheme={theme === "dark" ? "dark" : "light"}
-          >
-            <Switch
-              value={analytics.enabled}
-              disabled={!analytics.ready || analytics.saving}
-              label={t("mobile.settings.privacy.analytics")}
-              onValueChange={saveAnalytics}
-            />
-          </Host>
+          <SettingsSwitch
+            value={analytics.enabled}
+            disabled={!analytics.ready || analytics.saving}
+            label={t("mobile.settings.privacy.analytics")}
+            dark={theme === "dark"}
+            onValueChange={saveAnalytics}
+          />
         </SettingsRow>
         {retryAnalyticsValue !== null ? (
           <SettingsRow

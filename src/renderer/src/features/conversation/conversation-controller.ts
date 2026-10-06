@@ -18,6 +18,7 @@ import {
   readStoredQueueEdit,
   type StoredQueueEdit,
 } from "./composer-draft";
+import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
 import type { ComposerDraft, ConversationProps, RightPanelMode, SidebarFilePreview } from "./conversation-types";
 import { createPendingSendStore } from "./stores/pending-send-store";
@@ -92,14 +93,23 @@ interface ConversationResources {
  * switch would throw away typing the user still expects to find, so this owner
  * sits above the keyed scope in `app-providers.tsx` and lives as long as the app.
  *
- * Every signal here is keyed by `serverId:agentId` (`composerDraftKey`) or carries
- * its server in the value, which is what makes the shared lifetime safe.
+ * Every signal here is keyed by `serverId:agentId` (`composerDraftKey`), by a
+ * channel UUID, or carries its server in the value, which is what makes the shared
+ * lifetime safe.
  */
-export function createStableConversationState(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {
+export function createStableConversationState(
+  props: Pick<ConversationProps, "onTypingChange">,
+  persistDrafts = true,
+  storedDrafts: StoredComposerDrafts | null = null,
+) {
   const restoredEdit = persistDrafts ? readStoredQueueEdit() : null;
-  const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>(
-    restoredEdit ? { [composerDraftKey(restoredEdit)]: restoredEdit.draft } : {},
-  );
+  // A restored queue edit wins over the composer draft stored for the same agent.
+  const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>({
+    ...storedDrafts?.agents,
+    ...(restoredEdit ? { [composerDraftKey(restoredEdit)]: restoredEdit.draft } : {}),
+  });
+  /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
+  const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
   const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
@@ -170,6 +180,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
       };
     },
   );
+  if (storedDrafts)
+    writeComposerDraftsOnChange({ drafts, channelDrafts, editingAgentId, editingServerId, editingDraftBackup });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
@@ -247,6 +259,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     stopComposerTyping,
     drafts,
     setDrafts,
+    channelDrafts,
+    setChannelDrafts,
     editingAgentId,
     setEditingAgentId,
     editingServerId,

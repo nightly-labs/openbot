@@ -1,4 +1,4 @@
-import { Host, Picker, Switch } from "@expo/ui";
+import { Host, Switch } from "@expo/ui";
 import type { AgentAccess, AgentAdminSettings, UpdateAgentAdminSettingsInput } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
@@ -7,6 +7,7 @@ import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import {
   type MobileAgent,
   type MobileServer,
@@ -91,12 +92,17 @@ export function AgentAccessFields({
       >
         <SettingsRow
           trailing={
-            <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-              <Picker<AgentAccess> selectedValue={current.access} enabled={enabled} onValueChange={changeAccess}>
-                <Picker.Item label={t("mobile.agent.access.workspace")} value="workspace" />
-                <Picker.Item label={t("mobile.agent.access.full")} value="full" />
-              </Picker>
-            </Host>
+            <SettingsPicker<AgentAccess>
+              value={current.access}
+              options={[
+                { value: "workspace", label: t("mobile.agent.access.workspace") },
+                { value: "full", label: t("mobile.agent.access.full") },
+              ]}
+              enabled={enabled}
+              dark={theme === "dark"}
+              label={t("mobile.agent.access.label")}
+              onChange={changeAccess}
+            />
           }
         >
           <Typography.Paragraph>{t("mobile.agent.access.label")}</Typography.Paragraph>

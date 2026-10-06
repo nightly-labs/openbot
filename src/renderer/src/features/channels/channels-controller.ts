@@ -3,6 +3,19 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
 import { mergeChannelPage } from "./channel-page-merge";
+
+/**
+ * Takes the older edge of a page: its cursor, and the unloaded length that belongs to that cursor. A
+ * page with no length removes the old one, so the day rail never draws a length for another window.
+ */
+function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
+  target.olderCursor = source.olderCursor;
+  if (source.olderCount === undefined) delete target.olderCount;
+  else target.olderCount = source.olderCount;
+  if (source.oldestAt === undefined) delete target.oldestAt;
+  else target.oldestAt = source.oldestAt;
+}
+
 import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
@@ -133,7 +146,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
-          if (merged.takeFetchedCursor) state.page.olderCursor = page.olderCursor;
+          if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else state.page = page;
         state.loading = false;
         if (!failedCommand) state.error = null;
@@ -187,7 +200,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
       return false;
     }
   }
-  async function command(input: ChannelCommand): Promise<boolean> {
+  /**
+   * `onAccepted` runs after the service accepts the command and the channel refreshes. When the
+   * reader leaves the scope during the request, it runs at once and the result is `false`: a sent
+   * message must still leave the composer, or it comes back as a draft.
+   */
+  async function command(input: ChannelCommand, onAccepted?: (accepted: ChannelCommand) => void): Promise<boolean> {
     const account = env.scopeKey();
     // Only the save that creates a channel opens it, and only while the reader has stayed where
     // the save started. The sidebar takes a click through a save of the settings, and settings
@@ -212,7 +230,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
     );
     try {
       await env.port().agent.channelCommand(attempt);
-      if (disposed || account !== env.scopeKey()) return false;
+      if (disposed || account !== env.scopeKey()) {
+        onAccepted?.(attempt);
+        return false;
+      }
       failedCommand = null;
       // Only creation closes the editor. Settings save on every field, so closing on a save
       // would shut the panel under the user between two edits.
@@ -227,6 +248,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         );
       }
       await refreshAfter();
+      onAccepted?.(attempt);
       return true;
     } catch (error) {
       if (!disposed && account === env.scopeKey()) {
@@ -259,7 +281,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           if (!page || page.olderCursor !== beforeSequence) return;
           const ids = new Set(page.messages.map((item) => item.id));
           reconcile([...older.messages.filter((item) => !ids.has(item.id)), ...page.messages], "id")(page.messages);
-          page.olderCursor = older.olderCursor;
+          takeOlderWindow(page, older);
         });
     } catch (error) {
       if (!disposed && account === env.scopeKey() && state.selectedId === channelId)
@@ -335,9 +357,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
     refresh,
-    retry: async () => {
+    retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;
-      if (previous) return (await command(previous)) ? previous : null;
+      if (previous) return (await command(previous, onAccepted)) ? previous : null;
       await refresh();
       return null;
     },
