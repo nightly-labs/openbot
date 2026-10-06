@@ -32,15 +32,15 @@ const translate = (point: CursorPoint) => `${point.x}px ${point.y}px`;
 export function ComputerUseAgentCursor(props: ComputerUseAgentCursorProps) {
   let element: SVGSVGElement | undefined;
   let target: CursorPoint | null = null;
-  let playing: { move: CursorMove; startedAt: number; animation: Animation } | null = null;
+  let playing: { move: CursorMove; animation: Animation } | null = null;
 
   createEffect(
     () => ({ x: props.x, y: props.y }),
     (next) => {
       // Main sends the placement thirty times a second, most of them with the same point.
       if (target && target.x === next.x && target.y === next.y) return;
-      const now = performance.now();
-      const from = playing ? agentCursorPointAt(playing.move, now - playing.startedAt) : target;
+      // The animation's own clock, which starts on the first frame it draws, not when it was asked for.
+      const from = playing ? agentCursorPointAt(playing.move, Number(playing.animation.currentTime ?? 0)) : target;
       playing?.animation.cancel();
       playing = null;
       target = next;
@@ -53,7 +53,7 @@ export function ComputerUseAgentCursor(props: ComputerUseAgentCursorProps) {
         move.map((sample) => ({ translate: translate(sample), offset: sample.t / duration })),
         { duration },
       );
-      playing = { move, startedAt: now, animation };
+      playing = { move, animation };
       animation.onfinish = () => {
         if (playing?.animation === animation) playing = null;
       };
