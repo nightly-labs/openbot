@@ -78,7 +78,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/install-git-hooks.ts",
-    "postinstall": "install-electron && bun run --cwd apps/mobile setup:skia",
+    "postinstall": "install-electron && bun scripts/setup-mobile-skia.ts",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",
     "api:images": "bun run --cwd apps/auth-api images",
