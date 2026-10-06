@@ -6,6 +6,8 @@
 // No transport needs a public endpoint on the host.
 
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
+import { type Effect, Schema } from "effect";
+import type { MessagingOperationFailed } from "./messaging-service";
 import type { MessagingAnswerFile } from "./messaging-threads";
 
 /** Where a post goes: a platform channel, and the thread in it or the top level. */
@@ -87,36 +89,49 @@ export class MessagingConnectionError extends Error {
   }
 }
 
+export class MessagingAdapterError extends Schema.TaggedError<MessagingAdapterError>()("MessagingAdapterError", {
+  cause: Schema.Defect(),
+}) {}
+
 export interface MessagingAdapter {
   readonly platform: MessagingPlatform;
-  identify(): Promise<ConnectionIdentity>;
-  post(target: MessageTarget, body: MessageBody): Promise<string>;
-  edit(target: MessageTarget, messageId: string, body: MessageBody): Promise<void>;
-  postPrivate(target: MessageTarget, userId: string, text: string): Promise<void>;
-  react(target: MessageTarget, messageId: string, reaction: StatusReaction, on: boolean): Promise<void>;
+  identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
+  post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
+  edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
+  postPrivate(target: MessageTarget, userId: string, text: string): Effect.Effect<void, MessagingAdapterError>;
+  react(
+    target: MessageTarget,
+    messageId: string,
+    reaction: StatusReaction,
+    on: boolean,
+  ): Effect.Effect<void, MessagingAdapterError>;
   /**
    * Posts the agent's answer, in as many posts as the platform needs. The first part replaces
    * `replaceMessageId` when it is given.
    */
-  postAnswer(target: MessageTarget, markdown: string, replaceMessageId: string | null): Promise<void>;
+  postAnswer(
+    target: MessageTarget,
+    markdown: string,
+    replaceMessageId: string | null,
+  ): Effect.Effect<void, MessagingAdapterError>;
   /** Uploads files to the conversation, and returns the names it did not send. */
-  upload(target: MessageTarget, files: MessagingAnswerFile[]): Promise<string[]>;
+  upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,
     threadKey: string,
     afterId: string | null,
     beforeId: string,
-  ): Promise<ContextEntry[]>;
+  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
-  download(file: InboundFile, destination: string, maxBytes: number): Promise<void>;
-  authorName(userId: string): Promise<string>;
-  placeName(platformChannelId: string): Promise<string>;
+  download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
+  authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
+  placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   mention(userId: string): string;
   /** Joins every public place the platform lets OpenBot join without an invitation. */
-  joinPublicPlaces?(): Promise<void>;
+  joinPublicPlaces?(): Effect.Effect<void, MessagingAdapterError>;
   /** Joins one public place, such as a channel that was just created. */
-  joinPlace?(platformChannelId: string): Promise<void>;
+  joinPlace?(platformChannelId: string): Effect.Effect<void, MessagingAdapterError>;
 }
 
 export interface TransportSink {
@@ -131,9 +146,9 @@ export interface MessagingTransport {
   start(sink: TransportSink): void;
   /** Reconnects now, such as after the computer wakes. */
   reconnect(): void;
-  stop(): Promise<void>;
+  stop(): Effect.Effect<void>;
   /** Handles one request that the ingress relay brought, for a transport that gets its events that way. */
-  deliver?(delivery: IngressDelivery): Promise<IngressAnswer>;
+  deliver?(delivery: IngressDelivery): Effect.Effect<IngressAnswer>;
 }
 
 /**
@@ -157,7 +172,10 @@ export interface IngressAnswer {
 export type IngressState = "online" | "connecting" | "signed_out" | "no_host" | "unavailable";
 
 /** Handles one request for a workspace, by the platform's workspace id. */
-export type IngressHandler = (workspaceId: string, delivery: IngressDelivery) => Promise<IngressAnswer>;
+export type IngressHandler = (
+  workspaceId: string,
+  delivery: IngressDelivery,
+) => Effect.Effect<IngressAnswer, MessagingOperationFailed>;
 
 /**
  * The relay that brings a platform's HTTP requests to this host: Signal's `ingress` socket, which

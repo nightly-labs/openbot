@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { teeLogLines } from "@openbot/logging";
+import { Effect } from "effect";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 
 /**
@@ -18,6 +19,6 @@ const PROVIDER_LOG_PREFIXES = ["provider-runtime", "provider-runtimes", "provide
 export function startProviderLog(logsDirectory: string): () => void {
   const directory = join(logsDirectory, "providers");
   return teeLogLines(PROVIDER_LOG_PREFIXES, (line) => {
-    void appendRemoteDiagnosticLog(directory, "providers", `${line}\n`);
+    Effect.runFork(appendRemoteDiagnosticLog(directory, "providers", `${line}\n`));
   });
 }

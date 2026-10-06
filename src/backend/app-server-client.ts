@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
@@ -14,12 +15,12 @@ import {
   type RpcError,
   type RpcMessage,
 } from "./protocol";
+import { ProviderClientOperationError } from "./provider-client-effects";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
-  timeout: NodeJS.Timeout;
 }
 
 interface ClientEvents {
@@ -103,33 +104,28 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  async stop(): Promise<void> {
+  readonly stop = Effect.fn("CodexAppServer.stop")(function* (this: CodexAppServerClient) {
     const child = this.#process;
     if (!child) return;
-
     this.#stopping = true;
     this.#process = null;
-
-    for (const pending of this.#pending.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error("Codex App Server stopped."));
-    }
+    for (const pending of this.#pending.values()) pending.reject(new Error("Codex App Server stopped."));
     this.#pending.clear();
-
     child.stdin.end();
     if (child.exitCode !== null) return;
-
-    await new Promise<void>((resolve) => {
+    yield* Effect.callback<void>((resume) => {
       const forceKill = setTimeout(() => {
         if (child.exitCode === null) child.kill("SIGKILL");
       }, 2_000);
-      child.once("exit", () => {
-        clearTimeout(forceKill);
-        resolve();
-      });
+      const exited = () => resume(Effect.void);
+      child.once("exit", exited);
       child.kill("SIGTERM");
+      return Effect.sync(() => {
+        clearTimeout(forceKill);
+        child.off("exit", exited);
+      });
     });
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Drops this connection's hold on one thread and keeps the app server for the others.
@@ -143,40 +139,48 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * A thread this connection never subscribed to answers `NotSubscribed`, which is not an error
    * here: either way this side has stopped using it.
    */
-  async releaseThread(threadId: string): Promise<void> {
+  readonly releaseThread = Effect.fn("CodexAppServer.releaseThread")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
     if (!this.running) return;
-    await this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
-  }
+    yield* this.request("thread/unsubscribe", { threadId }, decodeRecordResponse);
+  });
 
-  request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
-  request<T>(
+  readonly request = Effect.fn("CodexAppServer.request")(function* <T>(
+    this: CodexAppServerClient,
     method: string,
     params: unknown,
     decoder: ResponseDecoder<T>,
     timeoutMs = this.#requestTimeoutMs,
-  ): Promise<T> {
+  ) {
     const id = this.#nextId++;
-    return new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.#pending.delete(id);
-        reject(new RequestTimeoutError("Codex", method));
-      }, timeoutMs);
-
+    return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
-        resolve: (value) => resolve(decoder(value)),
-        reject,
-        timeout,
+        resolve: (value) =>
+          resume(
+            Effect.try({
+              try: () => decoder(value),
+              catch: (cause) => new ProviderClientOperationError({ cause }),
+            }),
+          ),
+        reject: (cause) => resume(Effect.fail(new ProviderClientOperationError({ cause }))),
       });
-
       try {
         this.#write({ method, id, params });
-      } catch (error) {
-        clearTimeout(timeout);
-        this.#pending.delete(id);
-        reject(error);
+      } catch (cause) {
+        resume(Effect.fail(new ProviderClientOperationError({ cause })));
       }
-    });
-  }
+      return Effect.sync(() => this.#pending.delete(id));
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: timeoutMs,
+        orElse: () =>
+          Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+      }),
+      Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
+    );
+  });
 
   notify(method: string, params: unknown = {}): void {
     this.#write({ method, params });
@@ -214,7 +218,6 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const pending = this.#pending.get(message.id);
     if (!pending) return;
 
-    clearTimeout(pending.timeout);
     this.#pending.delete(message.id);
 
     if (message.error && isRecord(message.error)) {
@@ -232,7 +235,6 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#process = null;
 
     for (const pending of this.#pending.values()) {
-      clearTimeout(pending.timeout);
       pending.reject(error);
     }
     this.#pending.clear();
@@ -252,3 +254,5 @@ function redactDiagnostic(message: string): string {
     .replace(/(?:sk|sess|Bearer|token)[-_a-zA-Z0-9.=]{8,}/gi, "[redacted]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]");
 }
+
+/** Kept inside the adapter; public callers still receive the native protocol error. */

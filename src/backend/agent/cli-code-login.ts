@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
+import { Effect, Fiber, Schema } from "effect";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
 import { waitForSuccessfulProcess } from "./provider-status";
@@ -21,9 +22,9 @@ export type CliCodePrompt =
 export interface CliCodeLogin {
   child: ChildProcess;
   /** Settles when the CLI exits: resolves on success, rejects on failure or after `timeoutMs`. */
-  done: Promise<void>;
+  done: Effect.Effect<void, CliCodeLoginFailed>;
   /** Resolves when the CLI has printed what the user needs. Rejects when it exits or goes quiet first. */
-  prompt: Promise<CliCodePrompt>;
+  prompt: Effect.Effect<CliCodePrompt, CliCodeLoginFailed>;
   /** Types the code into the CLI's prompt. Only a `paste` sign-in reads it. */
   submit(code: string): void;
 }
@@ -45,71 +46,62 @@ const MAX_CODE_LENGTH = 2048;
  * flow runs only there: the BSD `script` of macOS stops when its stdin is a socket, which is what
  * Node gives a child, and a FIFO on macOS is a socket too. Windows has no `script`.
  */
-export function startCliCodeLogin(options: {
+export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   flow: CliCodePrompt["flow"];
   executable: string;
   argv: readonly string[];
   env: Record<string, string>;
   timeoutMs: number;
   platform?: NodeJS.Platform;
-}): CliCodeLogin {
+}) {
   const platform = options.platform ?? process.platform;
-  const command = options.flow === "paste" ? terminalCommand(platform, options.argv) : null;
-  // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
-  const target = command
-    ? { command: command.file, args: command.args, windowsVerbatimArguments: false }
-    : cliSpawnTarget(options.executable, options.argv, platform);
-  const child = spawn(target.command, target.args, {
-    cwd: process.cwd(),
-    env: { ...process.env, ...options.env, ...(command ? { OPENBOT_LOGIN_EXECUTABLE: options.executable } : {}) },
-    windowsVerbatimArguments: target.windowsVerbatimArguments,
-    stdio: ["pipe", "pipe", "pipe"],
-    shell: false,
-    windowsHide: platform === "win32",
+  const command = yield* Effect.try({
+    try: () => (options.flow === "paste" ? terminalCommand(platform, options.argv) : null),
+    catch: (cause) => new CliCodeLoginFailed({ cause }),
   });
+  const child = yield* Effect.acquireRelease(
+    Effect.try({
+      try: () => {
+        // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
+        const target = command
+          ? { command: command.file, args: command.args, windowsVerbatimArguments: false }
+          : cliSpawnTarget(options.executable, options.argv, platform);
+        return spawn(target.command, target.args, {
+          cwd: process.cwd(),
+          env: { ...process.env, ...options.env, ...(command ? { OPENBOT_LOGIN_EXECUTABLE: options.executable } : {}) },
+          windowsVerbatimArguments: target.windowsVerbatimArguments,
+          stdio: ["pipe", "pipe", "pipe"],
+          shell: false,
+          windowsHide: platform === "win32",
+        });
+      },
+      catch: (cause) => new CliCodeLoginFailed({ cause }),
+    }),
+    (child) => stopProcessTree(child).pipe(Effect.orDie),
+  );
   child.stdin?.on("error", () => undefined);
   let submitted = false;
   // After a pasted code, an exit with a failure code is the provider refusing it. A timeout is a
   // signal, so it keeps its own message.
-  const done = waitForSuccessfulProcess(child, options.timeoutMs).catch((error: unknown) => {
-    if (submitted && child.exitCode !== null) throw new Error(sourceText("error.provider.codeLoginRefused"));
-    throw error;
-  });
-  const prompt = new Promise<CliCodePrompt>((resolve, reject) => {
-    let output = "";
-    let settled = false;
-    const settle = (result: CliCodePrompt | Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      child.stdout?.off("data", read);
-      child.stderr?.off("data", read);
-      if (result instanceof Error) {
-        // Cursor's Windows launcher runs under `cmd.exe`, so the whole tree has to stop.
-        if (child.exitCode === null) stopProcessTree(child);
-        reject(result);
-      } else resolve(result);
-    };
-    const read = (chunk: Buffer) => {
-      if (output.length >= MAX_OUTPUT_CHARS) return;
-      output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);
-      const parsed = parseCliCodePrompt(options.flow, output);
-      if (parsed) settle(parsed);
-    };
-    const timer = setTimeout(() => settle(new Error(sourceText("error.provider.codeLoginNoLink"))), PROMPT_TIMEOUT_MS);
-    timer.unref?.();
-    child.stdout?.on("data", read);
-    child.stderr?.on("data", read);
-    child.once("error", () => settle(new Error(sourceText("error.provider.codeLoginNoLink"))));
-    child.once("exit", () => settle(new Error(sourceText("error.provider.codeLoginNoLink"))));
-  });
-  // Both are awaited by the caller; this only keeps an early exit from being unhandled.
-  done.catch(() => undefined);
-  prompt.catch(() => undefined);
+  const done = yield* Effect.forkScoped(
+    waitForSuccessfulProcess(child, options.timeoutMs).pipe(
+      Effect.mapError(
+        (failure) =>
+          new CliCodeLoginFailed({
+            cause:
+              submitted && child.exitCode !== null
+                ? new Error(sourceText("error.provider.codeLoginRefused"))
+                : failure.cause,
+          }),
+      ),
+    ),
+    { startImmediately: true },
+  );
+  const prompt = yield* Effect.forkScoped(readCodePrompt(child, options.flow), { startImmediately: true });
   return {
     child,
-    done,
-    prompt,
+    done: Fiber.join(done),
+    prompt: Fiber.join(prompt),
     submit(code) {
       if (options.flow !== "paste") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
       const value = normalizePastedCode(code);
@@ -119,8 +111,52 @@ export function startCliCodeLogin(options: {
       submitted = true;
       child.stdin.write(`${value}\r`);
     },
-  };
-}
+  } satisfies CliCodeLogin;
+});
+
+export class CliCodeLoginFailed extends Schema.TaggedError<CliCodeLoginFailed>()("CliCodeLoginFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+// Output contains credentials and must not become a trace payload.
+const readCodePrompt = Effect.fnUntraced(function* (child: ChildProcess, flow: CliCodePrompt["flow"]) {
+  return yield* Effect.callback<CliCodePrompt, CliCodeLoginFailed>((resume) => {
+    let output = "";
+    let settled = false;
+    const cleanup = () => {
+      child.stdout?.off("data", read);
+      child.stderr?.off("data", read);
+      child.off("error", unavailable);
+      child.off("exit", unavailable);
+    };
+    const settle = (result: CliCodePrompt | Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resume(result instanceof Error ? Effect.fail(new CliCodeLoginFailed({ cause: result })) : Effect.succeed(result));
+    };
+    const unavailable = () => settle(new Error(sourceText("error.provider.codeLoginNoLink")));
+    const read = (chunk: Buffer) => {
+      if (output.length >= MAX_OUTPUT_CHARS) return;
+      output += chunk.toString("utf8").slice(0, MAX_OUTPUT_CHARS - output.length);
+      const parsed = parseCliCodePrompt(flow, output);
+      if (parsed) settle(parsed);
+    };
+    child.stdout?.on("data", read);
+    child.stderr?.on("data", read);
+    child.once("error", unavailable);
+    child.once("exit", unavailable);
+    return Effect.sync(cleanup);
+  }).pipe(
+    Effect.timeoutOrElse({
+      duration: PROMPT_TIMEOUT_MS,
+      orElse: () =>
+        Effect.fail(new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) })),
+    }),
+    // Cursor's Windows launcher runs under `cmd.exe`, so the whole tree has to stop.
+    Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+  );
+});
 
 /** The pasted code, or an error that does not quote it. */
 export function normalizePastedCode(code: string): string {

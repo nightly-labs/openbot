@@ -1,5 +1,7 @@
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import type { Effect } from "effect";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
+import type { ProviderClientOperationError } from "./provider-client-effects";
 
 export type AgentProvider = AgentProviderId;
 
@@ -12,7 +14,7 @@ export interface AgentClient {
   readonly provider: AgentProvider;
   readonly running: boolean;
   start(): void;
-  stop(): Promise<void>;
+  stop(): Effect.Effect<void, ProviderClientOperationError>;
   /**
    * Closes the provider-side state of one thread and leaves the client running for the others.
    *
@@ -21,14 +23,19 @@ export interface AgentClient {
    * alive with it, so each further change adds another set of processes - including the servers the
    * user turned off. Optional, because a client that keeps no per-thread state has nothing to close.
    */
-  releaseThread?(externalThreadId: string): Promise<void>;
+  releaseThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   /**
    * Closes each thread that has no turn and can open again from its session, to free its processes
    * and MCP servers when the machine is low on memory. Optional, because a client that runs all its
    * threads in one process frees nothing this way.
    */
-  releaseIdleThreads?(): void;
-  request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
+  releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  request<T>(
+    method: string,
+    params: unknown,
+    decoder: ResponseDecoder<T>,
+    timeoutMs?: number,
+  ): Effect.Effect<T, ProviderClientOperationError>;
   notify(method: string, params?: unknown): void;
   respond(id: RequestId, result: unknown): void;
   respondError(id: RequestId, error: RpcError): void;
@@ -40,6 +47,10 @@ export interface AgentClient {
    */
   on(event: "diagnostic", listener: (message: string, origin?: DiagnosticOrigin) => void): this;
   once(event: "exit", listener: (error: Error) => void): this;
+  /** Removes listeners when an owning operation completes or is interrupted. */
+  off(event: "notification", listener: (notification: AppServerNotification) => void): this;
+  off(event: "request", listener: (request: AppServerRequest) => void): this;
+  off(event: "exit", listener: (error: Error) => void): this;
 }
 
 /**

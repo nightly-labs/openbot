@@ -1,5 +1,7 @@
 import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
+import { runTeamEffect } from "./effect-boundary";
 
 import {
   createRemoteDirectoryRefresh,
@@ -36,7 +38,7 @@ describe("RemoteTeamDirectoryClient", () => {
       authentication: { kind: "browser" },
       fetch,
     });
-    await client.listHosts();
+    await runTeamEffect(client.listHosts());
     expect(fetch).toHaveBeenLastCalledWith(
       new URL("https://openbot.run/api/browser/v2/remote/hosts/"),
       expect.objectContaining({
@@ -45,7 +47,7 @@ describe("RemoteTeamDirectoryClient", () => {
       }),
     );
     fetch.mockResolvedValue(Response.json({ ended: true }));
-    await client.endSession("session");
+    await runTeamEffect(client.endSession("session"));
     expect(fetch).toHaveBeenLastCalledWith(
       new URL("https://openbot.run/api/browser/v2/remote/sessions/session/end"),
       expect.objectContaining({ method: "POST", body: "{}" }),
@@ -58,7 +60,7 @@ describe("RemoteTeamDirectoryClient", () => {
       authentication: { kind: "browser" },
       fetch,
     });
-    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
+    await expect(runTeamEffect(client.previewInvite(INVITE))).resolves.toMatchObject({ hostId: HOST_ID });
     expect(fetch).toHaveBeenCalledWith(
       new URL("https://openbot.run/api/browser/v2/remote/invites/preview"),
       expect.objectContaining({ credentials: "same-origin" }),
@@ -69,7 +71,7 @@ describe("RemoteTeamDirectoryClient", () => {
       fingerprint: HOST_FINGERPRINT,
       token: "t".repeat(32),
     });
-    await expect(client.previewInvite(foreign)).rejects.toThrow("another OpenBot service");
+    await expect(runTeamEffect(client.previewInvite(foreign))).rejects.toThrow("another OpenBot service");
     expect(fetch).toHaveBeenCalledOnce();
   });
   it("removes a revoked paired desktop while keeping the other memberships available", async () => {
@@ -87,7 +89,7 @@ describe("RemoteTeamDirectoryClient", () => {
       pairedHost: { hostId: HOST_ID, fingerprint: HOST_FINGERPRINT },
       fetch: async () => Response.json({ hosts: [remote] }),
     });
-    await expect(client.listHosts()).resolves.toEqual([remote]);
+    await expect(runTeamEffect(client.listHosts())).resolves.toEqual([remote]);
   });
 
   it("pins the QR's exact host even when another owned desktop is first", async () => {
@@ -124,7 +126,7 @@ describe("RemoteTeamDirectoryClient", () => {
           ],
         }),
     });
-    await client.listHosts();
+    await runTeamEffect(client.listHosts());
     expect(pinned.get(HOST_ID)).toBe(HOST_KEY);
     expect(pinned.has("other-desktop")).toBe(false);
   });
@@ -148,7 +150,7 @@ describe("RemoteTeamDirectoryClient", () => {
           ],
         }),
     });
-    await expect(client.listHosts()).rejects.toThrow("paired desktop identity");
+    await expect(runTeamEffect(client.listHosts())).rejects.toThrow("paired desktop identity");
   });
 
   it("leaves the exact membership without removing the trusted key", async () => {
@@ -161,7 +163,7 @@ describe("RemoteTeamDirectoryClient", () => {
         return new Response(null, { status: 204 });
       },
     });
-    await client.leaveHost(HOST_ID, "membership-1");
+    await runTeamEffect(client.leaveHost(HOST_ID, "membership-1"));
     expect(requests).toEqual([{ url: `${API_URL}/v2/remote/hosts/${HOST_ID}/members/membership-1`, method: "DELETE" }]);
   });
   it("returns only connectable hosts and authenticates the directory request", async () => {
@@ -197,7 +199,7 @@ describe("RemoteTeamDirectoryClient", () => {
       },
     });
 
-    await expect(client.listHosts()).resolves.toEqual([
+    await expect(runTeamEffect(client.listHosts())).resolves.toEqual([
       {
         hostId: HOST_ID,
         name: "Studio",
@@ -231,7 +233,7 @@ describe("RemoteTeamDirectoryClient", () => {
       },
     });
 
-    await expect(client.createBootstrap(HOST_ID, "client-public-key")).rejects.toThrow("host offline");
+    await expect(runTeamEffect(client.createBootstrap(HOST_ID, "client-public-key"))).rejects.toThrow("host offline");
     expect(paths).toEqual([
       "/v2/remote/sessions/",
       "/v2/remote/sessions/session-1/ticket",
@@ -267,13 +269,15 @@ describe("RemoteTeamDirectoryClient", () => {
       },
     });
 
-    await expect(client.createBootstrap(HOST_ID, "client-public-key", "session-1")).resolves.toMatchObject({
+    await expect(
+      runTeamEffect(client.createBootstrap(HOST_ID, "client-public-key", "session-1")),
+    ).resolves.toMatchObject({
       sessionId: "session-1",
     });
     expect(paths).toEqual(["/v2/remote/sessions/session-1/ticket"]);
 
     paths.length = 0;
-    await expect(client.createBootstrap(HOST_ID, "client-public-key", "ended")).resolves.toMatchObject({
+    await expect(runTeamEffect(client.createBootstrap(HOST_ID, "client-public-key", "ended"))).resolves.toMatchObject({
       sessionId: "session-2",
     });
     expect(paths).toEqual([
@@ -283,7 +287,9 @@ describe("RemoteTeamDirectoryClient", () => {
     ]);
 
     paths.length = 0;
-    await expect(client.createBootstrap(HOST_ID, "client-public-key", "unreachable")).rejects.toThrow("Try again.");
+    await expect(runTeamEffect(client.createBootstrap(HOST_ID, "client-public-key", "unreachable"))).rejects.toThrow(
+      "Try again.",
+    );
     expect(paths).toEqual(["/v2/remote/sessions/unreachable/ticket"]);
   });
 
@@ -307,7 +313,7 @@ describe("RemoteTeamDirectoryClient", () => {
       },
     });
 
-    await expect(client.createBootstrap(HOST_ID, "client-public-key")).resolves.toMatchObject({
+    await expect(runTeamEffect(client.createBootstrap(HOST_ID, "client-public-key"))).resolves.toMatchObject({
       signalUrl: "ws://192.168.1.143:3101/v1/signal",
     });
   });
@@ -336,7 +342,10 @@ describe("RemoteTeamDirectoryClient", () => {
       token: "t".repeat(32),
     });
 
-    await expect(client.previewInvite(inviteUrl)).resolves.toMatchObject({ hostId: HOST_ID, hostName: "Studio" });
+    await expect(runTeamEffect(client.previewInvite(inviteUrl))).resolves.toMatchObject({
+      hostId: HOST_ID,
+      hostName: "Studio",
+    });
     expect(authorizations).toEqual([null]);
   });
 
@@ -352,7 +361,7 @@ describe("RemoteTeamDirectoryClient", () => {
         );
       },
     });
-    await expect(client.acceptInvite(INVITE)).rejects.toThrow("fingerprint");
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).rejects.toThrow("fingerprint");
     expect(paths).toEqual(["/v2/remote/invites/preview"]);
   });
 
@@ -367,7 +376,7 @@ describe("RemoteTeamDirectoryClient", () => {
       fetch: async (input) =>
         Response.json(new URL(input.toString()).pathname.endsWith("/preview") ? PREVIEW : accepted),
     });
-    await expect(client.acceptInvite(INVITE)).rejects.toThrow("invalid invitation acceptance");
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).rejects.toThrow("invalid invitation acceptance");
   });
 
   it("returns the joined host without needing a directory refresh, and retains its pin across client restarts", async () => {
@@ -398,17 +407,19 @@ describe("RemoteTeamDirectoryClient", () => {
       },
     };
     const client = new RemoteTeamDirectoryClient(options);
-    await expect(client.acceptInvite(INVITE)).resolves.toEqual({
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).resolves.toEqual({
       ...ACCEPTED,
       name: "Studio",
       logoKey: null,
       devicePublicKey: HOST_KEY,
     });
-    await expect(client.listHosts()).rejects.toThrow("Directory offline");
+    await expect(runTeamEffect(client.listHosts())).rejects.toThrow("Directory offline");
     directoryOffline = false;
-    await expect(client.listHosts()).resolves.toMatchObject([{ devicePublicKey: HOST_KEY }]);
+    await expect(runTeamEffect(client.listHosts())).resolves.toMatchObject([{ devicePublicKey: HOST_KEY }]);
     advertisedKey = "substituted-key";
-    await expect(new RemoteTeamDirectoryClient(options).listHosts()).rejects.toThrow("server identity changed");
+    await expect(runTeamEffect(new RemoteTeamDirectoryClient(options).listHosts())).rejects.toThrow(
+      "server identity changed",
+    );
     expect(keys.get(HOST_ID)).toBe(HOST_KEY);
   });
 
@@ -429,7 +440,9 @@ describe("RemoteTeamDirectoryClient", () => {
           return Response.json(PREVIEW);
         },
       });
-      await expect(client.acceptInvite(INVITE)).rejects.toThrow(pinned ? "conflicts" : "Keychain locked");
+      await expect(runTeamEffect(client.acceptInvite(INVITE))).rejects.toThrow(
+        pinned ? "conflicts" : "Keychain locked",
+      );
       expect(paths).toEqual(["/v2/remote/invites/preview"]);
     }
   });
@@ -450,10 +463,10 @@ describe("mobile member management", () => {
         return new Response(null, { status: 204 });
       },
     });
-    await client.updateMember(HOST_ID, "member/id", "admin");
-    await client.updateMember(HOST_ID, "member/id", "member", true);
-    await client.leaveHost(HOST_ID, "member/id");
-    await client.revokeInvite("invite/id");
+    await runTeamEffect(client.updateMember(HOST_ID, "member/id", "admin"));
+    await runTeamEffect(client.updateMember(HOST_ID, "member/id", "member", true));
+    await runTeamEffect(client.leaveHost(HOST_ID, "member/id"));
+    await runTeamEffect(client.revokeInvite("invite/id"));
     expect(requests).toEqual([
       { path: `/v2/remote/hosts/${HOST_ID}/members/member%2Fid`, method: "PATCH", body: '{"role":"admin"}' },
       {
@@ -472,7 +485,9 @@ describe("mobile member management", () => {
       token: "mobile-session",
       fetch: async () => Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 }),
     });
-    expect(await client.createInvite({ hostId: HOST_ID, devicePublicKey: HOST_KEY }, { role: "member" })).toEqual({
+    expect(
+      await runTeamEffect(client.createInvite({ hostId: HOST_ID, devicePublicKey: HOST_KEY }, { role: "member" })),
+    ).toEqual({
       inviteId: "invite-1",
       inviteUrl: INVITE,
       expiresAt: 1234,
@@ -511,18 +526,17 @@ describe("mobile member management", () => {
         return Response.json(method === "POST" ? { ...invite, token: "t".repeat(32) } : { invites: [invite] });
       },
     });
-    const created = await client.createInvite(
-      { hostId: HOST_ID, devicePublicKey: HOST_KEY },
-      { role: "member", permanent: true },
+    const created = await runTeamEffect(
+      client.createInvite({ hostId: HOST_ID, devicePublicKey: HOST_KEY }, { role: "member", permanent: true }),
     );
     expect(created.inviteUrl).toBe(INVITE);
     expect(requests[0]?.body).toEqual({ role: "member", permanent: true });
-    await expect(client.listInvites(HOST_ID)).resolves.toEqual([invite]);
-    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ permanent: true });
-    await expect(client.acceptInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
-    await expect(client.acceptInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
-    await client.revokeInvite(invite.inviteId);
-    await expect(client.acceptInvite(INVITE)).rejects.toThrow("Invitation revoked.");
+    await expect(runTeamEffect(client.listInvites(HOST_ID))).resolves.toEqual([invite]);
+    await expect(runTeamEffect(client.previewInvite(INVITE))).resolves.toMatchObject({ permanent: true });
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).resolves.toMatchObject({ hostId: HOST_ID });
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).resolves.toMatchObject({ hostId: HOST_ID });
+    await runTeamEffect(client.revokeInvite(invite.inviteId));
+    await expect(runTeamEffect(client.acceptInvite(INVITE))).rejects.toThrow("Invitation revoked.");
   });
 
   it("recognizes a never-expiring invitation from an older projection", async () => {
@@ -531,7 +545,7 @@ describe("mobile member management", () => {
       token: "session",
       fetch: async () => Response.json({ ...PREVIEW, expiresAt: PERMANENT_INVITE_EXPIRES_AT_MS }),
     });
-    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ permanent: true });
+    await expect(runTeamEffect(client.previewInvite(INVITE))).resolves.toMatchObject({ permanent: true });
   });
 
   it("sends the created email invitation through the delivery endpoint", async () => {
@@ -547,9 +561,11 @@ describe("mobile member management", () => {
           : Response.json({ inviteId: "invite-1", token: "t".repeat(32), expiresAt: 1234 });
       },
     });
-    const invite = await client.sendInviteEmail(
-      { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
-      { role: "member", email: "member@example.com" },
+    const invite = await runTeamEffect(
+      client.sendInviteEmail(
+        { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+        { role: "member", email: "member@example.com" },
+      ),
     );
     expect(requests).toEqual([
       { path: `/v2/remote/hosts/${HOST_ID}/invites`, body: { role: "member", email: "member@example.com" } },
@@ -582,9 +598,11 @@ describe("mobile member management", () => {
       },
     });
     await expect(
-      client.sendInviteEmail(
-        { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
-        { role: "member", email: "member@example.com" },
+      runTeamEffect(
+        client.sendInviteEmail(
+          { hostId: HOST_ID, devicePublicKey: HOST_KEY, name: "My desktop" },
+          { role: "member", email: "member@example.com" },
+        ),
       ),
     ).rejects.toThrow();
     expect(revoked).toEqual(["/v2/remote/invites/invite-1"]);
@@ -608,10 +626,12 @@ describe("mobile member management", () => {
           ? Response.json({ error: "Owner access required." }, { status: 403 })
           : Response.json(url.toString().endsWith("members/") ? { members: [member] } : { invites: [invite] }),
     });
-    const result = [await client.listMembers(HOST_ID), await client.listInvites(HOST_ID)];
+    const result = [await runTeamEffect(client.listMembers(HOST_ID)), await runTeamEffect(client.listInvites(HOST_ID))];
     expect(result).toEqual([[member], [{ ...invite, permanent: false, useCount: 0 }]]);
     denied = true;
-    await expect(client.updateMember(HOST_ID, "member-1", "admin")).rejects.toMatchObject({ status: 403 });
+    await expect(runTeamEffect(client.updateMember(HOST_ID, "member-1", "admin"))).rejects.toMatchObject({
+      status: 403,
+    });
   });
 });
 
@@ -621,13 +641,20 @@ describe("directory refresh", () => {
     const load = vi.fn(async () => {
       throw new Error("Offline");
     });
-    const refresh = createRemoteDirectoryRefresh(load, () => now);
-    await Promise.allSettled([refresh.refresh(), refresh.refresh(), refresh.refresh(true)]);
+    const refresh = createRemoteDirectoryRefresh(
+      () => Effect.tryPromise(load),
+      () => now,
+    );
+    await Promise.allSettled([
+      runTeamEffect(refresh.refresh()),
+      runTeamEffect(refresh.refresh()),
+      runTeamEffect(refresh.refresh(true)),
+    ]);
     now = 15 * 60_000 - 1;
-    await refresh.refresh().catch(() => undefined);
+    await runTeamEffect(refresh.refresh()).catch(() => undefined);
     now = 15 * 60_000;
-    await refresh.refresh().catch(() => undefined);
-    await refresh.refresh(true).catch(() => undefined);
+    await runTeamEffect(refresh.refresh()).catch(() => undefined);
+    await runTeamEffect(refresh.refresh(true)).catch(() => undefined);
     expect(load).toHaveBeenCalledTimes(3);
   });
 });
@@ -641,12 +668,18 @@ it("finds memberships accepted on another device and stops polling on cleanup", 
     fetch: async () => Response.json({ hosts }),
   });
   let visible: string[] = [];
-  const refresh = createRemoteDirectoryRefresh(async () => {
-    visible = (await client.listHosts()).map((host) => host.hostId);
-  });
+  const refresh = createRemoteDirectoryRefresh(() =>
+    client.listHosts().pipe(
+      Effect.tap((hosts) =>
+        Effect.sync(() => {
+          visible = hosts.map((host) => host.hostId);
+        }),
+      ),
+    ),
+  );
   const stop = watchRemoteDirectory(() => refresh.refresh(true));
   try {
-    await refresh.refresh(true);
+    await runTeamEffect(refresh.refresh(true));
     hosts = [
       {
         hostId: HOST_ID,

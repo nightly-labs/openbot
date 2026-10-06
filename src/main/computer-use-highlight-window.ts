@@ -4,8 +4,10 @@ import type {
   ComputerUseHighlightPlacement,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
+import { Deferred, Effect, Exit, Schema } from "effect";
 import type { BrowserWindow, Rectangle } from "electron";
 import type { ComputerUseHighlightTarget } from "./computer-use-target-window";
+import type { CuaDriverFailure } from "./cua-driver-effects";
 
 const logger = createOpenBotLogger("computer-use-highlight");
 
@@ -26,6 +28,12 @@ const DEFAULT_POLL_INTERVAL_MS = 33;
 const IDLE_OVERLAY_MS = 60_000;
 /** The corner radius of a standard macOS window, which is what the rim follows by default. */
 const DEFAULT_CORNER_RADIUS = 12;
+
+/** An overlay surface that did not load. */
+class HighlightOverlayLoadFailed extends Schema.TaggedError<HighlightOverlayLoadFailed>()(
+  "HighlightOverlayLoadFailed",
+  { cause: Schema.Defect() },
+) {}
 
 /**
  * The part of a window the controller uses. A real `BrowserWindow` answers all of it, and naming
@@ -56,7 +64,9 @@ export interface ComputerUseHighlightControllerOptions<W extends HighlightOverla
    * rim is on now is passed back, because the choice holds on to it rather than following the
    * front of the desktop into whatever the user clicks next.
    */
-  readTarget: (previous: ComputerUseHighlightTarget | null) => Promise<ComputerUseHighlightTarget | null>;
+  readTarget: (
+    previous: ComputerUseHighlightTarget | null,
+  ) => Effect.Effect<ComputerUseHighlightTarget | null, CuaDriverFailure>;
   /**
    * Where the agent last aimed the pointer, on the desktop, or `null` when nothing is to be drawn.
    *
@@ -105,7 +115,8 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   #target: ComputerUseHighlightTarget | null = null;
   #loggedWindowId: number | null = null;
   #timer: ReturnType<typeof setInterval> | null = null;
-  #tick: Promise<void> | null = null;
+  /** The tick in progress, which a refresh that arrives meanwhile waits for instead of starting another. */
+  #tick: Deferred.Deferred<void> | null = null;
   #destroyed = false;
   /** When the rim went down, or `null` while it is up. */
   #hiddenAt: number | null = null;
@@ -133,10 +144,10 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   start(): void {
     if (this.#destroyed || this.#timer) return;
     const interval = this.#options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-    this.#timer = setInterval(() => void this.refresh(), interval);
+    this.#timer = setInterval(() => Effect.runFork(this.refresh()), interval);
     // A timer that keeps the process alive would hold a quit open for a whole interval.
     this.#timer.unref?.();
-    void this.refresh();
+    Effect.runFork(this.refresh());
   }
 
   stop(): void {
@@ -153,18 +164,28 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
    * One placement. Ticks never overlap: a driver read that takes longer than the interval would
    * otherwise queue reads behind each other and place the rim from an answer that is already old.
    */
-  async refresh(): Promise<void> {
-    if (this.#destroyed) return;
-    if (this.#tick) return this.#tick;
-    this.#tick = this.#refresh().catch((error) => {
-      this.#logger.debug("Computer Use highlight could not be placed", { error: toLogValue(error) });
-      this.#hide();
+  refresh(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#destroyed) return Effect.void;
+      if (this.#tick) return Deferred.await(this.#tick);
+      const tick = Deferred.makeUnsafe<void>();
+      this.#tick = tick;
+      const failed = (error: unknown) =>
+        Effect.sync(() => {
+          this.#logger.debug("Computer Use highlight could not be placed", { error: toLogValue(error) });
+          this.#hide();
+        });
+      return this.#refresh().pipe(
+        Effect.catch((error) => failed(error.cause)),
+        Effect.catchDefect(failed),
+        Effect.ensuring(
+          Effect.suspend(() => {
+            this.#tick = null;
+            return Deferred.done(tick, Exit.void);
+          }),
+        ),
+      );
     });
-    try {
-      await this.#tick;
-    } finally {
-      this.#tick = null;
-    }
   }
 
   destroy(): void {
@@ -172,10 +193,10 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     this.stop();
   }
 
-  async #refresh(): Promise<void> {
+  readonly #refresh = Effect.fn("ComputerUseHighlight.refresh")(function* (this: ComputerUseHighlightController<W>) {
     const generation = this.#generation;
     const stale = () => this.#destroyed || this.#generation !== generation;
-    const target = await this.#options.readTarget(this.#target);
+    const target = yield* this.#options.readTarget(this.#target);
     if (stale()) return;
     this.#target = target;
     // Only the move from one window to another, not every tick, and never the title: a window
@@ -202,7 +223,11 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       }
       if (!overlay.loaded) {
         overlay.loaded = true;
-        await this.#options.loadWindow(overlay.window);
+        const window = overlay.window;
+        yield* Effect.tryPromise({
+          try: () => this.#options.loadWindow(window),
+          catch: (cause) => new HighlightOverlayLoadFailed({ cause }),
+        });
         if (stale() || overlay.window.isDestroyed()) return;
       }
       // Only when the display is resized or moved. Every other tick leaves the window alone, which
@@ -213,7 +238,7 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       }
       this.#place(overlay.window, target, display.bounds, pointer);
     }
-  }
+  }).bind(this);
 
   /** The rim and the cursor in one display's own pixels, which is what that overlay draws in. */
   #place(window: W, target: ComputerUseHighlightTarget, display: Rectangle, pointer: ComputerUseCursorPoint | null) {

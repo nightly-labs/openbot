@@ -4,10 +4,14 @@ import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { desktopCall, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import { RemoteScreenGateway, type RemoteScreenRuntime } from "./remote-screen-gateway";
+import { remoteCall } from "./remote-service-effects";
 import { SunshineApiError } from "./sunshine-moonlight-runtime";
 
 const displays = [
@@ -19,7 +23,7 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
 const runtimes: FakeRuntime[] = [];
 
 afterEach(async () => {
-  await Promise.all(runtimes.map((runtime) => runtime.stop()));
+  await Promise.all(runtimes.map((runtime) => runCauseEffect(runtime.stop())));
   runtimes.length = 0;
 });
 
@@ -31,7 +35,7 @@ describe("RemoteScreenGateway", () => {
       expect(gateway.capabilities().ready).toBe(true);
       const session = await createSession(gateway, "http://127.0.0.1:9");
       expect(session.phase).toBe("connecting");
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     },
   );
 
@@ -46,7 +50,7 @@ describe("RemoteScreenGateway", () => {
           "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on a Mac, a Windows x64 host or a Linux x64 host, then restart OpenBot.",
       });
       expect(gateway.list()).toEqual([]);
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     },
   );
 
@@ -59,13 +63,13 @@ describe("RemoteScreenGateway", () => {
         code: "host_unavailable",
         message: "Remote desktop on Linux needs an X11 session. Wayland is not supported.",
       });
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     },
   );
 
   it("serves a local test on loopback and closes its listener with the session", async () => {
     const gateway = createGateway();
-    const session = await gateway.createLocalTestSession();
+    const session = await runCauseEffect(gateway.createLocalTestSession());
     try {
       expect(new URL(session.viewerUrl).hostname).toBe("127.0.0.1");
       expect(session.serverId).toBe("local");
@@ -78,18 +82,18 @@ describe("RemoteScreenGateway", () => {
       });
       expect(authorized.status).toBe(204);
       expect(authorized.headers.get("set-cookie")).toContain("HttpOnly; Secure; SameSite=None");
-      expect(() => gateway.testLocalSession("another-session", "start")).toThrow();
+      await expect(runCauseEffect(gateway.testLocalSession("another-session", "start"))).rejects.toThrow();
     } finally {
-      await gateway.closeLocalTestSession(session.id);
+      await runCauseEffect(gateway.closeLocalTestSession(session.id));
     }
     expect(gateway.list()).toHaveLength(0);
     await expect(fetch(session.viewerUrl)).rejects.toThrow();
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
   });
 
   it.each([false, true])("rejects a malformed local request target (upgrade: %s)", async (upgrade) => {
     const gateway = createGateway();
-    const session = await gateway.createLocalTestSession();
+    const session = await runCauseEffect(gateway.createLocalTestSession());
     try {
       const socket = connect({ host: "127.0.0.1", port: Number(new URL(session.viewerUrl).port) });
       const response = await new Promise<string>((resolve, reject) => {
@@ -115,7 +119,7 @@ describe("RemoteScreenGateway", () => {
       else expect(response).toMatch(/^HTTP\/1\.1 400 /);
       expect((await fetch(session.viewerUrl)).status).toBe(200);
     } finally {
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     }
   });
 
@@ -125,11 +129,11 @@ describe("RemoteScreenGateway", () => {
     });
     const gateway = createGateway({ getIceServers });
     try {
-      await gateway.createLocalTestSession();
-      await expect(runtimes[0]?.getIceServers()).resolves.toEqual([]);
+      await runCauseEffect(gateway.createLocalTestSession());
+      await expect(runCauseEffect(runtimes[0]?.getIceServers() ?? Effect.succeed([]))).resolves.toEqual([]);
       expect(getIceServers).not.toHaveBeenCalled();
     } finally {
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     }
   });
 
@@ -138,16 +142,16 @@ describe("RemoteScreenGateway", () => {
     const getIceServers = vi.fn(async () => iceServers);
     const gateway = createGateway({ getIceServers });
     try {
-      await gateway.createLocalTestSession();
+      await runCauseEffect(gateway.createLocalTestSession());
       const remote = await createSession(gateway, "https://remote.example");
-      await expect(runtimes[0]?.getIceServers()).resolves.toEqual(iceServers);
+      await expect(runCauseEffect(runtimes[0]?.getIceServers() ?? Effect.succeed([]))).resolves.toEqual(iceServers);
       expect(getIceServers).toHaveBeenCalledOnce();
-      await gateway.closeSession(remote.id);
-      await expect(runtimes[0]?.getIceServers()).resolves.toEqual([]);
+      await runCauseEffect(gateway.closeSession(remote.id));
+      await expect(runCauseEffect(runtimes[0]?.getIceServers() ?? Effect.succeed([]))).resolves.toEqual([]);
       expect(getIceServers).toHaveBeenCalledOnce();
       expect(runtimes[0]?.stop).not.toHaveBeenCalled();
     } finally {
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
     }
   });
 
@@ -241,11 +245,11 @@ describe("RemoteScreenGateway", () => {
       code: "host_permissions_required",
     });
 
-    await expect(gateway.recheckScreenRecording()).resolves.toBe(true);
+    await expect(runCauseEffect(gateway.recheckScreenRecording())).resolves.toBe(true);
     expect(gateway.screenRecordingDenied()).toBe(true);
 
     deniedAtStartup = false;
-    await expect(gateway.recheckScreenRecording()).resolves.toBe(false);
+    await expect(runCauseEffect(gateway.recheckScreenRecording())).resolves.toBe(false);
     expect(gateway.screenRecordingDenied()).toBe(false);
     expect(onScreenRecordingDenied.mock.calls).toEqual([[true], [false]]);
 
@@ -256,58 +260,62 @@ describe("RemoteScreenGateway", () => {
 
   it("checks the Sunshine user and permissions without interrupting a session", async () => {
     let accessibility: "allowed" | "blocked" = "blocked";
-    const checkSetup = vi.fn(async () => ({
-      hostName: "Mac mini",
-      username: "tenant",
-      screenRecording: "allowed" as const,
-      accessibility,
-      guiSession: "allowed" as const,
-      displays: "allowed" as const,
-      restartRequired: false,
-    }));
+    const checkSetup = vi.fn(() =>
+      desktopSync(() => ({
+        hostName: "Mac mini",
+        username: "tenant",
+        screenRecording: "allowed" as const,
+        accessibility,
+        guiSession: "allowed" as const,
+        displays: "allowed" as const,
+        restartRequired: false,
+      })),
+    );
     const gateway = createGateway({ checkSetup });
     await createSession(gateway, "https://remote.example");
     const runtime = runtimes[0];
-    await expect(gateway.checkSetup()).resolves.toMatchObject({
+    await expect(runCauseEffect(gateway.checkSetup())).resolves.toMatchObject({
       username: "tenant",
       accessibility: "blocked",
       service: "allowed",
       activeSessions: 1,
     });
     accessibility = "allowed";
-    await expect(gateway.checkSetup()).resolves.toMatchObject({ accessibility: "allowed" });
+    await expect(runCauseEffect(gateway.checkSetup())).resolves.toMatchObject({ accessibility: "allowed" });
     accessibility = "blocked";
-    await expect(gateway.checkSetup()).resolves.toMatchObject({ accessibility: "blocked" });
+    await expect(runCauseEffect(gateway.checkSetup())).resolves.toMatchObject({ accessibility: "blocked" });
     expect(runtime?.stop).not.toHaveBeenCalled();
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
   });
 
   it("does not report permission approval from an absent endpoint or failed check", async () => {
-    await expect(createGateway().checkSetup()).resolves.toMatchObject({
+    await expect(runCauseEffect(createGateway().checkSetup())).resolves.toMatchObject({
       screenRecording: "unavailable",
       accessibility: "unavailable",
     });
     const gateway = createGateway({
-      checkSetup: async () => {
-        throw new Error("private native details");
-      },
+      checkSetup: () =>
+        desktopSync(() => {
+          throw new Error("private native details");
+        }),
     });
-    const result = await gateway.checkSetup();
+    const result = await runCauseEffect(gateway.checkSetup());
     expect(result).toMatchObject({ screenRecording: "failed", accessibility: "failed", service: "allowed" });
     expect(JSON.stringify(result)).not.toContain("private native details");
     expect(runtimes.at(-1)?.stop).toHaveBeenCalledOnce();
-    await expect(createGateway({ runtimeInstalled: false }).checkSetup()).resolves.toMatchObject({
+    await expect(runCauseEffect(createGateway({ runtimeInstalled: false }).checkSetup())).resolves.toMatchObject({
       service: "unavailable",
     });
   });
 
   it("reports an older native endpoint as unavailable", async () => {
     const gateway = createGateway({
-      checkSetup: async () => {
-        throw new SunshineApiError(404);
-      },
+      checkSetup: () =>
+        desktopSync(() => {
+          throw new SunshineApiError(404);
+        }),
     });
-    await expect(gateway.checkSetup()).resolves.toMatchObject({
+    await expect(runCauseEffect(gateway.checkSetup())).resolves.toMatchObject({
       accessibility: "unavailable",
       screenRecording: "unavailable",
       service: "allowed",
@@ -315,47 +323,51 @@ describe("RemoteScreenGateway", () => {
   });
 
   it("rechecks permissions before starting a test and clears the test lock on refusal", async () => {
-    const test = vi.fn(async (action: "start" | "status" | "stop") => ({
-      active: action !== "stop",
-      mouse: false,
-      keyboard: false,
-      code: "1234",
-    }));
+    const test = vi.fn((action: "start" | "status" | "stop") =>
+      desktopSync(() => ({
+        active: action !== "stop",
+        mouse: false,
+        keyboard: false,
+        code: "1234",
+      })),
+    );
     const gateway = createGateway({
       test,
-      checkSetup: async () => ({
-        hostName: "Mac mini",
-        username: "tenant",
-        screenRecording: "allowed",
-        accessibility: "blocked",
-        guiSession: "allowed",
-        displays: "allowed",
-        restartRequired: false,
-      }),
+      checkSetup: () =>
+        desktopSync(() => ({
+          hostName: "Mac mini",
+          username: "tenant",
+          screenRecording: "allowed",
+          accessibility: "blocked",
+          guiSession: "allowed",
+          displays: "allowed",
+          restartRequired: false,
+        })),
     });
     const session = await createSession(gateway, "https://remote.example");
-    await expect(gateway.test(session.id, "member-a", "start")).rejects.toMatchObject({
+    await expect(runCauseEffect(gateway.test(session.id, "member-a", "start"))).rejects.toMatchObject({
       code: "host_permissions_required",
     });
     expect(test).not.toHaveBeenCalledWith("start");
     await createSession(gateway, "https://remote.example", "member-b");
     expect(gateway.list()).toHaveLength(2);
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
   });
 
   it("reports missing displays and inactive GUI sessions independently", async () => {
     const gateway = createGateway({
-      checkSetup: async () => ({
-        hostName: "Mac mini",
-        username: "tenant",
-        screenRecording: "blocked",
-        accessibility: "allowed",
-        guiSession: "blocked",
-        displays: "unavailable",
-        restartRequired: false,
-      }),
+      checkSetup: () =>
+        desktopSync(() => ({
+          hostName: "Mac mini",
+          username: "tenant",
+          screenRecording: "blocked",
+          accessibility: "allowed",
+          guiSession: "blocked",
+          displays: "unavailable",
+          restartRequired: false,
+        })),
     });
-    await expect(gateway.checkSetup()).resolves.toMatchObject({
+    await expect(runCauseEffect(gateway.checkSetup())).resolves.toMatchObject({
       screenRecording: "blocked",
       accessibility: "allowed",
       guiSession: "blocked",
@@ -364,58 +376,66 @@ describe("RemoteScreenGateway", () => {
   });
 
   it("restricts a test to its session owner and releases the panel on disconnect", async () => {
-    const test = vi.fn(async (action: "start" | "status" | "stop") => ({
-      active: action !== "stop",
-      mouse: false,
-      keyboard: false,
-      code: "1234",
-    }));
+    const test = vi.fn((action: "start" | "status" | "stop") =>
+      desktopSync(() => ({
+        active: action !== "stop",
+        mouse: false,
+        keyboard: false,
+        code: "1234",
+      })),
+    );
     const gateway = createGateway({
       test,
-      checkSetup: async () => ({
-        hostName: "Mac mini",
-        username: "tenant",
-        screenRecording: "allowed",
-        accessibility: "allowed",
-        guiSession: "allowed",
-        displays: "allowed",
-        restartRequired: false,
-      }),
+      checkSetup: () =>
+        desktopSync(() => ({
+          hostName: "Mac mini",
+          username: "tenant",
+          screenRecording: "allowed",
+          accessibility: "allowed",
+          guiSession: "allowed",
+          displays: "allowed",
+          restartRequired: false,
+        })),
     });
     const session = await createSession(gateway, "https://remote.example");
-    await expect(gateway.test(session.id, "outsider", "start")).rejects.toMatchObject({ status: 404 });
+    await expect(runCauseEffect(gateway.test(session.id, "outsider", "start"))).rejects.toMatchObject({
+      status: 404,
+    });
     expect(test).not.toHaveBeenCalled();
-    await expect(gateway.test(session.id, "member-a", "start")).resolves.toMatchObject({
+    await expect(runCauseEffect(gateway.test(session.id, "member-a", "start"))).resolves.toMatchObject({
       active: true,
       mouse: false,
       keyboard: false,
     });
     await expect(createSession(gateway, "https://remote.example", "member-b")).rejects.toMatchObject({ status: 409 });
-    await gateway.closeSession(session.id);
+    await runCauseEffect(gateway.closeSession(session.id));
     expect(test).toHaveBeenLastCalledWith("stop");
     expect(runtimes[0]?.stop).toHaveBeenCalledOnce();
   });
 
   it("does not start a test while another member has a session", async () => {
-    const test = vi.fn(async () => ({ active: true, mouse: false, keyboard: false, code: "1234" }));
+    const test = vi.fn(() => desktopSync(() => ({ active: true, mouse: false, keyboard: false, code: "1234" })));
     const gateway = createGateway({
       test,
-      checkSetup: async () => ({
-        hostName: "Mac mini",
-        username: "tenant",
-        screenRecording: "allowed",
-        accessibility: "allowed",
-        guiSession: "allowed",
-        displays: "allowed",
-        restartRequired: false,
-      }),
+      checkSetup: () =>
+        desktopSync(() => ({
+          hostName: "Mac mini",
+          username: "tenant",
+          screenRecording: "allowed",
+          accessibility: "allowed",
+          guiSession: "allowed",
+          displays: "allowed",
+          restartRequired: false,
+        })),
     });
     const session = await createSession(gateway, "https://remote.example");
     await createSession(gateway, "https://remote.example", "member-b");
-    await expect(gateway.test(session.id, "member-a", "start")).rejects.toMatchObject({ status: 409 });
+    await expect(runCauseEffect(gateway.test(session.id, "member-a", "start"))).rejects.toMatchObject({
+      status: 409,
+    });
     expect(test).not.toHaveBeenCalled();
     expect(gateway.list()).toHaveLength(2);
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
   });
 
   it("limits the host to four active sessions", async () => {
@@ -445,7 +465,7 @@ describe("RemoteScreenGateway", () => {
   });
 
   it("releases an unused session when its viewer grant expires", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(new Date("2026-08-21T12:00:00.000Z"));
     const gateway = createGateway();
     try {
@@ -456,13 +476,13 @@ describe("RemoteScreenGateway", () => {
       expect(gateway.list()).toHaveLength(0);
       expect(runtimes[0]?.stop).toHaveBeenCalled();
     } finally {
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
       vi.useRealTimers();
     }
   });
 
   it("closes an active remote stream when its team session expires", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(new Date("2026-08-21T12:00:00.000Z"));
     const gateway = createGateway();
     try {
@@ -473,7 +493,7 @@ describe("RemoteScreenGateway", () => {
       expect(gateway.list()).toHaveLength(0);
       expect(runtimes[0]?.stop).toHaveBeenCalled();
     } finally {
-      await gateway.stop();
+      await runCauseEffect(gateway.stop());
       vi.useRealTimers();
     }
   });
@@ -511,7 +531,7 @@ describe("RemoteScreenGateway", () => {
 
     await expect(upstreamMessage).resolves.toBe(init);
     client.close();
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
     upstreamWebSockets.close();
     await close();
     await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
@@ -590,7 +610,7 @@ describe("RemoteScreenGateway", () => {
     clients.forEach((client) => {
       client.close();
     });
-    await gateway.stop();
+    await runCauseEffect(gateway.stop());
     upstreamWebSockets.close();
     await close();
     await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
@@ -600,7 +620,7 @@ describe("RemoteScreenGateway", () => {
     const gateway = createGateway();
     await createSession(gateway, "https://remote.example", "member-a");
     await createSession(gateway, "https://remote.example", "member-b");
-    await gateway.revokeMember("member-a");
+    await runCauseEffect(gateway.revokeMember("member-a"));
     expect(gateway.list()).toHaveLength(1);
   });
 
@@ -608,7 +628,7 @@ describe("RemoteScreenGateway", () => {
     const gateway = createGateway();
     const session = await createSession(gateway, "https://remote.example");
     const secondSession = await createSession(gateway, "https://remote.example", "member-b");
-    await gateway.selectDisplay("second");
+    await runCauseEffect(gateway.selectDisplay("second"));
     expect(runtimes[0]?.selectedDisplays).toEqual(["second"]);
     expect(gateway.list()).toEqual(
       expect.arrayContaining([
@@ -616,7 +636,7 @@ describe("RemoteScreenGateway", () => {
         expect.objectContaining({ id: secondSession.id, selectedDisplayId: "second", phase: "connecting" }),
       ]),
     );
-    await expect(gateway.selectDisplay("missing")).rejects.toMatchObject({ status: 400 });
+    await expect(runCauseEffect(gateway.selectDisplay("missing"))).rejects.toMatchObject({ status: 400 });
   });
 
   it("rejects a second display change while Sunshine is restarting", async () => {
@@ -629,10 +649,10 @@ describe("RemoteScreenGateway", () => {
     });
     await createSession(gateway, "https://remote.example");
 
-    const firstChange = gateway.selectDisplay("second");
+    const firstChange = runCauseEffect(gateway.selectDisplay("second"));
     await vi.waitFor(() => expect(runtimes[0]?.selectedDisplays).toEqual(["second"]));
 
-    await expect(gateway.selectDisplay("main")).rejects.toMatchObject({ status: 409 });
+    await expect(runCauseEffect(gateway.selectDisplay("main"))).rejects.toMatchObject({ status: 409 });
     releaseDisplayChange?.();
     await firstChange;
   });
@@ -662,9 +682,9 @@ function createGateway(
         ? null
         : { sunshine: "/sunshine", moonlightWebServer: "/web-server", moonlightStreamer: "/streamer" },
     runtimeStateDirectory: "/tmp/openbot-test-runtime",
-    getRuntimeCredentials: async () => ({ username: "openbot", password: "secret" }),
+    getRuntimeCredentials: () => Effect.succeed({ username: "openbot", password: "secret" }),
     getDisplays: () => displays,
-    getIceServers: options.getIceServers ?? (async () => [{ urls: "stun:127.0.0.1:3478" }]),
+    getIceServers: () => remoteCall(options.getIceServers ?? (async () => [{ urls: "stun:127.0.0.1:3478" }])),
     ...(options.onScreenRecordingDenied ? { onScreenRecordingDenied: options.onScreenRecordingDenied } : {}),
     ...(options.now ? { now: options.now } : {}),
     createRuntime: ({ getIceServers }) => {
@@ -684,21 +704,23 @@ function createSession(
   memberId = "member-a",
   teamSessionExpiresAt = new Date(Date.now() + 86_400_000).toISOString(),
 ) {
-  return gateway.createSession({
-    serverId: "server-a",
-    memberId,
-    teamSessionId: `team-${memberId}`,
-    teamSessionExpiresAt,
-    publicHttpBaseUrl,
-  });
+  return runCauseEffect(
+    gateway.createSession({
+      serverId: "server-a",
+      memberId,
+      teamSessionId: `team-${memberId}`,
+      teamSessionExpiresAt,
+      publicHttpBaseUrl,
+    }),
+  );
 }
 
 class FakeRuntime implements RemoteScreenRuntime {
-  getIceServers: () => Promise<RemoteDesktopIceServer[]> = async () => [];
+  getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError> = () => Effect.succeed([]);
   checkSetup?: RemoteScreenRuntime["checkSetup"];
   test?: RemoteScreenRuntime["test"];
   selectedDisplays: string[] = [];
-  readonly stop = vi.fn(async () => undefined);
+  readonly stop = vi.fn(() => Effect.void);
 
   constructor(
     private readonly baseUrl = "http://127.0.0.1:9",
@@ -710,8 +732,8 @@ class FakeRuntime implements RemoteScreenRuntime {
     return this.denied;
   }
 
-  async start() {
-    return {
+  start() {
+    return Effect.succeed({
       baseUrl: this.baseUrl,
       authHeader: "X-OpenBot-Remote-User",
       hostId: 12,
@@ -719,19 +741,21 @@ class FakeRuntime implements RemoteScreenRuntime {
       desktopAppId: 1,
       displays,
       selectedDisplayId: "main",
-    };
+    });
   }
 
-  async selectDisplay(displayId: string) {
-    this.selectedDisplays.push(displayId);
-    await this.selectDisplayHandler?.(displayId);
+  selectDisplay(displayId: string) {
+    return Effect.gen({ self: this }, function* () {
+      this.selectedDisplays.push(displayId);
+      if (this.selectDisplayHandler) yield* desktopCall(() => this.selectDisplayHandler?.(displayId));
+    });
   }
 }
 
 async function serveGateway(gateway: RemoteScreenGateway) {
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
-    void gateway.handleHttp(request, response, url);
+    void runCauseEffect(gateway.handleHttp(request, response, url));
   });
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");

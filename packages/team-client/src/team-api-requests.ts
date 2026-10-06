@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 // Team API requests that the web client and the mobile app send in the same way.
 //
 // Each client has its own transport and its own error text for most responses, so only the requests
@@ -39,6 +40,10 @@ import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-r
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
 
+export class TeamRequestError extends Schema.TaggedError<TeamRequestError>()("TeamRequestError", {
+  cause: Schema.Defect(),
+}) {}
+
 /** One request to the selected host. It rejects when the host fails or `decode` rejects the body. */
 export type TeamApiRequest = <T>(
   method: string,
@@ -56,85 +61,166 @@ function decodeAttachment(value: unknown): AttachmentSummary {
 }
 
 /** Sends a file as an attachment draft. The host keeps it until a message uses it or it is discarded. */
-export function uploadAttachmentDraft(request: TeamApiRequest, upload: RemoteFileUpload): Promise<AttachmentSummary> {
+export const uploadAttachmentDraft = Effect.fn("TeamClient.uploadAttachmentDraft")(function* (
+  request: TeamApiRequest,
+  upload: RemoteFileUpload,
+): Effect.fn.Return<AttachmentSummary, TeamRequestError> {
   const query = new URLSearchParams({ name: upload.name, mime: upload.mimeType });
-  return request("POST", `${TEAM_API_ROUTES.attachments}?${query}`, decodeAttachment, undefined, upload);
-}
+  return yield* Effect.tryPromise({
+    try: () => request("POST", `${TEAM_API_ROUTES.attachments}?${query}`, decodeAttachment, undefined, upload),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function discardAttachmentDraft(request: TeamApiRequest, attachmentId: string): Promise<void> {
-  return request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse);
-}
+export const discardAttachmentDraft = Effect.fn("TeamClient.discardAttachmentDraft")(function* (
+  request: TeamApiRequest,
+  attachmentId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function interruptAgentTurn(request: TeamApiRequest, agentId: string, turnId: string): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.agent.interrupt(agentId), ignoreResponse, { turnId });
-}
+export const interruptAgentTurn = Effect.fn("TeamClient.interruptAgentTurn")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+  turnId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", TEAM_API_ROUTES.agent.interrupt(agentId), ignoreResponse, { turnId }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function cancelQueuedMessage(
+export const cancelQueuedMessage = Effect.fn("TeamClient.cancelQueuedMessage")(function* (
   request: TeamApiRequest,
   { agentId, deliveryId }: CancelQueuedMessageInput,
-): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.agent.queueCancel(agentId), ignoreResponse, { deliveryId });
-}
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", TEAM_API_ROUTES.agent.queueCancel(agentId), ignoreResponse, { deliveryId }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function steerQueuedMessage(
+export const steerQueuedMessage = Effect.fn("TeamClient.steerQueuedMessage")(function* (
   request: TeamApiRequest,
   { agentId, deliveryId, expectedTurnId }: SteerQueuedMessageInput,
-): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.agent.queueSteer(agentId), ignoreResponse, { deliveryId, expectedTurnId });
-}
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () =>
+      request("POST", TEAM_API_ROUTES.agent.queueSteer(agentId), ignoreResponse, { deliveryId, expectedTurnId }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function updateQueuedMessage(
+export const updateQueuedMessage = Effect.fn("TeamClient.updateQueuedMessage")(function* (
   request: TeamApiRequest,
   { agentId, ...update }: UpdateQueuedMessageInput,
-): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.agent.queueUpdate(agentId), ignoreResponse, update);
-}
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", TEAM_API_ROUTES.agent.queueUpdate(agentId), ignoreResponse, update),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function reorderQueue(request: TeamApiRequest, { agentId, deliveryIds }: ReorderQueueInput): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.agent.queueReorder(agentId), ignoreResponse, { deliveryIds });
-}
+export const reorderQueue = Effect.fn("TeamClient.reorderQueue")(function* (
+  request: TeamApiRequest,
+  { agentId, deliveryIds }: ReorderQueueInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", TEAM_API_ROUTES.agent.queueReorder(agentId), ignoreResponse, { deliveryIds }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
 /** Starts a new chat with the agent. Send it only to a host that serves `context-reset-v1`. */
-export function clearAgentContext(request: TeamApiRequest, agentId: string): Promise<void> {
-  return request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId });
-}
+export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
 /** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */
-export function stageAgentImport(request: TeamApiRequest, upload: RemoteFileUpload): Promise<AgentImportPreview> {
-  return request("POST", AGENT_IMPORT_ROUTES.stage, decodeRemoteAgentImportPreview, undefined, {
-    ...upload,
-    maxBytes: AGENT_IMPORT_UPLOAD_BYTES,
+export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(function* (
+  request: TeamApiRequest,
+  upload: RemoteFileUpload,
+): Effect.fn.Return<AgentImportPreview, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () =>
+      request("POST", AGENT_IMPORT_ROUTES.stage, decodeRemoteAgentImportPreview, undefined, {
+        ...upload,
+        maxBytes: AGENT_IMPORT_UPLOAD_BYTES,
+      }),
+    catch: (cause) => new TeamRequestError({ cause }),
   });
-}
+});
 
-export function applyAgentImport(
+export const applyAgentImport = Effect.fn("TeamClient.applyAgentImport")(function* (
   request: TeamApiRequest,
   input: ApplyAgentImportInput,
   timezone: string,
-): Promise<RemoteAgentImportResult> {
-  return request("POST", AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, { ...input, timezone });
-}
+): Effect.fn.Return<RemoteAgentImportResult, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, { ...input, timezone }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function discardAgentImport(request: TeamApiRequest, token: string): Promise<void> {
-  return request("POST", AGENT_IMPORT_ROUTES.discard, ignoreResponse, { token });
-}
+export const discardAgentImport = Effect.fn("TeamClient.discardAgentImport")(function* (
+  request: TeamApiRequest,
+  token: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", AGENT_IMPORT_ROUTES.discard, ignoreResponse, { token }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
 /** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */
-export function listInstalledSkills(request: TeamApiRequest, agentId: string): Promise<InstalledSkill[]> {
-  return request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills);
-}
+export const listInstalledSkills = Effect.fn("TeamClient.listInstalledSkills")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<InstalledSkill[], TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function deleteAgent(request: TeamApiRequest, agentId: string): Promise<void> {
-  return request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse);
-}
+export const deleteAgent = Effect.fn("TeamClient.deleteAgent")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function respondToBrowserTakeover(request: TeamApiRequest, input: RespondToBrowserTakeoverInput): Promise<void> {
-  return request("POST", TEAM_API_ROUTES.respond.browserTakeover, ignoreResponse, { ...input });
-}
+export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
+  request: TeamApiRequest,
+  input: RespondToBrowserTakeoverInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", TEAM_API_ROUTES.respond.browserTakeover, ignoreResponse, { ...input }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
-export function respondToBrowserSecret(request: TeamApiRequest, input: RespondToBrowserSecretInput): Promise<void> {
-  return request("POST", BROWSER_SECRET_RESPONSE_PATH, ignoreResponse, { ...input });
-}
+export const respondToBrowserSecret = Effect.fn("TeamClient.respondToBrowserSecret")(function* (
+  request: TeamApiRequest,
+  input: RespondToBrowserSecretInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* Effect.tryPromise({
+    try: () => request("POST", BROWSER_SECRET_RESPONSE_PATH, ignoreResponse, { ...input }),
+    catch: (cause) => new TeamRequestError({ cause }),
+  });
+});
 
 /** The channel calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
 export type TeamChannelsApi = Pick<

@@ -14,6 +14,7 @@ import type { MobileSearchTextInputHandle } from "@/features/search/components/s
 import { mobileSearchView, normalizeMobileSearchQuery } from "@/features/search/model/mobile-search";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 export function SearchAgentsScreen() {
@@ -88,7 +89,7 @@ export function SearchAgentsScreen() {
       contentContainerClassName="pb-safe-offset-5"
       contentInsetAdjustmentBehavior="automatic"
       header={
-        <View className="flex-row items-center gap-2 px-5 pb-3 pt-7">
+        <View className={`flex-row items-center gap-2 px-5 pb-3 ${isAndroid ? "pt-4" : "pt-7"}`}>
           <GlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
             isInteractive={liquidGlassAvailable}
@@ -113,6 +114,9 @@ export function SearchAgentsScreen() {
           </GlassView>
         </View>
       }
+      // On Android the field is a React Native input in the sticky header. When it takes focus, the
+      // keyboard-aware scroll moves the results under the header. The Android sheet moves over the keyboard.
+      keyboardAware={!isAndroid}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}

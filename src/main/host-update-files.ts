@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { Effect, Schema } from "effect";
 import { z } from "zod";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { isMissingFileError } from "../backend/file-errors";
@@ -46,85 +47,110 @@ export const tenantStatusSchema: z.ZodType<HostTenantStatus> = z
   })
   .strict();
 
-/** Each ancestor is immutable to tenants. Never accept a symlink as a directory. */
-export async function verifyHostDirectory(path: string, hostUid = 0): Promise<void> {
-  const absolute = resolve(path);
-  const parent = dirname(absolute);
-  if (parent !== absolute) await verifyHostDirectory(parent, hostUid);
-  const info = await lstat(absolute);
-  // Tests use a private directory below the OS temporary directory. Production always uses UID 0.
-  if (!info.isDirectory() || (info.uid !== 0 && info.uid !== hostUid) || (info.mode & 0o022) !== 0) {
-    throw new Error("Host directory must have a trusted owner and no group or public write permission.");
-  }
-}
-
-export async function readOwnedJson<T>(path: string, uid: number, schema: z.ZodType<T>): Promise<T> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const info = await handle.stat();
-    if (!info.isFile() || info.uid !== uid || info.nlink !== 1 || (info.mode & 0o022) !== 0 || info.size > 8192) {
-      throw new Error("Invalid host protocol file ownership, type, permissions or size.");
+export class HostProtocolFileError extends Schema.TaggedError<HostProtocolFileError>()("HostProtocolFileError", {
+  cause: Schema.Defect(),
+}) {}
+const fileCall = <A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: (cause) => new HostProtocolFileError({ cause }),
+  });
+export const verifyHostDirectory: (path: string, hostUid?: number) => Effect.Effect<void, HostProtocolFileError> =
+  Effect.fn("HostFiles.verifyDirectory")(function* (
+    path: string,
+    hostUid = 0,
+  ): Effect.fn.Return<void, HostProtocolFileError> {
+    const absolute = resolve(path);
+    const parent = dirname(absolute);
+    if (parent !== absolute) yield* verifyHostDirectory(parent, hostUid);
+    const info = yield* fileCall(() => lstat(absolute));
+    // Tests use a private directory below the OS temporary directory. Production always uses UID 0.
+    if (!info.isDirectory() || (info.uid !== 0 && info.uid !== hostUid) || (info.mode & 0o022) !== 0) {
+      return yield* new HostProtocolFileError({
+        cause: new Error("Host directory must have a trusted owner and no group or public write permission."),
+      });
     }
-    // Bound the read even if the tenant grows its file after fstat.
-    const buffer = Buffer.alloc(8193);
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-    if (bytesRead > 8192) throw new Error("Host protocol file is too large.");
-    return schema.parse(JSON.parse(buffer.subarray(0, bytesRead).toString("utf8")));
-  } finally {
-    await handle.close();
-  }
-}
-
-/** Rename replaces the directory entry; it never opens an existing destination or symlink. */
-export async function writeProtocolJson(
+  });
+export const readOwnedJson = Effect.fn("HostFiles.readOwnedJson")(function* <T>(
+  path: string,
+  uid: number,
+  schema: z.ZodType<T>,
+): Effect.fn.Return<T, HostProtocolFileError> {
+  return yield* Effect.acquireUseRelease(
+    fileCall(() => open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)),
+    (handle) =>
+      Effect.gen(function* () {
+        const info = yield* fileCall(() => handle.stat());
+        if (!info.isFile() || info.uid !== uid || info.nlink !== 1 || (info.mode & 0o022) !== 0 || info.size > 8192) {
+          return yield* new HostProtocolFileError({
+            cause: new Error("Invalid host protocol file ownership, type, permissions or size."),
+          });
+        }
+        // Bound the read even if the tenant grows its file after fstat.
+        const buffer = Buffer.alloc(8193);
+        const { bytesRead } = yield* fileCall(() => handle.read(buffer, 0, buffer.length, 0));
+        if (bytesRead > 8192)
+          return yield* new HostProtocolFileError({ cause: new Error("Host protocol file is too large.") });
+        return yield* Effect.try({
+          try: () => schema.parse(JSON.parse(buffer.subarray(0, bytesRead).toString("utf8"))),
+          catch: (cause) => new HostProtocolFileError({ cause }),
+        });
+      }),
+    (handle) => fileCall(() => handle.close()),
+  );
+});
+export const writeProtocolJson = Effect.fn("HostFiles.writeProtocolJson")(function* (
   path: string,
   value: HostUpdateState | HostTenantStatus | HostManagerConfig,
-): Promise<void> {
-  const temporary = join(dirname(path), `.write-${randomUUID()}`);
-  const handle = await open(temporary, "wx", 0o644);
-  try {
-    await handle.chmod(0o644);
-    await handle.writeFile(`${JSON.stringify(value)}\n`);
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  try {
-    await rename(temporary, path);
-    const parent = await open(dirname(path), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-    try {
-      await parent.sync();
-    } finally {
-      await parent.close();
-    }
-  } catch (error) {
-    await unlink(temporary).catch((cleanupError: unknown) => {
-      if (!isMissingFileError(cleanupError)) throw cleanupError;
-    });
-    throw error;
-  }
-}
-
-export async function readHostConfig(
+): Effect.fn.Return<void, HostProtocolFileError> {
+  yield* Effect.acquireUseRelease(
+    Effect.sync(() => join(dirname(path), `.write-${randomUUID()}`)),
+    (temporary) =>
+      Effect.gen(function* () {
+        yield* Effect.acquireUseRelease(
+          fileCall(() => open(temporary, "wx", 0o644)),
+          (handle) =>
+            Effect.gen(function* () {
+              yield* fileCall(() => handle.chmod(0o644));
+              yield* fileCall(() => handle.writeFile(`${JSON.stringify(value)}\n`));
+              yield* fileCall(() => handle.sync());
+            }),
+          (handle) => fileCall(() => handle.close()),
+        );
+        yield* fileCall(() => rename(temporary, path));
+        yield* Effect.acquireUseRelease(
+          fileCall(() => open(dirname(path), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)),
+          (parent) => fileCall(() => parent.sync()),
+          (parent) => fileCall(() => parent.close()),
+        );
+      }),
+    // A successful rename already removes this path. Other cleanup failures remain visible.
+    (temporary) =>
+      fileCall(() => unlink(temporary)).pipe(
+        Effect.catch((failure) => (isMissingFileError(failure.cause) ? Effect.void : Effect.fail(failure))),
+      ),
+  );
+});
+export const readHostConfig = Effect.fn("HostFiles.readConfig")(function* (
   directory = HOST_MANAGER_DIRECTORY,
   hostUid = 0,
-): Promise<HostManagerConfig | null> {
-  try {
-    await verifyHostDirectory(directory, hostUid);
-    return await readOwnedJson(join(directory, "config.json"), hostUid, hostConfigSchema);
-  } catch (error) {
-    if (isMissingFileError(error)) return null;
-    throw error;
-  }
-}
-
-export async function verifyTenantDirectory(directory: string, uid: number, hostUid = 0): Promise<string> {
-  await verifyHostDirectory(join(directory, "tenants"), hostUid);
+): Effect.fn.Return<HostManagerConfig | null, HostProtocolFileError> {
+  return yield* Effect.gen(function* () {
+    yield* verifyHostDirectory(directory, hostUid);
+    return yield* readOwnedJson(join(directory, "config.json"), hostUid, hostConfigSchema);
+  }).pipe(Effect.catch((failure) => (isMissingFileError(failure.cause) ? Effect.succeed(null) : Effect.fail(failure))));
+});
+export const verifyTenantDirectory = Effect.fn("HostFiles.verifyTenantDirectory")(function* (
+  directory: string,
+  uid: number,
+  hostUid = 0,
+): Effect.fn.Return<string, HostProtocolFileError> {
+  yield* verifyHostDirectory(join(directory, "tenants"), hostUid);
   const path = join(directory, "tenants", String(uid));
-  const info = await lstat(path);
+  const info = yield* fileCall(() => lstat(path));
   // The parent is root-owned, so a tenant cannot replace this directory with a symlink.
   if (!info.isDirectory() || info.uid !== uid || (info.mode & 0o077) !== 0) {
-    throw new Error("Invalid tenant status directory.");
+    return yield* new HostProtocolFileError({ cause: new Error("Invalid tenant status directory.") });
   }
   return path;
-}
+});

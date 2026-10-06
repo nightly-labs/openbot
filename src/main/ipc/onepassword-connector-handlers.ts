@@ -3,6 +3,7 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { OnePasswordConnectInput } from "@openbot/contracts/ipc";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { isObject, requireString, stringPayload } from "./validation";
@@ -36,15 +37,15 @@ export function onePasswordConnectorIpcHandlers({
   return {
     onePasswordConnector: {
       status: handler(() => onePasswordConnector.status()),
-      checkSetup: handler(() => onePasswordConnector.checkSetup()),
-      installCli: handler(() => onePasswordConnector.installCli()),
-      openApp: handler(() => onePasswordConnector.openApp()),
-      connect: payloadHandler(decodeConnectInput, (input) => onePasswordConnector.connect(input)),
+      checkSetup: handler(() => runCauseEffect(onePasswordConnector.checkSetup())),
+      installCli: handler(() => runCauseEffect(onePasswordConnector.installCli())),
+      openApp: handler(() => runCauseEffect(onePasswordConnector.openApp())),
+      connect: payloadHandler(decodeConnectInput, (input) => runCauseEffect(onePasswordConnector.connect(input))),
       connectWithToken: payloadHandler(stringPayload("token", MAX_TOKEN_LENGTH), (token) =>
-        onePasswordConnector.connectWithToken(token),
+        runCauseEffect(onePasswordConnector.connectWithToken(token)),
       ),
       cancel: handler(() => onePasswordConnector.cancel()),
-      disconnect: handler(() => onePasswordConnector.disconnect()),
+      disconnect: handler(() => runCauseEffect(onePasswordConnector.disconnect())),
     },
   };
 }

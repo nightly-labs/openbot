@@ -565,6 +565,27 @@
   white-space: nowrap;
 }
 
+/* Shown only beside a skill whose name another listed skill shares: the slug tells them apart. */
+.mention-picker-slug {
+  flex: 0 0 auto;
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Takes the list's place when `$` finds nothing, at the height of one row in the list. */
+.mention-picker-status {
+  display: flex;
+  height: calc(var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
+  align-items: center;
+  margin: 0;
+  padding: 0 calc(var(--mention-picker-gutter) + 8px);
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
 .mention-picker-badge {
   margin-left: auto;
   flex: 0 0 auto;

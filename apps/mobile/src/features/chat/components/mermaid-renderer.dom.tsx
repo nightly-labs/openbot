@@ -17,13 +17,17 @@ const RASTER_MAX_SCALE = 3;
 /** Large diagrams are drawn smaller, so one image never takes much memory. */
 const RASTER_MAX_PIXELS = 4_000_000;
 
+// In Expo Go on Android the first render can have no props: react-native-webview cannot pass the
+// initial props of text with escapes, and the props come again when the DOM side is ready.
+const NO_JOBS: readonly MermaidJob[] = [];
+
 /**
  * The one web view that runs Mermaid. It stays loaded, so only the first diagram waits for
  * Mermaid to start, and it draws each diagram once, one after another. `strict` escapes the HTML
  * in labels and turns off click handlers, and a diagram cannot change it. Labels are SVG text, not
  * HTML, so the web view can also draw the diagram to a canvas for the chat card.
  */
-export default function MermaidRenderer({ jobs, onResult }: MermaidRendererProps) {
+export default function MermaidRenderer({ jobs = NO_JOBS, onResult }: MermaidRendererProps) {
   const started = useRef(new Set<string>());
   const queue = useRef<Promise<void>>(Promise.resolve());
   const report = useRef(onResult);

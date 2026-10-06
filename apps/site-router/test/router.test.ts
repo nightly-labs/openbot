@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { routeRequest } from "../src/index";
 
@@ -33,12 +34,14 @@ describe("site router", () => {
       "routes/example-project-page-long-name-23456789ab.openbot.site.json": JSON.stringify(activeRoute),
       "sites/site-1/deployments/deployment-1/index.html": "Hello, world!",
     });
-    const response = await routeRequest(
-      new Request("https://example-project-page-long-name-23456789ab.openbot.site/", {
-        headers: { Cookie: "unsafe=true", "If-None-Match": '"etag"' },
-      }),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
+    const response = await Effect.runPromise(
+      routeRequest(
+        new Request("https://example-project-page-long-name-23456789ab.openbot.site/", {
+          headers: { Cookie: "unsafe=true", "If-None-Match": '"etag"' },
+        }),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -53,10 +56,12 @@ describe("site router", () => {
     const expired = fakeBucket({
       "routes/example-project-page-long-name-23456789ab.openbot.site.json": JSON.stringify(activeRoute),
     });
-    const expiredResponse = await routeRequest(
-      new Request("https://example-project-page-long-name-23456789ab.openbot.site/"),
-      { SITES: expired, SITE_SERVE_ENABLED: "true" },
-      3_000,
+    const expiredResponse = await Effect.runPromise(
+      routeRequest(
+        new Request("https://example-project-page-long-name-23456789ab.openbot.site/"),
+        { SITES: expired, SITE_SERVE_ENABLED: "true" },
+        3_000,
+      ),
     );
     expect(expiredResponse.status).toBe(410);
     expect(expiredResponse.headers.get("X-Robots-Tag")).toContain("noindex");
@@ -64,16 +69,18 @@ describe("site router", () => {
 
   it("blocks service workers from an SVG document", async () => {
     const hostname = "example-project-page-long-name-23456789ab.openbot.site";
-    const response = await routeRequest(
-      new Request(`https://${hostname}/graphic.svg`),
-      {
-        SITES: fakeBucket({
-          [`routes/${hostname}.json`]: JSON.stringify(activeRoute),
-          "sites/site-1/deployments/deployment-1/graphic.svg": "<svg></svg>",
-        }),
-        SITE_SERVE_ENABLED: "true",
-      },
-      1_000,
+    const response = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/graphic.svg`),
+        {
+          SITES: fakeBucket({
+            [`routes/${hostname}.json`]: JSON.stringify(activeRoute),
+            "sites/site-1/deployments/deployment-1/graphic.svg": "<svg></svg>",
+          }),
+          SITE_SERVE_ENABLED: "true",
+        },
+        1_000,
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -87,20 +94,20 @@ describe("site router", () => {
       [`routes/${hostname}.json`]: JSON.stringify(activeRoute),
       "sites/site-1/deployments/deployment-1/index.html": "Hello, world!",
     });
-    const response = await routeRequest(
-      new Request(`https://${hostname}/`),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
+    const response = await Effect.runPromise(
+      routeRequest(new Request(`https://${hostname}/`), { SITES: bucket, SITE_SERVE_ENABLED: "true" }, 1_000),
     );
     expect(response.status).toBe(451);
     expect(response.headers.get("X-Robots-Tag")).toContain("noindex");
   });
 
   it("keeps unknown hostnames separate from tombstones", async () => {
-    const response = await routeRequest(
-      new Request("https://unknown-project-page-long-name-23456789ab.openbot.site/"),
-      { SITES: fakeBucket({}), SITE_SERVE_ENABLED: "true" },
-      1_000,
+    const response = await Effect.runPromise(
+      routeRequest(
+        new Request("https://unknown-project-page-long-name-23456789ab.openbot.site/"),
+        { SITES: fakeBucket({}), SITE_SERVE_ENABLED: "true" },
+        1_000,
+      ),
     );
     expect(response.status).toBe(404);
   });
@@ -111,22 +118,24 @@ describe("site router", () => {
       [`routes/${hostname}.json`]: JSON.stringify(activeRoute),
       "sites/site-1/deployments/deployment-1/app.js": "console.log('ok')",
     });
-    const disabled = await routeRequest(new Request(`https://${hostname}/app.js`), { SITES: bucket }, 1_000);
+    const disabled = await Effect.runPromise(
+      routeRequest(new Request(`https://${hostname}/app.js`), { SITES: bucket }, 1_000),
+    );
     expect(disabled.status).toBe(503);
 
-    const response = await routeRequest(
-      new Request(`https://${hostname}/app.js`),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
+    const response = await Effect.runPromise(
+      routeRequest(new Request(`https://${hostname}/app.js`), { SITES: bucket, SITE_SERVE_ENABLED: "true" }, 1_000),
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("public, no-cache");
     expect(response.headers.get("ETag")).toBe('"etag"');
 
-    const revalidated = await routeRequest(
-      new Request(`https://${hostname}/app.js`, { headers: { "If-None-Match": '"etag"' } }),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
+    const revalidated = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/app.js`, { headers: { "If-None-Match": '"etag"' } }),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+      ),
     );
     expect(revalidated.status).toBe(304);
     expect(revalidated.headers.get("ETag")).toBe('"etag"');
@@ -145,33 +154,39 @@ describe("site router", () => {
     const pending: Promise<unknown>[] = [];
     const runtime = {
       assetCache,
-      context: { waitUntil: (promise: Promise<unknown>) => pending.push(promise) },
+      schedule: (work: Effect.Effect<void>) => pending.push(Effect.runPromise(work)),
     };
 
-    const first = await routeRequest(
-      new Request(`https://${hostname}/app.js`),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
-      runtime,
+    const first = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/app.js`),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+        runtime,
+      ),
     );
     expect(first.status).toBe(200);
     expect(await first.text()).toBe("console.log('ok')");
     await Promise.all(pending);
 
-    const cached = await routeRequest(
-      new Request(`https://${hostname}/app.js`),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
-      runtime,
+    const cached = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/app.js`),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+        runtime,
+      ),
     );
     expect(cached.status).toBe(200);
     expect(await cached.text()).toBe("console.log('ok')");
 
-    const revalidated = await routeRequest(
-      new Request(`https://${hostname}/app.js`, { headers: { "If-None-Match": 'W/"etag"' } }),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
-      runtime,
+    const revalidated = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/app.js`, { headers: { "If-None-Match": 'W/"etag"' } }),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+        runtime,
+      ),
     );
     expect(revalidated.status).toBe(304);
     expect(getCounts.get(`blocks/${hostname}`)).toBe(3);
@@ -179,11 +194,13 @@ describe("site router", () => {
     expect(getCounts.get("sites/site-1/deployments/deployment-1/app.js")).toBe(1);
 
     objects[`blocks/${hostname}`] = "blocked";
-    const blocked = await routeRequest(
-      new Request(`https://${hostname}/app.js`),
-      { SITES: bucket, SITE_SERVE_ENABLED: "true" },
-      1_000,
-      runtime,
+    const blocked = await Effect.runPromise(
+      routeRequest(
+        new Request(`https://${hostname}/app.js`),
+        { SITES: bucket, SITE_SERVE_ENABLED: "true" },
+        1_000,
+        runtime,
+      ),
     );
     expect(blocked.status).toBe(451);
     expect(getCounts.get(`blocks/${hostname}`)).toBe(4);
@@ -195,19 +212,23 @@ describe("site router", () => {
     const env = { SITES: fakeBucket({}), SITE_SERVE_ENABLED: "true" };
     expect(
       (
-        await routeRequest(
-          new Request("https://example-project-page-long-name-23456789ab.openbot.site/", { method: "POST" }),
-          env,
-          1_000,
+        await Effect.runPromise(
+          routeRequest(
+            new Request("https://example-project-page-long-name-23456789ab.openbot.site/", { method: "POST" }),
+            env,
+            1_000,
+          ),
         )
       ).status,
     ).toBe(405);
     expect(
       (
-        await routeRequest(
-          new Request("https://example-project-page-long-name-23456789ab.openbot.site/%2e%2e/secret"),
-          env,
-          1_000,
+        await Effect.runPromise(
+          routeRequest(
+            new Request("https://example-project-page-long-name-23456789ab.openbot.site/%2e%2e/secret"),
+            env,
+            1_000,
+          ),
         )
       ).status,
     ).toBe(404);

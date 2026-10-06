@@ -4,16 +4,19 @@ import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import { X } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { toggleChannelMember } from "../model/channel-draft";
 import type { MobileChannelStore } from "../model/channel-store";
@@ -207,7 +210,18 @@ function ChannelForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {create ? (
+      {create && isAndroid ? (
+        <AndroidHeaderButton
+          placement="left"
+          icon={X}
+          accessibilityLabel={t("common.close")}
+          disabled={saving}
+          onPress={() => {
+            void haptics.impact("soft");
+            router.back();
+          }}
+        />
+      ) : create ? (
         <Stack.Toolbar placement="left">
           <Stack.Toolbar.Button
             icon="xmark"

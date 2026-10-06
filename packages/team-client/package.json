@@ -37,7 +37,8 @@
     "@noble/ed25519": "3.1.0",
     "@noble/hashes": "catalog:",
     "@openbot/contracts": "workspace:*",
-    "@openbot/i18n": "workspace:*"
+    "@openbot/i18n": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

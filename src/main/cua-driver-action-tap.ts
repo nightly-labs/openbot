@@ -28,6 +28,8 @@ import { connect, createServer, type Server, type Socket } from "node:net";
 import { Transform, type TransformCallback } from "node:stream";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, type Logger } from "@openbot/logging";
+import { Effect, Result } from "effect";
+import { CuaDriverFailure, cuaIO } from "./cua-driver-effects";
 import { rewriteCallAnswer } from "./cua-driver-structured-text";
 
 /**
@@ -312,29 +314,39 @@ export class CuaDriverActionTap {
     return this.#now() - pointer.at <= maxAgeMs ? pointer : null;
   }
 
-  async listen({ upstream, tap }: ActionTapAddresses): Promise<void> {
+  listen = Effect.fn("CuaDriverActionTap.listen")(function* (
+    this: CuaDriverActionTap,
+    { upstream, tap }: ActionTapAddresses,
+  ) {
     if (this.#server) return;
     const server = createServer((client) => this.#join(client, upstream));
     this.#server = server;
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(tap, () => {
-        server.removeListener("error", reject);
-        resolve();
-      });
-    });
-    // A listener of its own keeps a failed address from taking the whole main process down: a
-    // client that dies mid-request raises `ECONNRESET` on a socket nothing is waiting on.
+    const result = yield* Effect.result(
+      Effect.callback<void, CuaDriverFailure>((resume) => {
+        const fail = (cause: Error) => resume(Effect.fail(new CuaDriverFailure({ cause })));
+        const ready = () => {
+          server.removeListener("error", fail);
+          resume(Effect.void);
+        };
+        server.once("error", fail);
+        server.listen(tap, ready);
+        return Effect.sync(() => {
+          server.removeListener("error", fail);
+          server.removeListener("listening", ready);
+        });
+      }),
+    );
+    // Keep the listener safe after it is acquired and while it is closed after a bind failure.
     server.on("error", () => undefined);
-    // The same mode the daemon gives its own socket. This address reaches a process that can drive
-    // the whole desktop, and `listen` takes the mode from the umask, which the user owns. The
-    // directory around it is already private; both together are what keep the channel private.
-    // A Windows named pipe has no file to change, so the failure there is expected and ignored.
-    await chmod(tap, 0o600).catch(() => undefined);
+    if (Result.isFailure(result)) {
+      yield* this.close();
+      return yield* result.failure;
+    }
+    yield* cuaIO(() => chmod(tap, 0o600)).pipe(Effect.catch(() => Effect.void));
     this.#address = tap;
-  }
+  }, Effect.uninterruptible);
 
-  async close(): Promise<void> {
+  close = Effect.fn("CuaDriverActionTap.close")(function* (this: CuaDriverActionTap) {
     const server = this.#server;
     this.#server = null;
     this.#address = null;
@@ -343,8 +355,10 @@ export class CuaDriverActionTap {
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     if (!server) return;
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+    yield* Effect.callback<void>((resume) => {
+      server.close(() => resume(Effect.void));
+    });
+  }, Effect.uninterruptible);
 
   #join(client: Socket, upstream: string): void {
     const daemon = connect(upstream);

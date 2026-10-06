@@ -1,7 +1,8 @@
+import type { MenuComponentRef } from "@expo/ui/community/menu";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import type { PropsWithChildren } from "react";
+import { type PropsWithChildren, useRef } from "react";
 import { View } from "react-native";
 import Animated, {
   CurvedTransition,
@@ -12,12 +13,13 @@ import Animated, {
   ReduceMotion,
 } from "react-native-reanimated";
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
-import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
+import { AgentAndroidMenu, useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -60,63 +62,74 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const [background, accent] = useThemeColor(["background", "accent"]);
   const agentContextMenu = useAgentContextMenu(agent);
   const agentChatPreview = useAgentChatPreview(agent);
+  const menu = useRef<MenuComponentRef>(null);
   const isUnread = useAgentUnread(agent.id);
 
+  const link = (
+    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+      <Link.Trigger>
+        <ChatLinkPressable
+          chatId={agent.id}
+          accessibilityLabel={
+            agent.title.trim()
+              ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
+              : t("mobile.agent.list.openPinned", { name: agent.name })
+          }
+          accessibilityRole="button"
+          className="w-full items-center gap-2 px-1"
+          onPressIn={agentChatPreview.onPressIn}
+          onLongPress={isAndroid ? () => menu.current?.show() : undefined}
+          style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
+        >
+          <Link.AppleZoom>
+            <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
+              <BloubAvatar
+                agentId={agent.id}
+                serverId={agent.serverId}
+                hue={agent.avatarHue}
+                seed={agent.avatarSeed}
+                size={64}
+                animateIdle={false}
+              />
+              {isUnread ? (
+                <View
+                  className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
+                  style={{ borderColor: background, backgroundColor: accent }}
+                />
+              ) : null}
+            </AgentPinAvatar>
+          </Link.AppleZoom>
+          <View className="w-full gap-0.5">
+            <Typography.Paragraph
+              type="body-xs"
+              align="center"
+              className="w-full text-text-secondary"
+              numberOfLines={1}
+            >
+              {agent.name}
+            </Typography.Paragraph>
+            {agent.title.trim() ? (
+              <Typography.Paragraph type="body-xs" align="center" className="w-full text-muted" numberOfLines={1}>
+                {agent.title.trim()}
+              </Typography.Paragraph>
+            ) : null}
+          </View>
+          {agentChatPreview.measurer}
+        </ChatLinkPressable>
+      </Link.Trigger>
+      {agentChatPreview.preview}
+      {agentContextMenu}
+    </Link>
+  );
   return (
     <PinnedChatItem>
-      <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
-        <Link.Trigger>
-          <ChatLinkPressable
-            chatId={agent.id}
-            accessibilityLabel={
-              agent.title.trim()
-                ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
-                : t("mobile.agent.list.openPinned", { name: agent.name })
-            }
-            accessibilityRole="button"
-            className="w-full items-center gap-2 px-1"
-            onPressIn={agentChatPreview.onPressIn}
-            style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
-          >
-            <Link.AppleZoom>
-              <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
-                <BloubAvatar
-                  agentId={agent.id}
-                  serverId={agent.serverId}
-                  hue={agent.avatarHue}
-                  seed={agent.avatarSeed}
-                  size={64}
-                  animateIdle={false}
-                />
-                {isUnread ? (
-                  <View
-                    className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-                    style={{ borderColor: background, backgroundColor: accent }}
-                  />
-                ) : null}
-              </AgentPinAvatar>
-            </Link.AppleZoom>
-            <View className="w-full gap-0.5">
-              <Typography.Paragraph
-                type="body-xs"
-                align="center"
-                className="w-full text-text-secondary"
-                numberOfLines={1}
-              >
-                {agent.name}
-              </Typography.Paragraph>
-              {agent.title.trim() ? (
-                <Typography.Paragraph type="body-xs" align="center" className="w-full text-muted" numberOfLines={1}>
-                  {agent.title.trim()}
-                </Typography.Paragraph>
-              ) : null}
-            </View>
-            {agentChatPreview.measurer}
-          </ChatLinkPressable>
-        </Link.Trigger>
-        {agentChatPreview.preview}
-        {agentContextMenu}
-      </Link>
+      {isAndroid ? (
+        <AgentAndroidMenu agent={agent} menuRef={menu} style={{ width: "100%" }}>
+          {link}
+        </AgentAndroidMenu>
+      ) : (
+        link
+      )}
     </PinnedChatItem>
   );
 }

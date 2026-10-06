@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
+import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
@@ -37,6 +38,13 @@ const MACBOOK_NOTCH_REFERENCE = {
 } as const;
 const MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE = 0.01;
 
+/** A Dynamic Island operation that failed. The cause is what the renderer reads. */
+export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>()("DynamicIslandFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+type CriticalAction = Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>;
+
 export interface DynamicIslandWindowControllerOptions {
   platform: NodeJS.Platform;
   preferencePath: string;
@@ -47,9 +55,7 @@ export interface DynamicIslandWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
-  performCriticalAction: (
-    action: Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>,
-  ) => Promise<void>;
+  performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
   logger?: Logger;
 }
 
@@ -59,21 +65,22 @@ export class DynamicIslandWindowController {
   #presentation = IDLE_DYNAMIC_ISLAND_PRESENTATION;
   readonly #windows = new Map<number, BrowserWindow>();
   readonly #interactiveDisplays = new Set<number>();
-  readonly #criticalActions = new Map<string, Promise<void>>();
+  /** One run per critical action, shared by the overlays and IPC retries that send it again. */
+  readonly #criticalActions = new Map<string, Deferred.Deferred<void, DynamicIslandFailed>>();
   readonly #notchSizes = new Map<number, { width: number; height: number }>();
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
-  #preferenceMutation = Promise.resolve();
-  #windowReconciliation = Promise.resolve();
+  readonly #preferenceMutation = Semaphore.makeUnsafe(1);
+  readonly #windowReconciliation = Semaphore.makeUnsafe(1);
   #destroyed = false;
 
   constructor(options: DynamicIslandWindowControllerOptions) {
     this.#options = options;
   }
 
-  async initialize(): Promise<void> {
-    this.#preference = await readDynamicIslandPreference(this.#options.preferencePath);
-    await this.reconcileWindow();
-  }
+  readonly initialize = Effect.fn("DynamicIsland.initialize")(function* (this: DynamicIslandWindowController) {
+    this.#preference = yield* readDynamicIslandPreference(this.#options.preferencePath);
+    yield* this.reconcileWindow();
+  }).bind(this);
 
   get preference(): DynamicIslandPreference {
     return { ...this.#preference };
@@ -100,17 +107,19 @@ export class DynamicIslandWindowController {
     );
   }
 
-  async setPreference(preference: DynamicIslandPreference): Promise<DynamicIslandPreference> {
-    let savedPreference: DynamicIslandPreference | undefined;
-    const mutation = this.#preferenceMutation.then(async () => {
-      savedPreference = await writeDynamicIslandPreference(this.#options.preferencePath, preference);
-      this.#preference = savedPreference;
-      await this.reconcileWindow();
-      this.publishPreference();
-    });
-    this.#preferenceMutation = mutation.catch(() => undefined);
-    await mutation;
-    return { ...(savedPreference ?? preference) };
+  /** Writes run in the order of the calls; each one reconciles the windows before the next. */
+  setPreference(preference: DynamicIslandPreference): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#preferenceMutation.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
+          Effect.mapError((error) => new DynamicIslandFailed({ cause: error.cause })),
+        );
+        this.#preference = savedPreference;
+        yield* this.reconcileWindow();
+        this.publishPreference();
+        return { ...savedPreference };
+      }),
+    );
   }
 
   performHaptic(): void {
@@ -176,46 +185,68 @@ export class DynamicIslandWindowController {
     this.#collapseTimers.delete(displayId);
   }
 
-  async performAction(action: DynamicIslandAction): Promise<void> {
-    if (action.type === "answer-prompt" || action.type === "respond-approval") {
-      const key = criticalActionKey(action);
-      const existing = this.#criticalActions.get(key);
-      if (existing) return existing;
-      const pending = this.#ensureMainWindow().then(async (window) => {
-        await this.#options.performCriticalAction(action);
-        sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
-      });
-      this.#criticalActions.set(key, pending);
-      try {
-        await pending;
-      } finally {
-        if (this.#criticalActions.get(key) === pending) this.#criticalActions.delete(key);
+  performAction(action: DynamicIslandAction): Effect.Effect<void, DynamicIslandFailed> {
+    return Effect.suspend(() => {
+      if (action.type === "answer-prompt" || action.type === "respond-approval") {
+        return this.#performCriticalAction(action);
       }
-      return;
-    }
-    const window = await this.#ensureMainWindow();
-    // A dismissal changes only the island, so the main window stays where it is.
-    if (action.type !== "dismiss-failure") this.#options.presentMainWindow(window);
-    if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
-      throw new Error(sourceText("error.backend.windowTemporarilyUnavailable"));
-    }
+      return Effect.gen({ self: this }, function* () {
+        const window = yield* this.#ensureMainWindow();
+        // A dismissal changes only the island, so the main window stays where it is.
+        if (action.type !== "dismiss-failure") this.#options.presentMainWindow(window);
+        if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
+          return yield* new DynamicIslandFailed({
+            cause: new Error(sourceText("error.backend.windowTemporarilyUnavailable")),
+          });
+        }
+      });
+    });
   }
 
-  async #ensureMainWindow(): Promise<BrowserWindow> {
-    const current = this.#options.getMainWindow();
-    if (current && !current.isDestroyed()) return current;
-    const created = await this.#options.ensureMainWindow?.();
-    if (!created || created.isDestroyed()) throw new Error(sourceText("error.backend.windowUnavailable"));
-    return created;
+  #performCriticalAction(action: CriticalAction): Effect.Effect<void, DynamicIslandFailed> {
+    const key = criticalActionKey(action);
+    const existing = this.#criticalActions.get(key);
+    if (existing) return Deferred.await(existing);
+    const done = Deferred.makeUnsafe<void, DynamicIslandFailed>();
+    this.#criticalActions.set(key, done);
+    return Effect.gen({ self: this }, function* () {
+      const window = yield* this.#ensureMainWindow();
+      yield* this.#options.performCriticalAction(action);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
+    }).pipe(
+      Effect.onExit((exit) => {
+        if (this.#criticalActions.get(key) === done) this.#criticalActions.delete(key);
+        return Deferred.done(done, exit);
+      }),
+    );
   }
 
-  reconcileWindow(): Promise<void> {
-    const reconciliation = this.#windowReconciliation.then(() => this.#reconcileWindows());
-    this.#windowReconciliation = reconciliation.catch(() => undefined);
-    return reconciliation;
+  #ensureMainWindow(): Effect.Effect<BrowserWindow, DynamicIslandFailed> {
+    return Effect.gen({ self: this }, function* () {
+      const current = this.#options.getMainWindow();
+      if (current && !current.isDestroyed()) return current;
+      const ensureMainWindow = this.#options.ensureMainWindow;
+      const created = ensureMainWindow
+        ? yield* Effect.tryPromise({
+            try: () => ensureMainWindow(),
+            catch: (cause) => new DynamicIslandFailed({ cause }),
+          })
+        : undefined;
+      if (!created || created.isDestroyed()) {
+        return yield* new DynamicIslandFailed({ cause: new Error(sourceText("error.backend.windowUnavailable")) });
+      }
+      return created;
+    });
   }
 
-  async #reconcileWindows(): Promise<void> {
+  /** Reconciliations run one at a time, in the order of the calls. A window that fails to load is logged. */
+  reconcileWindow(): Effect.Effect<void> {
+    return this.#windowReconciliation.withPermit(this.#reconcileWindows());
+  }
+
+  readonly #reconcileWindows = Effect.fn("DynamicIsland.reconcileWindows")(function* (
+    this: DynamicIslandWindowController,
+  ) {
     if (this.#destroyed || this.#options.platform !== "darwin" || !this.#preference.enabled) {
       this.destroyWindows();
       return;
@@ -256,18 +287,29 @@ export class DynamicIslandWindowController {
         current.showInactive();
         continue;
       }
-      try {
-        await this.createDisplayWindow(display, bounds);
-      } catch (error) {
-        (this.#options.logger ?? logger).error(
-          `Unable to load Dynamic Island on display ${display.id}:`,
-          toLogValue(error),
-        );
-      }
+      yield* this.#createDisplayWindow(display, bounds).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() =>
+            (this.#options.logger ?? logger).error(
+              `Unable to load Dynamic Island on display ${display.id}:`,
+              toLogValue(error.cause),
+            ),
+          ),
+        ),
+      );
     }
+  }).bind(this);
+
+  /** A window that cannot be created or loaded fails here, so that the other displays still get theirs. */
+  #createDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
+    return Effect.try({
+      try: () => this.#openDisplayWindow(display, bounds),
+      catch: (cause) => new DynamicIslandFailed({ cause }),
+    }).pipe(Effect.flatten);
   }
 
-  private async createDisplayWindow(display: Display, bounds: Rectangle): Promise<void> {
+  /** Creates the window now and returns its load. */
+  #openDisplayWindow(display: Display, bounds: Rectangle): Effect.Effect<void, DynamicIslandFailed> {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
     window.excludedFromShownWindowsMenu = true;
     this.#windows.set(display.id, window);
@@ -304,14 +346,18 @@ export class DynamicIslandWindowController {
         this.#cancelCollapse(display.id);
       }
     });
-    try {
-      await this.#options.loadWindow(window, display);
-    } catch (error) {
-      if (this.#windows.get(display.id) === window) this.#windows.delete(display.id);
-      this.#notchSizes.delete(display.id);
-      if (!window.isDestroyed()) window.destroy();
-      throw error;
-    }
+    return Effect.tryPromise({
+      try: () => this.#options.loadWindow(window, display),
+      catch: (cause) => new DynamicIslandFailed({ cause }),
+    }).pipe(
+      Effect.tapError(() =>
+        Effect.sync(() => {
+          if (this.#windows.get(display.id) === window) this.#windows.delete(display.id);
+          this.#notchSizes.delete(display.id);
+          if (!window.isDestroyed()) window.destroy();
+        }),
+      ),
+    );
   }
 
   destroy(): void {
@@ -367,9 +413,7 @@ function notchSizeChanged(
   return previous?.width !== next?.width || previous?.height !== next?.height;
 }
 
-function criticalActionKey(
-  action: Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>,
-): string {
+function criticalActionKey(action: CriticalAction): string {
   return [action.type, action.serverId, action.agentId, String(action.requestId)].join("\u0000");
 }
 

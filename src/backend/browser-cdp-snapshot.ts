@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { BrowserElement, BrowserFocus, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
+import type { BrowserElement, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import {
   assertBeforeDeadline,
   automationContextId,
@@ -15,6 +16,7 @@ import {
   stringValue,
   textMatches,
 } from "./browser-cdp-values";
+import { browserFailure, browserSync } from "./browser-effects";
 
 const MAX_SNAPSHOT_ELEMENTS = 200;
 const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
@@ -70,7 +72,7 @@ export interface SemanticMatch {
   name: string;
 }
 
-export async function collectBoundedSnapshot(
+export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot")(function* (
   send: SendCommand,
   captures: SnapshotTarget[],
   revision: number,
@@ -85,10 +87,12 @@ export async function collectBoundedSnapshot(
   let hasFrame = captures.length > 1;
   let truncated = false;
   for (const capture of captures) {
-    assertBeforeDeadline(deadline);
+    yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = await collectPageSummary(send, capture.sessionId, remainingText).catch(() => null);
+      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText).pipe(
+        Effect.catch(() => Effect.succeed(null)),
+      );
       if (summary) {
         if (summary.text) {
           textParts.push(summary.text);
@@ -103,8 +107,10 @@ export async function collectBoundedSnapshot(
     if (remainingElements <= 0) break;
     const candidates =
       capture.sessionId && deadline === undefined
-        ? await collectActionableNodes(send, capture, remainingElements).catch(() => [])
-        : await collectActionableNodes(send, capture, remainingElements, deadline);
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements).pipe(
+            Effect.catch(() => Effect.succeed([])),
+          )
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, deadline);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -147,15 +153,15 @@ export async function collectBoundedSnapshot(
     hasVisualSurface,
     hasFrame,
   };
-}
+});
 
-async function collectPageSummary(
+const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(function* (
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
-): Promise<{ text: string; truncated: boolean; hasVisualSurface: boolean; hasFrame: boolean }> {
-  const contextId = await automationContextId(send, sessionId);
-  const result = await send(
+) {
+  const contextId = yield* automationContextId(send, sessionId);
+  const result = yield* send(
     "Runtime.evaluate",
     {
       expression: `(() => {
@@ -249,15 +255,11 @@ async function collectPageSummary(
     hasVisualSurface: value?.hasVisualSurface === true,
     hasFrame: value?.hasFrame === true,
   };
-}
+});
 
-// Focus is what `type` writes to when it has no target, and an application that draws its own
-// surface keeps it on a node no semantic target names -- Google Sheets parks it on a hidden editor
-// beside the grid, and on its Name box the moment that box was used. Without this a caller cannot
-// tell the two apart until the data lands in the wrong place.
-export async function collectFocus(send: SendCommand, sessionId?: string): Promise<BrowserFocus | null> {
-  const contextId = await automationContextId(send, sessionId);
-  const result = await send(
+export const collectFocus = Effect.fn("Browser.collectFocus")(function* (send: SendCommand, sessionId?: string) {
+  const contextId = yield* automationContextId(send, sessionId);
+  const result = yield* send(
     "Runtime.evaluate",
     {
       expression: `(() => {
@@ -297,19 +299,19 @@ export async function collectFocus(send: SendCommand, sessionId?: string): Promi
     editable: value.editable === true,
     inFrame: value.inFrame === true,
   };
-}
+});
 
-export async function pageContainsText(
+export const pageContainsText = Effect.fn("Browser.pageContainsText")(function* (
   send: SendCommand,
   captures: SnapshotTarget[],
   text: string,
   deadline: number,
-): Promise<boolean> {
+) {
   for (const capture of captures) {
-    assertBeforeDeadline(deadline);
+    yield* browserSync(() => assertBeforeDeadline(deadline));
     const scanBudgetMs = Math.max(1, deadline - Date.now());
-    const contextId = await automationContextId(send, capture.sessionId);
-    const result = await send(
+    const contextId = yield* automationContextId(send, capture.sessionId);
+    const result = yield* send(
       "Runtime.evaluate",
       {
         expression: `(() => {
@@ -373,22 +375,22 @@ export async function pageContainsText(
         returnByValue: true,
       },
       capture.sessionId,
-    ).catch(() => null);
-    assertBeforeDeadline(deadline);
+    ).pipe(Effect.catch(() => Effect.succeed(null)));
+    yield* browserSync(() => assertBeforeDeadline(deadline));
     const value = recordValue(recordValue(result?.result)?.value);
-    if (value?.expired === true) throw new Error("Browser wait condition timed out.");
+    if (value?.expired === true) return yield* browserFailure(new Error("Browser wait condition timed out."));
     if (value?.matched === true) return true;
   }
   return false;
-}
+});
 
-export async function cssObjectMatch(
+export const cssObjectMatch = Effect.fn("Browser.cssObjectMatch")(function* (
   send: SendCommand,
   selector: string,
   sessionId?: string,
-): Promise<{ objectId?: string; ambiguous: boolean }> {
-  const contextId = await automationContextId(send, sessionId);
-  const collection = await send(
+) {
+  const contextId = yield* automationContextId(send, sessionId);
+  const collection = yield* send(
     "Runtime.evaluate",
     {
       expression: `(() => {
@@ -432,11 +434,11 @@ export async function cssObjectMatch(
     sessionId,
   );
   const exception = recordValue(collection.exceptionDetails);
-  if (exception) throw new Error(exceptionDescription(exception));
+  if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
   const collectionId = stringValue(recordValue(collection.result)?.objectId);
   if (!collectionId) return { ambiguous: false };
-  try {
-    const lengthResult = await send(
+  return yield* Effect.gen(function* () {
+    const lengthResult = yield* send(
       "Runtime.callFunctionOn",
       {
         objectId: collectionId,
@@ -448,7 +450,7 @@ export async function cssObjectMatch(
     const length = numberValue(recordValue(lengthResult.result)?.value);
     if (length === 0) return { ambiguous: false };
     if (length > 1) return { ambiguous: true };
-    const element = await send(
+    const element = yield* send(
       "Runtime.callFunctionOn",
       {
         objectId: collectionId,
@@ -458,28 +460,32 @@ export async function cssObjectMatch(
       sessionId,
     );
     const objectId = stringValue(recordValue(element.result)?.objectId);
-    if (!objectId) throw new Error(`Unable to resolve CSS selector: ${selector}`);
+    if (!objectId) return yield* browserFailure(new Error(`Unable to resolve CSS selector: ${selector}`));
     return { objectId, ambiguous: false };
-  } finally {
-    await send("Runtime.releaseObject", { objectId: collectionId }, sessionId).catch(() => undefined);
-  }
-}
+  }).pipe(
+    Effect.ensuring(
+      Effect.gen(function* () {
+        yield* send("Runtime.releaseObject", { objectId: collectionId }, sessionId).pipe(Effect.ignore);
+      }).pipe(Effect.orDie),
+    ),
+  );
+});
 
-export async function semanticAxMatches(
+export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function* (
   send: SendCommand,
   capture: SnapshotTarget,
   target: Extract<BrowserTarget, { kind: "role" | "text" }>,
   allowNonActionableRole: boolean,
   deadline?: number,
-): Promise<SemanticMatch[]> {
-  assertBeforeDeadline(deadline);
-  await send("Accessibility.enable", {}, capture.sessionId);
+) {
+  yield* browserSync(() => assertBeforeDeadline(deadline));
+  yield* send("Accessibility.enable", {}, capture.sessionId);
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
-  const frameTree = await send("Page.getFrameTree", {}, capture.sessionId);
+  const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
   for (const frameId of frameIds(frameTree)) {
-    const tree = await send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
-    assertBeforeDeadline(deadline);
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+    yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;
       const backendNodeId = numberValue(node.backendDOMNodeId);
@@ -507,17 +513,17 @@ export async function semanticAxMatches(
     }
   }
   return matches;
-}
+});
 
-export async function visibleTextObjectMatches(
+export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatches")(function* (
   send: SendCommand,
   capture: SnapshotTarget,
   target: Extract<BrowserTarget, { kind: "text" }>,
   deadline?: number,
-): Promise<string[]> {
-  assertBeforeDeadline(deadline);
-  const contextId = await automationContextId(send, capture.sessionId);
-  const collection = await send(
+) {
+  yield* browserSync(() => assertBeforeDeadline(deadline));
+  const contextId = yield* automationContextId(send, capture.sessionId);
+  const collection = yield* send(
     "Runtime.evaluate",
     {
       expression: `(() => {
@@ -586,11 +592,11 @@ export async function visibleTextObjectMatches(
     capture.sessionId,
   );
   const exception = recordValue(collection.exceptionDetails);
-  if (exception) throw new Error(exceptionDescription(exception));
+  if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
   const collectionId = stringValue(recordValue(collection.result)?.objectId);
   if (!collectionId) return [];
-  try {
-    const properties = await send(
+  return yield* Effect.gen(function* () {
+    const properties = yield* send(
       "Runtime.getProperties",
       { objectId: collectionId, ownProperties: true },
       capture.sessionId,
@@ -601,21 +607,27 @@ export async function visibleTextObjectMatches(
       .map((descriptor) => stringValue(recordValue(descriptor.value)?.objectId))
       .filter(Boolean)
       .slice(0, 2);
-  } finally {
-    await send("Runtime.releaseObject", { objectId: collectionId }, capture.sessionId).catch(() => undefined);
-  }
-}
+  }).pipe(
+    Effect.ensuring(
+      Effect.gen(function* () {
+        yield* send("Runtime.releaseObject", { objectId: collectionId }, capture.sessionId).pipe(Effect.ignore);
+      }).pipe(Effect.orDie),
+    ),
+  );
+});
 
-async function collectActionableNodes(
+const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")(function* (
   send: SendCommand,
   capture: SnapshotTarget,
   limit: number,
   deadline?: number,
-): Promise<Array<{ backendNodeId: number; node: CdpResult; ax: CdpResult; role: string; visibleText: string }>> {
-  assertBeforeDeadline(deadline);
-  await Promise.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)]);
-  assertBeforeDeadline(deadline);
-  const contextId = await automationContextId(send, capture.sessionId);
+) {
+  yield* browserSync(() => assertBeforeDeadline(deadline));
+  yield* Effect.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)], {
+    concurrency: "unbounded",
+  });
+  yield* browserSync(() => assertBeforeDeadline(deadline));
+  const contextId = yield* automationContextId(send, capture.sessionId);
   const results: Array<{
     backendNodeId: number;
     node: CdpResult;
@@ -624,7 +636,7 @@ async function collectActionableNodes(
     visibleText: string;
   }> = [];
   const batchSize = MAX_SNAPSHOT_ELEMENTS;
-  const collection = await send(
+  const collection = yield* send(
     "Runtime.evaluate",
     {
       expression: actionableNodesExpression(MAX_SNAPSHOT_CANDIDATES),
@@ -634,12 +646,12 @@ async function collectActionableNodes(
     capture.sessionId,
   );
   const exception = recordValue(collection.exceptionDetails);
-  if (exception) throw new Error(exceptionDescription(exception));
+  if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
   const collectionId = stringValue(recordValue(collection.result)?.objectId);
   if (!collectionId) return results;
   const objectIds: string[] = [];
-  try {
-    const properties = await send(
+  yield* Effect.gen(function* () {
+    const properties = yield* send(
       "Runtime.getProperties",
       { objectId: collectionId, ownProperties: true },
       capture.sessionId,
@@ -655,51 +667,64 @@ async function collectActionableNodes(
     );
     for (let offset = 0; offset < objectIds.length && results.length < limit; offset += batchSize) {
       const batch = objectIds.slice(offset, offset + batchSize);
-      const resolved = await Promise.all(
-        batch.map(async (objectId) => {
-          const [description, partialAxTree, visibleTextResult] = await Promise.all([
-            send("DOM.describeNode", { objectId, depth: 0 }, capture.sessionId),
-            send("Accessibility.getPartialAXTree", { objectId, fetchRelatives: false }, capture.sessionId),
-            send(
-              "Runtime.callFunctionOn",
-              {
-                objectId,
-                functionDeclaration:
-                  "function() { return String(this.innerText ?? this.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 500); }",
-                returnByValue: true,
-              },
-              capture.sessionId,
-            ),
-          ]);
-          const node = recordValue(description.node);
-          const backendNodeId = numberValue(node?.backendNodeId);
-          if (!node || !backendNodeId) return null;
-          const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
-          const ax =
-            axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
-          if (!ax || ax.ignored === true) return null;
-          const role = axValue(ax.role).toLowerCase() || fallbackRole(node);
-          if (!ACTIONABLE_ROLES.has(role)) return null;
-          return {
-            backendNodeId,
-            node,
-            ax,
-            role,
-            visibleText: stringValue(recordValue(visibleTextResult.result)?.value),
-          };
-        }),
+      const resolved = yield* Effect.all(
+        batch.map((objectId) =>
+          Effect.gen(function* () {
+            const [description, partialAxTree, visibleTextResult] = yield* Effect.all(
+              [
+                send("DOM.describeNode", { objectId, depth: 0 }, capture.sessionId),
+                send("Accessibility.getPartialAXTree", { objectId, fetchRelatives: false }, capture.sessionId),
+                send(
+                  "Runtime.callFunctionOn",
+                  {
+                    objectId,
+                    functionDeclaration:
+                      "function() { return String(this.innerText ?? this.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 500); }",
+                    returnByValue: true,
+                  },
+                  capture.sessionId,
+                ),
+              ],
+              { concurrency: "unbounded" },
+            );
+            const node = recordValue(description.node);
+            const backendNodeId = numberValue(node?.backendNodeId);
+            if (!node || !backendNodeId) return null;
+            const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
+            const ax =
+              axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
+            if (!ax || ax.ignored === true) return null;
+            const role = axValue(ax.role).toLowerCase() || fallbackRole(node);
+            if (!ACTIONABLE_ROLES.has(role)) return null;
+            return {
+              backendNodeId,
+              node,
+              ax,
+              role,
+              visibleText: stringValue(recordValue(visibleTextResult.result)?.value),
+            };
+          }),
+        ),
+        { concurrency: "unbounded" },
       );
       results.push(...resolved.filter((candidate) => candidate !== null).slice(0, limit - results.length));
-      assertBeforeDeadline(deadline);
+      yield* browserSync(() => assertBeforeDeadline(deadline));
     }
-  } finally {
-    await Promise.allSettled([
-      ...objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, capture.sessionId)),
-      send("Runtime.releaseObject", { objectId: collectionId }, capture.sessionId),
-    ]);
-  }
+  }).pipe(
+    Effect.ensuring(
+      Effect.gen(function* () {
+        yield* Effect.all(
+          [
+            ...objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, capture.sessionId)),
+            send("Runtime.releaseObject", { objectId: collectionId }, capture.sessionId),
+          ].map((operation) => Effect.exit(operation)),
+          { concurrency: "unbounded" },
+        );
+      }).pipe(Effect.orDie),
+    ),
+  );
   return results;
-}
+});
 
 function actionableNodesExpression(limit: number): string {
   return `(() => {

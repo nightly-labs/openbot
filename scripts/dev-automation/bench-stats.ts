@@ -243,6 +243,18 @@ const HEADLINE_METRICS: readonly string[] = [
   "cpu.utility",
   "cpu.provider",
   "time.readyMs",
+  "startup.main.services-built",
+  "startup.main.window-ready",
+  "startup.renderer.app-started",
+  "render.layouts",
+  "render.styleRecalcs",
+  "render.scriptMs",
+  "render.taskMs",
+  "render.longTasks",
+  "render.longTaskMs",
+  "render.framesOver17ms",
+  "render.framesOver50ms",
+  "render.calls",
 ];
 
 function formatSpread(value: Spread | null): string {

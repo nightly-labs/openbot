@@ -1,3 +1,4 @@
+import { MenuView } from "@expo/ui/community/menu";
 import type { RoutineCalendarRoutine, RoutineCalendarRun, RoutineCalendarRunStatus } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -11,10 +12,10 @@ import {
 import { useQueries } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { Check, CirclePause, X } from "lucide-react-native";
+import { Check, ChevronDown, CirclePause, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useChannels } from "@/features/channels/components/use-channels";
@@ -28,6 +29,7 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const DAY = 86_400_000;
@@ -89,6 +91,8 @@ function rangeAround(first: CalendarDay, last: CalendarDay) {
 
 export function ServerRoutinesScreen() {
   const { t, format } = useText();
+  const { theme } = useUniwind();
+  const foreground = String(useCSSVariable("--openbot-text-primary"));
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const { session, sessionScope } = useMobileSession();
   const { servers, agents, loadRoutineCalendar } = useMobileWorkspace();
@@ -262,7 +266,43 @@ export function ServerRoutinesScreen() {
     </SettingsRow>
   );
 
-  const header = (
+  const header = isAndroid ? (
+    <Stack.Screen
+      options={{
+        headerRight: () => (
+          <MenuView
+            colorScheme={theme === "dark" ? "dark" : "light"}
+            actions={[
+              {
+                id: "today",
+                title: t("mobile.server.routines.today"),
+                attributes: { disabled: days.includes(today) },
+              },
+              { id: "day", title: t("mobile.server.routines.viewDay"), state: view === "day" ? "on" : "off" },
+              { id: "week", title: t("mobile.server.routines.viewWeek"), state: view === "week" ? "on" : "off" },
+            ]}
+            onPressAction={({ nativeEvent }) => {
+              if (nativeEvent.event === "today") showToday();
+              if (nativeEvent.event === "day") selectDay(anchor, "day");
+              if (nativeEvent.event === "week") selectDay(anchor, "week");
+            }}
+          >
+            <View
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.server.routines.view")}
+              className="min-h-11 flex-row items-center gap-1 px-2"
+            >
+              <Typography.Paragraph>
+                {t(view === "week" ? "mobile.server.routines.viewWeek" : "mobile.server.routines.viewDay")}
+              </Typography.Paragraph>
+              <ChevronDown color={foreground} size={18} strokeWidth={1.9} />
+            </View>
+          </MenuView>
+        ),
+      }}
+    />
+  ) : (
     <Stack.Toolbar placement="right">
       <Stack.Toolbar.Menu
         accessibilityLabel={t("mobile.server.routines.view")}

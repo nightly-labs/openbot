@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { OPENBOT_LINKS } from "../src/lib/landing-links";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { latestDownloadResponse } from "../src/server/latest-download";
 
 describe("latest download", () => {
@@ -24,7 +25,7 @@ describe("latest download", () => {
         }),
       );
 
-      const response = await latestDownloadResponse(platform, fetcher, architecture);
+      const response = await runApiEffect(latestDownloadResponse(platform, fetcher, architecture));
 
       expect(fetcher).toHaveBeenCalledWith(
         `https://github.com/nightly-labs/openbot/releases/latest/download/${manifest}`,
@@ -42,7 +43,9 @@ describe("latest download", () => {
     new Response("Not found", { status: 404 }),
     new Response("files:\n  - url: checksums.txt", { status: 200 }),
   ])("falls back to the Releases page when no installer can be resolved", async (manifestResponse) => {
-    const response = await latestDownloadResponse("macos", vi.fn<typeof fetch>().mockResolvedValue(manifestResponse));
+    const response = await runApiEffect(
+      latestDownloadResponse("macos", vi.fn<typeof fetch>().mockResolvedValue(manifestResponse)),
+    );
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(OPENBOT_LINKS.releases);

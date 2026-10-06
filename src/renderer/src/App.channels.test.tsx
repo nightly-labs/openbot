@@ -69,6 +69,36 @@ it("restores the selected channel after restart and clears it when returning to 
   view.unmount();
 });
 
+it("keeps unsent agent and channel drafts through a chat switch and a restart", async () => {
+  let unmount: (() => void) | undefined;
+  const chat = await openSavedChannel((dispose) => {
+    unmount = dispose;
+  });
+  const channelComposer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  channelComposer.textContent = "Channel draft";
+  await fireEvent.input(channelComposer);
+  await fireEvent.click(screen.getByRole("button", { name: /^Chief, Chief of staff/ }));
+  const agentComposer = await screen.findByRole("textbox", { name: "Message Chief" });
+  agentComposer.textContent = "Agent draft";
+  await fireEvent.input(agentComposer);
+  await fireEvent.click(channelRow("Project room"));
+  const returnedChat = await screen.findByRole("main", { name: "Channel conversation" });
+  expect(await within(returnedChat).findByRole("textbox", { name: "Message to channel" })).toHaveTextContent(
+    "Channel draft",
+  );
+
+  // Unmounting the app writes the drafts at once, the way a quit inside the write delay does.
+  unmount?.();
+  const restarted = render(() => <App />);
+  const restartedChat = await screen.findByRole("main", { name: "Channel conversation" });
+  expect(await within(restartedChat).findByRole("textbox", { name: "Message to channel" })).toHaveTextContent(
+    "Channel draft",
+  );
+  await fireEvent.click(screen.getByRole("button", { name: /^Chief, Chief of staff/ }));
+  expect(await screen.findByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Agent draft");
+  restarted.unmount();
+});
+
 it("shows the channel title in the header and sidebar and refreshes it after editing", async () => {
   await window.openbot.agent.channelCommand({
     type: "save",

@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentMarketplace } from "../src/server/agent-marketplace";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { SkillMarketplace } from "../src/server/skill-marketplace";
 
 const databases: DatabaseSync[] = [];
@@ -80,17 +82,21 @@ describe("marketplace presentation migration", () => {
       skills: [],
       routines: [],
     };
-    const published = await agents.submit({
-      user,
-      snapshot,
-      avatar: null,
-      category: "documents",
-      showCreatorAvatar: true,
-    });
+    const published = await runApiEffect(
+      agents.submit({
+        user,
+        snapshot,
+        avatar: null,
+        category: "documents",
+        showCreatorAvatar: true,
+      }),
+    );
     expect(published).toMatchObject({ category: "documents", showCreatorAvatar: true });
-    await agents.review(published.id, "approved", null);
-    expect((await agents.list({ category: "documents" })).agents.map((item) => item.name)).toEqual(["Writer"]);
-    const next = await agents.submit({ user, snapshot, avatar: null, agentId: published.agentId });
+    await runApiEffect(agents.review(published.id, "approved", null));
+    expect((await runApiEffect(agents.list({ category: "documents" }))).agents.map((item) => item.name)).toEqual([
+      "Writer",
+    ]);
+    const next = await runApiEffect(agents.submit({ user, snapshot, avatar: null, agentId: published.agentId }));
     expect(next.showCreatorAvatar).toBe(true);
   });
 
@@ -99,34 +105,54 @@ describe("marketplace presentation migration", () => {
     const bindings = { DB: d1(database), SKILLS: unusedBucket() };
     const agents = new AgentMarketplace(bindings);
     const skills = new SkillMarketplace(bindings);
-    expect((await skills.list({ query: "Owner" })).skills.map((item) => item.id)).toEqual(["skill-1"]);
-    expect((await agents.list({ query: "Owner" })).agents.map((item) => item.id)).toEqual(["agent-1"]);
+    expect((await runApiEffect(skills.list({ query: "Owner" }))).skills.map((item) => item.id)).toEqual(["skill-1"]);
+    expect((await runApiEffect(agents.list({ query: "Owner" }))).agents.map((item) => item.id)).toEqual(["agent-1"]);
     database.exec("UPDATE users SET name = NULL");
-    expect((await skills.list({ query: "owner@example.com" })).skills.map((item) => item.id)).toEqual(["skill-1"]);
-    expect((await agents.list({ query: "owner@example.com" })).agents.map((item) => item.id)).toEqual(["agent-1"]);
+    expect((await runApiEffect(skills.list({ query: "owner@example.com" }))).skills.map((item) => item.id)).toEqual([
+      "skill-1",
+    ]);
+    expect((await runApiEffect(agents.list({ query: "owner@example.com" }))).agents.map((item) => item.id)).toEqual([
+      "agent-1",
+    ]);
 
-    expect((await agents.list({ category: "coding" })).agents).toEqual([]);
-    expect((await agents.list({ category: "other" })).agents.map((item) => item.id)).toEqual(["agent-1"]);
+    expect((await runApiEffect(agents.list({ category: "coding" }))).agents).toEqual([]);
+    expect((await runApiEffect(agents.list({ category: "other" }))).agents.map((item) => item.id)).toEqual(["agent-1"]);
     database.exec("UPDATE marketplace_agent_versions SET category = 'coding'");
-    expect((await agents.list({ category: "coding" })).agents.map((item) => item.id)).toEqual(["agent-1"]);
+    expect((await runApiEffect(agents.list({ category: "coding" }))).agents.map((item) => item.id)).toEqual([
+      "agent-1",
+    ]);
     for (const [service, id] of [
       [agents, "agent-1"],
       [skills, "skill-1"],
     ] as const) {
       const read = async () =>
         service === agents
-          ? (await agents.list()).agents[0]?.creatorAvatarUrl
-          : (await skills.list({})).skills[0]?.creatorAvatarUrl;
+          ? (await runApiEffect(agents.list())).agents[0]?.creatorAvatarUrl
+          : (await runApiEffect(skills.list({}))).skills[0]?.creatorAvatarUrl;
       expect(await read()).toBeNull();
-      await expect(service.setCreatorAvatar("intruder", id, true)).rejects.toMatchObject({ status: 404 });
-      await service.setCreatorAvatar("user-1", id, true);
+      await expect(
+        runApiEffect(
+          Effect.gen(function* () {
+            return yield* service.setCreatorAvatar("intruder", id, true);
+          }),
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+      await runApiEffect(
+        Effect.gen(function* () {
+          return yield* service.setCreatorAvatar("user-1", id, true);
+        }),
+      );
       expect(await read()).toBe("/v1/avatars/user-1?v=one");
       database.exec("UPDATE users SET avatar_url = '/v1/avatars/user-1?v=two'");
       expect(await read()).toBe("/v1/avatars/user-1?v=two");
       database.exec("UPDATE users SET avatar_url = NULL");
       expect(await read()).toBeNull();
       database.exec("UPDATE users SET avatar_url = '/v1/avatars/user-1?v=one'");
-      await service.setCreatorAvatar("user-1", id, false);
+      await runApiEffect(
+        Effect.gen(function* () {
+          return yield* service.setCreatorAvatar("user-1", id, false);
+        }),
+      );
       expect(await read()).toBeNull();
     }
   });

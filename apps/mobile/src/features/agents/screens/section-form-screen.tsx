@@ -1,14 +1,16 @@
 import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import { X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 export function SectionFormScreen() {
@@ -73,19 +75,32 @@ export function SectionFormScreen() {
       <Stack.Screen
         options={{ title: t(sectionId ? "mobile.agent.sectionForm.renameTitle" : "mobile.agent.sectionForm.newTitle") }}
       />
-      <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button
-          icon={isIOS ? "xmark" : undefined}
+      {isAndroid ? (
+        <AndroidHeaderButton
+          placement="left"
+          icon={X}
           accessibilityLabel={t("common.close")}
           disabled={saving}
           onPress={() => {
             void haptics.impact("soft");
             router.back();
           }}
-        >
-          {isIOS ? t("common.close") : "×"}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+        />
+      ) : (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button
+            icon={isIOS ? "xmark" : undefined}
+            accessibilityLabel={t("common.close")}
+            disabled={saving}
+            onPress={() => {
+              void haptics.impact("soft");
+              router.back();
+            }}
+          >
+            {isIOS ? t("common.close") : "×"}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
       <SheetSaveAction
         dirty={dirty}
         canSave={available && valid && !finished}

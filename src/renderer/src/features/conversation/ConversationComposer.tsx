@@ -46,6 +46,7 @@ export function ConversationComposer() {
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
+    installedSkillsLoadFailed,
     mcpServers,
     editQueuedMessage,
     editingDeliveryId,
@@ -60,7 +61,6 @@ export function ConversationComposer() {
     removeAttachment,
     reorderPresentedQueue,
     replyTarget,
-    selectionSending,
     setComposerFocusRequest,
     setContextAttachmentPickerElement,
     setImageAttachmentPickerElement,
@@ -83,6 +83,8 @@ export function ConversationComposer() {
       ? t("composer.placeholder.message", { name: props.agent.name })
       : t("composer.placeholder.messageAgent");
   const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
+  let skillPickerChosen = false;
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
@@ -285,12 +287,11 @@ export function ConversationComposer() {
               agentId={props.agent?.id}
               agents={props.agents}
               skills={installedSkills()}
+              skillsLoadFailed={installedSkillsLoadFailed()}
               mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
-              disabled={
-                submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady() || savePending()
-              }
+              disabled={submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()}
               placeholder={
                 !agentReady()
                   ? props.runtime
@@ -308,6 +309,7 @@ export function ConversationComposer() {
               }
               ariaLabel={messageLabel()}
               focusRequest={composerFocusRequest()}
+              skillPickerRequest={skillPickerRequest()}
               onValueChange={(text) => {
                 updateCurrentDraft({ text });
                 updateTeamTyping(text);
@@ -354,7 +356,18 @@ export function ConversationComposer() {
             />
             <DropdownMenu.Root
               open={showComposerActions()}
-              onOpenChange={setShowComposerActions}
+              onOpenChange={(open) => {
+                setShowComposerActions(open);
+                const chosen = skillPickerChosen;
+                skillPickerChosen = false;
+                if (open || !chosen) return;
+                // The menu gives the focus back to its trigger two frames after it closes; open the picker after that.
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() => setSkillPickerRequest((current) => current + 1)),
+                  ),
+                );
+              }}
               placement="top-start"
               gutter={8}
               modal={false}
@@ -363,12 +376,7 @@ export function ConversationComposer() {
                 class="composer-button"
                 aria-label={t("composer.add.label")}
                 disabled={
-                  attachmentBusy() ||
-                  submitting() ||
-                  selectionSending() ||
-                  voicePhase() === "transcribing" ||
-                  !agentReady() ||
-                  savePending()
+                  attachmentBusy() || submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()
                 }
               >
                 <Plus aria-hidden="true" />
@@ -385,7 +393,14 @@ export function ConversationComposer() {
                     <Image aria-hidden="true" />
                     <span>{t("composer.add.image")}</span>
                   </DropdownMenu.Item>
-                  <DropdownMenu.Item disabled title={t("composer.add.skillUnavailable")}>
+                  <DropdownMenu.Item
+                    onPointerDown={(event) => {
+                      if (event.button === 0) skillPickerChosen = true;
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") skillPickerChosen = true;
+                    }}
+                  >
                     <Puzzle aria-hidden="true" />
                     <span>{t("composer.add.skill")}</span>
                   </DropdownMenu.Item>
@@ -495,7 +510,6 @@ export function ConversationComposer() {
                     disabled={
                       attachmentBusy() ||
                       submitting() ||
-                      selectionSending() ||
                       !agentReady() ||
                       voicePhase() === "preparing" ||
                       voicePhase() === "requesting" ||

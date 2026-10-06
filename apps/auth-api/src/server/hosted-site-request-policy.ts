@@ -1,12 +1,18 @@
+import { Effect } from "effect";
 import { HostedSiteInputError } from "./hosted-site-contract";
+import { siteCall } from "./hosted-site-effects";
 import type { WorkerBindings } from "./types";
 
-export async function enforceHostedSiteReportRateLimit(
+export const enforceHostedSiteReportRateLimit = Effect.fn("HostedSites.enforceReportRateLimit")(function* (
   bindings: Pick<WorkerBindings, "SITE_REPORT_RATE_LIMITER">,
   sourceIp: string,
-): Promise<void> {
-  const result = await bindings.SITE_REPORT_RATE_LIMITER.limit({ key: `ip:${sourceIp}` });
+) {
+  const result = yield* siteCall(() => bindings.SITE_REPORT_RATE_LIMITER.limit({ key: `ip:${sourceIp}` }));
   if (!result.success) {
-    throw new HostedSiteInputError(429, "report_rate_limit", "Too many reports were submitted. Try again later.");
+    return yield* new HostedSiteInputError(
+      429,
+      "report_rate_limit",
+      "Too many reports were submitted. Try again later.",
+    );
   }
-}
+});

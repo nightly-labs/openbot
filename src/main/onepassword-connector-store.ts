@@ -2,8 +2,10 @@
 
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Semaphore } from "effect";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { OnePasswordOperationError, onePasswordCall, onePasswordDecode } from "./onepassword-effects";
 import type { SecretCipher } from "./provider-credential-store";
 
 const onePasswordConnectorRecordSchema = z.object({
@@ -35,7 +37,7 @@ export class OnePasswordConnectorStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
   #record: OnePasswordConnectorRecord | null = null;
-  #queue: Promise<void> = Promise.resolve();
+  readonly #queue = Semaphore.makeUnsafe(1);
 
   constructor(path: string, cipher: SecretCipher) {
     this.#path = path;
@@ -43,14 +45,17 @@ export class OnePasswordConnectorStore {
   }
 
   /** Reads the file. Returns the error when the file is there but cannot be read. */
-  async load(): Promise<Error | null> {
-    this.#record = null;
-    try {
-      this.#record = await this.#read();
+  load(): Effect.Effect<Error | null> {
+    return Effect.gen({ self: this }, function* () {
+      this.#record = null;
+      const result = yield* Effect.result(this.#read());
+      if (Result.isFailure(result)) {
+        const error = result.failure.cause;
+        return error instanceof Error ? error : new Error(sourceText("error.connector.onePasswordFileUnreadable"));
+      }
+      this.#record = result.success;
       return null;
-    } catch (error) {
-      return error instanceof Error ? error : new Error(sourceText("error.connector.onePasswordFileUnreadable"));
-    }
+    });
   }
 
   read(): OnePasswordConnectorRecord | null {
@@ -62,56 +67,73 @@ export class OnePasswordConnectorStore {
    * same queued change: an attempt that was stopped during the write removes the file again and
    * leaves no token in memory or on disk. True when the record was kept.
    */
-  write(record: OnePasswordConnectorRecord, current: () => boolean = () => true): Promise<boolean> {
-    return this.#enqueue(async () => {
-      if (!current()) return false;
-      const encrypted = this.#cipher.encrypt(JSON.stringify(record)).toString("base64");
-      // Write then rename, so a crash leaves the previous connection readable.
-      await writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true });
-      if (!current()) {
-        await rm(this.#path, { force: true });
-        this.#record = null;
-        return false;
-      }
-      this.#record = record;
-      return true;
-    });
+  write(
+    record: OnePasswordConnectorRecord,
+    current: () => boolean = () => true,
+  ): Effect.Effect<boolean, OnePasswordOperationError> {
+    return this.#serialize(
+      Effect.gen({ self: this }, function* () {
+        if (!current()) return false;
+        const encrypted = yield* onePasswordDecode(() =>
+          this.#cipher.encrypt(JSON.stringify(record)).toString("base64"),
+        );
+        // Write then rename, so a crash leaves the previous connection readable.
+        yield* writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true }).pipe(
+          Effect.mapError(({ cause }) => new OnePasswordOperationError({ cause })),
+        );
+        if (!current()) {
+          yield* onePasswordCall(() => rm(this.#path, { force: true }));
+          this.#record = null;
+          return false;
+        }
+        this.#record = record;
+        return true;
+      }),
+    );
   }
 
   /** Forgets the record at once, so no read starts with it, then removes the file. */
-  clear(): Promise<void> {
-    this.#record = null;
-    return this.#enqueue(async () => {
-      await rm(this.#path, { force: true });
+  clear(): Effect.Effect<void, OnePasswordOperationError> {
+    return Effect.suspend(() => {
       this.#record = null;
+      return this.#serialize(
+        Effect.gen({ self: this }, function* () {
+          yield* onePasswordCall(() => rm(this.#path, { force: true }));
+          this.#record = null;
+        }),
+      );
     });
   }
 
-  #enqueue<T>(change: () => Promise<T>): Promise<T> {
-    const result = this.#queue.then(change, change);
-    this.#queue = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+  #serialize<A>(change: Effect.Effect<A, OnePasswordOperationError>): Effect.Effect<A, OnePasswordOperationError> {
+    return this.#queue.withPermit(change).pipe(Effect.uninterruptible);
   }
 
-  async #read(): Promise<OnePasswordConnectorRecord | null> {
-    let source: string;
-    try {
-      source = await readFile(this.#path, "utf8");
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
-      throw error;
-    }
-    if (source.length > MAX_ENVELOPE_BYTES) throw new Error(sourceText("error.connector.onePasswordFileTooLarge"));
-    try {
+  readonly #read = Effect.fn("OnePasswordConnectorStore.read")(function* (
+    this: OnePasswordConnectorStore,
+  ): Effect.fn.Return<OnePasswordConnectorRecord | null, OnePasswordOperationError> {
+    const source = yield* onePasswordCall(() => readFile(this.#path, "utf8")).pipe(
+      Effect.catch(({ cause }) =>
+        cause instanceof Error && "code" in cause && cause.code === "ENOENT"
+          ? Effect.succeed(null)
+          : Effect.fail(new OnePasswordOperationError({ cause })),
+      ),
+    );
+    if (source === null) return null;
+    if (source.length > MAX_ENVELOPE_BYTES)
+      return yield* new OnePasswordOperationError({
+        cause: new Error(sourceText("error.connector.onePasswordFileTooLarge")),
+      });
+    return yield* onePasswordDecode(() => {
       const envelope = envelopeSchema.parse(JSON.parse(source));
       return onePasswordConnectorRecordSchema.parse(
         JSON.parse(this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))),
       );
-    } catch {
-      throw new Error(sourceText("error.connector.onePasswordFileUnreadable"));
-    }
-  }
+    }).pipe(
+      Effect.mapError(
+        () =>
+          new OnePasswordOperationError({ cause: new Error(sourceText("error.connector.onePasswordFileUnreadable")) }),
+      ),
+    );
+  });
 }

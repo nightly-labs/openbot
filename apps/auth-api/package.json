@@ -40,7 +40,8 @@
     "solid-js": "2.0.0-rc.0",
     "yaml": "catalog:",
     "zod": "catalog:",
-    "@openbot/ui": "workspace:*"
+    "@openbot/ui": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.52.1",

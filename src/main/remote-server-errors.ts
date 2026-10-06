@@ -10,27 +10,31 @@
 // copy of a class makes every `instanceof` silently false.
 
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
+import { Schema } from "effect";
 
-export class RemoteRequestError extends Error {
-  readonly status: number;
-  readonly code: string | null;
-
+export class RemoteRequestError extends Schema.TaggedError<RemoteRequestError>()("RemoteRequestError", {
+  status: Schema.Number,
+  code: Schema.NullOr(Schema.String),
+  message: Schema.String,
+}) {
   constructor(status: number, message: string, code: string | null = null) {
-    super(message);
-    this.name = "RemoteRequestError";
-    this.status = status;
-    this.code = code;
+    super({ status, message, code });
   }
 }
 
-export class RemoteProtocolError extends Error {
+export class RemoteProtocolError extends Schema.TaggedError<RemoteProtocolError>()("RemoteProtocolError", {
+  code: Schema.Literals(["client_update_required", "host_update_required", "protocol_error"]),
+  message: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {
+  readonly support: TeamProtocolSupportV1 | null;
   constructor(
-    readonly code: "client_update_required" | "host_update_required" | "protocol_error",
+    code: "client_update_required" | "host_update_required" | "protocol_error",
     message: string,
-    readonly support: TeamProtocolSupportV1 | null = null,
+    support: TeamProtocolSupportV1 | null = null,
     options?: ErrorOptions,
   ) {
-    super(message, options);
-    this.name = "RemoteProtocolError";
+    super({ code, message, cause: options?.cause });
+    this.support = support;
   }
 }

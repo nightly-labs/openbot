@@ -30,6 +30,10 @@ interface ComposerEditorProps {
   ariaLabel: string;
   disabled: boolean;
   focusRequest?: number;
+  /** Raised by one to open the skill picker at the caret, as a typed `$` does. */
+  skillPickerRequest?: number;
+  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
+  skillsLoadFailed?: boolean;
   onValueChange: (value: string) => void;
   onSubmit: () => void;
   /**
@@ -73,7 +77,8 @@ export function expandComposerMentions(value: string): string {
 
 type PickerOption =
   | { type: "agent"; agent: AgentProfile }
-  | { type: "skill"; skill: InstalledSkill }
+  /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
+  | { type: "skill"; skill: InstalledSkill; showSlug: boolean }
   | { type: "mcp"; server: McpServerConfig }
   | { type: "attachment"; attachment: DraftAttachment };
 
@@ -85,7 +90,10 @@ function pickerOptionKey(option: PickerOption): string {
 
 function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
   if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
-  if (option.type === "skill") return t("composer.picker.option.skill", { name: option.skill.name });
+  if (option.type === "skill") {
+    const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
+    return t("composer.picker.option.skill", { name });
+  }
   return option.type === "mcp"
     ? t("composer.picker.option.mcp", { name: option.server.name })
     : t("composer.picker.option.file", { name: option.attachment.name });
@@ -141,10 +149,27 @@ function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: st
 /** The protocol name. It is not translated. */
 const MCP_BADGE = "MCP";
 
+/**
+ * How well a skill answers the query, lower first; null when it does not. A hit in the name
+ * outranks one in the description, so the skill the user names is at the top.
+ */
+function skillMatchRank(skill: InstalledSkill, query: string): number | null {
+  if (!query) return 0;
+  const name = skill.name.toLocaleLowerCase();
+  const slug = skill.slug.toLocaleLowerCase();
+  if (name === query || slug === query) return 0;
+  if (name.startsWith(query) || slug.startsWith(query)) return 1;
+  if (name.split(/[\s\-_]+/u).some((word) => word.startsWith(query))) return 2;
+  if (name.includes(query) || slug.includes(query)) return 3;
+  return skill.description?.toLocaleLowerCase().includes(query) ? 4 : null;
+}
+
 export function ComposerEditor(props: ComposerEditorProps) {
   const { t, format } = useText();
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
+  /* Where the `$` that the add menu wrote starts, so that picker can say why it is empty. */
+  const [requestedMentionStart, setRequestedMentionStart] = createSignal<number | null>(null);
   const [attachmentTooltip, setAttachmentTooltip] = createSignal<{
     anchor: HTMLElement;
     content: string;
@@ -175,14 +200,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
         !referencedIds.has(attachment.id) && (!query || attachment.name.toLocaleLowerCase().includes(query)),
     );
   });
+  const usableSkills = createMemo(() =>
+    (props.skills ?? []).filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false),
+  );
   const matchingSkills = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
-    return (props.skills ?? []).filter(
-      (skill) =>
-        skill.state !== "needs-repair" &&
-        skill.enabled !== false &&
-        (!query || `${skill.name} ${skill.slug} ${skill.description ?? ""}`.toLocaleLowerCase().includes(query)),
-    );
+    const ranked = usableSkills().flatMap((skill) => {
+      const rank = skillMatchRank(skill, query);
+      return rank === null ? [] : [{ skill, rank }];
+    });
+    // Array sort is stable, so skills of one rank keep the host's order.
+    ranked.sort((left, right) => left.rank - right.rank);
+    const nameCounts = new Map<string, number>();
+    for (const { skill } of ranked) {
+      const name = skill.name.toLocaleLowerCase();
+      nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+    return ranked.map(({ skill }) => ({
+      skill,
+      showSlug: (nameCounts.get(skill.name.toLocaleLowerCase()) ?? 0) > 1,
+    }));
   });
   const matchingMcpServers = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
@@ -195,7 +232,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
     if (trigger === "$")
       return [
-        ...matchingSkills().map((skill) => ({ type: "skill" as const, skill })),
+        ...matchingSkills().map((match) => ({ type: "skill" as const, ...match })),
         ...matchingMcpServers().map((server) => ({ type: "mcp" as const, server })),
       ];
     if (trigger !== "@") return [];
@@ -211,7 +248,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
   });
-  const pickerOpen = createMemo(() => mention() !== null && matchingOptions().length > 0);
+  /*
+   * A `$` with no match says why only when the user asked for skills: after the add menu, or a
+   * bare `$`. A price such as "$5" in a sentence keeps the picker closed.
+   */
+  const pickerStatus = createMemo(() => {
+    const context = mention();
+    if (context?.trigger !== "$" || matchingOptions().length > 0) return null;
+    if (requestedMentionStart() !== context.start && context.query.trim()) return null;
+    if (usableSkills().length === 0)
+      return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
+    return t("composer.picker.noSkillMatch", { query: context.query.trim() });
+  });
+  const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
   createEffect(
     () => pickerOpen(),
     (open) => {
@@ -233,6 +282,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastMcpKey = "";
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
+  let lastSkillPickerRequest = 0;
   let isComposing = false;
   const attachmentTokenActions: AttachmentTokenActions = {
     tooltipId: attachmentTooltipId,
@@ -268,8 +318,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
       focusRequest: props.focusRequest ?? 0,
+      skillPickerRequest: props.skillPickerRequest ?? 0,
     }),
-    ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest }) => {
+    ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest, skillPickerRequest }) => {
       if (!editor) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
@@ -299,6 +350,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
         lastFocusRequest = focusRequest;
         editor.focus();
         placeCaretAtEnd(editor);
+      }
+      if (skillPickerRequest > lastSkillPickerRequest) {
+        lastSkillPickerRequest = skillPickerRequest;
+        openSkillPicker();
       }
     },
   );
@@ -388,6 +443,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     setPickerFrame(measurePickerFrame(editor));
     setMention({ query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger });
     setActiveOption(0);
+  }
+
+  /* Writes a `$` at the caret, as if typed, so the picker and its query work as for a typed one. */
+  function openSkillPicker() {
+    if (!editor || props.disabled) return;
+    editor.focus();
+    ensureEditorSelection();
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    // Keep selected text: put the `$` after it.
+    if (!selection.isCollapsed) selection.collapseToEnd();
+    const range = selection.getRangeAt(0).cloneRange();
+    range.selectNodeContents(editor);
+    range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
+    const beforeCaret = range.toString();
+    const separator = beforeCaret && !/\s$/u.test(beforeCaret) ? " " : "";
+    insertPlainText(editor, `${separator}$`);
+    setRequestedMentionStart(beforeCaret.length + separator.length);
+    emitValue();
+    updateMention();
   }
 
   function insertOption(option: PickerOption) {
@@ -685,7 +760,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onPaste={handlePaste}
         onBlur={() => {
           isComposing = false;
-          window.setTimeout(() => setMention(null), 100);
+          // A menu can return the focus to the editor within this delay; keep the picker it opened.
+          window.setTimeout(() => {
+            const ownerDocument = editor?.ownerDocument;
+            if (!ownerDocument?.hasFocus() || ownerDocument.activeElement !== editor) setMention(null);
+          }, 100);
         }}
       />
       <Show when={pickerOpen()}>
@@ -694,79 +773,93 @@ export function ComposerEditor(props: ComposerEditorProps) {
             class="mention-picker"
             style={{
               "--mention-picker-bottom": `${pickerFrame().bottom}px`,
-              "--mention-picker-rows": matchingOptions().length,
+              "--mention-picker-rows": pickerStatus() === null ? matchingOptions().length : 1,
             }}
           >
-            <Listbox.Root<PickerOption>
-              as="div"
-              ref={pickerFades.bind}
-              class={["mention-picker-list", pickerFades.classes()]}
-              onScroll={pickerFades.measure}
-              aria-label={t(mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel")}
-              options={matchingOptions()}
-              optionValue={pickerOptionKey}
-              optionTextValue={(option) => pickerOptionText(option, t)}
-              selectionMode="single"
-              disallowEmptySelection={true}
-              allowDuplicateSelectionEvents={true}
-              shouldUseVirtualFocus={true}
-              shouldFocusOnHover={true}
-              shouldSelectOnPressUp={true}
-              value={activePickerValue()}
-              onChange={(keys) => {
-                const key = keys.values().next().value;
-                const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
-                if (option) insertOption(option);
-              }}
-              renderItem={(item) => {
-                const option = item.rawValue;
-                const optionIndex = () =>
-                  matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
-                const badge = pickerOptionBadge(option, t);
-                return (
-                  <Listbox.Item
-                    ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
-                    item={item}
-                    aria-label={pickerOptionText(option, t)}
-                    class={[
-                      "mention-picker-option",
-                      {
-                        "mention-picker-file-option": option.type === "attachment",
-                        "mention-picker-option-active": activeOption() === optionIndex(),
-                      },
-                    ]}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      // The composer focuses its editor on any pointerdown that is not a control.
-                      event.stopPropagation();
-                    }}
-                    onMouseEnter={() => setActiveOption(optionIndex())}
-                  >
-                    {option.type === "agent" ? (
-                      <AgentAvatar agent={option.agent} />
-                    ) : option.type === "skill" ? (
-                      <span class="mention-picker-skill-icon" aria-hidden="true">
-                        <Puzzle />
-                      </span>
-                    ) : option.type === "mcp" ? (
-                      <span class="mention-picker-skill-icon" aria-hidden="true">
-                        <Blocks />
-                      </span>
-                    ) : (
-                      <AttachmentReferenceVisual name={option.attachment.name} />
-                    )}
-                    <strong>{pickerOptionName(option)}</strong>
-                    <Show when={pickerOptionDescription(option, format)}>
-                      {(description) => <span class="mention-picker-description">{description()}</span>}
-                    </Show>
-                    <Badge class="mention-picker-badge" variant="ghost">
-                      <Dynamic component={badge.icon} aria-hidden="true" />
-                      {badge.label}
-                    </Badge>
-                  </Listbox.Item>
-                );
-              }}
-            />
+            <Show when={pickerStatus()}>
+              {(status) => (
+                <p class="mention-picker-status" role="status">
+                  {status()}
+                </p>
+              )}
+            </Show>
+            <Show when={pickerStatus() === null}>
+              <Listbox.Root<PickerOption>
+                as="div"
+                ref={pickerFades.bind}
+                class={["mention-picker-list", pickerFades.classes()]}
+                onScroll={pickerFades.measure}
+                aria-label={t(
+                  mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel",
+                )}
+                options={matchingOptions()}
+                optionValue={pickerOptionKey}
+                optionTextValue={(option) => pickerOptionText(option, t)}
+                selectionMode="single"
+                disallowEmptySelection={true}
+                allowDuplicateSelectionEvents={true}
+                shouldUseVirtualFocus={true}
+                shouldFocusOnHover={true}
+                shouldSelectOnPressUp={true}
+                value={activePickerValue()}
+                onChange={(keys) => {
+                  const key = keys.values().next().value;
+                  const option = matchingOptions().find((candidate) => pickerOptionKey(candidate) === key);
+                  if (option) insertOption(option);
+                }}
+                renderItem={(item) => {
+                  const option = item.rawValue;
+                  const optionIndex = () =>
+                    matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
+                  const badge = pickerOptionBadge(option, t);
+                  return (
+                    <Listbox.Item
+                      ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
+                      item={item}
+                      aria-label={pickerOptionText(option, t)}
+                      class={[
+                        "mention-picker-option",
+                        {
+                          "mention-picker-file-option": option.type === "attachment",
+                          "mention-picker-option-active": activeOption() === optionIndex(),
+                        },
+                      ]}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        // The composer focuses its editor on any pointerdown that is not a control.
+                        event.stopPropagation();
+                      }}
+                      onMouseEnter={() => setActiveOption(optionIndex())}
+                    >
+                      {option.type === "agent" ? (
+                        <AgentAvatar agent={option.agent} />
+                      ) : option.type === "skill" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <Puzzle />
+                        </span>
+                      ) : option.type === "mcp" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <Blocks />
+                        </span>
+                      ) : (
+                        <AttachmentReferenceVisual name={option.attachment.name} />
+                      )}
+                      <strong>{pickerOptionName(option)}</strong>
+                      <Show when={option.type === "skill" && option.showSlug ? option.skill.slug : undefined}>
+                        {(slug) => <span class="mention-picker-slug">{slug()}</span>}
+                      </Show>
+                      <Show when={pickerOptionDescription(option, format)}>
+                        {(description) => <span class="mention-picker-description">{description()}</span>}
+                      </Show>
+                      <Badge class="mention-picker-badge" variant="ghost">
+                        <Dynamic component={badge.icon} aria-hidden="true" />
+                        {badge.label}
+                      </Badge>
+                    </Listbox.Item>
+                  );
+                }}
+              />
+            </Show>
           </div>
         </Portal>
       </Show>

@@ -1,9 +1,11 @@
-export class AgentInitializationGate {
-  readonly #initialize: () => Promise<void>;
-  #pending: Promise<void> | null = null;
+import { Deferred, Effect, Exit } from "effect";
+
+export class AgentInitializationGate<E> {
+  readonly #initialize: () => Effect.Effect<void, E>;
+  #pending: Deferred.Deferred<void, E> | null = null;
   #settled = false;
 
-  constructor(initialize: () => Promise<void>) {
+  constructor(initialize: () => Effect.Effect<void, E>) {
     this.#initialize = initialize;
   }
 
@@ -12,25 +14,21 @@ export class AgentInitializationGate {
     return this.#pending !== null && !this.#settled;
   }
 
-  /** True only after initialization resolves successfully, never before start or after rejection. */
+  /** True only after initialization succeeds, never before start or after failure. */
   get succeeded(): boolean {
     return this.#settled && this.#pending !== null;
   }
 
-  start(): Promise<void> {
-    if (!this.#pending) {
-      this.#settled = false;
-      this.#pending = this.#initialize().then(
-        () => {
-          this.#settled = true;
-        },
-        (error: unknown) => {
-          this.#settled = true;
-          this.#pending = null;
-          throw error;
-        },
-      );
-    }
-    return this.#pending;
-  }
+  readonly start = Effect.fn("AgentInitializationGate.start")(function* (this: AgentInitializationGate<E>) {
+    if (this.#pending) return yield* Deferred.await(this.#pending);
+    const completion = Deferred.makeUnsafe<void, E>();
+    this.#pending = completion;
+    this.#settled = false;
+    // Migrations must settle before shutdown can close the database.
+    const exit = yield* Effect.exit(Effect.suspend(this.#initialize));
+    this.#settled = true;
+    if (Exit.isFailure(exit)) this.#pending = null;
+    yield* Deferred.done(completion, exit);
+    return yield* Deferred.await(completion);
+  }, Effect.uninterruptible).bind(this);
 }

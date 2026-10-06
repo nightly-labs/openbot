@@ -9,6 +9,7 @@ import {
   isAgentEvent,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -23,6 +24,8 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import { browserCall, browserFailure } from "../browser-effects";
+import { runCauseEffect } from "../effect-boundary";
 import type { PasswordVault, VaultLogin } from "../password-vault";
 
 let root: string;
@@ -53,8 +56,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -93,7 +96,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.reason).toHaveLength(AGENT_RUNTIME_TEXT_LIMIT);
     expect(service.getRuntimeSnapshot().pendingApprovals[0]?.truncated).toBe(true);
 
-    await service.respondToApproval({ requestId: "approval-command", decision: "accept" });
+    await runCauseEffect(service.respondToApproval({ requestId: "approval-command", decision: "accept" }));
     expect(client.responses).toEqual([{ id: "approval-command", result: { decision: "accept" } }]);
     expect(events).toContainEqual({
       type: "agent-input-resolved",
@@ -118,7 +121,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "approval").length === 2);
-    await service.respondToApproval({ requestId: "approval-permissions", decision: "decline" });
+    await runCauseEffect(service.respondToApproval({ requestId: "approval-permissions", decision: "decline" }));
     expect(client.responses.at(-1)).toEqual({
       id: "approval-permissions",
       result: { permissions: {}, scope: "turn" },
@@ -139,8 +142,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Use Telegram" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Use Telegram" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -182,10 +185,12 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
 
-    await service.respondToPrompt({
-      requestId: "computer-use-always",
-      answers: { "mcp-elicitation-decision": ["Always allow"] },
-    });
+    await runCauseEffect(
+      service.respondToPrompt({
+        requestId: "computer-use-always",
+        answers: { "mcp-elicitation-decision": ["Always allow"] },
+      }),
+    );
     expect(client.responses.at(-1)).toEqual({
       id: "computer-use-always",
       result: { action: "accept", content: {}, _meta: { persist: "always" } },
@@ -205,10 +210,12 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 2);
-    await service.respondToPrompt({
-      requestId: "computer-use-decline",
-      answers: { "mcp-elicitation-decision": ["Don't allow"] },
-    });
+    await runCauseEffect(
+      service.respondToPrompt({
+        requestId: "computer-use-decline",
+        answers: { "mcp-elicitation-decision": ["Don't allow"] },
+      }),
+    );
     expect(client.responses.at(-1)).toEqual({
       id: "computer-use-decline",
       result: { action: "decline", content: null, _meta: null },
@@ -260,15 +267,17 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
 
-    await service.respondToPrompt({
-      requestId: "plugin-api-key",
-      answers: { apiKey: ["phx_test-key"], region: ["eu"] },
-    });
+    await runCauseEffect(
+      service.respondToPrompt({
+        requestId: "plugin-api-key",
+        answers: { apiKey: ["phx_test-key"], region: ["eu"] },
+      }),
+    );
     expect(client.responses.at(-1)).toEqual({
       id: "plugin-api-key",
       result: { action: "accept", content: { apiKey: "phx_test-key", region: "eu" }, _meta: null },
     });
-    const keyMessage = (await service.readConversation("chief")).messages.find(
+    const keyMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "plugin-api-key",
     );
     expect(keyMessage?.text).not.toContain("phx_test-key");
@@ -295,7 +304,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
-    await service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } });
+    await runCauseEffect(service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } }));
     expect(client.responses.at(-1)).toEqual({
       id: "skipped-required-field",
       result: { action: "decline", content: null, _meta: null },
@@ -344,7 +353,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       }),
     );
     // The card submits the displayed label, but the schema asks for the const behind it.
-    await service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } });
+    await runCauseEffect(
+      service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } }),
+    );
     expect(client.responses.at(-1)).toEqual({
       id: "titled-option",
       result: { action: "accept", content: { region: "eu" }, _meta: null },
@@ -387,8 +398,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Ask me a question" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask me a question" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -433,7 +444,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     );
     expect(runtimeSnapshot.pendingPrompts[0]?.questions[0]?.options?.[0]?.label).toBe(optionLabel);
     expect(client.responses).toHaveLength(0);
-    const pendingMessage = (await service.readConversation("chief")).messages.find(
+    const pendingMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "question-call",
     );
     expect(pendingMessage).toMatchObject({
@@ -443,10 +454,12 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     expect(runtimeSnapshot.latestMessages).not.toContainEqual(expect.objectContaining({ id: pendingMessage?.id }));
 
-    await service.respondToPrompt({
-      requestId: "question-call",
-      answers: { favorite: [optionLabel], token: ["super-secret"] },
-    });
+    await runCauseEffect(
+      service.respondToPrompt({
+        requestId: "question-call",
+        answers: { favorite: [optionLabel], token: ["super-secret"] },
+      }),
+    );
     expect(events).toContainEqual({
       type: "agent-input-resolved",
       kind: "prompt",
@@ -471,7 +484,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     }
     expect(JSON.parse(content.text)).toEqual({ favorite: [optionLabel], token: ["super-secret"] });
 
-    const resolvedMessage = (await service.readConversation("chief")).messages.find(
+    const resolvedMessage = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.questionPrompt?.requestId === "question-call",
     );
     expect(resolvedMessage?.questionPrompt?.resolution).toEqual({
@@ -508,9 +521,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 2);
-    await service.respondToPrompt({ requestId: "skipped-question-call", answers: { favorite: [] } });
+    await runCauseEffect(service.respondToPrompt({ requestId: "skipped-question-call", answers: { favorite: [] } }));
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "skipped-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "answered", responses: { favorite: { status: "skipped" } } });
@@ -530,9 +543,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 3);
-    await service.respondToPrompt({ requestId: "cancelled-question-call", answers: {} });
+    await runCauseEffect(service.respondToPrompt({ requestId: "cancelled-question-call", answers: {} }));
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "cancelled-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "cancelled" });
@@ -632,27 +645,27 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
     await expect(
-      service.respondToPrompt({ requestId: "retry-question-call", answers: { typo: ["Yes"] } }),
+      runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { typo: ["Yes"] } })),
     ).rejects.toThrow("does not match an active question");
     expect(client.responses.some((response) => response.id === "retry-question-call")).toBe(false);
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toBeNull();
     client.responseError = new Error("Provider process is not running.");
     await expect(
-      service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } }),
+      runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } })),
     ).rejects.toThrow("Provider process is not running.");
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toBeNull();
     client.responseError = null;
-    await service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } });
+    await runCauseEffect(service.respondToPrompt({ requestId: "retry-question-call", answers: { retry: ["Yes"] } }));
     expect(
-      (await service.readConversation("chief")).messages.find(
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
         (message) => message.questionPrompt?.requestId === "retry-question-call",
       )?.questionPrompt?.resolution,
     ).toEqual({ status: "answered", responses: { retry: { status: "answered", answers: ["Yes"] } } });
@@ -676,11 +689,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       throw new Error("Database write failed.");
     });
     await expect(
-      service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
+      runCauseEffect(
+        service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
+      ),
     ).resolves.toBeUndefined();
     expect(client.responses.filter((response) => response.id === "persistence-question-call")).toHaveLength(1);
     await expect(
-      service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
+      runCauseEffect(
+        service.respondToPrompt({ requestId: "persistence-question-call", answers: { delivery: ["Yes"] } }),
+      ),
     ).rejects.toThrow("no longer active");
     expect(events).toContainEqual(
       expect.objectContaining({ type: "error", code: "prompt_persistence_failed", agentId: "chief" }),
@@ -694,25 +711,27 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     // Suspending agent control is half of the contract; resuming it is the half the user cannot work
     // around. A tab the browser never leaves takeover on is a state they enter and cannot exit.
     const control: string[] = [];
-    browser.beginTakeover = async (tabId) => {
-      control.push(`begin:${tabId}`);
-    };
+    browser.beginTakeover = (tabId) =>
+      Effect.sync(() => {
+        control.push(`begin:${tabId}`);
+      });
     browser.endTakeover = (tabId) => {
       control.push(`end:${tabId}`);
     };
-    browser.handleDynamicTool = async (params) => {
-      if (params.tool === "open") {
-        tabs.push({
-          id: "protected-tab",
-          title: "Sign in",
-          url: "https://example.com/login",
-          loading: false,
-          ownerThreadId: params.threadId,
-          ownerAgentId: params.ownerAgentId ?? null,
-        });
-      }
-      return { success: true, contentItems: [] };
-    };
+    browser.handleDynamicTool = (params) =>
+      Effect.sync(() => {
+        if (params.tool === "open") {
+          tabs.push({
+            id: "protected-tab",
+            title: "Sign in",
+            url: "https://example.com/login",
+            loading: false,
+            ownerThreadId: params.threadId,
+            ownerAgentId: params.ownerAgentId ?? null,
+          });
+        }
+        return { success: true, contentItems: [] };
+      });
     const { store, mailbox } = stores(root);
     service = createTestService({
       store,
@@ -727,8 +746,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Open a protected page" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Open a protected page" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -813,7 +832,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(events.filter((event) => event.type === "browser-takeover-requested")).toHaveLength(1);
     expect(control).toEqual(["begin:protected-tab"]);
 
-    await service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" });
+    await runCauseEffect(service.respondToBrowserTakeover({ requestId: "takeover-call", decision: "complete" }));
     await waitFor(() => client.responses.length === 4);
     expect(openBotToolPayload(client.responses[3]?.result)).toEqual({
       status: "completed",
@@ -846,7 +865,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
         (event) => event.type === "browser-takeover-requested" && event.request.requestId === "takeover-cancel",
       ),
     );
-    await service.respondToBrowserTakeover({ requestId: "takeover-cancel", decision: "cancel" });
+    await runCauseEffect(service.respondToBrowserTakeover({ requestId: "takeover-cancel", decision: "cancel" }));
     await waitFor(() => client.responses.length === 5);
     expect(openBotToolPayload(client.responses[4]?.result)).toEqual({ status: "cancelled" });
     // Cancelling returns the tab as surely as completing does.
@@ -867,8 +886,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Need a legacy approval" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need a legacy approval" }));
     await waitFor(() => clients.get("codex")?.requests.some((request) => request.method === "turn/start"));
     const client = clients.get("codex");
     if (!client) throw new Error("Codex client was not created.");
@@ -880,8 +899,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       id: 42,
       params: { conversationId, command: "git status", reason: "Inspect the worktree." },
     });
-    await waitFor(() => client.responses.length === 0);
-    await service.respondToApproval({ requestId: 42, decision: "decline" });
+    await waitFor(() => events.some((event) => event.type === "approval" && event.approval.requestId === 42));
+    expect(client.responses).toHaveLength(0);
+    await runCauseEffect(service.respondToApproval({ requestId: 42, decision: "decline" }));
     expect(client.responses.at(-1)).toEqual({
       id: 42,
       result: { decision: { denied: { rejection: "The user declined this action." } } },
@@ -892,9 +912,10 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       id: 43,
       params: { conversationId, turnId: "turn-legacy", reason: "Update the file." },
     });
-    await service.stop();
+    await waitFor(() => events.some((event) => event.type === "approval" && event.approval.requestId === 43));
+    await runCauseEffect(service.stop());
     expect(events).toContainEqual({ type: "agent-input-resolved", kind: "approval", requestId: 43, agentId: "chief" });
-    await expect(service.respondToApproval({ requestId: 43, decision: "accept" })).rejects.toThrow(
+    await expect(runCauseEffect(service.respondToApproval({ requestId: 43, decision: "accept" }))).rejects.toThrow(
       "This approval is no longer active.",
     );
   });
@@ -914,8 +935,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Ask, then end the turn" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Ask, then end the turn" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -978,8 +999,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1046,8 +1067,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Need an approval" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1081,10 +1102,10 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    const agent = await service.updateAgent({ agentId: "chief", access: "workspace" });
-    await service.sendMessage({ agentId: "chief", text: "Write outside the workspace" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const agent = await runCauseEffect(service.updateAgent({ agentId: "chief", access: "workspace" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Write outside the workspace" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     const client = clients.get("codex");
@@ -1120,24 +1141,25 @@ it.each(["submitted", "takeover"] as const)(
     const submission = new Promise<"submitted" | "takeover">((resolve) => {
       resolveSubmission = resolve;
     });
-    const submit = vi.fn(() => submission);
+    const submit = vi.fn((_secret: string) => submission);
     const cancel = vi.fn();
     const browser = {
       ...fakeBrowser(tabs),
-      prepareSecret: async () => ({
-        request: { method: "otp" as const, origin: "https://example.com", digits: 6 },
-        agentScriptedOrigin: false,
-        vaultFillable: false,
-        submit,
-        cancel,
-      }),
+      prepareSecret: () =>
+        Effect.sync(() => ({
+          request: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+          agentScriptedOrigin: false,
+          vaultFillable: false,
+          submit: (secret: string) => browserCall(() => submit(secret)),
+          cancel,
+        })),
     };
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(structuredClone(event)));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Sign in" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -1167,17 +1189,23 @@ it.each(["submitted", "takeover"] as const)(
     const requestId = service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.requestId;
     if (!requestId) throw new Error("Missing authentication request.");
     await expect(
-      service.respondToBrowserSecret({ requestId, agentId: "other-agent", decision: "submit", secret: "729104" }),
+      runCauseEffect(
+        service.respondToBrowserSecret({ requestId, agentId: "other-agent", decision: "submit", secret: "729104" }),
+      ),
     ).rejects.toThrow("no longer active");
-    const response = service.respondToBrowserSecret({
-      requestId,
-      agentId: "chief",
-      decision: "submit",
-      secret: "729104",
-    });
+    const response = runCauseEffect(
+      service.respondToBrowserSecret({
+        requestId,
+        agentId: "chief",
+        decision: "submit",
+        secret: "729104",
+      }),
+    );
     await waitFor(() => submit.mock.calls.length === 1);
     await expect(
-      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+      runCauseEffect(
+        service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+      ),
     ).rejects.toThrow("no longer active");
     if (!resolveSubmission) throw new Error("Missing submission resolver.");
     resolveSubmission(outcome);
@@ -1186,11 +1214,13 @@ it.each(["submitted", "takeover"] as const)(
     expect(JSON.stringify(client.responses)).not.toContain("729104");
     if (outcome === "takeover") {
       expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.requiresReload).toBe(true);
-      await service.respondToBrowserTakeover({ requestId, decision: "complete" });
+      await runCauseEffect(service.respondToBrowserTakeover({ requestId, decision: "complete" }));
     }
     expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
     await expect(
-      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+      runCauseEffect(
+        service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+      ),
     ).rejects.toThrow("no longer active");
   },
 );
@@ -1200,16 +1230,17 @@ it("returns the secure input refusal so the agent can request takeover", async (
   const tabs: BrowserTab[] = [];
   const browser = {
     ...fakeBrowser(tabs),
-    prepareSecret: async () => {
-      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
-    },
+    prepareSecret: () =>
+      Effect.fail(
+        browserFailure(new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.")),
+      ),
   };
   const { store, mailbox } = stores(root);
   service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
   const events: AgentEvent[] = [];
   service.on("event", (event) => events.push(structuredClone(event)));
-  await service.initialize();
-  await service.sendMessage({ agentId: "chief", text: "Sign in" });
+  await runCauseEffect(service.initialize());
+  await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
   await waitFor(() => events.some((event) => event.type === "turn-started"));
   const started = events.find((event) => event.type === "turn-started");
   const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -1263,19 +1294,22 @@ describe("filling from the shared password vault", () => {
     const submit = vi.fn(async (_secret: string) => "submitted" as const);
     const browser = {
       ...fakeBrowser(tabs),
-      prepareSecret: async () => ({
-        request: { method: "password" as const, origin: "https://example.com", digits: 6 },
-        agentScriptedOrigin,
-        vaultFillable,
-        submit,
-        cancel: vi.fn(),
-      }),
+      prepareSecret: () =>
+        Effect.sync(() => ({
+          request: { method: "password" as const, origin: "https://example.com", digits: 6 },
+          agentScriptedOrigin,
+          vaultFillable,
+          submit: (secret: string) => browserCall(() => submit(secret)),
+          cancel: vi.fn(),
+        })),
     };
     const passwordVault: PasswordVault = {
       connected: () => true,
-      loginsFor: async () => logins,
-      secretFor: async (loginId, origin, kind) =>
-        loginId === LOGIN.id && origin === "https://example.com" && kind === "password" ? PASSWORD : null,
+      loginsFor: () => Effect.succeed(logins),
+      secretFor: (loginId, origin, kind) =>
+        Effect.succeed(
+          loginId === LOGIN.id && origin === "https://example.com" && kind === "password" ? PASSWORD : null,
+        ),
     };
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -1288,8 +1322,8 @@ describe("filling from the shared password vault", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(structuredClone(event)));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Sign in" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Sign in" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;

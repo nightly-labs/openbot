@@ -10,7 +10,8 @@
  * margin gives that height back, so the transcript under it does not move.
  */
 .chat-scroll-rail {
-  --chat-scroll-rail-accent: var(--openbot-logo-production);
+  /* A muted neutral with a trace of the logo lilac: the full lilac pulls the eye while the reader reads. */
+  --chat-scroll-rail-accent: color-mix(in srgb, var(--openbot-logo-production) 25%, var(--openbot-text-muted));
   --chat-scroll-rail-track: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
   --chat-scroll-rail-glow: color-mix(in srgb, var(--chat-scroll-rail-accent) 60%, transparent);
   --chat-scroll-rail-ease: var(--openbot-ease-out);
@@ -91,7 +92,7 @@
 }
 
 .chat-scroll-rail-count {
-  color: var(--chat-scroll-rail-accent);
+  color: var(--openbot-logo-production);
   font-variant-numeric: tabular-nums;
 }
 

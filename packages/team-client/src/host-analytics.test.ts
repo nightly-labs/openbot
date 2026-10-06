@@ -1,4 +1,5 @@
 import { emptyAnalyticsTotals } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { readHostAnalytics } from "./host-analytics";
 
@@ -20,12 +21,22 @@ describe("host analytics client", () => {
       requests.push(path);
       return decode(report);
     }
-    expect(await readHostAnalytics(request, [], input)).toBeNull();
+    expect(
+      await Effect.runPromise(readHostAnalytics(request, [], input).pipe(Effect.mapError((error) => error.cause))),
+    ).toBeNull();
     expect(requests).toEqual([]);
-    expect(await readHostAnalytics(request, ["host-analytics"], input)).toEqual(report);
+    expect(
+      await Effect.runPromise(
+        readHostAnalytics(request, ["host-analytics"], input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).toEqual(report);
     expect(requests).toEqual(["/v1/analytics?startDate=2026-09-01&endDate=2026-09-07&timeZone=UTC"]);
-    await expect(readHostAnalytics(request, ["host-analytics"], { ...input, agentId: "agent-a" })).rejects.toThrow(
-      "does not match",
-    );
+    await expect(
+      Effect.runPromise(
+        readHostAnalytics(request, ["host-analytics"], { ...input, agentId: "agent-a" }).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      ),
+    ).rejects.toThrow("does not match");
   });
 });
