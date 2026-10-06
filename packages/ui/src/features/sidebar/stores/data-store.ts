@@ -22,6 +22,8 @@ export function createSidebarDataStore(deps: {
   dragActive: () => boolean;
 }) {
   const { normalizedQuery, props } = deps;
+  /** The channels view keeps the sections and pins and leaves out agents and people. */
+  const channelsOnly = () => props.view === "channels";
 
   const directThreadByMember = createMemo(
     () => new Map(props.directThreads.map((thread) => [thread.otherMemberId, thread])),
@@ -54,7 +56,7 @@ export function createSidebarDataStore(deps: {
       return resolved;
     };
     for (const ref of chatPinnedItems()) {
-      if (ref.kind === "agent") {
+      if (ref.kind === "agent" && !channelsOnly()) {
         const agent = agentById().get(ref.id);
         if (agent && agentMatchesQuery(agent, normalizedQuery())) {
           items.push(resolve(ref, agent, { ref, chat: { kind: "agent", id: agent.id, agent } }));
@@ -69,7 +71,7 @@ export function createSidebarDataStore(deps: {
     return items;
   });
   const listedAgents = createMemo(() =>
-    props.agents.filter(
+    (channelsOnly() ? [] : props.agents).filter(
       (agent) =>
         !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
         agentMatchesQuery(agent, normalizedQuery()),
@@ -157,7 +159,7 @@ export function createSidebarDataStore(deps: {
     );
   });
   const filteredPeople = createMemo(() =>
-    orderedPeople().filter((member) => {
+    (channelsOnly() ? [] : orderedPeople()).filter((member) => {
       const thread = directThreadByMember().get(member.id);
       return personMatchesQuery(member, thread, normalizedQuery());
     }),
@@ -187,7 +189,7 @@ export function createSidebarDataStore(deps: {
     props.layout.order.filter((sectionId) => {
       if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return props.showPeople !== false && filteredPeople().length > 0;
       if (customSectionById().has(sectionId)) {
-        return !normalizedQuery() || (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
+        return (!normalizedQuery() && !channelsOnly()) || (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;
       }
       if (sectionId !== SIDEBAR_UNASSIGNED_SECTION_ID) return false;
       return (filteredChatsBySection().get(sectionId)?.length ?? 0) > 0;

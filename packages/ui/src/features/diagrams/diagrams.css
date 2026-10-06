@@ -1,0 +1,873 @@
+/* The diagram view: header, canvas, cards, edges, the assistant over the canvas and the run panel. */
+
+.diagram-view {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--openbot-bg-canvas);
+}
+
+.diagram-view-header {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2) var(--openbot-space-4);
+}
+
+.diagram-view-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.diagram-view-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.diagram-view-title {
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-view-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  white-space: nowrap;
+}
+
+.diagram-view-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin-left: auto;
+}
+
+.diagram-view-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.diagram-view-chat {
+  position: absolute;
+  bottom: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+  z-index: 2;
+  width: min(360px, calc(100% - var(--openbot-space-8)));
+}
+
+/* Canvas */
+
+.diagram-board {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.diagram-board-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  outline: 0;
+  background-color: var(--openbot-bg-canvas);
+  background-image: radial-gradient(circle at 1px 1px, var(--openbot-border-strong) 1px, transparent 0);
+  background-position: var(--diagram-grid-x) var(--diagram-grid-y);
+  background-size: var(--diagram-grid-size) var(--diagram-grid-size);
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-board-viewport:focus-visible {
+  box-shadow: inset var(--openbot-focus-ring);
+}
+
+.diagram-board-viewport:is([data-panning], [data-dragging]) {
+  cursor: grabbing;
+}
+
+.diagram-board-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.diagram-board-world[data-settling] {
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.diagram-board-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  max-width: 280px;
+  gap: var(--openbot-space-1);
+  translate: -50% -50%;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  pointer-events: none;
+  text-align: center;
+}
+
+.diagram-board-empty strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+}
+
+.diagram-board-empty p {
+  margin: 0;
+}
+
+.diagram-board-tools,
+.diagram-board-zoom {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-overlay);
+  box-shadow:
+    0 0 0 1px var(--openbot-border),
+    var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1);
+}
+
+.diagram-board-tools {
+  top: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+}
+
+.diagram-board-zoom {
+  right: var(--openbot-space-4);
+  bottom: var(--openbot-space-4);
+}
+
+.diagram-board-tools .ui-button,
+.diagram-board-zoom .ui-button {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.diagram-board-zoom-level {
+  min-width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagram-board-status {
+  position: absolute;
+  top: var(--openbot-space-4);
+  left: 50%;
+  z-index: 2;
+  max-width: min(420px, calc(100% - 320px));
+  margin: 0;
+  translate: -50% 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-overlay);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  padding: var(--openbot-space-1-5) var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  pointer-events: none;
+  text-align: center;
+}
+
+.diagram-board-status:empty {
+  display: none;
+}
+
+.diagram-board-status[data-tone="danger"] {
+  box-shadow: 0 0 0 1px var(--openbot-danger-border);
+  color: var(--openbot-danger-text);
+}
+
+/* Edges. The SVG has no size of its own: it draws outside its box, in canvas coordinates. */
+
+.diagram-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.diagram-edge path,
+.diagram-edge-draft {
+  fill: none;
+}
+
+.diagram-edge-hit {
+  stroke: transparent;
+  stroke-width: 16px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.diagram-edge-line {
+  stroke: var(--openbot-border-strong);
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+.diagram-edge[data-state="delivered"] .diagram-edge-line {
+  stroke: var(--openbot-accent);
+}
+
+.diagram-edge[data-state="running"] .diagram-edge-line {
+  stroke: var(--openbot-accent);
+  stroke-dasharray: 6 6;
+  animation: diagram-edge-flow 0.6s linear infinite;
+}
+
+.diagram-edge:hover .diagram-edge-line,
+.diagram-edge[data-selected] .diagram-edge-line {
+  stroke: var(--openbot-text-primary);
+  stroke-width: 3px;
+}
+
+.diagram-edge-draft {
+  stroke: var(--openbot-accent);
+  stroke-width: 2px;
+  stroke-dasharray: 6 6;
+}
+
+.diagram-edge-draft[data-target="invalid"] {
+  stroke: var(--openbot-danger);
+}
+
+.diagram-edge-remove.ui-button {
+  position: absolute;
+  top: var(--diagram-edge-y);
+  left: var(--diagram-edge-x);
+  z-index: 1;
+  translate: -50% -50%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.diagram-edge-remove.ui-button:is([data-selected], :focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@keyframes diagram-edge-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+/* Cards */
+
+.diagram-node {
+  position: absolute;
+  top: var(--diagram-node-y);
+  left: var(--diagram-node-x);
+  display: flex;
+  width: var(--diagram-node-width);
+  flex-direction: column;
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--openbot-border),
+    var(--openbot-shadow-raised);
+  cursor: grab;
+  transition: box-shadow var(--openbot-duration-fast) var(--openbot-ease-out);
+  user-select: none;
+}
+
+.diagram-node[data-status="running"] {
+  box-shadow:
+    0 0 0 1px var(--openbot-accent),
+    0 0 0 5px var(--openbot-accent-soft);
+}
+
+.diagram-node[data-status="failed"] {
+  box-shadow:
+    0 0 0 1px var(--openbot-danger-border),
+    var(--openbot-shadow-raised);
+}
+
+.diagram-node[data-unreachable] {
+  box-shadow: 0 0 0 1px var(--openbot-warning);
+}
+
+.diagram-node[data-selected] {
+  box-shadow:
+    0 0 0 2px var(--openbot-accent),
+    var(--openbot-shadow-raised);
+}
+
+.diagram-node-header {
+  display: flex;
+  height: 52px;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1);
+}
+
+.diagram-node-select.ui-button {
+  height: 44px;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  padding: 0 var(--openbot-space-1-5);
+  background: transparent;
+  cursor: inherit;
+  text-align: left;
+}
+
+.diagram-node-avatar.agent-avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.diagram-node-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.diagram-node-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.diagram-node-heading {
+  display: grid;
+  min-width: 0;
+}
+
+.diagram-node-kicker {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-node-name {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-node-step {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  padding: 0 var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.diagram-node-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+}
+
+.diagram-node-task,
+.diagram-node-schedule {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.diagram-node-schedule {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+}
+
+/* The output of the last run, inside the card, the way a generation shows its result. */
+.diagram-node-preview {
+  display: flex;
+  min-height: 64px;
+  align-items: flex-start;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.diagram-node-preview[data-empty] {
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-node-preview p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  white-space: pre-line;
+}
+
+.diagram-node[data-status="failed"] .diagram-node-preview {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.diagram-node-preview-empty {
+  color: var(--openbot-text-placeholder);
+}
+
+.diagram-node-footer {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.diagram-node-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.diagram-node-status svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+:is(.diagram-node-status, .diagram-inspector-step-status)[data-status="succeeded"] {
+  color: var(--openbot-success-text);
+}
+
+:is(.diagram-node-status, .diagram-inspector-step-status)[data-status="failed"] {
+  color: var(--openbot-danger-text);
+}
+
+:is(.diagram-node-status, .diagram-inspector-step-status)[data-status="running"] {
+  color: var(--openbot-accent-text);
+}
+
+.diagram-node-status[data-status="unreachable"] {
+  color: var(--openbot-warning-text);
+}
+
+.diagram-node-duration {
+  color: var(--openbot-text-muted);
+}
+
+.diagram-node-duration::before {
+  content: "·";
+  margin-right: var(--openbot-space-1);
+}
+
+.diagram-node-remove.ui-button,
+.diagram-node-run.ui-button {
+  flex: none;
+}
+
+.diagram-node-run.ui-button svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* Ports sit on the card's edge, level with the header. */
+.diagram-port.ui-button {
+  position: absolute;
+  top: 19px;
+  z-index: 1;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  border: 2px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface-raised);
+  padding: 0;
+  cursor: crosshair;
+  transition:
+    scale var(--openbot-duration-fast) var(--openbot-ease-out),
+    border-color var(--openbot-duration-fast) var(--openbot-ease-out),
+    background-color var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+/* A larger target than the dot it shows. */
+.diagram-port.ui-button::before {
+  position: absolute;
+  inset: -8px;
+  content: "";
+}
+
+.diagram-port-in.ui-button {
+  left: -7px;
+}
+
+.diagram-port-out.ui-button {
+  right: -7px;
+}
+
+.diagram-port.ui-button:hover,
+.diagram-port-out.ui-button[data-connecting],
+.diagram-port-in.ui-button[data-target="valid"] {
+  scale: 1.25;
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent-soft);
+}
+
+.diagram-port-out.ui-button[data-connecting] {
+  background: var(--openbot-accent);
+}
+
+.diagram-port-in.ui-button[data-target="invalid"] {
+  border-color: var(--openbot-danger);
+  opacity: 0.5;
+}
+
+.diagram-port.ui-button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* Run panel */
+
+.diagram-inspector {
+  display: flex;
+  width: 340px;
+  min-height: 0;
+  flex: none;
+  flex-direction: column;
+  border-left: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-surface);
+}
+
+.diagram-inspector-header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.diagram-inspector-title {
+  overflow: hidden;
+  margin: 0;
+  flex: 1;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-inspector-avatar.agent-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.diagram-inspector-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-4);
+}
+
+.diagram-inspector-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-1-5) var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.diagram-inspector-muted,
+.diagram-inspector-empty {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
+.diagram-inspector-section {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+.diagram-inspector-section p {
+  margin: 0;
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.diagram-inspector-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.diagram-inspector-section-title {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
+}
+
+.diagram-inspector-text {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.diagram-inspector-text[data-tone="danger"] {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.diagram-inspector-steps {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagram-inspector-step.ui-button {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2);
+  text-align: left;
+}
+
+.diagram-inspector-step-number {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.diagram-inspector-step-name {
+  overflow: hidden;
+  flex: 1;
+  font-size: var(--openbot-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-inspector-step-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagram-inspector-step-status svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* Assistant */
+
+.diagram-chat,
+.diagram-chat-launcher.ui-button {
+  background: var(--openbot-bg-glass);
+  box-shadow:
+    0 0 0 1px var(--openbot-glass-border),
+    var(--openbot-shadow-overlay);
+  backdrop-filter: blur(16px);
+}
+
+.diagram-chat-launcher.ui-button {
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  padding-left: var(--openbot-space-1);
+}
+
+.diagram-chat {
+  display: flex;
+  max-height: 340px;
+  flex-direction: column;
+  border-radius: var(--openbot-radius-xl);
+  overflow: hidden;
+}
+
+.diagram-chat-avatar.agent-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.diagram-chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.diagram-chat-title {
+  overflow: hidden;
+  margin: 0;
+  flex: 1;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-chat-messages {
+  display: flex;
+  min-height: 96px;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  overflow-y: auto;
+  padding: var(--openbot-space-3);
+}
+
+.diagram-chat-empty {
+  margin: auto 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  text-align: center;
+}
+
+.diagram-chat-bubble {
+  max-width: 88%;
+  font-size: var(--openbot-text-md);
+}
+
+.diagram-chat-bubble p {
+  margin: 0;
+}
+
+.diagram-chat-changes {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: var(--openbot-space-2) 0 0;
+  padding: 0;
+  font-size: var(--openbot-text-sm);
+  list-style: none;
+}
+
+.diagram-chat-changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--openbot-space-1-5);
+}
+
+.diagram-chat-changes svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  flex: none;
+  margin-top: 2px;
+  color: var(--openbot-success-text);
+}
+
+.diagram-chat-working {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.diagram-chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2);
+}
+
+.diagram-chat-input.ui-textarea {
+  min-height: 0;
+  flex: 1;
+  resize: none;
+}
+
+.diagram-chat-send.ui-button {
+  flex: none;
+  border-radius: var(--openbot-radius-pill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram-edge[data-state="running"] .diagram-edge-line {
+    animation: none;
+  }
+
+  .diagram-board-world[data-settling],
+  .diagram-node,
+  .diagram-port.ui-button,
+  .diagram-edge-remove.ui-button {
+    transition: none;
+  }
+}

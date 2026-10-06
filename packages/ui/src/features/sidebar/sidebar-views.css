@@ -1,0 +1,51 @@
+/* The switch over the sidebar list, and the rows of the diagrams view. */
+
+.sidebar-view-switch {
+  padding: 2px 12px 6px;
+}
+
+.sidebar-view-tabs.ui-sliding-tabs {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sidebar-view-tab.ui-sliding-tabs-trigger {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-1);
+  overflow: hidden;
+  padding-inline: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.sidebar-view-tab svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+}
+
+.diagram-row-preview svg,
+.diagram-row-preview .ui-spinner {
+  display: inline-block;
+  margin-right: var(--openbot-space-1);
+  vertical-align: -2px;
+}
+
+.diagram-row-preview svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.diagram-row-failed {
+  color: var(--openbot-danger-text);
+}
+
+.sidebar-diagram-create.ui-button {
+  justify-content: flex-start;
+  margin-top: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
