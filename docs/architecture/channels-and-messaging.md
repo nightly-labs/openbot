@@ -213,9 +213,11 @@ the token and does the platform work for the hosts:
   `/v2/remote/discord-route/validate`). The socket asks for a route only for the platforms whose
   connections hold it.
 - **Removal.** When the bot leaves a guild, Signal drops its route and asks the account service to
-  unlink it (`/v2/remote/discord-route/removed`, signed), so an offline host does not keep it. A
-  route ticket that still names a guild the bot is not in, after a failed unlink or a Signal restart,
-  is not routed, and Signal asks for the unlink again. The `discord-session` frame lists the guilds
+  unlink it (`/v2/remote/discord-route/removed`, signed), so an offline host does not keep it. After
+  the Gateway lists every guild of the bot, and every 30 minutes, Signal sends those guild IDs
+  (`/v2/remote/discord-route/reconcile`), and the account service unlinks each link of another guild
+  that is older than five minutes. A route ticket that still names a guild the bot is not in is not
+  routed. The `discord-session` frame lists the guilds
   routed to the socket; a host connection whose guild is not listed stops, and **Reconnect** starts
   the install again.
 - **Calls.** After `ready`, Signal sends the socket a `discord-session` token. The host's adapter

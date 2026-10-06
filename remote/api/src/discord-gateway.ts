@@ -18,6 +18,19 @@ import { DISCORD_DIRECT_MESSAGE_REPLY, type DiscordAction, DiscordState } from "
 import type { SignalService } from "./signal-service";
 
 const DISCORD_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
+// How often Signal tells the account service which guilds the bot is in, so a link of a guild that
+// the bot left goes also when every unlink before it failed.
+const DISCORD_RECONCILE_INTERVAL = "30 minutes";
+// A link this new is kept: its guild can be added on the Gateway after the snapshot.
+const DISCORD_RECONCILE_GRACE_MILLISECONDS = 5 * 60_000;
+
+/** What Signal tells the account service about the bot's guilds. */
+export interface DiscordLinks {
+  /** The bot left the guild: unlink it at once. */
+  removed(guildId: string): Effect.Effect<void, { readonly message: string }>;
+  /** The bot is in these guilds: unlink every other guild linked before `before`. */
+  reconcile(guildIds: string[], before: number): Effect.Effect<void, { readonly message: string }>;
+}
 const METHODS: Record<DiscordRestRequest["method"], RequestMethod> = {
   GET: RequestMethod.Get,
   POST: RequestMethod.Post,
@@ -67,12 +80,7 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
   "@openbot/remote-api/DiscordGateway",
 ) {
   /** Connects the bot. The scope's finalizer closes the Gateway connection. */
-  /** `unlinkGuild` tells the account service that the bot left a guild. */
-  static layer(
-    config: DiscordBotConfig,
-    signal: SignalService,
-    unlinkGuild: (guildId: string) => Effect.Effect<void, { readonly message: string }>,
-  ) {
+  static layer(config: DiscordBotConfig, signal: SignalService, links: DiscordLinks) {
     return Layer.effect(
       DiscordGateway,
       Effect.gen(function* () {
@@ -90,14 +98,14 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
 
         /**
          * Drops the route of a guild that the bot left and unlinks it in the account service. A failed
-         * unlink is tried again when a host presents the guild in a route ticket.
+         * unlink is recovered by the next reconcile.
          */
         const left = (guildId: string) => {
           signal.revokeDiscordRoute(guildId, Date.now());
           if (unlinking.has(guildId)) return;
           unlinking.add(guildId);
           run(
-            unlinkGuild(guildId).pipe(
+            links.removed(guildId).pipe(
               Effect.catch(() => Effect.sync(() => console.error("OpenBot Discord could not unlink a removed guild."))),
               Effect.ensuring(Effect.sync(() => unlinking.delete(guildId))),
             ),
@@ -106,12 +114,31 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         signal.setDiscordMembership({ isMember: (guildId) => state.isMember(guildId), left });
         yield* Effect.addFinalizer(() => Effect.sync(() => signal.setDiscordMembership(null)));
 
+        /** Sends the guilds that the bot is in. Nothing happens before every shard is ready. */
+        const reconcile = Effect.suspend(() => {
+          const guildIds = state.memberGuildIds();
+          return guildIds === null
+            ? Effect.void
+            : links
+                .reconcile(guildIds, Date.now() - DISCORD_RECONCILE_GRACE_MILLISECONDS)
+                .pipe(
+                  Effect.catch(() =>
+                    Effect.sync(() => console.error("OpenBot Discord could not reconcile the guild links.")),
+                  ),
+                );
+        });
+        run(reconcile.pipe(Effect.delay(DISCORD_RECONCILE_INTERVAL), Effect.forever));
+
         const act = (action: DiscordAction) => {
           if (action.type === "deliver") {
             signal.deliverDiscord(action.guildId, action.delivery);
             // The bot left the guild. The route goes now, and the account service unlinks the guild,
             // also when its host is offline and does not receive the delivery above.
             if (action.delivery.kind === "removed") left(action.guildId);
+            return;
+          }
+          if (action.type === "reconcile") {
+            run(reconcile);
             return;
           }
           const call =

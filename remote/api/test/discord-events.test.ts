@@ -1,5 +1,11 @@
+import {
+  ApplicationFlags,
+  GatewayDispatchEvents,
+  GatewayOpcodes,
+  type GatewayReadyDispatch,
+} from "discord-api-types/v10";
 import { describe, expect, it } from "vitest";
-import { type DiscordMessageData, normalizeGuildMessage } from "../src/discord-events";
+import { type DiscordMessageData, DiscordState, normalizeGuildMessage } from "../src/discord-events";
 
 const BOT = "900";
 
@@ -61,5 +67,43 @@ describe("Discord message normalization", () => {
       BOT,
     );
     expect(toPerson?.replyTo).toEqual({ messageId: "401", authorIsBot: false, rootId: null });
+  });
+});
+
+// Guild 8388608 is on shard 0 of 2 and guild 4194304 on shard 1: Discord uses `(id >> 22) % count`.
+function ready(shard: [number, number], guilds: string[]): GatewayReadyDispatch {
+  return {
+    op: GatewayOpcodes.Dispatch,
+    t: GatewayDispatchEvents.Ready,
+    s: 1,
+    d: {
+      v: 10,
+      user: { id: BOT, username: "openbot", discriminator: "0", global_name: null, avatar: null },
+      guilds: guilds.map((id) => ({ id, unavailable: true })),
+      session_id: "session",
+      resume_gateway_url: "wss://gateway.discord.gg",
+      shard,
+      application: { id: "1", flags: ApplicationFlags.GatewayMessageContentLimited, flags_new: "0" },
+    },
+  };
+}
+
+describe("Discord guild membership", () => {
+  it("is known only after every shard is ready, and follows a removal", () => {
+    const state = new DiscordState("1");
+    expect(state.handle(ready([0, 2], ["8388608"]))).toEqual([]);
+    expect(state.memberGuildIds()).toBeNull();
+    expect(state.isMember("8388608")).toBeNull();
+
+    expect(state.handle(ready([1, 2], ["4194304"]))).toEqual([{ type: "reconcile" }]);
+    expect(state.memberGuildIds()?.sort()).toEqual(["4194304", "8388608"]);
+    expect(state.isMember("4194304")).toBe(true);
+    expect(state.isMember("12582912")).toBe(false);
+
+    state.handle({ op: GatewayOpcodes.Dispatch, t: GatewayDispatchEvents.GuildDelete, s: 2, d: { id: "4194304" } });
+    expect(state.isMember("4194304")).toBe(false);
+    // A new session of a shard lists its guilds again.
+    state.handle(ready([0, 2], []));
+    expect(state.memberGuildIds()).toEqual([]);
   });
 });

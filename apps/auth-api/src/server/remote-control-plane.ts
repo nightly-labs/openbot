@@ -1702,6 +1702,47 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  /**
+   * Unlinks every guild that was linked before `before` and that the bot is no longer in. Signal sends
+   * the bot's guilds from the Gateway, so a link goes also when every unlink before it failed.
+   */
+
+  readonly reconcileDiscordGuilds = Effect.fn("RemoteControlPlane.reconcileDiscordGuilds")(
+    function* (
+      this: RemoteControlPlane,
+      input: { guilds: readonly string[]; before: number },
+    ): Effect.fn.Return<number, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const member = new Set(input.guilds);
+      const rows = yield* remoteCall(() =>
+        dependencies.database
+          .prepare("SELECT guild_id, connected_at FROM discord_guild_routes WHERE connected_at < ?")
+          .bind(input.before)
+          .all<{ guild_id: string; connected_at: number }>(),
+      );
+      const stale = rows.results.filter((row) => !member.has(row.guild_id));
+      if (stale.length === 0) return 0;
+      const now = dependencies.now();
+      // Each statement names the link it read, so a link made since then stays.
+      yield* remoteCall(() =>
+        dependencies.database.batch(
+          stale.flatMap((row) => [
+            this.#authEventStatement({ type: "discord-route-revoked", guildId: row.guild_id, through: now }, now, {
+              sql: "EXISTS (SELECT 1 FROM discord_guild_routes WHERE guild_id = ? AND connected_at = ?)",
+              binds: [row.guild_id, row.connected_at],
+            }),
+            dependencies.database
+              .prepare("DELETE FROM discord_guild_routes WHERE guild_id = ? AND connected_at = ?")
+              .bind(row.guild_id, row.connected_at),
+          ]),
+        ),
+      );
+      yield* this.#flushAuthEvents();
+      return stale.length;
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   /** Checks the credential that a host received when it registered. */
 
   readonly authenticateHost = Effect.fn("RemoteControlPlane.authenticateHost")(

@@ -29,6 +29,7 @@ class ControlPlane extends Context.Service<
       guilds: import("@openbot/contracts/signal-protocol/discord-route").DiscordRouteGuild[],
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
+    reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
   static layer = Layer.sync(ControlPlane, () => {
@@ -114,6 +115,18 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      reconcileDiscordGuilds: Effect.fn("ControlPlane.reconcileDiscordGuilds")((guildIds, before) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/discord-route/reconcile", { guilds: guildIds, before }),
+          (response) =>
+            response.ok
+              ? Effect.void
+              : Effect.fail(
+                  new ControlPlaneError({ message: "The account service did not reconcile the Discord guilds." }),
+                ),
+          releaseResponse,
+        ),
+      ),
       discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/discord-route/removed", { guildId }),
@@ -167,7 +180,10 @@ const signalRuntime = ManagedRuntime.make(signal.dependencies);
 // The Discord bot's Gateway connection lives in this runtime. Disposal closes it.
 const discordRuntime = config.discord
   ? ManagedRuntime.make(
-      DiscordGateway.layer(config.discord, signal, (guildId) => controlPlaneService.discordGuildRemoved(guildId)),
+      DiscordGateway.layer(config.discord, signal, {
+        removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
+        reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
+      }),
     )
   : null;
 const discord = discordRuntime ? await discordRuntime.runPromise(DiscordGateway) : null;

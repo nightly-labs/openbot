@@ -51,7 +51,9 @@ export type DiscordAction =
   | { type: "deliver"; guildId: string; delivery: DiscordDelivery }
   // Acknowledge a button press at once, as a deferred update: Discord waits 3 seconds.
   | { type: "acknowledge"; interactionId: string; interactionToken: string }
-  | { type: "direct-reply"; channelId: string };
+  | { type: "direct-reply"; channelId: string }
+  // The Gateway listed every guild of the bot: the account service drops the links of the others.
+  | { type: "reconcile" };
 
 interface StoredInteraction {
   token: string;
@@ -128,8 +130,10 @@ export class DiscordState {
   #botUserId: string | null = null;
   // Guild ID to name, for each guild that the bot is in.
   readonly #guilds = new Map<string, string>();
-  // Each guild that the bot is in, from READY on. Null before READY: then it is not known.
-  #memberGuilds: Set<string> | null = null;
+  // The guilds that the bot is in, for each Gateway shard, from that shard's READY on. Discord puts a
+  // guild on shard `(guild_id >> 22) % shard count`.
+  readonly #shardGuilds = new Map<number, Set<string>>();
+  #shardCount: number | null = null;
   // Channel or thread ID to its guild and name.
   readonly #channels = new Map<string, { guildId: string; name: string }>();
   readonly #interactions = new Map<string, StoredInteraction>();
@@ -140,9 +144,22 @@ export class DiscordState {
     this.#configuredApplicationId = applicationId;
   }
 
-  /** Whether the bot is in the guild, or null before READY. */
+  /** Whether the bot is in the guild, or null before the READY of every shard. */
   isMember(guildId: string): boolean | null {
-    return this.#memberGuilds ? this.#memberGuilds.has(guildId) : null;
+    return this.memberGuildIds() === null
+      ? null
+      : (this.#shardGuilds.get(this.#shardOf(guildId))?.has(guildId) ?? false);
+  }
+
+  /** Every guild that the bot is in, or null before the READY of every shard. */
+  memberGuildIds(): string[] | null {
+    const count = this.#shardCount;
+    if (count === null || this.#shardGuilds.size < count) return null;
+    return [...this.#shardGuilds.values()].flatMap((guilds) => [...guilds]);
+  }
+
+  #shardOf(guildId: string): number {
+    return Number((BigInt(guildId) >> 22n) % BigInt(this.#shardCount ?? 1));
   }
 
   get botUserId(): string | null {
@@ -175,13 +192,19 @@ export class DiscordState {
       case GatewayDispatchEvents.Ready:
         this.#botUserId = payload.d.user.id;
         this.#applicationId = payload.d.application.id;
-        this.#memberGuilds = new Set(payload.d.guilds.map((guild) => guild.id));
-        return [];
+        {
+          const [shard, count] = payload.d.shard ?? [0, 1];
+          // A new session of a shard lists its guilds again; a guild that it does not list was left.
+          if (this.#shardCount !== count) this.#shardGuilds.clear();
+          this.#shardCount = count;
+          this.#shardGuilds.set(shard, new Set(payload.d.guilds.map((guild) => guild.id)));
+        }
+        return this.memberGuildIds() === null ? [] : [{ type: "reconcile" }];
       case GatewayDispatchEvents.GuildCreate:
       case GatewayDispatchEvents.GuildUpdate: {
         const guild = payload.d;
         this.#guilds.set(guild.id, guild.name);
-        this.#memberGuilds?.add(guild.id);
+        if (this.#shardCount !== null) this.#shardGuilds.get(this.#shardOf(guild.id))?.add(guild.id);
         if (payload.t === GatewayDispatchEvents.GuildCreate) {
           for (const channel of [...(payload.d.channels ?? []), ...(payload.d.threads ?? [])]) {
             this.#channels.set(channel.id, { guildId: guild.id, name: channel.name ?? "" });
@@ -288,7 +311,7 @@ export class DiscordState {
 
   #forgetGuild(guildId: string): void {
     this.#guilds.delete(guildId);
-    this.#memberGuilds?.delete(guildId);
+    if (this.#shardCount !== null) this.#shardGuilds.get(this.#shardOf(guildId))?.delete(guildId);
     for (const [channelId, channel] of this.#channels) {
       if (channel.guildId === guildId) this.#channels.delete(channelId);
     }

@@ -745,6 +745,18 @@ describe("RemoteControlPlane", () => {
       guildId: "333",
       through: expect.any(Number),
     });
+    // Signal sends the bot's guilds: an older link of another guild goes, a newer one stays.
+    database
+      .prepare(
+        `INSERT INTO discord_guild_routes(guild_id, host_id, account_id, connected_at)
+         VALUES ('444', 'host-1', 'owner', 10), ('555', 'host-1', 'owner', 10), ('666', 'host-1', 'owner', 100)`,
+      )
+      .run();
+    await expect(runApiEffect(controlPlane.reconcileDiscordGuilds({ guilds: ["444"], before: 50 }))).resolves.toBe(1);
+    expect(
+      database.prepare("SELECT guild_id FROM discord_guild_routes WHERE guild_id IN ('444','555','666')").all(),
+    ).toEqual([{ guild_id: "444" }, { guild_id: "666" }]);
+    expect(discordRevocations().at(-1)).toMatchObject({ guildId: "555" });
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

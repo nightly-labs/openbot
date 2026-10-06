@@ -78,7 +78,7 @@ host. Its public key must be in the ticket JWKS that Signal loads, as for the Sl
 account service revokes a guild link through `/internal/auth-events`. After a start, Signal asks the
 account service which links are current until every older ticket has expired.
 
-A socket that holds at least one guild gets a `discord-session` token. The host sends it as the
+A socket with a Discord route gets a `discord-session` token and the list of the guilds routed to it. The host sends it as the
 bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
 reaction, read the messages after one message, read a member or channel name, answer a button press,
 and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
@@ -88,6 +88,13 @@ valid while the socket is open.
 So the answers and files of Discord conversations pass through Signal. Signal does not store them or
 log them, and it does not log a token or Discord's error text.
 
+When the bot leaves a guild, Signal drops its route and asks the account service to unlink it
+(`/v2/remote/discord-route/removed`). After the Gateway lists the bot's guilds, and every 30 minutes,
+Signal sends the account service the guild IDs that the bot is in
+(`/v2/remote/discord-route/reconcile`), and the account service unlinks each older link of another
+guild. So a link goes also when its host is off and the first unlink failed, or Signal restarted.
+
+## Production requirements
 
 - Linux with Docker Engine and Docker Compose.
 - A static public IPv4 address.
