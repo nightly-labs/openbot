@@ -93,7 +93,9 @@ function parseHtml(html: string): HtmlNode[] {
   const root: ElementNode = { tag: "#root", attributes: {}, children: [] };
   const open: ElementNode[] = [root];
   const tokens = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>|([^<]+)|</gu;
-  for (const token of html.matchAll(tokens)) {
+  // `exec`, not `matchAll`: `matchAll` reads a copy of the pattern, so it would not
+  // see the jump over a script below.
+  for (let token = tokens.exec(html); token; token = tokens.exec(html)) {
     const current = open.at(-1) ?? root;
     const [whole, closing, rawTag, rawAttributes = "", text] = token;
     if (text !== undefined) {
@@ -115,7 +117,7 @@ function parseHtml(html: string): HtmlNode[] {
     if (VOID_ELEMENTS.has(tag) || rawAttributes.trimEnd().endsWith("/")) continue;
     if (tag === "script" || tag === "style") {
       // Their content is not markup, and may hold a "<" that is not a tag.
-      const end = html.indexOf(`</${tag}`, (token.index ?? 0) + whole.length);
+      const end = html.indexOf(`</${tag}`, token.index + whole.length);
       tokens.lastIndex = end === -1 ? html.length : end;
     }
     open.push(element);
@@ -336,6 +338,13 @@ function markdownHeaders(contentType: string): Record<string, string> {
 }
 
 /**
+ * `/llms-full.txt` for each site URL. It renders every article, and the articles
+ * change only with a deploy, so an isolate renders it once. Only the finished text
+ * is kept: a Worker request can not wait on a promise that another request made.
+ */
+const FULL_TEXT_BY_SITE = new Map<string, string>();
+
+/**
  * The Markdown copy of an article, or `/llms-full.txt`. `undefined` for every other
  * request, which then goes to the site as usual.
  */
@@ -345,15 +354,20 @@ export async function pageMarkdownResponse(request: Request, renderPage: RenderP
   const siteUrl = siteUrlForPage(requestUrl);
 
   if (requestUrl.pathname === "/llms-full.txt") {
-    const pages: string[] = [];
-    for (const collection of CONTENT_COLLECTIONS) {
-      for (const article of collection.articles) {
-        const rendered = await renderArticle(request, articlePath(collection, article.slug), siteUrl, renderPage);
-        if ("failure" in rendered) return rendered.failure;
-        pages.push(`Source: ${articleUrl(collection, article.slug, siteUrl)}\n\n${rendered.markdown}`);
+    let fullText = FULL_TEXT_BY_SITE.get(siteUrl);
+    if (fullText === undefined) {
+      const pages: string[] = [];
+      for (const collection of CONTENT_COLLECTIONS) {
+        for (const article of collection.articles) {
+          const rendered = await renderArticle(request, articlePath(collection, article.slug), siteUrl, renderPage);
+          if ("failure" in rendered) return rendered.failure;
+          pages.push(`Source: ${articleUrl(collection, article.slug, siteUrl)}\n\n${rendered.markdown}`);
+        }
       }
+      fullText = pages.join("\n---\n\n");
+      FULL_TEXT_BY_SITE.set(siteUrl, fullText);
     }
-    return new Response(pages.join("\n---\n\n"), {
+    return new Response(fullText, {
       headers: {
         ...markdownHeaders("text/plain; charset=utf-8"),
         // Every page in it has its own URL, and a search result should name that one.

@@ -52,8 +52,8 @@ export function siteUrlForPage(pageUrl: URL): string {
 
 /** What the app's structured data names and that this file can not import: see the note at the top. */
 export interface OpenBotApplicationFacts {
-  /** The newest dated release. */
-  release: { version: string; date: string } | undefined;
+  /** The version of the newest release. */
+  version: string;
   /** An absolute URL of a picture of the app. */
   screenshot: string;
 }
@@ -98,7 +98,7 @@ export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
       price: "0",
       priceCurrency: "USD",
     },
-    ...(facts.release ? { softwareVersion: facts.release.version, dateModified: facts.release.date } : {}),
+    softwareVersion: facts.version,
     screenshot: facts.screenshot,
     license: OPENBOT_LICENSE_URL,
     publisher: { "@id": OPENBOT_ORGANIZATION_ID },
