@@ -1347,31 +1347,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const update = notification.update;
     if (!turn) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+      // A harness reports a dropped stream as answer text, and then sends the retried answer (#1471).
+      // The report gets its own muted item, so it is not joined to the answer around it.
+      if (HARNESS_ERROR_CHUNK.test(update.content.text)) {
+        this.#completeThought(thread, turn);
+        this.#appendThought(thread, turn, update.content.text.trim());
+        this.#completeThought(thread, turn);
+        return;
+      }
       if (update.content.text) this.#completeThought(thread, turn);
       if (update.content.text.trim()) turn.receivedOutput = true;
       turn.text += update.content.text;
       return;
     }
     if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text") {
-      this.#completeMessage(thread, turn, "commentary");
-      /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
-         thought lands in an ordinary agentMessage and renders as a chat bubble. */
-      if (!turn.thoughtStarted) {
-        turn.thoughtStarted = true;
-        this.emit("notification", {
-          method: "item/started",
-          params: {
-            threadId: thread.id,
-            turnId: turn.id,
-            item: { id: turn.thoughtItemId, type: "agentMessage", phase: "commentary" },
-          },
-        });
-      }
-      turn.thought += update.content.text;
-      this.emit("notification", {
-        method: "item/agentMessage/delta",
-        params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta: update.content.text },
-      });
+      this.#appendThought(thread, turn, update.content.text);
       return;
     }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
@@ -1417,6 +1407,28 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.text = "";
     turn.itemId = `${turn.id}:assistant:${turn.messages.length}`;
+  }
+
+  #appendThought(thread: AcpThread, turn: AcpTurn, text: string): void {
+    this.#completeMessage(thread, turn, "commentary");
+    /* A delta carries no phase, so the item has to be opened as `commentary` first — otherwise the
+       thought lands in an ordinary agentMessage and renders as a chat bubble. */
+    if (!turn.thoughtStarted) {
+      turn.thoughtStarted = true;
+      this.emit("notification", {
+        method: "item/started",
+        params: {
+          threadId: thread.id,
+          turnId: turn.id,
+          item: { id: turn.thoughtItemId, type: "agentMessage", phase: "commentary" },
+        },
+      });
+    }
+    turn.thought += text;
+    this.emit("notification", {
+      method: "item/agentMessage/delta",
+      params: { threadId: thread.id, turnId: turn.id, itemId: turn.thoughtItemId, delta: text },
+    });
   }
 
   #completeThought(thread: AcpThread, turn: AcpTurn): void {
@@ -1901,6 +1913,13 @@ function failureText(error: unknown): string {
 function isOpenCodeServiceFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
+
+/**
+ * A message chunk that is the harness's own error report, such as "API Error: Connection lost
+ * mid-response. The response above may be incomplete." A model streams small deltas, so its own
+ * text does not start a chunk with this prefix.
+ */
+const HARNESS_ERROR_CHUNK = /^\s*API Error: /u;
 
 const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
 
