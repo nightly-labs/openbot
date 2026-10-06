@@ -108,7 +108,13 @@ export function AttachmentCards(props: {
                     class="attachment-file-visual attachment-file-image"
                     data-file-tone={attachmentReferenceTone(attachment.name)}
                   >
-                    <img src={attachment.previewUrl ?? ""} alt="" onError={() => markMissing(attachment)} />
+                    <img
+                      src={attachment.previewUrl ?? ""}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={() => markMissing(attachment)}
+                    />
                   </span>
                 </Show>
                 <span class="attachment-file-copy">

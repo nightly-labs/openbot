@@ -47,6 +47,8 @@ export interface ChannelHooks {
   skipAtLimit?(task: ChannelTask): boolean;
   normalBusy?(): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
+  /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
+  loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
   steer?(
@@ -1320,7 +1322,13 @@ export class ChannelService {
     if (event.type === "conversation-delta") {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
-      this.capture(this.store.database.readConversation(event.agentId, event.threadId));
+      const loaded = this.hooks.loadedSnapshot?.(event.threadId);
+      const snapshot =
+        loaded?.agentId === event.agentId
+          ? loaded
+          : this.store.database.readConversation(event.agentId, event.threadId);
+      // Only the streaming turn changed. Each other message was captured by its own event.
+      this.capture(snapshot, event.turnId);
       return true;
     }
     if (event.type === "turn-completed") {
@@ -1370,7 +1378,7 @@ export class ChannelService {
     );
   }
 
-  private capture(snapshot: ConversationSnapshot): boolean {
+  private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
     const assignments = this.store.assignments(channelId);
@@ -1379,9 +1387,19 @@ export class ChannelService {
     // holds every message of the whole conversation. A read of the task table and two scans of the
     // channel history for each of them made one capture cost the square of the transcript.
     const tasks = new Map(this.store.tasks(channelId).map((task) => [task.id, task] as const));
-    const existing = new Map(this.store.messages(channelId).map((message) => [message.id, message] as const));
+    // A delta reads the few messages of its turn by id. A whole snapshot reads the history once.
+    const history =
+      turnId === undefined
+        ? new Map(this.store.messages(channelId).map((message) => [message.id, message] as const))
+        : new Map<string, ChannelMessage | null>();
+    const existing = (id: string): ChannelMessage | undefined => {
+      if (turnId !== undefined && !history.has(id)) history.set(id, this.store.message(channelId, id));
+      return history.get(id) ?? undefined;
+    };
     const messages: ChannelMessage[] = [];
-    for (const message of snapshot.messages) {
+    for (const message of turnId === undefined
+      ? snapshot.messages
+      : snapshot.messages.filter((item) => item.turnId === turnId)) {
       if (
         message.author !== "assistant" &&
         !message.questionPrompt &&
@@ -1393,9 +1411,9 @@ export class ChannelService {
         assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
       if (!assignment) continue;
       const task = tasks.get(assignment.taskId);
-      const result = existing.get(`channel-result-${assignment.id}-revision-${assignment.taskRevision}`);
+      const result = existing(`channel-result-${assignment.id}-revision-${assignment.taskRevision}`);
       if (result?.message.text === message.text) continue;
-      const original = existing.get(message.id);
+      const original = existing(message.id);
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
           ? `${message.id}-revision-${task.revision}`
@@ -1411,7 +1429,7 @@ export class ChannelService {
           task?.revision !== assignment.taskRevision || (messageId === message.id && original?.superseded === true),
         message,
       };
-      const previous = existing.get(value.id);
+      const previous = existing(value.id);
       if (
         !previous ||
         JSON.stringify(previous.message) !== JSON.stringify(value.message) ||

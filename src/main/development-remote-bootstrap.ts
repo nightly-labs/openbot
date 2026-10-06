@@ -2,8 +2,8 @@ import { Effect, Result } from "effect";
 /**
  * Everything `OPENBOT_DEV_REMOTE_ROLE` adds to startup: signing a throwaway account in against the
  * local account API, configuring the dev host, and handing the client the connection the host wrote
- * to a temporary file. None of it runs in a packaged build - `developmentRemoteRole` is null unless
- * the app is unpackaged and the variable is set to `host` or `client`.
+ * to a file in the dev runtime directory. None of it runs in a packaged build - `developmentRemoteRole`
+ * is null unless the app is unpackaged and the variable is set to `host` or `client`.
  *
  * The two entry points below keep the positions they had in the construction sequence:
  * `applyDevelopmentRemoteAccount` must run after `teamStore.initialize()` and before `HostService`
@@ -12,11 +12,11 @@ import { Effect, Result } from "effect";
  * failure worth seeing at startup rather than an empty window.
  */
 
-import { readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { z } from "zod";
 import type { CentralAuthManager } from "./central-auth-manager";
+import { developmentRemoteConnectionPath } from "./development-runtime-directory";
 import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, type HostService } from "./host-service";
 import type { DevelopmentRemoteServerConnection, RemoteServerManager } from "./remote-server-manager";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
@@ -25,7 +25,6 @@ import type { TeamStore } from "./team-store";
 
 export type DevelopmentRemoteRole = "host" | "client";
 
-const DEVELOPMENT_REMOTE_CONNECTION_FILE = "openbot-dev-remote-connection-v1.json";
 const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServerConnection> = z.object({
   serverId: z.string().min(1),
   serverName: z.string().min(1),
@@ -35,10 +34,6 @@ const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServer
   username: z.string().min(1),
   sessionToken: z.string().min(1),
 });
-
-function developmentRemoteConnectionPath(): string {
-  return join(tmpdir(), DEVELOPMENT_REMOTE_CONNECTION_FILE);
-}
 
 export interface DevelopmentRemoteAccountOptions {
   role: DevelopmentRemoteRole;
@@ -144,12 +139,12 @@ export const ensureDevelopmentAccount = Effect.fn("DevelopmentRemote.ensureAccou
 
 const writeDevelopmentRemoteConnection = Effect.fn("DevelopmentRemote.writeConnection")(
   (connection: DevelopmentRemoteServerConnection) =>
-    remoteCall(() =>
-      writeFile(developmentRemoteConnectionPath(), `${JSON.stringify(connection)}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      }),
-    ),
+    remoteCall(async () => {
+      const path = developmentRemoteConnectionPath();
+      // `bun run dev` has already made the runtime directory owner-only; this covers a start without it.
+      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+      await writeFile(path, `${JSON.stringify(connection)}\n`, { encoding: "utf8", mode: 0o600 });
+    }),
 );
 
 const connectDevelopmentRemoteServer = Effect.fn("DevelopmentRemote.connect")(function* (manager: RemoteServerManager) {

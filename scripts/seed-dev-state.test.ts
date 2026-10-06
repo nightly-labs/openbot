@@ -22,6 +22,7 @@ import { parseSeedScale } from "./seed-dev-scale";
 import {
   cleanupSeedOwnedTransfers,
   DEVELOPMENT_SEED_MANIFEST_FILE,
+  isDevelopmentProfileActive,
   SEED_FALLBACK_AGENT,
   seedDevelopmentState,
 } from "./seed-dev-state";
@@ -304,6 +305,15 @@ describe("development state seed", () => {
       "Quit the OpenBot dev app",
     );
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+  });
+
+  it("treats a Windows Chromium lockfile as a live profile", async () => {
+    const { appDataRoot } = await createRoots();
+    const profilePath = join(appDataRoot, developmentUserDataName("app"));
+    await writeSentinel(join(profilePath, "lockfile"), "");
+
+    await expect(isDevelopmentProfileActive(profilePath, "win32")).resolves.toBe(true);
+    await expect(isDevelopmentProfileActive(profilePath, "darwin")).resolves.toBe(false);
   });
 
   it("reports a dry run without changing the target profile", async () => {

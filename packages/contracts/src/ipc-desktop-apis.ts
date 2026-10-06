@@ -1,7 +1,7 @@
 import type { AgentEvent } from "./ipc-agent-events";
 import type { AttachmentImportEvent } from "./ipc-attachments";
 import type { BrowserLiveViewInput } from "./ipc-browser";
-import type { GroupApi, IpcEndpoints } from "./ipc-endpoints";
+import type { BridgedDesktopApi, GroupApi, IpcEndpoints, PathApi } from "./ipc-endpoints";
 import type { DirectMessageRealtimeEvent, DirectTypingRealtimeEvent, TeamPresenceSnapshot } from "./ipc-team-host";
 
 /**
@@ -9,16 +9,7 @@ import type { DirectMessageRealtimeEvent, DirectTypingRealtimeEvent, TeamPresenc
  * it is the selected server. `onEvent` is `onScopedEvent` filtered to the selected server, and
  * `onAttachmentImport` reports the files the preload imports from a drop or a paste.
  */
-export interface AgentDesktopApi
-  extends GroupApi<IpcEndpoints["agent"]>,
-    GroupApi<IpcEndpoints["agentMemories"]>,
-    GroupApi<IpcEndpoints["sharedTables"]>,
-    GroupApi<IpcEndpoints["agentRoutines"]>,
-    GroupApi<IpcEndpoints["channelMemories"]>,
-    GroupApi<IpcEndpoints["channelRoutines"]>,
-    GroupApi<IpcEndpoints["mcpServers"]>,
-    GroupApi<IpcEndpoints["agentAdmin"]>,
-    GroupApi<IpcEndpoints["agentAttachments"]> {
+export interface AgentDesktopApi extends PathApi<"agent"> {
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
 }
@@ -129,36 +120,10 @@ export type StorageDesktopApi = GroupApi<IpcEndpoints["storage"]>;
  */
 export type AgentImportDesktopApi = GroupApi<IpcEndpoints["agentImport"]>;
 
-// The `app` and `providers` groups sit at the top level, as they did before groups existed.
-export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupApi<IpcEndpoints["providers"]> {
-  dynamicIsland: DynamicIslandDesktopApi;
-  computerUse: ComputerUseDesktopApi;
-  providerRuntimes: ProviderRuntimesDesktopApi;
-  voice: VoiceDesktopApi;
-  skills: SkillsDesktopApi;
-  customProviders: CustomProvidersDesktopApi;
-  providerDetection: ProviderDetectionDesktopApi;
-  customAgents: CustomAgentsDesktopApi;
-  providerAdmin: ProviderAdminDesktopApi;
-  hostAdmin: HostAdminDesktopApi;
-  messaging: MessagingDesktopApi;
-  storage: StorageDesktopApi;
-  agentImport: AgentImportDesktopApi;
-  hostedSites: HostedSitesDesktopApi;
-  githubConnector: GitHubConnectorDesktopApi;
-  onePasswordConnector: OnePasswordConnectorDesktopApi;
-  billing: BillingDesktopApi;
-  hostedServers: HostedServersDesktopApi;
-  marketplaceAgents: MarketplaceAgentsDesktopApi;
-  agentTemplates: AgentTemplatesDesktopApi;
-  auth: CentralAuthDesktopApi;
+// Each member is at its place in `IPC_GROUP_PATHS`, so a new group needs no line here. Only the
+// members with methods that the preload writes by hand are named.
+export interface OpenBotDesktopApi extends Omit<BridgedDesktopApi, "agent" | "browser" | "servers"> {
   agent: AgentDesktopApi;
   browser: BrowserDesktopApi;
-  update: UpdateDesktopApi;
-  notifications: NotificationsDesktopApi;
-  maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
-  plugins: PluginsDesktopApi;
-  host: HostDesktopApi;
-  remoteDesktop: RemoteDesktopDesktopApi;
 }

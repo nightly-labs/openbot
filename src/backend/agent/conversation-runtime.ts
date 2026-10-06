@@ -300,6 +300,11 @@ export class ConversationRuntime {
     }
   }
 
+  /** The execution thread's snapshot in memory now, with no SQLite read. */
+  loadedExecutionSnapshot(threadId: string): ConversationSnapshot | undefined {
+    return this.#executionSnapshots.get(threadId);
+  }
+
   isExecutionThread(threadId: string | null): boolean {
     return threadId !== null && this.#executionSnapshots.has(threadId);
   }

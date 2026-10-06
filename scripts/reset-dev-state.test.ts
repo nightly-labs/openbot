@@ -1,8 +1,10 @@
 // @vitest-environment node
 
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, assert, describe, expect, it } from "vitest";
 import { developmentStatePaths, resetDevelopmentState, resolveDevelopmentAppDataRoot } from "./reset-dev-state";
 import { DEVELOPMENT_SEED_MANIFEST_FILE } from "./seed-dev-state";
@@ -86,6 +88,46 @@ describe("reset dev state", () => {
 
     await expect(stat(seedDirectory)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(stat(sharedFile)).resolves.toBeDefined();
+  });
+
+  it("deletes nothing while a dev app has a profile open", async () => {
+    const appDataRoot = await makeTemporaryDirectory();
+    const [appPath, testClientPath] = developmentStatePaths(appDataRoot);
+    assert(appPath && testClientPath);
+    await Promise.all([mkdir(appPath, { recursive: true }), mkdir(testClientPath, { recursive: true })]);
+    await Promise.all([
+      writeFile(join(appPath, "openbot.db"), "database"),
+      writeFile(join(testClientPath, "openbot.db"), "test-client database"),
+      writeFile(join(testClientPath, "SingletonLock"), ""),
+    ]);
+
+    await expect(resetDevelopmentState(appDataRoot)).rejects.toThrow("Quit the OpenBot dev app");
+    await expect(stat(join(appPath, "openbot.db"))).resolves.toBeDefined();
+    await expect(stat(join(testClientPath, "openbot.db"))).resolves.toBeDefined();
+  });
+
+  // A script that ignored an unknown flag used to run anyway, so `dev:reset --help` deleted the profiles.
+  it.each([
+    ["reset-dev-state.ts", ["--help"], 0],
+    ["reset-dev-state.ts", ["--dry-run"], 2],
+    ["seed-dev-state.ts", ["--help"], 0],
+    ["seed-dev-state.ts", ["--force"], 2],
+  ])("%s %j changes no profile", async (script, args, status) => {
+    const home = await makeTemporaryDirectory();
+    const environment = { ...process.env, HOME: home, USERPROFILE: home, APPDATA: home, XDG_CONFIG_HOME: home };
+    const [appPath] = developmentStatePaths(resolveDevelopmentAppDataRoot(process.platform, environment, home));
+    assert(appPath);
+    await mkdir(appPath, { recursive: true });
+    await writeFile(join(appPath, "openbot.db"), "database");
+
+    const result = spawnSync("bun", [join(dirname(fileURLToPath(import.meta.url)), script), ...args], {
+      env: environment,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(status);
+    expect(status === 0 ? result.stdout : result.stderr).toContain("Usage: bun run dev:");
+    await expect(stat(join(appPath, "openbot.db"))).resolves.toBeDefined();
   });
 
   it("rejects a filesystem root", () => {

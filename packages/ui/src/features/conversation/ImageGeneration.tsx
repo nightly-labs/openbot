@@ -117,6 +117,8 @@ export function ImageGeneration(props: ImageGenerationProps) {
             <img
               src={props.attachment?.previewUrl ?? ""}
               alt={props.prompt ?? t("chat.image.generated")}
+              loading="lazy"
+              decoding="async"
               onLoad={(event) => {
                 const { naturalHeight, naturalWidth } = event.currentTarget;
                 if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);

@@ -37,7 +37,7 @@ describe("dev verification planning", () => {
         "bun run lint",
         "bun run typecheck",
         "bun run check:ui",
-        "bun run dev --isolated",
+        "bun run dev",
         "bun run dev:automation snapshot",
         "bun run dev:automation screenshot",
       ],
@@ -151,7 +151,9 @@ describe("dev verification planning", () => {
         orphanedStack: false,
         ambiguousApp: false,
       }),
-    ).toEqual(["The running app uses the default profile. Start bun run dev --isolated for isolated renderer QA."]);
+    ).toEqual([
+      "The running app uses the shared profile. Start bun run dev without --shared for isolated renderer QA.",
+    ]);
   });
 
   it("reports setup blockers before dependencies are installed", async () => {

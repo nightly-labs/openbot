@@ -18,17 +18,30 @@ env:
   GIT_CONFIG_COUNT: 1
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
+  # No job here builds the native mobile app, so the postinstall skips the React Native Skia
+  # library copy. The jobs that install with `--ignore-scripts` skip it already.
+  OPENBOT_SKIP_SKIA: "1"
 
 jobs:
   detect:
-    # Four lanes check workspaces that most pull requests do not touch, so a pull request runs each
-    # of them only when a path it reads changed. A path every workspace reads - the lockfile, a
-    # shared package, a workflow - runs all of them. A push to main and a manual run always run
-    # every lane: `deploy-production` needs them, and a skipped need would skip the deploy.
+    # A pull request runs each lane only when a path the lane reads changed. A path every
+    # workspace reads - the lockfile, a shared package, a workflow - runs all of them. A push to
+    # main and a manual run always run every lane: `deploy-production` needs them, and a skipped
+    # need would skip the deploy.
+    #
+    # `code` runs for every change except Markdown that no build or test reads: the desktop tests
+    # run the mobile tests and read mobile, API and remote files, and lint and knip cover every
+    # workspace. `docs` runs for any Markdown change, so that `Check` still checks its links. `desktop` lists what it skips, not what it reads: the other apps, which the
+    # Electron build does not read. `api` also reads the renderer: the Worker bundles its preview
+    # and web client.
     name: Detect changed areas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      code: ${{ steps.lanes.outputs.code }}
+      docs: ${{ steps.lanes.outputs.docs }}
+      desktop: ${{ steps.lanes.outputs.desktop }}
+      api: ${{ steps.lanes.outputs.api }}
       sites: ${{ steps.lanes.outputs.sites }}
       remote: ${{ steps.lanes.outputs.remote }}
       storybook: ${{ steps.lanes.outputs.storybook }}
@@ -50,8 +63,15 @@ jobs:
           if [[ "$EVENT_NAME" != "pull_request" ]]; then
             changed="package.json"
           else
-            changed="$(git diff --name-only HEAD^1 HEAD)"
+            # Without `--no-renames`, a moved file lists only its new path, and a move to `docs/`
+            # would hide the path that a lane reads.
+            changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
           fi
+          # Markdown that no build or test reads changes no lane. Not every Markdown file: the API
+          # bundles CHANGELOG.md, and the renderer bundles Markdown from `resources/`.
+          docs='^((docs|plans|changelog\.d)/.+\.md|(.+/)?AGENTS\.md|(ANALYTICS|CODE_OF_CONDUCT|CONTRIBUTING|PRIVACY|README|SECURITY|SUPPORT)\.md)$'
+          all="$changed"
+          changed="$(grep -Ev "$docs" <<<"$changed" || true)"
           shared='^(package\.json|bun\.lock|bunfig\.toml|\.nvmrc|biome\.json|tsconfig[^/]*\.json|\.github/|packages/|patches/|tools/|vendor/)'
           lane() {
             if grep -Eq "$shared|$2" <<<"$changed"; then
@@ -60,6 +80,24 @@ jobs:
               echo "$1=false" >> "$GITHUB_OUTPUT"
             fi
           }
+          # The inverse, for a lane that reads most of the repository: it runs when a changed path
+          # does not match the pattern.
+          lane_unless() {
+            if grep -Ev "$2" <<<"$changed" | grep -q .; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          lane code '.'
+          # Every Markdown file, before the filter above removed some of them.
+          if grep -Eq "\.md$|^scripts/check-doc-links\.ts$" <<<"$all" || grep -Eq "$shared" <<<"$changed"; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          fi
+          lane_unless desktop '^(apps/(auth-api|mobile|site-router)|docker|remote)/'
+          lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane sites '^apps/site-router/'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/auth-api|\.storybook|resources|marketplace|build)/'
@@ -72,9 +110,17 @@ jobs:
     # Ubuntu runner, so the two run side by side. The install here is the full
     # one: this job builds with electron-vite, which resolves the `electron`
     # package.
+    #
+    # Branch protection requires this job, and a skipped required check counts as passed. So it
+    # runs when `detect` did not succeed, and it skips only when `detect` found no code change and
+    # no Markdown change. A Markdown-only change runs only the link check.
     name: Check
+    needs: detect
+    if: ${{ !cancelled() && (needs.detect.result != 'success' || needs.detect.outputs.code == 'true' || needs.detect.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CODE: ${{ needs.detect.result != 'success' || needs.detect.outputs.code == 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,21 +129,26 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Check unused files and dependencies
+        if: env.CODE == 'true'
         run: bun run knip:check
 
       - name: Check image asset directories
+        if: env.CODE == 'true'
         run: bun run check:assets
 
+      - name: Check Markdown links and anchors
+        run: bun run check:doc-links
+
       - name: Check desktop application
+        if: env.CODE == 'true'
         run: bun run check:desktop:static
 
-      - name: Check ratcheted lint rules
-        run: bun run lint:ratchet
-
       - name: Check translation catalogs
+        if: env.CODE == 'true'
         run: bun run i18n:check
 
       - name: Check ratcheted TypeScript options
+        if: env.CODE == 'true'
         run: bun run types:ratchet
 
   browser:
@@ -108,6 +159,8 @@ jobs:
     # starts, which `development-checks.md` measures as faster than restoring
     # a binary cache.
     name: Browser smoke
+    needs: detect
+    if: needs.detect.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -137,6 +190,8 @@ jobs:
     # tools/vitest/balanced-sequencer.ts for why, and run `bun run
     # test:durations` when the two shards below stop finishing together.
     name: Tests (desktop ${{ matrix.shard }}/2)
+    needs: detect
+    if: needs.detect.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -248,12 +303,23 @@ jobs:
         run: bun run remote:check:compose
 
   api:
+    # `check:api` ends with `api:build:check`, the preview build of the Worker. For a pull request
+    # from this repository, this job uploads that build. It has no secrets and no write token. The
+    # trusted `cloudflare-preview.yml` workflow uploads the build and comments on the pull request
+    # after this run completes; it runs code from `main` only. Forks get no preview. A pull request
+    # that skips this lane, or fails it, keeps the preview of its last commit that built one.
     name: API
+    needs: detect
+    if: needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -262,6 +328,17 @@ jobs:
 
       - name: Check API
         run: bun run check:api
+
+      - name: Upload preview build
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloudflare-preview
+          path: apps/auth-api/dist
+          # The build writes `.assetsignore`, which keeps the config out of the public assets.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
 
   storybook:
     name: Storybook build
@@ -284,46 +361,13 @@ jobs:
           # This output is not published. Skip Solid's per-component docgen analysis.
           OPENBOT_STORYBOOK_CHECK: "true"
 
-  preview:
-    # This job builds the pull request's Worker with no secrets and no write token. The trusted
-    # `cloudflare-preview.yml` workflow uploads the build and comments on the pull request after
-    # this run completes; it runs code from `main` only. Forks get no preview.
-    name: Cloudflare preview build
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Bun
-        uses: ./.github/actions/setup-bun
-
-      - name: Build isolated preview
-        run: bun run api:build
-        env:
-          CLOUDFLARE_ENV: preview
-
-      - name: Upload preview build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: cloudflare-preview
-          path: apps/auth-api/dist
-          # The build writes `.assetsignore`, which keeps the config out of the public assets.
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 3
-
   all-checks-pass:
-    # The one check branch protection requires. A lane that `detect` skipped counts as passed; a
-    # failed or cancelled job, including `detect` itself, fails this one.
+    # A summary of every job. Branch protection requires `Check`, not this job. A lane that
+    # `detect` skipped counts as passed; a failed or cancelled job, including `detect` itself,
+    # fails this one.
     name: All required checks pass
     if: always()
-    needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook, preview]
+    needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

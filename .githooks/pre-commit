@@ -57,14 +57,16 @@ git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' 'apps/
   ':(exclude)changelog.d/README.md' ':(exclude)apps/mobile/changelog.d/README.md' |
   xargs -0 -r bun scripts/check-release-notes.ts --staged --fragments
 
-# Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.
-code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|json|jsonc|grit)$|(^|/)bun\.lock$'
+# Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule. Data JSON is
+# not code; `apps/mobile/app.json` is, because the mobile codegen reads it.
+code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|grit)$|(^|/)(tsconfig[^/]*|package|biome)\.json$|^apps/mobile/app\.json$|(^|/)bun\.lock$'
 if printf '%s\n' "$staged_paths" | grep -Eq "$code_pattern"; then
   echo "Running UI foundation check..."
   bun run check:ui
 
+  # Only the projects that can see a staged file, one at a time. CI checks all of them.
   echo "Running type checks..."
-  bun run typecheck
+  bun scripts/staged-typecheck.ts
 else
   echo "Skipping UI and type checks: no staged code, style, or configuration files."
 fi

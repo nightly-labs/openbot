@@ -344,9 +344,9 @@ function applyAppIconColor(color: AppLogoColor): void {
 /**
  * Outside macOS, closing the main window ends OpenBot.
  *
- * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are built
- * once and then hidden between actions rather than closed, and a hidden window is still a window,
- * so the event never arrives: the user would close the last window they can see and leave OpenBot
+ * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are hidden
+ * between actions and closed only after a minute of idle, and a hidden window is still a window,
+ * so the event may never arrive: the user would close the last window they can see and leave OpenBot
  * and the driver running with no way back to them.
  */
 function attachQuitOnMainWindowClose(window: BrowserWindow): void {

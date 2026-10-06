@@ -758,6 +758,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#forgetExecutionThread(threadId).pipe(
           Effect.mapError((failure) => new ChannelOperationError({ cause: failure.cause })),
         ),
+      loadedSnapshot: (threadId) => this.#conversation.loadedExecutionSnapshot(threadId),
       normalBusy: () =>
         this.#mailbox
           .unresolvedDeliveries()
@@ -1720,9 +1721,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(input.agentId);
       const activeTurn =
         this.#conversation.workingSnapshot(input.agentId)?.activeTurnId ??
-        (previous.threadId
-          ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
-          : null);
+        (previous.threadId ? this.#store.database.readActiveTurnId(input.agentId, previous.threadId) : null);
       if (hasPendingWork || activeTurn) {
         throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
       }
@@ -1864,7 +1863,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const agent = this.#conversation.requireKnownAgent(agentId);
       const activeTurn =
         this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
-        (agent.threadId ? this.#store.database.readConversation(agentId, agent.threadId).activeTurnId : null);
+        (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null);
       if (activeTurn || this.#mailbox.hasUnfinishedDelivery(agentId) || this.#threads.providerContextBusy(agent)) {
         throw new ContextResetBusyError(sourceText("error.agent.waitBeforeClearContext"));
       }

@@ -1,9 +1,10 @@
 # Messaging connections
 
 The agents of this computer can answer in an external chat platform. Slack and Discord are supported
-today. The design notes are in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), the Slack
-launch steps in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md), and the Discord app settings
-in [apps/discord-app/README.md](../apps/discord-app/README.md).
+today. The design notes are in
+[architecture/channels-and-messaging.md](architecture/channels-and-messaging.md#messaging-connections),
+the Slack launch steps in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md), and the Discord app
+settings in [apps/discord-app/README.md](../apps/discord-app/README.md).
 
 ## Connect Slack
 
@@ -111,7 +112,7 @@ local Signal and gives it the development app's signing secret.
 3. In `apps/auth-api/.env.dev`, add `SLACK_ROUTE_PRIVATE_JWK` with the same value as
    `REMOTE_TICKET_PRIVATE_JWK`, and `SLACK_ROUTE_KEY_ID=openbot-remote-1`. Development only: the
    ticket key's public key is already in the JWKS that Signal loads.
-4. Run `bun run dev:slack` (add `--isolated` for a profile of this worktree). Set the printed address
+4. Run `bun run dev:slack` (add `--shared` for the shared `OpenBot Dev` profile). Set the printed address
    as the development app's request URL, for events and interactivity. It changes on each start.
 
 The install itself needs an account API that Slack can send the browser back to over HTTPS. Use the
