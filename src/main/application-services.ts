@@ -395,6 +395,128 @@ function computerUseCapability(state: ComputerUseState): CapabilityState {
   return "unavailable";
 }
 
+interface MessagingServicesContext {
+  teardown: TeardownRegistry;
+  secretCipher: ReturnType<typeof safeStorageCipher>;
+  centralAuth: CentralAuthManager;
+  service: AgentService;
+  sidebarLayout: SidebarLayoutStore;
+  /** Read on each call: the team store that names this host is built after messaging. */
+  readHostId: () => string | null;
+}
+
+/** The Slack connections. Awaited in place, so start and teardown order stay as they were inline. */
+async function createMessagingServices({
+  teardown,
+  secretCipher,
+  centralAuth,
+  service,
+  sidebarLayout,
+  readHostId,
+}: MessagingServicesContext): Promise<{ messaging: MessagingService; slackIngress: SlackIngress }> {
+  /*
+   * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
+   * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
+   */
+  const messagingCredentials = new MessagingCredentialStore(
+    join(app.getPath("userData"), MESSAGING_CREDENTIAL_FILE),
+    secretCipher,
+  );
+  const messagingCredentialLoadError = await Effect.runPromise(messagingCredentials.load());
+  if (messagingCredentialLoadError)
+    logger.warn(
+      `OpenBot could not read the messaging token file (${messagingCredentialLoadError.name}). It was left unchanged.`,
+    );
+  // The Signal socket that brings the events of the Slack workspaces linked to this host.
+  const slackIngress = new SlackIngress({
+    hostId: readHostId,
+    signedIn: () => {
+      try {
+        centralAuth.getSignedInUser();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    issueTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId).pipe(toRemoteWorkflowError),
+    issueSlackRoute: (hostId) => centralAuth.issueSlackRoute(hostId).pipe(toRemoteWorkflowError),
+  });
+  teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack ingress socket", () =>
+    Effect.runPromise(slackIngress.dispose()),
+  );
+  // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
+  // dev app and not to an installed OpenBot that owns `openbot://`.
+  const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
+  const messaging = new MessagingService({
+    threads: service.messaging,
+    agents: {
+      listAgents: () => service.listAgents(),
+      respondToApproval: (input) => service.respondToApproval(input),
+      onEvent: (listener) => {
+        service.on("event", listener);
+        return () => service.off("event", listener);
+      },
+      createAgentProfile: (input) => service.createAgentProfile(input),
+      createMemory: (input) => service.createMemory(input),
+    },
+    credentials: messagingCredentials,
+    drivers: [slackDriver({ ingress: slackIngress })],
+    downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
+    ingress: slackIngress,
+    sidebar: sidebarLayout,
+    slackApp: {
+      authorize: (input) =>
+        Effect.suspend(() => {
+          const hostId = readHostId();
+          if (!hostId)
+            return Effect.fail(
+              new SlackConnectFailed({ cause: new Error(sourceText("error.messaging.relayUnavailable")) }),
+            );
+          return centralAuth
+            .requestAuthorized(
+              "/v2/slack/authorize",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  hostId,
+                  ...input,
+                  ...(developmentSlackCallbackPort > 0
+                    ? { returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}` }
+                    : {}),
+                }),
+              },
+              (value) => requiredString(decodeRecord(value, "Slack sign-in"), "authorizeUrl"),
+            )
+            .pipe(toSlackConnectFailed);
+        }),
+      unlink: (workspaceId) =>
+        Effect.suspend(() => {
+          const hostId = readHostId();
+          return hostId
+            ? centralAuth.unlinkSlackWorkspace(hostId, workspaceId).pipe(toSlackConnectFailed)
+            : Effect.void;
+        }),
+      openExternal: (url) => shell.openExternal(url),
+    },
+  });
+  // Not awaited: a connection waits for Slack, and the app does not wait for it.
+  void runCauseEffect(messaging.start()).catch((error) =>
+    logger.warn("Messaging connections did not start.", toLogValue(error)),
+  );
+  teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => Effect.runPromise(messaging.stop()));
+  if (developmentSlackCallbackPort > 0) {
+    // As `openbot://` does for a packaged build, a finished install brings OpenBot to the front.
+    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, async (nonce, grant) => {
+      const received = await runCauseEffect(messaging.completeSlackWorkspace(nonce, grant));
+      if (received) app.focus({ steal: true });
+      return received;
+    });
+    teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
+  }
+  return { messaging, slackIngress };
+}
+
 export async function createApplicationServices({
   mainWindow,
   windows,
@@ -997,109 +1119,17 @@ export async function createApplicationServices({
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
-  /*
-   * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
-   * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
-   */
-  const messagingCredentials = new MessagingCredentialStore(
-    join(app.getPath("userData"), MESSAGING_CREDENTIAL_FILE),
-    secretCipher,
-  );
-  const messagingCredentialLoadError = await Effect.runPromise(messagingCredentials.load());
-  if (messagingCredentialLoadError)
-    logger.warn(
-      `OpenBot could not read the messaging token file (${messagingCredentialLoadError.name}). It was left unchanged.`,
-    );
-  // The Signal socket that brings the events of the Slack workspaces linked to this host. The host
-  // id is read when the socket opens, and the team store is built further down, so it starts as "no
-  // name yet".
+  // The host id is read when the Slack socket opens, and the team store is built further down, so
+  // it starts as "no name yet".
   let slackIngressHostId: () => string | null = () => null;
-  const slackIngress = new SlackIngress({
-    hostId: () => slackIngressHostId(),
-    signedIn: () => {
-      try {
-        centralAuth.getSignedInUser();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    issueTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId).pipe(toRemoteWorkflowError),
-    issueSlackRoute: (hostId) => centralAuth.issueSlackRoute(hostId).pipe(toRemoteWorkflowError),
+  const { messaging, slackIngress } = await createMessagingServices({
+    teardown,
+    secretCipher,
+    centralAuth,
+    service,
+    sidebarLayout,
+    readHostId: () => slackIngressHostId(),
   });
-  teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack ingress socket", () =>
-    Effect.runPromise(slackIngress.dispose()),
-  );
-  // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
-  // dev app and not to an installed OpenBot that owns `openbot://`.
-  const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
-  const messaging = new MessagingService({
-    threads: service.messaging,
-    agents: {
-      listAgents: () => service.listAgents(),
-      respondToApproval: (input) => service.respondToApproval(input),
-      onEvent: (listener) => {
-        service.on("event", listener);
-        return () => service.off("event", listener);
-      },
-      createAgentProfile: (input) => service.createAgentProfile(input),
-      createMemory: (input) => service.createMemory(input),
-    },
-    credentials: messagingCredentials,
-    drivers: [slackDriver({ ingress: slackIngress })],
-    downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
-    ingress: slackIngress,
-    sidebar: sidebarLayout,
-    slackApp: {
-      authorize: (input) =>
-        Effect.suspend(() => {
-          const hostId = slackIngressHostId();
-          if (!hostId)
-            return Effect.fail(
-              new SlackConnectFailed({ cause: new Error(sourceText("error.messaging.relayUnavailable")) }),
-            );
-          return centralAuth
-            .requestAuthorized(
-              "/v2/slack/authorize",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  hostId,
-                  ...input,
-                  ...(developmentSlackCallbackPort > 0
-                    ? { returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}` }
-                    : {}),
-                }),
-              },
-              (value) => requiredString(decodeRecord(value, "Slack sign-in"), "authorizeUrl"),
-            )
-            .pipe(toSlackConnectFailed);
-        }),
-      unlink: (workspaceId) =>
-        Effect.suspend(() => {
-          const hostId = slackIngressHostId();
-          return hostId
-            ? centralAuth.unlinkSlackWorkspace(hostId, workspaceId).pipe(toSlackConnectFailed)
-            : Effect.void;
-        }),
-      openExternal: (url) => shell.openExternal(url),
-    },
-  });
-  // Not awaited: a connection waits for Slack, and the app does not wait for it.
-  void runCauseEffect(messaging.start()).catch((error) =>
-    logger.warn("Messaging connections did not start.", toLogValue(error)),
-  );
-  teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => Effect.runPromise(messaging.stop()));
-  if (developmentSlackCallbackPort > 0) {
-    // As `openbot://` does for a packaged build, a finished install brings OpenBot to the front.
-    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, async (nonce, grant) => {
-      const received = await runCauseEffect(messaging.completeSlackWorkspace(nonce, grant));
-      if (received) app.focus({ steal: true });
-      return received;
-    });
-    teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
-  }
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
   githubConnector.onAgentAccessChanged(() => {
     void runCauseEffect(service.notifyGitHubConnectorChanged()).catch((error) =>

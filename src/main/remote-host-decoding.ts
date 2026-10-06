@@ -21,3 +21,6 @@ import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
 export type ResponseDecoder<T> = (value: unknown) => T;
 
 export const decodeVoid = emptyDecoder("The remote server returned data.");
+
+/** Discards the reply of a route whose team-protocol codec has already checked it. */
+export const acceptEmpty = (): undefined => undefined;
