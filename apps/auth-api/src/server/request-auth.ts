@@ -6,7 +6,6 @@ import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
-import { constantTimeEqual } from "./crypto";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { runApiEffect } from "./effect-runtime";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
