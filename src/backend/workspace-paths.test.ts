@@ -69,12 +69,14 @@ describe("listWorkspaceDirectory", () => {
     expect(linked.reason).toBe("outside");
   });
 
-  it("names the path and the workspace when nothing is there", async () => {
+  it("names the path and the workspace when nothing is there, but not the host path to a member", async () => {
     const agent = await fixture();
 
     const missing = await refusal(listWorkspaceDirectory(agent, "research/lipstick/"));
     expect(missing.reason).toBe("missing");
     expect(missing.message).toContain("research/lipstick/");
     expect(missing.message).toContain(agent.workspacePath);
+    expect(missing.memberMessage).toContain("research/lipstick/");
+    expect(missing.memberMessage).not.toContain(agent.workspacePath);
   });
 });

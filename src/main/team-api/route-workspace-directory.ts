@@ -14,11 +14,14 @@ import { readJson, stringField } from "./request-helpers";
 const REFUSED_STATUS = { missing: 404, outside: 403, "not-file": 400, "not-directory": 400 } as const;
 
 /**
- * A refused workspace path as the sentence a member reads, with its own status. Any other error stays
- * a host fault, so the router logs it and answers 500.
+ * A refused workspace path as the sentence a member reads, with its own status. The sentence does not
+ * name the host's workspace path. Any other error stays a host fault, so the router logs it and
+ * answers 500.
  */
 export function rethrowWorkspacePathError(error: unknown): never {
-  throw error instanceof WorkspacePathRefused ? new HttpError(REFUSED_STATUS[error.reason], error.message) : error;
+  throw error instanceof WorkspacePathRefused
+    ? new HttpError(REFUSED_STATUS[error.reason], error.memberMessage)
+    : error;
 }
 
 /**

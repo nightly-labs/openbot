@@ -170,6 +170,7 @@ export const messages = {
   "error.backend.workspacePathNotFile": "O caminho do espaço de trabalho não é um arquivo.",
   "error.backend.workspacePathNotDirectory": "O caminho do espaço de trabalho não é uma pasta.",
   "error.backend.workspacePathMissing": "Nada existe em {path} no espaço de trabalho do agente {root}.",
+  "error.backend.workspacePathMissingForMember": "Nada existe em {path} no espaço de trabalho do agente.",
   "error.backend.useChannelTaskControls": "Use os controles de tarefas do canal para esta tarefa atribuída.",
   "error.backend.editFinished": "Esta edição já terminou.",
   "error.backend.editCancelled": "Esta edição foi cancelada, por isso a mensagem mantém o texto original.",

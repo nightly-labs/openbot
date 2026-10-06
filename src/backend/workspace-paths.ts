@@ -119,19 +119,21 @@ export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(functi
 });
 /**
  * Why a workspace path was refused. The cause of the failure, so the Team API can answer each with its
- * own status and a remote member reads the sentence instead of a generic server error.
+ * own status and a remote member reads the sentence instead of a generic server error. `memberMessage`
+ * is the sentence for a remote member: it does not name the absolute workspace path of the host.
  */
 export class WorkspacePathRefused extends Error {
   constructor(
     readonly reason: "missing" | "outside" | "not-file" | "not-directory",
     message: string,
+    readonly memberMessage = message,
   ) {
     super(message);
   }
 }
 
-function refuse(reason: WorkspacePathRefused["reason"], message: string) {
-  return Effect.fail(attachmentFailure(new WorkspacePathRefused(reason, message)));
+function refuse(reason: WorkspacePathRefused["reason"], message: string, memberMessage?: string) {
+  return Effect.fail(attachmentFailure(new WorkspacePathRefused(reason, message, memberMessage)));
 }
 
 /** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
@@ -154,6 +156,7 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
         ? refuse(
             "missing",
             sourceText("error.backend.workspacePathMissing", { path: inputPath, root: agent.workspacePath }),
+            sourceText("error.backend.workspacePathMissingForMember", { path: inputPath }),
           )
         : Effect.fail(error),
     ),
