@@ -594,6 +594,7 @@ export class AgentStore {
       this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
     } catch (error) {
       Object.assign(agent, previous);
+      if (previous.busyMessageMode === undefined) delete agent.busyMessageMode;
       throw error;
     }
     return { ...agent };

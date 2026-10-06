@@ -1045,7 +1045,8 @@ export class MailboxStore {
 
   async markStarting(deliveryId: string): Promise<void> {
     this.#assertQueueNotEditing(deliveryId);
-    await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null, steerFallback: undefined });
+    this.#clearSteerFallback(deliveryId);
+    await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null });
   }
 
   async markRunning(deliveryId: string, turnId: string): Promise<void> {
@@ -1380,11 +1381,11 @@ export class MailboxStore {
 
   async markSteering(deliveryId: string, turnId: string): Promise<void> {
     this.#assertQueueNotEditing(deliveryId);
+    this.#clearSteerFallback(deliveryId);
     await this.#updateDelivery(deliveryId, ["queued"], {
       status: "starting",
       turnId,
       error: null,
-      steerFallback: undefined,
     });
   }
 
@@ -1716,6 +1717,12 @@ export class MailboxStore {
     if (!allowed.includes(delivery.status)) return;
     Object.assign(delivery, patch);
     await this.#persist("delivery.updated");
+  }
+
+  /** The reason a steer waits is shown only while queued, so it goes when the delivery leaves the queue. */
+  #clearSteerFallback(deliveryId: string): void {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (delivery?.status === "queued") delete delivery.steerFallback;
   }
 
   #requireMessage(id: string): StoredMessage {
