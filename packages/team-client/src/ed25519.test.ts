@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { createEd25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
+import { runTeamEffect } from "./effect-boundary";
 
 const SECRET_KEY = hexToBytes("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
@@ -14,38 +14,48 @@ describe("portable Ed25519 identities", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("creates the RFC 8032 identity and signature used by the desktop protocol", async () => {
-    const identity = await createEd25519Identity((size) => {
-      expect(size).toBe(32);
-      return SECRET_KEY;
-    });
+    const identity = await runTeamEffect(
+      createEd25519Identity((size) => {
+        expect(size).toBe(32);
+        return SECRET_KEY;
+      }),
+    );
 
     expect(identity.publicKeyPem).toBe(PUBLIC_KEY_PEM);
-    await expect(signEd25519(new Uint8Array(), identity.secretKey)).resolves.toEqual(EMPTY_MESSAGE_SIGNATURE);
+    await expect(runTeamEffect(signEd25519(new Uint8Array(), identity.secretKey))).resolves.toEqual(
+      EMPTY_MESSAGE_SIGNATURE,
+    );
   });
 
   it("creates, signs, and verifies an identity when Expo DOM does not expose Web Crypto", async () => {
     vi.stubGlobal("crypto", undefined);
 
-    const identity = await createEd25519Identity(() => SECRET_KEY);
+    const identity = await runTeamEffect(createEd25519Identity(() => SECRET_KEY));
 
     expect(identity.publicKeyPem).toBe(PUBLIC_KEY_PEM);
-    await expect(signEd25519(new Uint8Array(), identity.secretKey)).resolves.toEqual(EMPTY_MESSAGE_SIGNATURE);
-    await expect(verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new Uint8Array(), identity.publicKeyPem)).resolves.toBe(
-      true,
+    await expect(runTeamEffect(signEd25519(new Uint8Array(), identity.secretKey))).resolves.toEqual(
+      EMPTY_MESSAGE_SIGNATURE,
     );
+    await expect(
+      runTeamEffect(verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new Uint8Array(), identity.publicKeyPem)),
+    ).resolves.toBe(true);
   });
 
   it("accepts a standard signature and rejects a changed transcript", async () => {
-    await expect(verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new Uint8Array(), PUBLIC_KEY_PEM)).resolves.toBe(true);
     await expect(
-      verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new TextEncoder().encode("changed transcript"), PUBLIC_KEY_PEM),
+      runTeamEffect(verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new Uint8Array(), PUBLIC_KEY_PEM)),
+    ).resolves.toBe(true);
+    await expect(
+      runTeamEffect(
+        verifyEd25519Pem(EMPTY_MESSAGE_SIGNATURE, new TextEncoder().encode("changed transcript"), PUBLIC_KEY_PEM),
+      ),
     ).resolves.toBe(false);
   });
 
   it("rejects a key that is not an Ed25519 SPKI public key", async () => {
-    await expect(verifyEd25519Pem(new Uint8Array(64), new Uint8Array(), "not a public key")).rejects.toThrow(
-      "invalid Ed25519 public key",
-    );
+    await expect(
+      runTeamEffect(verifyEd25519Pem(new Uint8Array(64), new Uint8Array(), "not a public key")),
+    ).rejects.toThrow("invalid Ed25519 public key");
   });
 });
 

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -15,7 +16,7 @@ afterEach(async () => {
 describe("setup store", () => {
   it("returns incomplete setup when the v2 file is missing", async () => {
     const root = await temporaryRoot();
-    await expect(readSetupState(join(root, "openbot-setup-v2.json"))).resolves.toEqual({
+    await expect(Effect.runPromise(readSetupState(join(root, "openbot-setup-v2.json")))).resolves.toEqual({
       completed: false,
       preferredProvider: null,
       preferredModel: null,
@@ -26,7 +27,7 @@ describe("setup store", () => {
     const root = await temporaryRoot();
     const path = join(root, "openbot-setup-v2.json");
     await writeFile(path, '{"version":1,"acceptedAt":"2026-01-01T00:00:00.000Z"}\n');
-    await expect(readSetupState(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readSetupState(path))).resolves.toEqual({
       completed: false,
       preferredProvider: null,
       preferredModel: null,
@@ -36,8 +37,10 @@ describe("setup store", () => {
   it("persists the preferred model without changing the file version", async () => {
     const root = await temporaryRoot();
     const path = join(root, "openbot-setup-v2.json");
-    await writeSetupState(path, { preferredProvider: "opencode", preferredModel: "studio-local/glm-5-air" });
-    await expect(readSetupState(path)).resolves.toEqual({
+    await Effect.runPromise(
+      writeSetupState(path, { preferredProvider: "opencode", preferredModel: "studio-local/glm-5-air" }),
+    );
+    await expect(Effect.runPromise(readSetupState(path))).resolves.toEqual({
       completed: true,
       preferredProvider: "opencode",
       preferredModel: "studio-local/glm-5-air",
@@ -51,7 +54,7 @@ describe("setup store", () => {
     const root = await temporaryRoot();
     const path = join(root, "openbot-setup-v2.json");
     await writeFile(path, '{"version":2,"preferredProvider":"codex","completedAt":"2026-01-01T00:00:00.000Z"}\n');
-    await expect(readSetupState(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readSetupState(path))).resolves.toEqual({
       completed: true,
       preferredProvider: "codex",
       preferredModel: null,

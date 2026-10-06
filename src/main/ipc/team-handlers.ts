@@ -1,4 +1,5 @@
 import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
 import type { RemoteServerManager } from "../remote-server-manager";
@@ -43,28 +44,34 @@ export function teamIpcHandlers({
   return {
     servers: {
       setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted, durationMs }) =>
-        remoteServers
-          .setMuted(serverId, muted, durationMs)
-          .then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.setMuted(serverId, muted, durationMs)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       setNotificationLevel: payloadHandler(parseSetServerNotificationLevel, ({ serverId, level }) =>
-        remoteServers
-          .setNotificationLevel(serverId, level)
-          .then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.setNotificationLevel(serverId, level)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       list: handler(() => withLocalHostSummary(remoteServers.list(), host.getStatus())),
       select: payloadHandler(stringPayload("serverId"), (serverId) =>
-        remoteServers.select(serverId).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.select(serverId)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
       reorder: payloadHandler(parseReorderServers, (request) =>
-        remoteServers.reorder(request.serverIds).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+        runCauseEffect(remoteServers.reorder(request.serverIds)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
       ),
-      join: payloadHandler(parseJoinServer, (request) => remoteServers.join(request)),
-      previewInvite: payloadHandler(parseJoinServer, (request) => remoteServers.previewInvite(request)),
+      join: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.join(request))),
+      previewInvite: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.previewInvite(request))),
       takePendingInvite: handler(takePendingInvite),
-      login: payloadHandler(parseLoginServer, (request) => remoteServers.login(request)),
-      retryConnection: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.retryConnection(serverId)),
-      remove: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.remove(serverId)),
+      login: payloadHandler(parseLoginServer, (request) => runCauseEffect(remoteServers.login(request))),
+      retryConnection: payloadHandler(stringPayload("serverId"), (serverId) =>
+        runCauseEffect(remoteServers.retryConnection(serverId)),
+      ),
+      remove: payloadHandler(stringPayload("serverId"), (serverId) => runCauseEffect(remoteServers.remove(serverId))),
       getPresence: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.getPresence(),
@@ -74,104 +81,121 @@ export function teamIpcHandlers({
       getPresenceFor: payloadHandler(stringPayload("serverId"), (serverId) =>
         routeToServer(serverId, {
           local: () => host.getPresence(),
-          remote: (target) => remoteServers.getPresenceFor(target),
+          remote: (target) => runCauseEffect(remoteServers.getPresenceFor(target)),
         }),
       ),
-      refreshIdentity: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.refreshIdentity(serverId)),
-      listMembers: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.listMembers(serverId)),
+      refreshIdentity: payloadHandler(stringPayload("serverId"), (serverId) =>
+        runCauseEffect(remoteServers.refreshIdentity(serverId)),
+      ),
+      listMembers: payloadHandler(stringPayload("serverId"), (serverId) =>
+        runCauseEffect(remoteServers.listMembers(serverId)),
+      ),
       updateMember: payloadHandler(agentRequest(parseUpdateTeamMember), ({ serverId, payload }) =>
-        remoteServers.updateMember(serverId, payload),
+        runCauseEffect(remoteServers.updateMember(serverId, payload)),
       ),
       removeMember: payloadHandler(agentRequest(stringPayload("memberId")), ({ serverId, payload }) =>
-        remoteServers.removeMember(serverId, payload),
+        runCauseEffect(remoteServers.removeMember(serverId, payload)),
       ),
-      listInvites: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.listInvites(serverId)),
+      listInvites: payloadHandler(stringPayload("serverId"), (serverId) =>
+        runCauseEffect(remoteServers.listInvites(serverId)),
+      ),
       revokeInvite: payloadHandler(agentRequest(stringPayload("inviteId")), ({ serverId, payload }) =>
-        remoteServers.revokeInvite(serverId, payload),
+        runCauseEffect(remoteServers.revokeInvite(serverId, payload)),
       ),
       createInvite: payloadHandler(agentRequest(parseCreateTeamInvite), ({ serverId, payload }) =>
-        remoteServers.createInvite(serverId, payload),
+        runCauseEffect(remoteServers.createInvite(serverId, payload)),
       ),
       setTyping: payloadHandler(parseSetTeamTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {
           local: () => host.setTyping(parsed),
-          remote: () => remoteServers.setTyping(parsed),
+          remote: () => runCauseEffect(remoteServers.setTyping(parsed)),
         }),
       ),
       listDirectThreads: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.listDirectThreads(),
-          remote: () => remoteServers.listDirectThreads(),
+          remote: () => runCauseEffect(remoteServers.listDirectThreads()),
         }),
       ),
       readDirectConversation: payloadHandler(stringPayload("memberId"), (memberId) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.readDirectConversation(memberId),
-          remote: () => remoteServers.readDirectConversation(memberId),
+          remote: () => runCauseEffect(remoteServers.readDirectConversation(memberId)),
         }),
       ),
       readDirectConversationPage: payloadHandler(parseReadDirectConversationPage, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit),
-          remote: () => remoteServers.readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit),
+          remote: () =>
+            runCauseEffect(remoteServers.readDirectConversationPage(parsed.memberId, parsed.anchor, parsed.limit)),
         }),
       ),
       sendDirectMessage: payloadHandler(parseSendDirectMessage, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.sendDirectMessage(parsed),
-          remote: () => remoteServers.sendDirectMessage(parsed),
+          remote: () => runCauseEffect(remoteServers.sendDirectMessage(parsed)),
         }),
       ),
       markDirectRead: payloadHandler(parseMarkDirectRead, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => host.markDirectRead(parsed),
-          remote: () => remoteServers.markDirectRead(parsed),
+          remote: () => runCauseEffect(remoteServers.markDirectRead(parsed)),
         }),
       ),
       setDirectTyping: payloadHandler(parseDirectTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {
           local: () => host.setDirectTyping(parsed),
-          remote: () => remoteServers.setDirectTyping(parsed),
+          remote: () => runCauseEffect(remoteServers.setDirectTyping(parsed)),
         }),
       ),
     },
     host: {
       getStatus: handler(() => host.getStatus()),
-      configure: payloadHandler(parseHostConfig, (config) => host.configure(config)),
-      updateIdentity: payloadHandler(parseHostIdentity, (identity) => host.updateIdentity(identity)),
+      configure: payloadHandler(parseHostConfig, (config) => runCauseEffect(host.configure(config))),
+      updateIdentity: payloadHandler(parseHostIdentity, (identity) => runCauseEffect(host.updateIdentity(identity))),
       getPresence: handler(() => host.getPresence()),
-      start: handler(() => host.start()),
-      stop: handler(() => host.stop()),
-      recheckScreenRecording: handler(() => host.recheckScreenRecording()),
-      listMembers: handler(() => host.listMembers()),
-      updateMember: payloadHandler(parseUpdateTeamMember, (update) => host.updateMember(update)),
-      removeMember: payloadHandler(stringPayload("memberId"), (memberId) => host.removeMember(memberId)),
+      start: handler(() => runCauseEffect(host.start())),
+      stop: handler(() => runCauseEffect(host.stop())),
+      recheckScreenRecording: handler(() => runCauseEffect(host.recheckScreenRecording())),
+      listMembers: handler(() => runCauseEffect(host.listMembers())),
+      updateMember: payloadHandler(parseUpdateTeamMember, (update) => runCauseEffect(host.updateMember(update))),
+      removeMember: payloadHandler(stringPayload("memberId"), (memberId) =>
+        runCauseEffect(host.removeMember(memberId)),
+      ),
       listSessions: handler(() => host.listSessions()),
-      revokeSession: payloadHandler(stringPayload("sessionId"), (sessionId) => host.revokeSession(sessionId)),
-      listInvites: handler(() => host.listInvites()),
-      revokeInvite: payloadHandler(stringPayload("inviteId"), (inviteId) => host.revokeInvite(inviteId)),
-      createInvite: payloadHandler(parseCreateTeamInvite, (invite) => host.createInvite(invite)),
+      revokeSession: payloadHandler(stringPayload("sessionId"), (sessionId) =>
+        runCauseEffect(host.revokeSession(sessionId)),
+      ),
+      listInvites: handler(() => runCauseEffect(host.listInvites())),
+      revokeInvite: payloadHandler(stringPayload("inviteId"), (inviteId) =>
+        runCauseEffect(host.revokeInvite(inviteId)),
+      ),
+      createInvite: payloadHandler(parseCreateTeamInvite, (invite) => runCauseEffect(host.createInvite(invite))),
     },
     remoteDesktop: {
       checkSetup: payloadHandler(stringPayload("serverId"), (serverId) =>
         routeToServer(serverId, {
-          local: () => host.checkRemoteDesktopSetup(),
-          remote: (target) => remoteServers.checkRemoteDesktopSetup(target),
+          local: () => runCauseEffect(host.checkRemoteDesktopSetup()),
+          remote: (target) => runCauseEffect(remoteServers.checkRemoteDesktopSetup(target)),
         }),
       ),
-      openSetup: payloadHandler(parseRemoteDesktopSetupAction, (action) => host.openRemoteDesktopSetup(action)),
+      openSetup: payloadHandler(parseRemoteDesktopSetupAction, (action) =>
+        runCauseEffect(host.openRemoteDesktopSetup(action)),
+      ),
       test: payloadHandler(parseRemoteDesktopTest, (input) =>
         routeToServer(input.serverId, {
-          local: () => host.testLocalRemoteDesktop(input.sessionId, input.action),
-          remote: () => remoteServers.testRemoteDesktop(input),
+          local: () => runCauseEffect(host.testLocalRemoteDesktop(input.sessionId, input.action)),
+          remote: () => runCauseEffect(remoteServers.testRemoteDesktop(input)),
         }),
       ),
       list: handler(() => remoteDesktop.list()),
-      connect: payloadHandler(parseRemoteDesktopConnect, (request) => remoteDesktop.connect(request)),
+      connect: payloadHandler(parseRemoteDesktopConnect, (request) => runCauseEffect(remoteDesktop.connect(request))),
       selectDisplay: payloadHandler(parseRemoteDesktopDisplay, (request) =>
-        remoteDesktop.selectDisplay(request.serverId, request.displayId),
+        runCauseEffect(remoteDesktop.selectDisplay(request.serverId, request.displayId)),
       ),
-      disconnect: payloadHandler(stringPayload("sessionId"), (sessionId) => remoteDesktop.disconnect(sessionId)),
+      disconnect: payloadHandler(stringPayload("sessionId"), (sessionId) =>
+        runCauseEffect(remoteDesktop.disconnect(sessionId)),
+      ),
     },
   };
 }

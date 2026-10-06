@@ -153,12 +153,17 @@ export interface ConversationProps {
   onSelectAgent: (agentId: string) => void;
   onUpdateAgent: (agentId: string, updates: Omit<UpdateAgentInput, "agentId">) => Promise<void>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  /**
+   * Sends one message. `clientMessageId` names it for the host, so a retry with the same id
+   * returns the first receipt; the answer carries the host's id for the message, or why it failed.
+   */
   onSendMessage: (
     body: string,
     attachmentDraftIds: string[],
     replyToMessageId: string | null,
     target?: ConversationTarget,
-  ) => Promise<boolean>;
+    clientMessageId?: string,
+  ) => Promise<SendMessageResult>;
   onMarkRead: () => Promise<void>;
   onLoadOlder?: () => void;
   onLoadLatest?: () => Promise<void>;
@@ -203,6 +208,9 @@ export interface ConversationProps {
   onOpenRemoteDesktop: (serverId: string, trigger: HTMLElement) => Promise<void>;
   onStop: () => void;
 }
+
+/** `messageId` is the conversation message the host stored: the delivery id of the receipt. */
+export type SendMessageResult = { messageId: string } | { error: string };
 
 export interface ComposerDraft {
   text: string;

@@ -1,3 +1,4 @@
+import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
 import {
   installAgentSkill,
@@ -13,6 +14,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import type { AgentTemplateInstallCalls } from "../agent-templates/agent-templates-port";
 import type { MarketplaceCalls } from "../settings/marketplace-calls";
 
@@ -33,23 +35,39 @@ export function createWebMarketplaceCalls(
 ): MarketplaceCalls {
   const catalog = createMarketplaceCatalog(accountFetch);
   return {
-    skills: catalog.skills,
-    agents: catalog.agents,
+    skills: {
+      list: (query) => runTeamEffect(catalog.skills.list(query)),
+      get: (id) => runTeamEffect(catalog.skills.get(id)),
+    },
+    agents: {
+      list: (query) => runTeamEffect(catalog.agents.list(query)),
+      get: (id) => runTeamEffect(catalog.agents.get(id)),
+    },
     agentSkills: (serverId) => ({
-      listInstalled: async (agentId) => listAgentSkills(request(serverId), agentId),
-      install: async (input) => installAgentSkill(request(serverId), input),
-      uninstall: async (input) => uninstallAgentSkill(request(serverId), input),
-      setEnabled: async (input) => setAgentSkillEnabled(request(serverId), input),
+      listInstalled: async (agentId) =>
+        runTeamEffect(listAgentSkills(request(serverId), agentId).pipe(Effect.mapError((error) => error.cause))),
+      install: async (input) =>
+        runTeamEffect(installAgentSkill(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      uninstall: async (input) =>
+        runTeamEffect(uninstallAgentSkill(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      setEnabled: async (input) =>
+        runTeamEffect(setAgentSkillEnabled(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     }),
     mcp: {
-      listMcpServers: async (serverId) => listMcpServers(request(serverId)),
-      testMcpServer: async (input, serverId) => testMcpServer(request(serverId), input),
-      saveMcpServer: async (input, serverId) => saveMcpServer(request(serverId), input),
-      removeMcpServer: async (input, serverId) => removeMcpServer(request(serverId), input),
+      listMcpServers: async (serverId) =>
+        runTeamEffect(listMcpServers(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      testMcpServer: async (input, serverId) =>
+        runTeamEffect(testMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      saveMcpServer: async (input, serverId) =>
+        runTeamEffect(saveMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      removeMcpServer: async (input, serverId) =>
+        runTeamEffect(removeMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     },
     addAgent: async (input, serverId) => {
       if (!serverId) throw new Error(noAgentInstall());
-      return installMarketplaceAgent(request(serverId), input);
+      return runTeamEffect(
+        installMarketplaceAgent(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      );
     },
     openUrl: async (url) => {
       const protocol = URL.parse(url)?.protocol;
@@ -70,7 +88,7 @@ export function createWebAgentTemplateCalls(
   const catalog = createMarketplaceCatalog(accountFetch);
   return {
     agentTemplates: {
-      get: catalog.templates.get,
+      get: (id) => runTeamEffect(catalog.templates.get(id)),
       install: async () => {
         throw new Error(noAgentInstall());
       },
@@ -78,7 +96,9 @@ export function createWebAgentTemplateCalls(
     agent: {
       addTemplateAgent: async (input, serverId) => {
         if (!serverId) throw new Error(noAgentInstall());
-        return installAgentTemplate(request(serverId), input);
+        return runTeamEffect(
+          installAgentTemplate(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+        );
       },
     },
   };

@@ -9,7 +9,8 @@ import type { VoiceModelStatus, VoiceTranscriptionResult } from "@openbot/contra
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { VoiceModelService } from "./voice-model-service";
+import { Effect, Exit, Fiber, Scope } from "effect";
+import { VoiceModelService, VoiceOperationError, voiceIO } from "./voice-model-service";
 
 const logger = createOpenBotLogger("voice-transcription-service");
 
@@ -34,6 +35,7 @@ interface VoiceTranscriptionServiceOptions {
 }
 
 export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEvents> {
+  readonly #scope = Scope.makeUnsafe();
   private activeChild: ChildProcess | null = null;
   private busy = false;
   private readonly executable: string;
@@ -54,100 +56,135 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     this.model.on("status", (status) => this.emit("modelStatus", status));
   }
 
-  getModelStatus(): Promise<VoiceModelStatus> {
-    return this.runtimeMissing() ?? this.model.getStatus();
-  }
+  readonly getModelStatus = Effect.fn("VoiceTranscription.getModelStatus")(function* (this: VoiceTranscriptionService) {
+    const missing = this.runtimeMissing();
+    return missing ?? (yield* this.model.getStatus());
+  }).bind(this);
 
-  prepareModel(): Promise<VoiceModelStatus> {
-    return this.runtimeMissing() ?? this.model.prepare();
-  }
+  readonly prepareModel = Effect.fn("VoiceTranscription.prepareModel")(function* (this: VoiceTranscriptionService) {
+    const missing = this.runtimeMissing();
+    return missing ?? (yield* this.model.prepare());
+  }).bind(this);
 
-  async transcribe(audio: Uint8Array): Promise<VoiceTranscriptionResult> {
-    if (this.busy) throw new Error(sourceText("error.voice.busy"));
-    this.busy = true;
-    let temporaryRoot: string | undefined;
-    const modelStatus = await this.prepareModel();
-    if (modelStatus.phase !== "ready") {
-      this.busy = false;
-      throw new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable"));
-    }
-    const model = this.model.modelPath;
-    const startedAt = Date.now();
+  readonly transcribe = Effect.fn("VoiceTranscription.transcribe")(
+    (audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> =>
+      Effect.gen({ self: this }, function* () {
+        if (this.busy) return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.busy")) });
+        return yield* Effect.acquireUseRelease(
+          Effect.sync(() => {
+            this.busy = true;
+          }),
+          () =>
+            Effect.gen({ self: this }, function* () {
+              const modelStatus = yield* this.prepareModel();
+              if (modelStatus.phase !== "ready")
+                return yield* new VoiceOperationError({
+                  cause: new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable")),
+                });
+              const startedAt = Date.now();
+              return yield* Effect.acquireUseRelease(
+                voiceIO(() => mkdtemp(join(tmpdir(), "openbot-voice-"))),
+                (temporaryRoot) =>
+                  Effect.gen({ self: this }, function* () {
+                    const inputPath = join(temporaryRoot, "recording.wav");
+                    const outputPath = join(temporaryRoot, "transcript");
+                    yield* voiceIO(() => writeFile(inputPath, audio));
+                    yield* this.run(this.executable, [
+                      "--model",
+                      this.model.modelPath,
+                      "--file",
+                      inputPath,
+                      "--language",
+                      "auto",
+                      "--output-txt",
+                      "--output-file",
+                      outputPath,
+                      "--no-timestamps",
+                      "--no-gpu",
+                      "--threads",
+                      "4",
+                    ]);
+                    const text = (yield* voiceIO(() => readFile(`${outputPath}.txt`, "utf8"))).trim();
+                    if (text.length > INPUT_LIMITS.messageText)
+                      return yield* new VoiceOperationError({ cause: new Error("The voice transcript is too long.") });
+                    logger.info(`Voice transcription completed in ${Date.now() - startedAt}ms.`);
+                    return { text };
+                  }),
+                (temporaryRoot) =>
+                  voiceIO(() => rm(temporaryRoot, { recursive: true, force: true })).pipe(Effect.orDie),
+              ).pipe(
+                Effect.mapError((error) => {
+                  logger.error(
+                    `Voice transcription failed after ${Date.now() - startedAt}ms.`,
+                    errorCategory(error.cause),
+                  );
+                  return new VoiceOperationError({ cause: userFacingError(error.cause) });
+                }),
+              );
+            }),
+          () =>
+            Effect.sync(() => {
+              this.activeChild = null;
+              this.busy = false;
+            }),
+        );
+      }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }), Effect.flatMap(Fiber.join)),
+  );
 
-    try {
-      temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-voice-"));
-      const inputPath = join(temporaryRoot, "recording.wav");
-      const outputPath = join(temporaryRoot, "transcript");
-      await writeFile(inputPath, audio);
-      await this.run(this.executable, [
-        "--model",
-        model,
-        "--file",
-        inputPath,
-        "--language",
-        "auto",
-        "--output-txt",
-        "--output-file",
-        outputPath,
-        "--no-timestamps",
-        "--no-gpu",
-        "--threads",
-        "4",
-      ]);
-      const text = (await readFile(`${outputPath}.txt`, "utf8")).trim();
-      if (text.length > INPUT_LIMITS.messageText) throw new Error("The voice transcript is too long.");
-      logger.info(`Voice transcription completed in ${Date.now() - startedAt}ms.`);
-      return { text };
-    } catch (error) {
-      logger.error(`Voice transcription failed after ${Date.now() - startedAt}ms.`, errorCategory(error));
-      throw userFacingError(error);
-    } finally {
-      this.activeChild = null;
-      this.busy = false;
-      if (temporaryRoot) await rm(temporaryRoot, { recursive: true, force: true });
-    }
-  }
-
-  shutdown(): void {
-    this.model.shutdown();
+  readonly shutdown = Effect.fn("VoiceTranscription.shutdown")(function* (this: VoiceTranscriptionService) {
     this.activeChild?.kill();
+    yield* this.model.shutdown();
+    yield* Scope.close(this.#scope, Exit.void);
     this.activeChild = null;
-  }
+  }, Effect.uninterruptible).bind(this);
 
-  /**
-   * The error status for a build with no whisper binary, or `null` when one is present. Returned as
-   * a resolved promise so the callers stay one-liners over the model service they otherwise wrap.
-   */
-  private runtimeMissing(): Promise<VoiceModelStatus> | null {
+  /** Reports a build with no bundled whisper binary. */
+  private runtimeMissing(): VoiceModelStatus | null {
     if (existsSync(this.executable)) return null;
     const status: VoiceModelStatus = { phase: "error", progress: null, message: RUNTIME_UNAVAILABLE_MESSAGE };
     this.emit("modelStatus", status);
-    return Promise.resolve(status);
+    return status;
   }
 
-  private run(executable: string, arguments_: string[]): Promise<void> {
-    return new Promise((resolveRun, rejectRun) => {
+  private run(executable: string, arguments_: string[]): Effect.Effect<void, VoiceOperationError> {
+    return Effect.callback<void, VoiceOperationError>((resume) => {
       const child = execFile(executable, arguments_, { windowsHide: true });
       this.activeChild = child;
       let stderr = "";
       child.stderr?.setEncoding("utf8");
-      child.stderr?.on("data", (chunk: string) => {
+      const onData = (chunk: string) => {
         stderr = `${stderr}${chunk}`.slice(-4_000);
+      };
+      child.stderr?.on("data", onData);
+      const onError = (cause: Error) => resume(Effect.fail(new VoiceOperationError({ cause })));
+      const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+        if (code === 0) resume(Effect.void);
+        else
+          resume(
+            Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(`Whisper exited with ${signal ?? `code ${String(code)}`}: ${stderr.trim()}`),
+              }),
+            ),
+          );
+      };
+      child.once("error", onError);
+      child.once("exit", onExit);
+      return Effect.sync(() => {
+        child.stderr?.off("data", onData);
+        child.once("close", () => {
+          child.off("error", onError);
+          child.off("exit", onExit);
+        });
+        if (child.exitCode === null && child.signalCode === null) child.kill();
       });
-      const timer = setTimeout(() => {
-        child.kill();
-        rejectRun(new Error(sourceText("error.voice.transcriptionTimedOut")));
-      }, TRANSCRIPTION_TIMEOUT_MS);
-      child.once("error", (error) => {
-        clearTimeout(timer);
-        rejectRun(error);
-      });
-      child.once("exit", (code, signal) => {
-        clearTimeout(timer);
-        if (code === 0) resolveRun();
-        else rejectRun(new Error(`Whisper exited with ${signal ?? `code ${String(code)}`}: ${stderr.trim()}`));
-      });
-    });
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: TRANSCRIPTION_TIMEOUT_MS,
+        orElse: () =>
+          Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.transcriptionTimedOut")) })),
+      }),
+    );
   }
 }
 

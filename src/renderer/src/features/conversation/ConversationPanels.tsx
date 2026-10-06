@@ -283,7 +283,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
-                !controller.selectionSending() &&
                 controller.voicePhase() === "idle" &&
                 !controller.editingDeliveryId()
                   ? () => {
@@ -297,7 +296,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
-                !controller.selectionSending() &&
                 controller.voicePhase() === "idle" &&
                 !controller.editingDeliveryId()
                   ? (skill) => {

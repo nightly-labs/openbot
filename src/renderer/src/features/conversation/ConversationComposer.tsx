@@ -61,7 +61,6 @@ export function ConversationComposer() {
     removeAttachment,
     reorderPresentedQueue,
     replyTarget,
-    selectionSending,
     setComposerFocusRequest,
     setContextAttachmentPickerElement,
     setImageAttachmentPickerElement,
@@ -292,9 +291,7 @@ export function ConversationComposer() {
               mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
-              disabled={
-                submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady() || savePending()
-              }
+              disabled={submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()}
               placeholder={
                 !agentReady()
                   ? props.runtime
@@ -379,12 +376,7 @@ export function ConversationComposer() {
                 class="composer-button"
                 aria-label={t("composer.add.label")}
                 disabled={
-                  attachmentBusy() ||
-                  submitting() ||
-                  selectionSending() ||
-                  voicePhase() === "transcribing" ||
-                  !agentReady() ||
-                  savePending()
+                  attachmentBusy() || submitting() || voicePhase() === "transcribing" || !agentReady() || savePending()
                 }
               >
                 <Plus aria-hidden="true" />
@@ -518,7 +510,6 @@ export function ConversationComposer() {
                     disabled={
                       attachmentBusy() ||
                       submitting() ||
-                      selectionSending() ||
                       !agentReady() ||
                       voicePhase() === "preparing" ||
                       voicePhase() === "requesting" ||

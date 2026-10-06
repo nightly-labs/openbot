@@ -21,6 +21,8 @@ interface ComposerDraftOwner {
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDraftBackup: () => ComposerDraft | null;
+  /** Messages that left the composer but that the host has not confirmed, per chat, oldest first. */
+  unsentTexts: () => Record<string, string[]>;
 }
 
 /**
@@ -62,6 +64,12 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
     if (editAgentId && editServerId)
       agents[composerDraftKey({ agentId: editAgentId, serverId: editServerId })] =
         owner.editingDraftBackup() ?? EMPTY_DRAFT;
+    // A failed or waiting message lives only in memory. After a restart its text is back in the
+    // composer, before what the user typed later, and nothing sends it again on its own.
+    for (const [key, texts] of Object.entries(owner.unsentTexts())) {
+      const draft = agents[key] ?? EMPTY_DRAFT;
+      agents[key] = { ...draft, text: [...texts, draft.text].filter((text) => text.trim()).join("\n\n") };
+    }
     try {
       window.localStorage.setItem(
         COMPOSER_DRAFTS_STORAGE_KEY,
@@ -72,7 +80,14 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
     }
   };
   createEffect(
-    () => [owner.drafts(), owner.channelDrafts(), owner.editingAgentId(), owner.editingDraftBackup()] as const,
+    () =>
+      [
+        owner.drafts(),
+        owner.channelDrafts(),
+        owner.editingAgentId(),
+        owner.editingDraftBackup(),
+        owner.unsentTexts(),
+      ] as const,
     () => {
       clearTimeout(timer);
       timer = setTimeout(write, WRITE_DELAY_MS);

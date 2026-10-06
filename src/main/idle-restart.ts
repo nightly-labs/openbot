@@ -8,12 +8,14 @@
 
 import type { IdleRestart as IdleRestartStatus, IdleRestartTarget, UpdateStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result } from "effect";
 import type { RoutineHoldWindow } from "../backend/routine-store";
 import type { RestartReadiness } from "./update-readiness";
+import type { UpdateService } from "./update-service";
 
 interface IdleRestartUpdater {
   getStatus(): UpdateStatus;
-  installUpdate(): Promise<void>;
+  installUpdate: UpdateService["installUpdate"];
   setIdleRestart(restart: IdleRestartStatus | null): void;
 }
 
@@ -106,12 +108,12 @@ export class IdleRestart {
     this.#clearTimer();
     this.#timer = setTimeout(() => {
       this.#timer = null;
-      void this.#attempt();
+      Effect.runFork(this.#attempt());
     }, delayMs);
     this.#timer.unref?.();
   }
 
-  async #attempt(): Promise<void> {
+  readonly #attempt = Effect.fn("IdleRestart.attempt")(function* (this: IdleRestart) {
     const status = this.#status;
     if (!status || status.error) return;
     const { safeToRestart, reasons } = this.#describeReadiness();
@@ -130,14 +132,15 @@ export class IdleRestart {
       return;
     }
     this.#log("Installing the update: no work runs.");
-    try {
-      await this.#updater.installUpdate();
+    const installed = yield* Effect.result(this.#updater.installUpdate());
+    if (Result.isSuccess(installed)) {
       // The updater owns the install from here, and reports its own failure, which can come after
       // this returns. A relaunch then stays possible.
       this.#restarting = false;
       this.#handedOff = true;
       this.#publish(null);
-    } catch (error) {
+    } else {
+      const error = installed.failure.cause;
       // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready, and
       // the routines run again. A failure after teardown stopped the services: only a relaunch runs
       // the held routines, so the saved window stays.
@@ -147,7 +150,7 @@ export class IdleRestart {
       if (this.#updater.getStatus().errorCode === "install_failed") this.#handedOff = true;
       this.#end({ ...status, waitingFor: [], error: message });
     }
-  }
+  });
 
   #end(status: IdleRestartStatus | null): void {
     this.#clearTimer();

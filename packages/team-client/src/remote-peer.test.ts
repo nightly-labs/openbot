@@ -13,6 +13,7 @@ import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEd25519Identity, signEd25519 } from "./ed25519";
+import { runTeamEffect } from "./effect-boundary";
 import {
   createRemoteCommandMailbox,
   createRemoteTeamPeer,
@@ -991,7 +992,7 @@ async function setupNetwork(
     responseFile?: TeamProtocolV2Json;
   } = {},
 ) {
-  const host = await createEd25519Identity(() => new Uint8Array(32).fill(7));
+  const host = await runTeamEffect(createEd25519Identity(() => new Uint8Array(32).fill(7)));
   const sockets: TestSocket[] = [];
   const connections: TestConnection[] = [];
   const updates: RemoteTeamConnectionUpdate[] = [];
@@ -1088,7 +1089,7 @@ async function setupNetwork(
           clientFingerprint: "AA:11",
           hostFingerprint: "BB:22",
         });
-        void signEd25519(new TextEncoder().encode(transcript), host.secretKey).then((signature) =>
+        void runTeamEffect(signEd25519(new TextEncoder().encode(transcript), host.secretKey)).then((signature) =>
           this.receive(
             encodeTeamProtocolV2Frame({
               version: 2,

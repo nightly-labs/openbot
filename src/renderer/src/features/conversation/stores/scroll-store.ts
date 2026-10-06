@@ -1,4 +1,5 @@
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import type { AgentMessage } from "@openbot/ui/data";
 import {
   calculateChatScrollMargin,
   chatHistoryBoundaryReached,
@@ -40,6 +41,8 @@ export interface ScrollStoreDeps {
   markingRead: () => boolean;
   setMarkingRead: (reading: boolean) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
+  /** The user's messages the host has not drawn yet. They follow the transcript. */
+  pendingMessages: () => AgentMessage[];
   elements: ScrollElements;
   sticky: ScrollStickyState;
 }
@@ -56,11 +59,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
-  const drawnMessages = createMemo(() =>
-    summarizeRoutineRunMessages(
+  const drawnMessages = createMemo(() => [
+    ...summarizeRoutineRunMessages(
       deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
     ),
-  );
+    ...deps.pendingMessages(),
+  ]);
   /*
    * The unread divider sits on the first unread row the timeline draws. A silent answer has no row,
    * so the divider moves to the next row that has one; read state keeps the stored message. A

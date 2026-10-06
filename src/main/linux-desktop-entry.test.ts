@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -15,12 +16,14 @@ afterEach(async () => {
 describe("linux desktop entry", () => {
   it("points the invitation scheme at the AppImage that is running", async () => {
     const home = await temporaryHome();
-    const path = await installLinuxDesktopEntry({
-      platform: "linux",
-      environment: { APPIMAGE: "/home/jane/Applications/OpenBot-0.8.0-x86_64.AppImage" },
-      iconPath: await temporaryIcon(home),
-      homeDirectory: home,
-    });
+    const path = await Effect.runPromise(
+      installLinuxDesktopEntry({
+        platform: "linux",
+        environment: { APPIMAGE: "/home/jane/Applications/OpenBot-0.8.0-x86_64.AppImage" },
+        iconPath: await temporaryIcon(home),
+        homeDirectory: home,
+      }),
+    );
 
     expect(path).toBe(join(home, ".local/share/applications/openbot.desktop"));
     const entry = await readFile(String(path), "utf8");
@@ -34,12 +37,14 @@ describe("linux desktop entry", () => {
   it("copies the icon out of the package and names the copy", async () => {
     const home = await temporaryHome();
     const iconPath = join(home, ".local/share/icons/openbot.png");
-    const path = await installLinuxDesktopEntry({
-      platform: "linux",
-      environment: { APPIMAGE: "/tmp/.mount_OpenBoAbc123/OpenBot.AppImage" },
-      iconPath: await temporaryIcon(home),
-      homeDirectory: home,
-    });
+    const path = await Effect.runPromise(
+      installLinuxDesktopEntry({
+        platform: "linux",
+        environment: { APPIMAGE: "/tmp/.mount_OpenBoAbc123/OpenBot.AppImage" },
+        iconPath: await temporaryIcon(home),
+        homeDirectory: home,
+      }),
+    );
 
     expect(await readFile(String(path), "utf8")).toContain(`Icon=${iconPath}`);
     await expect(readFile(iconPath)).resolves.toEqual(Buffer.from("icon bytes"));
@@ -49,24 +54,28 @@ describe("linux desktop entry", () => {
   // The entry is what registers the invitation scheme, so a missing icon must not stop it.
   it("names the packaged icon when it cannot copy one", async () => {
     const home = await temporaryHome();
-    const path = await installLinuxDesktopEntry({
-      platform: "linux",
-      environment: { APPIMAGE: "/opt/OpenBot.AppImage" },
-      iconPath: join(home, "absent.png"),
-      homeDirectory: home,
-    });
+    const path = await Effect.runPromise(
+      installLinuxDesktopEntry({
+        platform: "linux",
+        environment: { APPIMAGE: "/opt/OpenBot.AppImage" },
+        iconPath: join(home, "absent.png"),
+        homeDirectory: home,
+      }),
+    );
 
     expect(await readFile(String(path), "utf8")).toContain(`Icon=${join(home, "absent.png")}`);
   });
 
   it("writes into XDG_DATA_HOME when the user moved it", async () => {
     const home = await temporaryHome();
-    const path = await installLinuxDesktopEntry({
-      platform: "linux",
-      environment: { APPIMAGE: "/opt/OpenBot.AppImage", XDG_DATA_HOME: join(home, "data") },
-      iconPath: await temporaryIcon(home),
-      homeDirectory: home,
-    });
+    const path = await Effect.runPromise(
+      installLinuxDesktopEntry({
+        platform: "linux",
+        environment: { APPIMAGE: "/opt/OpenBot.AppImage", XDG_DATA_HOME: join(home, "data") },
+        iconPath: await temporaryIcon(home),
+        homeDirectory: home,
+      }),
+    );
 
     expect(path).toBe(join(home, "data/applications/openbot.desktop"));
     expect(await readFile(String(path), "utf8")).toContain(`Icon=${join(home, "data/icons/openbot.png")}`);
@@ -76,15 +85,19 @@ describe("linux desktop entry", () => {
     const home = await temporaryHome();
 
     await expect(
-      installLinuxDesktopEntry({ platform: "linux", environment: {}, iconPath: "/icon.png", homeDirectory: home }),
+      Effect.runPromise(
+        installLinuxDesktopEntry({ platform: "linux", environment: {}, iconPath: "/icon.png", homeDirectory: home }),
+      ),
     ).resolves.toBeNull();
     await expect(
-      installLinuxDesktopEntry({
-        platform: "darwin",
-        environment: { APPIMAGE: "/opt/OpenBot.AppImage" },
-        iconPath: "/icon.png",
-        homeDirectory: home,
-      }),
+      Effect.runPromise(
+        installLinuxDesktopEntry({
+          platform: "darwin",
+          environment: { APPIMAGE: "/opt/OpenBot.AppImage" },
+          iconPath: "/icon.png",
+          homeDirectory: home,
+        }),
+      ),
     ).resolves.toBeNull();
   });
 

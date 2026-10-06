@@ -32,11 +32,6 @@ export const messages = {
   "webClient.notice.join": "Entrar com convite",
   "webClient.notice.reconnect": "Reconectar",
   "webClient.notice.refreshHosts": "Atualizar computadores anfitriões",
-  "webClient.uncertain.title": "Verifique se sua mensagem chegou",
-  "webClient.uncertain.description":
-    "A conexão terminou antes da confirmação de entrega. Atualize e verifique a conversa antes de enviar novamente. Sua mensagem não será reenviada automaticamente.",
-  "webClient.uncertain.refresh": "Atualizar conversa",
-  "webClient.uncertain.checked": "Verifiquei a conversa",
   "webClient.agent.modelsFailed": "Não foi possível carregar os modelos do computador anfitrião.",
   "webClient.agent.refreshFailed":
     "O agente foi criado, mas não foi possível atualizar o espaço de trabalho. Recarregue antes de tentar novamente.",

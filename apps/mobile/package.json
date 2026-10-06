@@ -27,6 +27,7 @@
     "@shopify/react-native-skia": "2.6.2",
     "@speed-highlight/core": "catalog:",
     "@tanstack/react-query": "^5.102.8",
+    "effect": "catalog:",
     "expo": "~57.0.24",
     "expo-application": "~57.0.3",
     "expo-blur": "~57.0.3",
@@ -102,7 +103,7 @@
     "ios:release:testflight": "gh workflow run release-ios.yml --ref main",
     "lint": "biome check --max-diagnostics=none src",
     "codegen": "expo customize tsconfig.json && uniwind generate-artifacts --css ./global.css --dts ./src/uniwind-types.d.ts",
-    "typecheck": "bun run codegen && bun ../../node_modules/typescript/bin/tsc --noEmit",
+    "typecheck": "bun ../../scripts/mobile-codegen.ts && bun ../../node_modules/typescript/bin/tsc --noEmit",
     "doctor": "bunx expo-doctor@latest"
   },
   "private": true

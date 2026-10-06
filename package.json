@@ -68,7 +68,8 @@
       "solid-sonner": "0.3.2",
       "solid-recharts": "1.0.1",
       "qrcode": "^1.5.4",
-      "@tanstack/virtual-core": "3.17.8"
+      "@tanstack/virtual-core": "3.17.8",
+      "effect": "4.0.0"
     }
   },
   "main": "./out/main/index.js",
@@ -78,7 +79,7 @@
   },
   "scripts": {
     "prepare": "bun scripts/install-git-hooks.ts",
-    "postinstall": "install-electron && bun run --cwd apps/mobile setup:skia",
+    "postinstall": "install-electron && bun scripts/setup-mobile-skia.ts && bun scripts/stamp-install.ts",
     "api:start": "bun run --cwd apps/auth-api start",
     "api:build": "bun run --cwd apps/auth-api build",
     "api:images": "bun run --cwd apps/auth-api images",
@@ -178,6 +179,8 @@
     "check:staged": "biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
     "test": "bun run test:desktop && bun run test:api && bun run test:sites && bun run test:remote",
     "test:desktop": "vitest run",
+    "test:changed": "git merge-base origin/main HEAD > /dev/null && vitest run --changed origin/main --maxWorkers=1",
+    "test:related": "vitest related --run --maxWorkers=1",
     "test:durations": "bun scripts/test-durations.ts",
     "test:api": "bun run --cwd apps/auth-api test",
     "test:contracts": "bun run --cwd packages/contracts test",
@@ -276,7 +279,8 @@
     "ws": "8.21.3",
     "yaml": "catalog:",
     "zod": "catalog:",
-    "@openbot/ui": "workspace:*"
+    "@openbot/ui": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",

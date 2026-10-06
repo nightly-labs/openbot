@@ -5,6 +5,7 @@ import {
   hostedSiteBlockKey,
   hostedSiteRouteKey,
 } from "@openbot/contracts/hosted-sites";
+import { Context, Effect, Layer, Schema } from "effect";
 
 interface SiteBucket {
   get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
@@ -17,14 +18,23 @@ interface SiteRouterEnv {
 
 interface SiteRouterRuntime {
   assetCache: Pick<Cache, "match" | "put">;
-  context: Pick<ExecutionContext, "waitUntil">;
+  schedule(work: Effect.Effect<void>): void;
 }
 
 export default {
   async fetch(request: Request, env: SiteRouterEnv, ctx: ExecutionContext): Promise<Response> {
     try {
-      const assetCache = await openAssetCache();
-      return await routeRequest(request, env, Date.now(), assetCache ? { assetCache, context: ctx } : undefined);
+      return await Effect.runPromise(
+        Effect.gen(function* () {
+          const assetCache = yield* openAssetCache();
+          return yield* routeRequest(
+            request,
+            env,
+            Date.now(),
+            assetCache ? { assetCache, schedule: (work) => ctx.waitUntil(Effect.runPromise(work)) } : undefined,
+          );
+        }),
+      );
     } catch (error) {
       console.error(JSON.stringify({ event: "site_router_error", message: errorMessage(error) }));
       return errorResponse(500, "Site unavailable");
@@ -32,98 +42,131 @@ export default {
   },
 } satisfies ExportedHandler<SiteRouterEnv>;
 
-async function openAssetCache(): Promise<Cache | undefined> {
-  try {
-    return await caches.open("openbot-site-assets-v1");
-  } catch (error) {
-    console.error(JSON.stringify({ event: "site_asset_cache_open_error", message: errorMessage(error) }));
-    return undefined;
-  }
-}
+class SiteStorageError extends Schema.TaggedError<SiteStorageError>()("SiteStorageError", {
+  message: Schema.String,
+}) {}
 
-export async function routeRequest(
-  request: Request,
-  env: SiteRouterEnv,
-  now: number,
-  runtime?: SiteRouterRuntime,
-): Promise<Response> {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    const response = errorResponse(405, "Method not allowed");
-    response.headers.set("Allow", "GET, HEAD");
-    return response;
-  }
-  if (env.SITE_SERVE_ENABLED !== "true") return errorResponse(503, "Site hosting is temporarily unavailable");
-
-  const url = new URL(request.url);
-  const hostname = url.hostname.toLowerCase();
-  if (!isHostedSiteHostname(hostname)) return errorResponse(404, "Site not found");
-  if (url.pathname === "/_openbot/report" || url.pathname === "/_openbot/report/") {
-    const report = new URL("https://openbot.run/report-site");
-    report.searchParams.set("hostname", hostname);
-    return new Response(null, {
-      status: 302,
-      headers: secureHeaders({ Location: report.toString(), "Cache-Control": "no-store" }),
-    });
-  }
-  const blockMarker = await env.SITES.get(hostedSiteBlockKey(hostname));
-  if (blockMarker) return errorResponse(451, "Site unavailable");
-
-  const routeObject = await env.SITES.get(hostedSiteRouteKey(hostname));
-  if (!routeObject) return errorResponse(404, "Site not found");
-  if (!hasBody(routeObject)) return errorResponse(500, "Site unavailable");
-  const route = await readRouteManifest(routeObject);
-  if (!route) return errorResponse(500, "Site unavailable");
-  if (route.status === "deleted" || route.status === "expired") return errorResponse(410, "Site no longer available");
-  if (route.status === "blocked") return errorResponse(451, "Site unavailable");
-  if (route.expiresAt === null || route.expiresAt <= now) return errorResponse(410, "Site no longer available");
-
-  const path = requestPath(url.pathname);
-  if (path === null) return errorResponse(404, "Page not found");
-  const file = resolveFile(route, path);
-  if (!file) return errorResponse(404, "Page not found");
-  if (file.mimeType !== "text/html" && runtime) {
-    const cached = await readCachedAsset(request, file, runtime.assetCache);
-    if (cached) return assetResponse(request, file, cached.body, cached.headers.get("ETag"));
-  }
-  const revalidation = assetRevalidationHeaders(request, file.mimeType);
-  const object = await env.SITES.get(file.key, revalidation ? { onlyIf: revalidation } : undefined);
-  if (!object || object.size !== file.size) return errorResponse(404, "Page not found");
-
-  if (!hasBody(object)) return assetResponse(request, file, null, object.httpEtag, 304);
-  if (file.mimeType === "text/html" || request.method === "HEAD" || !runtime) {
-    return assetResponse(request, file, object.body, object.httpEtag);
-  }
-
-  const cacheResponse = new Response(object.body, {
-    headers: {
-      "Cache-Control": "public, max-age=2764800, immutable",
-      "Content-Length": String(object.size),
-      ETag: object.httpEtag,
-    },
+const storageCall = <A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: (error) => new SiteStorageError({ message: errorMessage(error) }),
   });
-  runtime.context.waitUntil(
-    runtime.assetCache.put(assetCacheRequest(request, file), cacheResponse.clone()).catch((error: unknown) => {
-      console.error(JSON.stringify({ event: "site_asset_cache_write_error", message: errorMessage(error) }));
-    }),
-  );
-  return assetResponse(request, file, cacheResponse.body, object.httpEtag);
-}
 
-async function readCachedAsset(
-  request: Request,
-  file: HostedSiteRouteFile,
-  cache: Pick<Cache, "match">,
-): Promise<Response | undefined> {
-  try {
-    const cached = await cache.match(assetCacheRequest(request, file));
-    if (cached?.status !== 200) return undefined;
-    if (cached.headers.get("Content-Length") !== String(file.size) || !cached.headers.has("ETag")) return undefined;
-    return cached;
-  } catch (error) {
-    console.error(JSON.stringify({ event: "site_asset_cache_read_error", message: errorMessage(error) }));
-    return undefined;
+class SiteStorage extends Context.Service<
+  SiteStorage,
+  {
+    get(key: string, options?: R2GetOptions): Effect.Effect<R2ObjectBody | R2Object | null, SiteStorageError>;
+  }
+>()("@openbot/site-router/SiteStorage") {
+  static layer(bucket: SiteBucket) {
+    return Layer.succeed(
+      SiteStorage,
+      SiteStorage.of({
+        get: Effect.fn("SiteStorage.get")((key: string, options?: R2GetOptions) =>
+          storageCall(() => bucket.get(key, options)),
+        ),
+      }),
+    );
   }
 }
+
+const openAssetCache = Effect.fn("SiteRouter.openAssetCache")(() =>
+  storageCall(() => caches.open("openbot-site-assets-v1")).pipe(
+    Effect.catch((error) => {
+      console.error(JSON.stringify({ event: "site_asset_cache_open_error", message: error.message }));
+      return Effect.succeed(undefined);
+    }),
+  ),
+);
+
+export const routeRequest = Effect.fn("SiteRouter.routeRequest")(
+  function* (request: Request, env: SiteRouterEnv, now: number, runtime?: SiteRouterRuntime) {
+    const storage = yield* SiteStorage;
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      const response = errorResponse(405, "Method not allowed");
+      response.headers.set("Allow", "GET, HEAD");
+      return response;
+    }
+    if (env.SITE_SERVE_ENABLED !== "true") return errorResponse(503, "Site hosting is temporarily unavailable");
+
+    const url = new URL(request.url);
+    const hostname = url.hostname.toLowerCase();
+    if (!isHostedSiteHostname(hostname)) return errorResponse(404, "Site not found");
+    if (url.pathname === "/_openbot/report" || url.pathname === "/_openbot/report/") {
+      const report = new URL("https://openbot.run/report-site");
+      report.searchParams.set("hostname", hostname);
+      return new Response(null, {
+        status: 302,
+        headers: secureHeaders({ Location: report.toString(), "Cache-Control": "no-store" }),
+      });
+    }
+    const blockMarker = yield* storage.get(hostedSiteBlockKey(hostname));
+    if (blockMarker) return errorResponse(451, "Site unavailable");
+
+    const routeObject = yield* storage.get(hostedSiteRouteKey(hostname));
+    if (!routeObject) return errorResponse(404, "Site not found");
+    if (!hasBody(routeObject)) return errorResponse(500, "Site unavailable");
+    const route = yield* readRouteManifest(routeObject);
+    if (!route) return errorResponse(500, "Site unavailable");
+    if (route.status === "deleted" || route.status === "expired") return errorResponse(410, "Site no longer available");
+    if (route.status === "blocked") return errorResponse(451, "Site unavailable");
+    if (route.expiresAt === null || route.expiresAt <= now) return errorResponse(410, "Site no longer available");
+
+    const path = requestPath(url.pathname);
+    if (path === null) return errorResponse(404, "Page not found");
+    const file = resolveFile(route, path);
+    if (!file) return errorResponse(404, "Page not found");
+    if (file.mimeType !== "text/html" && runtime) {
+      const cached = yield* readCachedAsset(request, file, runtime.assetCache);
+      if (cached) return assetResponse(request, file, cached.body, cached.headers.get("ETag"));
+    }
+    const revalidation = assetRevalidationHeaders(request, file.mimeType);
+    const object = yield* storage.get(file.key, revalidation ? { onlyIf: revalidation } : undefined);
+    if (!object || object.size !== file.size) return errorResponse(404, "Page not found");
+
+    if (!hasBody(object)) return assetResponse(request, file, null, object.httpEtag, 304);
+    if (file.mimeType === "text/html" || request.method === "HEAD" || !runtime) {
+      return assetResponse(request, file, object.body, object.httpEtag);
+    }
+
+    const cacheResponse = new Response(object.body, {
+      headers: {
+        "Cache-Control": "public, max-age=2764800, immutable",
+        "Content-Length": String(object.size),
+        ETag: object.httpEtag,
+      },
+    });
+    // This independent Effect owns the cache write until waitUntil settles. The response
+    // body remains owned by the Worker; returning it does not close the stream.
+    runtime.schedule(
+      storageCall(() => runtime.assetCache.put(assetCacheRequest(request, file), cacheResponse.clone())).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            console.error(JSON.stringify({ event: "site_asset_cache_write_error", message: error.message }));
+          }),
+        ),
+      ),
+    );
+    return assetResponse(request, file, cacheResponse.body, object.httpEtag);
+  },
+  (operation, _request, env, _now, _runtime?: SiteRouterRuntime) =>
+    operation.pipe(Effect.provide(SiteStorage.layer(env.SITES))),
+);
+
+const readCachedAsset = Effect.fn("SiteRouter.readCachedAsset")(
+  (request: Request, file: HostedSiteRouteFile, cache: Pick<Cache, "match">) =>
+    storageCall(() => cache.match(assetCacheRequest(request, file))).pipe(
+      Effect.map((cached) => {
+        if (cached?.status !== 200) return undefined;
+        if (cached.headers.get("Content-Length") !== String(file.size) || !cached.headers.has("ETag")) return undefined;
+        return cached;
+      }),
+      Effect.catch((error) => {
+        console.error(JSON.stringify({ event: "site_asset_cache_read_error", message: error.message }));
+        return Effect.succeed(undefined);
+      }),
+    ),
+);
 
 function assetCacheRequest(request: Request, file: HostedSiteRouteFile): Request {
   const url = new URL(request.url);
@@ -201,14 +244,18 @@ function resolveFile(route: HostedSiteRouteManifest, path: string): HostedSiteRo
   return route.spaFallback ? (route.files["index.html"] ?? null) : null;
 }
 
-async function readRouteManifest(object: R2ObjectBody): Promise<HostedSiteRouteManifest | null> {
+const readRouteManifest = Effect.fn("SiteRouter.readRouteManifest")(function* (object: R2ObjectBody) {
   if (object.size > 64 * 1024) return null;
-  try {
-    return decodeHostedSiteRouteManifest(await object.json());
-  } catch {
-    return null;
-  }
-}
+  return yield* storageCall(() => object.json()).pipe(
+    Effect.flatMap((value) =>
+      Effect.try({
+        try: () => decodeHostedSiteRouteManifest(value),
+        catch: () => new SiteStorageError({ message: "Invalid route manifest" }),
+      }),
+    ),
+    Effect.catch(() => Effect.succeed(null)),
+  );
+});
 
 function errorResponse(status: number, message: string): Response {
   const headers = secureHeaders({

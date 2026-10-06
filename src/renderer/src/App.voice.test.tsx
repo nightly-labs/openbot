@@ -195,7 +195,12 @@ describe("OpenBot connected desktop shell", () => {
     resolveTranscription?.({ text: "Voice transcript" });
     await waitFor(() =>
       expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
-        { agentId: "chief", text: "Existing draft Voice transcript", attachmentDraftIds: [] },
+        {
+          agentId: "chief",
+          text: "Existing draft Voice transcript",
+          attachmentDraftIds: [],
+          clientMessageId: expect.any(String),
+        },
         "local",
       ),
     );
@@ -285,13 +290,14 @@ describe("OpenBot connected desktop shell", () => {
           agentId: "chief",
           text: "Message for local Chief",
           attachmentDraftIds: [],
+          clientMessageId: expect.any(String),
         },
         "local",
       ),
     );
   });
 
-  it("shows a deferred send error on the original server", async () => {
+  it("keeps a deferred failed send in the chat of the original server", async () => {
     const local = testServer("local", true);
     const remote = testServer("remote-1", false);
     let resolveTranscription: ((result: { text: string }) => void) | undefined;
@@ -326,10 +332,10 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.sendMessage).toHaveBeenCalledOnce());
     expect(screen.queryByText("Local send failed")).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
+    // The failed message waits in the local chat with Retry; the later draft stays as it was typed.
     expect(await screen.findByText("Local send failed")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent(
-      "Later local draft Message for local Chief",
-    );
+    expect(screen.getByText("Message for local Chief")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Later local draft");
   });
 
   // The Linux package carries no whisper binary, so the composer must not offer a control that

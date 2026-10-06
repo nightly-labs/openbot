@@ -1,5 +1,5 @@
+import { Effect, Result, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
-import { z } from "zod";
 
 /**
  * Installation tokens of the OpenBot GitHub App for one signed-in GitHub user.
@@ -35,13 +35,12 @@ export interface GitHubInstallationTokensOptions {
   now?: () => number;
 }
 
-export class GitHubInstallationTokensError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
+export class GitHubInstallationTokensError extends Schema.TaggedError<GitHubInstallationTokensError>()(
+  "GitHubInstallationTokensError",
+  { status: Schema.Number, code: Schema.String, message: Schema.String },
+) {
+  constructor(status: number, code: string, message: string) {
+    super({ status, code, message });
   }
 }
 
@@ -54,23 +53,29 @@ const MAX_REPOSITORY_PAGES = 10;
 /** GitHub limits `repository_ids` to 500 in one token. */
 const MAX_REPOSITORIES_PER_TOKEN = 500;
 
-const appSchema = z.object({ id: z.number() });
-const installationsSchema = z.object({
-  installations: z.array(z.object({ id: z.number(), app_id: z.number(), account: z.object({ login: z.string() }) })),
+const appSchema = Schema.Struct({ id: Schema.Number });
+const installationsSchema = Schema.Struct({
+  installations: Schema.Array(
+    Schema.Struct({ id: Schema.Number, app_id: Schema.Number, account: Schema.Struct({ login: Schema.String }) }),
+  ),
 });
-const repositoriesSchema = z.object({
-  total_count: z.number(),
-  repositories: z.array(
-    z.object({
-      id: z.number(),
-      full_name: z.string(),
-      permissions: z
-        .object({ push: z.boolean().optional(), maintain: z.boolean().optional(), admin: z.boolean().optional() })
-        .optional(),
+const repositoriesSchema = Schema.Struct({
+  total_count: Schema.Number,
+  repositories: Schema.Array(
+    Schema.Struct({
+      id: Schema.Number,
+      full_name: Schema.String,
+      permissions: Schema.optional(
+        Schema.Struct({
+          push: Schema.optional(Schema.Boolean),
+          maintain: Schema.optional(Schema.Boolean),
+          admin: Schema.optional(Schema.Boolean),
+        }),
+      ),
     }),
   ),
 });
-const accessTokenSchema = z.object({ token: z.string().min(1), expires_at: z.string() });
+const accessTokenSchema = Schema.Struct({ token: Schema.NonEmptyString, expires_at: Schema.String });
 
 type Credential = { kind: "user"; token: string } | { kind: "app" };
 const APP: Credential = { kind: "app" };
@@ -91,36 +96,39 @@ export class GitHubInstallationTokens {
     this.#now = options.now ?? Date.now;
   }
 
-  /** The tokens for each installation of this app where the user of `userToken` can push to a repository. */
-  async issue(userToken: string): Promise<GitHubInstallationToken[]> {
-    const appId = await this.#readAppId();
+  /** The tokens for installations where this user can push to a repository. */
+
+  readonly issue = Effect.fn("GitHubInstallationTokens.issue")(function* (
+    this: GitHubInstallationTokens,
+    userToken: string,
+  ): Effect.fn.Return<GitHubInstallationToken[], GitHubInstallationTokensError> {
+    const appId = yield* this.#readAppId();
     const user: Credential = { kind: "user", token: userToken };
-    const { installations } = await this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
+    const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
     const tokens: GitHubInstallationToken[] = [];
-    // `/user/installations` lists the installations of the app that issued the user token. A token
-    // from another app lists that app's installations, which this app has no token for.
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
-      try {
-        tokens.push(...(await this.#issueForInstallation(installation.id, installation.account.login, user)));
-      } catch (error) {
-        // GitHub can refuse one installation, as for an organization with SAML SSO or a suspended
-        // app. The other installations still get their tokens.
-        if (!(error instanceof GitHubInstallationTokensError && error.code === "github_failed")) throw error;
-      }
+      const result = yield* Effect.result(
+        this.#issueForInstallation(installation.id, installation.account.login, user),
+      );
+      // A suspended installation or SAML SSO refusal must not block the others.
+      if (Result.isFailure(result)) {
+        if (result.failure.code !== "github_failed") return yield* result.failure;
+      } else tokens.push(...result.success);
     }
     return tokens;
-  }
+  }).bind(this);
 
-  async #issueForInstallation(
+  readonly #issueForInstallation = Effect.fn("GitHubInstallationTokens.issueForInstallation")(function* (
+    this: GitHubInstallationTokens,
     installationId: number,
     account: string,
     user: Credential,
-  ): Promise<GitHubInstallationToken[]> {
-    const writable = await this.#writableRepositories(installationId, user);
+  ): Effect.fn.Return<GitHubInstallationToken[], GitHubInstallationTokensError> {
+    const writable = yield* this.#writableRepositories(installationId, user);
     const tokens: GitHubInstallationToken[] = [];
     for (let start = 0; start < writable.length; start += MAX_REPOSITORIES_PER_TOKEN) {
       const part = writable.slice(start, start + MAX_REPOSITORIES_PER_TOKEN);
-      const minted = await this.#post(
+      const minted = yield* this.#post(
         `/app/installations/${installationId}/access_tokens`,
         APP,
         { repository_ids: part.map((repository) => repository.id) },
@@ -135,12 +143,16 @@ export class GitHubInstallationTokens {
       });
     }
     return tokens;
-  }
+  });
 
-  async #writableRepositories(installationId: number, user: Credential): Promise<WritableRepository[]> {
+  readonly #writableRepositories = Effect.fn("GitHubInstallationTokens.writableRepositories")(function* (
+    this: GitHubInstallationTokens,
+    installationId: number,
+    user: Credential,
+  ): Effect.fn.Return<WritableRepository[], GitHubInstallationTokensError> {
     const writable: WritableRepository[] = [];
     for (let page = 1; page <= MAX_REPOSITORY_PAGES; page += 1) {
-      const answer = await this.#get(
+      const answer = yield* this.#get(
         `/user/installations/${installationId}/repositories?per_page=${PAGE_SIZE}&page=${page}`,
         user,
         repositoriesSchema,
@@ -154,38 +166,61 @@ export class GitHubInstallationTokens {
       if (answer.repositories.length < PAGE_SIZE || page * PAGE_SIZE >= answer.total_count) break;
     }
     return writable;
-  }
+  });
 
-  async #readAppId(): Promise<number> {
-    this.#appId ??= (await this.#get("/app", APP, appSchema)).id;
+  readonly #readAppId = Effect.fn("GitHubInstallationTokens.readAppId")(function* (
+    this: GitHubInstallationTokens,
+  ): Effect.fn.Return<number, GitHubInstallationTokensError> {
+    this.#appId ??= (yield* this.#get("/app", APP, appSchema)).id;
     return this.#appId;
-  }
+  });
 
-  /** GitHub accepts an app JWT for at most 10 minutes. `iat` is 60 s early for a clock that is behind. */
-  async #appJwt(): Promise<string> {
-    try {
-      this.#key ??= await importPKCS8(this.#options.privateKey, "RS256");
-    } catch {
-      throw new GitHubInstallationTokensError(
-        503,
-        "github_app_unavailable",
-        "The OpenBot GitHub App key is not a PKCS #8 key.",
-      );
-    }
+  /** The JWT expires within ten minutes and allows sixty seconds of clock skew. */
+  readonly #appJwt = Effect.fn("GitHubInstallationTokens.appJwt")(function* (
+    this: GitHubInstallationTokens,
+  ): Effect.fn.Return<string, GitHubInstallationTokensError> {
+    this.#key ??= yield* Effect.tryPromise({
+      try: () => importPKCS8(this.#options.privateKey, "RS256"),
+      catch: () =>
+        new GitHubInstallationTokensError(
+          503,
+          "github_app_unavailable",
+          "The OpenBot GitHub App key is not a PKCS #8 key.",
+        ),
+    });
+    const key = this.#key;
     const seconds = Math.floor(this.#now() / 1000);
-    return new SignJWT({})
-      .setProtectedHeader({ alg: "RS256", typ: "JWT" })
-      .setIssuer(this.#options.clientId)
-      .setIssuedAt(seconds - 60)
-      .setExpirationTime(seconds + 9 * 60)
-      .sign(this.#key);
-  }
+    return yield* Effect.tryPromise({
+      try: () =>
+        new SignJWT({})
+          .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+          .setIssuer(this.#options.clientId)
+          .setIssuedAt(seconds - 60)
+          .setExpirationTime(seconds + 9 * 60)
+          .sign(key),
+      catch: () =>
+        new GitHubInstallationTokensError(
+          503,
+          "github_app_unavailable",
+          "The OpenBot GitHub App could not sign a request.",
+        ),
+    });
+  });
 
-  #get<T>(path: string, credential: Credential, schema: z.ZodType<T>): Promise<T> {
+  #get<T>(
+    path: string,
+    credential: Credential,
+    schema: Schema.Decoder<T>,
+  ): Effect.Effect<T, GitHubInstallationTokensError> {
     return this.#request(path, credential, { method: "GET" }, schema);
   }
 
-  #post<T>(path: string, credential: Credential, body: unknown, schema: z.ZodType<T>): Promise<T> {
+  #post<T>(
+    path: string,
+    credential: Credential,
+    body: unknown,
+    schema: Schema.Decoder<T>,
+  ): Effect.Effect<T, GitHubInstallationTokensError> {
     return this.#request(
       path,
       credential,
@@ -194,28 +229,33 @@ export class GitHubInstallationTokens {
     );
   }
 
-  /** An error names the path and the status only: a GitHub answer can echo a request header. */
-  async #request<T>(path: string, credential: Credential, init: RequestInit, schema: z.ZodType<T>): Promise<T> {
+  /** Do not retain response bodies or causes that can contain a credential. */
+  readonly #request = Effect.fn("GitHubInstallationTokens.request")(function* <T>(
+    this: GitHubInstallationTokens,
+    path: string,
+    credential: Credential,
+    init: RequestInit,
+    schema: Schema.Decoder<T>,
+  ): Effect.fn.Return<T, GitHubInstallationTokensError> {
     const route = path.split("?")[0];
-    const authorization = credential.kind === "user" ? `token ${credential.token}` : `Bearer ${await this.#appJwt()}`;
-    let response: Response;
-    try {
-      response = await this.#options.fetch(`${GITHUB_API}${path}`, {
-        ...init,
-        headers: {
-          ...init.headers,
-          Accept: "application/vnd.github+json",
-          Authorization: authorization,
-          "User-Agent": "OpenBot",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch {
-      throw new GitHubInstallationTokensError(502, "github_unreachable", "GitHub did not answer.");
-    }
+    const authorization = credential.kind === "user" ? `token ${credential.token}` : `Bearer ${yield* this.#appJwt()}`;
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        this.#options.fetch(`${GITHUB_API}${path}`, {
+          ...init,
+          headers: {
+            ...init.headers,
+            Accept: "application/vnd.github+json",
+            Authorization: authorization,
+            "User-Agent": "OpenBot",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        }),
+      catch: () => new GitHubInstallationTokensError(502, "github_unreachable", "GitHub did not answer."),
+    });
     if (response.status === 401) {
-      throw credential.kind === "user"
+      return yield* credential.kind === "user"
         ? new GitHubInstallationTokensError(401, "github_unauthorized", "GitHub refused the GitHub sign-in.")
         : new GitHubInstallationTokensError(
             503,
@@ -223,17 +263,15 @@ export class GitHubInstallationTokens {
             "GitHub refused the OpenBot GitHub App key.",
           );
     }
-    if (!response.ok) {
-      throw new GitHubInstallationTokensError(
+    if (!response.ok)
+      return yield* new GitHubInstallationTokensError(
         502,
         "github_failed",
         `GitHub refused ${route} (HTTP ${response.status}).`,
       );
-    }
-    const parsed = schema.safeParse(await response.json().catch(() => null));
-    if (!parsed.success) {
-      throw new GitHubInstallationTokensError(502, "github_failed", `GitHub sent an unexpected answer for ${route}.`);
-    }
-    return parsed.data;
-  }
+    const invalidResponse = () =>
+      new GitHubInstallationTokensError(502, "github_failed", `GitHub sent an unexpected answer for ${route}.`);
+    const payload = yield* Effect.tryPromise({ try: () => response.json(), catch: invalidResponse });
+    return yield* Schema.decodeUnknownEffect(schema)(payload).pipe(Effect.mapError(invalidResponse));
+  });
 }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "./file-preview";
 
 const temporaryDirectories: string[] = [];
@@ -68,7 +69,7 @@ describe("file previews", () => {
     const path = join(directory, "archive.zip");
     await writeFile(path, new Uint8Array([1, 2, 3]));
 
-    await expect(localFilePreview(path, "archive.zip", 3)).resolves.toEqual({
+    await expect(runCauseEffect(localFilePreview(path, "archive.zip", 3))).resolves.toEqual({
       name: "archive.zip",
       size: 3,
       mimeType: "application/octet-stream",
@@ -79,7 +80,7 @@ describe("file previews", () => {
 
   it("rejects oversized previews before reading local content", async () => {
     await expect(
-      localFilePreview("/does/not/need/to/exist", "large.txt", ATTACHMENT_LIMITS.fileBytes + 1),
+      runCauseEffect(localFilePreview("/does/not/need/to/exist", "large.txt", ATTACHMENT_LIMITS.fileBytes + 1)),
     ).rejects.toThrow("100 MB");
   });
 });

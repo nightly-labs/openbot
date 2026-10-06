@@ -32,11 +32,6 @@ export const messages = {
   "webClient.notice.join": "招待で参加",
   "webClient.notice.reconnect": "再接続",
   "webClient.notice.refreshHosts": "ホストを更新",
-  "webClient.uncertain.title": "メッセージが届いたか確認してください",
-  "webClient.uncertain.description":
-    "配信が確認される前に接続が切れました。もう一度送信する前に、更新して会話を確認してください。メッセージは自動では再送信されません。",
-  "webClient.uncertain.refresh": "会話を更新",
-  "webClient.uncertain.checked": "会話を確認しました",
   "webClient.agent.modelsFailed": "ホストのモデルを読み込めませんでした。",
   "webClient.agent.refreshFailed":
     "エージェントは作成されましたが、ワークスペースを更新できませんでした。再試行する前に再読み込みしてください。",

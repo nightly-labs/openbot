@@ -12,8 +12,8 @@ import {
   type DetectedAcpAgent,
   isNewCustomAgentId,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { resolveAgentCommand } from "./acp-agent-command";
-import { withTimeout } from "./with-timeout";
 
 const AGENT_SCAN_TIMEOUT_MS = 10_000;
 const AGENT_SCAN_CONCURRENCY = 4;
@@ -31,7 +31,7 @@ export interface ScanAcpAgentsOptions {
 }
 
 /** One row for each preset that is installed, in preset order. A scan past its time finds nothing. */
-export async function scanAcpAgents(options: ScanAcpAgentsOptions): Promise<DetectedAcpAgent[]> {
+export const scanAcpAgents = Effect.fn("AcpAgents.scan")(function* (options: ScanAcpAgentsOptions) {
   const presets = options.presets ?? ACP_AGENT_PRESETS;
   const platform = options.platform ?? process.platform;
   const home = options.home ?? homedir();
@@ -44,20 +44,26 @@ export async function scanAcpAgents(options: ScanAcpAgentsOptions): Promise<Dete
   // On Windows an npm folder holds an extensionless shell script next to the `.cmd` shim, and only
   // the shim or an `.exe` can be started.
   const names = (command: string) => (platform === "win32" ? [`${command}.exe`, `${command}.cmd`] : [command]);
-  const find = async (preset: AcpAgentPreset): Promise<string | null> => {
+  const lookup = Effect.fn("AcpAgents.lookup")((name: string, searchPath?: readonly string[]) =>
+    resolve(name, { platform, home, ...(searchPath ? { searchPath } : {}) }).pipe(
+      Effect.catch(() => Effect.succeed(null)),
+    ),
+  );
+  const find = Effect.fn("AcpAgents.find")(function* (preset: AcpAgentPreset) {
     if (folders.length > 0) {
       for (const name of names(preset.command)) {
-        const found = await resolve(name, { platform, home, searchPath: folders }).catch(() => null);
+        const found = yield* lookup(name, folders);
         if (found) return found;
       }
     }
-    return resolve(preset.command, { platform, home }).catch(() => null);
-  };
-  const found = await withTimeout(
-    inPool(presets, AGENT_SCAN_CONCURRENCY, find),
-    options.timeoutMs ?? AGENT_SCAN_TIMEOUT_MS,
-    "",
-  ).catch(() => presets.map(() => null));
+    return yield* lookup(preset.command);
+  });
+  const found = yield* Effect.forEach(presets, find, { concurrency: AGENT_SCAN_CONCURRENCY }).pipe(
+    Effect.timeoutOrElse({
+      duration: options.timeoutMs ?? AGENT_SCAN_TIMEOUT_MS,
+      orElse: () => Effect.succeed(presets.map(() => null)),
+    }),
+  );
   const taken = new Set(options.takenIds);
   const seen = new Set<string>();
   const rows: DetectedAcpAgent[] = [];
@@ -71,7 +77,7 @@ export async function scanAcpAgents(options: ScanAcpAgentsOptions): Promise<Dete
     rows.push({ id, name: preset.name, command, args: [...preset.args] });
   });
   return rows;
-}
+});
 
 function freeId(base: string, taken: ReadonlySet<string>): string | null {
   for (let suffix = 1; suffix <= 99; suffix += 1) {
@@ -79,19 +85,4 @@ function freeId(base: string, taken: ReadonlySet<string>): string | null {
     if (!taken.has(id) && isNewCustomAgentId(id)) return id;
   }
   return null;
-}
-
-/** `work` for each item, at most `limit` at a time, with the results in item order. */
-async function inPool<T, R>(items: readonly T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    for (let index = next; index < items.length; index = next) {
-      next += 1;
-      const item = items[index];
-      if (item !== undefined) results[index] = await work(item);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }

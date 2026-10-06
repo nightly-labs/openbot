@@ -48,6 +48,7 @@ import {
   readStateForMessages,
   retainedAutoReadState,
 } from "./conversation-read-state";
+import type { SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
 
 const LATEST_PAGE_SIZE = 50;
@@ -717,20 +718,24 @@ const Conversation = createSimpleContext({
       attachmentDraftIds: string[],
       replyToMessageId: string | null,
       target?: { agentId: string; serverId: string },
-    ): Promise<boolean> {
+      clientMessageId?: string,
+    ): Promise<SendMessageResult> {
       const agentId = target?.agentId ?? activeAgent()?.id;
       const serverId = target?.serverId ?? activeServerId();
-      if (!agentId || (!body.trim() && attachmentDraftIds.length === 0)) return false;
-      return sendMessageToAgent(agentId, body, attachmentDraftIds, replyToMessageId, serverId);
+      if (!agentId || (!body.trim() && attachmentDraftIds.length === 0))
+        return { error: currentText().t("chat.errorStatus.send") };
+      return sendMessageToAgent(agentId, body, attachmentDraftIds, replyToMessageId, serverId, clientMessageId);
     }
 
+    /** The failure goes back to the pending message, which shows it with Retry. */
     async function sendMessageToAgent(
       agentId: string,
       body: string,
       attachmentDraftIds: string[],
       replyToMessageId: string | null = null,
       serverId = activeServerId(),
-    ): Promise<boolean> {
+      clientMessageId?: string,
+    ): Promise<SendMessageResult> {
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
       try {
@@ -739,6 +744,7 @@ const Conversation = createSimpleContext({
           text: body.trim(),
           attachmentDraftIds,
           ...(replyToMessageId ? { replyToMessageId } : {}),
+          ...(clientMessageId ? { clientMessageId } : {}),
         };
         const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
@@ -751,12 +757,12 @@ const Conversation = createSimpleContext({
           result: "succeeded",
           delivery_count: receipt.deliveries.length,
         });
-        try {
-          await markAgentMessagesRead(agentId, receipt.deliveries[0]?.id ?? receipt.messageId, serverId);
-        } catch (error) {
+        const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
+        // The pending message does not wait for read state: it is the user's own message.
+        markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {
           appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
-        }
-        return true;
+        });
+        return { messageId };
       } catch (error) {
         analytics.track("message_send", {
           ...(properties ?? {}),
@@ -766,8 +772,8 @@ const Conversation = createSimpleContext({
           result: "failed",
           failure_code: "send_failed",
         });
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.send"), serverId);
-        return false;
+        const { t, errorMessage } = currentText();
+        return { error: errorMessage(error, t("chat.errorStatus.send")) };
       }
     }
 

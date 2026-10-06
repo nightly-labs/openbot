@@ -13,7 +13,8 @@ React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and B
 The repository uses Bun’s hoisted linker so native Expo modules resolve to one installation.
 The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after dependency installation.
 Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
-EAS and local installs use the same setup.
+EAS and local installs use the same setup. `OPENBOT_SKIP_SKIA=1` skips the step for desktop and
+API work. If you installed with it, run `bun run --cwd apps/mobile setup:skia` before a native build.
 
 EAS profiles pin Bun 1.4.0 to match the root `packageManager`. Use the same Bun version
 locally: dependency paths and package patch metadata affect the runtime fingerprint.

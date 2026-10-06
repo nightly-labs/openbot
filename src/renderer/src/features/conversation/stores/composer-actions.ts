@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
+import { type DraftAttachment, LOCAL_SERVER_ID, type QueueDelivery } from "@openbot/contracts/ipc";
+import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
@@ -8,6 +9,7 @@ import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueu
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
+import type { PendingSendStore } from "./pending-send-store";
 
 // Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
@@ -34,8 +36,6 @@ export interface ComposerActionsDeps {
   setEditingPendingSave: (save: StoredQueueEdit["pendingSave"] | null) => void;
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
-  selectionSending: () => boolean;
-  setSelectionSending: (sending: boolean) => void;
   voicePhase: () => string;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
@@ -67,6 +67,7 @@ export interface ComposerActionsDeps {
   clearSubmittedDraft: (target: ConversationTarget, submitted: ComposerDraft) => void;
   setConversationError: (target: ConversationTarget, message: string) => void;
   setStickToLatest: (value: boolean) => void;
+  pendingSends: PendingSendStore;
   imageAttachmentPicker: () => HTMLInputElement | undefined;
   contextAttachmentPicker: () => HTMLInputElement | undefined;
 }
@@ -496,35 +497,76 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     targetOverride?: ConversationTarget,
     submittedSnapshot?: ComposerDraft,
   ): Promise<boolean> {
-    if (deps.selectionSending() || deps.attachmentBusy()) return false;
+    if (deps.attachmentBusy()) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
       return saveQueuedMessageEdit();
     }
     const agentId = targetOverride?.agentId ?? deps.props.agent?.id;
     const target = targetOverride ?? (agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined);
-    const draft = draftOverride ?? deps.currentDraft();
+    const draft = copyComposerDraft(draftOverride ?? deps.currentDraft());
     const text = expandComposerMentions(draft.text);
-    const attachments = draft.attachments;
-    if (!agentId || !target || deps.submitting() || (!text.trim() && attachments.length === 0)) return false;
+    if (!agentId || !target || deps.submitting() || (!text.trim() && draft.attachments.length === 0)) return false;
     stopTeamTyping();
-    deps.setStickToLatest(true);
-    deps.setSubmitting(true);
     deps.setComposerError(null, target);
-    const sent = await deps.props.onSendMessage(
-      text,
-      attachments.map((item) => item.id),
-      draft.replyToMessageId,
-      target,
-    );
-    deps.setSubmitting(false);
-    if (sent) {
-      deps.clearConversationError(target);
-      if (submittedSnapshot) deps.clearSubmittedDraft(target, submittedSnapshot);
-      else deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: EMPTY_DRAFT }));
-    } else {
-      playActionSound("error");
-    }
-    return sent;
+    deps.clearConversationError(target);
+    queueSend(target, draft, text);
+    deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
+    return true;
+  }
+
+  /**
+   * Shows a message at once and sends it after the earlier sends of its chat, so the host stores the
+   * chat's messages in the order the user sent them. `draft` is what Edit puts back in the composer.
+   */
+  function queueSend(target: ConversationTarget, draft: ComposerDraft, text: string): void {
+    deps.setStickToLatest(true);
+    // Read the send function now: the send outlives this view when the user switches server.
+    const send = deps.props.onSendMessage;
+    const server = deps.props.server;
+    // A deferred voice send can name a server that is no longer on screen. Its capabilities are not
+    // known here, so only the local host, which always drops a repeat, is safe to retry then.
+    const retrySafe =
+      target.serverId === LOCAL_SERVER_ID ||
+      (server?.id === target.serverId &&
+        (server.kind !== "remote" ||
+          Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY))));
+    deps.pendingSends.add(target, { draft, text, retrySafe }, async (pending) => {
+      const result = await send(
+        pending.text,
+        pending.draft.attachments.map((item) => item.id),
+        pending.draft.replyToMessageId,
+        target,
+        pending.clientMessageId,
+      );
+      if ("error" in result) playActionSound("error");
+      return result;
+    });
+  }
+
+  function retryPendingSend(clientMessageId: string): void {
+    const target = deps.currentTarget();
+    if (target) deps.pendingSends.retry(target, clientMessageId);
+  }
+
+  /** Puts a failed message back in the composer. The composer must be empty, so nothing is lost. */
+  function editPendingSend(clientMessageId: string): void {
+    const target = deps.currentTarget();
+    if (!target || deps.currentEditingDeliveryId()) return;
+    const current = deps.currentDraft();
+    if (current.text.trim() || current.attachments.length > 0) return;
+    const removed = deps.pendingSends.remove(target, clientMessageId);
+    if (!removed) return;
+    deps.setDrafts((drafts) => ({ ...drafts, [composerDraftKey(target)]: removed.draft }));
+    deps.setComposerFocusRequest((value) => value + 1);
+  }
+
+  function dismissPendingSend(clientMessageId: string): void {
+    const target = deps.currentTarget();
+    if (!target) return;
+    const removed = deps.pendingSends.remove(target, clientMessageId);
+    // A send whose answer was lost may have stored the files already; the host ignores those ids.
+    for (const attachment of removed?.draft.attachments ?? [])
+      void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, target.serverId);
   }
 
   function submitComposer(): void {
@@ -567,16 +609,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
+  /** An instruction about selected text is a reply to that message. A failure shows on its row. */
   async function sendSelectionInstruction(messageId: string, body: string): Promise<boolean> {
-    if (!deps.props.agent || deps.submitting() || deps.selectionSending() || !deps.agentReady()) {
-      return false;
-    }
-    deps.setSelectionSending(true);
-    try {
-      return await deps.props.onSendMessage(body, [], messageId);
-    } finally {
-      deps.setSelectionSending(false);
-    }
+    const target = deps.currentTarget();
+    if (!target || deps.submitting() || !deps.agentReady()) return false;
+    queueSend(target, { text: body, attachments: [], replyToMessageId: messageId }, body);
+    return true;
   }
 
   return {
@@ -592,5 +630,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     submitMessage,
     submitComposer,
     sendSelectionInstruction,
+    retryPendingSend,
+    editPendingSend,
+    dismissPendingSend,
   };
 }
