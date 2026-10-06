@@ -269,8 +269,9 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 }
 
 /**
- * The providers that stay on the computer that runs OpenBot. The Team API does not carry them, so a
- * joined server's settings do not list them.
+ * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
+ * 5, Cursor and Cline from protocol 6. A joined server's settings list one only when the host's status
+ * names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",

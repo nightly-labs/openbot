@@ -25,6 +25,7 @@ import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limi
 import type { CreateAgentInput, DuplicateAgentResult } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
+import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
@@ -156,11 +157,12 @@ export async function routeAgents(
     return json(200, await agents.getUsage());
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
-    // Only ids the shipped peers accept: their model list decoders fail closed on the whole array, and
-    // `isAgentModel` now also accepts `=` and `,`, which no released protocol knows.
+    // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
+    // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
+    const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
     return json(
       200,
-      (await agents.listModels()).filter((model) => V5_AGENT_MODEL.test(model.id)),
+      (await agents.listModels()).filter((model) => modelId.test(model.id)),
     );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all) {

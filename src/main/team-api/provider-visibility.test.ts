@@ -50,28 +50,26 @@ describe("provider visibility", () => {
   it.each([
     { provider: "cursor", version: "2026.09.28-64d2043" },
     { provider: "cline", version: "3.0.68" },
-  ])(
-    "keeps $provider on this computer for every protocol, and keeps an endpoint with its id",
-    ({ provider, version }) => {
-      const payload = {
-        agents: [{ id: `agent-${provider}`, provider, model: "auto" }],
-        providers: [{ id: provider, state: "ready" }],
-        customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
-        cliVersion: version,
-        auth: { kind: provider, email: null },
-        message: "Sign in.",
-      };
-      const hidden = {
-        agents: [],
-        providers: [],
-        customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
-        cliVersion: null,
-        auth: { kind: "unknown" },
-        message: null,
-      };
-      expect(legacyProviderView(payload, new Set())).toEqual(hidden);
-      expect(hiddenAgentView(payload, new Set(), 4)).toEqual(hidden);
-      expect(hiddenAgentView(payload, new Set(), 5)).toEqual(hidden);
-    },
-  );
+  ])("shows $provider to a protocol 6 peer only, and keeps an endpoint with its id", ({ provider, version }) => {
+    const payload = {
+      agents: [{ id: `agent-${provider}`, provider, model: "auto" }],
+      providers: [{ id: provider, state: "ready" }],
+      customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
+      cliVersion: version,
+      auth: { kind: provider, email: null },
+      message: "Sign in.",
+    };
+    const hidden = {
+      agents: [],
+      providers: [],
+      customProviders: [{ id: provider, name: "An endpoint saved before the provider existed" }],
+      cliVersion: null,
+      auth: { kind: "unknown" },
+      message: null,
+    };
+    expect(legacyProviderView(payload, new Set())).toEqual(hidden);
+    expect(hiddenAgentView(payload, new Set(), 4)).toEqual(hidden);
+    expect(hiddenAgentView(payload, new Set(), 5)).toEqual(hidden);
+    expect(hiddenAgentView(payload, new Set(), 6)).toEqual(payload);
+  });
 });

@@ -70,8 +70,10 @@ import {
   encodeTeamProtocolV1CurrentEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
-import { TEAM_LOCAL_PROVIDERS_CAPABILITY, TEAM_PROTOCOL_V5 } from "@openbot/contracts/team-protocol/v5";
+import { TEAM_LOCAL_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v5";
 import { encodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
+import { TEAM_CURSOR_CLINE_CAPABILITY, TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
+import { encodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
@@ -759,7 +761,13 @@ export class TeamApiServer {
     const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
     if (protocol !== 1)
-      return (protocol === 5 ? encodeTeamProtocolV5BaseCurrentEvent : encodeTeamProtocolV4BaseCurrentEvent)(visible, {
+      return (
+        protocol === 6
+          ? encodeTeamProtocolV6BaseCurrentEvent
+          : protocol === 5
+            ? encodeTeamProtocolV5BaseCurrentEvent
+            : encodeTeamProtocolV4BaseCurrentEvent
+      )(visible, {
         ...options,
         preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
       });
@@ -822,7 +830,7 @@ export class TeamApiServer {
           !connection.capabilities.has("routine-run-event-markers") ||
           !connection.capabilities.has("hosted-site-event-markers"))
       ) {
-        const key = `${connection.capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -1176,7 +1184,7 @@ export class TeamApiServer {
       status < 400 && route.hiddenAgentIds
         ? route.protocol < 4
           ? legacyProviderView(value, route.hiddenAgentIds)
-          : hiddenAgentView(value, route.hiddenAgentIds, route.protocol < 5 ? 4 : 5)
+          : hiddenAgentView(value, route.hiddenAgentIds, route.protocol < 5 ? 4 : route.protocol < 6 ? 5 : 6)
         : value;
     const sideRoute = teamSideRouteCodec(route.path);
     const body = sideRoute
@@ -1232,7 +1240,7 @@ export class TeamApiServer {
   #protocolSupport(): TeamProtocolSupportV1 {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
-      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V5 },
+      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V6 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
         if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
           return this.#options.channels !== undefined;
@@ -1293,7 +1301,7 @@ export class TeamApiServer {
         body: { error: "Invalid Team API protocol headers.", code: "protocol_error", host },
       };
     }
-    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V5) return null;
+    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V6) return null;
     const clientIsOlder = protocol < TEAM_PROTOCOL_V1;
     return {
       status: 426,
@@ -1371,7 +1379,8 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
 }
 
 /** The protocol that an event connection's capabilities describe, as `#encodeProviderEvent` encodes it. */
-function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 {
+function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 {
+  if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
   return capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY) ? 5 : capabilities.has("opencode") ? 4 : 1;
 }
 

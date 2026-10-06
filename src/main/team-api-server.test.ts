@@ -92,7 +92,7 @@ describe("TeamApiServer compatibility", () => {
     expect(compatibility.status).toBe(200);
     await expect(compatibility.json()).resolves.toMatchObject({
       appVersion: "0.4.0",
-      protocol: { minimum: 1, maximum: 5 },
+      protocol: { minimum: 1, maximum: 6 },
       capabilities: expect.arrayContaining(["browser-control", "remote-desktop", TEAM_SEMANTIC_TAGS_CAPABILITY]),
     });
 
@@ -101,7 +101,7 @@ describe("TeamApiServer compatibility", () => {
     await expect(missing.json()).resolves.toMatchObject({ code: "client_update_required" });
 
     const newerClient = await fetch(`${base}/v1/identity`, {
-      headers: { [TEAM_PROTOCOL_VERSION_HEADER]: "6", [TEAM_APP_VERSION_HEADER]: "0.5.0" },
+      headers: { [TEAM_PROTOCOL_VERSION_HEADER]: "7", [TEAM_APP_VERSION_HEADER]: "0.5.0" },
     });
     expect(newerClient.status).toBe(426);
     await expect(newerClient.json()).resolves.toMatchObject({ code: "host_update_required" });

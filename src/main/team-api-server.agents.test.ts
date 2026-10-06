@@ -398,6 +398,31 @@ describe("TeamApiServer agents", () => {
     }
     expect(newAgentProvider).toHaveBeenCalledWith(expect.objectContaining({ model: "composer-2" }));
     expect(createAgent).not.toHaveBeenCalled();
+
+    // Protocol 6 knows Cursor, so the same request starts the agent.
+    await fetch(`${base}/v1/agents`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        [TEAM_PROTOCOL_VERSION_HEADER]: "6",
+        [TEAM_CAPABILITIES_HEADER]: "opencode,local-providers,local-providers-v2,agent-create-model",
+      },
+      body: JSON.stringify({
+        name: "Explorer",
+        description: "",
+        initialMessage: "Hello.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "cursor",
+        model: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+      }),
+    });
+    expect(createAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "cursor", model: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]" }),
+      undefined,
+      undefined,
+      expect.objectContaining({ id: expect.any(String) }),
+    );
   });
 
   it("keeps agent access on the computer that runs the agent", async () => {
@@ -495,6 +520,16 @@ describe("TeamApiServer agents", () => {
     const agents = await fetch(`${base}/v1/agents`, { headers });
     expect(agents.status).toBe(200);
     expect((await agents.json()).map((agent: AgentSummary) => agent.id)).toEqual(["plain"]);
+
+    // Protocol 6 knows `=` and `,`.
+    const v6 = { ...headers, [TEAM_PROTOCOL_VERSION_HEADER]: "6" };
+    const v6Models = await fetch(`${base}/v1/agents/models`, { headers: v6 });
+    expect((await v6Models.json()).map((model: { id: string }) => model.id)).toEqual([
+      "claude-opus-5[effort=high,fast=false]",
+      "claude-fable-5-1[1m]",
+    ]);
+    const v6Agents = await fetch(`${base}/v1/agents`, { headers: v6 });
+    expect((await v6Agents.json()).map((agent: AgentSummary) => agent.id)).toEqual(["plain", "settings"]);
   });
 
   it("duplicates an agent through protocol v3 and places it after the source", async () => {

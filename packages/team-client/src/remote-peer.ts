@@ -12,10 +12,10 @@ import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV5CurrentEvent,
-  decodeTeamProtocolV5WebRtcHttpResponse,
+  decodeTeamProtocolV6CurrentEvent,
+  decodeTeamProtocolV6WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV5WebRtcHttpRequest,
+  encodeTeamProtocolV6WebRtcHttpRequest,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
@@ -780,7 +780,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           status: frame.result.status,
           body: sideRoute
             ? sideRoute.response(pending.path, frame.result.status, frame.result.body)
-            : decodeTeamProtocolV5WebRtcHttpResponse(
+            : decodeTeamProtocolV6WebRtcHttpResponse(
                 pending.method,
                 pending.path,
                 frame.result.status,
@@ -814,7 +814,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error(sourceText("error.remote.eventStreamGap"));
     const channel = optionalTeamEvent(frame.payload);
-    const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV5CurrentEvent(frame);
+    const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV6CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error(sourceText("error.remote.malformedEvent"));
     state.lastEventSequence = frame.sequence;
     if (decoded.status === "known") await actions.current.onTeamEvent(state.hostId, decoded.event);
@@ -903,7 +903,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         ? sideRoute.request(path, body)
         : // A caller names a provider and model on agent creation only when the host advertises
           // `agent-create-model`, so the pair is kept whenever it is present.
-          encodeTeamProtocolV5WebRtcHttpRequest(method, path, body, {
+          encodeTeamProtocolV6WebRtcHttpRequest(method, path, body, {
             preserveSemanticTags: true,
             agentCreateModel: true,
           });

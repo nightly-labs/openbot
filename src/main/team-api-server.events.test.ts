@@ -83,6 +83,51 @@ describe("TeamApiServer events", () => {
     expect(snapshot.agents).toEqual([source, gemini]);
   });
 
+  it("sends a Cursor agent only to a protocol 6 event client", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
+    const cursor: AgentSummary = {
+      ...source,
+      id: "agent-cursor",
+      provider: "cursor",
+      model: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+    };
+    const events = new EventEmitter();
+    const { store, start } = await createTeamApiFixture("cursor-events", { configure: true });
+    const snapshot = { ...createAgents().getRuntimeSnapshot(), agents: [source, cursor] };
+    const { port } = await start({
+      agents: createAgents({ listAgents: () => [source, cursor], getRuntimeSnapshot: () => snapshot }, events),
+    });
+    const login = await store.login("owner", "correct horse battery");
+    for (const capabilities of [
+      ["agent-runtime-snapshots", "opencode", "local-providers"],
+      ["agent-runtime-snapshots", "opencode", "local-providers", "local-providers-v2"],
+    ]) {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+        "openbot-team-v1",
+        `openbot-token.${login.sessionToken}`,
+      ]);
+      const presence = nextJsonEvent(socket);
+      await new Promise<void>((resolve) => socket.addEventListener("open", () => resolve(), { once: true }));
+      await presence;
+      const initial = nextJsonEvent(socket);
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: true, capabilities }));
+      const expected = capabilities.includes("local-providers-v2") ? [source, cursor] : [source];
+      await expect(initial).resolves.toMatchObject({
+        type: "runtime-snapshot",
+        snapshot: { bots: expected.map((agent) => expect.objectContaining({ id: agent.id })) },
+      });
+      const changed = new Promise<unknown>((resolve) =>
+        socket.addEventListener("message", (event) => resolve(JSON.parse(String(event.data))), { once: true }),
+      );
+      events.emit("event", { type: "agents-changed", agents: [source, cursor] });
+      await expect(changed).resolves.toMatchObject({ type: "bots-changed", bots: expected });
+      const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
+      socket.close();
+      await closed;
+    }
+  });
+
   it("sends a skills change only to clients that negotiated skills-events-v1", async () => {
     const events = new EventEmitter();
     const { store, start } = await createTeamApiFixture("skills-events", { configure: true });

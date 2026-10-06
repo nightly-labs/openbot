@@ -1,6 +1,6 @@
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
-import { decodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
+import { decodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
 // This is the only part of the remote-server family that owns a clock. Everything it does -- the
@@ -466,7 +466,7 @@ export class RemoteEventStream {
             const optional = optionalTeamEvent(value);
             const decoded = optional
               ? { kind: "known" as const, event: optional }
-              : decodeTeamProtocolV5BaseCurrentEvent(value);
+              : decodeTeamProtocolV6BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;

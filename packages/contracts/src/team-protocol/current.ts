@@ -21,7 +21,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
-import { TEAM_PROTOCOL_V5_CAPABILITIES } from "./v5";
+import { TEAM_PROTOCOL_V6_CAPABILITIES } from "./v6";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -70,7 +70,7 @@ export {
 
 export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SECRET_CAPABILITY,
-  ...TEAM_PROTOCOL_V5_CAPABILITIES,
+  ...TEAM_PROTOCOL_V6_CAPABILITIES,
   "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
