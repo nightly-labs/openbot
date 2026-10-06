@@ -2630,7 +2630,9 @@ describe.sequential("AgentService: providers", () => {
     await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "notes:2"))).resolves.toMatchObject({
       path: await realpath(colonName),
     });
-    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "missing.ts:4"))).rejects.toThrow(/ENOENT/u);
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "missing.ts:4"))).rejects.toThrow(
+      /Nothing exists at missing\.ts:4 /u,
+    );
 
     const home = process.env.HOME;
     process.env.HOME = root;

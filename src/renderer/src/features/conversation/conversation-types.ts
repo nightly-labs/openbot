@@ -227,7 +227,7 @@ export interface ComposerDraft {
 type SidebarFilePreviewSource =
   | { kind: "shared"; path: string }
   /** `folder` is the folder view the file was opened from, so the panel can go back to it. */
-  | { kind: "workspace"; path: string; folder?: string }
+  | { kind: "workspace"; path: string; folder?: string | undefined }
   | { kind: "attachment"; attachment: AttachmentSummary };
 
 export type SidebarFilePreview =
