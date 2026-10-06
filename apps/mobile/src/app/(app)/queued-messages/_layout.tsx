@@ -2,6 +2,7 @@ import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
 import { isIOS } from "@/shared/lib/platform";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
+import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
@@ -13,6 +14,7 @@ export default function QueuedMessagesLayout() {
     <Stack
       screenListeners={sheetBackHaptics}
       screenOptions={{
+        ...sheetHeaderInsetOptions,
         presentation: "card",
         headerBackButtonDisplayMode: "minimal",
         headerShadowVisible: false,

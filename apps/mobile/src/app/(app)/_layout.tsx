@@ -14,6 +14,7 @@ import { setLiveActivityNavigator } from "@/features/live-activity/model/live-ac
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
+import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = {
@@ -122,6 +123,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="channel-actions/[channelId]"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: sheetBackground },
             headerTransparent: false,
@@ -136,6 +138,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-channel"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -150,6 +153,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-agent"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -175,6 +179,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="install-agent"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -191,6 +196,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="section-form"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,

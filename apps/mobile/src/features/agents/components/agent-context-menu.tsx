@@ -1,7 +1,9 @@
+import { type MenuAction, type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import * as Clipboard from "expo-clipboard";
 import { Link, router } from "expo-router";
-import { useRef } from "react";
+import { type PropsWithChildren, type Ref, useRef } from "react";
 import { Alert } from "react-native";
+import { useUniwind } from "uniwind";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
@@ -10,7 +12,7 @@ import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-export function useAgentContextMenu(agent: MobileAgent) {
+function useAgentMenuActions(agent: MobileAgent) {
   const { deleteAgent, duplicateAgent, hideAgent, markAgentRead, markAgentUnread, pinnedAgentIds, pinnedChannelIds } =
     useMobileWorkspace();
   const { toggleAgentPinAnimated } = useAgentPinTransition();
@@ -71,17 +73,46 @@ export function useAgentContextMenu(agent: MobileAgent) {
   };
   const handleInfo = () =>
     router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
+  const canPin = canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id);
+  const handleDuplicate = () => {
+    void runAgentAction("duplicate");
+  };
+  return {
+    isPinned,
+    isUnread,
+    canPin,
+    sectionMenu,
+    handleRead,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDuplicate,
+    handleDelete,
+  };
+}
+
+export function useAgentContextMenu(agent: MobileAgent) {
+  const { t } = useText();
+  const {
+    isPinned,
+    isUnread,
+    canPin,
+    sectionMenu,
+    handleRead,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDuplicate,
+    handleDelete,
+  } = useAgentMenuActions(agent);
   return (
     <Link.Menu>
       <Link.MenuAction icon={isUnread ? "envelope.open" : "envelope.badge"} onPress={handleRead}>
         {t(isUnread ? "mobile.agent.menu.markRead" : "mobile.agent.menu.markUnread")}
       </Link.MenuAction>
-      <Link.MenuAction
-        icon={isPinned ? "pin.slash" : "pin"}
-        isOn={isPinned}
-        onPress={handlePin}
-        disabled={!canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id)}
-      >
+      <Link.MenuAction icon={isPinned ? "pin.slash" : "pin"} isOn={isPinned} onPress={handlePin} disabled={!canPin}>
         {t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin")}
       </Link.MenuAction>
       <Link.MenuAction icon="eye.slash" onPress={handleHide}>
@@ -95,12 +126,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
         <Link.MenuAction icon="doc.on.doc" onPress={handleCopyId}>
           {t("mobile.agent.menu.copyId")}
         </Link.MenuAction>
-        <Link.MenuAction
-          icon="plus.square.on.square"
-          onPress={() => {
-            void runAgentAction("duplicate");
-          }}
-        >
+        <Link.MenuAction icon="plus.square.on.square" onPress={handleDuplicate}>
           {t("mobile.agent.menu.duplicate")}
         </Link.MenuAction>
         <Link.MenuAction destructive icon="trash" onPress={handleDelete}>
@@ -108,5 +134,71 @@ export function useAgentContextMenu(agent: MobileAgent) {
         </Link.MenuAction>
       </Link.Menu>
     </Link.Menu>
+  );
+}
+
+/** The long-press menu of an agent on Android, with the actions of the iOS context menu. */
+export function AgentAndroidMenu({
+  agent,
+  menuRef,
+  children,
+}: PropsWithChildren<{ agent: MobileAgent; menuRef?: Ref<MenuComponentRef> }>) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const {
+    isPinned,
+    isUnread,
+    canPin,
+    sectionMenu,
+    handleRead,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDuplicate,
+    handleDelete,
+  } = useAgentMenuActions(agent);
+  const actions: MenuAction[] = [
+    { id: "read", title: t(isUnread ? "mobile.agent.menu.markRead" : "mobile.agent.menu.markUnread") },
+    {
+      id: "pin",
+      title: t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin"),
+      attributes: { disabled: !canPin },
+    },
+    { id: "hide", title: t("mobile.agent.menu.hide") },
+    ...sectionMenu.androidActions,
+    { id: "info", title: t("mobile.agent.menu.info") },
+    {
+      id: "more",
+      title: t("mobile.agent.menu.more"),
+      subactions: [
+        { id: "copy", title: t("mobile.agent.menu.copyId") },
+        { id: "duplicate", title: t("mobile.agent.menu.duplicate") },
+        { id: "delete", title: t("common.delete"), attributes: { destructive: true } },
+      ],
+    },
+  ];
+  const handlers: Record<string, () => void> = {
+    read: handleRead,
+    pin: handlePin,
+    hide: handleHide,
+    info: handleInfo,
+    copy: handleCopyId,
+    duplicate: handleDuplicate,
+    delete: handleDelete,
+  };
+  return (
+    <MenuView
+      ref={menuRef}
+      colorScheme={theme === "dark" ? "dark" : "light"}
+      shouldOpenOnLongPress
+      actions={actions}
+      onPressAction={({ nativeEvent }) => {
+        sectionMenu.onAction(nativeEvent.event);
+        handlers[nativeEvent.event]?.();
+      }}
+    >
+      {children}
+    </MenuView>
   );
 }

@@ -166,7 +166,14 @@ export default function RootLayout() {
 
   return (
     <UniwindGestureHandlerRootView className="flex-1">
-      <KeyboardProvider preload={false}>
+      {/* The app draws under the system bars and pads with safe area insets. Expo Go on Android does not
+          report edge-to-edge, and without these props the keyboard provider pads the whole app. */}
+      <KeyboardProvider
+        preload={false}
+        statusBarTranslucent={isAndroid}
+        navigationBarTranslucent={isAndroid}
+        preserveEdgeToEdge={isAndroid}
+      >
         <QueryClientProvider client={queryClient}>
           <HeroUINativeProvider>
             <ThemeProvider value={colorScheme === "dark" ? darkTheme : DefaultTheme}>

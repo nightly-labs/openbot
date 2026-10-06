@@ -14,6 +14,7 @@ import type { MobileSearchTextInputHandle } from "@/features/search/components/s
 import { mobileSearchView, normalizeMobileSearchQuery } from "@/features/search/model/mobile-search";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 export function SearchAgentsScreen() {
@@ -88,7 +89,7 @@ export function SearchAgentsScreen() {
       contentContainerClassName="pb-safe-offset-5"
       contentInsetAdjustmentBehavior="automatic"
       header={
-        <View className="flex-row items-center gap-2 px-5 pb-3 pt-7">
+        <View className={`flex-row items-center gap-2 px-5 pb-3 ${isAndroid ? "pt-4" : "pt-7"}`}>
           <GlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
             isInteractive={liquidGlassAvailable}

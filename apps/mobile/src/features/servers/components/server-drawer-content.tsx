@@ -1,10 +1,11 @@
-import { type MenuAction, MenuView } from "@expo/ui/community/menu";
+import { type MenuAction, type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import { Check, Plus, Settings } from "lucide-react-native";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
+import { useUniwind } from "uniwind";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
@@ -19,6 +20,7 @@ import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
@@ -67,6 +69,10 @@ export function ServerDrawerContent({
   onSelectServer,
 }: ServerDrawerContentProps) {
   const { t } = useText();
+  const { theme } = useUniwind();
+  // Android: the row's own long press opens its menu, as on the agent rows. `shouldOpenOnLongPress`
+  // does not open it there, because the row takes the long press.
+  const menus = useRef(new Map<string, MenuComponentRef | null>());
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
@@ -154,7 +160,7 @@ export function ServerDrawerContent({
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
         // The native context menu does not cancel this touch. Without a long-press handler, lifting the
         // finger after the menu opens counts as a tap and closes the drawer under the open menu.
-        onLongPress={editing ? undefined : ignoreLongPress}
+        onLongPress={editing ? undefined : isAndroid ? () => menus.current.get(serverItem.id)?.show() : ignoreLongPress}
         style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 8, opacity: pressed ? 0.58 : 1, width })}
       >
         <ServerAvatar server={serverItem} />
@@ -196,6 +202,14 @@ export function ServerDrawerContent({
     return rowSlot(
       serverItem,
       <MenuView
+        {...(isAndroid
+          ? {
+              ref: (menu: MenuComponentRef | null) => {
+                menus.current.set(serverItem.id, menu);
+              },
+              colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const),
+            }
+          : null)}
         shouldOpenOnLongPress
         actions={menuActions}
         onPressAction={(event) => {

@@ -1,10 +1,10 @@
 import { HeaderHeightContext, HeaderShownContext } from "expo-router/react-navigation";
-import { type PropsWithChildren, type ReactNode, useContext } from "react";
-import { type ScrollViewProps, View } from "react-native";
+import { type PropsWithChildren, type ReactNode, useContext, useState } from "react";
+import { type LayoutChangeEvent, type ScrollViewProps, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { withUniwind } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 const StyledKeyboardAwareScrollView = withUniwind(KeyboardAwareScrollView);
 
@@ -36,6 +36,19 @@ export function SheetScrollView({
   const headerShown = useContext(HeaderShownContext);
   const nativeHeader = isIOS && headerShown && !header;
   const showCustomEdge = scrollEdgeEffect && !nativeHeader;
+  // Android: the sheet leaves a drag that starts on a nested-scrolling list to that list. A list that
+  // cannot scroll never takes the drag, so the sheet would not close. Only a list that can scroll
+  // reports nested scrolling.
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const scrollable = contentHeight > viewportHeight + 1;
+  const androidScrollProps = isAndroid
+    ? {
+        nestedScrollEnabled: scrollable,
+        onLayout: (event: LayoutChangeEvent) => setViewportHeight(event.nativeEvent.layout.height),
+        onContentSizeChange: (_width: number, height: number) => setContentHeight(height),
+      }
+    : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -47,6 +60,8 @@ export function SheetScrollView({
         automaticallyAdjustKeyboardInsets={false}
         style={{ flex: 1 }}
         alwaysBounceVertical={false}
+        // Without nested scrolling the Android sheet takes every drag, and the list cannot scroll.
+        {...androidScrollProps}
         overScrollMode="auto"
         contentInsetAdjustmentBehavior={
           nativeHeader ? (headerOverlaysContent ? "automatic" : "never") : contentInsetAdjustmentBehavior
