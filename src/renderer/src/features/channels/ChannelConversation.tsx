@@ -25,6 +25,7 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
+import { ChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -327,6 +328,21 @@ export function ChannelConversation(props: ChannelConversationProps) {
     scrollMargin: virtualScrollMargin,
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  // The rail reads the scroll container reactively; the handlers below keep it in a plain variable.
+  const [railScrollElement, setRailScrollElement] = createSignal<HTMLElement>();
+  const days = createMemo(() =>
+    timeline().flatMap((entry, index) => (entry.dayMarker === null ? [] : [{ index, label: entry.dayMarker }])),
+  );
+  const daySections = createMemo(() => {
+    void messageVirtualizer.getTotalSize();
+    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
+  });
+  const jumpToDay = (section: number) => {
+    const day = days()[section];
+    if (!day) return;
+    stickToLatest = false;
+    messageVirtualizer.scrollToIndex(day.index);
+  };
   /*
    * A message animates in once, and only after the channel has drawn its first page: everything
    * that was already there when the reader opened the channel arrives at the same moment, and ten
@@ -632,6 +648,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               aria-live="polite"
               ref={(element) => {
                 messageList = element;
+                setRailScrollElement(element);
                 updateVirtualScrollMargin();
               }}
               onScroll={(event) => {
@@ -641,6 +658,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                 updateUnreadDividerVisibility();
               }}
             >
+              <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
               <Show when={unreadCount() > 0 && !unreadDividerVisible()}>
                 <UnreadMessagesBanner
                   count={unreadCount()}

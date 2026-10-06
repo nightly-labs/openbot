@@ -22,6 +22,8 @@ import {
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { ChatScrollRail } from "./ChatScrollRail";
+import { chatDaySections } from "./chat-day-markers";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "./send-shortcut";
@@ -99,6 +101,19 @@ export function DirectConversation(props: DirectConversationProps) {
     },
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  // The rail reads the scroll container reactively; the handlers below keep it in a plain variable.
+  const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
+  const days = createMemo(() => chatDaySections(props.snapshot?.messages ?? [], { t, format }));
+  const daySections = createMemo(() => {
+    void messageVirtualizer.getTotalSize();
+    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
+  });
+  const jumpToDay = (section: number) => {
+    const day = days()[section];
+    if (!day) return;
+    stickToLatest = false;
+    messageVirtualizer.scrollToIndex(day.index);
+  };
   const unreadBannerReady = (): boolean => {
     const unreadMessageId = props.snapshot?.readState?.firstUnreadMessageId;
     if (!unreadMessageId) return true;
@@ -289,6 +304,7 @@ export function DirectConversation(props: DirectConversationProps) {
       <div
         ref={(element) => {
           messageList = element;
+          setRailScrollElement(element);
           updateVirtualScrollMargin();
         }}
         class="direct-message-list"
@@ -300,6 +316,7 @@ export function DirectConversation(props: DirectConversationProps) {
           updateUnreadDividerVisibility();
         }}
       >
+        <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
         <Show when={showScrollToLatest()}>
           <ScrollToLatestButton
             onClick={jumpToLatestMessage}

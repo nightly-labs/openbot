@@ -62,3 +62,25 @@ export function dayMarkerLabel(
   if (age === 1) return t("chat.day.yesterday", { time });
   return t("chat.day.date", { date: dateOf(current, options), time });
 }
+
+/** Where a day starts in a transcript: the row that carries its separator, and the separator's text. */
+export interface ChatDaySection {
+  index: number;
+  label: string;
+}
+
+/**
+ * The days of a transcript, in the rule of `dayMarkerLabel`. The first row always opens a day, so a
+ * transcript with rows has at least one. A first row with no readable time has an empty label.
+ */
+export function chatDaySections(
+  rows: readonly { createdAt?: string | undefined }[],
+  options: DayMarkerOptions = {},
+): ChatDaySection[] {
+  const sections: ChatDaySection[] = [];
+  rows.forEach((row, index) => {
+    const label = row.createdAt ? dayMarkerLabel(rows[index - 1]?.createdAt, row.createdAt, options) : null;
+    if (label !== null || index === 0) sections.push({ index, label: label ?? "" });
+  });
+  return sections;
+}

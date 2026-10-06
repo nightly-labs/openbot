@@ -243,6 +243,8 @@
     "./components/QuestionPromptBubble": "./src/components/QuestionPromptBubble.tsx",
     "./features/conversation/DirectConversation": "./src/features/conversation/DirectConversation.tsx",
     "./features/conversation/createChatVirtualizer": "./src/features/conversation/createChatVirtualizer.ts",
+    "./features/conversation/ChatScrollRail": "./src/features/conversation/ChatScrollRail.tsx",
+    "./features/conversation/chat-day-markers": "./src/features/conversation/chat-day-markers.ts",
     "./features/conversation/new-message-tally": "./src/features/conversation/new-message-tally.ts",
     "./features/remote-desktop/RemoteDesktopWorkspace": "./src/features/remote-desktop/RemoteDesktopWorkspace.tsx",
     "./components/SkillPreview": "./src/components/SkillPreview.tsx",

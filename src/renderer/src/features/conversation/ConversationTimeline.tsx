@@ -6,8 +6,10 @@ import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCar
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
+import { ChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { chatDaySections, dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -18,7 +20,6 @@ import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "sol
 import { planItems, planTitle } from "../../app-message-projection";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { groupedMessageIds } from "./agent-message-timeline";
-import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -180,6 +181,19 @@ export function ConversationTimeline() {
   const suggestionMarker = (marker: ChatActionMarkerModel) =>
     marker.kind === "marketplace-suggestion" && marketplaceSuggestionKnown(marker.appId) ? marker : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  // The rail reads the scroll container reactively; the scope keeps it in a plain variable.
+  const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
+  const days = createMemo(() => chatDaySections(timelineMessages(), { t, format }));
+  const daySections = createMemo(() => {
+    void messageVirtualizer.getTotalSize();
+    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
+  });
+  const jumpToDay = (section: number) => {
+    const day = days()[section];
+    if (!day) return;
+    setStickToLatest(false);
+    messageVirtualizer.scrollToIndex(day.index);
+  };
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
     const prompt = props.prompt;
@@ -223,7 +237,10 @@ export function ConversationTimeline() {
 
       <div
         class={["conversation-scroll", scrollFades.classes()]}
-        ref={setScrollElement}
+        ref={(element) => {
+          setScrollElement(element);
+          setRailScrollElement(element);
+        }}
         onScroll={(event) => {
           const element = event.currentTarget;
           setStickToLatest(element.scrollHeight - element.scrollTop - element.clientHeight <= 80);
@@ -231,6 +248,7 @@ export function ConversationTimeline() {
           updateUnreadDividerVisibility();
         }}
       >
+        <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
         <Show when={showScrollToLatest() || props.discontinuous}>
           <ScrollToLatestButton
             onClick={() => void jumpToLatestMessage()}

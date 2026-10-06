@@ -204,6 +204,7 @@ export const messages = defineMessages("chat", {
   "chat.day.yesterday": "Yesterday {time}",
   "chat.day.date": "{date} {time}",
   "chat.history.loadingOlder": "Loading older messages…",
+  "chat.scrollRail.label": "In this chat",
   "chat.day.now": "now",
   "chat.errorStatus.readState": "Read state failed",
   "chat.errorStatus.load": "Load failed",
