@@ -19,10 +19,12 @@ import type {
 } from "@openbot/ui/features/diagrams/diagram-model";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createSignal, createStore, onCleanup, snapshot, untrack } from "solid-js";
+import { createSignal, createStore, For, Match, onCleanup, Switch, snapshot, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
+import { CHANNEL_STORY_ROWS, ChannelStoryComposer, ChannelTranscript } from "./channel-story-support";
+import { StoryAgentConversation } from "./conversation-story-support";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 function storyAgent(id: string): AgentProfile {
@@ -632,9 +634,28 @@ function SidebarWithViews(props: { initialView: SidebarView }) {
   );
 }
 
+/** Each diagram in the sidebar list opens one of the fixtures above. */
+const workspaceDiagrams: Record<string, Diagram> = {
+  "diagram-morning": succeededDiagram,
+  "diagram-leads": { ...failedDiagram, id: "diagram-leads", name: "Inbound leads" },
+  "diagram-weekly": { ...emptyDiagram, id: "diagram-weekly", name: "Weekly planning" },
+};
+
+/**
+ * The app's layout: the middle shows the chat that is open, as it always has, and the canvas only
+ * while the sidebar is on its Diagrams view. Leaving that view goes back to the last open chat.
+ */
 function WorkspaceStage() {
   const [view, setView] = createSignal<SidebarView>("diagrams");
+  const [chat, setChat] = createSignal<{ kind: "agent" | "channel"; id: string }>({ kind: "agent", id: "chief" });
   const [activeDiagramId, setActiveDiagramId] = createSignal<string | null>("diagram-morning");
+  const openAgent = () => (chat().kind === "agent" ? agents.find((agent) => agent.id === chat().id) : undefined);
+  const openChannel = () => (chat().kind === "channel" ? chat().id : undefined);
+  // A one-item list keyed by the id, so opening another diagram mounts it fresh.
+  const openDiagram = () => {
+    const id = activeDiagramId();
+    return view() === "diagrams" && id ? [id] : [];
+  };
   return (
     <div style={{ display: "flex", height: "100vh" }}>
       <div style={{ width: "280px", "flex-shrink": "0" }}>
@@ -642,11 +663,33 @@ function WorkspaceStage() {
           {...sidebarArgs()}
           view={view()}
           onViewChange={setView}
+          activeAgentId={openAgent()?.id ?? ""}
+          onSelectAgent={(id) => setChat({ kind: "agent", id })}
+          activeChannelId={openChannel() ?? null}
+          onSelectChannel={(id) => setChat({ kind: "channel", id })}
           activeDiagramId={activeDiagramId()}
           onSelectDiagram={setActiveDiagramId}
         />
       </div>
-      <InteractiveDiagram diagram={succeededDiagram} />
+      <div style={{ display: "flex", flex: "1", "min-width": "0" }}>
+        <Switch>
+          <Match when={view() === "diagrams"}>
+            <For each={openDiagram()}>
+              {(id) => <InteractiveDiagram diagram={workspaceDiagrams[id] ?? emptyDiagram} />}
+            </For>
+          </Match>
+          <Match when={openChannel()}>
+            <div class="conversation-story-frame">
+              <ChannelTranscript rows={CHANNEL_STORY_ROWS} workers={[]}>
+                <ChannelStoryComposer
+                  channelName={storyChannels.find((channel) => channel.id === openChannel())?.name ?? ""}
+                />
+              </ChannelTranscript>
+            </div>
+          </Match>
+          <Match when={openAgent()}>{(agent) => <StoryAgentConversation agent={agent()} />}</Match>
+        </Switch>
+      </div>
     </div>
   );
 }
@@ -660,7 +703,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The whole surface: the sidebar on its Diagrams view and the diagram in the chat area. */
+/**
+ * The whole surface. On the Agents and Channels views the middle shows the open chat; on the
+ * Diagrams view it shows the selected diagram.
+ */
 export const Workspace: Story = {};
 
 export const LastRunSucceeded: Story = {
