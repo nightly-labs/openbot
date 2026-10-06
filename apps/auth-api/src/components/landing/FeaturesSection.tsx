@@ -30,7 +30,6 @@ import {
   LANDING_PERSIST_EARLIER,
   LANDING_PERSIST_REQUEST,
   LANDING_PERSIST_SWITCH,
-  LANDING_PROVIDER_COPY,
   LANDING_PROVIDERS,
   LANDING_QUEUE,
   LANDING_QUEUE_DRAFT,
@@ -42,6 +41,7 @@ import {
   LANDING_TEAM_HANDOFF,
   LANDING_TEAM_MESSAGES,
   LANDING_TEAM_REPLY,
+  type LandingFeature,
   type LandingFeatureId,
   type LandingPersistReply,
   type LandingTeamMessage,
@@ -328,7 +328,9 @@ export function FeaturesSection() {
                 </div>
                 <div class="landing-feature-copy">
                   <h3>{feature.title}</h3>
-                  <p>{feature.id === "providers" ? <ProviderCopy /> : feature.description}</p>
+                  <p>
+                    <FeatureDescription description={feature.description} />
+                  </p>
                 </div>
               </li>
             )}
@@ -339,10 +341,11 @@ export function FeaturesSection() {
   );
 }
 
-/** The provider tile's sentence, with each name linked to its provider page. */
-function ProviderCopy() {
+/** A tile's sentence. A part with a slug links to its provider page. */
+function FeatureDescription(props: { description: LandingFeature["description"] }) {
+  const parts = () => (typeof props.description === "string" ? [props.description] : props.description);
   return (
-    <For each={LANDING_PROVIDER_COPY}>
+    <For each={parts()}>
       {(part) =>
         typeof part === "string" ? (
           part

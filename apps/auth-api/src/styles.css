@@ -6212,7 +6212,7 @@ a {
   color: var(--openbot-text-primary);
 }
 
-.compare-page :is(.provider-step-text, .provider-add-text, .provider-table td) code {
+.compare-page :is(.provider-step-text, .provider-table td) code {
   padding: 1px 6px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);

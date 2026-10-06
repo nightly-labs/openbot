@@ -6,7 +6,7 @@ import {
   OPENBOT_PLANS,
   type OpenBotPlan,
 } from "../../content/compare/comparison";
-import { providerPageSlug } from "../../content/providers";
+import { PROVIDER_PAGES, providerPageSlug } from "../../content/providers";
 import { type CollectionArticle, type ContentCollection, formatArticleDate } from "../../lib/content-collection";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { DataArticleFrame } from "../content/DataArticleFrame";
@@ -47,11 +47,13 @@ export function MatchupPage(props: MatchupPageProps) {
     props.matchup.products.some((product) => product.provider === plan.provider);
   // The plans of the two products first, then the rest in their usual order.
   const plans = () => [...OPENBOT_PLANS.filter(isCompared), ...OPENBOT_PLANS.filter((plan) => !isCompared(plan))];
-  // The provider page of each product, which says how to set it up in OpenBot.
+  // The provider page of each product, which says how to set it up in OpenBot. The link uses the
+  // page's name, which is the provider's name in OpenBot: Antigravity runs as Gemini.
   const setups = () =>
     props.matchup.products.flatMap((product) => {
       const slug = providerPageSlug(product.provider);
-      return slug ? [{ name: product.name, slug }] : [];
+      const page = slug ? PROVIDER_PAGES[slug] : undefined;
+      return slug && page ? [{ name: page.name, slug }] : [];
     });
 
   return (
