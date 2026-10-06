@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { runApiEffect } from "../../../../../server/effect-runtime";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../../server/json-body";
 import {
   apiError,
@@ -11,17 +12,17 @@ import {
 export const Route = createFileRoute("/v2/hosting/servers/$serverId/")({
   server: {
     handlers: {
-      DELETE: async ({ request, params }) => {
-        try {
-          const user = await runApiEffect(requestUser(request));
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          const body = await readJsonObject(request);
-          await runApiEffect(requestHostedServerService().delete(user, params.serverId, body.confirmName));
-          return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-        } catch (error) {
-          return hostedServerErrorResponse(error);
-        }
-      },
+      DELETE: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            const body = yield* readJsonObject(request);
+            yield* requestHostedServerService().delete(user, params.serverId, body.confirmName);
+            return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+          }),
+          hostedServerErrorResponse,
+        ),
     },
   },
 });

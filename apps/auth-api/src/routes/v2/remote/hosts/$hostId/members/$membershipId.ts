@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { runApiEffect } from "../../../../../../server/effect-runtime";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../../../server/json-body";
 import {
   apiError,
@@ -11,44 +12,40 @@ import {
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/members/$membershipId")({
   server: {
     handlers: {
-      PATCH: async ({ request, params }) => {
-        try {
-          const user = await runApiEffect(requestUser(request));
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          const body = await readJsonObject(request);
-          if (body.role !== "admin" && body.role !== "member")
-            return apiError(400, "invalid_remote_request", "The member role is invalid.");
-          if (body.reactivate !== undefined && body.reactivate !== true)
-            return apiError(400, "invalid_remote_request", "The member status is invalid.");
-          await runApiEffect(
-            requestRemoteControlPlane().changeMembership(user.id, {
+      PATCH: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            const body = yield* readJsonObject(request);
+            if (body.role !== "admin" && body.role !== "member")
+              return apiError(400, "invalid_remote_request", "The member role is invalid.");
+            if (body.reactivate !== undefined && body.reactivate !== true)
+              return apiError(400, "invalid_remote_request", "The member status is invalid.");
+            yield* requestRemoteControlPlane().changeMembership(user.id, {
               hostId: params.hostId,
               membershipId: params.membershipId,
               role: body.role,
               reactivate: body.reactivate === true,
-            }),
-          );
-          return new Response(null, { status: 204 });
-        } catch (error) {
-          return remoteControlPlaneErrorResponse(error);
-        }
-      },
-      DELETE: async ({ request, params }) => {
-        try {
-          const user = await runApiEffect(requestUser(request));
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await runApiEffect(
-            requestRemoteControlPlane().changeMembership(user.id, {
+            });
+            return new Response(null, { status: 204 });
+          }),
+          remoteControlPlaneErrorResponse,
+        ),
+      DELETE: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            yield* requestRemoteControlPlane().changeMembership(user.id, {
               hostId: params.hostId,
               membershipId: params.membershipId,
               revoke: true,
-            }),
-          );
-          return new Response(null, { status: 204 });
-        } catch (error) {
-          return remoteControlPlaneErrorResponse(error);
-        }
-      },
+            });
+            return new Response(null, { status: 204 });
+          }),
+          remoteControlPlaneErrorResponse,
+        ),
     },
   },
 });

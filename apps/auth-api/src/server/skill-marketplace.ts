@@ -483,8 +483,9 @@ export class SkillMarketplace {
         const bindings = yield* MarketplaceStorage;
 
         const row = yield* this.approvedRowEffect(skillId);
-        if (!row?.icon_key) return null;
-        return bindings.SKILLS.get(row.icon_key);
+        const iconKey = row?.icon_key;
+        if (!iconKey) return null;
+        return yield* marketplaceCall(() => bindings.SKILLS.get(iconKey));
       }),
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }

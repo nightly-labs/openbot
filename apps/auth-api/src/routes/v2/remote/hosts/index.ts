@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { runApiEffect } from "../../../../server/effect-runtime";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../server/effect-runtime";
 import {
   apiError,
   json,
@@ -11,15 +12,15 @@ import {
 export const Route = createFileRoute("/v2/remote/hosts/")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        try {
-          const user = await runApiEffect(requestUser(request));
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json({ hosts: await runApiEffect(requestRemoteControlPlane().listHosts(user.id)) });
-        } catch (error) {
-          return remoteControlPlaneErrorResponse(error);
-        }
-      },
+      GET: ({ request }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            return json({ hosts: yield* requestRemoteControlPlane().listHosts(user.id) });
+          }),
+          remoteControlPlaneErrorResponse,
+        ),
     },
   },
 });

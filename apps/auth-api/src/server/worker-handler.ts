@@ -31,26 +31,33 @@ export function createWorkerHandler(
     ) {
       const hostRedirect = canonicalHostRedirect(request);
       if (hostRedirect) return hostRedirect;
-      const localSiteResponse = await serveLocalHostedSite(request, bindings);
-      if (localSiteResponse) return localSiteResponse;
-      try {
-        await runApiEffect(enforceMarketplaceIngress(request, bindings));
-      } catch (error) {
-        if (error instanceof MarketplaceRateLimitError) {
-          return Response.json(
-            { error: { code: error.code, message: error.message } },
-            {
-              status: error.status,
-              headers: {
-                "Cache-Control": "no-store",
-                "Retry-After": String(error.retryAfterSeconds),
-                "X-Content-Type-Options": "nosniff",
-              },
-            },
-          );
-        }
-        throw error;
-      }
+      const earlyResponse = await runApiEffect(
+        Effect.gen(function* () {
+          const localSiteResponse = yield* serveLocalHostedSite(request, bindings);
+          if (localSiteResponse) return localSiteResponse;
+          yield* enforceMarketplaceIngress(request, bindings);
+          return null;
+        }).pipe(
+          Effect.catchIf(
+            (error) => error instanceof MarketplaceRateLimitError,
+            (error) =>
+              Effect.succeed(
+                Response.json(
+                  { error: { code: error.code, message: error.message } },
+                  {
+                    status: error.status,
+                    headers: {
+                      "Cache-Control": "no-store",
+                      "Retry-After": String(error.retryAfterSeconds),
+                      "X-Content-Type-Options": "nosniff",
+                    },
+                  },
+                ),
+              ),
+          ),
+        ),
+      );
+      if (earlyResponse) return earlyResponse;
       const response = Promise.resolve(fetchHandler(request)).then((result) =>
         permanentTrailingSlashRedirect(request, result),
       );
@@ -69,28 +76,26 @@ export function createWorkerHandler(
       bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET"> &
         Partial<Pick<WorkerBindings, "SITES" | HostedServerTickBindingKey>>,
     ) {
-      const hosting = bindings.BOAT_API_KEY
-        ? runApiEffect(tickHostedServers(bindings, controller.scheduledTime))
-        : null;
-      const delivery = runApiEffect(deliverRemoteAuthEvents(bindings, controller.scheduledTime));
-      const cleanup = bindings.SITES
-        ? runApiEffect(new HostedSiteService(bindings.DB, bindings.SITES).cleanup(controller.scheduledTime))
-        : Promise.resolve(null);
-      const hostingResult = await hosting;
-      if (hostingResult && Object.values(hostingResult).some(Boolean)) {
-        console.info("Hosted server check completed.", hostingResult);
-      }
-      if (!isDailyRetentionRun(controller.scheduledTime)) {
-        const [, sites] = await Promise.all([delivery, cleanup]);
-        if (sites) console.info("Hosted site cleanup completed.", sites);
-        return;
-      }
-      const [result, , sites] = await Promise.all([
-        runApiEffect(prune(bindings.DB, controller.scheduledTime)),
-        delivery,
-        cleanup,
-      ]);
-      log(result);
+      const now = controller.scheduledTime;
+      // Retention starts after the hosted server check; delivery and site cleanup run beside both.
+      const hostingThenRetention = Effect.gen(function* () {
+        const hostingResult = bindings.BOAT_API_KEY ? yield* tickHostedServers(bindings, now) : null;
+        if (hostingResult && Object.values(hostingResult).some(Boolean)) {
+          console.info("Hosted server check completed.", hostingResult);
+        }
+        return isDailyRetentionRun(now) ? yield* prune(bindings.DB, now) : null;
+      });
+      const [retention, , sites] = await runApiEffect(
+        Effect.all(
+          [
+            hostingThenRetention,
+            deliverRemoteAuthEvents(bindings, now),
+            bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
+          ],
+          { concurrency: "unbounded" },
+        ),
+      );
+      if (retention) log(retention);
       if (sites) console.info("Hosted site cleanup completed.", sites);
     },
   } satisfies ExportedHandler<WorkerBindings>;
@@ -132,11 +137,11 @@ function tickHostedServers(
   );
 }
 
-async function serveLocalHostedSite(
+function serveLocalHostedSite(
   request: Request,
   bindings: Partial<Pick<WorkerBindings, "SITES" | "SITE_LOCAL_ORIGIN">>,
-): Promise<Response | null> {
-  if (!bindings.SITES || !bindings.SITE_LOCAL_ORIGIN) return null;
+) {
+  if (!bindings.SITES || !bindings.SITE_LOCAL_ORIGIN) return Effect.succeed(null);
   const requestUrl = new URL(request.url);
   const configuredOrigin = new URL(bindings.SITE_LOCAL_ORIGIN);
   const suffix = `.${configuredOrigin.hostname}`;
@@ -145,20 +150,18 @@ async function serveLocalHostedSite(
     requestUrl.port !== configuredOrigin.port ||
     !requestUrl.hostname.endsWith(suffix)
   ) {
-    return null;
+    return Effect.succeed(null);
   }
   const label = requestUrl.hostname.slice(0, -suffix.length);
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label)) return null;
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label)) return Effect.succeed(null);
   const hostedUrl = new URL(requestUrl);
   hostedUrl.protocol = "https:";
   hostedUrl.hostname = `${label}.openbot.site`;
   hostedUrl.port = "";
-  return Effect.runPromise(
-    routeHostedSiteRequest(
-      new Request(hostedUrl, request),
-      { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
-      Date.now(),
-    ),
+  return routeHostedSiteRequest(
+    new Request(hostedUrl, request),
+    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
+    Date.now(),
   );
 }
 

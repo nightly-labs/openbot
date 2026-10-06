@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { runApiEffect } from "../../../../../server/effect-runtime";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../../server/effect-runtime";
 import {
   apiError,
   hostedSiteErrorResponse,
@@ -11,26 +12,26 @@ import {
 export const Route = createFileRoute("/v1/sites/admin/$siteId/block")({
   server: {
     handlers: {
-      POST: async ({ request, params }) => {
-        if (!(await runApiEffect(requireOperationsAdmin(request))))
-          return apiError(401, "unauthorized", "Admin access is required.");
-        try {
-          await runApiEffect(requestHostedSiteService().setBlocked(params.siteId, true));
-          return json({ blocked: true });
-        } catch (error) {
-          return hostedSiteErrorResponse(error);
-        }
-      },
-      DELETE: async ({ request, params }) => {
-        if (!(await runApiEffect(requireOperationsAdmin(request))))
-          return apiError(401, "unauthorized", "Admin access is required.");
-        try {
-          await runApiEffect(requestHostedSiteService().setBlocked(params.siteId, false));
-          return json({ blocked: false });
-        } catch (error) {
-          return hostedSiteErrorResponse(error);
-        }
-      },
+      POST: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            if (!(yield* requireOperationsAdmin(request)))
+              return apiError(401, "unauthorized", "Admin access is required.");
+            yield* requestHostedSiteService().setBlocked(params.siteId, true);
+            return json({ blocked: true });
+          }),
+          hostedSiteErrorResponse,
+        ),
+      DELETE: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            if (!(yield* requireOperationsAdmin(request)))
+              return apiError(401, "unauthorized", "Admin access is required.");
+            yield* requestHostedSiteService().setBlocked(params.siteId, false);
+            return json({ blocked: false });
+          }),
+          hostedSiteErrorResponse,
+        ),
     },
   },
 });

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { runApiEffect } from "../../../server/effect-runtime";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../server/effect-runtime";
 import {
   apiError,
   enforceMarketplaceMutationRateLimit,
@@ -12,25 +13,25 @@ import {
 export const Route = createFileRoute("/v1/agent-templates/$templateId")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
-        try {
-          // Not cached: after an unpublish no copy may still show the instructions.
-          return json(await runApiEffect(requestAgentTemplates().get(params.templateId)));
-        } catch (error) {
-          return marketplaceErrorResponse(error);
-        }
-      },
-      DELETE: async ({ request, params }) => {
-        try {
-          const user = await runApiEffect(requestUser(request));
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          await runApiEffect(enforceMarketplaceMutationRateLimit("mutation", user.id));
-          await runApiEffect(requestAgentTemplates().unpublish(user.id, params.templateId));
-          return json({ deleted: true });
-        } catch (error) {
-          return marketplaceErrorResponse(error);
-        }
-      },
+      GET: ({ params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            // Not cached: after an unpublish no copy may still show the instructions.
+            return json(yield* requestAgentTemplates().get(params.templateId));
+          }),
+          marketplaceErrorResponse,
+        ),
+      DELETE: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            yield* enforceMarketplaceMutationRateLimit("mutation", user.id);
+            yield* requestAgentTemplates().unpublish(user.id, params.templateId);
+            return json({ deleted: true });
+          }),
+          marketplaceErrorResponse,
+        ),
     },
   },
 });

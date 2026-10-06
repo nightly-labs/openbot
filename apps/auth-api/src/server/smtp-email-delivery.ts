@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/validation";
-import { Effect, Fiber, Result, Schema } from "effect";
+import { Effect, Fiber, Option, Result, Schema } from "effect";
 import { type RenderedEmail, renderSignInCodeEmail, renderTeamInviteEmail } from "./email-templates";
 
 export interface SmtpEmailConfig {
@@ -209,7 +209,7 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
       }),
     ({ socket, session }) =>
       Effect.gen(function* () {
-        outcome.closeConfirmed = yield* Effect.promise(() => closeSmtpSocket(socket));
+        outcome.closeConfirmed = yield* closeSmtpSocket(socket);
         yield* Fiber.interrupt(session);
       }),
   );
@@ -220,23 +220,13 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   return yield* new SmtpError("smtp_delivery_unknown");
 });
 
-async function closeSmtpSocket(socket: SmtpSocket): Promise<boolean> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      Promise.resolve()
-        .then(() => socket.close())
-        .then(
-          () => true,
-          () => false,
-        ),
-      new Promise<boolean>((resolve) => {
-        timeout = setTimeout(() => resolve(false), SMTP_CLOSE_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
+/** True when the socket confirms its close before the deadline. */
+function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<boolean> {
+  return Effect.tryPromise(async () => socket.close()).pipe(
+    Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS),
+    Effect.map(Option.isSome),
+    Effect.orElseSucceed(() => false),
+  );
 }
 
 function normalizeSmtpError(error: unknown): SmtpFailure {
