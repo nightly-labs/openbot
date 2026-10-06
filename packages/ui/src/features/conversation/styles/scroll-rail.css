@@ -24,11 +24,12 @@
   pointer-events: none;
 }
 
-/* Only the bars take the pointer until the rail opens, so the messages beside it stay selectable. */
+/* Only the bars take the pointer until the rail opens, so the messages beside it stay selectable.
+   The nav reaches into the container's side padding, so the bars stand beside the messages. */
 .chat-scroll-rail-nav {
   position: absolute;
   top: 50%;
-  right: calc(var(--openbot-space-1) - var(--chat-scroll-rail-inset, 0px));
+  right: calc(-1 * var(--chat-scroll-rail-inset, 0px));
   width: min(260px, 70%);
   height: min(64%, 600px);
   display: flex;
@@ -56,8 +57,7 @@
    so they stay legible over a wide message, and over empty space it does not show at all. */
 .chat-scroll-rail-surface {
   position: absolute;
-  inset: calc(-1 * var(--openbot-space-8)) calc(-1 * var(--openbot-space-1)) calc(-1 * var(--openbot-space-8))
-    calc(-1 * var(--openbot-space-8));
+  inset: calc(-1 * var(--openbot-space-8)) 0 calc(-1 * var(--openbot-space-8)) calc(-1 * var(--openbot-space-8));
   background: linear-gradient(
     to left,
     var(--openbot-bg-canvas) 0%,
@@ -165,7 +165,8 @@
   text-underline-offset: 4px;
 }
 
-/* A hit area wider than the 2px bar it holds. */
+/* A hit area wider than the 2px bar it holds. The bar is 5-7px from the edge, inside the 12px
+   padding the narrowest transcript keeps, so it does not cover a message. */
 .chat-scroll-rail-bar {
   position: relative;
   width: 20px;
@@ -182,7 +183,7 @@
   content: "";
   position: absolute;
   top: 0;
-  right: 9px;
+  right: 5px;
   bottom: var(--openbot-space-1);
   width: 2px;
   border-radius: var(--openbot-radius-pill);
@@ -204,7 +205,7 @@
 
 .chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::before,
 .chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
-  right: 8.5px;
+  right: 4.5px;
   width: 3px;
 }
 
@@ -217,7 +218,7 @@
   content: "";
   position: absolute;
   top: calc((100% - var(--openbot-space-1)) * var(--chat-scroll-rail-fill, 0));
-  right: 7px;
+  right: 3px;
   width: 6px;
   height: 6px;
   border-radius: var(--openbot-radius-pill);

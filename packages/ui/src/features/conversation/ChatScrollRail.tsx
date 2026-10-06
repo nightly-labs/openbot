@@ -93,8 +93,10 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       idle = setTimeout(() => setScrolling(false), IDLE_MS);
       schedule();
     };
+    // Every scroll moves the current day, also one the app makes: focus can open the rail at any time.
     const onScroll = () => {
       if (scrolling()) reveal();
+      else schedule();
     };
     const onKey = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key)) reveal();
