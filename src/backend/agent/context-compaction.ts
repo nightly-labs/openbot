@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import { decodeRecordResponse, getRecord } from "../protocol";
 import { finiteNumberOrNull } from "./account-usage";
 import type { ProviderPort } from "./provider-runtime";
@@ -131,7 +132,7 @@ export class ContextCompaction {
 
     yield* client
       .request("thread/compact/start", { threadId }, decodeRecordResponse)
-      .pipe(Effect.mapError((failure) => new ContextCompactionFailed({ cause: failure.cause })))
+      .pipe(toContextCompactionFailed)
       .pipe(
         Effect.catch((failure) =>
           Effect.sync(() => {
@@ -221,3 +222,5 @@ export class ContextCompaction {
 class ContextCompactionFailed extends Schema.TaggedError<ContextCompactionFailed>()("ContextCompactionFailed", {
   cause: Schema.Defect(),
 }) {}
+
+const { rewrap: toContextCompactionFailed } = causeHelpers(ContextCompactionFailed);

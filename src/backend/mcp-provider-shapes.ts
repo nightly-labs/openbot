@@ -13,6 +13,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
 import { runInLoginShell } from "./cli";
+import { causeHelpers } from "./effect-boundary";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
 
@@ -659,6 +660,7 @@ export function mcpHandoffHeaders(server: ResolvedMcpServer): Record<string, str
 export class McpShapeFailed extends Schema.TaggedError<McpShapeFailed>()("McpShapeFailed", {
   cause: Schema.Defect(),
 }) {}
-function mcpShapeIo<A>(run: () => Promise<A>): Effect.Effect<A, McpShapeFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new McpShapeFailed({ cause }) });
-}
+
+const { io: mcpShapeIo, rewrap: toMcpShapeFailed } = causeHelpers(McpShapeFailed);
+
+export { toMcpShapeFailed };

@@ -43,7 +43,7 @@ import {
   type StoredGeneratedAttachment,
   toAttachmentSummary,
 } from "./attachment-files";
-import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "./stored-state-effects";
 
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
@@ -1762,12 +1762,7 @@ export class MailboxStore {
       // markers without their outbox entry, and a failed save restores a copy that has all other changes.
       const managedPaths = new Map<string, string | null>();
       for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
-        managedPaths.set(
-          path,
-          yield* this.#files
-            .managedTransferFile(path)
-            .pipe(Effect.mapError((failure) => new StoredStateFailure({ cause: failure.cause }))),
-        );
+        managedPaths.set(path, yield* this.#files.managedTransferFile(path).pipe(toStoredStateFailure));
       }
       const records = this.#fileRecords();
       const targets = this.#undeletedFileRecords(fileId);

@@ -10,6 +10,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber, Result, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
+import { causeHelpers } from "../effect-boundary";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -40,6 +41,8 @@ export class GenerationUsageLimitError extends Schema.TaggedError<GenerationUsag
 export class ProfileGenerationFailed extends Schema.TaggedError<ProfileGenerationFailed>()("ProfileGenerationFailed", {
   cause: Schema.Defect(),
 }) {}
+
+const { io: profileIo, rewrap: toProfileGenerationFailed } = causeHelpers(ProfileGenerationFailed);
 
 export const generateProfile = Effect.fn("Agent.generateProfile")(function* (
   client: AgentClient,
@@ -93,7 +96,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
             },
             decodeRecordResponse,
           )
-          .pipe(Effect.mapError((failure) => new ProfileGenerationFailed({ cause: failure.cause })));
+          .pipe(toProfileGenerationFailed);
         yield* Effect.try({
           try: () => client.notify("initialized"),
           catch: (cause) => new ProfileGenerationFailed({ cause }),
@@ -102,7 +105,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
           client.provider === "codex"
             ? yield* client
                 .request("config/read", { includeLayers: false }, decodeRecordResponse)
-                .pipe(Effect.mapError((failure) => new ProfileGenerationFailed({ cause: failure.cause })))
+                .pipe(toProfileGenerationFailed)
             : {};
         const configuredServers = getRecord(getRecord(providerConfig, "config"), "mcp_servers");
         const disabledServers = Object.fromEntries(
@@ -162,7 +165,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
             },
             decodeRecordResponse,
           )
-          .pipe(Effect.mapError((failure) => new ProfileGenerationFailed({ cause: failure.cause })));
+          .pipe(toProfileGenerationFailed);
         const threadId = getString(getRecord(thread, "thread"), "id");
         if (!threadId)
           return yield* new ProfileGenerationFailed({ cause: new Error(sourceText("error.agent.profileNotStarted")) });
@@ -177,7 +180,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
             },
             decodeRecordResponse,
           )
-          .pipe(Effect.mapError((failure) => new ProfileGenerationFailed({ cause: failure.cause })));
+          .pipe(toProfileGenerationFailed);
         return yield* Fiber.join(completion);
       }).pipe(
         Effect.timeoutOrElse({
@@ -191,7 +194,7 @@ export const generateTextWithoutTools = Effect.fn("Agent.generateTextWithoutTool
       Effect.gen(function* () {
         const stopped = yield* Effect.result(
           client.stop().pipe(
-            Effect.mapError((failure) => new ProfileGenerationFailed({ cause: failure.cause })),
+            toProfileGenerationFailed,
             Effect.catchDefect((cause) => Effect.fail(new ProfileGenerationFailed({ cause }))),
           ),
         );
@@ -266,10 +269,6 @@ const profileCompletion = Effect.fnUntraced(function* (client: AgentClient) {
     return Effect.sync(cleanup);
   });
 });
-
-function profileIo<A>(run: () => Promise<A>): Effect.Effect<A, ProfileGenerationFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new ProfileGenerationFailed({ cause }) });
-}
 
 export function profilePrompt(input: GenerateAgentProfileInput, sections: SidebarSection[]): string {
   return [

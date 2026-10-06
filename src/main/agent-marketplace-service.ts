@@ -25,6 +25,7 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbo
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
 
@@ -106,7 +107,7 @@ export class AgentMarketplaceService {
       const params = marketplaceQueryParams(query);
       const page = yield* this.auth
         .requestAuthorized(`/v1/marketplace/agents/?${params}`, { method: "GET" }, decodeMarketplaceAgentPage)
-        .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+        .pipe(toAgentMarketplaceFailure);
       return { ...page, agents: page.agents.map((agent) => this.withAbsoluteAvatar(agent)) };
     });
   }
@@ -119,7 +120,7 @@ export class AgentMarketplaceService {
           { method: "GET" },
           decodeMarketplaceAgentDetail,
         )
-        .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+        .pipe(toAgentMarketplaceFailure);
       return this.withAbsoluteAvatar(detail);
     });
   }
@@ -128,7 +129,7 @@ export class AgentMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentSubmission[], AgentMarketplaceFailure> {
       const values = yield* this.auth
         .requestAuthorized("/v1/marketplace/agents/mine", { method: "GET" }, decodeAgentSubmissions)
-        .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+        .pipe(toAgentMarketplaceFailure);
       return values.map((value) => this.withAbsoluteAvatar(value));
     });
   }
@@ -138,9 +139,7 @@ export class AgentMarketplaceService {
       const agent = this.agents.listAgents().find((candidate) => candidate.id === agentId);
       if (!agent)
         return yield* new AgentMarketplaceFailure({ cause: new Error(sourceText("error.skill.chooseLocalAgent")) });
-      const skills = yield* this.skills
-        .listPublishable(agentId)
-        .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+      const skills = yield* this.skills.listPublishable(agentId).pipe(toAgentMarketplaceFailure);
       const routines = this.agents.listRoutines(agentId).map(({ name, instruction, active, trigger }) => ({
         name,
         instruction,
@@ -177,7 +176,7 @@ export class AgentMarketplaceService {
       }
       const submission = yield* this.auth
         .requestAuthorized("/v1/marketplace/agents/", { method: "POST", body: form }, decodeAgentSubmission, 30_000)
-        .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+        .pipe(toAgentMarketplaceFailure);
       return this.withAbsoluteAvatar(submission);
     });
   }
@@ -210,9 +209,7 @@ export class AgentMarketplaceService {
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
         const avatarUrl = detail.avatarUrl;
-        const bytes = yield* this.auth
-          .downloadAuthorized(avatarUrl)
-          .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+        const bytes = yield* this.auth.downloadAuthorized(avatarUrl).pipe(toAgentMarketplaceFailure);
         const mimeType = imageMimeType(bytes);
         if (!mimeType)
           return yield* new AgentMarketplaceFailure({
@@ -230,7 +227,7 @@ export class AgentMarketplaceService {
             avatarSeed: detail.avatarSeed,
             avatarHue: detail.avatarHue,
           })
-          .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause }))));
+          .pipe(toAgentMarketplaceFailure));
       const createdRoutineIds: string[] = [];
       {
         const outcome = yield* Effect.result(
@@ -238,7 +235,7 @@ export class AgentMarketplaceService {
             for (const skill of detail.skills) {
               yield* this.skills
                 .installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId })
-                .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+                .pipe(toAgentMarketplaceFailure);
             }
             for (const routine of detail.routines) {
               const created = yield* marketplaceSync(() =>
@@ -266,17 +263,13 @@ export class AgentMarketplaceService {
                   avatarSeed: detail.avatarSeed,
                   avatarHue: detail.avatarHue,
                 })
-                .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+                .pipe(toAgentMarketplaceFailure);
             }
-            agent = yield* this.agents
-              .setAvatar(agent.id, avatar)
-              .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+            agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentMarketplaceFailure);
             const nextSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
             for (const skillId of existing?.marketplaceSource?.skillIds ?? []) {
               if (!nextSkillIds.has(skillId))
-                yield* this.skills
-                  .uninstall({ agentId: agent.id, skillId })
-                  .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+                yield* this.skills.uninstall({ agentId: agent.id, skillId }).pipe(toAgentMarketplaceFailure);
             }
             agent = yield* marketplaceSync(() =>
               this.agents.setMarketplaceSource(agent.id, {
@@ -322,7 +315,7 @@ export class AgentMarketplaceService {
             },
             decodeInstallReceipt,
           )
-          .pipe(Effect.mapError((error) => new AgentMarketplaceFailure({ cause: error.cause })));
+          .pipe(toAgentMarketplaceFailure);
       }
       return { agent: agent };
     });
@@ -421,10 +414,9 @@ export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 export class AgentMarketplaceFailure extends Schema.TaggedError<AgentMarketplaceFailure>()("AgentMarketplaceFailure", {
   cause: Schema.Defect(),
 }) {}
-function marketplaceIO<A>(operation: () => Promise<A>): Effect.Effect<A, AgentMarketplaceFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AgentMarketplaceFailure({ cause }) });
-}
 
-function marketplaceSync<A>(operation: () => A): Effect.Effect<A, AgentMarketplaceFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new AgentMarketplaceFailure({ cause }) });
-}
+const {
+  io: marketplaceIO,
+  sync: marketplaceSync,
+  rewrap: toAgentMarketplaceFailure,
+} = causeHelpers(AgentMarketplaceFailure);

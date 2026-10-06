@@ -7,16 +7,11 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { causeHelpers } from "../backend/effect-boundary";
 import { type McpOAuthRecord, type McpOAuthStorage, mcpOAuthRecordSchema } from "../backend/mcp-oauth-provider";
 import type { SecretCipher } from "./provider-credential-store";
 
-function mcpIO<A>(operation: () => Promise<A>): Effect.Effect<A, McpOperationError> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new McpOperationError({ cause }) });
-}
-
-function mcpSync<A>(operation: () => A): Effect.Effect<A, McpOperationError> {
-  return Effect.try({ try: operation, catch: (cause) => new McpOperationError({ cause }) });
-}
+const { io: mcpIO, sync: mcpSync } = causeHelpers(McpOperationError);
 
 /**
  * One envelope holding every server's record, each encrypted on its own.

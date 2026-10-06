@@ -9,7 +9,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import type { AnalyticsInventoryDayStore } from "./analytics";
-import { AnalyticsOperationFailure } from "./analytics-effects";
+import { AnalyticsOperationFailure, toAnalyticsOperationFailure } from "./analytics-effects";
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
@@ -30,10 +30,7 @@ export function analyticsInventoryDayStore(path: string): AnalyticsInventoryDayS
           return Effect.fail(new AnalyticsOperationFailure({ cause: failure.cause }));
         }),
       ),
-    write: (day) =>
-      writePreferenceFile(path, { version: 1, day }).pipe(
-        Effect.mapError((failure) => new AnalyticsOperationFailure({ cause: failure.cause })),
-      ),
+    write: (day) => writePreferenceFile(path, { version: 1, day }).pipe(toAnalyticsOperationFailure),
   };
 }
 

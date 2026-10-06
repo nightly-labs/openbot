@@ -7,18 +7,13 @@ import { registerSecretValue } from "@openbot/logging";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { causeHelpers } from "../backend/effect-boundary";
 
 export class CredentialStoreFailure extends Schema.TaggedError<CredentialStoreFailure>()("CredentialStoreFailure", {
   cause: Schema.Defect(),
 }) {}
 
-function credentialIO<A>(operation: () => Promise<A>): Effect.Effect<A, CredentialStoreFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new CredentialStoreFailure({ cause }) });
-}
-
-function credentialSync<A>(operation: () => A): Effect.Effect<A, CredentialStoreFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new CredentialStoreFailure({ cause }) });
-}
+const { io: credentialIO, sync: credentialSync } = causeHelpers(CredentialStoreFailure);
 
 /**
  * One envelope holding every provider's key, each encrypted on its own.

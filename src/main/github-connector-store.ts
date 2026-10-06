@@ -5,7 +5,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
-import { GitHubOperationError, githubCall, githubDecode } from "./github-effects";
+import { GitHubOperationError, githubCall, githubDecode, toGitHubOperationError } from "./github-effects";
 import type { SecretCipher } from "./provider-credential-store";
 
 const githubConnectorRecordSchema = z.object({
@@ -72,7 +72,7 @@ export class GitHubConnectorStore {
     function* (this: GitHubConnectorStore, record: GitHubConnectorRecord) {
       const encrypted = yield* githubDecode(() => this.#cipher.encrypt(JSON.stringify(record)).toString("base64"));
       yield* writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true }).pipe(
-        Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
+        toGitHubOperationError,
       );
       this.#record = record;
     },

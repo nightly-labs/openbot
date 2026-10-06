@@ -61,11 +61,12 @@ import {
   type ThreadItem,
 } from "./protocol";
 import {
-  ProviderClientOperationError,
+  type ProviderClientOperationError,
   providerCall,
   providerFailure,
   providerResult,
   providerSync,
+  toProviderClientOperationError,
 } from "./provider-client-effects";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
@@ -451,7 +452,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.rejectAll("ACP session stopped.");
     yield* this.#bridge
       .close()
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+      .pipe(toProviderClientOperationError)
       .pipe(
         Effect.ensuring(
           Effect.suspend(() => (!child || child.exitCode !== null ? Effect.void : endProcess(child))).pipe(
@@ -480,9 +481,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
-    yield* this.#threads
-      .close(thread)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+    yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
   });
 
   readonly #closeSession = Effect.fn("AcpAgentClient.closeSession")(function* (
@@ -908,9 +907,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // session again. A session with a turn keeps its servers until a later resume.
     if (held && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
       turns = held.turns;
-      yield* this.#threads
-        .close(held)
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      yield* this.#threads.close(held).pipe(toProviderClientOperationError);
     }
     // A thread this client already holds takes the caller's settings even though no session is
     // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
@@ -959,7 +956,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => threadRef?.activeTurn?.id ?? null,
           (call, signal) => this.#callDynamicTool(call, signal),
         )
-        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+        .pipe(toProviderClientOperationError),
       (mcp) =>
         Effect.gen({ self: this }, function* () {
           try {
@@ -977,7 +974,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                     agentMcpServers(this.options.mcpServers?.() ?? [], computerUse),
                     this.options.mcpToolRuntimes?.(),
                     this.options.mcpAuthorization,
-                  ).pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
+                  ).pipe(toProviderClientOperationError),
                 ),
               ),
             );
@@ -1182,7 +1179,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const threadId = yield* providerSync(() => requiredString(params, "threadId"));
     return yield* this.#threads
       .startTurn(threadId, () => this.#openTurn(threadId, params, steer))
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
   });
 
   readonly #openTurn = Effect.fn("AcpAgentClient.openTurn")(function* (
@@ -1191,9 +1188,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
     steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
-    yield* this.#threads
-      .wake(threadId)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+    yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const thread = yield* providerSync(() => this.#requireThread(threadId));
     if (!steer && thread.activeTurn)
       return yield* providerFailure(new Error("The ACP thread already has an active turn."));
@@ -1511,7 +1506,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           acpOptions: params.options,
         },
       )
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     const accepted =
       isRecord(result) &&
       (result.decision === "accept" ||
@@ -1537,7 +1532,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turnId: thread?.activeTurn?.id ?? randomUUID(),
         sourceMethod: method,
       })
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     return yield* providerSync(() => (isRecord(result) ? result : {}));
   });
 
@@ -1597,7 +1592,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
     const result = yield* this.#serverRequests
       .call("item/tool/call", params, signal)
-      .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+      .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
     return yield* providerSync(() => result);

@@ -29,7 +29,7 @@ import { Effect, Schema } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import { type Zippable, zip } from "fflate";
 import type { AgentService } from "../../backend/agent-service";
-import { runCauseEffect } from "../../backend/effect-boundary";
+import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { decodeVoid } from "../remote-host-decoding";
@@ -413,9 +413,7 @@ export class AttachmentArchiveFailed extends Schema.TaggedError<AttachmentArchiv
   cause: Schema.Defect(),
 }) {}
 
-function archiveIO<A>(operation: () => Promise<A>): Effect.Effect<A, AttachmentArchiveFailed> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AttachmentArchiveFailed({ cause }) });
-}
+const { io: archiveIO } = causeHelpers(AttachmentArchiveFailed);
 
 function archiveFailure(message: string): Effect.Effect<never, AttachmentArchiveFailed> {
   return Effect.fail(new AttachmentArchiveFailed({ cause: new Error(message) }));

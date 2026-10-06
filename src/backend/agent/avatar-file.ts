@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { AVATAR_MIME_TYPES, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { Effect, Schema, Stream } from "effect";
+import { causeHelpers } from "../effect-boundary";
 
 const SIZE_ERROR =
   "The avatar exceeds 512 KB. Resize or compress a copy with your available tools, then retry with its path.";
@@ -10,6 +11,8 @@ const SIZE_ERROR =
 export class AvatarFileFailed extends Schema.TaggedError<AvatarFileFailed>()("AvatarFileFailed", {
   cause: Schema.Defect(),
 }) {}
+
+const { io: avatarIo } = causeHelpers(AvatarFileFailed);
 
 export const loadAvatarFile = Effect.fn("AvatarFile.load")(function* (path: string, workspacePath: string) {
   const source = yield* readSource(resolve(workspacePath, path));
@@ -61,7 +64,3 @@ const readSource = Effect.fn("AvatarFile.readSource")((path: string) =>
     (file) => avatarIo(() => file.close()),
   ),
 );
-
-function avatarIo<A>(run: () => Promise<A>): Effect.Effect<A, AvatarFileFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new AvatarFileFailed({ cause }) });
-}

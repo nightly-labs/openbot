@@ -31,6 +31,7 @@ import { Effect, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
@@ -78,7 +79,7 @@ export class SkillMarketplaceService {
       const params = marketplaceQueryParams(query);
       const page = yield* this.auth
         .requestAuthorized(`/v1/skills/?${params}`, { method: "GET" }, decodeMarketplaceSkillPage)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       return {
         ...page,
         skills: page.skills.map((skill) => ({
@@ -93,12 +94,10 @@ export class SkillMarketplaceService {
   get(skillId: string): Effect.Effect<MarketplaceSkillDetail, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
       if (skillId.startsWith("local-skill-"))
-        return yield* this.requireLocalLibrary()
-          .get(skillId)
-          .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        return yield* this.requireLocalLibrary().get(skillId).pipe(toSkillMarketplaceFailure);
       const detail = yield* this.auth
         .requestAuthorized(`/v1/skills/${encodeURIComponent(skillId)}`, { method: "GET" }, decodeMarketplaceSkillDetail)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       return {
         ...detail,
         iconUrl: this.absoluteUrl(detail.iconUrl),
@@ -111,7 +110,7 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<SkillSubmission[], SkillMarketplaceFailure> {
       const submissions = yield* this.auth
         .requestAuthorized("/v1/skills/mine", { method: "GET" }, decodeSubmissions)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       return submissions.map((item) => ({ ...item, iconUrl: this.absoluteUrl(item.iconUrl) }));
     });
   }
@@ -151,7 +150,7 @@ export class SkillMarketplaceService {
         form.set("icon", new Blob([toArrayBuffer(input.icon.bytes)], { type: input.icon.mimeType }), "icon");
       const submission = yield* this.auth
         .requestAuthorized("/v1/skills/", { method: "POST", body: form }, decodeSubmission, 30_000)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       this.#drafts.delete(input.draftId);
       return { ...submission, iconUrl: this.absoluteUrl(submission.iconUrl) };
     });
@@ -176,11 +175,7 @@ export class SkillMarketplaceService {
           ),
         );
       }
-      installed.push(
-        ...(yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(
-          Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-        )),
-      );
+      installed.push(...(yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)));
       return installed.sort((a, b) => a.name.localeCompare(b.name));
     });
   }
@@ -189,12 +184,8 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill[], SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(agentId));
       const lock = yield* readLock(agent.workspacePath);
-      const installed: InstalledSkill[] = yield* listManagedSkillsForChat(agent).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      );
-      for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      ))
+      const installed: InstalledSkill[] = yield* listManagedSkillsForChat(agent).pipe(toSkillMarketplaceFailure);
+      for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure))
         if (!skill.problem) installed.push(skill);
       for (const entry of Object.values(lock.skills)) {
         if (entry.enabled === false) continue;
@@ -223,12 +214,10 @@ export class SkillMarketplaceService {
       const agent = yield* skillSync(() => this.requireAgent(input.agentId));
       const detail = yield* this.get(input.skillId);
       const bundle = input.skillId.startsWith("local-skill-")
-        ? yield* this.requireLocalLibrary()
-            .bundle(input.skillId, detail.version)
-            .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })))
+        ? yield* this.requireLocalLibrary().bundle(input.skillId, detail.version).pipe(toSkillMarketplaceFailure)
         : yield* this.auth
             .downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`)
-            .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+            .pipe(toSkillMarketplaceFailure);
       return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
     });
   }
@@ -247,12 +236,12 @@ export class SkillMarketplaceService {
           { method: "GET" },
           decodeMarketplaceSkillDetail,
         )
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       const bundle = yield* this.auth
         .downloadAuthorized(
           `/v1/skills/${encodeURIComponent(input.skillId)}/versions/${encodeURIComponent(input.versionId)}/content`,
         )
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
     });
   }
@@ -289,9 +278,7 @@ export class SkillMarketplaceService {
           result.push(yield* embeddedSkill(join(directory, "SKILL.md"), entry.name));
         } else result.push({ kind: "marketplace", ...(yield* this.publishedReferenceEffect(agent, entry)) });
       }
-      for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      )) {
+      for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)) {
         if (skill.problem || !skill.location) continue;
         result.push(yield* embeddedSkill(join(agent.workspacePath, skill.location, "SKILL.md"), skill.name));
       }
@@ -434,10 +421,8 @@ export class SkillMarketplaceService {
             { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
             decodeInstalledReceipt,
           )
-          .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
-      yield* this.refreshAgentRuntime(agent.id).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      );
+          .pipe(toSkillMarketplaceFailure);
+      yield* this.refreshAgentRuntime(agent.id).pipe(toSkillMarketplaceFailure);
       return toInstalledSkill(entry, detail.version, "installed", entry.description);
     });
   }
@@ -463,9 +448,7 @@ export class SkillMarketplaceService {
       }
       delete lock.skills[input.skillId];
       yield* writeLock(agent.workspacePath, lock);
-      yield* this.refreshAgentRuntime(input.agentId).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      );
+      yield* this.refreshAgentRuntime(input.agentId).pipe(toSkillMarketplaceFailure);
     });
   }
 
@@ -526,9 +509,7 @@ export class SkillMarketplaceService {
       }
       lock.skills[input.skillId] = entry;
       yield* writeLock(agent.workspacePath, lock);
-      yield* this.refreshAgentRuntime(input.agentId).pipe(
-        Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
-      );
+      yield* this.refreshAgentRuntime(input.agentId).pipe(toSkillMarketplaceFailure);
       return toInstalledSkill(
         entry,
         entry.version,
@@ -557,10 +538,10 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill, SkillMarketplaceFailure> {
       const detail = yield* this.requireLocalLibrary()
         .get(input.skillId, input.revision)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       const bundle = yield* this.requireLocalLibrary()
         .bundle(input.skillId, input.revision)
-        .pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })));
+        .pipe(toSkillMarketplaceFailure);
       return yield* this.installResolved(yield* skillSync(() => this.requireAgent(input.agentId)), detail, bundle);
     });
   }
@@ -805,7 +786,7 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
 });
 const writeLock = Effect.fn("SkillMarketplace.writeLock")((workspace: string, lock: SkillsLock) =>
   writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true }).pipe(
-    Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause })),
+    toSkillMarketplaceFailure,
   ),
 );
 const pathExists = Effect.fn("SkillMarketplace.pathExists")((path: string) =>
@@ -904,10 +885,5 @@ const assertSkillPaths = Effect.fn("SkillMarketplace.checkPaths")(function* (wor
 export class SkillMarketplaceFailure extends Schema.TaggedError<SkillMarketplaceFailure>()("SkillMarketplaceFailure", {
   cause: Schema.Defect(),
 }) {}
-function skillIO<A>(operation: () => Promise<A>): Effect.Effect<A, SkillMarketplaceFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new SkillMarketplaceFailure({ cause }) });
-}
 
-function skillSync<A>(operation: () => A): Effect.Effect<A, SkillMarketplaceFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new SkillMarketplaceFailure({ cause }) });
-}
+const { io: skillIO, sync: skillSync, rewrap: toSkillMarketplaceFailure } = causeHelpers(SkillMarketplaceFailure);

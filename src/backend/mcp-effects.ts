@@ -1,9 +1,12 @@
 import { Effect, Result, Schema } from "effect";
+import { causeHelpers } from "./effect-boundary";
 
 /** Preserves provider SDK failures at the existing Promise interfaces. */
 export class McpOperationError extends Schema.TaggedError<McpOperationError>()("McpOperationError", {
   cause: Schema.Defect(),
 }) {}
+
+export const { rewrap: toMcpOperationError } = causeHelpers(McpOperationError);
 
 export function mcpFailure(cause: unknown): McpOperationError {
   return cause instanceof McpOperationError ? cause : new McpOperationError({ cause });

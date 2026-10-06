@@ -12,7 +12,7 @@ import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
-import { runCauseEffect } from "../backend/effect-boundary";
+import { causeHelpers, runCauseEffect } from "../backend/effect-boundary";
 
 const logger = createOpenBotLogger("automation");
 
@@ -28,9 +28,7 @@ class AutomationServerFailed extends Schema.TaggedError<AutomationServerFailed>(
   cause: Schema.Defect(),
 }) {}
 
-function automationIO<A>(operation: () => Promise<A>): Effect.Effect<A, AutomationServerFailed> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AutomationServerFailed({ cause }) });
-}
+const { io: automationIO, rewrap: toAutomationServerFailed } = causeHelpers(AutomationServerFailed);
 
 export interface AutomationServerOptions {
   /** The folder that holds the URL and token files. Only the user can read it. */
@@ -270,9 +268,7 @@ export class AutomationServer {
 }
 
 function writeAutomationFile(path: string, content: string): Effect.Effect<void, AutomationServerFailed> {
-  return writeFileAtomically(path, content).pipe(
-    Effect.mapError((error) => new AutomationServerFailed({ cause: error.cause })),
-  );
+  return writeFileAtomically(path, content).pipe(toAutomationServerFailed);
 }
 
 /** A path segment, or null when its percent encoding is not valid. */

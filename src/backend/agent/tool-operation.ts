@@ -1,10 +1,9 @@
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
+import { causeHelpers } from "../effect-boundary";
 
 /** Expected failures from tool validation and injected storage or provider adapters. */
 export class ToolOperationFailed extends Schema.TaggedError<ToolOperationFailed>()("ToolOperationFailed", {
   cause: Schema.Defect(),
 }) {}
 
-export function toolStep<A>(run: () => A): Effect.Effect<A, ToolOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new ToolOperationFailed({ cause }) });
-}
+export const { sync: toolStep, rewrap: toToolOperationFailed } = causeHelpers(ToolOperationFailed);

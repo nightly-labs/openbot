@@ -22,6 +22,7 @@ import type {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 import { isMissingFileError } from "../backend/file-errors";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 
@@ -94,13 +95,13 @@ export class HostedSiteDesktopService {
       const credential = this.serverCredential();
       const unlinked = this.auth
         .requestAuthorized(`/v1/sites/${UNLINKED_SCOPE}`, { method: "GET" }, decodeSiteList)
-        .pipe(Effect.mapError((error) => new HostedSiteFailure({ cause: error.cause })));
+        .pipe(toHostedSiteFailure);
       if (!credential) return yield* unlinked;
       const [server, account] = yield* Effect.all(
         [
           this.auth
             .requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList)
-            .pipe(Effect.mapError((error) => new HostedSiteFailure({ cause: error.cause }))),
+            .pipe(toHostedSiteFailure),
           unlinked,
         ],
         { concurrency: "unbounded" },
@@ -151,7 +152,7 @@ export class HostedSiteDesktopService {
       const credential = yield* siteSync(() => this.requireServerCredential());
       const list = yield* this.auth
         .requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList)
-        .pipe(Effect.mapError((error) => new HostedSiteFailure({ cause: error.cause })));
+        .pipe(toHostedSiteFailure);
       if (list.sites.some((site) => site.serverId !== credential.hostId))
         return yield* new HostedSiteFailure({ cause: new Error(sourceText("error.team.hostedSitesUnsupported")) });
       return list;
@@ -206,7 +207,7 @@ export class HostedSiteDesktopService {
         { method: "DELETE", headers: { "Idempotency-Key": key, ...headers } },
         decodeDeleteResult,
       )
-      .pipe(Effect.mapError((error) => new HostedSiteFailure({ cause: error.cause })));
+      .pipe(toHostedSiteFailure);
   }
 
   private readonly upload = Effect.fn("HostedSite.upload")(function* (
@@ -543,9 +544,7 @@ function uploadSignature(input: PublishHostedSiteInput, siteId: string | null, p
 function retryTransport<A>(
   request: () => Effect.Effect<A, CentralAuthOperationError>,
 ): Effect.Effect<A, HostedSiteFailure> {
-  const operation = Effect.suspend(request).pipe(
-    Effect.mapError((error) => new HostedSiteFailure({ cause: error.cause })),
-  );
+  const operation = Effect.suspend(request).pipe(toHostedSiteFailure);
   return operation.pipe(Effect.catch((error) => (isTransportFailure(error.cause) ? operation : Effect.fail(error))));
 }
 
@@ -584,9 +583,5 @@ const exists = Effect.fn("HostedSite.exists")((path: string) =>
 export class HostedSiteFailure extends Schema.TaggedError<HostedSiteFailure>()("HostedSiteFailure", {
   cause: Schema.Defect(),
 }) {}
-function siteIO<A>(operation: () => Promise<A>): Effect.Effect<A, HostedSiteFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new HostedSiteFailure({ cause }) });
-}
-function siteSync<A>(operation: () => A): Effect.Effect<A, HostedSiteFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new HostedSiteFailure({ cause }) });
-}
+
+const { io: siteIO, sync: siteSync, rewrap: toHostedSiteFailure } = causeHelpers(HostedSiteFailure);

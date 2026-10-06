@@ -14,6 +14,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
@@ -907,9 +908,5 @@ function clampProgress(value: number): number {
 export class UpdateOperationFailure extends Schema.TaggedError<UpdateOperationFailure>()("UpdateOperationFailure", {
   cause: Schema.Defect(),
 }) {}
-function updateIO<A>(operation: () => Promise<A>): Effect.Effect<A, UpdateOperationFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new UpdateOperationFailure({ cause }) });
-}
-function updateSync<A>(operation: () => A): Effect.Effect<A, UpdateOperationFailure> {
-  return Effect.try({ try: operation, catch: (cause) => new UpdateOperationFailure({ cause }) });
-}
+
+const { io: updateIO, sync: updateSync } = causeHelpers(UpdateOperationFailure);

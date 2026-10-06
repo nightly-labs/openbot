@@ -12,6 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../backend/agent-service";
+import { causeHelpers } from "../backend/effect-boundary";
 import type { ApprovalAutomation } from "./approval-automation-store";
 
 export interface AgentAdminSettingsDependencies {
@@ -55,14 +56,9 @@ export function createAgentAdminSettings({
         try: () => requireAgent(agentId),
         catch: (cause) => new AgentSettingsFailure({ cause }),
       });
-      if (access !== undefined)
-        agent = yield* agents
-          .updateAgent({ agentId, access })
-          .pipe(Effect.mapError((error) => new AgentSettingsFailure({ cause: error.cause })));
+      if (access !== undefined) agent = yield* agents.updateAgent({ agentId, access }).pipe(toAgentSettingsFailure);
       if (autoApprove !== undefined)
-        yield* approvalAutomation
-          .set({ agentId, autoApprove })
-          .pipe(Effect.mapError((error) => new AgentSettingsFailure({ cause: error.cause })));
+        yield* approvalAutomation.set({ agentId, autoApprove }).pipe(toAgentSettingsFailure);
       return settings(agent);
     })().pipe(Effect.uninterruptible);
   }
@@ -71,3 +67,5 @@ export function createAgentAdminSettings({
 class AgentSettingsFailure extends Schema.TaggedError<AgentSettingsFailure>()("AgentSettingsFailure", {
   cause: Schema.Defect(),
 }) {}
+
+const { rewrap: toAgentSettingsFailure } = causeHelpers(AgentSettingsFailure);

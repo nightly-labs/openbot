@@ -21,6 +21,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Result, Schema, Scope } from "effect";
 import type { AgentLifecycleFailed } from "../agent-service";
+import { causeHelpers } from "../effect-boundary";
 import type { MessagingOrigin } from "../mailbox-store";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import type { MessagingConnectionRecord, MessagingLink } from "./messaging-store";
@@ -270,7 +271,7 @@ export class MessagingService {
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
       })
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      .pipe(toMessagingOperationFailed);
     for (const text of slackOrchestratorMemories(record.workspaceName))
       this.#agents.createMemory({ agentId: agent.id, text });
     this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agent.id });
@@ -302,7 +303,7 @@ export class MessagingService {
         existing ? { type: "assign", agentId, sectionId: existing.id } : { type: "create", name, agentId },
         agentIds,
       )
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      .pipe(toMessagingOperationFailed);
     return layout.agentAssignments[agentId] ?? null;
   });
 
@@ -311,7 +312,7 @@ export class MessagingService {
     this: MessagingService,
   ) {
     const connect = yield* messagingStep(() => this.#requireConnect());
-    yield* connect.start().pipe(Effect.mapError((failure) => new MessagingOperationFailed({ cause: failure.cause })));
+    yield* connect.start().pipe(toMessagingOperationFailed);
   }).bind(this);
 
   readonly completeSlackWorkspace = Effect.fn("MessagingService.completeSlackWorkspace")(function* (
@@ -320,9 +321,7 @@ export class MessagingService {
     grant: string,
   ): Effect.fn.Return<boolean, MessagingOperationFailed> {
     const connect = yield* messagingStep(() => this.#requireConnect());
-    const opened = yield* connect
-      .complete(nonce, grant)
-      .pipe(Effect.mapError((failure) => new MessagingOperationFailed({ cause: failure.cause })));
+    const opened = yield* connect.complete(nonce, grant).pipe(toMessagingOperationFailed);
     if (!opened) return false;
     const record = this.#threads.store.ensureConnection("slack", opened.workspaceId, opened.workspaceName);
     yield* this.#stopConnection(record.connectionId);
@@ -408,9 +407,7 @@ export class MessagingService {
       retryAt: null,
     };
     this.#live.set(record.connectionId, live);
-    const identified = yield* Effect.result(
-      live.adapter.identify().pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause }))),
-    );
+    const identified = yield* Effect.result(live.adapter.identify().pipe(toMessagingOperationFailed));
     if (Result.isFailure(identified)) {
       const error = identified.failure.cause;
       if (this.#live.get(record.connectionId) !== live) return;
@@ -447,8 +444,7 @@ export class MessagingService {
       action: (action) => this.#dispatch(this.#action(live, action)),
       placeCreated: (platformChannelId) => {
         const join = live.adapter.joinPlace?.(platformChannelId);
-        if (join)
-          this.#dispatch(join.pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause }))));
+        if (join) this.#dispatch(join.pipe(toMessagingOperationFailed));
       },
     });
     // So people can mention OpenBot in any public channel without inviting it first. Channels made
@@ -542,11 +538,7 @@ export class MessagingService {
       if (oldest !== undefined) this.#recent.delete(oldest);
     }
     if (existing && CANCEL_TEXT.test(message.text) && message.files.length === 0) {
-      if (
-        yield* this.#threads
-          .stop(existing.linkId, message.authorId)
-          .pipe(Effect.mapError((failure) => new MessagingOperationFailed({ cause: failure.cause })))
-      ) {
+      if (yield* this.#threads.stop(existing.linkId, message.authorId).pipe(toMessagingOperationFailed)) {
         yield* live.adapter
           .react(message.target, message.platformMessageId, "stopped", true)
           .pipe(Effect.catch(() => Effect.void));
@@ -554,21 +546,17 @@ export class MessagingService {
       }
     }
     const { adapter } = live;
-    const authorName = yield* adapter
-      .authorName(message.authorId)
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+    const authorName = yield* adapter.authorName(message.authorId).pipe(toMessagingOperationFailed);
     const place = message.isDirect
       ? null
-      : yield* adapter
-          .placeName(message.platformChannelId)
-          .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      : yield* adapter.placeName(message.platformChannelId).pipe(toMessagingOperationFailed);
     // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
     if (!agentId) {
       yield* adapter
         .post(message.target, { text: sourceText("status.messaging.noAgent") })
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+        .pipe(toMessagingOperationFailed);
       return;
     }
     const staging = join(this.#downloadsRoot, randomUUID());
@@ -593,13 +581,13 @@ export class MessagingService {
               origin: { authorId: message.authorId, authorName, platformMessageId: message.platformMessageId },
               idempotencyKey: `messaging:${live.record.connectionId}:${message.dedupKey}`,
             })
-            .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+            .pipe(toMessagingOperationFailed);
           if (result.status === "duplicate") return;
           const key = `${result.link.linkId}:${message.platformMessageId}`;
           if (result.status === "busy") {
             yield* adapter
               .post(message.target, { text: sourceText("status.messaging.busy") })
-              .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+              .pipe(toMessagingOperationFailed);
             yield* adapter
               .react(message.target, message.platformMessageId, "failed", true)
               .pipe(Effect.catch(() => Effect.void));
@@ -617,7 +605,7 @@ export class MessagingService {
                 if (this.#posts.has(key) || !this.#targets.has(key)) return;
                 const messageId = yield* adapter
                   .post(message.target, { text: sourceText("status.messaging.queued") })
-                  .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+                  .pipe(toMessagingOperationFailed);
                 this.#posts.set(key, {
                   connectionId: live.record.connectionId,
                   target: message.target,
@@ -662,7 +650,7 @@ export class MessagingService {
           const destination = join(staging, String(index), basename(file.name) || "file");
           yield* adapter
             .download(file, destination, Math.min(ATTACHMENT_LIMITS.fileBytes, ATTACHMENT_LIMITS.totalBytes - total))
-            .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+            .pipe(toMessagingOperationFailed);
           return destination;
         }),
       );
@@ -685,9 +673,7 @@ export class MessagingService {
     if (!live) return { workspaceName, place: link.title, messages: [], cursor: null, skippedFiles: [] };
     const place = link.isDirect
       ? "direct message"
-      : yield* live.adapter
-          .placeName(link.platformChannelId)
-          .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
     const messages = yield* live.adapter
       .history(link.platformChannelId, link.threadKey, link.historyCursor, origin.platformMessageId)
       .pipe(Effect.catch(() => Effect.succeed([])));
@@ -720,11 +706,9 @@ export class MessagingService {
       const messageId = existingMessageId
         ? yield* adapter
             .edit(target, existingMessageId, body)
-            .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })))
+            .pipe(toMessagingOperationFailed)
             .pipe(Effect.as(existingMessageId))
-        : yield* adapter
-            .post(target, body)
-            .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+        : yield* adapter.post(target, body).pipe(toMessagingOperationFailed);
       this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId, stopToken });
       return;
     }
@@ -757,24 +741,20 @@ export class MessagingService {
     // Slack is outside this computer, so a secret in the answer must not reach it.
     if (activity.answer) {
       const answer = redactText(activity.answer);
-      yield* adapter
-        .postAnswer(target, answer, placeholder)
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      yield* adapter.postAnswer(target, answer, placeholder).pipe(toMessagingOperationFailed);
     }
     // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
     else if (!activity.followUp && this.#threads.awaitsTeammate(activity.link.linkId))
       yield* this.#say(adapter, target, placeholder, sourceText("status.messaging.delegated"));
     else yield* this.#say(adapter, target, placeholder, sourceText("status.messaging.noAnswer"));
     if (activity.files.length) {
-      const skipped = yield* adapter
-        .upload(target, activity.files)
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      const skipped = yield* adapter.upload(target, activity.files).pipe(toMessagingOperationFailed);
       if (skipped.length)
         yield* adapter
           .post(target, {
             text: sourceText("status.messaging.filesSkipped", { names: skipped.join(", ") }),
           })
-          .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+          .pipe(toMessagingOperationFailed);
     }
   });
 
@@ -785,14 +765,8 @@ export class MessagingService {
     placeholder: string | null,
     text: string,
   ) {
-    if (placeholder)
-      yield* adapter
-        .edit(target, placeholder, { text })
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
-    else
-      yield* adapter
-        .post(target, { text })
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+    if (placeholder) yield* adapter.edit(target, placeholder, { text }).pipe(toMessagingOperationFailed);
+    else yield* adapter.post(target, { text }).pipe(toMessagingOperationFailed);
   });
 
   #dispatch<A>(operation: Effect.Effect<A, MessagingOperationFailed>): void {
@@ -860,7 +834,7 @@ export class MessagingService {
           { action: "decline", label: sourceText("status.messaging.deny"), token: decline, style: "danger" },
         ],
       })
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })))
+      .pipe(toMessagingOperationFailed)
       .pipe(
         Effect.onError(() =>
           Effect.sync(() => {
@@ -886,7 +860,7 @@ export class MessagingService {
       .edit(pending.target, messageId, {
         text: `${pending.text}\n${sourceText("status.messaging.answeredOnHost")}`,
       })
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      .pipe(toMessagingOperationFailed);
   });
 
   readonly #action = Effect.fn("MessagingService.action")(function* (
@@ -905,12 +879,10 @@ export class MessagingService {
             action.actorId,
             sourceText("status.messaging.onlyRequester", { user: adapter.mention(stop.authorId) }),
           )
-          .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+          .pipe(toMessagingOperationFailed);
         return;
       }
-      yield* this.#threads
-        .stop(stop.linkId, stop.authorId)
-        .pipe(Effect.mapError((failure) => new MessagingOperationFailed({ cause: failure.cause })));
+      yield* this.#threads.stop(stop.linkId, stop.authorId).pipe(toMessagingOperationFailed);
       return;
     }
     const pending = this.#approvals.get(action.token);
@@ -929,14 +901,14 @@ export class MessagingService {
             ? sourceText("status.messaging.onlyRequester", { user: adapter.mention(pending.allowedUserId) })
             : sourceText("status.messaging.hostOnly"),
         )
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+        .pipe(toMessagingOperationFailed);
       return;
     }
     pending.answered = true;
     const answered = yield* Effect.result(
       this.#agents
         .respondToApproval({ requestId: pending.requestId, decision: action.decision })
-        .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause }))),
+        .pipe(toMessagingOperationFailed),
     );
     const outcome = Result.isFailure(answered)
       ? sourceText("status.messaging.requestInactive")
@@ -948,7 +920,7 @@ export class MessagingService {
       .edit(pending.target, pending.messageId ?? action.platformMessageId, {
         text: `${pending.text}\n${outcome}`,
       })
-      .pipe(Effect.mapError((error) => new MessagingOperationFailed({ cause: error.cause })));
+      .pipe(toMessagingOperationFailed);
   }, Effect.uninterruptible);
 
   // Helpers.
@@ -1020,10 +992,8 @@ export class MessagingOperationFailed extends Schema.TaggedError<MessagingOperat
   },
 ) {}
 
-function messagingIo<A>(run: () => Promise<A>): Effect.Effect<A, MessagingOperationFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new MessagingOperationFailed({ cause }) });
-}
-
-function messagingStep<A>(run: () => A): Effect.Effect<A, MessagingOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new MessagingOperationFailed({ cause }) });
-}
+const {
+  io: messagingIo,
+  sync: messagingStep,
+  rewrap: toMessagingOperationFailed,
+} = causeHelpers(MessagingOperationFailed);

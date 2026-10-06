@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 
 const logger = createOpenBotLogger("linux-desktop-entry");
 
@@ -122,9 +123,8 @@ function readEntry(path: string): Effect.Effect<string | null> {
 class DesktopEntryFailure extends Schema.TaggedError<DesktopEntryFailure>()("DesktopEntryFailure", {
   cause: Schema.Defect(),
 }) {}
-function desktopEntryIO<A>(operation: () => Promise<A>): Effect.Effect<A, DesktopEntryFailure> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new DesktopEntryFailure({ cause }) });
-}
+
+const { io: desktopEntryIO } = causeHelpers(DesktopEntryFailure);
 
 /**
  * Quotes a path for the `Exec` key. The desktop entry specification reserves a set of characters

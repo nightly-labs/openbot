@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeProviderHistory, snapshotFromThread } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { decodeThreadResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -143,10 +144,10 @@ export class BootRecovery {
         if (agent && session && client) {
           const params = yield* this.#threads
             .threadParams(agent, client, session.externalSessionId)
-            .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
+            .pipe(toBootRecoveryFailed);
           const response = yield* client
             .request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse)
-            .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
+            .pipe(toBootRecoveryFailed);
           const batchIds = delivery.turnId ? null : unconfirmedStarts.get(delivery.recipientAgentId);
           const turn = response.thread.turns?.find(
             (candidate) =>
@@ -159,9 +160,7 @@ export class BootRecovery {
               ),
           );
           if (turn && !delivery.turnId) {
-            yield* this.#mailbox
-              .markRunning(delivery.id, turn.id)
-              .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
+            yield* this.#mailbox.markRunning(delivery.id, turn.id).pipe(toBootRecoveryFailed);
           }
           if (turn?.status === "completed") {
             return { terminal: "completed" as const, reason: null };
@@ -172,9 +171,7 @@ export class BootRecovery {
         return interrupted;
       }).pipe(Effect.catch(() => Effect.succeed(interrupted)));
       // A failed provider read keeps the conservative interrupted result; never replay side effects.
-      yield* this.#mailbox
-        .markTerminal(delivery.id, terminal, reason)
-        .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
+      yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
       yield* recoveryStep(() => {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
@@ -240,13 +237,11 @@ export class BootRecovery {
           // was deliberately replaced.
           const params =
             session.externalSessionId === active?.externalSessionId
-              ? yield* this.#threads
-                  .threadParams(agent, client, session.externalSessionId)
-                  .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })))
+              ? yield* this.#threads.threadParams(agent, client, session.externalSessionId).pipe(toBootRecoveryFailed)
               : { threadId: session.externalSessionId };
           const response = yield* client
             .request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse)
-            .pipe(Effect.mapError((failure) => new BootRecoveryFailed({ cause: failure.cause })));
+            .pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => {
             const imported = snapshotFromThread(agent.id, response.thread, (deliveryId) =>
               this.#mailbox.getDelivery(deliveryId),
@@ -285,6 +280,4 @@ class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootR
   cause: Schema.Defect(),
 }) {}
 
-function recoveryStep<A>(run: () => A): Effect.Effect<A, BootRecoveryFailed> {
-  return Effect.try({ try: run, catch: (cause) => new BootRecoveryFailed({ cause }) });
-}
+const { sync: recoveryStep, rewrap: toBootRecoveryFailed } = causeHelpers(BootRecoveryFailed);

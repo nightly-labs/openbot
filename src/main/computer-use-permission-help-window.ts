@@ -4,6 +4,7 @@ import type { ComputerUsePermissionApp, MacPermissionId } from "@openbot/contrac
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import type { BrowserWindow, NativeImage } from "electron";
+import { causeHelpers } from "../backend/effect-boundary";
 import { applicationBundleName } from "./computer-use-permission-app";
 
 /**
@@ -160,5 +161,4 @@ export class PermissionHelpFailed extends Schema.TaggedError<PermissionHelpFaile
   cause: Schema.Defect(),
 }) {}
 
-const helpCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({ try: operation, catch: (cause) => new PermissionHelpFailed({ cause }) });
+const { io: helpCall } = causeHelpers(PermissionHelpFailed);

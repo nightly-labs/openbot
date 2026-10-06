@@ -86,7 +86,7 @@ import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { RemoteScreenError } from "./remote-screen-gateway";
-import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, toRemoteWorkflowError } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -341,7 +341,7 @@ export class TeamApiServer {
       if (remoteScreen) yield* remoteScreen.stop();
       if (browserView) yield* browserView.stop();
     }).pipe(
-      Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
+      toRemoteWorkflowError,
       Effect.ensuring(
         Effect.gen({ self: this }, function* () {
           // The heartbeat and the event listeners are already gone. Leaving the socket open
