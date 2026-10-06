@@ -29,6 +29,8 @@ const DIAGRAM_LIMIT = 40;
 const DRAWING: MermaidDiagram = { status: "drawing" };
 const diagrams = new Map<string, MermaidDiagram>();
 const jobKeys = new Map<string, string>();
+/** How many mounted cards and screens show each diagram. The cache never lets one of these go. */
+const consumers = new Map<string, number>();
 const listeners = new Set<() => void>();
 let jobs: readonly MermaidJob[] = [];
 let jobCount = 0;
@@ -48,9 +50,10 @@ function subscribe(listener: () => void): () => void {
 
 function forgetOldest(): void {
   if (diagrams.size < DIAGRAM_LIMIT) return;
-  // A diagram that is still drawing has a job that will report to it, so it stays.
+  // A diagram that is still drawing has a job that will report to it, and a diagram on screen is
+  // in use, so both stay. When every diagram is in use, the cache grows past its limit.
   for (const [key, diagram] of diagrams) {
-    if (diagram.status === "drawing") continue;
+    if (diagram.status === "drawing" || consumers.has(key)) continue;
     diagrams.delete(key);
     return;
   }
@@ -66,6 +69,18 @@ function requestMermaidDiagram(source: string, dark: boolean): void {
   jobKeys.set(id, key);
   jobs = [...jobs, { id, source, dark }];
   emit();
+}
+
+/** Marks a diagram as on screen and draws it if needed. The returned function releases it. */
+function retainMermaidDiagram(source: string, dark: boolean): () => void {
+  const key = diagramKey(source, dark);
+  consumers.set(key, (consumers.get(key) ?? 0) + 1);
+  requestMermaidDiagram(source, dark);
+  return () => {
+    const count = (consumers.get(key) ?? 1) - 1;
+    if (count > 0) consumers.set(key, count);
+    else consumers.delete(key);
+  };
 }
 
 /** Stores what the renderer drew and removes its job. */
@@ -98,9 +113,6 @@ export function useMermaidJobs(): readonly MermaidJob[] {
 export function useMermaidDiagram(source: string, dark: boolean, enabled = true): MermaidDiagram | undefined {
   const key = diagramKey(source, dark);
   const diagram = useSyncExternalStore(subscribe, () => diagrams.get(key));
-  // `diagram` is a dependency, so a diagram that the cache let go while this card shows it draws again.
-  useEffect(() => {
-    if (enabled && !diagram) requestMermaidDiagram(source, dark);
-  }, [enabled, source, dark, diagram]);
+  useEffect(() => (enabled ? retainMermaidDiagram(source, dark) : undefined), [enabled, source, dark]);
   return enabled ? (diagram ?? DRAWING) : undefined;
 }
