@@ -130,8 +130,11 @@ renderer preview and web client and imports `apps/site-router/src`, so `api` rea
 `detect` job. When in doubt, let the lane run.
 
 `All required checks pass` needs every other check job and fails when one of them failed or was
-cancelled; a skipped lane counts as a pass. Branch protection requires only this job, so a new lane
-needs no change in the repository settings: add it to the gate's `needs` list.
+cancelled; a skipped lane counts as a pass. Add a new lane to its `needs` list. Branch protection on
+`main` requires only `Check`, not this job. A skipped required check counts as passed, so `Check`
+runs when `detect` did not succeed, and skips only when `detect` found no code change. The list of
+changed paths uses `git diff --no-renames`: a moved file then lists its old path as well, so a move
+of a file that a lane reads into `docs/` still runs the lane.
 
 `verify:preload` reads `out/preload` after the build. TypeScript checks the preload source, but
 the renderer gets the bundle. The script runs each bundle in a `node:vm` context with a fake
