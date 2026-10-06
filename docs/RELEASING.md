@@ -408,10 +408,18 @@ Docker builds, and all their verification steps. It does not run the macOS job o
 and it makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive,
 and an attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
 tag ref to check the macOS Host signing keychain, and `-f mode=windows-signing` on a tag ref to check
-Windows signing:
+Windows signing. `--ref` selects the workflow and the overlay, so the tag must point to the commit
+to test. Use a temporary `v0.0.0-*` tag. It matches the `release` environment policy. Its push
+starts a release run, but `Validate release tag` stops that run, because the tag never matches the
+`package.json` version:
 
 ```sh
-gh workflow run release.yml --ref <existing v*.*.* tag> -f mode=windows-signing
+git tag v0.0.0-windows-signing-test <commit>
+git push origin v0.0.0-windows-signing-test
+gh workflow run release.yml --ref v0.0.0-windows-signing-test -f mode=windows-signing
+# After the run:
+git tag -d v0.0.0-windows-signing-test
+git push origin :refs/tags/v0.0.0-windows-signing-test
 ```
 
 It logs in to Azure, then signs a throwaway executable once immediately and once 20 minutes later,
