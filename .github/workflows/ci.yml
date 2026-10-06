@@ -18,6 +18,9 @@ env:
   GIT_CONFIG_COUNT: 1
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
+  # No job here builds the native mobile app, so the postinstall skips the React Native Skia
+  # library copy. The jobs that install with `--ignore-scripts` skip it already.
+  OPENBOT_SKIP_SKIA: "1"
 
 jobs:
   detect:
