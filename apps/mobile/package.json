@@ -63,6 +63,7 @@
     "lucide-react-native": "^1.38.0",
     "katex": "catalog:",
     "marked": "catalog:",
+    "mermaid": "catalog:",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

@@ -1,5 +1,6 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
@@ -7,6 +8,8 @@ import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
+import { CodePreview } from "./CodePreview";
+import type { MessageCodeBlock } from "./DataTable";
 import { MathFormula } from "./MathFormula";
 import { MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
 import {
@@ -349,7 +352,18 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "code")) return token.raw;
       const language = token.lang?.trim().split(/\s+/u)[0] ?? "";
       if (language.toLowerCase() === "math") return <MathFormula tex={token.text} raw={token.raw} display block />;
-      return <CodeBlock block={{ type: "code", code: token.text, language }} streaming={props.streaming === true} />;
+      const block: MessageCodeBlock = { type: "code", code: token.text, language };
+      const preview = chatPreviewKind(language);
+      if (preview)
+        return (
+          <CodePreview
+            block={block}
+            kind={preview}
+            streaming={props.streaming === true}
+            onOpenLink={props.content.onOpenLink}
+          />
+        );
+      return <CodeBlock block={block} streaming={props.streaming === true} />;
     }
     case "table": {
       if (!tokenIs(token, "table")) return token.raw;

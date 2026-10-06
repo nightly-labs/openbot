@@ -1,3 +1,4 @@
+import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { type BubbleVariant, Button, DropdownMenu } from "@openbot/ui";
@@ -7,6 +8,7 @@ import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
+import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
 import { CheckIcon, CopyIcon, MoreIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
 import { createSmoothHeightResize } from "./createSmoothHeightResize";
@@ -387,10 +389,24 @@ export function MessageBody(props: {
                     </Match>
                     <Match when={codeContent(block())}>
                       {(code) => (
-                        <CodeBlock
-                          block={code()}
-                          streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                        />
+                        <Show
+                          when={chatPreviewKind(code().language)}
+                          fallback={
+                            <CodeBlock
+                              block={code()}
+                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                            />
+                          }
+                        >
+                          {(preview) => (
+                            <CodePreview
+                              block={code()}
+                              kind={preview()}
+                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                              onOpenLink={props.onOpenLink}
+                            />
+                          )}
+                        </Show>
                       )}
                     </Match>
                     <Match when={textContent(block())}>

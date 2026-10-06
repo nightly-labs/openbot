@@ -1,5 +1,6 @@
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Check, Copy } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { type ShjLanguage, type ShjToken, tokenize } from "@speed-highlight/core";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -86,6 +87,9 @@ const LANGUAGE_TEXT_KEYS = {
   regex: "chat.code.language.regex",
 } as const satisfies Partial<Record<ShjLanguage, AppTextKey>>;
 
+// Mermaid has no highlighter, so it shows as plain code with its own name.
+const PLAIN_LANGUAGE_LABELS: Record<string, string> = { mermaid: "Mermaid", mmd: "Mermaid" };
+
 const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
   c: "C",
   css: "CSS",
@@ -111,7 +115,16 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
   yaml: "YAML",
 };
 
-export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean }) {
+export function CodeBlock(props: {
+  block: MessageCodeBlock;
+  streaming?: boolean;
+  /** Buttons before Copy, such as the switch between a preview and its code. */
+  actions?: JSX.Element;
+  /** Buttons after Copy, such as the button that opens a larger view. */
+  trailingActions?: JSX.Element;
+  /** Places the code lines in a larger body, such as beside a rendered preview of the code. */
+  body?: (code: JSX.Element) => JSX.Element;
+}) {
   const { t } = useText();
   const [lines, setLines] = createSignal<CodeLine[]>(untrack(() => plainCodeLines(props.block.code)));
   const [copied, setCopied] = createSignal(false);
@@ -150,6 +163,29 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
     }
   };
 
+  // One element, so the code keeps its scroll position when a caller moves it into its body.
+  const code = (
+    <pre class="message-code-scroll" tabindex="0">
+      <code>
+        <For each={lines()}>
+          {(line, lineIndex) => (
+            <span class="message-code-line">
+              <span class="message-code-line-number" aria-hidden="true">
+                {lineIndex() + 1}
+              </span>
+              <span class="message-code-line-source">
+                <For each={line}>{(token) => <span data-code-token={token.type}>{token.text}</span>}</For>
+                <Show when={props.streaming && lineIndex() === lines().length - 1}>
+                  <span class="message-code-caret" aria-hidden="true" />
+                </Show>
+              </span>
+            </span>
+          )}
+        </For>
+      </code>
+    </pre>
+  );
+
   return (
     <section class="message-code-block" aria-label={t("chat.code.blockLabel", { language: languageLabel() })}>
       <header class="message-code-header">
@@ -159,44 +195,30 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
           </Show>
           <span class="message-code-language">{languageLabel()}</span>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          class="message-code-copy"
-          aria-label={copied() ? t("chat.code.copied") : t("chat.code.copy")}
-          onClick={() => void copy()}
-        >
-          <span class="message-code-copy-icons" aria-hidden="true">
-            <span data-visible={!copied() ? "true" : undefined}>
-              <Copy />
-            </span>
-            <span data-visible={copied() ? "true" : undefined}>
-              <Check />
-            </span>
-          </span>
-          <span>{copied() ? t("common.copied") : t("common.copy")}</span>
-        </Button>
-      </header>
-      <pre class="message-code-scroll" tabindex="0">
-        <code>
-          <For each={lines()}>
-            {(line, lineIndex) => (
-              <span class="message-code-line">
-                <span class="message-code-line-number" aria-hidden="true">
-                  {lineIndex() + 1}
-                </span>
-                <span class="message-code-line-source">
-                  <For each={line}>{(token) => <span data-code-token={token.type}>{token.text}</span>}</For>
-                  <Show when={props.streaming && lineIndex() === lines().length - 1}>
-                    <span class="message-code-caret" aria-hidden="true" />
-                  </Show>
-                </span>
+        <div class="message-code-actions">
+          {props.actions}
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            class="message-code-copy"
+            aria-label={copied() ? t("chat.code.copied") : t("chat.code.copy")}
+            onClick={() => void copy()}
+          >
+            <span class="message-code-copy-icons" aria-hidden="true">
+              <span data-visible={!copied() ? "true" : undefined}>
+                <Copy />
               </span>
-            )}
-          </For>
-        </code>
-      </pre>
+              <span data-visible={copied() ? "true" : undefined}>
+                <Check />
+              </span>
+            </span>
+            <span>{copied() ? t("common.copied") : t("common.copy")}</span>
+          </Button>
+          {props.trailingActions}
+        </div>
+      </header>
+      {props.body ? props.body(code) : code}
     </section>
   );
 }
@@ -224,6 +246,8 @@ export function codeLanguageLabel(language: string, t: AppTranslate): string {
     return LANGUAGE_LABELS[normalized] ?? normalized.toUpperCase();
   }
   const original = language.trim();
+  const plainLabel = PLAIN_LANGUAGE_LABELS[original.toLowerCase()];
+  if (plainLabel) return plainLabel;
   return original ? original.toUpperCase() : t(LANGUAGE_TEXT_KEYS.plain);
 }
 

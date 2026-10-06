@@ -6,6 +6,7 @@ import {
   isFileReference,
 } from "@openbot/brand/file-reference";
 import { chatMathStart } from "@openbot/contracts/chat-math";
+import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
@@ -31,6 +32,7 @@ import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
+import { ChatCodePreview } from "./chat-code-preview";
 import { ChatMath } from "./chat-math";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
@@ -73,6 +75,8 @@ interface TextPresentation {
   style: TextStyle;
   codeColor: ColorValue;
   animateTail: boolean;
+  /** The reply still streams, so a preview card shows code until its block is complete. */
+  streaming: boolean;
   agents: readonly MobileAgent[];
   mentionOffset: number;
   fontScale: number;
@@ -471,9 +475,19 @@ function MarkdownBlocks({
           );
         }
         if (tokenIs(token, "code")) {
+          const preview = chatPreviewKind(token.lang);
           return (
             <StreamingBlock key={offset} enabled={presentation.animateTail}>
-              <ChatCodeBlock selectable={presentation.selectable} text={token.text} language={token.lang} />
+              {preview ? (
+                <ChatCodePreview
+                  kind={preview}
+                  text={token.text}
+                  language={token.lang}
+                  streaming={presentation.streaming}
+                />
+              ) : (
+                <ChatCodeBlock selectable={presentation.selectable} text={token.text} language={token.lang} />
+              )}
             </StreamingBlock>
           );
         }
@@ -600,6 +614,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           mentionOffset: 4 * fontScale,
           fontScale,
           t,
+          streaming,
           animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
         }}
       />
