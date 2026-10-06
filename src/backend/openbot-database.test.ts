@@ -2969,14 +2969,16 @@ describe("OpenBotDatabase", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-db-gap-27-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runCauseEffect(database.initialize());
     database.close();
 
     const incomplete = new DatabaseSync(database.path);
     incomplete.prepare("DELETE FROM schema_migrations WHERE version = 27").run();
     incomplete.close();
 
-    await expect(new OpenBotDatabase(root).initialize()).rejects.toThrow("migration history is missing version 27");
+    await expect(runCauseEffect(new OpenBotDatabase(root).initialize())).rejects.toThrow(
+      "migration history is missing version 27",
+    );
   });
 
   // Every shipped provider-session table: the v16 baseline (three providers), v17 to v21 (four), v22
@@ -3008,7 +3010,7 @@ describe("OpenBotDatabase", () => {
       const root = await mkdtemp(join(tmpdir(), `openbot-db-provider-v${source}-open-`));
       roots.push(root);
       const database = new OpenBotDatabase(root);
-      await database.initialize();
+      await runCauseEffect(database.initialize());
       const agent = testAgent();
       if (!agent.threadId) throw new Error("The test agent has no thread.");
       const threadId = agent.threadId;
@@ -3073,7 +3075,9 @@ describe("OpenBotDatabase", () => {
       legacy.close();
 
       if (failFirst) {
-        await expect(new OpenBotDatabase(root).initialize()).rejects.toThrow("migration to version 28 failed");
+        await expect(runCauseEffect(new OpenBotDatabase(root).initialize())).rejects.toThrow(
+          "migration to version 28 failed",
+        );
         const rolledBack = new DatabaseSync(database.path);
         expect(rolledBack.prepare("SELECT * FROM projection_provider_sessions ORDER BY id").all()).toEqual(
           originalSessions,
@@ -3095,7 +3099,7 @@ describe("OpenBotDatabase", () => {
       }
 
       const migrated = new OpenBotDatabase(root);
-      await migrated.initialize();
+      await runCauseEffect(migrated.initialize());
       const connection = migrated.connection;
       expect(connection.prepare("SELECT * FROM projection_provider_sessions ORDER BY id").all()).toEqual(
         originalSessions,
@@ -3139,7 +3143,7 @@ describe("OpenBotDatabase", () => {
 
       // A second start runs nothing and keeps the session bound after the migration.
       const reopened = new OpenBotDatabase(root);
-      await reopened.initialize();
+      await runCauseEffect(reopened.initialize());
       expect(reopened.activeProviderSession(threadId, "cline")).toEqual(cline);
       expect(reopened.listProviderSessions(threadId)).toHaveLength(providers.length + 1);
       reopened.close();

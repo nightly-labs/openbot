@@ -314,7 +314,7 @@ const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provi
 const V17_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),`;
 
 // Migration 22 adds the Antigravity provider. This list is frozen with the migration: do not derive it
-// from `AGENT_PROVIDERS`, because a later provider must get its own migration.
+// from `AGENT_PROVIDERS`, because a shipped migration must always write the same table.
 const V22_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),`;
 
 // Migration 23 adds `acp`, the one provider of every custom ACP agent. Frozen with the migration, like V22.
