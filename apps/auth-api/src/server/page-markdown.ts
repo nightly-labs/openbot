@@ -296,7 +296,7 @@ function tableBlock(table: ElementNode, base: string): string[] {
 }
 
 /** The Markdown of the first `<article>` of a page, with links made absolute against `base`. */
-export function articleMarkdown(html: string, base: string): string | undefined {
+function articleMarkdown(html: string, base: string): string | undefined {
   const article = findElement(parseHtml(html), "article");
   if (!article) return undefined;
   return `${blocks(article.children, base).join("\n\n")}\n`;
