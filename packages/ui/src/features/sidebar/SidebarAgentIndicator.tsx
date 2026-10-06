@@ -44,7 +44,11 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           <Show when={state().kind === "working"}>
             <TypingDots class="agent-row-thinking-dots" />
           </Show>
-          <Show when={routinePhase(state()) === "running" || routinePhase(state()) === "queued"}>
+          <Show
+            when={
+              routinePhase(state()) === "running" || routinePhase(state()) === "queued" || state().kind === "limited"
+            }
+          >
             <Clock3 aria-hidden="true" />
           </Show>
           <Show when={waitReason(state())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>

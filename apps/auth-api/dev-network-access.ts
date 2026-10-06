@@ -5,10 +5,13 @@ const MOBILE_LAN_PATHS = new Set([
   "/v1/me",
   "/v1/me/profile",
   "/v1/me/avatar",
+  "/v1/mobile/features",
   "/v2/remote/hosts/",
   "/v2/remote/sessions/",
   "/v2/remote/invites/preview",
   "/v2/remote/invites/accept",
+  "/v2/hosting/plans",
+  "/v2/hosting/servers/",
 ]);
 
 export function developmentNetworkRequestAllowed(remoteAddress: string | undefined, requestUrl: string): boolean {
@@ -25,6 +28,16 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "agent-templates" &&
     segments[2] &&
     segments[2] !== "mine"
+  )
+    return true;
+  // The phone buys a hosted server, opens its payment page again, and wakes it.
+  if (
+    segments.length === 5 &&
+    segments[0] === "v2" &&
+    segments[1] === "hosting" &&
+    segments[2] === "servers" &&
+    segments[3] &&
+    (segments[4] === "checkout" || segments[4] === "wake")
   )
     return true;
   if (

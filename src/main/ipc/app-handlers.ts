@@ -1,3 +1,4 @@
+import { Effect, Semaphore } from "effect";
 // App identity, first-run setup, the analytics preference, external links and the data and
 // diagnostics exports.
 
@@ -17,6 +18,7 @@ import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
 import type { ApprovalAutomation } from "../approval-automation-store";
+import type { BusyMessageModePreferenceStore } from "../busy-message-mode-preference-store";
 import type { LanguageService } from "../language-service";
 import type { LogoColorService } from "../logo-color-service";
 import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
@@ -28,6 +30,7 @@ import {
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
   parseApprovalAutomation,
+  parseBusyMessageModePreference,
   parseExternalDestination,
   parseSetup,
 } from "./app-inputs";
@@ -56,6 +59,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TraceFile } from "../trace-file";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
@@ -67,6 +71,7 @@ export interface AppIpcDependencies {
   setupFile: string;
   analyticsPreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
+  busyMessageMode: BusyMessageModePreferenceStore;
   language: LanguageService;
   logoColor: LogoColorService;
   initializeAgent: () => Promise<void>;
@@ -84,6 +89,7 @@ export function appIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   approvalAutomation,
+  busyMessageMode,
   language,
   logoColor,
   initializeAgent,
@@ -93,7 +99,7 @@ export function appIpcHandlers({
   trace,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
-  let analyticsPreferenceWrite: Promise<unknown> = Promise.resolve();
+  const analyticsPreferenceWrites = Semaphore.makeUnsafe(1);
   return {
     app: {
       getAppInfo: handler((): AppInfo => {
@@ -103,26 +109,37 @@ export function appIpcHandlers({
         }
         return { name: app.getName(), version: app.getVersion(), platform, variant: appVariant };
       }),
-      getSetupState: handler(() => readSetupState(setupFile)),
-      getAnalyticsPreference: handler(() => readAnalyticsPreference(analyticsPreferenceFile)),
+      getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
+      getAnalyticsPreference: handler(() => Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile))),
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) => {
-        const write = analyticsPreferenceWrite.then(async () => {
-          const preference = await writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled);
-          setAnalyticsTrackingEnabled(preference.enabled);
-          return preference;
-        });
-        analyticsPreferenceWrite = write.catch(() => undefined);
-        return write;
+        return runCauseEffect(
+          analyticsPreferenceWrites.withPermit(
+            writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled).pipe(
+              Effect.tap((preference) => Effect.sync(() => setAnalyticsTrackingEnabled(preference.enabled))),
+              Effect.uninterruptible,
+            ),
+          ),
+        );
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
-      setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) => approvalAutomation.set(parsed)),
+      setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) =>
+        runCauseEffect(approvalAutomation.set(parsed)),
+      ),
+      getBusyMessageModePreference: handler(() => busyMessageMode.get()),
+      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
+        runCauseEffect(busyMessageMode.set(parsed)),
+      ),
       getAppLanguagePreference: handler(() => language.preference),
-      setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) => language.set(parsed)),
+      setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) =>
+        runCauseEffect(language.set(parsed)),
+      ),
       getAppLogoColorPreference: handler(() => logoColor.preference),
-      setAppLogoColorPreference: payloadHandler(parseAppLogoColorPreference, (parsed) => logoColor.set(parsed)),
+      setAppLogoColorPreference: payloadHandler(parseAppLogoColorPreference, (parsed) =>
+        runCauseEffect(logoColor.set(parsed)),
+      ),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
-        const state = await writeSetupState(setupFile, input);
-        await service.setPreferredProvider(input.preferredProvider, input.preferredModel);
+        const state = await runCauseEffect(writeSetupState(setupFile, input));
+        await runCauseEffect(service.setPreferredProvider(input.preferredProvider, input.preferredModel));
         await initializeAgent();
         return state;
       }),
@@ -139,17 +156,21 @@ export function appIpcHandlers({
     },
     maintenance: {
       exportData: handler(() =>
-        exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }),
+        runCauseEffect(
+          exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }),
+        ),
       ),
       exportDiagnostics: handler(() =>
-        exportDiagnostics({
-          service,
-          browser,
-          updater,
-          trace,
-          parentWindow: getMainWindow(),
-          translate: language.translate,
-        }),
+        runCauseEffect(
+          exportDiagnostics({
+            service,
+            browser,
+            updater,
+            trace,
+            parentWindow: getMainWindow(),
+            translate: language.translate,
+          }),
+        ),
       ),
     },
   };

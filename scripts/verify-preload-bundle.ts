@@ -2,65 +2,23 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { groupApiMethodName, IPC_ENDPOINTS, type IpcEndpoint } from "@openbot/contracts/ipc";
+import {
+  groupApiMethodName,
+  IPC_ENDPOINTS,
+  IPC_GROUP_PATHS,
+  type IpcEndpoint,
+  type IpcGroupName,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 
 // Runs the built preload bundles in a VM with a fake Electron, after `bun run build`. The types
 // describe the source; this reads what the renderer really gets. It fails when the bundle:
 // - loads a module that a sandboxed preload cannot load, or loads code with `import()`;
 // - exposes a world other than `openbot`, or a value other than a function or a method group;
-// - exposes a method that `IPC_ENDPOINTS` and the hand-written list below do not name, or omits one;
+// - exposes a method that `IPC_ENDPOINTS` at its `IPC_GROUP_PATHS` place and the hand-written list
+//   below do not name, or omits one;
 // - sends a method to a channel other than the channel of its endpoint, or with the wrong operation:
 //   a request must `invoke`, and an event must subscribe with `on` or `once`.
-
-type IpcGroupName = keyof typeof IPC_ENDPOINTS;
-
-// Where `src/preload/index.ts` puts each endpoint group. The empty path is the top of `window.openbot`.
-// A new group does not compile until it has a place, so that the author decides what the page can call.
-const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
-  app: "",
-  providers: "",
-  maintenance: "maintenance",
-  providerRuntimes: "providerRuntimes",
-  voice: "voice",
-  dynamicIsland: "dynamicIsland",
-  computerUse: "computerUse",
-  skills: "skills",
-  customProviders: "customProviders",
-  providerDetection: "providerDetection",
-  customAgents: "customAgents",
-  providerAdmin: "providerAdmin",
-  messaging: "messaging",
-  hostAdmin: "hostAdmin",
-  hostedSites: "hostedSites",
-  githubConnector: "githubConnector",
-  billing: "billing",
-  hostedServers: "hostedServers",
-  marketplaceAgents: "marketplaceAgents",
-  agentTemplates: "agentTemplates",
-  auth: "auth",
-  update: "update",
-  notifications: "notifications",
-  agent: "agent",
-  agentMemories: "agent",
-  sharedTables: "agent",
-  agentRoutines: "agent",
-  channelMemories: "agent",
-  channelRoutines: "agent",
-  mcpServers: "agent",
-  agentAdmin: "agent",
-  agentAttachments: "agent",
-  // The preload calls it from its own drop, paste, and file input handlers.
-  attachmentImports: null,
-  browser: "browser",
-  browserInput: "browser",
-  servers: "servers",
-  storage: "storage",
-  agentImport: "agentImport",
-  plugins: "plugins",
-  host: "host",
-  remoteDesktop: "remoteDesktop",
-};
 
 // Methods that `src/preload/index.ts` writes by hand. Each one narrows a scoped event and must
 // subscribe to its channel. `onAttachmentImport` has no channel: the preload's own handlers call it.
@@ -192,7 +150,7 @@ function runPreload(fileName: string): PreloadRun {
 function expectedMethods(): Map<string, ExpectedMethod> {
   const methods = new Map<string, ExpectedMethod>();
   for (const [group, endpoints] of Object.entries(IPC_ENDPOINTS)) {
-    const parent = isGroupName(group) ? GROUP_PATHS[group] : null;
+    const parent = isGroupName(group) ? IPC_GROUP_PATHS[group] : null;
     if (parent === null) continue;
     for (const [key, endpoint] of Object.entries(endpoints)) {
       const name = groupApiMethodName(key, endpoint);

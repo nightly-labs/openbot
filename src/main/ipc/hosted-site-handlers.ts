@@ -1,3 +1,5 @@
+import type { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // Publishing a local directory to a hosted site, and the sites of one server.
 //
 // Publishing is local: agents publish from the computer that runs them. The list and the delete are
@@ -11,6 +13,7 @@ import { HOSTED_SITES_CAPABILITY, HOSTED_SITES_ROUTES } from "@openbot/contracts
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -29,7 +32,12 @@ function decodeRemoteSiteList(value: unknown): HostedSiteList {
 
 interface HostedSiteRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
-  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
 export interface HostedSiteIpcDependencies {
@@ -54,13 +62,15 @@ export function hostedSiteIpcHandlers({
   return {
     hostedSites: {
       list: scopedQueryHandler({
-        local: () => hostedSites.list(),
+        local: () => runCauseEffect(hostedSites.list()),
         remote: (serverId) => {
           requireRemoteSupport(serverId);
-          return remoteServers.request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
-            method: "POST",
-            body: {},
-          });
+          return runCauseEffect(
+            remoteServers.request(serverId, HOSTED_SITES_ROUTES.list, decodeRemoteSiteList, {
+              method: "POST",
+              body: {},
+            }),
+          );
         },
       }),
       chooseDirectory: handler(async () => {
@@ -74,16 +84,18 @@ export function hostedSiteIpcHandlers({
           : await dialog.showOpenDialog(options);
         return result.canceled ? null : (result.filePaths[0] ?? null);
       }),
-      publish: payloadHandler(parsePublishHostedSite, (site) => hostedSites.publish(site)),
-      replace: payloadHandler(parseReplaceHostedSite, (site) => hostedSites.replace(site)),
+      publish: payloadHandler(parsePublishHostedSite, (site) => runCauseEffect(hostedSites.publish(site))),
+      replace: payloadHandler(parseReplaceHostedSite, (site) => runCauseEffect(hostedSites.replace(site))),
       delete: scopedHandler(parseDeleteHostedSite, {
-        local: ({ siteId }) => hostedSites.delete(siteId),
+        local: ({ siteId }) => runCauseEffect(hostedSites.delete(siteId)),
         remote: ({ siteId }, serverId) => {
           requireRemoteSupport(serverId);
-          return remoteServers.request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
-            method: "POST",
-            body: { siteId },
-          });
+          return runCauseEffect(
+            remoteServers.request(serverId, HOSTED_SITES_ROUTES.remove, acceptEmpty, {
+              method: "POST",
+              body: { siteId },
+            }),
+          );
         },
       }),
     },

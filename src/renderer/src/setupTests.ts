@@ -117,6 +117,11 @@ if (htmlElement && !htmlElement.prototype.scrollTo) {
   htmlElement.prototype.scrollTo = () => undefined;
 }
 
+// jsdom has no User Timing API. The app marks startup points for `dev:bench` and reads none back.
+if (typeof performance.mark !== "function") {
+  Object.defineProperty(performance, "mark", { configurable: true, value: () => undefined });
+}
+
 afterEach(() => {
   cleanup();
   TestResizeObserver.instances.clear();

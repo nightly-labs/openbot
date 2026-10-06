@@ -1,5 +1,6 @@
 import type { CentralAuthUser, UpdateAgentInput } from "@openbot/contracts/ipc";
 import { hasVisibleToasts } from "@openbot/ui";
+import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { createMemo } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -250,6 +251,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ? (conversations[activeAgent()?.id ?? ""]?.page?.hasOlder ?? false)
           : false
       }
+      unloadedHistory={activeAgent() ? unloadedHistory(conversations[activeAgent()?.id ?? ""]?.page) : undefined}
       discontinuous={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.windowMode === "around" : false}
       loadingOlder={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.olderLoading === true : false}
       olderError={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.olderError ?? null) : null}
@@ -322,6 +324,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           : (remoteAgentSettings()?.autoApproveLocked ?? false)
       }
       onSetAgentAutoApprove={setAgentAutoApproveForActiveAgent()}
+      defaultBusyMessageMode={generalSettings().busyMessageMode}
       onClearAgentContext={clearActiveAgentContext()}
       onRespondToBrowserTakeover={respondToBrowserTakeover}
       onCancelQueuedMessage={cancelQueuedMessage}

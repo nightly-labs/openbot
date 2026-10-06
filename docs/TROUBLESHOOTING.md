@@ -162,6 +162,36 @@ On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
 Report the field the message names, together with the details below. The output holds your own file
 paths, so review it before you publish it.
 
+## A company firewall or proxy blocks OpenBot
+
+Sign-in shows "A firewall or proxy on this network blocked OpenBot from reaching `<host>`" when a
+network filter, such as Fortinet, answers in place of the OpenBot service. This occurs when the
+filter shows a block page, or when it inspects TLS with a root certificate that the computer does
+not trust.
+
+OpenBot trusts the root certificates in the operating system store, as a browser does. If the
+company installs its inspection certificate on the computer, OpenBot accepts it. Agent CLIs that
+OpenBot starts, such as Codex and Claude, check certificates by their own rules. Do not turn off
+certificate checks to work around a block.
+
+Ask the network administrator to allow these hosts over HTTPS (TCP 443) and WebSocket:
+
+| Host | Use |
+| --- | --- |
+| `api.openbot.run` | Accounts, sign-in, teams, and hosted servers |
+| `signal.openbot.run` | Connection setup for teams and remote servers |
+| `openbot.run` | Public site and images in invitation emails |
+| `*.openbot.run` | Hosted servers and sites, and `analytics.openbot.run` |
+| `github.com`, `*.githubusercontent.com` | App updates |
+
+Teams and remote servers also send WebRTC traffic to the other device or to the TURN relay that
+Signal names, on the UDP and TCP ports that it names. A filter that blocks WebRTC makes these
+connections slow or stops them. Conversations stay on the computer; the [privacy policy](../PRIVACY.md) lists what each
+host receives.
+
+If the filter puts `openbot.run` in a blocked category, the administrator can ask the vendor to
+review it. For Fortinet, use the FortiGuard web filter lookup.
+
 ## Reset OpenBot
 
 Quit OpenBot before moving data. To reset application state and the shared browser profile while

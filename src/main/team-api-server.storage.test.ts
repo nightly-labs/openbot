@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Who may read and change the host machine's storage from a joined server. The authority is
@@ -53,17 +54,21 @@ function createStorage(): NonNullable<TeamApiOptions["storage"]> & {
     requests,
     deleted,
     cleared,
-    usage: async (input) => {
-      requests.push(input);
-      return usage;
-    },
-    deleteFile: async (fileId) => {
-      if (fileId !== "sent") throw new StorageNotFoundError("The file does not exist or is already deleted.");
-      deleted.push(fileId);
-    },
-    clear: async (category) => {
-      cleared.push(category);
-    },
+    usage: (input) =>
+      Effect.sync(() => {
+        requests.push(input);
+        return usage;
+      }),
+    deleteFile: (fileId) =>
+      Effect.sync(() => {
+        if (fileId !== "sent") throw new StorageNotFoundError("The file does not exist or is already deleted.");
+        deleted.push(fileId);
+        return undefined;
+      }),
+    clear: (category) =>
+      Effect.sync(() => {
+        cleared.push(category);
+      }),
   };
 }
 
@@ -78,8 +83,8 @@ describe("Team API storage access", () => {
       "OpenBot-Capabilities": "storage-v1",
       "Content-Type": "application/json",
     };
-    const invite = await fixture.store.createInvite("member");
-    const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+    const invite = await Effect.runPromise(fixture.store.createInvite("member"));
+    const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
     const asMember = { ...headers, Authorization: `Bearer ${member.sessionToken}` };
     const post = (path: string, body: Record<string, string | boolean>, as = headers) =>
       fetch(`${base}${path}`, { method: "POST", headers: as, body: JSON.stringify(body) });

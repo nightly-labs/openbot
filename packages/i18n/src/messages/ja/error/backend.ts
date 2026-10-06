@@ -137,7 +137,6 @@ export const messages = {
   "error.backend.mcpServerGone": "この MCP サーバーはもう存在しません。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
-  "error.backend.mcpConnectionCancelled": "接続はキャンセルされました。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",

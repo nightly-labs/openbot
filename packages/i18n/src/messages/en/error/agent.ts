@@ -77,6 +77,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
   "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",
+  "error.agent.busyMessageModeLocalOnly":
+    "What messages do while the agent works can only be set on the computer that runs the agent.",
   "error.agent.automationOff": "This agent does not allow local scripts to run its routines.",
   "error.agent.automationPayloadTooLong": "The payload is longer than {limit} characters.",
   "error.agent.automationRateLimited":

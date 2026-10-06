@@ -1,11 +1,45 @@
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { AgentEvent, AgentSummary, ServerNotificationLevel } from "@openbot/contracts/ipc";
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 
 export interface AgentNotificationContent {
   title: string;
   body: string;
   agentId: string;
-  threadId: string;
+  threadId: string | null;
+}
+
+/**
+ * The one notice for a provider plan limit, at every level but "nothing". It is about the account,
+ * so the switch of the agent whose turn found the limit does not silence it.
+ */
+export function notificationForUsageLimit(
+  event: Extract<AgentEvent, { type: "usage-limit-reached" }>,
+  agents: AgentSummary[],
+  translate: AppTranslate,
+  format: AppFormat,
+  level: ServerNotificationLevel,
+): AgentNotificationContent | null {
+  if (level === "nothing") return null;
+  const count = event.agentCount;
+  // A weekly window can reset days later, so a reset that is not today names its day.
+  const resetDate = event.resetsAt === null ? null : new Date(event.resetsAt * 1_000);
+  const reset =
+    resetDate === null
+      ? null
+      : format.date(resetDate, {
+          ...(resetDate.toDateString() === new Date().toDateString() ? {} : { weekday: "short" }),
+          hour: "numeric",
+          minute: "2-digit",
+        });
+  return {
+    title: translate("notification.usageLimit.title", { provider: agentProviderName(event.provider) }),
+    body: reset
+      ? translate("notification.usageLimit.bodyResets", { count, reset })
+      : translate("notification.usageLimit.body", { count }),
+    agentId: event.agentId,
+    threadId: agents.find((agent) => agent.id === event.agentId)?.threadId ?? null,
+  };
 }
 
 /**

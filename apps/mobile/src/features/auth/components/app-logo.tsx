@@ -8,7 +8,6 @@ import { useText } from "@/shared/lib/text";
 
 export interface AppLogoProps {
   animation?: AppLogoAnimation;
-  followDeviceOrientation?: boolean;
   interactive?: boolean;
   size?: number;
 }
@@ -26,20 +25,11 @@ function resolveColor(value: string | number | undefined, fallback: string): str
   return String(value ?? fallback);
 }
 
-export function AppLogo({
-  animation = "none",
-  followDeviceOrientation = false,
-  interactive = false,
-  size = VIEWBOX_SIZE,
-}: AppLogoProps) {
+export function AppLogo({ animation = "none", interactive = false, size = VIEWBOX_SIZE }: AppLogoProps) {
   const { t } = useText();
   const backgroundColor = resolveColor(useCSSVariable("--openbot-logo-production"), "#d6adf2");
   const eyeColor = resolveColor(useCSSVariable("--openbot-logo-eye"), "#040007");
-  const { deviceRotationAnimatedStyle, handlePressIn, leftEyeAnimatedStyle, rightEyeAnimatedStyle } = useAppLogoMotion({
-    animation,
-    followDeviceOrientation,
-    size,
-  });
+  const { handlePressIn, leftEyeAnimatedStyle, rightEyeAnimatedStyle } = useAppLogoMotion({ animation, size });
   const eyeLayerStyle = {
     height: size,
     left: 0,
@@ -49,57 +39,55 @@ export function AppLogo({
   };
 
   const logo = (
-    <Animated.View style={[{ height: size, transformOrigin: "center", width: size }, deviceRotationAnimatedStyle]}>
-      <View
-        style={{ height: size, width: size }}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+    <View
+      style={{ height: size, width: size }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
+        <Rect width={VIEWBOX_SIZE} height={VIEWBOX_SIZE} rx={50} ry={50} fill={backgroundColor} />
+      </Svg>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          eyeLayerStyle,
+          { transformOrigin: [(LEFT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
+          leftEyeAnimatedStyle,
+        ]}
       >
         <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
-          <Rect width={VIEWBOX_SIZE} height={VIEWBOX_SIZE} rx={50} ry={50} fill={backgroundColor} />
+          <Polyline
+            points={LEFT_EYE_POINTS}
+            fill="none"
+            stroke={eyeColor}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={9.5}
+          />
         </Svg>
+      </Animated.View>
 
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            eyeLayerStyle,
-            { transformOrigin: [(LEFT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
-            leftEyeAnimatedStyle,
-          ]}
-        >
-          <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
-            <Polyline
-              points={LEFT_EYE_POINTS}
-              fill="none"
-              stroke={eyeColor}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={9.5}
-            />
-          </Svg>
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            eyeLayerStyle,
-            { transformOrigin: [(RIGHT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
-            rightEyeAnimatedStyle,
-          ]}
-        >
-          <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
-            <Polyline
-              points={RIGHT_EYE_POINTS}
-              fill="none"
-              stroke={eyeColor}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={9.5}
-            />
-          </Svg>
-        </Animated.View>
-      </View>
-    </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          eyeLayerStyle,
+          { transformOrigin: [(RIGHT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
+          rightEyeAnimatedStyle,
+        ]}
+      >
+        <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
+          <Polyline
+            points={RIGHT_EYE_POINTS}
+            fill="none"
+            stroke={eyeColor}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={9.5}
+          />
+        </Svg>
+      </Animated.View>
+    </View>
   );
 
   if (!interactive) return logo;

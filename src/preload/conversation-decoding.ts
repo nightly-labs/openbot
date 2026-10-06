@@ -27,6 +27,7 @@ import {
   decodeRecord,
   guardedListDecoder,
   nullableString,
+  optionalHistoryExtent,
   requiredBoolean,
   requiredNumber,
   requiredString,
@@ -73,6 +74,7 @@ export function decodeConversationPageFromMain(value: unknown): ConversationPage
     pageInfo: {
       hasOlder: requiredBoolean(pageInfo, "hasOlder"),
       olderCursor: nullableString(pageInfo, "olderCursor"),
+      ...optionalHistoryExtent(pageInfo),
     },
     ...(value.readState === undefined ? {} : { readState: decodeReadState(value.readState) }),
   };

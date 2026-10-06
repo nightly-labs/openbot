@@ -83,8 +83,8 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
       }
       flush(() =>
         setCodeLoginState(
-          started.kind === "paste"
-            ? { phase: "paste", verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
+          started.kind === "paste" || started.kind === "link"
+            ? { phase: started.kind, verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
             : {
                 phase: "waiting",
                 userCode: started.userCode,
@@ -288,5 +288,5 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
 
 /** A phase in which the provider can end the sign-in: a code or a page is out, or a code was sent. */
 function isWaitingPhase(state: ProviderCodeLoginState): boolean {
-  return state.phase === "waiting" || state.phase === "paste" || state.phase === "verifying";
+  return state.phase === "waiting" || state.phase === "paste" || state.phase === "link" || state.phase === "verifying";
 }

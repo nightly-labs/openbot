@@ -282,6 +282,14 @@ account identity (name, email and avatar URL), not conversations or workspace co
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
+The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
+system and device model, app state changes, connection steps with server IDs and error text, the
+desktop app version and protocol support of each server, the method, address without query, status
+and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
+does not record message text, files, request bodies or headers, and it masks tokens, keys and email
+addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
+clear it.
+
 Mobile chat uses a local symbol beside links. It does not fetch website icons or Markdown images
 when displaying a conversation. Link destinations are contacted only when you choose to open them.
 
@@ -366,6 +374,13 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The 1Password connection (Marketplace > 1Password) is kept in
+  `~/Library/Application Support/OpenBot/openbot-onepassword-connector-v1.json`, encrypted by the
+  operating system's secret storage. It holds the service account token and the account ID only.
+  OpenBot keeps the list of logins (titles and web addresses) in memory, never on disk. A password
+  or a one-time code is read from 1Password when the browser fills it, goes only to that page, and
+  is never sent to an agent, a provider, a log or a team member. The token and each filled value
+  are redacted from logs, exports and diagnostics.
 - `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
   provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
   origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
@@ -395,7 +410,10 @@ An owner or admin of a joined server can manage its host from their own computer
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
-No response returns a key, and neither computer writes request bodies to its logs.
+No response returns a key, and neither computer writes request bodies to its logs. For a sign-in on
+another device, the host sends the provider's sign-in link, and for Codex, Grok and Cline its
+one-time code, to that computer or browser, which shows them and opens the link only when the admin
+asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
 ## Other network connections
 
@@ -410,6 +428,15 @@ Network traffic can also occur when:
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
   the grant the browser returns, and to renew the token. Nothing about the user's agents,
   conversations or files is sent in those requests;
+- the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
+  pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
+  `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
+  data;
+- the user connects 1Password. Connect runs the user's own 1Password CLI (`op`) on this computer to
+  create the vault "Shared with OpenBot" and a service account that can read only it. OpenBot then
+  reads that vault from 1Password's servers with the token: the vault names, the login titles and
+  web addresses, and, when an agent signs in to a site, that login's username and password or code.
+  Nothing about the user's agents, conversations or files is sent to 1Password;
 - the user connects GitHub in Server settings. OpenBot asks `github.com` for a sign-in code and a
   token, renews the token, and reads the account name and the repositories of the OpenBot GitHub App
   from `api.github.com`. The GitHub page in Server settings loads the account picture from the
@@ -549,6 +576,12 @@ The draft is reviewed before OpenBot saves it; generating a draft does not creat
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
 
+When you change an agent's provider, the new provider receives the chat history with its first
+message. That history includes the work steps that the previous provider recorded: commands, the end
+of their output, changed file paths, tool names, searches and progress notes. OpenBot removes known
+secrets from these steps first. Command output can contain file contents. Reasoning, diffs and
+attachment contents are not sent.
+
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
 stops the publish when a text field looks like a secret. Workspace files and memories are not sent.
@@ -596,8 +629,8 @@ Cursor's sign-in page in your browser, or the CLI uses `CURSOR_API_KEY` from the
 started OpenBot. OpenBot gives that key only to the local CLI, in its environment, and does
 not store it. The CLI keeps its login and session files
 in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
-upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
-on this computer: OpenBot does not show them to team members.
+upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Team members see
+the host's Cursor agents, as for the other providers, when their app supports Cursor.
 
 ### Cline
 
@@ -609,8 +642,8 @@ Sign in opens Cline's sign-in page in your browser, or the CLI uses `CLINE_API_K
 environment that started OpenBot. OpenBot gives that key only to the local CLI, in its environment,
 and does not store it. The CLI keeps its login and session files in `~/.cline`, or in `$CLINE_DIR`.
 OpenBot does not read, copy, or upload these files. Cline's terms apply:
-<https://cline.bot/tos>. Cline agents stay on this computer: OpenBot does not show them to team
-members.
+<https://cline.bot/tos>. Team members see the host's Cline agents, as
+for the other providers, when their app supports Cline.
 
 ### Local model servers
 

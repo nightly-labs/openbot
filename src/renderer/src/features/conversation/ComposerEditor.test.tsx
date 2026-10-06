@@ -17,6 +17,7 @@ function renderComposer(
   agents: AgentProfile[] = [],
   skills: InstalledSkill[] = [],
   mcpServers: McpServerConfig[] = [],
+  sendShortcut: "enter" | "meta-enter" | "ctrl-enter" = "enter",
 ) {
   const onSubmit = vi.fn();
   const onValueChange = vi.fn();
@@ -35,6 +36,7 @@ function renderComposer(
         placeholder="Message Chief"
         ariaLabel="Message Chief"
         disabled={false}
+        sendShortcut={sendShortcut}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
           setValue(nextValue);
@@ -161,5 +163,122 @@ describe("ComposerEditor", () => {
     renderComposer([], "@[Aave](mcp:mcp-aave) is down?", [], [], []);
 
     expect(screen.getByLabelText("Unavailable MCP server Aave")).toBeInTheDocument();
+  });
+
+  it("adds a line on plain Enter and sends on the modifier chord in modifier mode", async () => {
+    const { editor, onSubmit, onValueChange } = renderComposer([], "", [], [], [], "meta-enter");
+
+    await typeQuery(editor, "first");
+    await fireEvent.keyDown(editor, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onValueChange).toHaveBeenCalledWith("first\n"));
+    expect(editor.textContent).toContain("\n");
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, shiftKey: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("sends on Ctrl+Enter in modifier mode on other platforms", async () => {
+    const { editor, onSubmit } = renderComposer([], "", [], [], [], "ctrl-enter");
+
+    await typeQuery(editor, "first");
+    await fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(editor.textContent).toContain("first");
+  });
+
+  it("does not submit a Safari post-composition Enter in modifier mode", async () => {
+    const { editor, onSubmit } = renderComposer([], "", [], [], [], "meta-enter");
+
+    await fireEvent.compositionStart(editor);
+    await typeQuery(editor, "にほんご");
+    // Chromium: before compositionend, with isComposing.
+    await fireEvent.keyDown(editor, { key: "Enter", keyCode: 229, isComposing: true });
+    await fireEvent.compositionEnd(editor);
+    // Safari: after compositionend, without isComposing.
+    await fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // The send chord during composition belongs to the IME too.
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, keyCode: 229, isComposing: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ComposerEditor window focus", () => {
+  const fixtures: HTMLElement[] = [];
+
+  afterEach(() => {
+    document.getSelection()?.removeAllRanges();
+    for (const element of fixtures.splice(0)) element.remove();
+  });
+
+  function fixture(html: string) {
+    const element = document.createElement("div");
+    element.innerHTML = html;
+    document.body.append(element);
+    fixtures.push(element);
+    return element;
+  }
+
+  it("takes focus back when the window returns with nothing focused", () => {
+    const { editor } = renderComposer();
+    expect(editor).not.toHaveFocus();
+
+    fireEvent(window, new Event("focus"));
+
+    expect(editor).toHaveFocus();
+  });
+
+  it("leaves focus in an open dialog", () => {
+    const { editor } = renderComposer();
+    fixture('<div role="dialog" aria-label="Settings"><button type="button">Close</button></div>');
+    const close = screen.getByRole("button", { name: "Close" });
+    close.focus();
+
+    fireEvent(window, new Event("focus"));
+
+    expect(close).toHaveFocus();
+    expect(editor).not.toHaveFocus();
+  });
+
+  it("keeps a text selection outside the composer", () => {
+    const { editor } = renderComposer();
+    const transcript = fixture("<p>Copy this answer</p>");
+    const range = document.createRange();
+    range.selectNodeContents(transcript);
+    document.getSelection()?.addRange(range);
+
+    fireEvent(window, new Event("focus"));
+
+    expect(editor).not.toHaveFocus();
+    expect(document.getSelection()?.toString()).toBe("Copy this answer");
+  });
+
+  it("leaves a disabled composer alone", () => {
+    render(() => (
+      <ComposerEditor
+        agentId="chief"
+        agents={[]}
+        attachments={[]}
+        value=""
+        placeholder="Message Chief"
+        ariaLabel="Message Chief"
+        disabled
+        sendShortcut="enter"
+        onValueChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />
+    ));
+
+    fireEvent(window, new Event("focus"));
+
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).not.toHaveFocus();
   });
 });

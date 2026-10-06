@@ -88,7 +88,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         onReset={resetPanelWidth}
       />
 
-      <header class="browser-preview-header">
+      <header class="window-drag browser-preview-header">
         <span>{t("browser.panel.label")}</span>
         <Show when={props.onNewTab}>
           <Button variant="ghost" size="icon-sm" aria-label={t("browser.newTab")} onClick={() => props.onNewTab?.()}>

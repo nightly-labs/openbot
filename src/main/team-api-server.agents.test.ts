@@ -1,6 +1,9 @@
 import { isAgentSummary } from "@openbot/contracts/ipc";
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { Effect } from "effect";
 import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
+import { AgentLifecycleFailed } from "../backend/agent-service";
+import { StoredStateFailure } from "../backend/stored-state-effects";
 // @vitest-environment node
 
 // The agent collection and the per-agent routes: `src/main/team-api/route-agents.ts` and the
@@ -35,7 +38,9 @@ afterEach(stopTeamApiFixtures);
 describe("TeamApiServer agents", () => {
   it("requires authentication, capability and valid input for a queue edit", async () => {
     const { start, signIn } = await createTeamApiFixture("queue-edit", { configure: true });
-    const editQueuedMessage = vi.fn(async () => ({ agentId: "chief", deliveries: [] }));
+    const editQueuedMessage = vi.fn<TeamApiAgents["editQueuedMessage"]>(() =>
+      Effect.sync(() => ({ agentId: "chief", deliveries: [] })),
+    );
     const { base } = await start({ agents: createAgents({ editQueuedMessage }) });
     const token = await signIn();
     const input = { action: "begin", deliveryId: "delivery-1", editId: "edit-1" };
@@ -69,10 +74,19 @@ describe("TeamApiServer agents", () => {
       input,
       expect.objectContaining({ name: "owner" }),
     );
-    editQueuedMessage.mockRejectedValueOnce(new QueueEditRejectedError("Held by another device"));
+    editQueuedMessage.mockReturnValueOnce(
+      Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "editQueuedMessage",
+          cause: new QueueEditRejectedError("Held by another device"),
+        }),
+      ),
+    );
     const rejected = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
     expect(rejected.status).toBe(409);
-    editQueuedMessage.mockRejectedValueOnce(new Error("Disk write failed"));
+    editQueuedMessage.mockReturnValueOnce(
+      Effect.fail(new AgentLifecycleFailed({ operation: "editQueuedMessage", cause: new Error("Disk write failed") })),
+    );
     const uncertain = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
     expect(uncertain.ok).toBe(false);
     expect(uncertain.status).not.toBe(409);
@@ -81,9 +95,16 @@ describe("TeamApiServer agents", () => {
   it.each(["", "   ", "Plan trips"])("creates an agent through the API with description %j", async (description) => {
     const { root, start, signIn } = await createTeamApiFixture("agent-create", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));
-    await store.initialize();
+    await Effect.runPromise(store.initialize());
     const { base } = await start({
-      agents: createAgents({ createAgent: (input) => store.createAgent(input) }),
+      agents: createAgents({
+        createAgent: (input) =>
+          store
+            .createAgent(input)
+            .pipe(
+              Effect.mapError((error) => new AgentLifecycleFailed({ operation: "createAgent", cause: error.cause })),
+            ),
+      }),
     });
     const token = await signIn();
     const input = {
@@ -151,12 +172,15 @@ describe("TeamApiServer agents", () => {
   it("downloads uploaded and replaced avatars through a WebRTC request and removes them", async () => {
     const { root, start, signIn } = await createTeamApiFixture("agent-avatar", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));
-    await store.initialize();
-    await store.getOrCreate("chief");
+    await Effect.runPromise(store.initialize());
+    await Effect.runPromise(store.getOrCreate("chief"));
     const { base } = await start({
       agents: createAgents({
         listAgents: () => store.list(),
-        setAvatar: (id, image) => store.setAvatar(id, image),
+        setAvatar: (id, image) =>
+          store
+            .setAvatar(id, image)
+            .pipe(Effect.mapError((error) => new AgentLifecycleFailed({ operation: "setAvatar", cause: error.cause }))),
         resolveAvatar: (id) => store.resolveAvatar(id),
       }),
     });
@@ -212,7 +236,7 @@ describe("TeamApiServer agents", () => {
   it("hides OpenCode from old clients and allows protocol 4 to read and change it", async () => {
     const source = opencodeFixture[0];
     if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
-    const updateAgent = vi.fn(async () => source);
+    const updateAgent = vi.fn(() => Effect.sync(() => source));
     const { start, signIn } = await createTeamApiFixture("opencode-visibility", { configure: true });
     const { base } = await start({
       appVersion: "1.0.0",
@@ -250,8 +274,8 @@ describe("TeamApiServer agents", () => {
     const chief: AgentSummary = { ...fixture, id: "chief", provider: "codex", model: "gpt-5.6-luna" };
     const gemini: AgentSummary = { ...fixture, id: "agent-gemini", provider: "antigravity", model: "gemini-3-pro" };
     const option = { name: "Model", description: "", defaultReasoningEffort: "medium" as const };
-    const createAgent = vi.fn(async () => chief);
-    const updateAgent = vi.fn(async () => gemini);
+    const createAgent = vi.fn(() => Effect.sync(() => chief));
+    const updateAgent = vi.fn(() => Effect.sync(() => gemini));
     const { start, signIn } = await createTeamApiFixture("antigravity-visibility", { configure: true });
     const { base } = await start({
       appVersion: "1.0.0",
@@ -368,7 +392,10 @@ describe("TeamApiServer agents", () => {
   });
 
   it("does not create an agent that would start on a provider only the host can use", async () => {
-    const createAgent = vi.fn();
+    const fixture = opencodeFixture[0];
+    if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
+    const explorer: AgentSummary = { ...fixture, id: "explorer", provider: "cursor", model: "composer-2" };
+    const createAgent = vi.fn(() => Effect.sync(() => explorer));
     const newAgentProvider = vi.fn(() => "cursor" as const);
     const { start, signIn } = await createTeamApiFixture("local-only-new-agent", { configure: true });
     const { base } = await start({ appVersion: "1.0.0", agents: createAgents({ createAgent, newAgentProvider }) });
@@ -398,13 +425,38 @@ describe("TeamApiServer agents", () => {
     }
     expect(newAgentProvider).toHaveBeenCalledWith(expect.objectContaining({ model: "composer-2" }));
     expect(createAgent).not.toHaveBeenCalled();
+
+    // Protocol 6 knows Cursor, so the same request starts the agent.
+    await fetch(`${base}/v1/agents`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        [TEAM_PROTOCOL_VERSION_HEADER]: "6",
+        [TEAM_CAPABILITIES_HEADER]: "opencode,local-providers,local-providers-v2,agent-create-model",
+      },
+      body: JSON.stringify({
+        name: "Explorer",
+        description: "",
+        initialMessage: "Hello.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "cursor",
+        model: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+      }),
+    });
+    expect(createAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "cursor", model: "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]" }),
+      undefined,
+      undefined,
+      expect.objectContaining({ id: expect.any(String) }),
+    );
   });
 
   it("keeps agent access on the computer that runs the agent", async () => {
     const fixture = opencodeFixture[0];
     if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
     const source: AgentSummary = { ...fixture, access: "workspace" };
-    const updateAgent = vi.fn(async () => source);
+    const updateAgent = vi.fn(() => Effect.sync(() => source));
     const { start, signIn } = await createTeamApiFixture("agent-access", { configure: true });
     const { base } = await start({
       appVersion: "1.0.0",
@@ -495,12 +547,22 @@ describe("TeamApiServer agents", () => {
     const agents = await fetch(`${base}/v1/agents`, { headers });
     expect(agents.status).toBe(200);
     expect((await agents.json()).map((agent: AgentSummary) => agent.id)).toEqual(["plain"]);
+
+    // Protocol 6 knows `=` and `,`.
+    const v6 = { ...headers, [TEAM_PROTOCOL_VERSION_HEADER]: "6" };
+    const v6Models = await fetch(`${base}/v1/agents/models`, { headers: v6 });
+    expect((await v6Models.json()).map((model: { id: string }) => model.id)).toEqual([
+      "claude-opus-5[effort=high,fast=false]",
+      "claude-fable-5-1[1m]",
+    ]);
+    const v6Agents = await fetch(`${base}/v1/agents`, { headers: v6 });
+    expect((await v6Agents.json()).map((agent: AgentSummary) => agent.id)).toEqual(["plain", "settings"]);
   });
 
   it("duplicates an agent through protocol v3 and places it after the source", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-    await sidebarLayout.initialize();
+    await Effect.runPromise(sidebarLayout.initialize());
     const source = {
       id: "chief",
       provider: "codex",
@@ -527,18 +589,24 @@ describe("TeamApiServer agents", () => {
       preview: "No messages yet",
     } satisfies AgentSummary;
     let agents: AgentSummary[] = [source];
-    const duplicateAgent = vi.fn(async () => {
-      agents = [duplicate, source];
-      return duplicate;
-    });
-    let committedDuplicate: Awaited<ReturnType<TeamApiAgents["commitAgentDuplication"]>> | null = null;
-    const commitAgentDuplication = vi.fn(async (_agentId, layout) => {
-      committedDuplicate = { agent: duplicate, layout };
-      return committedDuplicate;
-    });
-    const deleteAgent = vi.fn(async (agentId: string) => {
-      agents = agents.filter((agent) => agent.id !== agentId);
-    });
+    const duplicateAgent = vi.fn(() =>
+      Effect.sync(() => {
+        agents = [duplicate, source];
+        return duplicate;
+      }),
+    );
+    let committedDuplicate: Effect.Success<ReturnType<TeamApiAgents["commitAgentDuplication"]>> | null = null;
+    const commitAgentDuplication = vi.fn((_agentId, layout) =>
+      Effect.sync(() => {
+        committedDuplicate = { agent: duplicate, layout };
+        return committedDuplicate;
+      }),
+    );
+    const deleteAgent = vi.fn((agentId: string) =>
+      Effect.sync(() => {
+        agents = agents.filter((agent) => agent.id !== agentId);
+      }),
+    );
     // A channel the user filed in the sidebar. The layout prunes every id outside the set it is
     // given, so duplication must offer the channels as well as the agents.
     const channelId = "channel-launch-room";
@@ -551,12 +619,13 @@ describe("TeamApiServer agents", () => {
       commitAgentDuplication,
       deleteAgent,
     });
-    const section = await sidebarLayout.mutate(
-      { type: "create", name: "Core", agentId: source.id },
-      new Set([source.id]),
+    const section = await Effect.runPromise(
+      sidebarLayout.mutate({ type: "create", name: "Core", agentId: source.id }, new Set([source.id])),
     );
     const sectionId = section.sections[0]?.id ?? null;
-    await sidebarLayout.mutate({ type: "move-agent", agentId: channelId, sectionId, beforeAgentId: null }, chatIds());
+    await Effect.runPromise(
+      sidebarLayout.mutate({ type: "move-agent", agentId: channelId, sectionId, beforeAgentId: null }, chatIds()),
+    );
     const { base } = await start({
       agents: agentService,
       sidebarLayout,
@@ -594,9 +663,11 @@ describe("TeamApiServer agents", () => {
     expect(commitAgentDuplication).toHaveBeenCalledWith(duplicate.id, expect.objectContaining({ revision: 3 }));
     expect(deleteAgent).not.toHaveBeenCalled();
 
-    const currentLayout = await sidebarLayout.mutate(
-      { type: "create", name: "Later", agentId: duplicate.id },
-      new Set([...chatIds(), duplicate.id]),
+    const currentLayout = await Effect.runPromise(
+      sidebarLayout.mutate(
+        { type: "create", name: "Later", agentId: duplicate.id },
+        new Set([...chatIds(), duplicate.id]),
+      ),
     );
 
     const retry = await fetch(`${base}/v1/agents/${source.id}/duplicate`, {
@@ -618,7 +689,7 @@ describe("TeamApiServer agents", () => {
   it("attempts layout cleanup when duplicate deletion reports an error", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate-rollback", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-    await sidebarLayout.initialize();
+    await Effect.runPromise(sidebarLayout.initialize());
     const duplicate = {
       id: "chief-copy",
       provider: "codex",
@@ -636,15 +707,17 @@ describe("TeamApiServer agents", () => {
       avatarHue: null,
       avatarUrl: null,
     } satisfies AgentSummary;
-    const deleteAgent = vi.fn(async () => {
-      throw new Error("agent cleanup failed");
-    });
+    const deleteAgent = vi.fn(() =>
+      Effect.fail(new AgentLifecycleFailed({ operation: "deleteAgent", cause: new Error("agent cleanup failed") })),
+    );
     const agents = createAgents({
       listAgents: () => [duplicate],
-      duplicateAgent: vi.fn(async () => duplicate),
+      duplicateAgent: vi.fn(() => Effect.sync(() => duplicate)),
       deleteAgent,
     });
-    vi.spyOn(sidebarLayout, "placeDuplicateAfter").mockRejectedValueOnce(new Error("layout persistence failed"));
+    vi.spyOn(sidebarLayout, "placeDuplicateAfter").mockReturnValueOnce(
+      Effect.fail(new StoredStateFailure({ cause: new Error("layout persistence failed") })),
+    );
     const removeAgent = vi.spyOn(sidebarLayout, "removeAgent");
     const { base } = await start({
       agents,
@@ -801,17 +874,19 @@ describe("TeamApiServer agents", () => {
     // below reads back came off `fetch` as frozen wire JSON, which still says `botId`.
     const { agentId: runAgentId, ...runRest } = run;
     const wireRun = { ...runRest, botId: runAgentId };
-    const deleteRoutine = vi.fn(async ({ routineId }: { routineId: string }) => {
-      const index = routines.findIndex((routine) => routine.id === routineId);
-      if (index >= 0) routines.splice(index, 1);
-    });
+    const deleteRoutine = vi.fn(({ routineId }: { routineId: string }) =>
+      Effect.sync(() => {
+        const index = routines.findIndex((routine) => routine.id === routineId);
+        if (index >= 0) routines.splice(index, 1);
+      }),
+    );
     const { base } = await start({
       agents: createAgents({
         listRoutines: (agentId) => routines.filter((routine) => routine.agentId === agentId),
         createRoutine,
         updateRoutine,
         deleteRoutine,
-        testRoutine: vi.fn(async () => run),
+        testRoutine: vi.fn(() => Effect.sync(() => run)),
         listRoutineRuns: vi.fn(() => [run]),
       }),
     });
@@ -857,15 +932,18 @@ describe("TeamApiServer agents", () => {
       acknowledgeFailedTurn: (agentId, turnId) => {
         failures.push({ agentId, turnId });
       },
-      respondToPrompt: async (input: unknown) => {
-        prompts.push(input);
-      },
-      respondToApproval: async (input: unknown) => {
-        approvals.push(input);
-      },
-      respondToBrowserTakeover: async (input: unknown) => {
-        takeovers.push(input);
-      },
+      respondToPrompt: (input: unknown) =>
+        Effect.sync(() => {
+          prompts.push(input);
+        }),
+      respondToApproval: (input: unknown) =>
+        Effect.sync(() => {
+          approvals.push(input);
+        }),
+      respondToBrowserTakeover: (input: unknown) =>
+        Effect.sync(() => {
+          takeovers.push(input);
+        }),
     });
     const { base } = await start({ agents });
 
@@ -923,7 +1001,7 @@ describe("TeamApiServer agents", () => {
 it("requires authentication and the profile capability before generating an editable draft", async () => {
   const { root, start, signIn } = await createTeamApiFixture("profile-generation", { configure: true });
   const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-  await sidebarLayout.initialize();
+  await Effect.runPromise(sidebarLayout.initialize());
   const draft = {
     name: "Researcher",
     title: "Science",
@@ -936,10 +1014,11 @@ it("requires authentication and the profile capability before generating an edit
   const { base } = await start({
     sidebarLayout,
     agents: createAgents({
-      generateProfile: async (input) => {
-        prompt = input.prompt;
-        return draft;
-      },
+      generateProfile: (input) =>
+        Effect.sync(() => {
+          prompt = input.prompt;
+          return draft;
+        }),
     }),
   });
   const token = await signIn({ protocol: TEAM_PROTOCOL_V3 });
@@ -977,7 +1056,7 @@ it("requires authentication and the profile capability before generating an edit
 
 it("requires authentication and the secure-handoff capability before accepting a remote secret", async () => {
   const { start, signIn } = await createTeamApiFixture("secure-auth", { configure: true });
-  const submit = vi.fn(async () => undefined);
+  const submit = vi.fn(() => Effect.sync(() => undefined));
   const { base } = await start({ agents: createAgents({ respondToBrowserSecret: submit }) });
   const token = await signIn();
   const input = { requestId: "auth", agentId: "chief", decision: "submit", secret: "729104" };

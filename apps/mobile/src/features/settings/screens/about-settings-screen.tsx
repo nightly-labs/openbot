@@ -1,3 +1,4 @@
+import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { Typography } from "heroui-native";
 import { useState } from "react";
@@ -9,7 +10,6 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const PRODUCT_NAME = "OpenBot";
@@ -17,12 +17,9 @@ const PRODUCT_NAME = "OpenBot";
 export function AboutSettingsScreen() {
   const { t } = useText();
   const version = Constants.expoConfig?.version ?? t("mobile.settings.about.development");
-  const build = isIOS
-    ? Constants.platform?.ios?.buildNumber
-    : isAndroid
-      ? Constants.platform?.android?.versionCode
-      : undefined;
-  const versionLabel = build != null ? `${version} (${build})` : version;
+  // The build number of the installed app. EAS sets it at build time, so app.json does not have it.
+  const build = Application.nativeBuildVersion;
+  const versionLabel = build ? `${version} (${build})` : version;
   const [error, setError] = useState<string | null>(null);
   function open(url: string) {
     setError(null);

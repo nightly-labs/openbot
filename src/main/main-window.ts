@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 /**
  * Every `BrowserWindow` the desktop app opens, the renderer URLs they load, and the application
  * menu. It is the one surface that legitimately keeps a mutable window handle: macOS destroys the
@@ -39,6 +40,7 @@ import {
   writeMainWindowBounds,
 } from "./main-window-state";
 import type { RemoteServerManager } from "./remote-server-manager";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
@@ -90,8 +92,8 @@ export interface MainWindowController {
   openMainWindow: () => BrowserWindow;
   ensureMainWindow: () => Promise<BrowserWindow>;
   loadRenderer: (window: BrowserWindow) => Promise<void>;
-  restoreMainWindowBounds: () => Promise<void>;
-  flushMainWindowBounds: () => Promise<void>;
+  restoreMainWindowBounds: () => Effect.Effect<void>;
+  flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 export function createMainWindowController({
@@ -157,6 +159,7 @@ export function createMainWindowController({
     });
 
     window.once("ready-to-show", () => {
+      performance.mark("openbot:window-ready");
       if (
         shouldShowDevelopmentWindow({
           remoteRole: developmentRemoteRole,
@@ -223,7 +226,7 @@ export function createMainWindowController({
         return;
       }
       event.preventDefault();
-      setImmediate(() => void services.browser.close(tabId).catch(() => undefined));
+      setImmediate(() => void Effect.runPromise(services.browser.close(tabId)).catch(() => undefined));
     });
     window.webContents.on("context-menu", (event, params) => {
       if (inspectElementModifierPressed) {
@@ -263,7 +266,7 @@ export function createMainWindowController({
       const services = getServices();
       if (services) {
         forwardAgentEvent("local", { type: "runtime-snapshot", snapshot: services.service.getRuntimeSnapshot() });
-        services.remoteServers.refreshRuntimeSnapshots();
+        Effect.runFork(services.remoteServers.refreshRuntimeSnapshots());
       }
     });
 
@@ -391,8 +394,10 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
   window.setAlwaysOnTop(true, "floating");
   // The agent works wherever the user left the window, which can be another Space or another
   // application's full screen. One overlay on every Space is what lets the rim follow it there
-  // without a second window and without pulling the user out of the Space they are on.
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // without a second window and without pulling the user out of the Space they are on. The
+  // overlays are built again after each idle period, and without `skipTransformProcessType` each
+  // build would hide the Dock icon and every OpenBot window for a moment.
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // Nothing on this surface may be pressed, and it covers another application's whole window, so
   // every event is handed straight on to the window below it.
   window.setIgnoreMouseEvents(true, { forward: true });
@@ -556,12 +561,16 @@ export function configureApplicationMenu(service: AgentService, updater: UpdateS
           {
             label: translate("menu.stopAllAgents"),
             accelerator: "CommandOrControl+.",
-            click: () => void service.interruptAll(),
+            click: () => {
+              Effect.runFork(service.interruptAll());
+            },
           },
           { type: "separator" },
           {
             label: translate("menu.checkForUpdates"),
-            click: () => void updater.checkForUpdates(),
+            click: () => {
+              Effect.runFork(updater.checkForUpdates());
+            },
           },
           { type: "separator" },
           {

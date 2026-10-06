@@ -5,15 +5,27 @@ import {
   AGENT_REASONING_EFFORTS,
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
+  isAvatarHue,
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
 const profileFields = {
   name: z.string().trim().min(1).max(INPUT_LIMITS.agentName),
   title: z.string().max(INPUT_LIMITS.agentTitle),
-  description: z.string().max(INPUT_LIMITS.agentDescription),
+  description: z
+    .string()
+    .max(INPUT_LIMITS.agentDescription)
+    .describe(
+      `Standing instructions, at most ${INPUT_LIMITS.agentDescription} characters. Shorten longer instructions before calling this tool.`,
+    ),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
-  avatarHue: z.literal(AVATAR_HUES).nullable(),
+  // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
+  avatarHue: z
+    .number()
+    .int()
+    .refine(isAvatarHue, "Invalid avatar hue.")
+    .nullable()
+    .describe(`One of ${AVATAR_HUES.join(", ")}, or null for an automatic hue.`),
 };
 
 export const createAgentToolSchema = z
@@ -102,3 +114,28 @@ export const readAgentToolSchema = z
       .optional(),
   })
   .strict();
+
+export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "list_models",
+  "read_agent",
+  "create_agent",
+  "update_profile",
+]);
+
+/**
+ * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
+ * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
+ * trimmed length.
+ */
+export function profileToolErrorMessage(error: unknown): string {
+  if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
+  const details = error.issues.map((issue) => {
+    if (issue.code === "unrecognized_keys") return "Remove unsupported profile fields.";
+    const field = issue.path.join(".") || "arguments";
+    if (issue.code === "too_big" && issue.origin === "string" && typeof issue.input === "string") {
+      return `${field} must have at most ${issue.maximum} characters; received ${issue.input.length}. Shorten it and retry.`;
+    }
+    return `${field}: ${issue.message}`;
+  });
+  return `${details.join(" ")} Correct the arguments and retry.`;
+}

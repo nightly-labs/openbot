@@ -1,0 +1,18 @@
+[
+  {
+    "provider": "cursor",
+    "id": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]",
+    "name": "GPT-5.6 Sol",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["medium"]
+  },
+  {
+    "provider": "cline",
+    "id": "cline/free-model",
+    "name": "Free model",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["medium"]
+  }
+]

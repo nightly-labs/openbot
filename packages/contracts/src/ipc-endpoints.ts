@@ -208,6 +208,7 @@ import type {
   SlackWorkspaceInput,
 } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type { OnePasswordConnectInput, OnePasswordConnectorStatus } from "./ipc-onepassword-connector";
 import type {
   DetectedModelServer,
   DiscoverModelsInput,
@@ -216,6 +217,7 @@ import type {
 } from "./ipc-provider-detection";
 import type {
   AcknowledgeFailedTurnInput,
+  BusyMessageModePreference,
   CancelQueuedMessageInput,
   EditQueuedMessageInput,
   InterruptTurnInput,
@@ -403,6 +405,10 @@ export const IPC_ENDPOINTS = {
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
+    getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
+    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
+      "app:set-busy-message-mode",
+    ),
     getAppLanguagePreference: request<undefined, AppLanguagePreference>()("app:get-language-preference"),
     setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
       "app:set-language-preference",
@@ -619,6 +625,22 @@ export const IPC_ENDPOINTS = {
     openVerification: request<undefined, void>()("github-connector:open-verification"),
     openInstall: request<undefined, void>()("github-connector:open-install"),
     changed: event<GitHubConnectorStatus>()("github-connector:changed"),
+  },
+  // The 1Password connection of this computer. Local only, like `githubConnector`. The token goes
+  // from the renderer to main once, in `connectWithToken`; every answer is the status only.
+  onePasswordConnector: {
+    status: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:status"),
+    // Looks again for the CLI and the 1Password app's CLI integration, for a page that opens or regains focus.
+    checkSetup: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:check-setup"),
+    // Downloads the CLI release that main pins, into a folder that OpenBot owns.
+    installCli: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:install-cli"),
+    // Opens the 1Password app, or its download page when it is not installed.
+    openApp: request<undefined, void>()("onepassword-connector:open-app"),
+    connect: request<OnePasswordConnectInput, OnePasswordConnectorStatus>()("onepassword-connector:connect"),
+    connectWithToken: request<string, OnePasswordConnectorStatus>()("onepassword-connector:connect-with-token"),
+    cancel: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:cancel"),
+    disconnect: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:disconnect"),
+    changed: event<OnePasswordConnectorStatus>()("onepassword-connector:changed"),
   },
   hostedSites: {
     // The sites of one server. A joined server answers through `hosted-sites-v1`.
@@ -980,6 +1002,62 @@ export const IPC_ENDPOINTS = {
 
 export type IpcEndpoints = typeof IPC_ENDPOINTS;
 
+/**
+ * Where each group sits on `window.openbot`. The empty path is the top level, and several groups can
+ * share one path: the agent groups are spread into `agent`. Null keeps a group off the page; only the
+ * preload calls it. A new group does not compile until it has a place here, so the author decides
+ * what the page can call. `OpenBotDesktopApi`, the built-preload verifier and the test harness all
+ * read this table; the preload and the preview mock are checked against it through the type.
+ */
+export const IPC_GROUP_PATHS = {
+  app: "",
+  maintenance: "maintenance",
+  providers: "",
+  providerRuntimes: "providerRuntimes",
+  voice: "voice",
+  dynamicIsland: "dynamicIsland",
+  computerUse: "computerUse",
+  skills: "skills",
+  customProviders: "customProviders",
+  providerDetection: "providerDetection",
+  customAgents: "customAgents",
+  providerAdmin: "providerAdmin",
+  messaging: "messaging",
+  hostAdmin: "hostAdmin",
+  githubConnector: "githubConnector",
+  onePasswordConnector: "onePasswordConnector",
+  hostedSites: "hostedSites",
+  billing: "billing",
+  hostedServers: "hostedServers",
+  marketplaceAgents: "marketplaceAgents",
+  agentTemplates: "agentTemplates",
+  auth: "auth",
+  update: "update",
+  notifications: "notifications",
+  agent: "agent",
+  agentMemories: "agent",
+  sharedTables: "agent",
+  agentRoutines: "agent",
+  channelMemories: "agent",
+  channelRoutines: "agent",
+  agentAttachments: "agent",
+  // The preload calls it from its own drop, paste, and file input handlers.
+  attachmentImports: null,
+  browser: "browser",
+  browserInput: "browser",
+  servers: "servers",
+  agentAdmin: "agent",
+  mcpServers: "agent",
+  storage: "storage",
+  agentImport: "agentImport",
+  plugins: "plugins",
+  host: "host",
+  remoteDesktop: "remoteDesktop",
+} as const satisfies { readonly [Group in keyof IpcEndpoints]: string | null };
+
+export type IpcGroupName = keyof IpcEndpoints;
+type IpcGroupPaths = typeof IPC_GROUP_PATHS;
+
 // What a typed endpoint looks like to the renderer. A payload that may be `undefined` is an optional
 // argument. A server-scoped payload loses its scope and takes the server last instead, because the
 // preload builds the scope; left out, it is the selected server. A scope that carries nothing takes
@@ -1027,6 +1105,30 @@ export type GroupApi<Group extends IpcEndpointGroup> = {
     ? Subscribe<Group[Key]>
     : Invoke<Group[Key]>;
 };
+
+type GroupsAt<Path extends string> = {
+  [Group in IpcGroupName]: IpcGroupPaths[Group] extends Path ? Group : never;
+}[IpcGroupName];
+
+type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (
+  value: infer Intersection,
+) => void
+  ? Intersection
+  : never;
+
+// Distributes over a union of groups, one `GroupApi` each.
+type GroupApis<Group extends IpcGroupName> = Group extends IpcGroupName ? GroupApi<IpcEndpoints[Group]> : never;
+
+/** Every group at one path of `window.openbot`, as one surface: `PathApi<"agent">` is all nine agent groups. */
+export type PathApi<Path extends string> = UnionToIntersection<GroupApis<GroupsAt<Path>>>;
+
+type NestedPath = Exclude<IpcGroupPaths[IpcGroupName], "" | null>;
+
+/**
+ * `window.openbot` as `IPC_GROUP_PATHS` lays it out, with every method passed straight through.
+ * `OpenBotDesktopApi` is this, except for the few members the preload writes by hand.
+ */
+export type BridgedDesktopApi = PathApi<""> & { [Path in NestedPath]: PathApi<Path> };
 
 /** The runtime twin of `GroupApi`'s method names, for the preload bridge and the test harness. */
 export function groupApiMethodName(key: string, endpoint: IpcEndpoint): string {

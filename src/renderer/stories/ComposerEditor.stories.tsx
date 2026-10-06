@@ -189,6 +189,33 @@ export const SkillPickerLongDescription: Story = {
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
 };
 
+/** A workspace copy and a marketplace copy share a name, so each row shows its slug. */
+export const SkillPickerDuplicateNames: Story = {
+  args: {
+    skills: [
+      ...installedSkills,
+      {
+        ...installedSkills[0],
+        skillId: "workspace:release-notes-team",
+        slug: "release-notes-team",
+        origin: "workspace",
+      },
+    ],
+    skillPickerRequest: 1,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const SkillPickerEmpty: Story = {
+  args: { skills: [], skillPickerRequest: 1 },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
+export const SkillPickerLoadFailed: Story = {
+  args: { skills: [], skillsLoadFailed: true, skillPickerRequest: 1 },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+};
+
 export const CompactComposerPicker: Story = {
   args: {
     skills: installedSkills,

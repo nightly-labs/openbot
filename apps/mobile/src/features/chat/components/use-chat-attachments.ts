@@ -16,6 +16,7 @@ import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
+import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 
@@ -140,7 +141,7 @@ export function useChatAttachments(
     // Check before reading: a rejected file should not be copied into memory first.
     if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: safeName }));
     assertSupported(safeName);
-    return { name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri };
+    return { name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await readFileBase64(file), uri };
   }
   async function addFile(uri: string, name: string) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());

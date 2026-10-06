@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Effect, Exit, Scope } from "effect";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../effect-boundary";
 import { normalizePastedCode, parseCliCodePrompt, startCliCodeLogin } from "./cli-code-login";
 
 // What the pinned CLIs printed with no browser, in an ubuntu:24.04 container (Grok 1.0.22 on
@@ -26,6 +28,13 @@ const GROK_OUTPUT = [
 ].join("\n");
 const CLAUDE_URL = "https://claude.com/cai/oauth/authorize?code=true&code_challenge=feIha1bB&state=wKR2LafO";
 const CLAUDE_OUTPUT = `Opening browser to sign in…\r\nIf the browser didn't open, visit: \u001b]8;;${CLAUDE_URL}\u0007${CLAUDE_URL}\u001b]8;;\u0007\r\nPaste code here if prompted > `;
+// Cursor 2026.10.01 `login` with `NO_OPEN_BROWSER=1`, on stdout, and Cline 3.0.68 `auth -p cline`,
+// both on macOS. The challenge and the code are shortened.
+const CURSOR_URL =
+  "https://cursor.com/loginDeepControl?challenge=km32Nwn&uuid=69f1edda-7ada&mode=login&redirectTarget=cli&supportsSelectedTeamLogin=true";
+const CURSOR_OUTPUT = `Starting login process...\nAuthenticating with Cursor...\nWaiting for browser authentication...\nOpen a browser and navigate to this link: ${CURSOR_URL}\n`;
+const CLINE_OUTPUT =
+  "\u001b[2m[auth] Enter this code in your browser: QVFH-LKDN\u001b[0m\n\u001b[2m[auth] https://authkit.cline.bot/device?user_code=QVFH-LKDN\u001b[0m\n";
 
 describe("parseCliCodePrompt", () => {
   it("reads the Grok device code only once its line is printed", () => {
@@ -43,6 +52,23 @@ describe("parseCliCodePrompt", () => {
     expect(parseCliCodePrompt("paste", CLAUDE_OUTPUT)).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
     expect(parseCliCodePrompt("paste", CLAUDE_OUTPUT.slice(0, CLAUDE_OUTPUT.indexOf("Paste")))).toBeNull();
   });
+
+  it("reads the Cursor link only once its line has ended", () => {
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT)).toEqual({ flow: "link", verificationUrl: CURSOR_URL });
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT.slice(0, CURSOR_OUTPUT.indexOf("&mode")))).toBeNull();
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT.trimEnd())).toBeNull();
+    expect(parseCliCodePrompt("link", `Open <${CURSOR_URL}>`)).toEqual({ flow: "link", verificationUrl: CURSOR_URL });
+  });
+
+  it("reads the Cline device code that comes before its link", () => {
+    expect(parseCliCodePrompt("device", CLINE_OUTPUT)).toEqual({
+      flow: "device",
+      userCode: "QVFH-LKDN",
+      verificationUrl: "https://authkit.cline.bot/device",
+      verificationUrlComplete: "https://authkit.cline.bot/device?user_code=QVFH-LKDN",
+    });
+    expect(parseCliCodePrompt("device", CLINE_OUTPUT.slice(0, CLINE_OUTPUT.indexOf("user_code")))).toBeNull();
+  });
 });
 
 describe("normalizePastedCode", () => {
@@ -57,6 +83,15 @@ describe("normalizePastedCode", () => {
 describe("startCliCodeLogin", () => {
   let directory: string;
   let fakeClaude: string;
+  const scopes: Scope.Closeable[] = [];
+  afterEach(async () => {
+    for (const scope of scopes.splice(0)) await Effect.runPromise(Scope.close(scope, Exit.void));
+  });
+  function start(options: Parameters<typeof startCliCodeLogin>[0]) {
+    const scope = Scope.makeUnsafe();
+    scopes.push(scope);
+    return runCauseEffect(startCliCodeLogin(options).pipe(Effect.provideService(Scope.Scope, scope)));
+  }
 
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), "openbot-code-login-"));
@@ -85,7 +120,7 @@ process.stdin.on("data", (chunk) => {
   });
 
   function login() {
-    return startCliCodeLogin({
+    return start({
       flow: "paste",
       executable: process.execPath,
       argv: [fakeClaude],
@@ -95,38 +130,38 @@ process.stdin.on("data", (chunk) => {
   }
 
   it.skipIf(process.platform !== "linux")("types a pasted code into the CLI's prompt on a terminal", async () => {
-    const started = login();
-    expect(await started.prompt).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
+    const started = await login();
+    expect(await runCauseEffect(started.prompt)).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
     started.submit("good-code");
-    await expect(started.done).resolves.toBeUndefined();
+    await expect(runCauseEffect(started.done)).resolves.toBeUndefined();
   });
 
   it.skipIf(process.platform !== "linux")(
     "reports a refused code without quoting it, and masks it in logs",
     async () => {
-      const started = login();
-      await started.prompt;
+      const started = await login();
+      await runCauseEffect(started.prompt);
       const code = "refused-code-7Hq2#state";
       started.submit(code);
-      await expect(started.done).rejects.toThrow(sourceText("error.provider.codeLoginRefused"));
+      await expect(runCauseEffect(started.done)).rejects.toThrow(sourceText("error.provider.codeLoginRefused"));
       expect(redactText(`Login failed: ${code}`)).not.toContain(code);
     },
   );
 
-  it.skipIf(process.platform === "linux")("refuses a pasted-code sign-in off Linux", () => {
-    expect(login).toThrow(sourceText("error.provider.codeLoginUnsupported"));
+  it.skipIf(process.platform === "linux")("refuses a pasted-code sign-in off Linux", async () => {
+    await expect(login()).rejects.toThrow(sourceText("error.provider.codeLoginUnsupported"));
   });
 
   it("stops a CLI that never finishes", async () => {
-    const started = startCliCodeLogin({
+    const started = await start({
       flow: "device",
       executable: process.execPath,
       argv: ["-e", "setInterval(() => undefined, 1000)"],
       env: {},
       timeoutMs: 200,
     });
-    await expect(started.done).rejects.toThrow("timed out");
-    await expect(started.prompt).rejects.toThrow();
+    await expect(runCauseEffect(started.done)).rejects.toThrow("timed out");
+    await expect(runCauseEffect(started.prompt)).rejects.toThrow();
     expect(started.child.killed).toBe(true);
   });
 });

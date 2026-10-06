@@ -5,14 +5,16 @@ import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { Stack, useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import { Plus } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { requestComposerFocus, requestComposerText } from "@/features/chat/model/composer-requests";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { haptics } from "@/shared/lib/haptics";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
 /** The route name of an agent chat in the app stack, `app/(app)/chat/[agentId].tsx`. */
@@ -36,26 +38,36 @@ export function CreateSkillAction({ agent }: { agent: MobileAgent }) {
     },
     [agent.serverId, agent.id],
   );
+  const create = () => {
+    if (!sheetStack) return;
+    void haptics.impact("light");
+    requestComposerText({ serverId: agent.serverId, agentId: agent.id, text: SKILL_CREATION_REQUEST });
+    sent.current = true;
+    const state = sheetStack.getState();
+    const below = state?.routes[state.index - 1];
+    const params = below?.params;
+    if (below?.name === CHAT_ROUTE && params && "agentId" in params && params.agentId === agent.id) {
+      sheetStack.goBack();
+    } else {
+      // The sheet opened from the list: this agent's chat takes the place of the sheet.
+      sheetStack.dispatch(StackActions.replace(CHAT_ROUTE, { agentId: agent.id }));
+    }
+  };
+  if (isAndroid)
+    return (
+      <AndroidHeaderButton
+        placement="right"
+        icon={Plus}
+        accessibilityLabel={t("mobile.agent.skill.create")}
+        onPress={create}
+      />
+    );
   return (
     <Stack.Toolbar placement="right">
       <Stack.Toolbar.Button
         icon={isIOS ? "plus" : undefined}
         accessibilityLabel={t("mobile.agent.skill.create")}
-        onPress={() => {
-          if (!sheetStack) return;
-          void haptics.impact("light");
-          requestComposerText({ serverId: agent.serverId, agentId: agent.id, text: SKILL_CREATION_REQUEST });
-          sent.current = true;
-          const state = sheetStack.getState();
-          const below = state?.routes[state.index - 1];
-          const params = below?.params;
-          if (below?.name === CHAT_ROUTE && params && "agentId" in params && params.agentId === agent.id) {
-            sheetStack.goBack();
-          } else {
-            // The sheet opened from the list: this agent's chat takes the place of the sheet.
-            sheetStack.dispatch(StackActions.replace(CHAT_ROUTE, { agentId: agent.id }));
-          }
-        }}
+        onPress={create}
       >
         {isIOS ? undefined : "+"}
       </Stack.Toolbar.Button>

@@ -1,7 +1,9 @@
 // @vitest-environment node
 
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
-import { listSiblingOpenBotInstances, parseSiblingInstances } from "./update-sibling-instances";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { listSiblingOpenBotInstances, parseSiblingInstances, SiblingScanFailed } from "./update-sibling-instances";
 
 const processMock = vi.hoisted(() => ({ execFile: vi.fn() }));
 vi.mock("node:child_process", () => processMock);
@@ -50,7 +52,7 @@ describe("listSiblingOpenBotInstances", () => {
       },
     );
     await expect(
-      listSiblingOpenBotInstances({ executablePath: EXECUTABLE, currentPid: 101, platform: "darwin" }),
+      runCauseEffect(listSiblingOpenBotInstances({ executablePath: EXECUTABLE, currentPid: 101, platform: "darwin" })),
     ).rejects.toThrow("Could not verify other OpenBot sessions");
     expect(processMock.execFile).toHaveBeenCalledWith(
       "/bin/ps",
@@ -59,27 +61,29 @@ describe("listSiblingOpenBotInstances", () => {
     );
   });
   it("scans with ps on macOS", async () => {
-    const listProcesses = vi.fn(async () => PS_OUTPUT);
-    const siblings = await listSiblingOpenBotInstances({
-      executablePath: EXECUTABLE,
-      currentPid: 101,
-      platform: "darwin",
-      listProcesses,
-    });
+    const listProcesses = vi.fn(() => Effect.succeed(PS_OUTPUT));
+    const siblings = await runCauseEffect(
+      listSiblingOpenBotInstances({
+        executablePath: EXECUTABLE,
+        currentPid: 101,
+        platform: "darwin",
+        listProcesses,
+      }),
+    );
     expect(listProcesses).toHaveBeenCalledOnce();
     expect(siblings).toEqual([{ pid: 202, uid: 502 }]);
   });
 
   it("rejects a failed scan instead of reporting no siblings", async () => {
     await expect(
-      listSiblingOpenBotInstances({
-        executablePath: EXECUTABLE,
-        currentPid: 101,
-        platform: "darwin",
-        listProcesses: async () => {
-          throw new Error("scan failed");
-        },
-      }),
+      runCauseEffect(
+        listSiblingOpenBotInstances({
+          executablePath: EXECUTABLE,
+          currentPid: 101,
+          platform: "darwin",
+          listProcesses: () => Effect.fail(new SiblingScanFailed({ cause: new Error("scan failed") })),
+        }),
+      ),
     ).rejects.toThrow("scan failed");
   });
 
@@ -88,13 +92,15 @@ describe("listSiblingOpenBotInstances", () => {
     // Chromium children on Linux run the main executable, so a scan would find this session itself.
     ["linux", "  101  1000 /tmp/.mount_OpenBo/openbot\n  102  1000 /tmp/.mount_OpenBo/openbot --type=zygote"],
   ] as const)("does not scan on %s", async (platform, output) => {
-    const listProcesses = vi.fn(async () => output);
-    const siblings = await listSiblingOpenBotInstances({
-      executablePath: platform === "linux" ? "/tmp/.mount_OpenBo/openbot" : EXECUTABLE,
-      currentPid: 101,
-      platform,
-      listProcesses,
-    });
+    const listProcesses = vi.fn(() => Effect.succeed(output));
+    const siblings = await runCauseEffect(
+      listSiblingOpenBotInstances({
+        executablePath: platform === "linux" ? "/tmp/.mount_OpenBo/openbot" : EXECUTABLE,
+        currentPid: 101,
+        platform,
+        listProcesses,
+      }),
+    );
     expect(listProcesses).not.toHaveBeenCalled();
     expect(siblings).toEqual([]);
   });

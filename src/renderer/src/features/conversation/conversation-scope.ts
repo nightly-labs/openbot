@@ -23,6 +23,7 @@ import { createComposerStore, currentConversationTarget } from "./stores/compose
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
+import { PENDING_SEND_ID_PREFIX, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
 import { createScrollStore } from "./stores/scroll-store";
 import { createSearchStore } from "./stores/search-store";
@@ -56,6 +57,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
+    pendingSends,
     showComposerActions,
     setShowComposerActions,
     attachmentBusy,
@@ -74,8 +76,6 @@ export function createConversationViewScope(props: ConversationProps) {
     setMarkingRead,
     submitting,
     setSubmitting,
-    selectionSending,
-    setSelectionSending,
     dropActive,
     setDropActive,
     rightPanels,
@@ -197,7 +197,7 @@ export function createConversationViewScope(props: ConversationProps) {
     closeSidebarFilePreview,
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
-  const { installedSkills } = skills;
+  const { installedSkills, installedSkillsLoadFailed } = skills;
   const { mcpServers } = createMcpServersStore({ props });
   const composer = createComposerStore({
     props,
@@ -283,13 +283,45 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserTabs().length === 0) void openBrowserAddress();
   }
   const viewIsMounted = createScopeGuard();
-  let imageAttachmentPicker: HTMLInputElement | undefined;
-  let contextAttachmentPicker: HTMLInputElement | undefined;
+  let attachmentPicker: HTMLInputElement | undefined;
+  const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
+  // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
+  // Built only while a send waits for its row, so a streaming reply does not rebuild it for nothing.
+  const drawnHostIds = createMemo(() =>
+    currentPendingSends().some((send) => send.messageId)
+      ? new Set([
+          ...props.messages.map((message) => message.id),
+          ...presentedQueueDeliveries().map((delivery) => delivery.id),
+        ])
+      : new Set<string>(),
+  );
+  // Filtered here as well as settled below, so the two rows never stand together for a frame.
+  const pendingMessages = createMemo(() =>
+    currentPendingSends()
+      .filter((send) => !(send.messageId && drawnHostIds().has(send.messageId)))
+      .map(pendingSendMessage),
+  );
+  /** The pending send a timeline row draws, by the row's message id. */
+  const pendingSendFor = (messageId: string | undefined) =>
+    messageId?.startsWith(PENDING_SEND_ID_PREFIX)
+      ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
+      : undefined;
+  createEffect(
+    () => ({
+      target: currentTarget(),
+      sent: currentPendingSends().some((send) => send.state === "sent"),
+      drawnIds: drawnHostIds(),
+    }),
+    ({ target, sent, drawnIds }) => {
+      if (target && sent) pendingSends.settle(target, drawnIds);
+    },
+  );
   const scroll = createScrollStore({
     props,
     markingRead,
     setMarkingRead,
     setComposerError: setScopedComposerError,
+    pendingMessages,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -311,6 +343,7 @@ export function createConversationViewScope(props: ConversationProps) {
     clearNewMessages,
     messageVirtualizer,
     timelineMessages,
+    timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,
@@ -384,8 +417,6 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingPendingSave,
     submitting,
     setSubmitting,
-    selectionSending,
-    setSelectionSending,
     voicePhase,
     setComposerError: setScopedComposerError,
     setComposerFocusRequest,
@@ -438,8 +469,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest: (value: boolean) => {
       stickToLatest = value;
     },
-    imageAttachmentPicker: () => imageAttachmentPicker,
-    contextAttachmentPicker: () => contextAttachmentPicker,
+    pendingSends,
+    attachmentPicker: () => attachmentPicker,
   });
   const {
     updateTeamTyping,
@@ -451,6 +482,9 @@ export function createConversationViewScope(props: ConversationProps) {
     reorderPresentedQueue,
     submitComposer,
     sendSelectionInstruction,
+    retryPendingSend,
+    editPendingSend,
+    dismissPendingSend,
   } = actions;
   createEffect(
     () => {
@@ -594,7 +628,7 @@ export function createConversationViewScope(props: ConversationProps) {
         return;
       }
       if (currentEditingDeliveryId()) {
-        cancelQueuedMessageEdit();
+        void cancelQueuedMessageEdit();
         return;
       }
       setOpenReactionMessageId(null);
@@ -1035,11 +1069,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
   };
-  const setImageAttachmentPickerElement = (element: HTMLInputElement) => {
-    imageAttachmentPicker = element;
-  };
-  const setContextAttachmentPickerElement = (element: HTMLInputElement) => {
-    contextAttachmentPicker = element;
+  const setAttachmentPickerElement = (element: HTMLInputElement) => {
+    attachmentPicker = element;
   };
 
   return {
@@ -1048,8 +1079,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserSurfaceElement,
     setChatSearchInputElement,
     setConversationPanelElement,
-    setContextAttachmentPickerElement,
-    setImageAttachmentPickerElement,
+    setAttachmentPickerElement,
     setScrollElement,
     setStickToLatest,
     setUnreadMessagesDividerElement,
@@ -1102,6 +1132,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentDraft,
     currentConversationError,
     installedSkills,
+    installedSkillsLoadFailed,
     mcpServers,
     dropActive,
     editQueuedMessage,
@@ -1121,6 +1152,7 @@ export function createConversationViewScope(props: ConversationProps) {
     markingRead,
     messageVirtualizer,
     timelineMessages,
+    timelineIndexById,
     unreadBoundaryMessageId,
     moveChatSearch,
     newMessageCount,
@@ -1138,6 +1170,10 @@ export function createConversationViewScope(props: ConversationProps) {
     revealSidebarFile,
     openWorkspaceFile,
     awaitingReplies,
+    pendingSendFor,
+    retryPendingSend,
+    editPendingSend,
+    dismissPendingSend,
     presentedQueueDeliveries,
     previewAttachment,
     props,
@@ -1158,7 +1194,6 @@ export function createConversationViewScope(props: ConversationProps) {
     screenOpen,
     selectAndConfirmModel,
     selectAndConfirmReasoning,
-    selectionSending,
     sendSelectionInstruction,
     setActiveRightPanel,
     setBrowserAddress,

@@ -31,21 +31,30 @@ import {
   encodeTeamProtocolV5CurrentHttpRequest,
   encodeTeamProtocolV5CurrentHttpResponse,
 } from "./v5-adapter";
+import { TEAM_PROTOCOL_V6 } from "./v6";
+import {
+  decodeTeamProtocolV6CurrentHttpRequest,
+  decodeTeamProtocolV6CurrentHttpResponse,
+  encodeTeamProtocolV6CurrentHttpRequest,
+  encodeTeamProtocolV6CurrentHttpResponse,
+} from "./v6-adapter";
 
 export interface TeamHttpCodecOptions {
   preserveSemanticTags?: boolean;
-  /** Read only by V4 and V5, which accept a model in an agent create request. */
+  /** Read only by V4, V5 and V6, which accept a model in an agent create request. */
   agentCreateModel?: boolean;
 }
 
 type DecodedRequest =
   | ReturnType<typeof decodeTeamProtocolV1CurrentHttpRequest>
   | ReturnType<typeof decodeTeamProtocolV4CurrentHttpRequest>
-  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpRequest>;
+  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpRequest>
+  | ReturnType<typeof decodeTeamProtocolV6CurrentHttpRequest>;
 type DecodedResponse =
   | ReturnType<typeof decodeTeamProtocolV1CurrentHttpResponse>
   | ReturnType<typeof decodeTeamProtocolV4CurrentHttpResponse>
-  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpResponse>;
+  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpResponse>
+  | ReturnType<typeof decodeTeamProtocolV6CurrentHttpResponse>;
 
 export interface TeamHttpCodec {
   encodeRequest(method: string, path: string, value: unknown, options: TeamHttpCodecOptions): string;
@@ -83,8 +92,16 @@ const V5_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV5CurrentHttpResponse,
 };
 
+const V6_CODEC: TeamHttpCodec = {
+  encodeRequest: encodeTeamProtocolV6CurrentHttpRequest,
+  decodeRequest: decodeTeamProtocolV6CurrentHttpRequest,
+  encodeResponse: encodeTeamProtocolV6CurrentHttpResponse,
+  decodeResponse: decodeTeamProtocolV6CurrentHttpResponse,
+};
+
 /** The HTTP adapter of a negotiated protocol. No protocol, or one older than V3, gets V1. */
 export function teamHttpCodec(protocol: number | undefined): TeamHttpCodec {
+  if (protocol === TEAM_PROTOCOL_V6) return V6_CODEC;
   if (protocol === TEAM_PROTOCOL_V5) return V5_CODEC;
   if (protocol === TEAM_PROTOCOL_V4) return V4_CODEC;
   if (protocol === TEAM_PROTOCOL_V3) return V3_CODEC;

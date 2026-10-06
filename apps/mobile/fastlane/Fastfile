@@ -22,3 +22,28 @@ platform :ios do
     )
   end
 end
+
+platform :android do
+  desc "Upload the signed AAB to a Google Play testing track without EAS Submit"
+  lane :play do
+    aab = ENV.fetch("AAB_PATH")
+    UI.user_error!("AAB_PATH must point to an existing .aab file") unless File.file?(aab) && File.extname(aab) == ".aab"
+    track = ENV.fetch("PLAY_TRACK")
+    UI.user_error!("PLAY_TRACK must be internal or alpha") unless %w[internal alpha].include?(track)
+    release_status = ENV.fetch("PLAY_RELEASE_STATUS")
+    UI.user_error!("PLAY_RELEASE_STATUS must be completed or draft") unless %w[completed draft].include?(release_status)
+
+    upload_to_play_store(
+      package_name: "run.openbot.mobile",
+      aab: aab,
+      json_key_data: ENV.fetch("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY"),
+      track: track,
+      release_status: release_status,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end

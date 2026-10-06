@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { describe, expect, it, vi } from "vitest";
@@ -7,17 +8,19 @@ describe("performDynamicIslandCriticalAction", () => {
   it("executes a local prompt answer directly", async () => {
     const local = localAgent();
     const remote = remoteAgent();
-    await performDynamicIslandCriticalAction(
-      {
-        type: "answer-prompt",
-        serverId: "local",
-        agentId: "chief",
-        requestId: "prompt-local",
-        answers: { source: ["Official data"] },
-      },
-      local,
-      remote,
-      () => undefined,
+    await Effect.runPromise(
+      performDynamicIslandCriticalAction(
+        {
+          type: "answer-prompt",
+          serverId: "local",
+          agentId: "chief",
+          requestId: "prompt-local",
+          answers: { source: ["Official data"] },
+        },
+        local,
+        remote,
+        () => undefined,
+      ),
     );
 
     expect(local.respondToPrompt).toHaveBeenCalledWith({
@@ -31,17 +34,19 @@ describe("performDynamicIslandCriticalAction", () => {
     const local = localAgent();
     const remote = remoteAgent();
     const decodeVoid = vi.fn(() => undefined);
-    await performDynamicIslandCriticalAction(
-      {
-        type: "answer-prompt",
-        serverId: "server-eu",
-        agentId: "research",
-        requestId: "prompt-1",
-        answers: { source: ["Official data"] },
-      },
-      local,
-      remote,
-      decodeVoid,
+    await Effect.runPromise(
+      performDynamicIslandCriticalAction(
+        {
+          type: "answer-prompt",
+          serverId: "server-eu",
+          agentId: "research",
+          requestId: "prompt-1",
+          answers: { source: ["Official data"] },
+        },
+        local,
+        remote,
+        decodeVoid,
+      ),
     );
 
     expect(remote.request).toHaveBeenCalledWith("server-eu", "/v1/prompts/respond", decodeVoid, {
@@ -56,29 +61,33 @@ describe("performDynamicIslandCriticalAction", () => {
     const remote = remoteAgent();
     const decodeVoid = vi.fn(() => undefined);
 
-    await performDynamicIslandCriticalAction(
-      {
-        type: "respond-approval",
-        serverId: "local",
-        agentId: "chief",
-        requestId: "approval-local",
-        decision: "accept",
-      },
-      local,
-      remote,
-      decodeVoid,
+    await Effect.runPromise(
+      performDynamicIslandCriticalAction(
+        {
+          type: "respond-approval",
+          serverId: "local",
+          agentId: "chief",
+          requestId: "approval-local",
+          decision: "accept",
+        },
+        local,
+        remote,
+        decodeVoid,
+      ),
     );
-    await performDynamicIslandCriticalAction(
-      {
-        type: "respond-approval",
-        serverId: "server-eu",
-        agentId: "research",
-        requestId: "approval-remote",
-        decision: "decline",
-      },
-      local,
-      remote,
-      decodeVoid,
+    await Effect.runPromise(
+      performDynamicIslandCriticalAction(
+        {
+          type: "respond-approval",
+          serverId: "server-eu",
+          agentId: "research",
+          requestId: "approval-remote",
+          decision: "decline",
+        },
+        local,
+        remote,
+        decodeVoid,
+      ),
     );
 
     expect(local.respondToApproval).toHaveBeenCalledWith({ requestId: "approval-local", decision: "accept" });
@@ -91,11 +100,11 @@ describe("performDynamicIslandCriticalAction", () => {
 
 function localAgent() {
   return {
-    respondToPrompt: vi.fn(async () => undefined),
-    respondToApproval: vi.fn(async () => undefined),
+    respondToPrompt: vi.fn(() => Effect.void),
+    respondToApproval: vi.fn(() => Effect.void),
   };
 }
 
 function remoteAgent() {
-  return { request: vi.fn(async () => undefined) };
+  return { request: vi.fn(() => Effect.void) };
 }

@@ -36,6 +36,7 @@ import {
   decodeRecord,
   nullableNumber,
   nullableString,
+  optionalHistoryExtent,
   requiredBoolean,
   requiredNumber,
   requiredString,
@@ -179,7 +180,11 @@ export function decodeDirectConversationPage(value: unknown): DirectConversation
     otherMemberId: requiredString(page, "otherMemberId"),
     messages: decodeList(page.messages, "direct message list", directMessage),
     revision: requiredNumber(page, "revision"),
-    pageInfo: { hasOlder: requiredBoolean(pageInfo, "hasOlder"), olderCursor: nullableString(pageInfo, "olderCursor") },
+    pageInfo: {
+      hasOlder: requiredBoolean(pageInfo, "hasOlder"),
+      olderCursor: nullableString(pageInfo, "olderCursor"),
+      ...optionalHistoryExtent(pageInfo),
+    },
     ...optionalReadState(page),
   };
 }

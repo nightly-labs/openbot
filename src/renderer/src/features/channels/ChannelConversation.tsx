@@ -6,7 +6,6 @@ import {
   type BrowserTab,
   type BrowserTakeoverRequest,
   canPreviewAttachment,
-  type DraftAttachment,
   type FilePreview,
 } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, Plus, X } from "@openbot/ui";
@@ -24,6 +23,12 @@ import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppe
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
+import {
+  ChatScrollRail,
+  createChatScrollRail,
+  unloadedHistory,
+} from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -47,6 +52,7 @@ import {
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { useText } from "@openbot/ui/text";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import {
   createEffect,
   createMemo,
@@ -63,9 +69,13 @@ import { planItems, planTitle } from "../../app-message-projection";
 import { channelAwaitingReplies } from "../../awaiting-replies";
 import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
+import { EMPTY_DRAFT } from "../conversation/composer-draft";
+import { useConversationController } from "../conversation/conversation-controller-context";
+import type { ComposerDraft } from "../conversation/conversation-types";
 import { channelMemoriesPort } from "../conversation/memories-port";
 import { channelRoutinesPort } from "../conversation/routines-port";
 import { ChannelEditor } from "./ChannelEditor";
@@ -77,12 +87,16 @@ const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPa
 /** What the open channel reads from the client around it. The channel itself comes from `useChannels()`. */
 export interface ChannelConversationProps {
   isOwnMessage: (authorId: string) => boolean;
+  /** The device with the keyboard on desktop. Web leaves it empty and the browser is detected. */
+  platform?: "darwin" | "win32" | "linux" | undefined;
   /** Keyed by agent id. */
   pendingApprovals: Record<string, AgentApproval | undefined>;
   /** Keyed by agent id. */
   pendingTakeovers: Record<string, BrowserTakeoverRequest | undefined>;
   browserTabs: BrowserTab[];
   onSelectAgent: (agentId: string) => void;
+  /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
+  localHost?: boolean;
 }
 
 export function ChannelConversation(props: ChannelConversationProps) {
@@ -126,7 +140,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
   });
   const routinesPort = createMemo(() => {
     const id = channelId();
-    return id ? channelRoutinesPort(id, runtime().agent) : null;
+    return id ? channelRoutinesPort(id, runtime().agent, props.localHost === true) : null;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.
@@ -160,19 +174,28 @@ export function ChannelConversation(props: ChannelConversationProps) {
       onCleanup(port.subscribe(load));
     },
   );
-  const [composer, setComposer] = createStore<{
-    text: string;
-    reply: string | null;
-    attachments: DraftAttachment[];
-  }>({ text: "", reply: null, attachments: [] });
+  // The drafts live in the conversation controller, so each channel keeps its own through a switch
+  // to another chat, and its text through a restart.
+  const conversation = useConversationController();
+  const composer = createMemo(() => {
+    const selectedId = channels.state.selectedId;
+    return (selectedId ? conversation.channelDrafts()[selectedId] : undefined) ?? EMPTY_DRAFT;
+  });
+  const updateDraft = (channelId: string, update: (draft: ComposerDraft) => ComposerDraft) =>
+    conversation.setChannelDrafts((current) => ({
+      ...current,
+      [channelId]: update(current[channelId] ?? EMPTY_DRAFT),
+    }));
+  const updateComposer = (patch: Partial<ComposerDraft>) => {
+    const selectedId = channels.state.selectedId;
+    if (selectedId) updateDraft(selectedId, (draft) => ({ ...draft, ...patch }));
+  };
   const addAttachments = (load: () => Promise<AttachmentSummary[]>) =>
     void channels.perform(async () => {
       const selectedId = channels.state.selectedId;
       const attachments = await load();
-      if (selectedId === channels.state.selectedId)
-        setComposer((state) => {
-          state.attachments = [...state.attachments, ...attachments];
-        });
+      if (selectedId)
+        updateDraft(selectedId, (draft) => ({ ...draft, attachments: [...draft.attachments, ...attachments] }));
     });
   /** Dropped or pasted files. Only a browser runtime imports them here; the desktop preload imports its own. */
   const canImportFiles = () => Boolean(runtime().importAttachments && channels.state.page?.channel.archived === false);
@@ -191,17 +214,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
         state.memories.count = 0;
         state.routines.count = 0;
       });
-      setComposer((state) => {
-        Object.assign(state, { text: "", reply: null, attachments: [] });
-      });
     },
   );
-  const clearSent = (text: string) => {
-    if (composer.text !== text) return;
-    setComposer((state) => {
-      Object.assign(state, { text: "", reply: null, attachments: [] });
-    });
-  };
+  const clearSent = (channelId: string, text: string) =>
+    updateDraft(channelId, (draft) => (draft.text === text ? EMPTY_DRAFT : draft));
   let messageList: HTMLElement | undefined;
   let virtualRoot: HTMLElement | undefined;
   let unreadMessagesDivider: HTMLElement | undefined;
@@ -269,6 +285,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
     () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
   );
   const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
+  /* A row finds its entry by id: the virtualizer gives a row its new index one tick after the list changes. */
+  const timelineIndexById = createMemo(
+    () => new Map<VirtualItem["key"], number>(timeline().map((entry, index) => [entry.id, index])),
+  );
   /* Every row anchors the count, but only another author's message adds to it. */
   const timelineRows = createMemo(() =>
     timeline().map((entry) => ({ id: entry.id, countable: countableTimelineMessage(entry.message) })),
@@ -316,6 +336,17 @@ export function ChannelConversation(props: ChannelConversationProps) {
     scrollMargin: virtualScrollMargin,
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  const timelineMessages = createMemo(() => timeline().map((entry) => entry.message));
+  const rail = createChatScrollRail({
+    rows: timelineMessages,
+    storedCount: () => channels.state.page?.messages.length ?? 0,
+    unloaded: () => unloadedHistory(channels.state.page),
+    virtualizer: messageVirtualizer,
+    onLoadOlder: () => void channels.loadOlder(),
+    onJump: () => {
+      stickToLatest = false;
+    },
+  });
   /*
    * A message animates in once, and only after the channel has drawn its first page: everything
    * that was already there when the reader opened the channel arrives at the same moment, and ten
@@ -527,27 +558,27 @@ export function ChannelConversation(props: ChannelConversationProps) {
       recipientAgentId,
     });
   const submit = () => {
-    const text = composer.text;
-    if (channels.state.pending || (!text.trim() && !composer.attachments.length) || !channels.state.selectedId) return;
+    const { text, attachments, replyToMessageId } = composer();
+    const channelId = channels.state.selectedId;
+    if (channels.state.pending || (!text.trim() && !attachments.length) || !channelId) return;
     const expanded = expandComposerMentions(text);
     // A request that opens with a member is addressed to that member, the way a reader writes it.
     // A mention later in the text is what it reads as: a reference the owner of the work can see.
     const mention = chatTagReferences(expanded).find(
       (reference) => reference.kind === "agent" && !expanded.slice(0, reference.start).trim(),
     );
-    void channels
-      .command({
+    void channels.command(
+      {
         type: "send",
         operationId: crypto.randomUUID(),
-        channelId: channels.state.selectedId,
+        channelId,
         text: expanded,
         recipientAgentId: mention?.id ?? null,
-        replyToMessageId: composer.reply,
-        attachmentDraftIds: composer.attachments.map((attachment) => attachment.id),
-      })
-      .then((sent) => {
-        if (sent) clearSent(text);
-      });
+        replyToMessageId,
+        attachmentDraftIds: attachments.map((attachment) => attachment.id),
+      },
+      () => clearSent(channelId, text),
+    );
   };
   return (
     <main
@@ -581,8 +612,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
           <Button
             variant="ghost"
             onClick={() =>
-              void channels.retry().then((sent) => {
-                if (sent?.type === "send") clearSent(sent.text);
+              void channels.retry((sent) => {
+                if (sent.type === "send") clearSent(sent.channelId, sent.text);
               })
             }
           >
@@ -621,6 +652,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               aria-live="polite"
               ref={(element) => {
                 messageList = element;
+                rail.ref(element);
                 updateVirtualScrollMargin();
               }}
               onScroll={(event) => {
@@ -630,6 +662,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                 updateUnreadDividerVisibility();
               }}
             >
+              <ChatScrollRail {...rail.props} />
               <Show when={unreadCount() > 0 && !unreadDividerVisible()}>
                 <UnreadMessagesBanner
                   count={unreadCount()}
@@ -674,7 +707,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
               >
                 <For each={virtualMessageRows()}>
                   {(virtualRow) => {
-                    const entry = createMemo(() => timeline()[virtualRow.index]);
+                    const entry = createMemo(() => {
+                      const index = timelineIndexById().get(virtualRow.key);
+                      return index === undefined ? undefined : timeline()[index];
+                    });
                     const initialEntry = untrack(entry);
                     if (!initialEntry) return null;
                     const animate = markMessageSeen(page().channel.id, initialEntry.id);
@@ -708,101 +744,101 @@ export function ChannelConversation(props: ChannelConversationProps) {
                             }}
                           />
                         </Show>
-                        {initialEntry.message.actionMarker ? (
-                          <article class={{ "chat-action-entry-animated": animate }}>
-                            <ChatActionMarker
-                              marker={initialEntry.message.actionMarker}
+                        <ChatRowBoundary>
+                          {initialEntry.message.actionMarker ? (
+                            <article class={{ "chat-action-entry-animated": animate }}>
+                              <ChatActionMarker
+                                marker={initialEntry.message.actionMarker}
+                                agents={agentList()}
+                                announce={animate}
+                                onSelectAgent={(id) => {
+                                  channels.close();
+                                  selectAgent(id);
+                                }}
+                              />
+                            </article>
+                          ) : initialEntry.message.plan ? (
+                            <article class={{ "message-entry-animated": animate }}>
+                              <Show when={entry()?.message.plan ?? initialEntry.message.plan}>
+                                {(plan) => (
+                                  <TaskList
+                                    items={planItems(plan(), entry()?.message.streaming === true)}
+                                    title={planTitle(plan())}
+                                    defaultOpen={initialEntry.message.streaming === true}
+                                  />
+                                )}
+                              </Show>
+                            </article>
+                          ) : (
+                            <ChatMessageRow
+                              message={entry()?.message ?? initialEntry.message}
+                              author={entry()?.author ?? initialEntry.author}
+                              showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                              showTime={entry()?.showAuthor ?? initialEntry.showAuthor}
+                              animate={animate}
                               agents={agentList()}
-                              announce={animate}
+                              referencedMessage={referenced()?.message}
+                              referencedAuthorName={referenced()?.author.name}
                               onSelectAgent={(id) => {
                                 channels.close();
                                 selectAgent(id);
                               }}
-                            />
-                          </article>
-                        ) : initialEntry.message.plan ? (
-                          <article class={{ "message-entry-animated": animate }}>
-                            <Show when={entry()?.message.plan ?? initialEntry.message.plan}>
-                              {(plan) => (
-                                <TaskList
-                                  items={planItems(plan(), entry()?.message.streaming === true)}
-                                  title={planTitle(plan())}
-                                  defaultOpen={initialEntry.message.streaming === true}
-                                />
-                              )}
-                            </Show>
-                          </article>
-                        ) : (
-                          <ChatMessageRow
-                            message={entry()?.message ?? initialEntry.message}
-                            author={entry()?.author ?? initialEntry.author}
-                            showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
-                            showTime={entry()?.showAuthor ?? initialEntry.showAuthor}
-                            animate={animate}
-                            agents={agentList()}
-                            referencedMessage={referenced()?.message}
-                            referencedAuthorName={referenced()?.author.name}
-                            onSelectAgent={(id) => {
-                              channels.close();
-                              selectAgent(id);
-                            }}
-                            onOpenLink={(url) => {
-                              void runtime().openUrl(url);
-                            }}
-                            onPreview={(attachment) => void previewChannelAttachment(attachment)}
-                            onDownloadAttachments={downloadAttachments()}
-                            onAttachmentAction={channelAttachmentAction}
-                            onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
-                            actions={
-                              <MessageActions
-                                message={entry()?.message ?? initialEntry.message}
-                                authorName={entry()?.author.name ?? initialEntry.author.name}
-                                reactions={false}
-                                pickerOpen={false}
-                                moreOpen={openMoreMessageId() === initialEntry.id}
-                                expandedEmoji={false}
-                                copied={copiedMessageId() === initialEntry.id}
-                                onTogglePicker={() => {}}
-                                onToggleMore={() =>
-                                  setOpenMoreMessageId((current) =>
-                                    current === initialEntry.id ? null : initialEntry.id,
-                                  )
-                                }
-                                onExpandEmoji={() => {}}
-                                onReact={() => {}}
-                                onReply={
-                                  page().channel.archived
-                                    ? undefined
-                                    : () =>
-                                        setComposer((state) => {
-                                          state.reply = initialEntry.id;
-                                        })
-                                }
-                                onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
-                              />
-                            }
-                          >
-                            <Show when={entry()?.message.questionPrompt}>
-                              {(prompt) => (
-                                <QuestionPromptBubble
-                                  questions={prompt().questions}
-                                  resolution={prompt().resolution}
-                                  readOnly={page().channel.archived}
-                                  onSubmit={(answers) =>
-                                    page().channel.archived
-                                      ? Promise.resolve(false)
-                                      : channels.perform(() =>
-                                          runtime().agent.respondToPrompt({
-                                            requestId: prompt().requestId,
-                                            answers,
-                                          }),
-                                        )
+                              onOpenLink={(url) => {
+                                void runtime().openUrl(url);
+                              }}
+                              onPreview={(attachment) => void previewChannelAttachment(attachment)}
+                              onDownloadAttachments={downloadAttachments()}
+                              onAttachmentAction={channelAttachmentAction}
+                              onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
+                              actions={
+                                <MessageActions
+                                  message={entry()?.message ?? initialEntry.message}
+                                  authorName={entry()?.author.name ?? initialEntry.author.name}
+                                  reactions={false}
+                                  pickerOpen={false}
+                                  moreOpen={openMoreMessageId() === initialEntry.id}
+                                  expandedEmoji={false}
+                                  copied={copiedMessageId() === initialEntry.id}
+                                  onTogglePicker={() => {}}
+                                  onToggleMore={() =>
+                                    setOpenMoreMessageId((current) =>
+                                      current === initialEntry.id ? null : initialEntry.id,
+                                    )
                                   }
+                                  onExpandEmoji={() => {}}
+                                  onReact={() => {}}
+                                  onReply={
+                                    page().channel.archived
+                                      ? undefined
+                                      : () => updateComposer({ replyToMessageId: initialEntry.id })
+                                  }
+                                  onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
                                 />
-                              )}
-                            </Show>
-                          </ChatMessageRow>
-                        )}
+                              }
+                            >
+                              <Show when={entry()?.message.questionPrompt}>
+                                {(prompt) => (
+                                  <QuestionPromptBubble
+                                    questions={prompt().questions}
+                                    resolution={prompt().resolution}
+                                    readOnly={page().channel.archived}
+                                    sendShortcut={deviceSendShortcut(props.platform)}
+                                    onSubmit={(answers) =>
+                                      page().channel.archived
+                                        ? Promise.resolve(false)
+                                        : channels.perform(() =>
+                                            runtime().agent.respondToPrompt({
+                                              requestId: prompt().requestId,
+                                              answers,
+                                            }),
+                                          )
+                                    }
+                                  />
+                                )}
+                              </Show>
+                            </ChatMessageRow>
+                          )}
+                        </ChatRowBoundary>
                       </div>
                     );
                   }}
@@ -911,10 +947,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
                 <form
                   class="composer"
                   data-compact={
-                    !composer.reply &&
-                    !composer.attachments.length &&
-                    !composer.text.includes("\n") &&
-                    composer.text.length < 120
+                    !composer().replyToMessageId &&
+                    !composer().attachments.length &&
+                    !composer().text.includes("\n") &&
+                    composer().text.length < 120
                       ? "true"
                       : undefined
                   }
@@ -923,23 +959,19 @@ export function ChannelConversation(props: ChannelConversationProps) {
                     submit();
                   }}
                 >
-                  <Show when={composer.reply}>
+                  <Show when={composer().replyToMessageId}>
                     <Button
                       type="button"
                       variant="ghost"
                       size="xs"
-                      onClick={() =>
-                        setComposer((state) => {
-                          state.reply = null;
-                        })
-                      }
+                      onClick={() => updateComposer({ replyToMessageId: null })}
                     >
                       {t("channel.composer.cancelReply")}
                     </Button>
                   </Show>
-                  <Show when={composer.attachments.length}>
+                  <Show when={composer().attachments.length}>
                     <div class="composer-attachments">
-                      <For each={composer.attachments}>
+                      <For each={composer().attachments}>
                         {(attachment) => (
                           <div class="composer-attachment" data-kind="file">
                             <span class="composer-attachment-copy">
@@ -951,8 +983,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
                               size="xs"
                               aria-label={t("channel.composer.removeAttachment", { name: attachment.name })}
                               onClick={() =>
-                                setComposer((state) => {
-                                  state.attachments = state.attachments.filter((item) => item.id !== attachment.id);
+                                updateComposer({
+                                  attachments: composer().attachments.filter((item) => item.id !== attachment.id),
                                 })
                               }
                             >
@@ -969,18 +1001,15 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       agents={agentList().filter((agent) =>
                         page().channel.members.some((member) => member.agentId === agent.id),
                       )}
-                      attachments={composer.attachments}
+                      sendShortcut={deviceSendShortcut(props.platform)}
+                      attachments={composer().attachments}
                       ariaLabel={t("channel.composer.label")}
                       placeholder={t("channel.composer.placeholder", { name: page().channel.name })}
-                      value={composer.text}
+                      value={composer().text}
                       disabled={channels.state.pending}
                       onSubmit={submit}
                       onPasteFiles={importFiles}
-                      onValueChange={(text) =>
-                        setComposer((state) => {
-                          state.text = text;
-                        })
-                      }
+                      onValueChange={(text) => updateComposer({ text })}
                     />
                   </div>
                   <div class="composer-toolbar">
@@ -996,14 +1025,18 @@ export function ChannelConversation(props: ChannelConversationProps) {
                     <div class="composer-primary-actions">
                       {/* As in the agent chat, an empty composer offers stop while work runs. */}
                       <Show
-                        when={activeRuns().length > 0 && !composer.text.trim() && !composer.attachments.length}
+                        when={activeRuns().length > 0 && !composer().text.trim() && !composer().attachments.length}
                         fallback={
                           <Button
                             type="submit"
                             variant="ghost"
                             class="voice-button"
                             aria-label={t("channel.composer.send")}
-                            disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
+                            aria-keyshortcuts={sendShortcutAriaKey(deviceSendShortcut(props.platform))}
+                            title={t(sendShortcutHintKey(deviceSendShortcut(props.platform), "send"))}
+                            disabled={
+                              channels.state.pending || (!composer().text.trim() && !composer().attachments.length)
+                            }
                           >
                             <ArrowUp aria-hidden="true" />
                           </Button>

@@ -79,6 +79,12 @@ export interface AgentProviderDescriptor {
    * `confined-process`: the CLI runs in a sandboxed process of its own (`process-confinement.ts`).
    */
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
+  /**
+   * How the CLI takes a message into a running turn. `native`: it reads the message at its next
+   * step. `deferred`: the protocol has no steer request (ACP), so the message can wait until the
+   * turn ends. Only a `native` provider steers a message sent in `steer` mode; the others queue it.
+   */
+  readonly steer: "native" | "deferred";
 }
 
 /**
@@ -100,6 +106,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: true,
     skillFolders: [".agents/skills"],
     workspaceEnforcement: "command-sandbox",
+    steer: "native",
   },
   claude: {
     id: "claude",
@@ -115,6 +122,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".claude/skills"],
     workspaceEnforcement: "tool-sandbox",
+    steer: "native",
   },
   grok: {
     id: "grok",
@@ -130,6 +138,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".agents/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
   opencode: {
     id: "opencode",
@@ -147,6 +156,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
   // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
@@ -164,6 +174,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".gemini/skills", ".agents/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
   // The Cursor CLI (`cursor-agent acp`) with the user's Cursor plan. Sign-in is the ACP
   // `cursor_login` method, which opens a browser. `CURSOR_API_KEY` in the environment also signs in.
@@ -181,6 +192,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
   // The Cline CLI (`cline --acp`). Sign-in is the ACP `cline` method, which opens a browser. A Cline
   // account runs the free models; `CLINE_API_KEY` in the environment also signs in.
@@ -198,6 +210,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
@@ -216,6 +229,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     codeSignIn: false,
     skillFolders: [".agents/skills"],
     workspaceEnforcement: "confined-process",
+    steer: "deferred",
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 
@@ -269,8 +283,9 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 }
 
 /**
- * The providers that stay on the computer that runs OpenBot. The Team API does not carry them, so a
- * joined server's settings do not list them.
+ * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
+ * 5, Cursor and Cline from protocol 6. A joined server's settings list one only when the host's status
+ * names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",

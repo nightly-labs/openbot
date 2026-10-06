@@ -1,6 +1,6 @@
-import { analyticsRange, type InstalledSkill, parseAnalyticsRange } from "@openbot/contracts/ipc";
+import { analyticsRange, type InstalledSkill } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { type PropsWithChildren, useEffect, useRef, useState } from "react";
@@ -9,13 +9,13 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { SheetFormField } from "@/shared/components/sheet-form-field";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { AgentFiles } from "./agent-files";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
 import { AgentSkills, CreateSkillAction } from "./agent-skills";
 import { AgentUsageReport } from "./agent-usage-report";
+import { UsageLoading } from "./usage-motion";
+import { UsageRangePicker } from "./usage-range-picker";
 
 type ListKind = "usage" | "memories" | "routines" | "skills" | "files";
 type RecordKind = "memory" | "routine";
@@ -96,24 +96,7 @@ export function AgentInformation({
   const { recordId } = useLocalSearchParams<{ recordId?: string }>();
   const workspace = useMobileWorkspace();
   const { session, sessionScope } = useMobileSession();
-  const [days, setDays] = useState(30);
   const [range, setRange] = useState(() => analyticsRange(agent.id));
-  const [custom, setCustom] = useState(false);
-  const [customStart, setCustomStart] = useState(range.startDate);
-  const [customEnd, setCustomEnd] = useState(range.endDate);
-  const [rangeError, setRangeError] = useState<string | null>(null);
-  function applyCustomRange() {
-    try {
-      const selected = parseAnalyticsRange({ startDate: customStart, endDate: customEnd, timeZone: range.timeZone });
-      setRange({ ...selected, agentId: agent.id });
-      setDays(0);
-      setRangeError(null);
-      void haptics.selection();
-    } catch {
-      void haptics.notification("error");
-      setRangeError(t("mobile.agent.usage.rangeInvalid"));
-    }
-  }
   const key = ["agent-info", session?.apiUrl, session?.user.id, sessionScope, agent.serverId, agent.id];
   const options = { enabled: available, retry: false, staleTime: 0, gcTime: 0 };
   const memories = useQuery({
@@ -161,79 +144,18 @@ export function AgentInformation({
     ...options,
     enabled: available && section === "usage",
     queryKey: [...key, "usage", available, range],
-    queryFn: () => workspace.loadAgentAnalytics(range, agent.serverId),
+    // The last report stays on screen while the next range loads, so its values change in place.
+    placeholderData: keepPreviousData,
+    // As on desktop, the agent page reads the host report with an agent filter: it splits the days by
+    // provider. A host without `host-analytics` still answers the agent report, which draws one area.
+    queryFn: async () =>
+      (await workspace.loadHostAnalytics(range, agent.serverId)) ?? workspace.loadAgentAnalytics(range, agent.serverId),
   });
   return (
     <>
       {section === "usage" ? (
         <View className="gap-4">
-          <View className="flex-row gap-2">
-            {[7, 30, 90, 365].map((value) => (
-              <Button
-                key={value}
-                className="flex-1"
-                size="sm"
-                variant={days === value ? "secondary" : "ghost"}
-                accessibilityState={{ selected: days === value }}
-                onPress={() => {
-                  void haptics.selection();
-                  setCustom(false);
-                  setRangeError(null);
-                  setDays(value);
-                  setRange(analyticsRange(agent.id, value));
-                }}
-              >
-                <Button.Label>
-                  {value === 365 ? t("mobile.agent.usage.oneYear") : t("mobile.agent.usage.days", { count: value })}
-                </Button.Label>
-              </Button>
-            ))}
-          </View>
-          <Button
-            variant="ghost"
-            accessibilityState={{ expanded: custom }}
-            onPress={() => {
-              void haptics.selection();
-              if (!custom) {
-                setCustomStart(range.startDate);
-                setCustomEnd(range.endDate);
-              }
-              setRangeError(null);
-              setCustom(!custom);
-            }}
-          >
-            <Button.Label>{t("mobile.agent.usage.customRange")}</Button.Label>
-          </Button>
-          {custom ? (
-            <View className="gap-3">
-              <SheetFormField
-                label={t("mobile.agent.usage.startDate")}
-                hint="YYYY-MM-DD"
-                appearance="soft"
-                value={customStart}
-                onChangeText={setCustomStart}
-                autoCorrect={false}
-                maxLength={10}
-              />
-              <SheetFormField
-                label={t("mobile.agent.usage.endDate")}
-                hint="YYYY-MM-DD"
-                appearance="soft"
-                value={customEnd}
-                onChangeText={setCustomEnd}
-                autoCorrect={false}
-                maxLength={10}
-              />
-              {rangeError ? (
-                <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-                  {rangeError}
-                </Typography.Paragraph>
-              ) : null}
-              <Button variant="secondary" onPress={applyCustomRange}>
-                <Button.Label>{t("mobile.agent.usage.applyRange")}</Button.Label>
-              </Button>
-            </View>
-          ) : null}
+          <UsageRangePicker range={range} onChange={(selected) => setRange({ ...selected, agentId: agent.id })} />
           <InformationSection
             kind="usage"
             list
@@ -243,7 +165,9 @@ export function AgentInformation({
             retry={() => void usage.refetch()}
           >
             {usage.data ? (
-              <AgentUsageReport result={usage.data} />
+              <UsageLoading loading={usage.isPlaceholderData}>
+                <AgentUsageReport result={usage.data} />
+              </UsageLoading>
             ) : (
               <Typography.Paragraph>{t("mobile.agent.usage.unsupported")}</Typography.Paragraph>
             )}

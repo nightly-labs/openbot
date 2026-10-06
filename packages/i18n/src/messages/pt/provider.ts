@@ -64,6 +64,8 @@ export const messages = {
   "provider.codeLogin.pasteSubmit": "Continuar",
   "provider.codeLogin.pasteExpired": "Esta tentativa de acesso terminou.",
   "provider.codeLogin.pasteExpiresIn": "Aguardando você. Esta tentativa de acesso termina em {time}.",
+  "provider.codeLogin.linkTitle": "Entre em {name} em outro dispositivo",
+  "provider.codeLogin.linkStep": "Entre em {name}. O OpenBot continua sozinho.",
   "provider.picker.noEndpoints": "Nenhum endpoint ainda",
   "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "Modelo do agente",

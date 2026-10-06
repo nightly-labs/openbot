@@ -117,6 +117,30 @@ export const UnreadMessages: Story = {
   },
 };
 
+/** Five days of history: scroll to bring in the day rail on the right edge. */
+export const LongHistory: Story = {
+  render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
+  args: {
+    snapshot: {
+      ...memberSnapshot,
+      revision: 3,
+      messages: Array.from({ length: 120 }, (_, index): DirectMessage => {
+        const own = index % 2 === 0;
+        return {
+          id: `direct-long-${index + 1}`,
+          threadId: "direct-alice",
+          senderMemberId: own ? "member-self" : member.id,
+          recipientMemberId: own ? member.id : "member-self",
+          text: `Launch note ${index + 1}: the owner, the deadline and the review status are recorded here.`,
+          createdAt: new Date(2026, 7, 15 + Math.floor(index / 24), 9, (index % 24) * 2).toISOString(),
+          sequence: index + 1,
+        };
+      }),
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughSequence: 120 },
+    },
+  },
+};
+
 export const ScrollToLatest: Story = {
   render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
   args: {

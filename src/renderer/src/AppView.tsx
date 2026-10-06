@@ -1,5 +1,5 @@
 import { useText } from "@openbot/ui/text";
-import { createSignal, Loading, Show } from "solid-js";
+import { createEffect, createSignal, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
@@ -58,6 +58,10 @@ export function AppAccessGate() {
   };
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
+  // A startup mark for `dev:bench`: the first moment the app can leave the splash.
+  createEffect(started, (ready) => {
+    if (ready) performance.mark("openbot:app-started");
+  });
 
   return (
     <>

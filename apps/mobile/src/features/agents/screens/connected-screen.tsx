@@ -186,7 +186,7 @@ export function ConnectedScreen() {
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
     [agents, activeServer.id],
   );
-  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  const [foreground, muted, background] = useThemeColor(["foreground", "muted", "background"]);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
@@ -455,6 +455,8 @@ export function ConnectedScreen() {
               )
             : undefined,
           headerTintColor: foreground,
+          // The Android header is opaque. It takes the list color, as the transparent iOS header shows it.
+          ...(isAndroid ? { headerStyle: { backgroundColor: background } } : null),
           title: "",
         }}
       />

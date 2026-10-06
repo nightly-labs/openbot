@@ -10,14 +10,14 @@ import {
 } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { validateProfileName } from "@openbot/contracts/validation";
-import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { z } from "zod";
-
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText } from "@/shared/lib/text";
+// Relative: the Node test project resolves no `@/` path that the test does not mock.
+import { fetch } from "../../support/model/logged-fetch";
 
 const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
 const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";
@@ -395,6 +395,47 @@ function serializeMobileProfile<T>(operation: () => Promise<T>): Promise<T> {
   return result;
 }
 
+/**
+ * One signed-in request to the account server. A 401 ends the session. A failed request throws the
+ * account server's message, or `failure`. A body that `decode` refuses throws `failure` too.
+ */
+export async function requestMobileAccount<T>(
+  session: MobileSession,
+  path: string,
+  init: { method?: "GET" | "POST"; body?: string; headers?: Record<string, string> },
+  decode: (value: unknown) => T | null,
+  failure: string,
+  timeoutMs?: number,
+): Promise<T> {
+  return withMobileAuthRequestTimeout(
+    async (signal) => {
+      let response: Response;
+      try {
+        response = await fetch(new URL(path, session.apiUrl).toString(), {
+          method: init.method ?? "GET",
+          headers: {
+            Authorization: `Bearer ${session.sessionToken}`,
+            ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
+            ...init.headers,
+          },
+          ...(init.body === undefined ? {} : { body: init.body }),
+          signal,
+        });
+      } catch {
+        throw new Error(failure);
+      }
+      await checkMobileAuthorization(response, session);
+      const body = await readResponseBody(response, signal).catch(() => null);
+      if (!response.ok) throw new Error(apiErrorMessage(body) ?? failure);
+      const value = decode(body);
+      if (value === null) throw new Error(failure);
+      return value;
+    },
+    undefined,
+    timeoutMs,
+  );
+}
+
 async function checkMobileAuthorization(response: Response, session: MobileSession): Promise<void> {
   if (response.status !== 401) return;
   await deleteMobileSessionIfCurrent(session.sessionToken);
@@ -404,12 +445,13 @@ async function checkMobileAuthorization(response: Response, session: MobileSessi
 async function withMobileAuthRequestTimeout<T>(
   operation: (signal: AbortSignal) => Promise<T>,
   signal?: AbortSignal,
+  timeoutMs = MOBILE_AUTH_REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });
   if (signal?.aborted) controller.abort();
-  const timeout = setTimeout(abort, MOBILE_AUTH_REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(abort, timeoutMs);
   try {
     return await operation(controller.signal);
   } finally {

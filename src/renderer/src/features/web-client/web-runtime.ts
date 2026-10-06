@@ -68,6 +68,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 import {
   RemoteTeamDirectoryClient,
@@ -98,6 +99,7 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
 import { createWebHostConnections, type WebHostConnections, type WebHostNotice } from "./web-host-connections";
 import {
@@ -155,7 +157,14 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
-  send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
+  /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
+  send(
+    agentId: string,
+    text: string,
+    attachmentDraftIds: string[],
+    replyToMessageId?: string | null,
+    clientMessageId?: string,
+  ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
   /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
@@ -257,9 +266,10 @@ export function createWebWorkspaceRuntime(
   });
   let sessionsEnded = false;
   const sessionActions = {
-    getBootstrap: (id: string, key: string, sessionId: string | null) => directory.createBootstrap(id, key, sessionId),
+    getBootstrap: (id: string, key: string, sessionId: string | null) =>
+      runTeamEffect(directory.createBootstrap(id, key, sessionId)),
     endSession: async (id: string) => {
-      if (!sessionsEnded) await directory.endSession(id);
+      if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
   const peer = dependencies.createPeer({
@@ -354,7 +364,7 @@ export function createWebWorkspaceRuntime(
         return;
       }
       try {
-        await discardAttachmentDraft(teamApi, id);
+        await Effect.runPromise(discardAttachmentDraft(teamApi, id).pipe(Effect.mapError((error) => error.cause)));
         ids.delete(id);
         if (!ids.size) completedDraftIdsByHost.delete(hostId);
       } catch {
@@ -390,7 +400,7 @@ export function createWebWorkspaceRuntime(
     return connectedHost;
   }
   async function listMembers(): Promise<TeamMemberSummary[]> {
-    return (await directory.listMembers(requireHost().hostId)).map(toTeamMember);
+    return (await runTeamEffect(directory.listMembers(requireHost().hostId))).map(toTeamMember);
   }
   const admin: WebAdminRuntime = {
     request: teamApi,
@@ -402,15 +412,15 @@ export function createWebWorkspaceRuntime(
       },
       listMembers,
       async listInvites() {
-        return (await directory.listInvites(requireHost().hostId))
+        return (await runTeamEffect(directory.listInvites(requireHost().hostId)))
           .filter((invite) => invite.revokedAt === null)
           .map(toTeamInvite);
       },
       async createInvite(input) {
         const host = requireHost();
         const invite = input.email
-          ? await directory.sendInviteEmail(host, { role: input.role, email: input.email })
-          : await directory.createInvite(host, input);
+          ? await runTeamEffect(directory.sendInviteEmail(host, { role: input.role, email: input.email }))
+          : await runTeamEffect(directory.createInvite(host, input));
         return {
           id: invite.inviteId,
           role: input.role,
@@ -428,14 +438,17 @@ export function createWebWorkspaceRuntime(
         const hostId = requireHost().hostId;
         const current = (await listMembers()).find((member) => member.id === input.memberId);
         if (!current || current.role === "owner") throw new Error(currentText().t("webClient.error.memberNotFound"));
-        if (input.disabled) await directory.leaveHost(hostId, input.memberId);
-        else await directory.updateMember(hostId, input.memberId, input.role ?? current.role, input.disabled === false);
+        if (input.disabled) await runTeamEffect(directory.leaveHost(hostId, input.memberId));
+        else
+          await runTeamEffect(
+            directory.updateMember(hostId, input.memberId, input.role ?? current.role, input.disabled === false),
+          );
         const updated = (await listMembers()).find((member) => member.id === input.memberId);
         if (!updated) throw new Error(currentText().t("webClient.error.memberNotFound"));
         return updated;
       },
-      removeMember: (memberId) => directory.leaveHost(requireHost().hostId, memberId),
-      revokeInvite: (inviteId) => directory.revokeInvite(inviteId),
+      removeMember: (memberId) => runTeamEffect(directory.leaveHost(requireHost().hostId, memberId)),
+      revokeInvite: (inviteId) => runTeamEffect(directory.revokeInvite(inviteId)),
     },
   };
   const channels = teamChannelsApi(teamApi);
@@ -451,7 +464,7 @@ export function createWebWorkspaceRuntime(
     const current = liveView;
     liveView = null;
     if (current) {
-      await current.close().catch(() => undefined);
+      await runTeamEffect(current.close()).catch(() => undefined);
     } else {
       // Also cancel an open request that has not installed its session yet.
       browserView.disconnect();
@@ -467,13 +480,15 @@ export function createWebWorkspaceRuntime(
     browser: {
       async startLiveView(tabId) {
         const currentGeneration = ++liveViewGeneration;
-        const next = await browserView.open(
-          tabId,
-          (frame) => emitView({ type: "frame", tabId, ...frame }),
-          () => emitView({ type: "stopped", tabId, reason: currentText().t("webClient.error.viewEnded") }),
+        const next = await runTeamEffect(
+          browserView.open(
+            tabId,
+            (frame) => emitView({ type: "frame", tabId, ...frame }),
+            () => emitView({ type: "stopped", tabId, reason: currentText().t("webClient.error.viewEnded") }),
+          ),
         );
         if (currentGeneration !== liveViewGeneration) {
-          await next.close().catch(() => undefined);
+          await runTeamEffect(next.close()).catch(() => undefined);
           throw new Error(currentText().t("webClient.error.viewChanged"));
         }
         liveView = next;
@@ -482,7 +497,7 @@ export function createWebWorkspaceRuntime(
         await releaseLiveView();
       },
       async sendLiveViewInput(input) {
-        if (liveView) await liveView.input(decodeBrowserViewInputValue(input));
+        if (liveView) await runTeamEffect(liveView.input(decodeBrowserViewInputValue(input)));
       },
       onLiveViewEvent(listener) {
         viewListeners.add(listener);
@@ -560,11 +575,13 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value)) throw new Error("The host returned an invalid team member.");
       return requiredString(value, "id");
     },
-    respondToBrowserSecret: (input) => respondToBrowserSecret(teamApi, input),
-    respondToTakeover: (input) => respondToBrowserTakeover(teamApi, input),
-    listHosts: () => directory.listHosts(),
+    respondToBrowserSecret: (input) =>
+      Effect.runPromise(respondToBrowserSecret(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    respondToTakeover: (input) =>
+      Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    listHosts: () => runTeamEffect(directory.listHosts()),
     async previewInvite(url) {
-      const value = await directory.previewInvite(url);
+      const value = await runTeamEffect(directory.previewInvite(url));
       return {
         serverId: value.hostId,
         serverName: value.hostName,
@@ -575,7 +592,7 @@ export function createWebWorkspaceRuntime(
         permanent: value.expiresAt === 0,
       };
     },
-    acceptInvite: (url) => directory.acceptInvite(url),
+    acceptInvite: (url) => runTeamEffect(directory.acceptInvite(url)),
     async connect(host) {
       if (connecting || disposed) throw new Error(currentText().t("webClient.error.connectionChanging"));
       connecting = true;
@@ -704,23 +721,33 @@ export function createWebWorkspaceRuntime(
         { name: "avatar", mimeType: image.mimeType, base64: btoa(binary) },
       );
     },
-    async send(id, text, attachmentDraftIds, replyToMessageId = null) {
+    async send(id, text, attachmentDraftIds, replyToMessageId = null, clientMessageId) {
       const result = await request("POST", TEAM_API_ROUTES.agent.messages(id), {
         text,
         attachmentDraftIds,
         replyToMessageId,
+        // The host uses this browser's zone for a routine the agent creates from the message.
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        // A host with `message-client-id-v1` answers a retry with the first receipt.
+        ...(clientMessageId ? { clientMessageId } : {}),
       });
       if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
       removeCompletedDrafts(attachmentDraftIds);
+      return result.deliveries[0]?.id ?? result.messageId;
     },
-    stop: (id, turnId) => interruptAgentTurn(teamApi, id, turnId),
+    stop: (id, turnId) =>
+      Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
-    cancelQueued: (input) => cancelQueuedMessage(teamApi, input),
-    steerQueued: (input) => steerQueuedMessage(teamApi, input),
-    updateQueued: (input) => updateQueuedMessage(teamApi, input),
-    reorderQueue: (input) => reorderQueue(teamApi, input),
+    cancelQueued: (input) =>
+      Effect.runPromise(cancelQueuedMessage(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    steerQueued: (input) =>
+      Effect.runPromise(steerQueuedMessage(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    updateQueued: (input) =>
+      Effect.runPromise(updateQueuedMessage(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    reorderQueue: (input) =>
+      Effect.runPromise(reorderQueue(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     async approve(input) {
       await request("POST", TEAM_API_ROUTES.respond.approval, { ...input });
     },
@@ -744,9 +771,16 @@ export function createWebWorkspaceRuntime(
       let binary = "";
       for (const byte of bytes) binary += String.fromCharCode(byte);
       const mimeType = file.type || "application/octet-stream";
-      const value = await uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: btoa(binary) });
+      const value = await Effect.runPromise(
+        uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: btoa(binary) }).pipe(
+          Effect.mapError((error) => error.cause),
+        ),
+      );
       if (currentUpload !== uploadGeneration) {
-        if (uploadHostGeneration === generation) await discardAttachmentDraft(teamApi, value.id);
+        if (uploadHostGeneration === generation)
+          await Effect.runPromise(
+            discardAttachmentDraft(teamApi, value.id).pipe(Effect.mapError((error) => error.cause)),
+          );
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
@@ -761,7 +795,7 @@ export function createWebWorkspaceRuntime(
       await peer.cancelUpload();
     },
     async discard(id) {
-      await discardAttachmentDraft(teamApi, id);
+      await Effect.runPromise(discardAttachmentDraft(teamApi, id).pipe(Effect.mapError((error) => error.cause)));
       removeCompletedDrafts([id]);
     },
     async download(id) {
@@ -810,7 +844,7 @@ export function createWebWorkspaceRuntime(
     },
     async deleteAgent(agentId) {
       if (connectedHost?.role === "member") throw new Error(currentText().t("error.team.membersCannotDeleteAgents"));
-      await deleteAgent(teamApi, agentId);
+      await Effect.runPromise(deleteAgent(teamApi, agentId).pipe(Effect.mapError((error) => error.cause)));
     },
     async search(agentId, query, cursor) {
       const params = new URLSearchParams({

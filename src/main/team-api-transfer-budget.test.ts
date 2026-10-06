@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -44,7 +45,7 @@ describe("Team API transfer budget", () => {
     const started = await startService(root, { provider: "codex" });
     service = started.service;
     for (const [index, text] of ["Summarize the week.", "Now list three risks."].entries()) {
-      await started.service.sendMessage({ agentId: "chief", text });
+      await Effect.runPromise(started.service.sendMessage({ agentId: "chief", text }));
       await waitFor(() => started.service.listQueue("chief").deliveries[index]?.status === "completed");
     }
 

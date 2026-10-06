@@ -2,17 +2,20 @@ import { router, useGlobalSearchParams, useSegments } from "expo-router";
 import { Stack } from "expo-router/stack";
 import { useThemeColor } from "heroui-native/hooks";
 import { useEffect, useRef, useState } from "react";
+import { TextInput } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { AgentPinTransitionProvider } from "@/features/agents/components/agent-pin-transition";
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
 import { MessageActionsProvider } from "@/features/chat/context/message-actions-context";
 import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = {
@@ -86,6 +89,18 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="code-preview/[previewId]"
+          options={{
+            animation: "slide_from_right",
+            contentStyle: { backgroundColor: background },
+            // The diagram pans with one finger, so only the screen edge goes back.
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            // The screen draws the app's glass header, as the chat does.
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="channel/[channelId]"
           options={{
             animation: "slide_from_right",
@@ -109,6 +124,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="channel-actions/[channelId]"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: sheetBackground },
             headerTransparent: false,
@@ -123,6 +139,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-channel"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -137,6 +154,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="add-agent"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -162,6 +180,7 @@ function AuthenticatedStack() {
         <Stack.Screen
           name="install-agent"
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -177,7 +196,23 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="section-form"
+          // Android: autoFocus focuses the name field while the sheet opens, and Android does not show
+          // the keyboard then. Focusing the field again after the opening shows it.
+          listeners={
+            isAndroid
+              ? {
+                  transitionEnd: (event) => {
+                    if (event.data.closing) return;
+                    const input = TextInput.State.currentlyFocusedInput();
+                    if (!input) return;
+                    input.blur();
+                    input.focus();
+                  },
+                }
+              : undefined
+          }
           options={{
+            ...sheetHeaderInsetOptions,
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
@@ -191,6 +226,17 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="add-server"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="hosted-server"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
@@ -225,6 +271,28 @@ function AuthenticatedStack() {
         />
         <Stack.Screen
           name="server-settings"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="server-routines"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="server-usage"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
@@ -283,6 +351,7 @@ export default function AuthenticatedLayout() {
           <MessageActionsProvider>
             <QueuedMessagesProvider>
               <AuthenticatedStack />
+              <MermaidRendererHost />
             </QueuedMessagesProvider>
           </MessageActionsProvider>
         </AppDrawerShell>

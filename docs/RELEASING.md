@@ -1,14 +1,16 @@
 # Releasing OpenBot
 
 For iOS builds uploaded to TestFlight through GitHub Actions, see
-[the mobile release guide](../apps/mobile/README.md#github-actions-testflight-release).
-The mobile workflow is separate from the desktop tag release described below.
+[the mobile release guide](../apps/mobile/README.md#github-actions-testflight-release). For Android
+builds uploaded to Google Play, see
+[the Google Play release guide](../apps/mobile/README.md#github-actions-google-play-release).
+The mobile workflows are separate from the desktop tag release described below.
 
 OpenBot updates are published through GitHub Releases and installed with `electron-updater`.
 macOS requires every auto-updatable build to be signed with a Developer ID Application certificate.
-The release workflow also notarizes and staples the macOS application before publishing it. Windows
-x64 and Linux releases are currently unsigned, so Windows can show an Unknown publisher or
-SmartScreen warning and the Linux AppImage carries no signature.
+The release workflow also notarizes and staples the macOS application before publishing it. A Windows
+x64 tag release is signed with Azure Artifact Signing (see [Windows signing](#windows-signing)). Linux
+releases are unsigned, and the Linux AppImage carries no signature.
 All three platforms must pass before one release is published. A release also requires the pinned
 Sunshine and Moonlight Web runtime artifacts. GitHub Actions downloads those artifacts, checks SHA-256, and
 verifies their native executables as part of the final OpenBot package. Release packages are not built
@@ -21,7 +23,7 @@ OpenBot. Linux has no code-signature contract to check, so its provider artifact
 SHA-256 and version only.
 
 Installed apps do not wait for a release to get a new provider CLI: they offer the latest upstream
-release (see [Provider CLI updates](ARCHITECTURE.md#provider-cli-updates)). The pinned version is the
+release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
 blocked version is no longer offered, but it stays on the computers that already installed it.
@@ -49,9 +51,39 @@ first push, GHCR keeps the package `openbot` private. Open the package settings 
 Actions access**. (Not confirmed: a repository that pushes a new package usually gets this access
 already.)
 
-Windows signing credentials are not currently configured. The workflow explicitly verifies that the
-OpenBot executable and NSIS installer remain unsigned, while retaining package, runtime, updater,
-checksum, SBOM, and provenance checks.
+## Windows signing
+
+A tag build signs the Windows release with Azure Artifact Signing. It needs no secret:
+
+- The Artifact Signing account `synthetifyartifactsign` (East US, `https://eus.codesigning.azure.net/`)
+  holds the Public Trust certificate profile `SYNTHETIFY`, issued to
+  `SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ`. Microsoft issues a new short-lived
+  certificate each day with the same subject.
+- The Entra app registration `openbot-release-signing` has the **Artifact Signing Certificate Profile
+  Signer** role on that profile only. Its federated credential trusts the subject
+  `repo:nightly-labs@100160810/openbot@1332461149:environment:release`, because this repository uses
+  GitHub's immutable OIDC subject format. A dry run has no environment, so it cannot sign.
+- The `windows` job logs in with `azure/login`, caches a token for the signing service, and runs
+  `bun run dist:win --config electron-builder.windows-signing.yml`, then runs `az account clear`, so
+  the steps after the build have no Azure session. That overlay adds
+  `win.azureSignOptions` and `forceCodeSigning`. electron-builder signs `OpenBot.exe`, every `.exe` from
+  `extraResources` (Whisper, the remote desktop runtime, and the Computer Use driver), the NSIS
+  installer, and its uninstaller. The provider CLIs are not packaged on Windows, so their vendor
+  signatures do not change.
+- `verify:package:win --require-signature` requires a valid signature with the `app-update.yml`
+  publisher on each of those executables, and the next step requires the same signer on the
+  installer. A dry run requires `NotSigned` instead.
+- `-f mode=windows-signing` checks the login and the signing service without a release (see
+  [Publish a version](#publish-a-version) for the command).
+
+electron-builder writes `publisherName` to `app-update.yml`. An installed signed build accepts an
+update only when its installer certificate has that CN. A change of the legal name or of the identity
+validation therefore stops auto-updates for every signed install: ship a release that lists both names
+in `publisherName` before the certificate changes. An unsigned install has no `publisherName` and
+accepts the first signed update.
+
+The signature removes the Unknown publisher warning. SmartScreen can still warn until the new
+certificate builds download reputation.
 
 ## Build the remote desktop runtime
 
@@ -200,7 +232,7 @@ entry and re-run it with that exact version: the command reports `already pins O
 when the committed block matches byte for byte.
 
 Run it on a version bump only. A bump also needs the Windows checks in
-[the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
+[the OpenCode notes](architecture/providers.md#opencode-and-acp): the `win32-x64` values come from the
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
 
@@ -212,7 +244,7 @@ provider CLIs, the driver is packaged rather than downloaded on demand, so the r
 the user installs nothing.
 
 ```bash
-bun run pin:cua-driver 0.28.2
+bun run pin:cua-driver 0.34.0
 ```
 
 The script downloads all three `-binary` release assets, hashes each shipped file, and refuses a
@@ -284,7 +316,8 @@ A change to the desktop app or the web client and the iPhone app gets one file i
 `bun run mobile:release:patch`, `mobile:release:minor` and `mobile:release:major` move these files
 into `apps/mobile/CHANGELOG.md` and set the version in `apps/mobile/app.json`,
 `apps/mobile/package.json` and the copy of it in `bun.lock`. The pre-commit hook checks the new section when a commit changes the
-`app.json` version.
+`app.json` version. The new section is `## [x.y.z] - In review`, and `/changelog` does not show it
+until the store makes the build available. Then `bun run mobile:release:published` writes the date.
 
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a
@@ -347,7 +380,7 @@ The workflow:
    build machine. The Host PKG is ARM64 only;
    when `hdiutil create` fails with "Device not configured" or "Resource busy", it builds again,
    up to 3 attempts, because that runner error is not caused by the app;
-5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
+5. builds a signed Windows x64 NSIS installer on a GitHub Windows runner (unsigned in a dry run);
 6. builds unsigned Linux x64 and arm64 AppImages on GitHub Ubuntu 24.04 runners of each architecture,
    with the launch check under `xvfb-run`;
 7. verifies all three unpacked applications, update metadata, included runtimes, provider control
@@ -377,7 +410,24 @@ The dry run runs the tag validation (without the tag and `main` checks), the Win
 Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
 and it makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive,
 and an attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
-tag ref to check the macOS Host signing keychain.
+tag ref to check the macOS Host signing keychain, and `-f mode=windows-signing` on a tag ref to check
+Windows signing. `--ref` selects the workflow and the overlay, so the tag must point to the commit
+to test. Use a temporary `v0.0.0-*` tag. It matches the `release` environment policy. Its push
+starts a release run, but `Validate release tag` stops that run, because the tag never matches the
+`package.json` version:
+
+```sh
+git tag v0.0.0-windows-signing-test <commit>
+git push origin v0.0.0-windows-signing-test
+gh workflow run release.yml --ref v0.0.0-windows-signing-test -f mode=windows-signing
+# After the run:
+git tag -d v0.0.0-windows-signing-test
+git push origin :refs/tags/v0.0.0-windows-signing-test
+```
+
+It logs in to Azure, then signs a throwaway executable once immediately and once 20 minutes later,
+the delay between login and signing in a release build. It uploads and publishes nothing. Run it once
+after a change to the Azure setup or to `electron-builder.windows-signing.yml`, before the next tag.
 
 Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions
 download automatically while **Automatically download updates** is on, which is the default and is
@@ -413,8 +463,8 @@ Before creating the first tag or any later release:
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
 1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
-2. confirm the `release` environment contains all eight macOS secrets above; Windows and Linux remain
-   unsigned;
+2. confirm the `release` environment contains all eight macOS secrets above; Windows signs through
+   the Azure federated credential and needs no secret; Linux remains unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;
 4. run `bun install --frozen-lockfile` and `bun run check` from a clean clone;
 5. run `bun run package:verify` on macOS; Windows and Linux packaging and launch verification run on

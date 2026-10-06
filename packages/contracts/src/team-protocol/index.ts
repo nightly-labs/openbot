@@ -13,3 +13,6 @@ export * from "./v4-webrtc-adapter";
 export * from "./v5";
 export * from "./v5-adapter";
 export * from "./v5-webrtc-adapter";
+export * from "./v6";
+export * from "./v6-adapter";
+export * from "./v6-webrtc-adapter";

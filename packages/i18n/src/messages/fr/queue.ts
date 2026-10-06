@@ -14,6 +14,10 @@ export const messages = {
   "queue.item.steerTooltip": "Orienter le message",
   "queue.item.steering": "Orientation",
   "queue.item.steer": "Orienter",
+  "queue.item.notSteered": "Non orienté",
+  "queue.item.steerFallback.providerUnsupported":
+    "Ce fournisseur ne peut pas orienter un tour en cours : le message attend dans la file.",
+  "queue.item.steerFallback.steerFailed": "L’orientation a échoué : le message attend dans la file.",
   "queue.item.deleteLabel": "Supprimer le message en attente {position}",
   "queue.item.deleteTooltip": "Supprimer le message",
   "queue.item.editLabel": "Modifier le message en attente {position}",

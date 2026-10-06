@@ -33,6 +33,7 @@ export const messages = {
   "island.action.decline": "Refuser",
   "island.action.approve": "Approuver",
   "island.action.later": "Plus tard",
+  "island.action.dismiss": "Ignorer",
   "island.action.answerInOpenBot": "Répondre dans OpenBot",
   "island.failure.fallback": "La tâche s’est arrêtée avant la fin.",
   "island.failure.title": "Échec de la tâche",

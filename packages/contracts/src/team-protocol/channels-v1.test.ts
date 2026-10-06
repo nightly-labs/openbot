@@ -96,6 +96,10 @@ describe("channel-chats-v1 payloads", () => {
       { ...channel, id: "channel-2", unreadCount: 0, activeTasks: 0, lastMessage: null },
     ]);
     expect(channelResponse(CHANNEL_ROUTES.read, 200, page)).toEqual(page);
+    // The day rail's unloaded length is local IPC only: the released page shape never carries it.
+    expect(
+      channelResponse(CHANNEL_ROUTES.read, 200, { ...page, olderCount: 40, oldestAt: "2026-09-01T00:00:00.000Z" }),
+    ).toEqual(page);
     expect(channelResponse(CHANNEL_ROUTES.command, 200, { ...channel, providerSessionId: "private" })).toEqual(channel);
     expect(channelEvent({ type: "channels-changed", channelId: "channel-1", revision: 2 })).toEqual({
       type: "channels-changed",

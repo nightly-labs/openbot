@@ -4,6 +4,7 @@ import {
   Badge,
   Bubble,
   BubbleContent,
+  Button,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -22,6 +23,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "../features/conversation/send-shortcut";
 
 export interface QuestionPromptBubbleProps {
   questions: AgentPromptQuestion[];
@@ -29,6 +31,12 @@ export interface QuestionPromptBubbleProps {
   readOnly?: boolean;
   resolution?: AgentPromptResolution | null;
   elementRef?: (element: HTMLDivElement | undefined) => void;
+  /**
+   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
+   * plain Enter does not submit and the single-line field adds no line. The renderer resolves
+   * the platform and passes it.
+   */
+  sendShortcut?: SendShortcut;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
 }
@@ -443,13 +451,19 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                       current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
                     }
                     aria-label={t("prompt.question.customAnswerFor", { question: current().question })}
+                    aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
                     maxlength={INPUT_LIMITS.promptAnswerText}
                     disabled={busy()}
                     onValueChange={(value) => setCustomDrafts((drafts) => ({ ...drafts, [current().id]: value }))}
                     onKeyDown={(event) => {
                       // The browser owns the key that commits an IME composition. Safari sends it
                       // after `compositionend` without `isComposing`; keyCode 229 marks it.
-                      if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+                      if (event.isComposing || event.keyCode === 229) return;
+                      const sendShortcut = props.sendShortcut ?? "enter";
+                      // Enter to send keeps the previous chord: every Enter sends.
+                      if (sendShortcut === "enter") {
+                        if (event.key !== "Enter") return;
+                      } else if (!isSendShortcutKey(event, sendShortcut)) return;
                       event.preventDefault();
                       commitCustomAnswer(current(), pageProps.index);
                     }}
@@ -460,6 +474,18 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                         <Spinner size="sm" />
                         {t("common.sending")}
                       </span>
+                    </Show>
+                    {/* A software keyboard has no modifier chord, so the modifier mode needs a button. */}
+                    <Show when={(props.sendShortcut ?? "enter") !== "enter"}>
+                      <Button
+                        type="button"
+                        size="xs"
+                        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
+                        disabled={busy() || !customDrafts()[current().id]?.trim()}
+                        onClick={() => commitCustomAnswer(current(), pageProps.index)}
+                      >
+                        {t("prompt.question.submitAnswer")}
+                      </Button>
                     </Show>
                     <Questionnaire.Skip size="xs">{t("prompt.question.skip")}</Questionnaire.Skip>
                   </div>

@@ -1,5 +1,11 @@
 export type ExternalLinkTarget = "Default browser" | "OpenBot";
 
+import type { BusyMessageMode } from "@openbot/contracts/ipc";
+/** Which chord sends a message. Re-exported here so settings state can name the same type. */
+import type { SendShortcutMode } from "../conversation/send-shortcut";
+
+export type { SendShortcutMode };
+
 /** The sound materials of sound feedback, by their cuelume theme names. */
 export const SOUND_THEMES = ["default", "mech", "bubble", "press"] as const;
 export type SoundTheme = (typeof SOUND_THEMES)[number];
@@ -20,6 +26,10 @@ export interface GeneralSettingsValue {
   macBookNotchWidthPercent: number;
   macBookNotchHeightPercent: number;
   taskCompletionSound: boolean;
+  /** How the user sends a message: plain Enter, or the platform modifier with Enter. */
+  sendShortcut: SendShortcutMode;
+  /** What a message sent to a busy agent does, unless the agent or the message sets its own. */
+  busyMessageMode: BusyMessageMode;
   /** Short sounds that confirm the user's own actions, such as a click or a sent message. */
   soundFeedback: boolean;
   soundTheme: SoundTheme;
@@ -49,6 +59,8 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   macBookNotchWidthPercent: 100,
   macBookNotchHeightPercent: 100,
   taskCompletionSound: true,
+  sendShortcut: "enter",
+  busyMessageMode: "queue",
   soundFeedback: false,
   soundTheme: "default",
   turboMode: false,

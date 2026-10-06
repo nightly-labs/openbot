@@ -1,5 +1,6 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
@@ -7,6 +8,8 @@ import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
+import { CodePreview } from "./CodePreview";
+import type { MessageCodeBlock } from "./DataTable";
 import { MathFormula } from "./MathFormula";
 import { MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
 import {
@@ -134,6 +137,44 @@ function lexBlockTokens(body: string, cache: boolean): TokensList {
   return tokens;
 }
 
+interface StreamedTokens {
+  body: string;
+  tokens: TokensList;
+}
+
+/**
+ * The tokens of a streaming body, which only grows. A block that has a blank line after it and a
+ * block after that is final, so only the text from that blank line is lexed again. Text with no
+ * blank line before it can still join the block before it, such as `#1234` after a paragraph line.
+ * A body that does not extend the previous one, or a link reference definition, which changes how
+ * earlier blocks read, lexes the whole body. The settled body is lexed whole.
+ */
+function lexStreamingTokens(body: string, previous: StreamedTokens | undefined): TokensList {
+  if (!previous || !body.startsWith(previous.body) || Object.keys(previous.tokens.links).length > 0) {
+    return markdown.lexer(body);
+  }
+  let kept = previous.tokens.length - 1;
+  while (kept > 0 && previous.tokens[kept]?.type === "space") kept -= 1;
+  while (kept > 0 && previous.tokens[kept]?.type !== "space") kept -= 1;
+  // Display math can span blank lines. Until its closing delimiter arrives, it reads as paragraphs.
+  const openMath = previous.tokens.findIndex(
+    (token, index) =>
+      index < kept &&
+      token.type !== "blockMath" &&
+      token.type !== "code" &&
+      chatMathBlockStart(token.raw) !== undefined,
+  );
+  if (openMath !== -1) kept = openMath;
+  const settled = previous.tokens.slice(0, kept);
+  const settledLength = settled.reduce((length, token) => length + token.raw.length, 0);
+  // The lexer normalizes line endings, and then the sources no longer add up to the body.
+  const previousLength = previous.tokens.reduce((length, token) => length + token.raw.length, 0);
+  if (settled.length === 0 || previousLength !== previous.body.length) return markdown.lexer(body);
+  const tail = markdown.lexer(body.slice(settledLength));
+  if (Object.keys(tail.links).length > 0) return markdown.lexer(body);
+  return Object.assign([...settled, ...tail], { links: tail.links });
+}
+
 function lexInlineTokens(body: string): Token[] {
   const cached = inlineLexerCache.get(body);
   if (cached) return cached;
@@ -150,7 +191,17 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   // A streaming reply passes each growing prefix here. Caching those would
   // retain up to 200 obsolete token trees and evict completed messages, so
   // only a settled body enters the shared cache.
-  const tokens = createMemo(() => lexBlockTokens(props.body, props.streaming !== true));
+  let streamed: StreamedTokens | undefined;
+  const tokens = createMemo(() => {
+    const body = props.body;
+    if (props.streaming !== true) {
+      streamed = undefined;
+      return lexBlockTokens(body, true);
+    }
+    const tokens = lexStreamingTokens(body, streamed);
+    streamed = { body, tokens };
+    return tokens;
+  });
   // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
   // `content` object and run their reads again. Only a new directory changes it.
   const fileDirectory = createMemo(() => messageFileDirectory(props.body), {
@@ -349,7 +400,18 @@ function MarkdownBlock(props: {
       if (!tokenIs(token, "code")) return token.raw;
       const language = token.lang?.trim().split(/\s+/u)[0] ?? "";
       if (language.toLowerCase() === "math") return <MathFormula tex={token.text} raw={token.raw} display block />;
-      return <CodeBlock block={{ type: "code", code: token.text, language }} streaming={props.streaming === true} />;
+      const block: MessageCodeBlock = { type: "code", code: token.text, language };
+      const preview = chatPreviewKind(language);
+      if (preview)
+        return (
+          <CodePreview
+            block={block}
+            kind={preview}
+            streaming={props.streaming === true}
+            onOpenLink={props.content.onOpenLink}
+          />
+        );
+      return <CodeBlock block={block} streaming={props.streaming === true} />;
     }
     case "table": {
       if (!tokenIs(token, "table")) return token.raw;

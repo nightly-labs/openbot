@@ -22,6 +22,7 @@ import {
   isAgentProvider,
   isAvatarHue,
   isAvatarSeed,
+  isBusyMessageMode,
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
@@ -36,7 +37,9 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  ROUTINE_LIMIT_POLICIES,
   type RoutineCalendarInput,
+  type RoutineLimitPolicy,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
@@ -53,7 +56,7 @@ import {
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { PayloadDecoder } from "../trusted-ipc";
@@ -226,6 +229,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     active: value.active,
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
+    ...optionalLimitPolicy(value.limitPolicy),
   };
 }
 
@@ -244,8 +248,15 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
+}
+
+function optionalLimitPolicy(value: unknown): { limitPolicy?: RoutineLimitPolicy } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_LIMIT_POLICIES, value)) throw new Error("Invalid routine limit policy.");
+  return { limitPolicy: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -327,6 +338,7 @@ export function parseCreateChannelRoutine(value: unknown): CreateChannelRoutineI
     active: value.active,
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
+    ...optionalLimitPolicy(value.limitPolicy),
   };
 }
 
@@ -345,6 +357,7 @@ export function parseUpdateChannelRoutine(value: unknown): UpdateChannelRoutineI
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -444,11 +457,19 @@ export function parseSendMessage(value: unknown): SendMessageInput {
   if (replyToMessageId !== null && (!isString(replyToMessageId) || replyToMessageId.length > INPUT_LIMITS.identifier)) {
     throw new Error("Invalid reply target.");
   }
+  const clientMessageId = value.clientMessageId;
+  if (
+    clientMessageId !== undefined &&
+    (!isString(clientMessageId) || !clientMessageId || clientMessageId.length > INPUT_LIMITS.identifier)
+  ) {
+    throw new Error("Invalid client message id.");
+  }
   return {
     agentId: requireString(value.agentId, "agentId"),
     text: value.text,
     attachmentDraftIds,
     replyToMessageId: replyToMessageId?.trim() || null,
+    ...(clientMessageId === undefined ? {} : { clientMessageId }),
   };
 }
 
@@ -525,6 +546,12 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.allowAutomation !== undefined) {
     if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
     result.allowAutomation = value.allowAutomation;
+  }
+  if (value.busyMessageMode !== undefined) {
+    if (value.busyMessageMode !== null && !isBusyMessageMode(value.busyMessageMode)) {
+      throw new Error("Invalid busy message mode.");
+    }
+    result.busyMessageMode = value.busyMessageMode;
   }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");

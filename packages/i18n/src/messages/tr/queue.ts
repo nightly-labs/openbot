@@ -14,6 +14,10 @@ export const messages = {
   "queue.item.steerTooltip": "Mesajı yönlendir",
   "queue.item.steering": "Yönlendiriliyor",
   "queue.item.steer": "Yönlendir",
+  "queue.item.notSteered": "Yönlendirilmedi",
+  "queue.item.steerFallback.providerUnsupported":
+    "Bu sağlayıcı çalışan bir turu yönlendiremez, bu yüzden mesaj kuyrukta bekler.",
+  "queue.item.steerFallback.steerFailed": "Yönlendirme başarısız oldu, bu yüzden mesaj kuyrukta bekler.",
   "queue.item.deleteLabel": "Kuyruktaki mesajı sil {position}",
   "queue.item.deleteTooltip": "Mesajı sil",
   "queue.item.editLabel": "Kuyruktaki mesajı düzenle {position}",

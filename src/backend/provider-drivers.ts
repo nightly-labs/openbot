@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
@@ -46,6 +47,7 @@ import {
   type SpawnTarget,
 } from "./process-confinement";
 import type { AccountReadResult } from "./protocol";
+import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
 interface ProviderCliCommand {
@@ -101,11 +103,11 @@ type ProviderSignIn =
  * A sign-in the user finishes on another device, for a host with no browser the user can see.
  * `codex-device` is the Codex app-server device code. `cli` spawns the provider's CLI and reads its
  * link: `device` prints a code the user confirms, `paste` waits for the code the provider's page
- * shows, which the user copies back.
+ * shows, which the user copies back, and `link` is a page that signs the CLI in by itself.
  */
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
-  | { kind: "cli"; flow: "device" | "paste"; command: ProviderCliCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderCliCommand };
 
 /**
  * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
@@ -216,7 +218,9 @@ export interface BuiltInProviderDriver {
   signIn: ProviderSignIn;
   /** Absent for a provider that has no sign-in on another device. */
   codeSignIn?: ProviderCodeSignIn;
-  resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
+  resolveCli(options?: {
+    bundledExecutable?: string | null;
+  }): Effect.Effect<AgentCliInfo, ProviderClientOperationError>;
   createClient(
     cli: AgentCliInfo,
     requestTimeoutMs: number,
@@ -348,7 +352,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpAuthorization: context.mcpAuthorization,
-        readRateLimits: () => readOpenCodeGoUsage(context.apiKey("opencode")),
+        readRateLimits: () =>
+          readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
+            Effect.mapError((failure) => providerFailure(failure.cause)),
+          ),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
@@ -411,6 +418,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // `cursor_login` opens the Cursor sign-in page from the server. `CURSOR_API_KEY` in the user's
     // environment signs the CLI in without it.
     signIn: { kind: "acp-authenticate", methodId: "cursor_login", argv: ["acp"], timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    // With `NO_OPEN_BROWSER`, `login` prints the sign-in link and waits until the page signs it in.
+    // The ACP `cursor_login` method gives up instead when it cannot open a browser.
+    codeSignIn: {
+      kind: "cli",
+      flow: "link",
+      command: { argv: ["login"], env: () => ({ NO_OPEN_BROWSER: "1" }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
     resolveCli: resolveCursorCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -449,6 +463,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       env: CLINE_ENV,
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
+    // `auth -p cline` prints a device code and its page, and waits until the user confirms it.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: { argv: ["auth", "-p", "cline"], env: () => ({ ...CLINE_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
     resolveCli: resolveClineCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -480,16 +500,17 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "acp",
     // Each custom agent signs in its own way, in its own CLI. OpenBot only checks it again.
     signIn: { kind: "external" },
-    resolveCli: async () => CUSTOM_AGENTS_CLI,
+    resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
         () => savedCustomAgents(context),
-        (config, executable) => customAgentChild(config, executable, timeout, context, confinement, false),
+        (config, executable, folder) =>
+          customAgentChild(config, executable, folder, timeout, context, confinement, false),
       ),
     createProfileClient: (_cli, timeout, context) =>
       new CustomAcpAgentsClient(
         () => savedCustomAgents(context),
-        (config, executable) => customAgentChild(config, executable, timeout, context, undefined, true),
+        (config, executable, folder) => customAgentChild(config, executable, folder, timeout, context, undefined, true),
       ),
     authState: () => ({ kind: "acp", email: null }),
     validateAccount: () => undefined,
@@ -500,10 +521,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
  * The ACP process of one custom agent. It is given the MCP servers and the confinement as a built-in
  * ACP provider is, and a model check of its own: a model of this agent is served while the agent is
  * saved. `CustomEndpoints.serves` is not used, because it knows only the custom endpoints.
+ *
+ * A process for a working folder lists its models in that folder: an agent that serves one folder
+ * for each process refuses any other. Only the process that lists the catalogue (`folder` null)
+ * uses the empty discovery folder.
  */
 function customAgentChild(
   config: CustomAgentConfig,
   executable: string,
+  folder: string | null,
   timeout: number,
   context: ProviderClientContext,
   confinement: ProcessConfinement | undefined,
@@ -515,7 +541,7 @@ function customAgentChild(
     provider: "acp",
     label: config.name,
     allowNoModels: true,
-    discoveryCwd: () => customAgentDiscoveryFolder(config.id),
+    discoveryCwd: () => folder ?? customAgentDiscoveryFolder(config.id),
     redactValues: () => values,
     argv: config.args,
     env,

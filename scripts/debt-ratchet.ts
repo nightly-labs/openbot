@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 
-// The shared part of `lint-ratchet.ts` and `type-ratchet.ts`. A baseline file holds the count of
-// each check (a Biome rule or a TypeScript option) for each file. A count above the baseline
+// The baseline rules of `type-ratchet.ts`. A baseline file holds the count of each check (a
+// TypeScript option) for each file. A count above the baseline
 // fails, so a check stops new debt before the old debt is fixed. `--add=<name>` starts a check at
 // its current counts. `--write` lowers the baseline after a fix and never raises it: a higher count
 // is a hand edit that a reviewer sees.
@@ -11,7 +11,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 type Baseline = Record<string, Record<string, number>>;
 
 export interface DebtRatchet {
-  /** The logger name and the `bun run` script, such as `lint:ratchet`. */
+  /** The logger name and the `bun run` script, such as `types:ratchet`. */
   script: string;
   baselinePath: string;
   /** What one count is, in the plural: `findings` or `errors`. */

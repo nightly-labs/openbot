@@ -1,7 +1,8 @@
 // Putting one Team API call on the wire, and reading what came back off it.
 //
-// HTTP uses the adapter for the negotiated protocol: V5 adds Gemini and custom ACP agents, V4 adds
-// OpenCode, V3 adds duplication, and V1 serves older hosts. The WebRTC transport retains its released V2 framing.
+// HTTP uses the adapter for the negotiated protocol: V6 adds Cursor and Cline, V5 adds Gemini and
+// custom ACP agents, V4 adds OpenCode, V3 adds duplication, and V1 serves older hosts. The WebRTC
+// transport retains its released V2 framing.
 //
 // Nothing here knows a server exists. It takes a URL, a token and a protocol number, and it either
 // returns a decoded value or throws one of `remote-server-errors.ts`. Deciding what a throw means for
@@ -19,42 +20,42 @@ import {
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Schema } from "effect";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 export const REMOTE_REQUEST_TIMEOUT_MS = 15_000;
 
-export function remoteFetch(
-  input: string | URL,
-  init: RequestInit = {},
-  timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
-): Promise<Response> {
-  return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+export interface RemoteJsonRequestOptions {
+  method?: string;
+  body?: unknown;
+  token?: string;
+  protocol?: number;
+  appVersion?: string;
+  capabilities?: readonly TeamCurrentCapability[];
+  preserveSemanticTags?: boolean;
+  agentCreateModel?: boolean;
+  timeoutMs?: number;
 }
 
-export async function requestJson<T>(
+export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   apiUrl: string,
   path: string,
   decoder: ResponseDecoder<T>,
-  options: {
-    method?: string;
-    body?: unknown;
-    token?: string;
-    protocol?: number;
-    appVersion?: string;
-    capabilities?: readonly TeamCurrentCapability[];
-    preserveSemanticTags?: boolean;
-    agentCreateModel?: boolean;
-    timeoutMs?: number;
-  } = {},
-): Promise<T> {
+  options: RemoteJsonRequestOptions = {},
+) {
+  const controller = yield* Effect.acquireRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) => Effect.sync(() => controller.abort()),
+  );
   const method = options.method ?? (options.body === undefined ? "GET" : "POST");
   const sideRoute = teamSideRouteCodec(path);
   const codec = teamHttpCodec(options.protocol);
-  const response = await remoteFetch(
+  const response = yield* remoteFetch(
     new URL(path, apiUrl),
     {
       method,
+      signal: controller.signal,
       headers: {
         Accept: "application/json",
         ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
@@ -77,26 +78,27 @@ export async function requestJson<T>(
   );
   let value: unknown;
   if (response.status !== 204) {
-    try {
-      value = await response.json();
-    } catch (error) {
-      // A body the host said was JSON and is not is the same failure as one that decodes to the
-      // wrong shape, so it leaves here as the same error. Raw, it was a `SyntaxError` that only
-      // `classifyRemoteConnectionError` recognised -- every caller checking for a protocol failure
-      // by class, the desktop probe among them, let it through as an ordinary rejection.
-      if (response.ok) {
-        throw new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause: error });
-      }
-    }
+    const decoded = yield* Effect.result(
+      Effect.tryPromise({
+        try: () => response.json(),
+        catch: (cause) =>
+          new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause }),
+      }),
+    );
+    if (Result.isFailure(decoded)) {
+      if (response.ok) return yield* Effect.fail(decoded.failure);
+    } else value = decoded.success;
   }
   if (value !== undefined) {
-    try {
-      value = sideRoute
-        ? sideRoute.response(path, response.status, value)
-        : codec.decodeResponse(method, path, response.status, value);
-    } catch (error) {
-      throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause: error });
-    }
+    const input = value;
+    value = yield* Effect.try({
+      try: () =>
+        sideRoute
+          ? sideRoute.response(path, response.status, input)
+          : codec.decodeResponse(method, path, response.status, input),
+      catch: (cause) =>
+        new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
+    });
   }
   if (!response.ok) {
     const message =
@@ -104,16 +106,13 @@ export async function requestJson<T>(
         ? value.error
         : sourceText("error.remote.requestFailedStatus", { status: response.status });
     const code = isDynamicRecord(value) && isString(value.code) ? value.code : null;
-    throw new RemoteRequestError(response.status, message, code);
+    return yield* Effect.fail(new RemoteRequestError(response.status, message, code));
   }
-  try {
-    return decoder(value);
-  } catch (error) {
-    throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, {
-      cause: error,
-    });
-  }
-}
+  return yield* Effect.try({
+    try: () => decoder(value),
+    catch: (cause) => new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
+  });
+}, Effect.scoped);
 
 export function webRtcRequestBody(
   body: RequestInit["body"],
@@ -138,27 +137,49 @@ export function webRtcRequestBody(
 // `requestJson` above agree on what a failing host response means. A host that answers with a JSON
 // error envelope produces a `RemoteRequestError` carrying its own message and code; a host that
 // claims JSON and does not send it is a protocol failure, not a request failure.
-export async function throwRemoteResponseError(response: Response, method: string, path: string): Promise<never> {
-  let body: unknown;
-  try {
-    body = await response.clone().json();
-  } catch (error) {
-    if (response.headers.get("content-type")?.toLowerCase().includes("json")) {
-      throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause: error });
-    }
-    throw new RemoteRequestError(
-      response.status,
-      sourceText("error.remote.requestFailedStatus", { status: response.status }),
+export const throwRemoteResponseError = Effect.fn("RemoteHttp.responseError")(function* (
+  response: Response,
+  method: string,
+  path: string,
+) {
+  const body = yield* Effect.tryPromise({
+    try: () => response.clone().json(),
+    catch: (cause) =>
+      response.headers.get("content-type")?.toLowerCase().includes("json")
+        ? new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause })
+        : new RemoteRequestError(
+            response.status,
+            sourceText("error.remote.requestFailedStatus", { status: response.status }),
+          ),
+  });
+  const value = yield* Effect.try({
+    try: () => decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, body),
+    catch: (cause) => new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
+  });
+  if (!isDynamicRecord(value) || !isString(value.error)) {
+    return yield* Effect.fail(
+      new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, {
+        cause: new Error("Invalid error envelope."),
+      }),
     );
   }
-  try {
-    const value = decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, body);
-    if (!isDynamicRecord(value) || !isString(value.error)) throw new Error("Invalid error envelope.");
-    throw new RemoteRequestError(response.status, value.error, isString(value.code) ? value.code : null);
-  } catch (error) {
-    if (error instanceof RemoteRequestError) throw error;
-    throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, {
-      cause: error,
-    });
-  }
-}
+  return yield* Effect.fail(
+    new RemoteRequestError(response.status, value.error, isString(value.code) ? value.code : null),
+  );
+});
+
+class RemoteTransportError extends Schema.TaggedError<RemoteTransportError>()("RemoteTransportError", {
+  cause: Schema.Defect(),
+}) {}
+
+export const remoteFetch = Effect.fn("RemoteHttp.fetch")(
+  (input: string | URL, init: RequestInit = {}, timeoutMs = REMOTE_REQUEST_TIMEOUT_MS) =>
+    Effect.tryPromise({
+      try: (signal) =>
+        fetch(input, {
+          ...init,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs), ...(init.signal ? [init.signal] : [])]),
+        }),
+      catch: (cause) => new RemoteTransportError({ cause }),
+    }),
+);

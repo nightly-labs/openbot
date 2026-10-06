@@ -28,6 +28,7 @@ export const messages = {
   "app.provider.codeExpiredDescription": "Kimse zamanında girmedi. Bu kod artık geçerli değil.",
   "app.provider.connectFailed": "{name} bağlanamadı",
   "app.provider.connectFailedRetry": "OpenBot {name} sağlayıcısına bağlanamadı. Tekrar deneyin.",
+  "app.provider.restartFailed": "{name} yeniden başlatılamadı",
   "app.provider.included": "{name}, OpenBot ile birlikte gelir.",
   "app.clipboard.copyFailed": "Metin kopyalanamadı.",
   "app.voice.tooLong": "Ses kayıtları iki dakika ile sınırlıdır.",

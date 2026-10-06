@@ -53,7 +53,7 @@ export function testConversationProps(agentId: string): ConversationProps {
     onSelectAgent: () => {},
     onUpdateAgent: async () => {},
     onSetAgentAvatar: async () => {},
-    onSendMessage: async () => true,
+    onSendMessage: async () => ({ messageId: "message-sent" }),
     onMarkRead: async () => {},
     onTypingChange: () => {},
     onAnswerPrompt: async () => true,

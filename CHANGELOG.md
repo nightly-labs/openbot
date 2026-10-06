@@ -6,6 +6,153 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-05
+
+### Added
+
+- An agent can suggest a Marketplace app in the chat. The card shows the app, its state, and
+  Connect. Connect opens the app in Marketplace and starts its sign-in there. You can dismiss the
+  card and undo.
+- When an agent needs GitHub and it is not connected, the agent shows a GitHub card in the chat.
+- The openbot.run home page shows what OpenBot does, answers common questions, and links to each comparison.
+- An official Docker image, `ghcr.io/nightly-labs/openbot`, for `linux/amd64` and `linux/arm64`. It
+  runs OpenBot as a self-hosted server with the Electron sandbox on. Sign it in with
+  `docker exec -it openbot openbot login`. See `docs/docker.md`.
+- openbot.run has a download page for each system: `/download/macos`, `/download/windows` and
+  `/download/linux`. Each page gives the system requirements, the install steps and the known limits,
+  and `/download` links to all three.
+- openbot.run has a download for Linux on arm64.
+- openbot.run has four new pages in /compare: Codex vs Claude Code, Claude Code vs Antigravity,
+  Cursor vs Claude Code, and the best AI agent apps of 2026. Each pair page compares the two apps
+  from their official sources, and shows how OpenBot runs both as one team. The roundup lists 13
+  apps and links each one to its comparisons. The Codex, Antigravity and roundup pages show a
+  chart of scores, cost per task and time per task from the Artificial Analysis Coding Agent Index.
+- Connect 1Password in the Marketplace or in Server settings > Connectors. The page shows three
+  steps: **Install** puts the 1Password CLI in place for you, with no administrator password; then
+  turn on the CLI integration in the 1Password app, which the page sees when you come back; then
+  **Connect 1Password** creates a "Shared with OpenBot" vault and a service account that can read only
+  that vault. You can paste a service account token instead. Agents then sign in to sites in the
+  OpenBot browser with the logins you move into that vault. The browser fills the password or
+  authenticator code; agents never see it.
+- Full Turkish language localization across OpenBot, covering 100% of messages including new features, connectors, Marketplace v3, schedule calendar, and all error catalogs.
+- Choose the message send shortcut in Settings > General > App behavior (desktop) or
+  Account > Preferences > App behavior (web): Enter to send, or ⌘Enter on macOS /
+  Ctrl+Enter on Windows and Linux to send with Enter adding a new line. The choice
+  stays on the device and browser. An Enter that confirms IME text never sends.
+- When a Claude or Codex account reaches its usage limit, OpenBot shows one desktop notification for
+  the account, with the number of agents that wait and the reset time when the provider gives it.
+  Each agent on that account shows "Waits for limit" and the reset time in the sidebar.
+- A routine has a new setting, "If the account is at its limit", on this computer: wait and run
+  after the reset, or skip the run. Wait is the default.
+
+### Changed
+
+- On openbot.run, News, Guides, Compare and Plugins in the header now open their pages when you
+  click them. Hover over them to see the panel.
+- The openbot.run footer names Synthetify Labs as the owner.
+- A chat now shows consecutive messages to and from other agents as one row, such as "7 messages with 7 agents". Click the agents to see each message.
+- The openbot.run footer links to the self-hosted server guide.
+- The direct installer links are now `/download/<os>/latest`. An old `/download/<os>` link opens the
+  download page for that system, not the installer.
+- The Schedule view of a server is now called Routines, the same name as in agent and channel
+  settings.
+- A failed task card in the Dynamic Island now has a "Dismiss" button. The button removes the card
+  from the island only. The conversation keeps the error, and the agent list keeps the failed mark.
+  The island then shows the newer replies of the other agents (#1348).
+
+### Removed
+
+- Removed the public guide-authoring page. Its instructions now live in the contributor documentation.
+
+### Fixed
+
+- The openbot.run home page title reads "Meet OpenBot" to search engines, and its text shows when JavaScript is off.
+- The openbot.run home page title shows sooner: it no longer waits for the page script.
+- `www.openbot.run` and `http://openbot.run` now go to `https://openbot.run`.
+- Page addresses that end in `/` now redirect permanently to the address without it.
+- The guides, news, plugins and changelog pages have clearer titles in search results.
+- The server member count now uses the singular form for one member. Before, a server with one
+  member read "1 members" in English.
+- The Dynamic Island toggle now reads "Expand" and "Collapse" in the interface language. Before, it
+  always used these two words in English. A screen reader then read English inside a control that
+  was otherwise in the chosen language.
+- The composer error banner showed two English messages that no catalog owned. With the interface
+  in another language, they stayed English above a translated composer. Both now come from the
+  composer catalog. The attachment limit message also reads the limit from the shared limit, so a
+  change to that value updates the text.
+- The desktop app no longer closes when a remote server announces a new name and the saved server list
+  cannot be written, for example when the profile directory is read-only or the disk is full. The new
+  name still appears in the app, and the next write of the list saves it.
+- A plugin listing with a server argument that is not text now stops the plugin catalog build. Before, the build dropped the whole argument list, so the listing shipped a server that started with no arguments.
+- The app no longer freezes when an agent declares a very long task resource list. OpenBot now
+  refuses an oversized list at once, instead of resolving every path in the list first.
+- Signing out, disconnecting or quitting now ends a file download that is still waiting. Before, the
+  download waited for its full 60 s timeout and its timer kept OpenBot from closing.
+- Closing a remote connection while Signal checks its ticket no longer uses one of the account's
+  remote connection slots. Before, the closed connection kept its slot, and the desktop was told
+  that a phone was ready. A later device was then refused because the account was full.
+- A remote client whose agent snapshot is too large to send no longer stops the other remote clients
+  from receiving that agent event. Before, every client that connected after it missed the event and
+  kept a stale queue until the next event arrived.
+- A chat could stop updating on screen when notifying the window failed. Every update now runs, so
+  the chat stays the same as the saved messages.
+- The skill marketplace no longer skips skills when a client pages with a cursor from before cursor
+  v1. That cursor held only a timestamp. The catalog order also leads with the featured flag, so the
+  timestamp could not say where the last page stopped. The page now comes again and the rest of the
+  catalog follows.
+- The agent marketplace no longer skips agents when a client pages with a cursor from before cursor
+  v1. That cursor held only a timestamp. The catalog order also leads with the featured flag, so the
+  timestamp could not say where the last page stopped. The page now comes again and the rest of the
+  catalog follows.
+- On macOS, the message that blocks an update while another OpenBot session runs now tells you when the other session runs in your own user account. Before, it always told you to stop OpenBot in every other macOS user account, even when the blocking process ran in your own account.
+- Open Desktop now shows why a remote desktop did not start: Sunshine did not start, Moonlight Web
+  did not start, or pairing failed. Before, it showed only "request failed".
+- When Sunshine stops on the host, OpenBot ends its remote desktop sessions and starts Sunshine again
+  for the next session. Before, each new session stayed at "Connecting".
+- Open Desktop shows an error when the host does not start the stream in 60 seconds. Before, it
+  stayed at "Connecting" until you closed it.
+- Signal no longer refuses a new phone or browser with "Too many active remote connections." when one
+  account has several computers and devices. The account limit is now 32 Signal connections, not 8.
+  A phone that reconnects after a network change no longer loses its own place to its old connection.
+- After a restart, a Claude agent chat no longer shows the context summary, "[Request interrupted by user]", or the output of a command such as `/compact` as a message from you, and no longer repeats an answer it already showed. The next restart also removes these messages from chats that already show them. An answer that was already repeated stays.
+- You can install the OpenBot website as an app from Chrome, Edge and Android. Before, the site
+  manifest told the browser to keep the site in a normal tab, so the browser did not offer to
+  install it.
+- On a phone, the email sign-in code now fills from the keyboard suggestion or from autofill, also
+  with its hyphen. Each character typed on an Android keyboard now goes into the next box. Before,
+  each character replaced the first box.
+- Canva opens in the embedded browser. Before, Canva showed an "Update your browser" page and did
+  not let you edit a presentation, because its server refused the OpenBot token in the user agent.
+- Gemini agents no longer fail every turn with "Invalid value at 'tools[0].function_declarations[…]…enum[0]' (TYPE_STRING)". Two OpenBot tools sent numbers in a list of allowed values, which Gemini accepts only as text.
+- When you change an agent's provider, the new provider now gets the work the previous one did: the commands it ran with their results, the files it changed, and its progress notes. Before, it got only the chat messages, so it did not know much of the earlier work.
+- When you ask an agent on a connected server to create a routine, the routine now runs in your
+  timezone. Before, it ran in the server's timezone, so a routine for 8:00 could run hours early or
+  late. This works from the desktop app and the web client when both the app and the server are
+  updated.
+- When you change an agent's provider, OpenBot now saves the earlier provider's work log at the moment of the switch. Before, if that provider stopped soon after the switch, as an unused provider does after a minute, the new provider could get the chat without the earlier work.
+- A custom agent that serves one folder for each process, such as Command Code (`cmd acp`), lists its
+  models while a bot uses it, and runs bots in more than one folder. Before, the model list failed
+  with "This cmd acp process serves ...; start another for ...", because OpenBot used one process
+  of the agent for all folders.
+- A steered message to a custom ACP agent that accepts one prompt at a time is not lost. Before, the
+  agent refused it with "A prompt is already running for this session", OpenBot showed a provider
+  error, and the message was not sent. Now OpenBot sends the message when the running reply ends.
+- On the website, the page keeps its scroll bar and does not move when you hover over or focus
+  "App" in the header. Before, the scroll bar went away, the page moved sideways and stopped
+  scrolling.
+- Codex and ACP agents now receive a clear reason and can retry when an agent profile request is invalid, for example when profile instructions exceed the length limit or a model is not available, instead of receiving a generic provider error.
+- The files of an "Update from" message now sit at the left edge, under the update, where an
+  agent's own files sit. Before, they were pushed to the right.
+- A chat row no longer takes the data of the next message when messages in the middle of the chat
+  change order. Before, a row could hold the raw text that an agent sent, or the file of another
+  message, until the list updated.
+- A chat message that cannot be shown now shows "This message could not be shown". The rest of the
+  chat stays usable.
+- A message, a routine run or a local script run that reached an account at its usage limit failed
+  with "Internal error: You've hit your session limit", and OpenBot did not run it again. Now it
+  waits in the queue and starts after the reset. A turn that had already run a command still fails,
+  so the command does not run twice.
+
 ## [0.29.0] - 2026-10-02
 
 ### Added

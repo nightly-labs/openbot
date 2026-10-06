@@ -275,13 +275,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               computerUseEditable={props.server?.kind === "local"}
               automationEditable={props.server?.kind === "local"}
+              busyMessageModeEditable={props.server?.kind === "local"}
+              defaultBusyMessageMode={props.defaultBusyMessageMode}
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
-                !controller.selectionSending() &&
                 controller.voicePhase() === "idle" &&
                 !controller.editingDeliveryId()
                   ? () => {
@@ -295,7 +296,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
-                !controller.selectionSending() &&
                 controller.voicePhase() === "idle" &&
                 !controller.editingDeliveryId()
                   ? (skill) => {

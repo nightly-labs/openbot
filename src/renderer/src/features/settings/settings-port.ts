@@ -7,10 +7,12 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface SettingsPort {
   getAnalyticsPreference: OpenBotDesktopApi["getAnalyticsPreference"];
   getApprovalAutomation: OpenBotDesktopApi["getApprovalAutomation"];
+  getBusyMessageModePreference: OpenBotDesktopApi["getBusyMessageModePreference"];
   onApprovalAutomation: OpenBotDesktopApi["onApprovalAutomation"];
   onOpenSettings: OpenBotDesktopApi["onOpenSettings"];
   setAnalyticsPreference: OpenBotDesktopApi["setAnalyticsPreference"];
   setApprovalAutomation: OpenBotDesktopApi["setApprovalAutomation"];
+  setBusyMessageModePreference: OpenBotDesktopApi["setBusyMessageModePreference"];
   dynamicIsland: Pick<
     OpenBotDesktopApi["dynamicIsland"],
     "getBuiltInDisplayGeometry" | "getPreference" | "setPreference"

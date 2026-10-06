@@ -3,6 +3,14 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { Deferred, Effect, Result } from "effect";
+import {
+  type AttachmentOperationError,
+  attachmentCall,
+  attachmentFailure,
+  attachmentResult,
+  attachmentSync,
+} from "../attachment-effects";
 import type { GeneratedAttachmentSource, MailboxStore } from "../mailbox-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "../workspace-paths";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -60,7 +68,7 @@ export class AttachmentGateway {
   readonly #mailbox: MailboxStore;
   readonly #sharedRoot: string;
   readonly #hooks: AttachmentGatewayHooks;
-  readonly #inFlight = new Map<string, Promise<OpenBotToolResponse>>();
+  readonly #inFlight = new Map<string, Deferred.Deferred<OpenBotToolResponse, AttachmentOperationError>>();
 
   constructor(options: AttachmentGatewayOptions) {
     this.#conversation = options.conversation;
@@ -69,144 +77,169 @@ export class AttachmentGateway {
     this.#hooks = options.hooks;
   }
 
-  attachFiles(
+  readonly attachFiles = Effect.fn("AttachmentGateway.attachFiles")(function* (
+    this: AttachmentGateway,
     senderAgentId: string,
     params: { threadId: string; turnId: string; callId: string },
     paths: string[],
     messageId: string,
-  ): Promise<OpenBotToolResponse> {
+  ) {
     const inFlight = this.#inFlight.get(messageId);
-    if (inFlight) return inFlight;
-    const command = this.#attachFilesToResponse(senderAgentId, params, paths, messageId);
-    this.#inFlight.set(messageId, command);
-    return command.finally(() => {
-      if (this.#inFlight.get(messageId) === command) this.#inFlight.delete(messageId);
-    });
-  }
+    if (inFlight) return yield* Deferred.await(inFlight);
+    const completion = Deferred.makeUnsafe<OpenBotToolResponse, AttachmentOperationError>();
+    this.#inFlight.set(messageId, completion);
+    const exit = yield* Effect.exit(this.#attachFilesToResponse(senderAgentId, params, paths, messageId));
+    yield* Deferred.done(completion, exit);
+    if (this.#inFlight.get(messageId) === completion) this.#inFlight.delete(messageId);
+    return yield* exit;
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Opens local files for a caller that stages them itself instead of attaching them to a conversation
    * -- `browser-uploads.ts` copies them into a private staging directory before a page ever sees them.
    * The handles belong to the caller, which must close every one it is given.
    */
-  openSources(agentId: string, paths: string[], scope: AttachmentSourceScope): Promise<GeneratedAttachmentSource[]> {
+  openSources(
+    agentId: string,
+    paths: string[],
+    scope: AttachmentSourceScope,
+  ): Effect.Effect<GeneratedAttachmentSource[], AttachmentOperationError> {
     return this.#openSources(agentId, paths, scope);
   }
 
-  pendingCommands(): Promise<OpenBotToolResponse>[] {
-    return [...this.#inFlight.values()];
+  pendingCommands(): Effect.Effect<OpenBotToolResponse, AttachmentOperationError>[] {
+    return [...this.#inFlight.values()].map(Deferred.await);
   }
 
   dispose(): void {
     this.#inFlight.clear();
   }
 
-  async #attachFilesToResponse(
+  readonly #attachFilesToResponse = Effect.fn("AttachmentGateway.attachFilesToResponse")(function* (
+    this: AttachmentGateway,
     senderAgentId: string,
     params: { threadId: string; turnId: string; callId: string },
     paths: string[],
     messageId: string,
-  ): Promise<OpenBotToolResponse> {
+  ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
     const publicThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     const snapshot = this.#conversation.ensureSnapshot(senderAgentId, publicThreadId);
     const existing = snapshot.messages.find((message) => message.id === messageId);
     if (existing) {
-      return openBotToolResult({
-        status: "attached",
-        messageId,
-        attachments: (existing.attachments ?? []).map((attachment) => ({
-          id: attachment.id,
-          name: attachment.name,
-        })),
-      });
-    }
-
-    const sources = await this.#openSources(senderAgentId, paths, WORKSPACE_OR_SHARED);
-    let attachments: Awaited<ReturnType<MailboxStore["stageGeneratedAttachments"]>>;
-    try {
-      attachments = await this.#mailbox.stageGeneratedAttachments({
-        sources,
-        ownerAgentId: senderAgentId,
-        ownerThreadId: publicThreadId,
-      });
-    } finally {
-      await Promise.allSettled(sources.map((source) => source.handle.close()));
-    }
-    const message: ConversationSnapshot["messages"][number] = {
-      id: messageId,
-      turnId: params.turnId,
-      author: "assistant",
-      source: "assistant",
-      text: "",
-      createdAt: new Date().toISOString(),
-      status: "completed",
-      itemType: "agent_attachment",
-      attachments,
-    };
-    snapshot.messages.push(message);
-    sortConversationMessages(snapshot.messages);
-    try {
-      const persisted = this.#mailbox.persistGeneratedAttachmentsWithConversation(
-        snapshot,
-        "response.attachments-added",
-        {
-          turnId: params.turnId,
+      return yield* attachmentCall(() =>
+        openBotToolResult({
+          status: "attached",
           messageId,
-          attachmentCount: attachments.length,
-        },
-        attachments.map((attachment) => attachment.id),
+          attachments: (existing.attachments ?? []).map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+          })),
+        }),
       );
-      snapshot.revision = persisted.revision;
-      this.#conversation.rememberConversationSignature(snapshot);
-    } catch (error) {
-      const messageIndex = snapshot.messages.findIndex((candidate) => candidate.id === messageId);
-      if (messageIndex >= 0) snapshot.messages.splice(messageIndex, 1);
-      await this.#mailbox.discardStagedGeneratedAttachments(attachments.map((attachment) => attachment.id));
-      throw error;
     }
-    try {
-      this.#hooks.emit({ type: "conversation", snapshot: structuredClone(snapshot) });
-    } catch (error) {
-      try {
-        this.#hooks.emitError("conversation_publication_failed", error, senderAgentId);
-      } catch {
-        // A committed attachment remains successful even if event listeners fail.
-      }
-    }
-    return openBotToolResult({
-      status: "attached",
-      messageId,
-      attachments: attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })),
-    });
-  }
 
-  async #openSources(
+    return yield* Effect.acquireUseRelease(
+      this.#openSources(senderAgentId, paths, WORKSPACE_OR_SHARED),
+      (sources) =>
+        Effect.gen({ self: this }, function* () {
+          const attachments = yield* this.#mailbox
+            .stageGeneratedAttachments({
+              sources,
+              ownerAgentId: senderAgentId,
+              ownerThreadId: publicThreadId,
+            })
+            .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
+          const message: ConversationSnapshot["messages"][number] = {
+            id: messageId,
+            turnId: params.turnId,
+            author: "assistant",
+            source: "assistant",
+            text: "",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            itemType: "agent_attachment",
+            attachments,
+          };
+          snapshot.messages.push(message);
+          sortConversationMessages(snapshot.messages);
+          try {
+            const persisted = this.#mailbox.persistGeneratedAttachmentsWithConversation(
+              snapshot,
+              "response.attachments-added",
+              {
+                turnId: params.turnId,
+                messageId,
+                attachmentCount: attachments.length,
+              },
+              attachments.map((attachment) => attachment.id),
+            );
+            snapshot.revision = persisted.revision;
+            this.#conversation.rememberConversationSignature(snapshot);
+          } catch (error) {
+            const messageIndex = snapshot.messages.findIndex((candidate) => candidate.id === messageId);
+            if (messageIndex >= 0) snapshot.messages.splice(messageIndex, 1);
+            yield* this.#mailbox
+              .discardStagedGeneratedAttachments(attachments.map((attachment) => attachment.id))
+              .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
+            return yield* attachmentFailure(error);
+          }
+          try {
+            this.#hooks.emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+          } catch (error) {
+            try {
+              this.#hooks.emitError("conversation_publication_failed", error, senderAgentId);
+            } catch {
+              // A committed attachment remains successful even if event listeners fail.
+            }
+          }
+          return yield* attachmentCall(() =>
+            openBotToolResult({
+              status: "attached",
+              messageId,
+              attachments: attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })),
+            }),
+          );
+        }),
+      (sources) =>
+        attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close()))).pipe(Effect.orDie),
+    );
+  });
+
+  readonly #openSources = Effect.fn("AttachmentGateway.openSources")(function* (
+    this: AttachmentGateway,
     agentId: string,
     paths: string[],
     scope: AttachmentSourceScope,
-  ): Promise<GeneratedAttachmentSource[]> {
-    const results = await Promise.allSettled(paths.map((path) => this.#openSource(agentId, path, scope)));
-    const sources = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
-    const failure = results.find((result) => result.status === "rejected");
-    if (failure?.status === "rejected") {
-      await Promise.allSettled(sources.map((source) => source.handle.close()));
-      throw failure.reason;
+  ): Effect.fn.Return<GeneratedAttachmentSource[], AttachmentOperationError> {
+    const results = yield* Effect.forEach(
+      paths,
+      (path) => Effect.result(this.#openSourceEffect(agentId, path, scope)),
+      { concurrency: "unbounded" },
+    );
+    const sources = results.flatMap((result) => (Result.isSuccess(result) ? [result.success] : []));
+    const failure = results.find(Result.isFailure);
+    if (failure) {
+      yield* attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close())));
+      return yield* failure.failure;
     }
     if (sources.length !== new Set(sources.map((source) => source.path)).size) {
-      await Promise.allSettled(sources.map((source) => source.handle.close()));
-      throw new Error("Duplicate attachment paths are not allowed.");
+      yield* attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close())));
+      return yield* attachmentFailure(new Error("Duplicate attachment paths are not allowed."));
     }
-    return sources;
-  }
+    return yield* attachmentCall(() => sources);
+  });
 
-  async #openSource(
+  readonly #openSourceEffect = Effect.fn("AttachmentGateway.openSource")(function* (
+    this: AttachmentGateway,
     agentId: string,
     inputPath: string,
     scope: AttachmentSourceScope,
-  ): Promise<GeneratedAttachmentSource> {
-    const agent = this.#conversation.requireKnownAgent(agentId);
+  ): Effect.fn.Return<GeneratedAttachmentSource, AttachmentOperationError> {
+    const agent = yield* attachmentSync(() => this.#conversation.requireKnownAgent(agentId));
     const value = inputPath.trim();
-    const [workspaceRoot, sharedRoot] = await Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]);
+    const [workspaceRoot, sharedRoot] = yield* attachmentCall(() =>
+      Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]),
+    );
     const normalized = value.replaceAll("\\", "/");
     const sharedReference = ["~/OpenBot/Shared/", "OpenBot/Shared/", "Shared/"].some((prefix) =>
       normalized.startsWith(prefix),
@@ -222,36 +255,49 @@ export class AttachmentGateway {
 
     for (const candidate of candidates) {
       try {
-        if (!scope.allowAnyReadablePath && (await lstat(candidate)).isSymbolicLink()) continue;
-        const resolved = await realpath(candidate);
+        if (
+          !scope.allowAnyReadablePath &&
+          attachmentResult(yield* Effect.result(attachmentCall(() => lstat(candidate)))).isSymbolicLink()
+        )
+          continue;
+        const resolved = attachmentResult(yield* Effect.result(attachmentCall(() => realpath(candidate))));
         if (!scope.allowAnyReadablePath && !isWithin(workspaceRoot, resolved) && !isWithin(sharedRoot, resolved)) {
           continue;
         }
-        const authorizedMetadata = await lstat(resolved);
+        const authorizedMetadata = attachmentResult(yield* Effect.result(attachmentCall(() => lstat(resolved))));
         if (authorizedMetadata.isSymbolicLink() || !authorizedMetadata.isFile()) continue;
-        const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
-        try {
-          const openedMetadata = await handle.stat();
-          if (
-            !openedMetadata.isFile() ||
-            openedMetadata.dev !== authorizedMetadata.dev ||
-            openedMetadata.ino !== authorizedMetadata.ino
-          ) {
-            throw new Error("The attachment changed while it was being opened.");
-          }
-          return { path: resolved, handle };
-        } catch (error) {
-          await handle.close();
-          throw error;
-        }
+        let retained = false;
+        return attachmentResult(
+          yield* Effect.result(
+            Effect.acquireUseRelease(
+              attachmentCall(() => open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW)),
+              (handle) =>
+                Effect.gen(function* () {
+                  const openedMetadata = yield* attachmentCall(() => handle.stat());
+                  if (
+                    !openedMetadata.isFile() ||
+                    openedMetadata.dev !== authorizedMetadata.dev ||
+                    openedMetadata.ino !== authorizedMetadata.ino
+                  ) {
+                    return yield* attachmentFailure(new Error("The attachment changed while it was being opened."));
+                  }
+                  retained = true;
+                  return { path: resolved, handle };
+                }),
+              (handle) => (retained ? Effect.void : attachmentCall(() => handle.close()).pipe(Effect.orDie)),
+            ),
+          ),
+        );
       } catch {
         // Try the other permitted root for relative paths.
       }
     }
-    throw new Error(
-      scope.allowAnyReadablePath
-        ? "Upload files must exist, be regular files, and be readable by OpenBot."
-        : "Attachment files must exist inside this agent's workspace or the OpenBot shared directory.",
+    return yield* attachmentFailure(
+      new Error(
+        scope.allowAnyReadablePath
+          ? "Upload files must exist, be regular files, and be readable by OpenBot."
+          : "Attachment files must exist inside this agent's workspace or the OpenBot shared directory.",
+      ),
     );
-  }
+  });
 }

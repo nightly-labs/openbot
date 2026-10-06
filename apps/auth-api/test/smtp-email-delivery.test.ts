@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { createEmailCodeDelivery } from "../src/server/email-delivery";
 import { type SmtpConnector, sendPrivateEmailCode, sendPrivateTeamInvite } from "../src/server/smtp-email-delivery";
 
@@ -35,23 +36,25 @@ describe("Private Email SMTP delivery", () => {
       close() {},
     });
 
-    await sendPrivateTeamInvite(
-      {
-        host: "mail.privateemail.com",
-        port: 465,
-        username: "hello@openbot.run",
-        password: "app-password-value",
-        from: "hello@openbot.run",
-      },
-      {
-        email: "alice@example.com",
-        inviterEmail: "owner@example.com",
-        serverName: "Studio Mac",
-        inviteUrl:
-          "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        role: "member",
-      },
-      connector,
+    await runApiEffect(
+      sendPrivateTeamInvite(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password: "app-password-value",
+          from: "hello@openbot.run",
+        },
+        {
+          email: "alice@example.com",
+          inviterEmail: "owner@example.com",
+          serverName: "Studio Mac",
+          inviteUrl:
+            "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          role: "member",
+        },
+        connector,
+      ),
     );
 
     expect(writes).toContain("RCPT TO:<alice@example.com>\r\n");
@@ -79,23 +82,25 @@ describe("Private Email SMTP delivery", () => {
     });
     const serverName = "Zespół <a href=//x.pl>Kraków";
 
-    await sendPrivateTeamInvite(
-      {
-        host: "mail.privateemail.com",
-        port: 465,
-        username: "hello@openbot.run",
-        password: "app-password-value",
-        from: "hello@openbot.run",
-      },
-      {
-        email: "alice@example.com",
-        inviterEmail: "owner@example.com",
-        serverName,
-        inviteUrl:
-          "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        role: "member",
-      },
-      connector,
+    await runApiEffect(
+      sendPrivateTeamInvite(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password: "app-password-value",
+          from: "hello@openbot.run",
+        },
+        {
+          email: "alice@example.com",
+          inviterEmail: "owner@example.com",
+          serverName,
+          inviteUrl:
+            "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          role: "member",
+        },
+        connector,
+      ),
     );
 
     const message = (writes[7] ?? "").replace(/\r\n\.\r\n$/u, "").replaceAll("\r\n..", "\r\n.");
@@ -140,20 +145,22 @@ describe("Private Email SMTP delivery", () => {
       };
     };
 
-    await sendPrivateEmailCode(
-      {
-        host: "mail.privateemail.com",
-        port: 465,
-        username: "hello@openbot.run",
-        password: "app-password-value",
-        from: "hello@openbot.run",
-      },
-      {
-        email: "person@example.com",
-        code: "ABCD-EFGH",
-        expiresAt: Date.now() + 10 * 60_000,
-      },
-      connector,
+    await runApiEffect(
+      sendPrivateEmailCode(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password: "app-password-value",
+          from: "hello@openbot.run",
+        },
+        {
+          email: "person@example.com",
+          code: "ABCD-EFGH",
+          expiresAt: Date.now() + 10 * 60_000,
+        },
+        connector,
+      ),
     );
 
     expect(addresses).toEqual([
@@ -179,23 +186,25 @@ describe("Private Email SMTP delivery", () => {
   it("rejects header injection before opening a socket", async () => {
     let connected = false;
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "secret",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com\r\nBcc: attacker@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        (() => {
-          connected = true;
-          throw new Error("must_not_connect");
-        }) satisfies SmtpConnector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "secret",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com\r\nBcc: attacker@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          (() => {
+            connected = true;
+            throw new Error("must_not_connect");
+          }) satisfies SmtpConnector,
+        ),
       ),
     ).rejects.toThrow("smtp_invalid_recipient");
     expect(connected).toBe(false);
@@ -214,20 +223,22 @@ describe("Private Email SMTP delivery", () => {
       close() {},
     });
     const password = "private-app-password";
-    const error = await sendPrivateEmailCode(
-      {
-        host: "mail.privateemail.com",
-        port: 465,
-        username: "hello@openbot.run",
-        password,
-        from: "hello@openbot.run",
-      },
-      {
-        email: "person@example.com",
-        code: "ABCD-EFGH",
-        expiresAt: Date.now() + 10 * 60_000,
-      },
-      connector,
+    const error = await runApiEffect(
+      sendPrivateEmailCode(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password,
+          from: "hello@openbot.run",
+        },
+        {
+          email: "person@example.com",
+          code: "ABCD-EFGH",
+          expiresAt: Date.now() + 10 * 60_000,
+        },
+        connector,
+      ),
     ).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(Error);
@@ -266,20 +277,22 @@ describe("Private Email SMTP delivery", () => {
       };
     };
 
-    await sendPrivateEmailCode(
-      {
-        host: "mail.privateemail.com",
-        port: 465,
-        username: "hello@openbot.run",
-        password: "app-password-value",
-        from: "hello@openbot.run",
-      },
-      {
-        email: "person@example.com",
-        code: "ABCD-EFGH",
-        expiresAt: Date.now() + 10 * 60_000,
-      },
-      connector,
+    await runApiEffect(
+      sendPrivateEmailCode(
+        {
+          host: "mail.privateemail.com",
+          port: 465,
+          username: "hello@openbot.run",
+          password: "app-password-value",
+          from: "hello@openbot.run",
+        },
+        {
+          email: "person@example.com",
+          code: "ABCD-EFGH",
+          expiresAt: Date.now() + 10 * 60_000,
+        },
+        connector,
+      ),
     );
 
     expect(attempts).toBe(2);
@@ -312,20 +325,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       ),
     ).rejects.toThrow("smtp_auth_failed");
     expect(attempts).toBe(1);
@@ -345,20 +360,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     try {
-      const delivery = sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      const delivery = runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       );
       const outcome = expect(delivery).rejects.toThrow("smtp_delivery_unknown");
 
@@ -402,20 +419,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     try {
-      const delivery = sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      const delivery = runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       );
       const outcome = expect(delivery).resolves.toBeUndefined();
 
@@ -446,20 +465,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       ),
     ).rejects.toThrow("smtp_delivery_unknown");
     expect(attempts).toBe(1);
@@ -484,20 +505,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       ),
     ).rejects.toThrow("smtp_message_failed");
     expect(attempts).toBe(1);
@@ -522,20 +545,22 @@ describe("Private Email SMTP delivery", () => {
     };
 
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       ),
     ).resolves.toBeUndefined();
     expect(attempts).toBe(1);
@@ -568,20 +593,22 @@ describe("Private Email SMTP delivery", () => {
 
     try {
       await expect(
-        sendPrivateEmailCode(
-          {
-            host: "mail.privateemail.com",
-            port: 465,
-            username: "hello@openbot.run",
-            password: "app-password-value",
-            from: "hello@openbot.run",
-          },
-          {
-            email: "person@example.com",
-            code: "ABCD-EFGH",
-            expiresAt: Date.now() + 10 * 60_000,
-          },
-          connector,
+        runApiEffect(
+          sendPrivateEmailCode(
+            {
+              host: "mail.privateemail.com",
+              port: 465,
+              username: "hello@openbot.run",
+              password: "app-password-value",
+              from: "hello@openbot.run",
+            },
+            {
+              email: "person@example.com",
+              code: "ABCD-EFGH",
+              expiresAt: Date.now() + 10 * 60_000,
+            },
+            connector,
+          ),
         ),
       ).rejects.toThrow("email_delivery_rate_limited");
     } finally {
@@ -612,20 +639,22 @@ describe("Private Email SMTP delivery", () => {
 
     try {
       await expect(
-        sendPrivateEmailCode(
-          {
-            host: "mail.privateemail.com",
-            port: 465,
-            username: "hello@openbot.run",
-            password: "app-password-value",
-            from: "hello@openbot.run",
-          },
-          {
-            email: "person@example.com",
-            code: "ABCD-EFGH",
-            expiresAt: Date.now() + 10 * 60_000,
-          },
-          connector,
+        runApiEffect(
+          sendPrivateEmailCode(
+            {
+              host: "mail.privateemail.com",
+              port: 465,
+              username: "hello@openbot.run",
+              password: "app-password-value",
+              from: "hello@openbot.run",
+            },
+            {
+              email: "person@example.com",
+              code: "ABCD-EFGH",
+              expiresAt: Date.now() + 10 * 60_000,
+            },
+            connector,
+          ),
         ),
       ).rejects.toThrow("email_delivery_rate_limited");
     } finally {
@@ -650,20 +679,22 @@ describe("Private Email SMTP delivery", () => {
     });
 
     await expect(
-      sendPrivateEmailCode(
-        {
-          host: "mail.privateemail.com",
-          port: 465,
-          username: "hello@openbot.run",
-          password: "app-password-value",
-          from: "hello@openbot.run",
-        },
-        {
-          email: "person@example.com",
-          code: "ABCD-EFGH",
-          expiresAt: Date.now() + 10 * 60_000,
-        },
-        connector,
+      runApiEffect(
+        sendPrivateEmailCode(
+          {
+            host: "mail.privateemail.com",
+            port: 465,
+            username: "hello@openbot.run",
+            password: "app-password-value",
+            from: "hello@openbot.run",
+          },
+          {
+            email: "person@example.com",
+            code: "ABCD-EFGH",
+            expiresAt: Date.now() + 10 * 60_000,
+          },
+          connector,
+        ),
       ),
     ).rejects.toThrow("smtp_recipient_failed");
   });
@@ -676,9 +707,10 @@ describe("Private Email SMTP delivery", () => {
     const delivery = createEmailCodeDelivery({ EMAIL_DELIVERY_WEBHOOK_URL: "https://mail.example.test/send" });
     const message = { email: "person@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 };
 
+    if (!delivery) throw new Error("Email delivery was not configured.");
     try {
-      await expect(delivery?.send(message)).rejects.toThrow("email_delivery_rate_limited");
-      await expect(delivery?.send(message)).rejects.toThrow("email_delivery_webhook_failed");
+      await expect(runApiEffect(delivery.send(message))).rejects.toThrow("email_delivery_rate_limited");
+      await expect(runApiEffect(delivery.send(message))).rejects.toThrow("email_delivery_webhook_failed");
     } finally {
       fetchCall.mockRestore();
     }

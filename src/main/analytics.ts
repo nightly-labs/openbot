@@ -14,9 +14,11 @@ import {
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
+import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
 import type { BrowserSiteVisit } from "../backend/browser-host";
+import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -109,7 +111,7 @@ export interface HostAnalyticsOptions {
    */
   resolveMcpServer?: (name: string) => { slug: string | null } | null;
   resolveRoutineRun?: (agentId: string, routineId: string, runId: string) => AnalyticsRoutineRun | null;
-  resolveInventory?: () => Promise<AnalyticsInventory>;
+  resolveInventory?: () => Effect.Effect<AnalyticsInventory, AnalyticsOperationFailure>;
   inventoryDay?: AnalyticsInventoryDayStore;
 }
 
@@ -134,8 +136,8 @@ export interface AnalyticsInventory {
 
 /** The local day of the last inventory event. `malformed` counts as sent today. */
 export interface AnalyticsInventoryDayStore {
-  read(): Promise<string | "missing" | "malformed">;
-  write(day: string): Promise<void>;
+  read(): Effect.Effect<string | "missing" | "malformed", AnalyticsOperationFailure>;
+  write(day: string): Effect.Effect<void, AnalyticsOperationFailure>;
 }
 
 const AGENT_PROPERTY_NAMES = ["provider", "model", "reasoning_effort", "agent_source", "agent_listing"] as const;
@@ -201,8 +203,10 @@ export class HostAnalytics {
   readonly #siteDomains = new Map<string, string>();
   readonly #routineRunOwners = new Map<string, AnalyticsIdentity | null>();
   readonly #routineRunReports = new Set<string>();
+  #closed = false;
+  readonly #scope = Scope.makeUnsafe();
   #inventoryDay: string | null = null;
-  #inventoryCheck: Promise<void> | null = null;
+  #inventoryCheck = false;
   readonly #operationQueue: AnalyticsOperationQueue = { active: false, operations: [] };
 
   constructor(options: HostAnalyticsOptions, createClient: ClientFactory = createOpenPanelClient) {
@@ -527,53 +531,59 @@ export class HostAnalytics {
   /** Sends the inventory at most once per local day. It needs an owner, so it waits for sign-in. */
   #checkInventory(): void {
     const today = localDay(new Date());
-    if (this.#inventoryDay === today || this.#inventoryCheck) return;
+    if (this.#closed || this.#inventoryDay === today || this.#inventoryCheck) return;
     const resolveInventory = this.#resolveInventory;
     const store = this.#inventoryDayStore;
     if (!this.#client || !this.#trackingEnabled || !resolveInventory || !store) return;
     if (!normalizeAnalyticsIdentity(this.#resolveOwner())) return;
-    this.#inventoryCheck = (async () => {
-      const stored = await store.read();
-      if (stored === "malformed") {
-        // A damaged file counts as sent today. It is written again, so the next day sends.
-        await store.write(today);
+    this.#inventoryCheck = true;
+    Effect.runFork(
+      Effect.gen({ self: this }, function* () {
+        const stored = yield* store.read();
+        if (stored === "malformed") {
+          // A damaged file counts as sent today. It is written again, so the next day sends.
+          yield* store.write(today);
+          this.#inventoryDay = today;
+          return;
+        }
+        if (stored === today) {
+          this.#inventoryDay = today;
+          return;
+        }
+        const inventory = yield* resolveInventory();
+        if (this.#closed || !this.#trackingEnabled || !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+        // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
+        yield* store.write(today);
         this.#inventoryDay = today;
-        return;
-      }
-      if (stored === today) {
-        this.#inventoryDay = today;
-        return;
-      }
-      const inventory = await resolveInventory();
-      if (!this.#trackingEnabled || !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
-      // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
-      await store.write(today);
-      this.#inventoryDay = today;
-      const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
-      if (!owner || !this.#trackingEnabled) return;
-      this.#trackForOwner(
-        "system_inventory",
-        {
-          agent_count: inventory.agentCount,
-          enabled_routine_count: inventory.enabledRoutineCount,
-          custom_mcp_server_count: inventory.customMcpServerCount,
-          plugins: inventory.plugins,
-          curated_skills: inventory.curatedSkills,
-          curated_agents: inventory.curatedAgents,
-          local_skill_count: inventory.localSkillCount,
-          community_skill_count: inventory.communitySkillCount,
-          providers: inventory.providers,
-          computer_use_enabled: inventory.computerUseEnabled,
-        },
-        owner,
-      );
-    })()
-      .catch(() => {
-        // Analytics must never change host behavior. The next check tries again.
-      })
-      .finally(() => {
-        this.#inventoryCheck = null;
-      });
+        const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+        if (!owner || !this.#trackingEnabled) return;
+        this.#trackForOwner(
+          "system_inventory",
+          {
+            agent_count: inventory.agentCount,
+            enabled_routine_count: inventory.enabledRoutineCount,
+            custom_mcp_server_count: inventory.customMcpServerCount,
+            plugins: inventory.plugins,
+            curated_skills: inventory.curatedSkills,
+            curated_agents: inventory.curatedAgents,
+            local_skill_count: inventory.localSkillCount,
+            community_skill_count: inventory.communitySkillCount,
+            providers: inventory.providers,
+            computer_use_enabled: inventory.computerUseEnabled,
+          },
+          owner,
+        );
+      }).pipe(
+        Effect.ignore,
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#inventoryCheck = false;
+          }),
+        ),
+        Effect.uninterruptible,
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
   }
 
   #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsIdentity, flushPending = true): void {
@@ -657,6 +667,7 @@ export class HostAnalytics {
   }
 
   #enqueue(kind: AnalyticsOperationKind, run: () => unknown): void {
+    if (this.#closed) return;
     const hasPendingTrack = this.#operationQueue.operations.some((operation) => operation.kind === "track");
     if (kind === "clear" && !hasPendingTrack) {
       this.#operationQueue.operations = [];
@@ -673,22 +684,28 @@ export class HostAnalytics {
     this.#operationQueue.operations.push({ kind, run });
     if (this.#operationQueue.active) return;
     this.#operationQueue.active = true;
-    void this.#drainQueue();
+    Effect.runFork(
+      this.#drainQueue().pipe(Effect.uninterruptible, Effect.forkIn(this.#scope, { startImmediately: true })),
+    );
   }
 
-  async #drainQueue(): Promise<void> {
+  #drainQueue = Effect.fn("Analytics.drainQueue")(function* (this: HostAnalytics) {
     while (this.#operationQueue.operations.length > 0) {
       const operation = this.#operationQueue.operations.shift();
       if (!operation) continue;
-      try {
-        const result = operation.run();
-        if (isPromiseLike(result)) await result;
-      } catch {
-        // Analytics must never change host behavior or stop later events.
-      }
+      yield* Effect.gen(function* () {
+        const result = yield* analyticsSync(operation.run);
+        if (isPromiseLike(result)) yield* analyticsIO(() => Promise.resolve(result));
+      }).pipe(Effect.catch(() => Effect.void));
     }
     this.#operationQueue.active = false;
-  }
+  });
+
+  /** Stop accepting events, then finish work already owned by this service. */
+  readonly close = Effect.fn("HostAnalytics.close")(function* (this: HostAnalytics) {
+    this.#closed = true;
+    yield* Scope.close(this.#scope, Exit.void);
+  }, Effect.uninterruptible);
 }
 
 /** Runs a resolver whose failure must not reach the host, which has already done its work. */

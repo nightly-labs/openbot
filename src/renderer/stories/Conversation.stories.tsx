@@ -1044,7 +1044,9 @@ const args: Parameters<typeof Conversation>[0] = {
   onSelectAgent: fn(),
   onUpdateAgent: async (_agentId: string, _updates: Omit<UpdateAgentInput, "agentId">) => undefined,
   onSetAgentAvatar: async (_agentId: string, _image: AvatarImageInput | null) => undefined,
-  onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => true,
+  onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => ({
+    messageId: `storybook-sent-${Date.now()}`,
+  }),
   onMarkRead: async () => undefined,
   onTypingChange: fn(),
   onAnswerPrompt: async (_answers: Record<string, string[]>) => true,
@@ -1187,6 +1189,28 @@ export const UnreadMessages: Story = {
 export const ScrollToLatest: Story = {
   args: {
     messages: unreadStoryMessages,
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+};
+
+/** Five days of history, 120 messages: scroll to bring in the day rail on the right edge. */
+export const LongHistory: Story = {
+  args: {
+    messages: Array.from({ length: 120 }, (_, index): RendererAgentMessage => {
+      const createdAt = new Date(2026, 8, 1 + Math.floor(index / 24), 9, (index % 24) * 2);
+      return {
+        id: `long-history-${index + 1}`,
+        author: index % 3 === 0 ? "you" : "agent",
+        body:
+          index % 3 === 0
+            ? `Can you check step ${index + 1} of the release plan?`
+            : `I checked step ${index + 1}. The owner, the date and the open risk are in the plan now.`,
+        time: `${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`,
+        createdAt: createdAt.toISOString(),
+        kind: "text",
+      };
+    }),
     unreadCount: 0,
     firstUnreadMessageId: null,
   },
@@ -1431,6 +1455,29 @@ export const ThreeQueuedMessages: Story = {
   args: { queue: queueWithItems(3), activeTurnId: "turn-active" },
 };
 
+/** Messages sent to steer that wait in the queue instead, each with the reason on its row. */
+export const QueuedAfterSteerFallback: Story = {
+  args: {
+    activeTurnId: "turn-active",
+    queue: {
+      ...queue,
+      deliveries: [
+        { ...queuedDelivery, text: "Use the staging database, not production.", steerFallback: "provider-unsupported" },
+        {
+          ...queuedDelivery,
+          id: "queued-2",
+          messageId: "queued-message-2",
+          text: "Skip the flaky browser tests.",
+          position: 2,
+          createdAt: "2026-08-19T10:01:00.000Z",
+          steerFallback: "steer-failed",
+        },
+        runningDelivery,
+      ],
+    },
+  },
+};
+
 export const SevenQueuedMessages: Story = {
   args: {
     queue: referenceQueue,
@@ -1491,7 +1538,7 @@ export const SevenQueuedMessages: Story = {
     };
     const sendMessage = async (body: string, attachmentDraftIds: string[], replyToMessageId: string | null) => {
       const sent = await storyArgs.onSendMessage(body, attachmentDraftIds, replyToMessageId);
-      if (!sent || !storyArgs.activeTurnId) return sent;
+      if ("error" in sent || !storyArgs.activeTurnId) return sent;
       const id = `storybook-queued-${nextStoryDeliveryId++}`;
       setQueueState((current) => ({
         ...current,
@@ -1513,7 +1560,7 @@ export const SevenQueuedMessages: Story = {
           },
         ],
       }));
-      return true;
+      return { messageId: id };
     };
 
     return (

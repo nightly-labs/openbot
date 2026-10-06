@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -29,14 +30,15 @@ function source(dueAt: string | null, onProcess?: () => Promise<void>): StubSour
     fired: [],
     record: {
       nextDueAt: () => stub.dueAt,
-      processDue: async (now) => {
-        stub.asked += 1;
-        if (stub.dueAt && now.toISOString() >= stub.dueAt) {
-          stub.fired.push(stub.dueAt);
-          stub.dueAt = null;
-        }
-        await onProcess?.();
-      },
+      processDue: (now) =>
+        Effect.gen(function* () {
+          stub.asked += 1;
+          if (stub.dueAt && now.toISOString() >= stub.dueAt) {
+            stub.fired.push(stub.dueAt);
+            stub.dueAt = null;
+          }
+          if (onProcess) yield* Effect.tryPromise({ try: onProcess, catch: (cause) => ({ cause }) });
+        }),
     },
   };
   return stub;
@@ -168,12 +170,13 @@ it("stops a pass that a suspend interrupts and finishes it on resume", async () 
   const record = first.record;
   first.record = {
     ...record,
-    processDue: async (now, isActive) => {
-      await record.processDue(now, isActive);
-      if (active) return;
-      timer.suspend();
-      active = isActive;
-    },
+    processDue: (now, isActive) =>
+      Effect.gen(function* () {
+        yield* record.processDue(now, isActive);
+        if (active) return;
+        timer.suspend();
+        active = isActive;
+      }),
   };
   const behind = source("2026-08-25T10:01:00.000Z");
   const timer = new RoutineTimer(

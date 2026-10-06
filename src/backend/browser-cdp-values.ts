@@ -1,28 +1,37 @@
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
+import { type BrowserOperationError, browserFailure } from "./browser-effects";
 
 const AUTOMATION_WORLD_NAME = "openbot-browser-automation";
 
 export type CdpResult = DynamicRecord;
 
-export type SendCommand = (method: string, params?: DynamicRecord, sessionId?: string) => Promise<CdpResult>;
+export type SendCommand = (
+  method: string,
+  params?: DynamicRecord,
+  sessionId?: string,
+) => Effect.Effect<CdpResult, BrowserOperationError>;
 
 export function assertBeforeDeadline(deadline: number | undefined): void {
   if (deadline !== undefined && Date.now() >= deadline) throw new Error("Browser wait condition timed out.");
 }
 
-export async function automationContextId(send: SendCommand, sessionId?: string): Promise<number> {
-  const tree = await send("Page.getFrameTree", {}, sessionId);
+export const automationContextId = Effect.fn("Browser.automationContextId")(function* (
+  send: SendCommand,
+  sessionId?: string,
+) {
+  const tree = yield* send("Page.getFrameTree", {}, sessionId);
   const frameId = frameTreeRootId(tree);
-  if (!frameId) throw new Error("The browser automation world has no frame.");
-  const world = await send(
+  if (!frameId) return yield* browserFailure(new Error("The browser automation world has no frame."));
+  const world = yield* send(
     "Page.createIsolatedWorld",
     { frameId, worldName: AUTOMATION_WORLD_NAME, grantUniveralAccess: false },
     sessionId,
   );
   const contextId = numberValue(world.executionContextId);
-  if (!contextId) throw new Error("The browser automation world is unavailable.");
+  if (!contextId) return yield* browserFailure(new Error("The browser automation world is unavailable."));
   return contextId;
-}
+});
 
 function frameTreeRootId(value: CdpResult): string {
   return stringValue(recordValue(recordValue(value.frameTree)?.frame)?.id);

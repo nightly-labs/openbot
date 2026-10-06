@@ -2,6 +2,7 @@
 import { open, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -14,6 +15,9 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import { attachmentFailure } from "../attachment-effects";
+import { browserFailure } from "../browser-effects";
+import { runCauseEffect } from "../effect-boundary";
 import type { DynamicToolCallParams } from "../protocol";
 import { BrowserUploads } from "./browser-uploads";
 
@@ -48,19 +52,23 @@ function uploadBrowser() {
     notifyDocumentChanged = listener;
     return () => undefined;
   };
-  browser.resolveUploadTarget = async (params) => targetOf(params);
-  browser.handleDynamicTool = async (params, hooks) => {
-    const { inputId, documentId } = targetOf(params);
-    const paths =
-      isDynamicRecord(params.arguments) && Array.isArray(params.arguments.paths) ? params.arguments.paths : [];
-    for (const path of paths) {
-      staged.push({ path: String(path), contents: await readFile(String(path), "utf8"), inputId });
-    }
-    hooks?.onUploadTargetResolved?.(inputId, documentId);
-    hooks?.onUploadOperationStarted?.(Promise.resolve());
-    hooks?.onUploadAssigned?.(inputId, documentId);
-    return { success: true, contentItems: [] };
-  };
+  browser.resolveUploadTarget = (params) => Effect.succeed(targetOf(params));
+  browser.handleDynamicTool = (params, hooks) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { inputId, documentId } = targetOf(params);
+        const paths =
+          isDynamicRecord(params.arguments) && Array.isArray(params.arguments.paths) ? params.arguments.paths : [];
+        for (const path of paths) {
+          staged.push({ path: String(path), contents: await readFile(String(path), "utf8"), inputId });
+        }
+        hooks?.onUploadTargetResolved?.(inputId, documentId);
+        hooks?.onUploadOperationStarted?.(Effect.runFork(Effect.void));
+        hooks?.onUploadAssigned?.(inputId, documentId);
+        return { success: true, contentItems: [] };
+      },
+      catch: browserFailure,
+    });
   return {
     browser,
     staged,
@@ -82,13 +90,13 @@ async function startService(browser: ReturnType<typeof uploadBrowser>["browser"]
       return client;
     },
   });
-  await service.initialize();
-  await service.sendMessage({ agentId: "chief", text: "Upload a file" });
+  await runCauseEffect(service.initialize());
+  await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Upload a file" }));
   await waitFor(() => Boolean(store.activeProviderSession("chief")));
   const client = clients.get("codex");
   const threadId = store.activeProviderSession("chief")?.externalSessionId;
   if (!client || !threadId) throw new Error("The browser upload thread was not created.");
-  return { client, threadId, workspacePath: (await store.getOrCreate("chief")).workspacePath };
+  return { client, threadId, workspacePath: (await runCauseEffect(store.getOrCreate("chief"))).workspacePath };
 }
 
 async function upload(
@@ -156,7 +164,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     documentChanged("tab", new Set(["some-other-document"]));
     await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [source] });
     await expect(readFile(stagedPath, "utf8")).resolves.toBe("kept");
-    await service?.stop();
+    if (service) await runCauseEffect(service.stop());
     await waitFor(() => missing(stagedPath));
   });
 
@@ -181,7 +189,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await upload(client, threadId, "parent-upload", { selector: "parent-input", paths: [first] });
     await expect(readFile(staged[0]?.path ?? "", "utf8")).resolves.toBe("first");
     await expect(readFile(staged[1]?.path ?? "", "utf8")).resolves.toBe("second");
-    await service?.stop();
+    if (service) await runCauseEffect(service.stop());
     await waitFor(() => missing(staged[0]?.path ?? ""));
     await waitFor(() => missing(staged[1]?.path ?? ""));
   });
@@ -209,11 +217,14 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     // What a real ambiguous semantic target throws: it names the candidates by accessible name, and a
     // page picks its own names. This one reaches the provider through the facade's error response
     // rather than through `handleDynamicTool`, which redacts only what it returns.
-    browser.resolveUploadTarget = async () => {
-      throw new Error(
-        "Target is ambiguous (at least 2 matches). Candidates: main:12 button \u201cUpload password=hunter2\u201d",
+    browser.resolveUploadTarget = () =>
+      Effect.fail(
+        browserFailure(
+          new Error(
+            "Target is ambiguous (at least 2 matches). Candidates: main:12 button \u201cUpload password=hunter2\u201d",
+          ),
+        ),
       );
-    };
     const { client, threadId } = await startService(browser);
     const source = join(root, "ambiguous.txt");
     await writeFile(source, "ambiguous");
@@ -236,28 +247,36 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     let takeoverPending = false;
     const handed: string[] = [];
     const uploads = new BrowserUploads({
-      attachments: { openSources: async () => [{ path: source, handle: await open(source, "r") }] },
+      attachments: {
+        openSources: () =>
+          Effect.tryPromise({
+            try: async () => [{ path: source, handle: await open(source, "r") }],
+            catch: attachmentFailure,
+          }),
+      },
       isStopping: () => false,
       hasTakeover: () => takeoverPending,
       browser: {
-        resolveUploadTarget: async () => {
-          // The user reaches for control here, which is after the facade checked and before staging ends.
-          takeoverPending = true;
-          return { inputId: "input", documentId: "main-document" };
-        },
+        resolveUploadTarget: () =>
+          Effect.sync(() => {
+            // The user reaches for control here, which is after the facade checked and before staging ends.
+            takeoverPending = true;
+            return { inputId: "input", documentId: "main-document" };
+          }),
         // `BrowserHost.handleDynamicTool` turns a throwing hook into a failed tool result, so the stub does too.
-        handleDynamicTool: async (params, hooks) => {
-          const paths =
-            isDynamicRecord(params.arguments) && Array.isArray(params.arguments.paths) ? params.arguments.paths : [];
-          for (const path of paths) handed.push(String(path));
-          try {
-            hooks?.onUploadTargetResolved?.("input", "main-document");
-            hooks?.onUploadAssigned?.("input", "main-document");
-            return { success: true, contentItems: [] };
-          } catch (error) {
-            return { success: false, contentItems: [{ type: "inputText", text: String(error) }] };
-          }
-        },
+        handleDynamicTool: (params, hooks) =>
+          Effect.sync(() => {
+            const paths =
+              isDynamicRecord(params.arguments) && Array.isArray(params.arguments.paths) ? params.arguments.paths : [];
+            for (const path of paths) handed.push(String(path));
+            try {
+              hooks?.onUploadTargetResolved?.("input", "main-document");
+              hooks?.onUploadAssigned?.("input", "main-document");
+              return { success: true, contentItems: [] };
+            } catch (error) {
+              return { success: false, contentItems: [{ type: "inputText", text: String(error) }] };
+            }
+          }),
       },
     });
     const params: DynamicToolCallParams = {
@@ -269,7 +288,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
       arguments: { tabId: "tab", target: { kind: "css", selector: "input" }, paths: [source] },
     };
 
-    const result = await uploads.uploadFiles("chief", params);
+    const result = await runCauseEffect(uploads.uploadFiles("chief", params));
 
     expect(result.success).toBe(false);
     expect(result.contentItems[0]).toEqual({
@@ -292,7 +311,7 @@ describe.sequential("BrowserUploads: staging files for openbot_browser.upload_fi
     await upload(client, threadId, "second", { selector: "#two", paths: [source] });
     const stagedPaths = staged.map((entry) => entry.path);
 
-    await service?.stop();
+    if (service) await runCauseEffect(service.stop());
 
     for (const path of stagedPaths) await expect(readFile(path)).rejects.toThrow();
   });

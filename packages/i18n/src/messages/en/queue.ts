@@ -13,6 +13,10 @@ export const messages = defineMessages("queue", {
   "queue.item.steerTooltip": "Steer message",
   "queue.item.steering": "Steering",
   "queue.item.steer": "Steer",
+  "queue.item.notSteered": "Not steered",
+  "queue.item.steerFallback.providerUnsupported":
+    "This provider cannot steer a running turn, so the message waits in the queue.",
+  "queue.item.steerFallback.steerFailed": "Steering did not succeed, so the message waits in the queue.",
   "queue.item.deleteLabel": "Delete queued message {position}",
   "queue.item.deleteTooltip": "Delete message",
   "queue.item.editLabel": "Edit queued message {position}",

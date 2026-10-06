@@ -5,6 +5,8 @@ export const messages = {
   // Errors from the OpenBot account service.
   "error.auth.serviceUnavailable":
     "OpenBot n’a pas pu joindre le service de compte. Vérifiez que l’API fonctionne, puis réessayez.",
+  "error.auth.networkBlocked":
+    "Un pare-feu ou un proxy de ce réseau a empêché OpenBot de joindre {host}. Demandez à votre administrateur réseau d’autoriser {host}, puis réessayez.",
   "error.auth.signInFirst": "Connectez-vous d’abord à OpenBot.",
   "error.auth.signInRequired": "Une connexion est requise.",
   "error.auth.accountChangedDuringRegister": "Le compte connecté a changé pendant l’enregistrement de ce serveur.",

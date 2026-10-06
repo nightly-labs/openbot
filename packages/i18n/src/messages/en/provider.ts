@@ -86,6 +86,8 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.pasteSubmit": "Continue",
   "provider.codeLogin.pasteExpired": "This login has stopped.",
   "provider.codeLogin.pasteExpiresIn": "Waiting for you. This login stops in {time}.",
+  "provider.codeLogin.linkTitle": "Log in to {name} on another device",
+  "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
 
   // The agent model picker.
   "provider.picker.noEndpoints": "No endpoints yet",

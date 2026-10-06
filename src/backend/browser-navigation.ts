@@ -1,5 +1,7 @@
 import type { BrowserTarget } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import type { WebContents } from "electron";
+import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 
 const NAVIGATION_TIMED_OUT = "Navigation timed out.";
 const TAB_CLOSED = "Browser tab was closed during navigation.";
@@ -13,19 +15,18 @@ export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
   timeoutMs = 10_000,
-): Promise<void> {
+): Effect.Effect<void, BrowserOperationError> {
   return watchNavigation(contents, initiate, timeoutMs);
 }
 
 /** Waits for a load that already started, such as one from CDP `Page.navigate`. */
-export function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {
-  if (!contents.isLoading()) return Promise.resolve();
-  return watchNavigation(contents, undefined, timeoutMs);
+export function waitForLoading(contents: WebContents, timeoutMs: number): Effect.Effect<void, BrowserOperationError> {
+  return Effect.suspend(() => (contents.isLoading() ? watchNavigation(contents, undefined, timeoutMs) : Effect.void));
 }
 
-export function stopLoadingAndWait(contents: WebContents): Promise<void> {
-  if (!contents.isLoading()) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
+export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((contents: WebContents) => {
+  if (!contents.isLoading()) return Effect.void;
+  return Effect.callback<void, BrowserOperationError>((resume) => {
     let settled = false;
     const cleanup = () => {
       contents.off("did-stop-loading", stopped);
@@ -35,13 +36,13 @@ export function stopLoadingAndWait(contents: WebContents): Promise<void> {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve();
+      resume(Effect.void);
     };
     const destroyed = () => {
       if (settled) return;
       settled = true;
       cleanup();
-      reject(new Error(TAB_CLOSED));
+      resume(Effect.fail(browserFailure(new Error(TAB_CLOSED))));
     };
     contents.once("did-stop-loading", stopped);
     contents.once("destroyed", destroyed);
@@ -51,100 +52,106 @@ export function stopLoadingAndWait(contents: WebContents): Promise<void> {
     } catch (error) {
       settled = true;
       cleanup();
-      reject(error);
+      resume(Effect.fail(browserFailure(error)));
     }
+    return Effect.sync(cleanup);
   });
-}
+});
 
 /** Without `initiate`, the load in progress counts as a started cross-document navigation. */
-function watchNavigation(
-  contents: WebContents,
-  initiate: (() => boolean | Promise<unknown>) | undefined,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    let started = initiate === undefined;
-    let inPlace = false;
-    let settled = false;
-    let timedOut = false;
-    let initiationPending = false;
-    let timer: NodeJS.Timeout;
-    const cleanup = () => {
-      clearTimeout(timer);
-      contents.off("did-start-navigation", didStartNavigation);
-      contents.off("did-stop-loading", didStopLoading);
-      contents.off("did-navigate-in-page", didNavigateInPage);
-      contents.off("did-fail-load", didFailLoad);
-      contents.off("destroyed", destroyed);
-    };
-    const finish = (error?: unknown) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (error) reject(error);
-      else resolve();
-    };
-    const complete = () => {
-      finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
-    };
-    const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
-      if (!isMainFrame) return;
-      // A page that calls `pushState` while it loads must not end the wait for that load.
-      inPlace = started ? inPlace && isInPlace : isInPlace;
-      started = true;
-    };
-    const didStopLoading = () => {
-      if (started && !inPlace) complete();
-    };
-    const didNavigateInPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
-      if (started && inPlace && isMainFrame) complete();
-    };
-    const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-      if (!started || !isMainFrame) return;
-      finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
-    };
-    const destroyed = () => {
-      finish(new Error(TAB_CLOSED));
-    };
-    contents.on("did-start-navigation", didStartNavigation);
-    contents.on("did-stop-loading", didStopLoading);
-    contents.on("did-navigate-in-page", didNavigateInPage);
-    contents.on("did-fail-load", didFailLoad);
-    contents.once("destroyed", destroyed);
-    timer = setTimeout(() => {
-      timedOut = true;
+const watchNavigation = Effect.fn("Browser.watchNavigation")(
+  (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number) => {
+    return Effect.callback<void, BrowserOperationError>((resume) => {
+      let started = initiate === undefined;
+      let inPlace = false;
+      let settled = false;
+      let timedOut = false;
+      let initiationPending = false;
+      let timer: NodeJS.Timeout;
+      const cleanup = () => {
+        clearTimeout(timer);
+        contents.off("did-start-navigation", didStartNavigation);
+        contents.off("did-stop-loading", didStopLoading);
+        contents.off("did-navigate-in-page", didNavigateInPage);
+        contents.off("did-fail-load", didFailLoad);
+        contents.off("destroyed", destroyed);
+      };
+      const finish = (error?: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) resume(Effect.fail(browserFailure(error)));
+        else resume(Effect.void);
+      };
+      const complete = () => {
+        finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
+      };
+      const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
+        if (!isMainFrame) return;
+        // A page that calls `pushState` while it loads must not end the wait for that load.
+        inPlace = started ? inPlace && isInPlace : isInPlace;
+        started = true;
+      };
+      const didStopLoading = () => {
+        if (started && !inPlace) complete();
+      };
+      const didNavigateInPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
+        if (started && inPlace && isMainFrame) complete();
+      };
+      const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
+        if (!started || !isMainFrame) return;
+        finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
+      };
+      const destroyed = () => {
+        finish(new Error(TAB_CLOSED));
+      };
+      contents.on("did-start-navigation", didStartNavigation);
+      contents.on("did-stop-loading", didStopLoading);
+      contents.on("did-navigate-in-page", didNavigateInPage);
+      contents.on("did-fail-load", didFailLoad);
+      contents.once("destroyed", destroyed);
+      timer = setTimeout(() => {
+        timedOut = true;
+        try {
+          const navigationWasActive = started || contents.isLoading();
+          contents.stop();
+          if (!navigationWasActive && !initiationPending) complete();
+        } catch (error) {
+          finish(error);
+        }
+      }, timeoutMs);
+      timer.unref();
+      if (!initiate) return Effect.sync(cleanup);
       try {
-        const navigationWasActive = started || contents.isLoading();
-        contents.stop();
-        if (!navigationWasActive && !initiationPending) complete();
+        const initiation = initiate();
+        if (initiation === false) {
+          complete();
+        } else if (initiation !== true) {
+          initiationPending = true;
+          void initiation.then(
+            () => {
+              initiationPending = false;
+              if (!contents.isLoading()) complete();
+            },
+            (error) => {
+              initiationPending = false;
+              finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
+            },
+          );
+        }
       } catch (error) {
         finish(error);
       }
-    }, timeoutMs);
-    timer.unref();
-    if (!initiate) return;
-    try {
-      const initiation = initiate();
-      if (initiation === false) {
-        complete();
-      } else if (initiation !== true) {
-        initiationPending = true;
-        void initiation.then(
-          () => {
-            initiationPending = false;
-            if (!contents.isLoading()) complete();
-          },
-          (error) => {
-            initiationPending = false;
-            finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
-          },
-        );
-      }
-    } catch (error) {
-      finish(error);
-    }
-  });
-}
+      return Effect.sync(cleanup);
+    }).pipe(
+      Effect.onInterrupt(() =>
+        browserSync(() => {
+          if (!contents.isDestroyed() && contents.isLoading()) contents.stop();
+        }).pipe(Effect.ignore),
+      ),
+    );
+  },
+);
 
 export function describeBrowserTarget(target: BrowserTarget): string {
   switch (target.kind) {

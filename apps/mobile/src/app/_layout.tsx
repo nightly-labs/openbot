@@ -5,6 +5,7 @@ import { usePathname } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import { HeroUINativeProvider } from "heroui-native/provider";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -22,11 +23,12 @@ import { loadDictationLanguage } from "@/features/settings/model/dictation-langu
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadAgentColorMessages } from "@/features/settings/model/message-color";
+import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { SplashBackdrop } from "@/shared/components/splash-backdrop";
 import { nativeSplash } from "@/shared/lib/native-splash";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
 import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
@@ -41,6 +43,8 @@ import { useSplashMotion } from "@/shared/lib/use-splash-motion";
 export const unstable_settings = {
   initialRouteName: "index",
 };
+
+installSupportLog();
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 
@@ -145,6 +149,12 @@ export default function RootLayout() {
   const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
   // React Navigation paints its near-black dark background behind screens during transitions.
   const darkTheme = useMemo(() => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas } }), [canvas]);
+  // Android shows the window background behind the system bars. Without this it keeps the light splash color.
+  // iOS shows the window background behind sheets, so it keeps its default.
+  useEffect(() => {
+    if (!isAndroid) return;
+    void SystemUI.setBackgroundColorAsync(canvas).catch(() => undefined);
+  }, [canvas]);
   useEffect(() => {
     void loadAppearance().catch(() => undefined);
     void loadHapticsPreference().catch(() => undefined);
@@ -156,7 +166,14 @@ export default function RootLayout() {
 
   return (
     <UniwindGestureHandlerRootView className="flex-1">
-      <KeyboardProvider preload={false}>
+      {/* The app draws under the system bars and pads with safe area insets. Expo Go on Android does not
+          report edge-to-edge, and without these props the keyboard provider pads the whole app. */}
+      <KeyboardProvider
+        preload={false}
+        statusBarTranslucent={isAndroid}
+        navigationBarTranslucent={isAndroid}
+        preserveEdgeToEdge={isAndroid}
+      >
         <QueryClientProvider client={queryClient}>
           <HeroUINativeProvider>
             <ThemeProvider value={colorScheme === "dark" ? darkTheme : DefaultTheme}>

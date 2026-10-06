@@ -21,6 +21,7 @@ import {
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
+import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSignal, Show } from "solid-js";
 import { replayActionSoundChoice } from "../../action-sounds";
@@ -40,6 +41,8 @@ const LINK_TARGET_KEYS = {
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
+  /** The device with the keyboard, naming ⌘ or Ctrl in the shortcut option. */
+  platform?: "darwin" | "win32" | "linux";
   /** A dev or preview build keeps its own logo color, so the logo color row says so. */
   variant: AppVariant;
   /** The dialog element the Select popovers portal into, captured when the tab was created. */
@@ -88,6 +91,26 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.sendShortcut.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.sendShortcut.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SendShortcutSelect
+                value={props.value.sendShortcut}
+                onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
+                devicePlatform={props.platform ?? "darwin"}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <SwitchField
+            checked={props.value.busyMessageMode === "steer"}
+            onChange={(checked) => props.onUpdateSetting("busyMessageMode", checked ? "steer" : "queue")}
+            label={i18n.t("settings.busyMessage.title")}
+            description={i18n.t("settings.busyMessage.description")}
+          />
           <SwitchField
             checked={props.value.launchAtLogin}
             onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}

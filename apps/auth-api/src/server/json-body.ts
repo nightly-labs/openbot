@@ -1,4 +1,5 @@
-import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 
 export const JSON_BODY_LIMIT = 16 * 1024;
 
@@ -12,51 +13,48 @@ export class JsonBodyError extends Error {
   }
 }
 
-export async function readJsonObject(request: Request): Promise<DynamicRecord> {
-  const bytes = await readRequestBytes(request, JSON_BODY_LIMIT);
-  try {
-    const value = JSON.parse(new TextDecoder().decode(bytes));
-    if (!isDynamicRecord(value)) throw invalidJson();
-    return value;
-  } catch (error) {
-    if (error instanceof JsonBodyError) throw error;
-    throw invalidJson();
-  }
-}
+export const readJsonObject = Effect.fn("JsonBody.readJsonObject")(function* (request: Request) {
+  const bytes = yield* readRequestBytes(request, JSON_BODY_LIMIT);
+  const value = yield* Effect.try({ try: () => JSON.parse(new TextDecoder().decode(bytes)), catch: invalidJson });
+  if (!isDynamicRecord(value)) return yield* Effect.fail(invalidJson());
+  return value;
+});
 
-export async function readMultipartFormData(request: Request, limit: number): Promise<FormData> {
+export const readMultipartFormData = Effect.fn("JsonBody.readMultipartFormData")(function* (
+  request: Request,
+  limit: number,
+) {
   const contentType = request.headers.get("Content-Type") ?? "";
-  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) throw invalidJson();
-  const bytes = await readRequestBytes(request, limit);
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;")) return yield* Effect.fail(invalidJson());
+  const bytes = yield* readRequestBytes(request, limit);
   const body = new Uint8Array(bytes.byteLength);
   body.set(bytes);
-  try {
-    return await new Response(body.buffer, { headers: { "Content-Type": contentType } }).formData();
-  } catch {
-    throw invalidJson();
-  }
-}
+  return yield* Effect.tryPromise({
+    try: () => new Response(body.buffer, { headers: { "Content-Type": contentType } }).formData(),
+    catch: invalidJson,
+  });
+});
 
-export async function readRequestBytes(request: Request, limit: number): Promise<Uint8Array> {
+export const readRequestBytes = Effect.fn("JsonBody.readRequestBytes")(function* (request: Request, limit: number) {
   const declaredLength = request.headers.get("Content-Length");
   if (declaredLength !== null) {
     const parsedLength = Number(declaredLength);
     if (Number.isFinite(parsedLength) && parsedLength > limit) {
-      throw tooLarge();
+      return yield* Effect.fail(tooLarge());
     }
   }
 
   const reader = request.body?.getReader();
-  if (!reader) throw invalidJson();
+  if (!reader) return yield* Effect.fail(invalidJson());
   const chunks: Uint8Array[] = [];
   let size = 0;
   while (true) {
-    const { done, value } = await reader.read();
+    const { done, value } = yield* Effect.promise(() => reader.read());
     if (done) break;
     size += value.byteLength;
     if (size > limit) {
-      await reader.cancel().catch(() => undefined);
-      throw tooLarge();
+      yield* Effect.tryPromise(() => reader.cancel()).pipe(Effect.ignore);
+      return yield* Effect.fail(tooLarge());
     }
     chunks.push(value);
   }
@@ -68,7 +66,7 @@ export async function readRequestBytes(request: Request, limit: number): Promise
     offset += chunk.byteLength;
   }
   return bytes;
-}
+});
 
 function invalidJson(): JsonBodyError {
   return new JsonBodyError(400, "invalid_json", "The request body is invalid.");

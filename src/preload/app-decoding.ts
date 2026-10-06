@@ -23,6 +23,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type BusyMessageModePreference,
   type CentralAuthIssue,
   type CentralAuthState,
   type CentralAuthUser,
@@ -47,6 +48,7 @@ import {
   isAppLanguage,
   isAppLogoColor,
   isApprovalAutomationPreference,
+  isBusyMessageMode,
   isCustomAgentCheckResult,
   isCustomAgentResult,
   isCustomAgentSummary,
@@ -62,9 +64,11 @@ import {
   type MobileConnectTicket,
   type NotificationOpenedEvent,
   type NotificationPreference,
+  type OnePasswordConnectorStatus,
   type ProviderDetectionSettings,
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
+  parseOnePasswordConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   UPDATE_PHASES,
@@ -111,6 +115,12 @@ export const decodeApprovalAutomationPreference: (value: unknown) => ApprovalAut
   isApprovalAutomationPreference,
   "approval automation preference",
 );
+
+export function decodeBusyMessageModePreference(value: unknown): BusyMessageModePreference {
+  const preference = decodeRecord(value, "busy message mode preference");
+  if (!isBusyMessageMode(preference.mode)) throw new Error("Invalid busy message mode.");
+  return { mode: preference.mode };
+}
 
 export function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {
   const preference = decodeRecord(value, "language preference");
@@ -323,6 +333,12 @@ export function decodeGitHubConnectorRepositories(value: unknown): GitHubConnect
   const repositories = parseGitHubConnectorRepositories(value);
   if (!repositories) throw new Error("Invalid GitHub repository list response.");
   return repositories;
+}
+
+export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
+  const status = parseOnePasswordConnectorStatus(value);
+  if (!status) throw new Error("Invalid 1Password connector response.");
+  return status;
 }
 
 export function decodeBillingState(value: unknown): BillingState {

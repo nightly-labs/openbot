@@ -8,6 +8,7 @@ import type {
   BrowserTarget,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
   buttonMask,
@@ -46,6 +47,7 @@ import {
   type SendCommand,
   stringValue,
 } from "./browser-cdp-values";
+import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
 
@@ -112,82 +114,142 @@ export class BrowserCdpEngine {
   #environment: BrowserEnvironment | null = null;
   #navigationGeneration = 0;
 
-  /** Resolves nodes before consent; the returned operation never resolves a replacement target. */
-  async prepareSecret(
+  readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
+    this: BrowserCdpEngine,
     targets: BrowserTarget[],
     origin: string,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
-  ): Promise<{ enter: (secret: string) => Promise<void>; clear: (secret: string) => Promise<boolean> }> {
+  ): Effect.fn.Return<
+    {
+      enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
+      clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      /**
+       * Which secret the fields are built for, so a fill that no user approves goes only there: every
+       * field is a password field, or every field asks for a one-time code, and no native submission of
+       * them or of the submit button is GET, which would put the value in a URL. The fingerprint check
+       * of `enter` keeps this true until the fill.
+       */
+      fields: { password: boolean; oneTimeCode: boolean };
+    },
+    BrowserOperationError
+  > {
     const generation = this.#navigationGeneration;
-    const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
-    const nodes = await this.#lease(async (send) => {
-      const inputs = [];
-      for (const target of targets) inputs.push(await this.#resolveElement(send, target, Date.now() + 10_000));
-      const button = submitTarget ? await this.#resolveElement(send, submitTarget, Date.now() + 10_000) : undefined;
-      for (const node of [...inputs, ...(button ? [button] : [])]) {
-        if (node.sessionId) throw new Error("Use takeover for authentication inside a frame.");
-        const valid = await this.#callOnNode(
-          send,
-          node.backendNodeId,
-          `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
-          [origin, inputs.includes(node)],
-        );
-        if (valid !== true) throw new Error("Authentication target is unavailable.");
-      }
-      if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
-        throw new Error("Authentication fields must be distinct.");
-      const fingerprints: string[] = [];
-      for (const node of [...inputs, ...(button ? [button] : [])]) {
-        const value = await this.#callOnNode(send, node.backendNodeId, fingerprint, []);
-        if (!isString(value)) throw new Error("Authentication target is unavailable.");
-        fingerprints.push(value);
-      }
-      return { inputs, button, fingerprints };
-    });
-    if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-    const enter = async (secret: string) => {
-      try {
-        await this.#lease(async (send) => {
-          if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-          for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
-            if ((await this.#callOnNode(send, node.backendNodeId, fingerprint, [])) !== nodes.fingerprints[index])
-              throw new Error("Authentication target changed.");
-            const valid = await this.#callOnNode(
-              send,
-              node.backendNodeId,
-              `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
-              [origin, nodes.inputs.includes(node)],
-            );
-            if (valid !== true) throw new Error("Authentication target changed.");
-          }
-          for (const [index, node] of nodes.inputs.entries()) {
-            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-            await send("DOM.focus", { backendNodeId: node.backendNodeId });
-            await this.#callOnNode(
-              send,
-              node.backendNodeId,
-              `function(origin) {
+    // A submitter that overrides the form to GET is part of it, so a page cannot add one while the
+    // vault read waits.
+    const fingerprintFields = `[this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method, [...(this.form?.elements ?? [])].some((element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post')]`;
+    const fingerprint = `function() { return JSON.stringify(${fingerprintFields}); }`;
+    const nodes = yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const inputs = [];
+        for (const target of targets) inputs.push(yield* this.#resolveElementEffect(send, target, Date.now() + 10_000));
+        const button = submitTarget
+          ? yield* this.#resolveElementEffect(send, submitTarget, Date.now() + 10_000)
+          : undefined;
+        for (const node of [...inputs, ...(button ? [button] : [])]) {
+          if (node.sessionId)
+            return yield* browserFailure(new Error("Use takeover for authentication inside a frame."));
+          const valid = yield* this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
+            [origin, inputs.includes(node)],
+          );
+          if (valid !== true) return yield* browserFailure(new Error("Authentication target is unavailable."));
+        }
+        if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
+          return yield* browserFailure(new Error("Authentication fields must be distinct."));
+        const fingerprints: string[] = [];
+        for (const node of [...inputs, ...(button ? [button] : [])]) {
+          const value = yield* this.#callOnNode(send, node.backendNodeId, fingerprint, []);
+          if (!isString(value)) return yield* browserFailure(new Error("Authentication target is unavailable."));
+          fingerprints.push(value);
+        }
+        // A native submission that could send the value in a URL: a form whose effective method is not
+        // POST (a form with no method is GET), or a submitter in it that overrides to GET. A field with
+        // no form is sent only by the page's own script.
+        const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
+        for (const node of inputs) {
+          const kind = yield* this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function() {
+              const form = this.form;
+              const overrides = (element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post';
+              const posts = !form || (form.method === 'post' && ![...form.elements].some(overrides));
+              return { password: this.type === 'password', oneTimeCode: (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code'), posts };
+            }`,
+            [],
+          );
+          const posts = isDynamicRecord(kind) && kind.posts === true;
+          fields.password &&= isDynamicRecord(kind) && kind.password === true && posts;
+          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true && posts;
+        }
+        if (button) {
+          const posts = yield* this.#callOnNode(
+            send,
+            button.backendNodeId,
+            `function() {
+              if (!this.form) return true;
+              if (this.hasAttribute('formmethod')) return this.getAttribute('formmethod').trim().toLowerCase() === 'post';
+              return this.form.method === 'post';
+            }`,
+            [],
+          );
+          if (posts !== true) fields.password = fields.oneTimeCode = false;
+        }
+        return { inputs, button, fingerprints, fields };
+      }),
+    );
+    if (generation !== this.#navigationGeneration)
+      return yield* browserFailure(new Error("Authentication page changed."));
+    const enter = (secret: string) =>
+      Effect.gen({ self: this }, function* () {
+        yield* Effect.gen({ self: this }, function* () {
+          yield* this.#leaseEffect((send) =>
+            Effect.gen({ self: this }, function* () {
+              if (generation !== this.#navigationGeneration)
+                return yield* browserFailure(new Error("Authentication page changed."));
+              for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
+                if ((yield* this.#callOnNode(send, node.backendNodeId, fingerprint, [])) !== nodes.fingerprints[index])
+                  return yield* browserFailure(new Error("Authentication target changed."));
+                const valid = yield* this.#callOnNode(
+                  send,
+                  node.backendNodeId,
+                  `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
+                  [origin, nodes.inputs.includes(node)],
+                );
+                if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
+              }
+              for (const [index, node] of nodes.inputs.entries()) {
+                if (generation !== this.#navigationGeneration)
+                  return yield* browserFailure(new Error("Authentication page changed."));
+                yield* send("DOM.focus", { backendNodeId: node.backendNodeId });
+                yield* this.#callOnNode(
+                  send,
+                  node.backendNodeId,
+                  `function(origin) {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
                 this.select();
               }`,
-              [origin],
-            );
-            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-            // Native entry emits trusted input events across shadow roots, as regular browser typing
-            // does. Synthetic value setters can leave component forms unaware of the filled field.
-            await send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
-          }
-          if (submission === "on_input" || generation !== this.#navigationGeneration) return;
-          if (submission === "click" && nodes.button) {
-            await this.#callOnNode(
-              send,
-              nodes.button.backendNodeId,
-              `function(origin, expected) {
+                  [origin],
+                );
+                if (generation !== this.#navigationGeneration)
+                  return yield* browserFailure(new Error("Authentication page changed."));
+                // Native entry emits trusted input events across shadow roots, as regular browser typing
+                // does. Synthetic value setters can leave component forms unaware of the filled field.
+                yield* send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+              }
+              if (submission === "on_input" || generation !== this.#navigationGeneration) return;
+              if (submission === "click" && nodes.button) {
+                yield* this.#callOnNode(
+                  send,
+                  nodes.button.backendNodeId,
+                  `function(origin, expected) {
                 return new Promise((resolve, reject) => {
                   const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
                   const check = () => {
-                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify(${fingerprintFields}) !== expected) return finish('Authentication target changed.');
                     if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
                   };
                   const observer = new MutationObserver(check);
@@ -197,50 +259,69 @@ export class BrowserCdpEngine {
                   check();
                 });
               }`,
-              [origin, nodes.fingerprints.at(-1)],
-            );
-            const point = await this.#elementPoint(send, nodes.button.backendNodeId, true);
-            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-            await dispatchMouseClick(send, point, "left", 1, 0);
-          } else if (submission === "enter") {
-            const last = nodes.inputs.at(-1);
-            if (!last) throw new Error("Authentication target changed.");
-            await send("DOM.focus", { backendNodeId: last.backendNodeId });
-            await dispatchShortcut(send, "Enter");
-          }
-        });
-      } catch {
-        throw new Error("Secure authentication could not be completed. Take over to check the page.");
-      }
-    };
+                  [origin, nodes.fingerprints.at(-1)],
+                );
+                const point = yield* this.#elementPointEffect(send, nodes.button.backendNodeId, true);
+                if (generation !== this.#navigationGeneration)
+                  return yield* browserFailure(new Error("Authentication page changed."));
+                yield* dispatchMouseClick(send, point, "left", 1, 0);
+              } else if (submission === "enter") {
+                const last = nodes.inputs.at(-1);
+                if (!last) return yield* browserFailure(new Error("Authentication target changed."));
+                // An input handler can change the form after the fill; the click branch checks the same.
+                if (
+                  (yield* this.#callOnNode(send, last.backendNodeId, fingerprint, [])) !==
+                  nodes.fingerprints[nodes.inputs.length - 1]
+                )
+                  return yield* browserFailure(new Error("Authentication target changed."));
+                yield* send("DOM.focus", { backendNodeId: last.backendNodeId });
+                yield* dispatchShortcut(send, "Enter");
+              }
+            }),
+          );
+        }).pipe(
+          Effect.catch(() =>
+            Effect.gen({ self: this }, function* () {
+              return yield* browserFailure(
+                new Error("Secure authentication could not be completed. Take over to check the page."),
+              );
+            }),
+          ),
+        );
+      });
     /**
      * Empties the filled fields, attached or detached, and reports whether the document is now free
      * of the value: every field is empty and no title, URL, text, value or attribute contains it.
      */
     const clear = (secret: string) =>
-      this.#lease(async (send) => {
-        for (const node of nodes.inputs) {
-          const cleared = await this.#callOnNode(
-            send,
-            node.backendNodeId,
-            `function() { this.value = ''; return this.value === ''; }`,
-            [],
-          ).catch(() => false);
-          if (cleared !== true) return false;
-        }
-        const scan = await send("Runtime.callFunctionOn", {
-          executionContextId: await automationContextId(send),
-          functionDeclaration: SECRET_SCAN_FUNCTION,
-          arguments: [{ value: secret }],
-          returnByValue: true,
-        });
-        return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
-      }).catch(() => false);
-    return { enter, clear };
-  }
+      this.#leaseEffect((send) =>
+        Effect.gen({ self: this }, function* () {
+          for (const node of nodes.inputs) {
+            const cleared = yield* this.#callOnNode(
+              send,
+              node.backendNodeId,
+              `function() { this.value = ''; return this.value === ''; }`,
+              [],
+            ).pipe(Effect.catch(() => Effect.succeed(false)));
+            if (cleared !== true) return false;
+          }
+          const executionContextId = yield* automationContextId(send);
+          const scan = yield* send("Runtime.callFunctionOn", {
+            executionContextId,
+            functionDeclaration: SECRET_SCAN_FUNCTION,
+            arguments: [{ value: secret }],
+            returnByValue: true,
+          });
+          return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
+        }),
+      ).pipe(Effect.catch(() => Effect.succeed(false)));
+    return { enter, clear, fields: nodes.fields };
+  });
   #retainDebugger = false;
   #ownsDebugger = false;
   #closing = false;
+  #disposed = false;
+  readonly #scope = Scope.makeUnsafe();
   /**
    * How many leases are running. A lease detaches on the way out, and until this counter existed it
    * detached whenever it was the one that had attached -- which is wrong as soon as two overlap. An
@@ -285,94 +366,114 @@ export class BrowserCdpEngine {
     contents.debugger.on("detach", () => this.#clearDebuggerSessions());
   }
 
-  async snapshot(context: SnapshotContext): Promise<SnapshotReadResult> {
-    return this.#lease(async (send) => {
-      const navigationGeneration = this.#navigationGeneration;
-      const [metrics, parsed, focus] = await Promise.all([
-        send("Page.getLayoutMetrics"),
-        collectBoundedSnapshot(send, this.#snapshotTargets(), context.revision, true),
-        collectFocus(send).catch(() => null),
-      ]);
-      if (navigationGeneration !== this.#navigationGeneration) {
-        throw new Error("Page navigated during the browser snapshot. Take a fresh snapshot.");
-      }
-      const viewport = readViewport(metrics, context.environment);
-      const snapshot: BrowserSnapshot = {
-        tabId: context.tabId,
-        revision: context.revision,
-        title: this.#contents.getTitle().slice(0, 500),
-        url: this.#contents.getURL(),
-        loading: this.#contents.isLoading(),
-        viewport,
-        text: parsed.text,
-        elements: parsed.elements,
-        truncated: parsed.truncated,
-        focus,
-        diagnostics: context.diagnostics,
-        actions: context.actions,
-      };
-      boundSerializedSnapshot(snapshot);
-      const retainedRefs = new Set(snapshot.elements.map((element) => element.ref));
-      this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
-      this.#lastSnapshot = snapshot;
-      const lowCoverage = parsed.elements.length < 3 && parsed.text.length > 200;
-      const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
-      const imageReason = parsed.hasVisualSurface
-        ? "canvas-or-video"
-        : parsed.hasFrame
-          ? "iframe"
-          : "low-semantic-coverage";
-      return { snapshot, recommendImage, imageReason };
-    });
-  }
+  readonly snapshot = Effect.fn("BrowserCdp.snapshot")(function* (
+    this: BrowserCdpEngine,
+    context: SnapshotContext,
+  ): Effect.fn.Return<SnapshotReadResult, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const navigationGeneration = this.#navigationGeneration;
+        const [metrics, parsed, focus] = yield* Effect.all(
+          [
+            send("Page.getLayoutMetrics"),
+            collectBoundedSnapshot(send, this.#snapshotTargets(), context.revision, true),
+            collectFocus(send).pipe(Effect.catch(() => Effect.succeed(null))),
+          ],
+          { concurrency: "unbounded" },
+        );
+        if (navigationGeneration !== this.#navigationGeneration) {
+          return yield* browserFailure(new Error("Page navigated during the browser snapshot. Take a fresh snapshot."));
+        }
+        const viewport = readViewport(metrics, context.environment);
+        const snapshot: BrowserSnapshot = {
+          tabId: context.tabId,
+          revision: context.revision,
+          title: this.#contents.getTitle().slice(0, 500),
+          url: this.#contents.getURL(),
+          loading: this.#contents.isLoading(),
+          viewport,
+          text: parsed.text,
+          elements: parsed.elements,
+          truncated: parsed.truncated,
+          focus,
+          diagnostics: context.diagnostics,
+          actions: context.actions,
+        };
+        boundSerializedSnapshot(snapshot);
+        const retainedRefs = new Set(snapshot.elements.map((element) => element.ref));
+        this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
+        this.#lastSnapshot = snapshot;
+        const lowCoverage = parsed.elements.length < 3 && parsed.text.length > 200;
+        const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
+        const imageReason = parsed.hasVisualSurface
+          ? "canvas-or-video"
+          : parsed.hasFrame
+            ? "iframe"
+            : "low-semantic-coverage";
+        return { snapshot, recommendImage, imageReason };
+      }),
+    );
+  });
 
-  async click(
+  readonly click = Effect.fn("BrowserCdp.click")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget,
     options: { button?: "left" | "middle" | "right"; clickCount?: number; modifiers?: string[] } = {},
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
-    await this.#lease(async (send) => {
-      const point = await this.#targetPoint(send, target, true, true, deadline);
-      const { sessionId, ...coordinates } = point;
-      const button = options.button ?? "left";
-      const totalClicks = options.clickCount ?? 1;
-      const modifiers = modifierMask(options.modifiers ?? []);
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
-    });
-  }
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const point = yield* this.#targetPointEffect(send, target, true, true, deadline);
+        const { sessionId, ...coordinates } = point;
+        const button = options.button ?? "left";
+        const totalClicks = options.clickCount ?? 1;
+        const modifiers = modifierMask(options.modifiers ?? []);
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
+      }),
+    );
+  });
 
-  async hover(target: BrowserTarget, deadline?: number, onDispatch?: ActionDispatch): Promise<void> {
-    await this.#lease(async (send) => {
-      const point = await this.#targetPoint(send, target, true, true, deadline);
-      const { sessionId, ...coordinates } = point;
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates }, sessionId);
-    });
-  }
+  readonly hover = Effect.fn("BrowserCdp.hover")(function* (
+    this: BrowserCdpEngine,
+    target: BrowserTarget,
+    deadline?: number,
+    onDispatch?: ActionDispatch,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const point = yield* this.#targetPointEffect(send, target, true, true, deadline);
+        const { sessionId, ...coordinates } = point;
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates }, sessionId);
+      }),
+    );
+  });
 
-  async type(
+  readonly type = Effect.fn("BrowserCdp.type")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget | undefined,
     text: string,
     options: { mode?: "replace" | "append"; submit?: boolean } = {},
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const mode = options.mode ?? "replace";
-    if (!target) return this.#typeFocused(text, options.submit === true, deadline, onDispatch);
-    await this.#lease(async (send) => {
-      const resolved = await this.#resolveTarget(send, target, deadline);
-      if (!resolved.backendNodeId) throw new Error("Typing requires an element target.");
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
-      const useEndKey = await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        `function(mode) {
+    if (!target) return yield* this.#typeFocusedEffect(text, options.submit === true, deadline, onDispatch);
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+        if (!resolved.backendNodeId) return yield* browserFailure(new Error("Typing requires an element target."));
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
+        const useEndKey = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          `function(mode) {
           if (!('value' in this) && !this.isContentEditable) throw new Error('Target does not accept text.');
           if (mode === 'replace') {
             if ('select' in this && typeof this.select === 'function') this.select();
@@ -392,22 +493,23 @@ export class BrowserCdpEngine {
           }
           return false;
         }`,
-        [mode],
-        resolved.sessionId,
-      );
-      if (useEndKey === true) await dispatchShortcut(send, "End", resolved.sessionId);
-      assertBeforeDeadline(deadline);
-      await send("Input.insertText", { text }, resolved.sessionId);
-      // Submitting is part of typing rather than a second action, because it has to reach the node
-      // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
-      // against its pre-typing text, so a contenteditable would fail with "The target changed after
-      // the snapshot" and `submit: true` would insert the text without ever submitting it.
-      if (options.submit === true) {
-        assertBeforeDeadline(deadline);
-        await dispatchShortcut(send, "Enter", resolved.sessionId);
-      }
-    });
-  }
+          [mode],
+          resolved.sessionId,
+        );
+        if (useEndKey === true) yield* dispatchShortcut(send, "End", resolved.sessionId);
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        yield* send("Input.insertText", { text }, resolved.sessionId);
+        // Submitting is part of typing rather than a second action, because it has to reach the node
+        // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
+        // against its pre-typing text, so a contenteditable would fail with "The target changed after
+        // the snapshot" and `submit: true` would insert the text without ever submitting it.
+        if (options.submit === true) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          yield* dispatchShortcut(send, "Enter", resolved.sessionId);
+        }
+      }),
+    );
+  });
 
   // An application that draws its own surface -- a spreadsheet grid on a canvas, a code editor, a
   // map -- has no element to focus and no value to set: it reads the keystrokes the page already
@@ -415,110 +517,133 @@ export class BrowserCdpEngine {
   // into a node, and keeps tab and newline as the keys that move between a grid's columns and rows
   // instead of inserting them as characters. Selection has no meaning without a node, so `mode` is
   // rejected at the tool boundary rather than silently ignored here.
-  async #typeFocused(text: string, submit: boolean, deadline?: number, onDispatch?: ActionDispatch): Promise<void> {
+
+  readonly #typeFocusedEffect = Effect.fn("BrowserCdp.typeFocused")(function* (
+    this: BrowserCdpEngine,
+    text: string,
+    submit: boolean,
+    deadline?: number,
+    onDispatch?: ActionDispatch,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const characters = [...text.replace(/\r\n?/g, "\n")];
-    await this.#lease(async (send) => {
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      let sent = 0;
-      for (const character of characters) {
-        // Each keystroke is its own event, so a deadline reached part way through leaves what the
-        // page already took. Reporting only that the action timed out would let a caller repeat a
-        // send that half happened, which in a spreadsheet writes the data twice.
-        assertTypingProgressBeforeDeadline(deadline, sent, characters.length);
-        if (character === "\n") await dispatchShortcut(send, "Enter");
-        else if (character === "\t") await dispatchShortcut(send, "Tab");
-        else await dispatchTextKey(send, character);
-        sent += 1;
-      }
-      if (submit) {
-        assertTypingProgressBeforeDeadline(deadline, sent, characters.length);
-        await dispatchShortcut(send, "Enter");
-      }
-    });
-  }
-
-  async press(key: string, target?: BrowserTarget, deadline?: number, onDispatch?: ActionDispatch): Promise<void> {
-    await this.#lease(async (send) => {
-      let sessionId: string | undefined;
-      if (target) {
-        if (target.kind === "point") throw new Error("Press requires an element target, not coordinates.");
-        const resolved = await this.#resolveTarget(send, target, deadline);
-        sessionId = resolved.sessionId;
-        if (resolved.backendNodeId) {
-          assertBeforeDeadline(deadline);
-          onDispatch?.();
-          await send("DOM.focus", { backendNodeId: resolved.backendNodeId }, sessionId);
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        let sent = 0;
+        for (const character of characters) {
+          // Each keystroke is its own event, so a deadline reached part way through leaves what the
+          // page already took. Reporting only that the action timed out would let a caller repeat a
+          // send that half happened, which in a spreadsheet writes the data twice.
+          yield* browserSync(() => assertTypingProgressBeforeDeadline(deadline, sent, characters.length));
+          if (character === "\n") yield* dispatchShortcut(send, "Enter");
+          else if (character === "\t") yield* dispatchShortcut(send, "Tab");
+          else yield* dispatchTextKey(send, character);
+          sent += 1;
         }
-      }
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await dispatchShortcut(send, key, sessionId);
-    });
-  }
+        if (submit) {
+          yield* browserSync(() => assertTypingProgressBeforeDeadline(deadline, sent, characters.length));
+          yield* dispatchShortcut(send, "Enter");
+        }
+      }),
+    );
+  });
 
-  async scroll(
+  readonly press = Effect.fn("BrowserCdp.press")(function* (
+    this: BrowserCdpEngine,
+    key: string,
+    target?: BrowserTarget,
+    deadline?: number,
+    onDispatch?: ActionDispatch,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        let sessionId: string | undefined;
+        if (target) {
+          if (target.kind === "point")
+            return yield* browserFailure(new Error("Press requires an element target, not coordinates."));
+          const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+          sessionId = resolved.sessionId;
+          if (resolved.backendNodeId) {
+            yield* browserSync(() => assertBeforeDeadline(deadline));
+            onDispatch?.();
+            yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, sessionId);
+          }
+        }
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* dispatchShortcut(send, key, sessionId);
+      }),
+    );
+  });
+
+  readonly scroll = Effect.fn("BrowserCdp.scroll")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget | undefined,
     deltaX: number,
     deltaY: number,
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
-    await this.#lease(async (send) => {
-      if (!target) {
-        assertBeforeDeadline(deadline);
-        onDispatch?.();
-        await send("Input.dispatchMouseEvent", {
-          type: "mouseWheel",
-          x: 1,
-          y: 1,
-          deltaX: clamp(deltaX, -100_000, 100_000),
-          deltaY: clamp(deltaY, -100_000, 100_000),
-        });
-        return;
-      }
-      const resolved = await this.#resolveTarget(send, target, deadline);
-      if (!resolved.backendNodeId) {
-        assertBeforeDeadline(deadline);
-        onDispatch?.();
-        await send(
-          "Input.dispatchMouseEvent",
-          {
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        if (!target) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          onDispatch?.();
+          yield* send("Input.dispatchMouseEvent", {
             type: "mouseWheel",
-            x: resolved.x,
-            y: resolved.y,
-            deltaX,
-            deltaY,
-          },
+            x: 1,
+            y: 1,
+            deltaX: clamp(deltaX, -100_000, 100_000),
+            deltaY: clamp(deltaY, -100_000, 100_000),
+          });
+          return;
+        }
+        const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+        if (!resolved.backendNodeId) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          onDispatch?.();
+          yield* send(
+            "Input.dispatchMouseEvent",
+            {
+              type: "mouseWheel",
+              x: resolved.x,
+              y: resolved.y,
+              deltaX,
+              deltaY,
+            },
+            resolved.sessionId,
+          );
+          return;
+        }
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          "function(x, y) { this.scrollBy({ left: x, top: y, behavior: 'instant' }); }",
+          [deltaX, deltaY],
           resolved.sessionId,
         );
-        return;
-      }
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        "function(x, y) { this.scrollBy({ left: x, top: y, behavior: 'instant' }); }",
-        [deltaX, deltaY],
-        resolved.sessionId,
-      );
-    });
-  }
+      }),
+    );
+  });
 
-  async selectOption(
+  readonly selectOption = Effect.fn("BrowserCdp.selectOption")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget,
     values: string[],
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
+  ): Effect.fn.Return<void, BrowserOperationError> {
     this.#contents.focus();
-    await this.#lease(async (send) => {
-      const resolved = await this.#resolveElement(send, target, deadline);
-      const plan = await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        `function(values) {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveElementEffect(send, target, deadline);
+        const plan = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          `function(values) {
           if (this.localName !== 'select') throw new Error('Target is not a select element.');
           if (!this.multiple && values.length > 1) throw new Error('A single-select accepts only one requested value.');
           const desiredIndices = [];
@@ -558,120 +683,131 @@ export class BrowserCdpEngine {
             enabledIndices,
           };
         }`,
-        [values],
-        resolved.sessionId,
-      );
-      if (!isDynamicRecord(plan) || !isBoolean(plan.multiple)) {
-        throw new Error("Select target returned an invalid option plan.");
-      }
-      const desiredIndices = Array.isArray(plan.desiredIndices) ? plan.desiredIndices.filter(isNumber) : [];
-      if (plan.multiple) desiredIndices.sort((left, right) => left - right);
-      const enabledIndices = Array.isArray(plan.enabledIndices) ? plan.enabledIndices.filter(isNumber) : [];
-      const [firstDesiredIndex] = desiredIndices;
-      if (firstDesiredIndex === undefined || desiredIndices.some((index) => !enabledIndices.includes(index))) {
-        throw new Error("Select target returned an invalid option plan.");
-      }
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
-      if (!plan.multiple) {
-        const cycleIndices = Array.isArray(plan.typeaheadCycleIndices)
-          ? plan.typeaheadCycleIndices.filter(isNumber)
-          : [];
-        if (!isString(plan.desiredLabel) || !isNumber(plan.selectedIndex)) {
-          throw new Error("Select target returned an invalid keyboard navigation plan.");
-        }
-        const selectedIndex = plan.selectedIndex;
-        const targetRank = enabledIndices.indexOf(firstDesiredIndex);
-        if (firstDesiredIndex !== selectedIndex && cycleIndices.length > 0) {
-          const firstCycleRank = cycleIndices.findIndex((index) => index > selectedIndex);
-          const startCycleRank = firstCycleRank < 0 ? 0 : firstCycleRank;
-          const targetCycleRank = cycleIndices.indexOf(firstDesiredIndex);
-          if (targetCycleRank < 0) {
-            throw new Error("Select target returned an invalid typeahead navigation plan.");
-          }
-          const steps = ((targetCycleRank - startCycleRank + cycleIndices.length) % cycleIndices.length) + 1;
-          const initial = Array.from(plan.desiredLabel)[0];
-          if (!initial) throw new Error("Select target returned an empty typeahead key.");
-          // Chromium keeps a typeahead buffer per select for about a second, so a second
-          // `select_option` inside that window appends to the characters the first one typed: `a`
-          // after `b` searches for `ba`, matches nothing, and leaves the selection where it was.
-          // A focus round-trip clears the buffer. Waiting the timer out is the only alternative and
-          // costs a second on every call.
-          await this.#callOnNode(send, resolved.backendNodeId, "function() { this.blur(); }", [], resolved.sessionId);
-          await send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
-          for (let index = 0; index < steps; index++) {
-            await dispatchTextKey(send, initial, resolved.sessionId);
-          }
-        } else if (firstDesiredIndex !== selectedIndex) {
-          await dispatchShortcut(send, "Home", resolved.sessionId);
-          for (let index = 0; index < targetRank; index++) {
-            await dispatchShortcut(send, "ArrowDown", resolved.sessionId);
-          }
-        }
-      } else {
-        const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
-        for (const [index, desiredIndex] of desiredIndices.entries()) {
-          const optionNodeId = await this.#optionBackendNodeId(
-            send,
-            resolved.backendNodeId,
-            desiredIndex,
-            resolved.sessionId,
-          );
-          const point = await this.#elementPoint(send, optionNodeId, false, resolved.sessionId);
-          const { sessionId, ...coordinates } = point;
-          const modifiers = index === 0 ? 0 : modifierMask(additiveModifiers);
-          await send(
-            "Input.dispatchMouseEvent",
-            { type: "mousePressed", ...coordinates, button: "left", clickCount: 1, modifiers },
-            sessionId,
-          );
-          await send(
-            "Input.dispatchMouseEvent",
-            { type: "mouseReleased", ...coordinates, button: "left", clickCount: 1, modifiers },
-            sessionId,
-          );
-        }
-      }
-      const selected = await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        "function() { return Array.from(this.options, (option, index) => option.selected ? index : -1).filter(index => index >= 0); }",
-        [],
-        resolved.sessionId,
-      );
-      const selectedIndices = Array.isArray(selected) ? selected.filter(isNumber) : [];
-      if (
-        selectedIndices.length !== desiredIndices.length ||
-        selectedIndices.some((index, position) => index !== desiredIndices[position])
-      ) {
-        // An option with no label has nothing to type towards, and on macOS typeahead is the only
-        // keyboard strategy a closed select honours -- ArrowDown opens the native popup instead of
-        // moving the selection, and no CDP key event reaches that popup. Say so, because the indices
-        // alone leave the caller with nothing to act on.
-        const unreachable =
-          !plan.multiple && plan.desiredLabel === ""
-            ? " An option with no label can only be reached by keyboard where a closed select honours arrow keys, which macOS does not."
-            : "";
-        throw new Error(
-          `Native select interaction did not produce the requested selection (expected ${desiredIndices.join(",")}, got ${selectedIndices.join(",")}).${unreachable}`,
+          [values],
+          resolved.sessionId,
         );
-      }
-    });
-  }
+        if (!isDynamicRecord(plan) || !isBoolean(plan.multiple)) {
+          return yield* browserFailure(new Error("Select target returned an invalid option plan."));
+        }
+        const desiredIndices = Array.isArray(plan.desiredIndices) ? plan.desiredIndices.filter(isNumber) : [];
+        if (plan.multiple) desiredIndices.sort((left, right) => left - right);
+        const enabledIndices = Array.isArray(plan.enabledIndices) ? plan.enabledIndices.filter(isNumber) : [];
+        const [firstDesiredIndex] = desiredIndices;
+        if (firstDesiredIndex === undefined || desiredIndices.some((index) => !enabledIndices.includes(index))) {
+          return yield* browserFailure(new Error("Select target returned an invalid option plan."));
+        }
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
+        if (!plan.multiple) {
+          const cycleIndices = Array.isArray(plan.typeaheadCycleIndices)
+            ? plan.typeaheadCycleIndices.filter(isNumber)
+            : [];
+          if (!isString(plan.desiredLabel) || !isNumber(plan.selectedIndex)) {
+            return yield* browserFailure(new Error("Select target returned an invalid keyboard navigation plan."));
+          }
+          const selectedIndex = plan.selectedIndex;
+          const targetRank = enabledIndices.indexOf(firstDesiredIndex);
+          if (firstDesiredIndex !== selectedIndex && cycleIndices.length > 0) {
+            const firstCycleRank = cycleIndices.findIndex((index) => index > selectedIndex);
+            const startCycleRank = firstCycleRank < 0 ? 0 : firstCycleRank;
+            const targetCycleRank = cycleIndices.indexOf(firstDesiredIndex);
+            if (targetCycleRank < 0) {
+              return yield* browserFailure(new Error("Select target returned an invalid typeahead navigation plan."));
+            }
+            const steps = ((targetCycleRank - startCycleRank + cycleIndices.length) % cycleIndices.length) + 1;
+            const initial = Array.from(plan.desiredLabel)[0];
+            if (!initial) return yield* browserFailure(new Error("Select target returned an empty typeahead key."));
+            // Chromium keeps a typeahead buffer per select for about a second, so a second
+            // `select_option` inside that window appends to the characters the first one typed: `a`
+            // after `b` searches for `ba`, matches nothing, and leaves the selection where it was.
+            // A focus round-trip clears the buffer. Waiting the timer out is the only alternative and
+            // costs a second on every call.
+            yield* this.#callOnNode(
+              send,
+              resolved.backendNodeId,
+              "function() { this.blur(); }",
+              [],
+              resolved.sessionId,
+            );
+            yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
+            for (let index = 0; index < steps; index++) {
+              yield* dispatchTextKey(send, initial, resolved.sessionId);
+            }
+          } else if (firstDesiredIndex !== selectedIndex) {
+            yield* dispatchShortcut(send, "Home", resolved.sessionId);
+            for (let index = 0; index < targetRank; index++) {
+              yield* dispatchShortcut(send, "ArrowDown", resolved.sessionId);
+            }
+          }
+        } else {
+          const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
+          for (const [index, desiredIndex] of desiredIndices.entries()) {
+            const optionNodeId = yield* this.#optionBackendNodeIdEffect(
+              send,
+              resolved.backendNodeId,
+              desiredIndex,
+              resolved.sessionId,
+            );
+            const point = yield* this.#elementPointEffect(send, optionNodeId, false, resolved.sessionId);
+            const { sessionId, ...coordinates } = point;
+            const modifiers = index === 0 ? 0 : modifierMask(additiveModifiers);
+            yield* send(
+              "Input.dispatchMouseEvent",
+              { type: "mousePressed", ...coordinates, button: "left", clickCount: 1, modifiers },
+              sessionId,
+            );
+            yield* send(
+              "Input.dispatchMouseEvent",
+              { type: "mouseReleased", ...coordinates, button: "left", clickCount: 1, modifiers },
+              sessionId,
+            );
+          }
+        }
+        const selected = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          "function() { return Array.from(this.options, (option, index) => option.selected ? index : -1).filter(index => index >= 0); }",
+          [],
+          resolved.sessionId,
+        );
+        const selectedIndices = Array.isArray(selected) ? selected.filter(isNumber) : [];
+        if (
+          selectedIndices.length !== desiredIndices.length ||
+          selectedIndices.some((index, position) => index !== desiredIndices[position])
+        ) {
+          // An option with no label has nothing to type towards, and on macOS typeahead is the only
+          // keyboard strategy a closed select honours -- ArrowDown opens the native popup instead of
+          // moving the selection, and no CDP key event reaches that popup. Say so, because the indices
+          // alone leave the caller with nothing to act on.
+          const unreachable =
+            !plan.multiple && plan.desiredLabel === ""
+              ? " An option with no label can only be reached by keyboard where a closed select honours arrow keys, which macOS does not."
+              : "";
+          return yield* browserFailure(
+            new Error(
+              `Native select interaction did not produce the requested selection (expected ${desiredIndices.join(",")}, got ${selectedIndices.join(",")}).${unreachable}`,
+            ),
+          );
+        }
+      }),
+    );
+  });
 
-  async setChecked(
+  readonly setChecked = Effect.fn("BrowserCdp.setChecked")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget,
     checked: boolean,
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
-    await this.#lease(async (send) => {
-      const resolved = await this.#resolveElement(send, target, deadline);
-      const state = await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        `function() {
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveElementEffect(send, target, deadline);
+        const state = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          `function() {
           if (this.localName !== 'input' || (this.type !== 'checkbox' && this.type !== 'radio')) {
             throw new Error('Target is not checkable.');
           }
@@ -680,243 +816,302 @@ export class BrowserCdpEngine {
             radio: this.localName === 'input' && this.type === 'radio',
           };
         }`,
-        [],
-        resolved.sessionId,
-      );
-      if (!isDynamicRecord(state) || !isBoolean(state.checked) || !isBoolean(state.radio)) {
-        throw new Error("Target returned an invalid checked state.");
-      }
-      if (state.radio && state.checked && !checked) {
-        throw new Error("A selected radio button cannot be cleared directly. Select another radio option instead.");
-      }
-      if (state.checked !== checked) {
-        assertBeforeDeadline(deadline);
-        onDispatch?.();
-        const point = await this.#elementPoint(send, resolved.backendNodeId, true, resolved.sessionId);
-        const { sessionId, ...coordinates } = point;
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mousePressed", ...coordinates, button: "left", clickCount: 1 },
-          sessionId,
+          [],
+          resolved.sessionId,
         );
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mouseReleased", ...coordinates, button: "left", clickCount: 1 },
-          sessionId,
+        if (!isDynamicRecord(state) || !isBoolean(state.checked) || !isBoolean(state.radio)) {
+          return yield* browserFailure(new Error("Target returned an invalid checked state."));
+        }
+        if (state.radio && state.checked && !checked) {
+          return yield* browserFailure(
+            new Error("A selected radio button cannot be cleared directly. Select another radio option instead."),
+          );
+        }
+        if (state.checked !== checked) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          onDispatch?.();
+          const point = yield* this.#elementPointEffect(send, resolved.backendNodeId, true, resolved.sessionId);
+          const { sessionId, ...coordinates } = point;
+          yield* send(
+            "Input.dispatchMouseEvent",
+            { type: "mousePressed", ...coordinates, button: "left", clickCount: 1 },
+            sessionId,
+          );
+          yield* send(
+            "Input.dispatchMouseEvent",
+            { type: "mouseReleased", ...coordinates, button: "left", clickCount: 1 },
+            sessionId,
+          );
+        }
+        const updated = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          "function() { return Boolean(this.checked); }",
+          [],
+          resolved.sessionId,
         );
-      }
-      const updated = await this.#callOnNode(
-        send,
-        resolved.backendNodeId,
-        "function() { return Boolean(this.checked); }",
-        [],
-        resolved.sessionId,
-      );
-      if (updated !== checked) throw new Error("Target did not reach the requested checked state.");
-    });
-  }
+        if (updated !== checked)
+          return yield* browserFailure(new Error("Target did not reach the requested checked state."));
+      }),
+    );
+  });
 
-  async drag(
+  readonly drag = Effect.fn("BrowserCdp.drag")(function* (
+    this: BrowserCdpEngine,
     source: BrowserTarget,
     target: BrowserTarget,
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<void> {
-    await this.#lease(async (send) => {
-      const initialFrom = await this.#targetPoint(send, source, true, true, deadline);
-      const initialTo = await this.#targetPoint(send, target, true, true, deadline);
-      if (initialFrom.sessionId !== initialTo.sessionId) throw new Error("Cross-frame drag is not supported.");
-      const from = await this.#targetPoint(send, source, true, false, deadline);
-      const to = await this.#targetPoint(send, target, true, false, deadline);
-      const sessionId = from.sessionId;
-      let stopWaitingForIntercept = () => undefined;
-      const interceptedDragData = new Promise<CdpResult | null>((resolve) => {
-        const debuggerClient = this.#contents.debugger;
-        const listener = (_event: Electron.Event, method: string, params: unknown, messageSessionId?: string) => {
-          if (method !== "Input.dragIntercepted" || (sessionId !== undefined && messageSessionId !== sessionId)) {
-            return;
-          }
-          stopWaitingForIntercept();
-          resolve(isRecord(params) ? (recordValue(params.data) ?? null) : null);
-        };
-        const timeout = setTimeout(() => {
-          stopWaitingForIntercept();
-          resolve(null);
-        }, 2_000);
-        stopWaitingForIntercept = () => {
-          clearTimeout(timeout);
-          debuggerClient.removeListener("message", listener);
-        };
-        debuggerClient.on("message", listener);
-      });
-      let pressSent = false;
-      try {
-        assertBeforeDeadline(deadline);
-        onDispatch?.();
-        await send("Input.setInterceptDrags", { enabled: true }, sessionId);
-        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y }, sessionId);
-        pressSent = true;
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mousePressed", x: from.x, y: from.y, button: "left", clickCount: 1 },
-          sessionId,
-        );
-      } catch (error) {
-        // The listener and the drag intercept would otherwise outlive a drag that never started.
-        stopWaitingForIntercept();
-        await send("Input.setInterceptDrags", { enabled: false }, sessionId).catch(() => undefined);
-        // The press can reach the page even when its reply fails, and a held button breaks later input.
-        if (pressSent) {
-          await send(
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const initialFrom = yield* this.#targetPointEffect(send, source, true, true, deadline);
+        const initialTo = yield* this.#targetPointEffect(send, target, true, true, deadline);
+        if (initialFrom.sessionId !== initialTo.sessionId)
+          return yield* browserFailure(new Error("Cross-frame drag is not supported."));
+        const from = yield* this.#targetPointEffect(send, source, true, false, deadline);
+        const to = yield* this.#targetPointEffect(send, target, true, false, deadline);
+        const sessionId = from.sessionId;
+        const interceptedDragData = Deferred.makeUnsafe<CdpResult | null>();
+        const stopWaitingForIntercept = yield* browserSync(() => {
+          let stopWaitingForIntercept = () => undefined;
+          const debuggerClient = this.#contents.debugger;
+          const listener = (_event: Electron.Event, method: string, params: unknown, messageSessionId?: string) => {
+            if (method !== "Input.dragIntercepted" || (sessionId !== undefined && messageSessionId !== sessionId)) {
+              return;
+            }
+            stopWaitingForIntercept();
+            Deferred.doneUnsafe(
+              interceptedDragData,
+              Effect.succeed(isRecord(params) ? (recordValue(params.data) ?? null) : null),
+            );
+          };
+          const timeout = setTimeout(() => {
+            stopWaitingForIntercept();
+            Deferred.doneUnsafe(interceptedDragData, Effect.succeed(null));
+          }, 2_000);
+          stopWaitingForIntercept = () => {
+            clearTimeout(timeout);
+            debuggerClient.removeListener("message", listener);
+          };
+          debuggerClient.on("message", listener);
+          return stopWaitingForIntercept;
+        });
+        let pressSent = false;
+        yield* Effect.gen({ self: this }, function* () {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          onDispatch?.();
+          yield* send("Input.setInterceptDrags", { enabled: true }, sessionId);
+          yield* send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y }, sessionId);
+          pressSent = true;
+          yield* send(
             "Input.dispatchMouseEvent",
-            { type: "mouseReleased", x: from.x, y: from.y, button: "left", clickCount: 1 },
+            { type: "mousePressed", x: from.x, y: from.y, button: "left", clickCount: 1 },
             sessionId,
-          ).catch(() => undefined);
-        }
-        throw error;
-      }
-      let released = false;
-      try {
-        const activationX = from.x + Math.sign(to.x - from.x) * 4;
-        const activationY = from.y + Math.sign(to.y - from.y) * 4;
-        await send(
-          "Input.dispatchMouseEvent",
-          {
-            type: "mouseMoved",
-            x: activationX,
-            y: activationY,
-            button: "left",
-            buttons: 1,
-          },
-          sessionId,
+          );
+        }).pipe(
+          Effect.onInterrupt(() =>
+            Effect.gen(function* () {
+              stopWaitingForIntercept();
+              yield* send("Input.setInterceptDrags", { enabled: false }, sessionId).pipe(Effect.ignore);
+              if (pressSent)
+                yield* send(
+                  "Input.dispatchMouseEvent",
+                  {
+                    type: "mouseReleased",
+                    x: from.x,
+                    y: from.y,
+                    button: "left",
+                    clickCount: 1,
+                  },
+                  sessionId,
+                ).pipe(Effect.ignore);
+            }),
+          ),
+          Effect.catch((operationFailure) =>
+            Effect.gen({ self: this }, function* () {
+              const error = operationFailure.cause;
+              // The listener and the drag intercept would otherwise outlive a drag that never started.
+              stopWaitingForIntercept();
+              yield* send("Input.setInterceptDrags", { enabled: false }, sessionId).pipe(Effect.ignore);
+              // The press can reach the page even when its reply fails, and a held button breaks later input.
+              if (pressSent) {
+                yield* send(
+                  "Input.dispatchMouseEvent",
+                  { type: "mouseReleased", x: from.x, y: from.y, button: "left", clickCount: 1 },
+                  sessionId,
+                ).pipe(Effect.ignore);
+              }
+              return yield* browserFailure(error);
+            }),
+          ),
         );
-        for (let step = 1; step <= 8; step++) {
-          await send(
+        let released = false;
+        yield* Effect.gen({ self: this }, function* () {
+          const activationX = from.x + Math.sign(to.x - from.x) * 4;
+          const activationY = from.y + Math.sign(to.y - from.y) * 4;
+          yield* send(
             "Input.dispatchMouseEvent",
             {
               type: "mouseMoved",
-              x: activationX + ((to.x - activationX) * step) / 8,
-              y: activationY + ((to.y - activationY) * step) / 8,
+              x: activationX,
+              y: activationY,
               button: "left",
               buttons: 1,
             },
             sessionId,
           );
-        }
-        const dragData = await interceptedDragData;
-        if (!dragData) throw new Error("The source did not start a native drag operation.");
-        await send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
-        await send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
-        await send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mouseReleased", x: to.x, y: to.y, button: "left", clickCount: 1 },
-          sessionId,
-        );
-        released = true;
-      } finally {
-        stopWaitingForIntercept();
-        await send("Input.setInterceptDrags", { enabled: false }, sessionId).catch(() => undefined);
-        if (!released) {
-          await send(
+          for (let step = 1; step <= 8; step++) {
+            yield* send(
+              "Input.dispatchMouseEvent",
+              {
+                type: "mouseMoved",
+                x: activationX + ((to.x - activationX) * step) / 8,
+                y: activationY + ((to.y - activationY) * step) / 8,
+                button: "left",
+                buttons: 1,
+              },
+              sessionId,
+            );
+          }
+          const dragData = yield* Deferred.await(interceptedDragData);
+          if (!dragData) return yield* browserFailure(new Error("The source did not start a native drag operation."));
+          yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
+          yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
+          yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
+          yield* send(
             "Input.dispatchMouseEvent",
             { type: "mouseReleased", x: to.x, y: to.y, button: "left", clickCount: 1 },
             sessionId,
-          ).catch(() => undefined);
-        }
-      }
-    });
-  }
+          );
+          released = true;
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen({ self: this }, function* () {
+              stopWaitingForIntercept();
+              yield* send("Input.setInterceptDrags", { enabled: false }, sessionId).pipe(Effect.ignore);
+              if (!released) {
+                yield* send(
+                  "Input.dispatchMouseEvent",
+                  { type: "mouseReleased", x: to.x, y: to.y, button: "left", clickCount: 1 },
+                  sessionId,
+                ).pipe(Effect.ignore);
+              }
+            }).pipe(Effect.orDie),
+          ),
+        );
+      }),
+    );
+  });
 
-  async resolveUploadTarget(target: BrowserTarget): Promise<BrowserUploadAssignment> {
-    return this.#lease(async (send) => {
-      const resolved = await this.#resolveElement(send, target);
-      return this.#identifyUploadTarget(send, resolved);
-    });
-  }
+  readonly resolveUploadTarget = Effect.fn("BrowserCdp.resolveUploadTarget")(function* (
+    this: BrowserCdpEngine,
+    target: BrowserTarget,
+  ): Effect.fn.Return<BrowserUploadAssignment, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveElementEffect(send, target);
+        return yield* this.#identifyUploadTargetEffect(send, resolved);
+      }),
+    );
+  });
 
-  async uploadFiles(
+  readonly uploadFiles = Effect.fn("BrowserCdp.uploadFiles")(function* (
+    this: BrowserCdpEngine,
     target: BrowserTarget,
     paths: string[],
     onTargetResolved?: (assignment: BrowserUploadAssignment) => void,
     deadline?: number,
     onDispatch?: ActionDispatch,
-  ): Promise<BrowserUploadAssignment> {
-    if (paths.length === 0 || paths.length > 10) throw new Error("Upload requires between 1 and 10 files.");
+  ): Effect.fn.Return<BrowserUploadAssignment, BrowserOperationError> {
+    if (paths.length === 0 || paths.length > 10)
+      return yield* browserFailure(new Error("Upload requires between 1 and 10 files."));
     if (Buffer.byteLength(JSON.stringify(paths)) > MAX_RESULT_BYTES)
-      throw new Error("Upload path arguments exceed 64 KB.");
+      return yield* browserFailure(new Error("Upload path arguments exceed 64 KB."));
     for (const path of paths) {
-      const info = await stat(path).catch(() => null);
-      if (!info?.isFile()) throw new Error(`Upload file does not exist or is not a regular file: ${path}`);
+      const info = yield* browserCall(() => stat(path).catch(() => null));
+      if (!info?.isFile())
+        return yield* browserFailure(new Error(`Upload file does not exist or is not a regular file: ${path}`));
     }
-    return this.#lease(async (send) => {
-      const resolved = await this.#resolveElement(send, target, deadline);
-      const assignment = await this.#identifyUploadTarget(send, resolved);
-      onTargetResolved?.(assignment);
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await send("DOM.setFileInputFiles", { backendNodeId: resolved.backendNodeId, files: paths }, resolved.sessionId);
-      return assignment;
-    });
-  }
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveElementEffect(send, target, deadline);
+        const assignment = yield* this.#identifyUploadTargetEffect(send, resolved);
+        onTargetResolved?.(assignment);
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        onDispatch?.();
+        yield* send(
+          "DOM.setFileInputFiles",
+          { backendNodeId: resolved.backendNodeId, files: paths },
+          resolved.sessionId,
+        );
+        return assignment;
+      }),
+    );
+  });
 
-  async #identifyUploadTarget(
+  readonly #identifyUploadTargetEffect = Effect.fn("BrowserCdp.identifyUploadTarget")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     resolved: { backendNodeId: number; sessionId?: string },
-  ): Promise<BrowserUploadAssignment> {
-    const documentId = await this.#callOnNode(
+  ): Effect.fn.Return<BrowserUploadAssignment, BrowserOperationError> {
+    const documentId = yield* this.#callOnNode(
       send,
       resolved.backendNodeId,
       documentIdFunctionDeclaration(),
       [],
       resolved.sessionId,
     );
-    if (!isString(documentId)) throw new Error("Unable to identify the upload document.");
+    if (!isString(documentId)) return yield* browserFailure(new Error("Unable to identify the upload document."));
     this.#uploadDocumentIds.add(documentId);
     return {
       inputId: `${documentId}:${resolved.backendNodeId}`,
       documentId,
     };
-  }
+  });
 
-  async documentIds(): Promise<Set<string>> {
-    return this.#lease(async (send) => {
-      const ids = new Set<string>();
-      let complete = true;
-      for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-        if (ids.size === this.#uploadDocumentIds.size) break;
-        const contextId = await automationContextId(send, capture.sessionId);
-        const result = await send(
-          "Runtime.evaluate",
-          {
-            expression: documentIdsExpression([...this.#uploadDocumentIds]),
-            contextId,
-            returnByValue: true,
-          },
-          capture.sessionId,
-        );
-        const exception = recordValue(result.exceptionDetails);
-        if (exception) throw new Error(exceptionDescription(exception));
-        const payload = recordValue(recordValue(result.result)?.value);
-        const values = payload?.ids;
-        if (!Array.isArray(values) || !isBoolean(payload?.complete))
-          throw new Error("Browser documents returned invalid identities.");
-        if (!payload.complete) complete = false;
-        for (const value of values) {
-          if (isString(value)) ids.add(value);
+  readonly documentIds = Effect.fn("BrowserCdp.documentIds")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<Set<string>, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const ids = new Set<string>();
+        let complete = true;
+        for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
+          if (ids.size === this.#uploadDocumentIds.size) break;
+          const contextId = yield* automationContextId(send, capture.sessionId);
+          const result = yield* send(
+            "Runtime.evaluate",
+            {
+              expression: documentIdsExpression([...this.#uploadDocumentIds]),
+              contextId,
+              returnByValue: true,
+            },
+            capture.sessionId,
+          );
+          const exception = recordValue(result.exceptionDetails);
+          if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
+          const payload = recordValue(recordValue(result.result)?.value);
+          const values = payload?.ids;
+          if (!Array.isArray(values) || !isBoolean(payload?.complete))
+            return yield* browserFailure(new Error("Browser documents returned invalid identities."));
+          if (!payload.complete) complete = false;
+          for (const value of values) {
+            if (isString(value)) ids.add(value);
+          }
         }
-      }
-      // A scan that hit the node budget proves nothing about the documents it never reached, and the
-      // caller frees the staged files of every id missing from this set. So an unvisited document is
-      // presumed open: keeping a staging directory until the tab closes costs a temp directory, while
-      // freeing one whose input is still live hands the page a path that no longer exists.
-      if (!complete) return new Set(this.#uploadDocumentIds);
-      for (const documentId of this.#uploadDocumentIds) {
-        if (!ids.has(documentId)) this.#uploadDocumentIds.delete(documentId);
-      }
-      return ids;
-    });
-  }
+        // A scan that hit the node budget proves nothing about the documents it never reached, and the
+        // caller frees the staged files of every id missing from this set. So an unvisited document is
+        // presumed open: keeping a staging directory until the tab closes costs a temp directory, while
+        // freeing one whose input is still live hands the page a path that no longer exists.
+        if (!complete) return new Set(this.#uploadDocumentIds);
+        for (const documentId of this.#uploadDocumentIds) {
+          if (!ids.has(documentId)) this.#uploadDocumentIds.delete(documentId);
+        }
+        return ids;
+      }),
+    );
+  });
 
   hasUploadDocuments(): boolean {
     return this.#uploadDocumentIds.size > 0;
@@ -933,90 +1128,97 @@ export class BrowserCdpEngine {
     return true;
   }
 
-  async setEnvironment(environment: BrowserEnvironment): Promise<void> {
+  readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (
+    this: BrowserCdpEngine,
+    environment: BrowserEnvironment,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const previousEnvironment = this.#environment;
     const previousRetainDebugger = this.#retainDebugger;
     this.#retainDebugger = true;
-    try {
-      await this.#lease(async (send) => {
-        try {
-          await this.#applyEnvironment(send, environment);
-        } catch (error) {
-          if (previousEnvironment) await this.#applyEnvironment(send, previousEnvironment);
-          else await this.#clearEnvironment(send);
-          throw error;
-        }
-      }, false);
+    yield* Effect.gen({ self: this }, function* () {
+      yield* this.#leaseEffect(
+        (send) =>
+          Effect.gen({ self: this }, function* () {
+            yield* Effect.gen({ self: this }, function* () {
+              yield* this.#applyEnvironmentEffect(send, environment);
+            }).pipe(
+              Effect.catch((operationFailure) =>
+                Effect.gen({ self: this }, function* () {
+                  const error = operationFailure.cause;
+                  if (previousEnvironment) yield* this.#applyEnvironmentEffect(send, previousEnvironment);
+                  else yield* this.#clearEnvironmentEffect(send);
+                  return yield* browserFailure(error);
+                }),
+              ),
+            );
+          }),
+        false,
+      );
       this.#environment = environment;
-    } catch (error) {
-      this.#retainDebugger = previousRetainDebugger;
-      if (!this.#retainDebugger) this.#detachOwnedDebugger();
-      throw error;
-    }
-  }
+    }).pipe(
+      Effect.catch((operationFailure) =>
+        Effect.gen({ self: this }, function* () {
+          const error = operationFailure.cause;
+          this.#retainDebugger = previousRetainDebugger;
+          if (!this.#retainDebugger) this.#detachOwnedDebugger();
+          return yield* browserFailure(error);
+        }),
+      ),
+    );
+  });
 
-  async screenshot(): Promise<NativeImage> {
-    return this.#lease(async (send) => {
-      const fill = !this.#environment || this.#environment.viewport.mode === "fill";
-      if (fill) {
-        // Hidden views need a capture surface. Preserve the page's full viewport,
-        // including scrollbars: layoutViewport.clientWidth would shrink it and
-        // can dispose a responsive page's OAuth callback during preview capture.
-        const contextId = await automationContextId(send);
-        const result = await send("Runtime.evaluate", {
-          expression: "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
-          contextId,
-          returnByValue: true,
-        });
-        const viewport = recordValue(recordValue(result.result)?.value);
-        await send("Emulation.setDeviceMetricsOverride", {
-          width: numberValue(viewport?.width),
-          height: numberValue(viewport?.height),
-          deviceScaleFactor: numberValue(viewport?.scale),
-          mobile: false,
-        });
-      }
-      try {
-        return await this.#contents.capturePage();
-      } finally {
-        if (fill) await send("Emulation.clearDeviceMetricsOverride");
-      }
-    });
-  }
+  readonly screenshot = Effect.fn("BrowserCdp.screenshot")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<NativeImage, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const fill = !this.#environment || this.#environment.viewport.mode === "fill";
+        if (fill) {
+          // Hidden views need a capture surface. Preserve the page's full viewport,
+          // including scrollbars: layoutViewport.clientWidth would shrink it and
+          // can dispose a responsive page's OAuth callback during preview capture.
+          const contextId = yield* automationContextId(send);
+          const result = yield* send("Runtime.evaluate", {
+            expression: "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
+            contextId,
+            returnByValue: true,
+          });
+          const viewport = recordValue(recordValue(result.result)?.value);
+          yield* send("Emulation.setDeviceMetricsOverride", {
+            width: numberValue(viewport?.width),
+            height: numberValue(viewport?.height),
+            deviceScaleFactor: numberValue(viewport?.scale),
+            mobile: false,
+          });
+        }
+        return yield* Effect.gen({ self: this }, function* () {
+          return yield* browserCall(() => this.#contents.capturePage());
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen({ self: this }, function* () {
+              if (fill) yield* send("Emulation.clearDeviceMetricsOverride");
+            }).pipe(Effect.orDie),
+          ),
+        );
+      }),
+    );
+  });
 
-  /**
-   * A live view of the page for as long as the returned stop function is not called.
-   *
-   * The lease is held open for the whole stream rather than taken per frame, so the debugger stays
-   * attached and the agent's own operations keep running beside it -- overlapping leases are what
-   * the lease counter is for. Every frame is acknowledged, which is how the page learns to send the
-   * next one: without the acknowledgement the screencast stops after the first frame. Frames are
-   * acknowledged as fast as they arrive and forwarded no faster than `createFramePacer` allows, so a
-   * page that animates cannot raise what the link and the client have to carry.
-   *
-   * `onEnded` runs when the stream stops after it started and before the stop function is called:
-   * a view that cannot start again must not freeze on its last frame.
-   */
-  async startScreencast(
+  readonly startScreencast = Effect.fn("BrowserCdp.startScreencast")(function* (
+    this: BrowserCdpEngine,
     options: BrowserScreencastOptions,
     onFrame: (frame: BrowserScreencastFrame) => void,
     onEnded?: (error: unknown) => void,
-  ): Promise<() => Promise<void>> {
+  ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
     let live = false;
     let stopRequested = false;
-    let stop = (): void => undefined;
-    const stopped = new Promise<void>((resolve) => {
-      stop = () => {
-        stopRequested = true;
-        resolve();
-      };
-    });
-    let started = (): void => undefined;
-    let failed = (_error: unknown): void => undefined;
-    const ready = new Promise<void>((resolve, reject) => {
-      started = resolve;
-      failed = reject;
-    });
+    const stopped = Deferred.makeUnsafe<void>();
+    const stop = () => {
+      stopRequested = true;
+      Deferred.doneUnsafe(stopped, Effect.void);
+    };
+    const ready = Deferred.makeUnsafe<void, BrowserOperationError>();
+    const started = () => Deferred.doneUnsafe(ready, Effect.void);
     let sequence = 0;
     // The number counts the frames the client is given, not the ones the page drew.
     const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
@@ -1046,115 +1248,161 @@ export class BrowserCdpEngine {
     };
     // A stalled agent operation can detach the debugger under the stream, which ends the screencast
     // without a word. The stream then starts again on a new lease, so the view does not freeze.
-    const running = (async () => {
-      try {
-        while (!stopRequested) {
-          let onDetach = (): void => undefined;
-          const detached = new Promise<void>((resolve) => {
-            onDetach = () => resolve();
-          });
-          await this.#lease(async (send) => {
-            this.#contents.debugger.on("message", listener);
-            this.#contents.debugger.on("detach", onDetach);
-            try {
-              await send("Page.startScreencast", {
-                format: "jpeg",
-                quality: options.quality,
-                maxWidth: options.maxWidth,
-                maxHeight: options.maxHeight,
-                everyNthFrame: 1,
-              });
-              live = true;
-              started();
-              await Promise.race([stopped, detached]);
-            } finally {
-              this.#contents.debugger.off("message", listener);
-              this.#contents.debugger.off("detach", onDetach);
-              if (stopRequested) await send("Page.stopScreencast").catch(() => undefined);
-            }
-          }, false);
-        }
-      } finally {
-        pacer.stop();
-      }
-    })();
-    void running.catch((error: unknown) => {
-      if (!live) failed(error);
-      else if (!stopRequested) onEnded?.(error);
+    const running = yield* Effect.forkIn(
+      Effect.gen({ self: this }, function* () {
+        yield* Effect.gen({ self: this }, function* () {
+          while (!stopRequested) {
+            const detached = Deferred.makeUnsafe<void>();
+            const onDetach = () => {
+              Deferred.doneUnsafe(detached, Effect.void);
+            };
+            yield* this.#leaseEffect(
+              (send) =>
+                Effect.gen({ self: this }, function* () {
+                  this.#contents.debugger.on("message", listener);
+                  this.#contents.debugger.on("detach", onDetach);
+                  yield* Effect.gen({ self: this }, function* () {
+                    yield* send("Page.startScreencast", {
+                      format: "jpeg",
+                      quality: options.quality,
+                      maxWidth: options.maxWidth,
+                      maxHeight: options.maxHeight,
+                      everyNthFrame: 1,
+                    });
+                    live = true;
+                    started();
+                    yield* Effect.raceFirst(Deferred.await(stopped), Deferred.await(detached));
+                  }).pipe(
+                    Effect.ensuring(
+                      Effect.gen({ self: this }, function* () {
+                        this.#contents.debugger.off("message", listener);
+                        this.#contents.debugger.off("detach", onDetach);
+                        if (stopRequested) yield* send("Page.stopScreencast").pipe(Effect.ignore);
+                      }).pipe(Effect.orDie),
+                    ),
+                  );
+                }),
+              false,
+            );
+          }
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              pacer.stop();
+            }),
+          ),
+        );
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if (!live) Deferred.doneUnsafe(ready, Effect.fail(error));
+            else if (!stopRequested) onEnded?.(error.cause);
+          }),
+        ),
+      ),
+      this.#scope,
+      { startImmediately: true },
+    );
+    running.addObserver(() => {
+      if (!live) Deferred.doneUnsafe(ready, Effect.fail(browserFailure(new Error("Browser tab was closed."))));
     });
-    await ready;
-    return async () => {
-      stop();
-      await running.catch(() => undefined);
-    };
-  }
 
-  /**
-   * Input from a person watching the live view. The coordinates are already in this page's CSS
-   * pixels: the fraction of a frame the remote client sends is turned into them by the caller, which
-   * is the only place that knows which frame the person was looking at.
-   */
-  async dispatchViewportInput(input: BrowserViewportInput): Promise<void> {
-    await this.#lease(async (send) => {
-      if (input.type === "key") {
-        if (input.action === "char") {
-          await send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
-          return;
-        }
-        // A client sends a character event only for a printable key, so Enter's `\r` is added here.
-        // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
-        const { text, ...keyCodes } = namedKey(input.key);
-        const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
-        await send("Input.dispatchKeyEvent", {
-          type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
-          modifiers: input.modifiers,
-          key: input.key,
-          code: input.code,
-          ...keyCodes,
-          ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
-        });
-        return;
-      }
-      if (input.action === "wheel") {
-        await send("Input.dispatchMouseEvent", {
-          type: "mouseWheel",
-          x: input.x,
-          y: input.y,
-          deltaX: input.deltaX,
-          deltaY: input.deltaY,
-          modifiers: input.modifiers,
-        });
-        return;
-      }
-      await send("Input.dispatchMouseEvent", {
-        type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
-        x: input.x,
-        y: input.y,
-        button: input.action === "move" ? "none" : input.button,
-        buttons: input.action === "down" ? buttonMask(input.button) : 0,
-        clickCount: input.action === "move" ? 0 : input.clickCount,
-        modifiers: input.modifiers,
+    yield* Deferred.await(ready).pipe(
+      Effect.onInterrupt(() =>
+        Effect.gen(function* () {
+          stop();
+          yield* Fiber.interrupt(running);
+        }),
+      ),
+    );
+    return () =>
+      Effect.gen(function* () {
+        stop();
+        yield* Fiber.await(running);
       });
-    }, false);
-  }
+  });
 
-  async navigate(url: string): Promise<void> {
-    await this.#lease(async (send) => {
-      await send("Network.enable");
-      await send("Network.setCacheDisabled", { cacheDisabled: true });
-      try {
-        const result = await send("Page.navigate", { url });
-        const errorText = stringValue(result.errorText);
-        if (errorText) throw new Error(`Navigation failed: ${errorText}`);
-        await waitForLoading(this.#contents, WAIT_TIMEOUT_MS);
-      } finally {
-        await send("Network.setCacheDisabled", { cacheDisabled: false }).catch(() => undefined);
-        await send("Network.disable").catch(() => undefined);
-      }
-    }, false);
-  }
+  readonly dispatchViewportInput = Effect.fn("BrowserCdp.dispatchViewportInput")(function* (
+    this: BrowserCdpEngine,
+    input: BrowserViewportInput,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect(
+      (send) =>
+        Effect.gen({ self: this }, function* () {
+          if (input.type === "key") {
+            if (input.action === "char") {
+              yield* send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
+              return;
+            }
+            // A client sends a character event only for a printable key, so Enter's `\r` is added here.
+            // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
+            const { text, ...keyCodes } = namedKey(input.key);
+            const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
+            yield* send("Input.dispatchKeyEvent", {
+              type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
+              modifiers: input.modifiers,
+              key: input.key,
+              code: input.code,
+              ...keyCodes,
+              ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
+            });
+            return;
+          }
+          if (input.action === "wheel") {
+            yield* send("Input.dispatchMouseEvent", {
+              type: "mouseWheel",
+              x: input.x,
+              y: input.y,
+              deltaX: input.deltaX,
+              deltaY: input.deltaY,
+              modifiers: input.modifiers,
+            });
+            return;
+          }
+          yield* send("Input.dispatchMouseEvent", {
+            type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
+            x: input.x,
+            y: input.y,
+            button: input.action === "move" ? "none" : input.button,
+            buttons: input.action === "down" ? buttonMask(input.button) : 0,
+            clickCount: input.action === "move" ? 0 : input.clickCount,
+            modifiers: input.modifiers,
+          });
+        }),
+      false,
+    );
+  });
 
-  destroy(): void {
+  readonly navigate = Effect.fn("BrowserCdp.navigate")(function* (
+    this: BrowserCdpEngine,
+    url: string,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect(
+      (send) =>
+        Effect.gen({ self: this }, function* () {
+          yield* send("Network.enable");
+          yield* send("Network.setCacheDisabled", { cacheDisabled: true });
+          yield* Effect.gen({ self: this }, function* () {
+            const result = yield* send("Page.navigate", { url });
+            const errorText = stringValue(result.errorText);
+            if (errorText) return yield* browserFailure(new Error(`Navigation failed: ${errorText}`));
+            yield* waitForLoading(this.#contents, WAIT_TIMEOUT_MS);
+          }).pipe(
+            Effect.ensuring(
+              Effect.gen({ self: this }, function* () {
+                yield* send("Network.setCacheDisabled", { cacheDisabled: false }).pipe(Effect.ignore);
+                yield* send("Network.disable").pipe(Effect.ignore);
+              }).pipe(Effect.orDie),
+            ),
+          );
+        }),
+      false,
+    );
+  });
+
+  readonly destroy = Effect.fn("BrowserCdp.destroy")(function* (this: BrowserCdpEngine) {
+    this.#disposed = true;
+    yield* Scope.close(this.#scope, Exit.void);
     this.#retainDebugger = false;
     this.#detachOwnedDebugger();
     this.#targetSessions.clear();
@@ -1162,178 +1410,227 @@ export class BrowserCdpEngine {
     this.#lastSnapshot = null;
     this.#highlightSessionId = undefined;
     this.#uploadDocumentIds.clear();
-  }
+  });
 
-  async waitFor(
+  readonly waitFor = Effect.fn("BrowserCdp.waitFor")(function* (
+    this: BrowserCdpEngine,
     condition: { target?: BrowserTarget; text?: string; url?: string; state?: string },
     timeoutMs = WAIT_TIMEOUT_MS,
-  ): Promise<void> {
-    await this.#lease(async (send) => {
-      const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
-      const matches = async () => {
-        let matched = true;
-        if (condition.url) matched &&= this.#contents.getURL().includes(condition.url);
-        if (condition.text) {
-          matched &&= await pageContainsText(send, this.#snapshotTargets(), condition.text, deadline);
-        }
-        if (condition.target) {
-          try {
-            await this.#resolveTarget(send, condition.target, deadline, true);
-          } catch {
-            matched = false;
-          }
-        }
-        if (condition.state === "load") matched &&= !this.#contents.isLoading();
-        if (condition.state === "domcontentloaded") {
-          const contextId = await automationContextId(send);
-          const result = await send("Runtime.evaluate", {
-            expression: "document.readyState !== 'loading'",
-            contextId,
-            returnByValue: true,
-          });
-          matched &&= recordValue(result.result)?.value === true;
-        }
-        return matched;
-      };
-      while (true) {
-        if (await matches()) {
-          if (condition.state !== "dom-quiet") return;
-          await waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), deadline - Date.now()).catch((error) => {
-            if (error instanceof Error && error.message === "DOM did not become quiet.") {
-              throw new Error("Browser wait condition timed out.");
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
+        const matches = () =>
+          Effect.gen({ self: this }, function* () {
+            let matched = true;
+            if (condition.url) matched &&= this.#contents.getURL().includes(condition.url);
+            const text = condition.text;
+            if (text) {
+              matched &&= yield* pageContainsText(send, this.#snapshotTargets(), text, deadline);
             }
-            throw error;
+            const target = condition.target;
+            if (target) {
+              yield* Effect.gen({ self: this }, function* () {
+                yield* this.#resolveTargetEffect(send, target, deadline, true);
+              }).pipe(
+                Effect.catch(() =>
+                  Effect.sync(() => {
+                    matched = false;
+                  }),
+                ),
+              );
+            }
+            if (condition.state === "load") matched &&= !this.#contents.isLoading();
+            if (condition.state === "domcontentloaded") {
+              const contextId = yield* automationContextId(send);
+              const result = yield* send("Runtime.evaluate", {
+                expression: "document.readyState !== 'loading'",
+                contextId,
+                returnByValue: true,
+              });
+              matched &&= recordValue(result.result)?.value === true;
+            }
+            return matched;
           });
-          if (await matches()) return;
+        while (true) {
+          if (yield* matches()) {
+            if (condition.state !== "dom-quiet") return;
+            yield* waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), deadline - Date.now()).pipe(
+              Effect.catch((failure) =>
+                browserSync(() => {
+                  const error = failure.cause;
+                  if (error instanceof Error && error.message === "DOM did not become quiet.") {
+                    throw new Error("Browser wait condition timed out.");
+                  }
+                  throw error;
+                }),
+              ),
+            );
+            if (yield* matches()) return;
+          }
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return yield* browserFailure(new Error("Browser wait condition timed out."));
+          yield* waitForPageSignal(this.#contents, Math.min(remaining, 500));
         }
-        const remaining = deadline - Date.now();
-        if (remaining <= 0) throw new Error("Browser wait condition timed out.");
-        await waitForPageSignal(this.#contents, Math.min(remaining, 500));
-      }
-    });
-  }
+      }),
+    );
+  });
 
-  async evaluate(expression: string, awaitPromise = true, timeoutMs = ACTION_TIMEOUT_MS): Promise<BrowserJsonValue> {
-    return this.#lease(async (send) => {
-      await send("Runtime.enable");
-      const result = await send("Runtime.evaluate", {
-        expression,
-        awaitPromise,
-        returnByValue: true,
-        userGesture: true,
-        timeout: clamp(timeoutMs, 1, WAIT_TIMEOUT_MS),
-        disableBreaks: true,
-      });
-      const exception = recordValue(result.exceptionDetails);
-      if (exception) throw new Error(`Browser evaluation failed: ${exceptionDescription(exception)}`);
-      const remoteObject = recordValue(result.result);
-      if (!remoteObject || !("value" in remoteObject) || "unserializableValue" in remoteObject) {
-        throw new Error("Browser evaluation result is not JSON-serializable.");
-      }
-      const value = remoteObject.value;
-      let serialized: string | undefined;
-      try {
-        serialized = JSON.stringify(value);
-      } catch {
-        throw new Error("Browser evaluation result is not JSON-serializable.");
-      }
-      if (serialized === undefined) throw new Error("Browser evaluation result is not JSON-serializable.");
-      const bytes = Buffer.byteLength(serialized, "utf8");
-      if (bytes > MAX_RESULT_BYTES) {
-        throw new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes).`);
-      }
-      // `serialized` is the value the caller receives, so parse that rather than asserting over
-      // `value`: JSON.stringify already dropped anything a JSON value cannot hold.
-      const jsonValue: BrowserJsonValue = JSON.parse(serialized);
-      return jsonValue;
-    });
-  }
+  readonly evaluate = Effect.fn("BrowserCdp.evaluate")(function* (
+    this: BrowserCdpEngine,
+    expression: string,
+    awaitPromise = true,
+    timeoutMs = ACTION_TIMEOUT_MS,
+  ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        yield* send("Runtime.enable");
+        const result = yield* send("Runtime.evaluate", {
+          expression,
+          awaitPromise,
+          returnByValue: true,
+          userGesture: true,
+          timeout: clamp(timeoutMs, 1, WAIT_TIMEOUT_MS),
+          disableBreaks: true,
+        });
+        const exception = recordValue(result.exceptionDetails);
+        if (exception)
+          return yield* browserFailure(new Error(`Browser evaluation failed: ${exceptionDescription(exception)}`));
+        const remoteObject = recordValue(result.result);
+        if (!remoteObject || !("value" in remoteObject) || "unserializableValue" in remoteObject) {
+          return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
+        }
+        const value = remoteObject.value;
+        let serialized: string | undefined;
+        try {
+          serialized = JSON.stringify(value);
+        } catch {
+          return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
+        }
+        if (serialized === undefined)
+          return yield* browserFailure(new Error("Browser evaluation result is not JSON-serializable."));
+        const bytes = Buffer.byteLength(serialized, "utf8");
+        if (bytes > MAX_RESULT_BYTES) {
+          return yield* browserFailure(new Error(`Browser evaluation result exceeds 64 KB (${bytes} bytes).`));
+        }
+        // `serialized` is the value the caller receives, so parse that rather than asserting over
+        // `value`: JSON.stringify already dropped anything a JSON value cannot hold.
+        const jsonValue: BrowserJsonValue = yield* browserSync(() => JSON.parse(serialized));
+        return jsonValue;
+      }),
+    );
+  });
 
-  async settle(timeoutMs = ACTION_TIMEOUT_MS): Promise<void> {
-    await this.#lease(async (send) => {
-      if (this.#contents.isLoading()) await waitForLoading(this.#contents, timeoutMs);
-      await waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), Math.min(timeoutMs, 1_500)).catch((error) => {
-        if (error instanceof Error && error.message === "DOM did not become quiet.") return;
-        throw error;
-      });
-    });
-  }
+  readonly settle = Effect.fn("BrowserCdp.settle")(function* (
+    this: BrowserCdpEngine,
+    timeoutMs = ACTION_TIMEOUT_MS,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        if (this.#contents.isLoading()) yield* waitForLoading(this.#contents, timeoutMs);
+        yield* waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), Math.min(timeoutMs, 1_500)).pipe(
+          Effect.catch((failure) =>
+            browserSync(() => {
+              const error = failure.cause;
+              if (error instanceof Error && error.message === "DOM did not become quiet.") return;
+              throw error;
+            }),
+          ),
+        );
+      }),
+    );
+  });
 
-  async stopLoading(): Promise<void> {
-    await stopLoadingAndWait(this.#contents);
-  }
+  readonly stopLoading = Effect.fn("BrowserCdp.stopLoading")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* stopLoadingAndWait(this.#contents);
+  });
 
-  async highlight(target: BrowserTarget): Promise<void> {
-    await this.#lease(async (send) => {
-      const resolved = await this.#resolveElement(send, target);
-      await send("Overlay.enable", {}, resolved.sessionId);
-      await send(
-        "Overlay.highlightNode",
-        {
-          backendNodeId: resolved.backendNodeId,
-          highlightConfig: {
-            showInfo: false,
-            contentColor: { r: 59, g: 130, b: 246, a: 0.12 },
-            borderColor: { r: 59, g: 130, b: 246, a: 0.95 },
+  readonly highlight = Effect.fn("BrowserCdp.highlight")(function* (
+    this: BrowserCdpEngine,
+    target: BrowserTarget,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaseEffect((send) =>
+      Effect.gen({ self: this }, function* () {
+        const resolved = yield* this.#resolveElementEffect(send, target);
+        yield* send("Overlay.enable", {}, resolved.sessionId);
+        yield* send(
+          "Overlay.highlightNode",
+          {
+            backendNodeId: resolved.backendNodeId,
+            highlightConfig: {
+              showInfo: false,
+              contentColor: { r: 59, g: 130, b: 246, a: 0.12 },
+              borderColor: { r: 59, g: 130, b: 246, a: 0.95 },
+            },
           },
-        },
-        resolved.sessionId,
-      );
-      this.#highlightSessionId = resolved.sessionId;
-    });
-  }
+          resolved.sessionId,
+        );
+        this.#highlightSessionId = resolved.sessionId;
+      }),
+    );
+  });
 
-  async hideHighlight(): Promise<void> {
+  readonly hideHighlight = Effect.fn("BrowserCdp.hideHighlight")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const sessionId = this.#highlightSessionId;
     this.#highlightSessionId = undefined;
-    await this.#lease((send) => send("Overlay.hideHighlight", {}, sessionId).then(() => undefined));
-  }
+    yield* this.#leaseEffect((send) => send("Overlay.hideHighlight", {}, sessionId).pipe(Effect.asVoid));
+  });
 
-  async #resolveElement(
+  readonly #resolveElementEffect = Effect.fn("BrowserCdp.resolveElement")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     target: BrowserTarget,
     deadline?: number,
-  ): Promise<{ backendNodeId: number; sessionId?: string }> {
-    const resolved = await this.#resolveTarget(send, target, deadline);
-    if (!resolved.backendNodeId) throw new Error("This operation requires an element target, not coordinates.");
+  ): Effect.fn.Return<{ backendNodeId: number; sessionId?: string }, BrowserOperationError> {
+    const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+    if (!resolved.backendNodeId)
+      return yield* browserFailure(new Error("This operation requires an element target, not coordinates."));
     return { backendNodeId: resolved.backendNodeId, sessionId: resolved.sessionId };
-  }
+  });
 
-  async #resolveTarget(
+  readonly #resolveTargetEffect = Effect.fn("BrowserCdp.resolveTarget")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     target: BrowserTarget,
     deadline?: number,
     allowNonActionableRole = false,
-  ): Promise<{ backendNodeId?: number; sessionId?: string; x: number; y: number }> {
+  ): Effect.fn.Return<{ backendNodeId?: number; sessionId?: string; x: number; y: number }, BrowserOperationError> {
     if (target.kind === "point") {
-      const metrics = await send("Page.getLayoutMetrics");
+      const metrics = yield* send("Page.getLayoutMetrics");
       const viewport = recordValue(metrics.cssLayoutViewport);
       const width = numberValue(viewport?.clientWidth);
       const height = numberValue(viewport?.clientHeight);
       if (target.x < 0 || target.y < 0 || target.x >= width || target.y >= height) {
-        throw new Error(`Point target is outside the current viewport (${width}x${height}).`);
+        return yield* browserFailure(new Error(`Point target is outside the current viewport (${width}x${height}).`));
       }
       return { x: target.x, y: target.y };
     }
     if (target.kind === "ref") {
       if (!this.#lastSnapshot || target.revision !== this.#lastSnapshot.revision) {
-        throw new Error("Stale browser reference. Take a fresh snapshot before acting.");
+        return yield* browserFailure(new Error("Stale browser reference. Take a fresh snapshot before acting."));
       }
       const record = this.#targets.get(target.ref);
-      if (!record) throw new Error("Element reference is no longer available. Take a fresh snapshot.");
+      if (!record)
+        return yield* browserFailure(new Error("Element reference is no longer available. Take a fresh snapshot."));
       const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
       if (deadline !== undefined) {
-        assertBeforeDeadline(deadline);
-        const current = await this.#targetFingerprint(send, record.backendNodeId, sessionId).catch(() => null);
-        assertBeforeDeadline(deadline);
-        if (!current?.visible) throw new Error("Element reference is no longer visible.");
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId).pipe(
+          Effect.catch(() => Effect.succeed(null)),
+        );
+        yield* browserSync(() => assertBeforeDeadline(deadline));
+        if (!current?.visible) return yield* browserFailure(new Error("Element reference is no longer visible."));
         if (
           current.role !== record.element.role ||
           current.name !== record.element.name ||
           current.tag !== record.element.tag ||
           current.visibleText !== record.visibleText
         ) {
-          throw new Error("Stale browser reference. The target changed after the snapshot.");
+          return yield* browserFailure(new Error("Stale browser reference. The target changed after the snapshot."));
         }
       }
       return {
@@ -1346,50 +1643,66 @@ export class BrowserCdpEngine {
     if (target.kind === "css") {
       const matches: Array<{ objectId: string; sessionId?: string }> = [];
       let ambiguous = false;
-      try {
+      yield* Effect.gen({ self: this }, function* () {
         for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-          const match = await cssObjectMatch(send, target.selector, capture.sessionId);
+          const match = yield* cssObjectMatch(send, target.selector, capture.sessionId);
           ambiguous ||= match.ambiguous;
           if (match.objectId) matches.push({ objectId: match.objectId, sessionId: capture.sessionId });
         }
-      } catch (error) {
-        await Promise.allSettled(
-          matches.map((match) =>
-            send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).catch(() => undefined),
-          ),
-        );
-        throw error;
-      }
+      }).pipe(
+        Effect.catch((operationFailure) =>
+          Effect.gen({ self: this }, function* () {
+            const error = operationFailure.cause;
+            yield* Effect.all(
+              matches
+                .map((match) =>
+                  send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).pipe(Effect.ignore),
+                )
+                .map((operation) => Effect.exit(operation)),
+              { concurrency: "unbounded" },
+            );
+            return yield* browserFailure(error);
+          }),
+        ),
+      );
       if (ambiguous || matches.length > 1) {
-        await Promise.allSettled(
-          matches.map((match) =>
-            send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).catch(() => undefined),
-          ),
+        yield* Effect.all(
+          matches
+            .map((match) =>
+              send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).pipe(Effect.ignore),
+            )
+            .map((operation) => Effect.exit(operation)),
+          { concurrency: "unbounded" },
         );
-        throw new Error(`CSS selector is ambiguous (at least 2 matches): ${target.selector}`);
+        return yield* browserFailure(new Error(`CSS selector is ambiguous (at least 2 matches): ${target.selector}`));
       }
       const match = matches[0];
-      if (!match) throw new Error(`No element matches CSS selector: ${target.selector}`);
-      try {
-        const described = await send("DOM.describeNode", { objectId: match.objectId, depth: 0 }, match.sessionId);
+      if (!match) return yield* browserFailure(new Error(`No element matches CSS selector: ${target.selector}`));
+      return yield* Effect.gen({ self: this }, function* () {
+        const described = yield* send("DOM.describeNode", { objectId: match.objectId, depth: 0 }, match.sessionId);
         const describedNode = recordValue(described.node);
         const backendNodeId = numberValue(describedNode?.backendNodeId);
-        if (!backendNodeId) throw new Error(`Unable to resolve CSS selector: ${target.selector}`);
+        if (!backendNodeId)
+          return yield* browserFailure(new Error(`Unable to resolve CSS selector: ${target.selector}`));
         return {
           backendNodeId,
           sessionId: match.sessionId,
           x: 0,
           y: 0,
         };
-      } finally {
-        await send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).catch(() => undefined);
-      }
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen({ self: this }, function* () {
+            yield* send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).pipe(Effect.ignore);
+          }).pipe(Effect.orDie),
+        ),
+      );
     }
     const navigationGeneration = this.#navigationGeneration;
     const candidates: SemanticMatch[] = [];
     const seen = new Set<string>();
     for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-      for (const candidate of await semanticAxMatches(send, capture, target, allowNonActionableRole, deadline)) {
+      for (const candidate of yield* semanticAxMatches(send, capture, target, allowNonActionableRole, deadline)) {
         const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -1398,10 +1711,10 @@ export class BrowserCdpEngine {
       }
       if (candidates.length >= 2) break;
       if (target.kind === "text") {
-        const objectIds = await visibleTextObjectMatches(send, capture, target, deadline);
-        try {
+        const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline);
+        yield* Effect.gen({ self: this }, function* () {
           for (const objectId of objectIds) {
-            const described = await send("DOM.describeNode", { objectId, depth: 0 }, capture.sessionId);
+            const described = yield* send("DOM.describeNode", { objectId, depth: 0 }, capture.sessionId);
             const node = recordValue(described.node);
             const backendNodeId = numberValue(node?.backendNodeId);
             if (!backendNodeId) continue;
@@ -1417,21 +1730,28 @@ export class BrowserCdpEngine {
             });
             if (candidates.length >= 2) break;
           }
-        } finally {
-          await Promise.allSettled(
-            objectIds.map((objectId) =>
-              send("Runtime.releaseObject", { objectId }, capture.sessionId).catch(() => undefined),
-            ),
-          );
-        }
+        }).pipe(
+          Effect.ensuring(
+            Effect.gen({ self: this }, function* () {
+              yield* Effect.all(
+                objectIds
+                  .map((objectId) => send("Runtime.releaseObject", { objectId }, capture.sessionId).pipe(Effect.ignore))
+                  .map((operation) => Effect.exit(operation)),
+                { concurrency: "unbounded" },
+              );
+            }).pipe(Effect.orDie),
+          ),
+        );
       }
       if (candidates.length >= 2) break;
     }
     if (navigationGeneration !== this.#navigationGeneration) {
-      throw new Error("Page navigated during semantic target collection. Take a fresh snapshot.");
+      return yield* browserFailure(
+        new Error("Page navigated during semantic target collection. Take a fresh snapshot."),
+      );
     }
     const [found] = candidates;
-    if (!found) throw new Error(`No element matches ${describeBrowserTarget(target)}.`);
+    if (!found) return yield* browserFailure(new Error(`No element matches ${describeBrowserTarget(target)}.`));
     if (candidates.length > 1) {
       const sample = candidates
         .slice(0, 5)
@@ -1440,7 +1760,7 @@ export class BrowserCdpEngine {
             `${candidate.targetId ?? "main"}:${candidate.backendNodeId} ${candidate.role} “${candidate.name.slice(0, 80)}”`,
         )
         .join("; ");
-      throw new Error(`Target is ambiguous (at least 2 matches). Candidates: ${sample}`);
+      return yield* browserFailure(new Error(`Target is ambiguous (at least 2 matches). Candidates: ${sample}`));
     }
     return {
       backendNodeId: found.backendNodeId,
@@ -1448,20 +1768,25 @@ export class BrowserCdpEngine {
       x: 0,
       y: 0,
     };
-  }
+  });
 
-  async #targetFingerprint(
+  readonly #targetFingerprint = Effect.fn("BrowserCdp.targetFingerprint")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     backendNodeId: number,
     sessionId?: string,
-  ): Promise<{ role: string; name: string; tag: string; visibleText: string; visible: boolean }> {
-    const [description, partialAxTree, pageState] = await Promise.all([
-      send("DOM.describeNode", { backendNodeId, depth: 0 }, sessionId),
-      send("Accessibility.getPartialAXTree", { backendNodeId, fetchRelatives: false }, sessionId),
-      this.#callOnNode(
-        send,
-        backendNodeId,
-        String.raw`function() {
+  ): Effect.fn.Return<
+    { role: string; name: string; tag: string; visibleText: string; visible: boolean },
+    BrowserOperationError
+  > {
+    const [description, partialAxTree, pageState] = yield* Effect.all(
+      [
+        send("DOM.describeNode", { backendNodeId, depth: 0 }, sessionId),
+        send("Accessibility.getPartialAXTree", { backendNodeId, fetchRelatives: false }, sessionId),
+        this.#callOnNode(
+          send,
+          backendNodeId,
+          String.raw`function() {
           if (this.nodeType !== 1 || !this.isConnected || this.getClientRects().length === 0) return null;
           let element = this;
           while (element) {
@@ -1477,10 +1802,12 @@ export class BrowserCdpEngine {
           }
           return { visibleText: String(this.innerText ?? this.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 500) };
         }`,
-        [],
-        sessionId,
-      ),
-    ]);
+          [],
+          sessionId,
+        ),
+      ],
+      { concurrency: "unbounded" },
+    );
     const node = recordValue(description.node);
     const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
     const ax = axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
@@ -1492,34 +1819,36 @@ export class BrowserCdpEngine {
       visibleText: stringValue(state?.visibleText),
       visible: state !== undefined,
     };
-  }
+  });
 
-  async #targetPoint(
+  readonly #targetPointEffect = Effect.fn("BrowserCdp.targetPoint")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     target: BrowserTarget,
     hitTest: boolean,
     scrollIntoView = true,
     deadline?: number,
-  ): Promise<{ x: number; y: number; sessionId?: string }> {
-    const resolved = await this.#resolveTarget(send, target, deadline);
-    assertBeforeDeadline(deadline);
+  ): Effect.fn.Return<{ x: number; y: number; sessionId?: string }, BrowserOperationError> {
+    const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+    yield* browserSync(() => assertBeforeDeadline(deadline));
     if (!resolved.backendNodeId) return { x: resolved.x, y: resolved.y };
-    return this.#elementPoint(send, resolved.backendNodeId, hitTest, resolved.sessionId, scrollIntoView);
-  }
+    return yield* this.#elementPointEffect(send, resolved.backendNodeId, hitTest, resolved.sessionId, scrollIntoView);
+  });
 
-  async #elementPoint(
+  readonly #elementPointEffect = Effect.fn("BrowserCdp.elementPoint")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     backendNodeId: number,
     hitTest: boolean,
     sessionId?: string,
     scrollIntoView = true,
-  ): Promise<{ x: number; y: number; sessionId?: string }> {
-    if (scrollIntoView) await send("DOM.scrollIntoViewIfNeeded", { backendNodeId }, sessionId);
-    const box = await send("DOM.getBoxModel", { backendNodeId }, sessionId);
+  ): Effect.fn.Return<{ x: number; y: number; sessionId?: string }, BrowserOperationError> {
+    if (scrollIntoView) yield* send("DOM.scrollIntoViewIfNeeded", { backendNodeId }, sessionId);
+    const box = yield* send("DOM.getBoxModel", { backendNodeId }, sessionId);
     const model = recordValue(box.model);
     const quad = Array.isArray(model?.content) ? model.content.filter(isFiniteNumber) : [];
-    if (quad.length < 8) throw new Error("Element has no visible clickable bounds.");
-    const metrics = await send("Page.getLayoutMetrics", {}, sessionId);
+    if (quad.length < 8) return yield* browserFailure(new Error("Element has no visible clickable bounds."));
+    const metrics = yield* send("Page.getLayoutMetrics", {}, sessionId);
     const viewport = recordValue(metrics.cssLayoutViewport);
     const viewportWidth = numberValue(viewport?.clientWidth);
     const viewportHeight = numberValue(viewport?.clientHeight);
@@ -1531,7 +1860,7 @@ export class BrowserCdpEngine {
     const top = Math.max(0, Math.min(...ys));
     const bottom = Math.min(viewportHeight - 1, Math.max(...ys));
     if (viewportWidth <= 0 || viewportHeight <= 0 || right < left || bottom < top) {
-      throw new Error("Element has no visible clickable bounds.");
+      return yield* browserFailure(new Error("Element has no visible clickable bounds."));
     }
     const insetX = Math.min(4, Math.max(0, (right - left) / 4));
     const insetY = Math.min(4, Math.max(0, (bottom - top) / 4));
@@ -1546,39 +1875,42 @@ export class BrowserCdpEngine {
     ]);
     let blockerId = 0;
     for (const point of points) {
-      const hit = await send(
+      const hit = yield* send(
         "DOM.getNodeForLocation",
         { x: Math.round(point.x), y: Math.round(point.y), includeUserAgentShadowDOM: true },
         sessionId,
       );
       const hitId = numberValue(hit.backendNodeId);
-      if (hitId && (await isNodeOrDescendant(send, hitId, backendNodeId, sessionId))) {
+      if (hitId && (yield* isNodeOrDescendant(send, hitId, backendNodeId, sessionId))) {
         return { ...point, sessionId };
       }
       blockerId ||= hitId;
     }
-    if (!blockerId) throw new Error("Element has no visible clickable point.");
-    const blocker = await send("DOM.describeNode", { backendNodeId: blockerId, depth: 0 }, sessionId);
+    if (!blockerId) return yield* browserFailure(new Error("Element has no visible clickable point."));
+    const blocker = yield* send("DOM.describeNode", { backendNodeId: blockerId, depth: 0 }, sessionId);
     const node = recordValue(blocker.node);
     const name = stringValue(node?.nodeName).toLowerCase() || "element";
-    throw new Error(
-      `Target is covered by ${name} (backendNodeId ${blockerId}). Dismiss the covering layer or choose a visible point.`,
+    return yield* browserFailure(
+      new Error(
+        `Target is covered by ${name} (backendNodeId ${blockerId}). Dismiss the covering layer or choose a visible point.`,
+      ),
     );
-  }
+  });
 
-  async #callOnNode(
+  readonly #callOnNode = Effect.fn("BrowserCdp.callOnNode")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     backendNodeId: number,
     declaration: string,
     args: unknown[],
     sessionId?: string,
-  ): Promise<unknown> {
-    const executionContextId = await automationContextId(send, sessionId);
-    const resolved = await send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+  ): Effect.fn.Return<unknown, BrowserOperationError> {
+    const executionContextId = yield* automationContextId(send, sessionId);
+    const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
     const objectId = stringValue(recordValue(resolved.object)?.objectId);
-    if (!objectId) throw new Error("Element is no longer attached to the document.");
-    try {
-      const result = await send(
+    if (!objectId) return yield* browserFailure(new Error("Element is no longer attached to the document."));
+    return yield* Effect.gen({ self: this }, function* () {
+      const result = yield* send(
         "Runtime.callFunctionOn",
         {
           objectId,
@@ -1591,26 +1923,36 @@ export class BrowserCdpEngine {
         sessionId,
       );
       const exception = recordValue(result.exceptionDetails);
-      if (exception) throw new Error(exceptionDescription(exception));
+      if (exception) return yield* browserFailure(new Error(exceptionDescription(exception)));
       return recordValue(result.result)?.value;
-    } finally {
-      await send("Runtime.releaseObject", { objectId }, sessionId).catch(() => undefined);
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          yield* send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore);
+        }).pipe(Effect.orDie),
+      ),
+    );
+  });
 
-  async #optionBackendNodeId(
+  readonly #optionBackendNodeIdEffect = Effect.fn("BrowserCdp.optionBackendNodeId")(function* (
+    this: BrowserCdpEngine,
     send: SendCommand,
     selectBackendNodeId: number,
     optionIndex: number,
     sessionId?: string,
-  ): Promise<number> {
-    const executionContextId = await automationContextId(send, sessionId);
-    const select = await send("DOM.resolveNode", { backendNodeId: selectBackendNodeId, executionContextId }, sessionId);
+  ): Effect.fn.Return<number, BrowserOperationError> {
+    const executionContextId = yield* automationContextId(send, sessionId);
+    const select = yield* send(
+      "DOM.resolveNode",
+      { backendNodeId: selectBackendNodeId, executionContextId },
+      sessionId,
+    );
     const selectObjectId = stringValue(recordValue(select.object)?.objectId);
-    if (!selectObjectId) throw new Error("Select element is no longer attached to the document.");
+    if (!selectObjectId)
+      return yield* browserFailure(new Error("Select element is no longer attached to the document."));
     let optionObjectId = "";
-    try {
-      const option = await send(
+    return yield* Effect.gen({ self: this }, function* () {
+      const option = yield* send(
         "Runtime.callFunctionOn",
         {
           objectId: selectObjectId,
@@ -1621,18 +1963,26 @@ export class BrowserCdpEngine {
         sessionId,
       );
       optionObjectId = stringValue(recordValue(option.result)?.objectId);
-      if (!optionObjectId) throw new Error("Requested select option is no longer available.");
-      const described = await send("DOM.describeNode", { objectId: optionObjectId, depth: 0 }, sessionId);
+      if (!optionObjectId) return yield* browserFailure(new Error("Requested select option is no longer available."));
+      const described = yield* send("DOM.describeNode", { objectId: optionObjectId, depth: 0 }, sessionId);
       const backendNodeId = numberValue(recordValue(described.node)?.backendNodeId);
-      if (!backendNodeId) throw new Error("Requested select option is no longer attached to the document.");
+      if (!backendNodeId)
+        return yield* browserFailure(new Error("Requested select option is no longer attached to the document."));
       return backendNodeId;
-    } finally {
-      await Promise.allSettled([
-        optionObjectId ? send("Runtime.releaseObject", { objectId: optionObjectId }, sessionId) : Promise.resolve(),
-        send("Runtime.releaseObject", { objectId: selectObjectId }, sessionId),
-      ]);
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          yield* Effect.all(
+            [
+              optionObjectId ? send("Runtime.releaseObject", { objectId: optionObjectId }, sessionId) : Effect.void,
+              send("Runtime.releaseObject", { objectId: selectObjectId }, sessionId),
+            ].map((operation) => Effect.exit(operation)),
+            { concurrency: "unbounded" },
+          );
+        }).pipe(Effect.orDie),
+      ),
+    );
+  });
 
   #snapshotTargets(limit = MAX_SNAPSHOT_FRAMES): SnapshotTarget[] {
     return [
@@ -1643,35 +1993,46 @@ export class BrowserCdpEngine {
     ];
   }
 
-  async #lease<T>(operation: (send: SendCommand) => Promise<T>, attachFrames = true): Promise<T> {
-    if (this.#closing || this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
+  readonly #leaseEffect = Effect.fn("BrowserCdp.lease")(function* <T>(
+    this: BrowserCdpEngine,
+    operation: (send: SendCommand) => Effect.Effect<T, BrowserOperationError>,
+    attachFrames = true,
+  ): Effect.fn.Return<T, BrowserOperationError> {
+    if (this.#disposed || this.#closing || this.#contents.isDestroyed())
+      return yield* browserFailure(new Error("Browser tab was closed."));
     if (!this.#contents.debugger.isAttached()) {
-      this.#contents.debugger.attach("1.3");
+      yield* browserSync(() => this.#contents.debugger.attach("1.3"));
       this.#ownsDebugger = true;
     }
     this.#activeLeases += 1;
-    const send: SendCommand = async (method, params = {}, sessionId) => {
-      const result = await this.#contents.debugger.sendCommand(method, params, sessionId);
-      if (!isDynamicRecord(result)) throw new Error(`CDP ${method} returned an invalid result.`);
-      return result;
-    };
-    try {
-      await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    const send: SendCommand = (method, params = {}, sessionId) =>
+      Effect.gen({ self: this }, function* () {
+        const result = yield* browserCall(() => this.#contents.debugger.sendCommand(method, params, sessionId));
+        if (!isDynamicRecord(result))
+          return yield* browserFailure(new Error(`CDP ${method} returned an invalid result.`));
+        return result;
+      });
+    return yield* Effect.gen({ self: this }, function* () {
+      yield* send("Emulation.setFocusEmulationEnabled", { enabled: true });
       if (attachFrames) {
-        await send("Target.setAutoAttach", {
+        yield* send("Target.setAutoAttach", {
           autoAttach: true,
           waitForDebuggerOnStart: false,
           flatten: true,
           filter: [{ type: "iframe", exclude: false }],
-        }).catch(() => undefined);
+        }).pipe(Effect.ignore);
       }
-      if (this.#environment) await this.#applyEnvironment(send, this.#environment);
-      return await operation(send);
-    } finally {
-      this.#activeLeases -= 1;
-      if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
-    }
-  }
+      if (this.#environment) yield* this.#applyEnvironmentEffect(send, this.#environment);
+      return yield* operation(send);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#activeLeases -= 1;
+          if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
+        }),
+      ),
+    );
+  });
 
   #detachOwnedDebugger(): void {
     if (!this.#ownsDebugger) return;
@@ -1686,11 +2047,15 @@ export class BrowserCdpEngine {
     this.#highlightSessionId = undefined;
   }
 
-  async #applyEnvironment(send: SendCommand, environment: BrowserEnvironment): Promise<void> {
+  readonly #applyEnvironmentEffect = Effect.fn("BrowserCdp.applyEnvironment")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    environment: BrowserEnvironment,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     if (environment.viewport.mode === "fill") {
-      await send("Emulation.clearDeviceMetricsOverride");
+      yield* send("Emulation.clearDeviceMetricsOverride");
     } else {
-      await send("Emulation.setDeviceMetricsOverride", {
+      yield* send("Emulation.setDeviceMetricsOverride", {
         width: environment.viewport.width,
         height: environment.viewport.height,
         deviceScaleFactor: environment.viewport.deviceScaleFactor,
@@ -1705,13 +2070,16 @@ export class BrowserCdpEngine {
       features.push({ name: "prefers-color-scheme", value: environment.colorScheme });
     }
     if (environment.reducedMotion) features.push({ name: "prefers-reduced-motion", value: "reduce" });
-    await send("Emulation.setEmulatedMedia", { features });
-  }
+    yield* send("Emulation.setEmulatedMedia", { features });
+  });
 
-  async #clearEnvironment(send: SendCommand): Promise<void> {
-    await send("Emulation.clearDeviceMetricsOverride");
-    await send("Emulation.setEmulatedMedia", { features: [] });
-  }
+  readonly #clearEnvironmentEffect = Effect.fn("BrowserCdp.clearEnvironment")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* send("Emulation.clearDeviceMetricsOverride");
+    yield* send("Emulation.setEmulatedMedia", { features: [] });
+  });
 }
 
 function assertTypingProgressBeforeDeadline(deadline: number | undefined, sent: number, total: number): void {
@@ -1740,25 +2108,25 @@ function uniquePoints(points: Array<{ x: number; y: number }>): Array<{ x: numbe
   });
 }
 
-async function isNodeOrDescendant(
+const isNodeOrDescendant = Effect.fn("Browser.isNodeOrDescendant")(function* (
   send: SendCommand,
   candidate: number,
   target: number,
   sessionId?: string,
-): Promise<boolean> {
+) {
   if (candidate === target) return true;
-  const executionContextId = await automationContextId(send, sessionId);
+  const executionContextId = yield* automationContextId(send, sessionId);
   const objectIds: string[] = [];
-  try {
+  return yield* Effect.gen(function* () {
     // describeNode does not reliably include parentId. Resolve both nodes in
     // our isolated world so a button's own child is not treated as an overlay.
     for (const backendNodeId of [target, candidate]) {
-      const resolved = await send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+      const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
       const objectId = stringValue(recordValue(resolved.object)?.objectId);
       if (!objectId) return false;
       objectIds.push(objectId);
     }
-    const result = await send(
+    const result = yield* send(
       "Runtime.callFunctionOn",
       {
         objectId: objectIds[0],
@@ -1774,27 +2142,33 @@ async function isNodeOrDescendant(
       sessionId,
     );
     return recordValue(result.result)?.value === true;
-  } finally {
-    await Promise.all(
-      objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, sessionId).catch(() => undefined)),
-    );
-  }
-}
+  }).pipe(
+    Effect.ensuring(
+      Effect.gen(function* () {
+        yield* Effect.all(
+          objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore)),
+          { concurrency: "unbounded" },
+        );
+      }).pipe(Effect.orDie),
+    ),
+  );
+});
 
-async function waitForDomQuietAcrossTargets(
+const waitForDomQuietAcrossTargets = Effect.fn("Browser.waitForDomQuietAcrossTargets")(function* (
   send: SendCommand,
   captures: SnapshotTarget[],
   timeoutMs: number,
-): Promise<void> {
-  if (timeoutMs <= 0) throw new Error("DOM did not become quiet.");
+) {
+  if (timeoutMs <= 0) return yield* browserFailure(new Error("DOM did not become quiet."));
   const deadlineMs = Math.max(1, Math.floor(timeoutMs));
-  const results = await Promise.all(
-    captures.map(async (capture) => {
-      const contextId = await automationContextId(send, capture.sessionId);
-      return send(
-        "Runtime.evaluate",
-        {
-          expression: `new Promise(resolve => {
+  const results = yield* Effect.all(
+    captures.map((capture) =>
+      Effect.gen(function* () {
+        const contextId = yield* automationContextId(send, capture.sessionId);
+        return yield* send(
+          "Runtime.evaluate",
+          {
+            expression: `new Promise(resolve => {
       let quietTimer;
       let deadlineTimer;
       let completed = false;
@@ -1845,18 +2219,20 @@ async function waitForDomQuietAcrossTargets(
       discoverRoots();
       deadlineTimer = setTimeout(() => done(false), ${deadlineMs});
     })`,
-          contextId,
-          awaitPromise: true,
-          returnByValue: true,
-        },
-        capture.sessionId,
-      );
-    }),
+            contextId,
+            awaitPromise: true,
+            returnByValue: true,
+          },
+          capture.sessionId,
+        );
+      }),
+    ),
+    { concurrency: "unbounded" },
   );
   if (results.some((result) => recordValue(result.result)?.value !== true)) {
-    throw new Error("DOM did not become quiet.");
+    return yield* browserFailure(new Error("DOM did not become quiet."));
   }
-}
+});
 
 /** Runs in the automation world. Returns true when the document shows the value anywhere a snapshot reads. */
 const SECRET_SCAN_FUNCTION = `function(secret) {
@@ -1929,19 +2305,21 @@ function documentIdsExpression(documentIds: string[]): string {
     return { ids, complete: wanted.size === 0 || scanned < ${MAX_SNAPSHOT_SCANNED_NODES} };
   })()`;
 }
-
-function waitForPageSignal(contents: WebContents, timeoutMs: number): Promise<void> {
-  return new Promise((resolve) => {
+const waitForPageSignal = Effect.fn("Browser.waitForPageSignal")((contents: WebContents, timeoutMs: number) =>
+  Effect.callback<void>((resume) => {
     let timer: NodeJS.Timeout;
     const cleanup = () => {
       clearTimeout(timer);
       contents.off("did-stop-loading", signal);
       contents.off("did-navigate-in-page", signal);
-      resolve();
     };
-    const signal = () => cleanup();
-    timer = setTimeout(cleanup, timeoutMs);
+    const signal = () => {
+      cleanup();
+      resume(Effect.void);
+    };
+    timer = setTimeout(signal, timeoutMs);
     contents.once("did-stop-loading", signal);
     contents.once("did-navigate-in-page", signal);
-  });
-}
+    return Effect.sync(cleanup);
+  }),
+);

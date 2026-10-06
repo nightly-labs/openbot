@@ -37,6 +37,12 @@ export function SettingsScreen() {
         </SettingsRow>
       </SettingsSection>
       <SettingsSection>
+        <SettingsRow
+          onPress={() => router.push("/settings/support")}
+          supportingText={t("mobile.settings.home.supportHint")}
+        >
+          <Typography.Paragraph type="body-sm">{t("mobile.settings.home.support")}</Typography.Paragraph>
+        </SettingsRow>
         <SettingsRow onPress={() => router.push("/settings/about")}>
           <Typography.Paragraph type="body-sm">{t("mobile.settings.home.about")}</Typography.Paragraph>
         </SettingsRow>

@@ -47,6 +47,8 @@ export const messages = {
   "agentSettings.runtime.selectReasoning": "Choisir le raisonnement",
   "agentSettings.runtime.access": "Accès",
   "agentSettings.runtime.accessLabel": "Accès de l’agent",
+  "agentSettings.runtime.busyMessage": "Pendant le travail",
+  "agentSettings.runtime.busyMessageLabel": "Messages pendant le travail de l’agent",
   "agentSettings.runtime.workingDirectory": "Répertoire de travail",
   "agentSettings.runtime.notAvailable": "Pas encore disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -58,6 +60,12 @@ export const messages = {
 
   "agentSettings.access.workspace": "Espace de travail uniquement",
   "agentSettings.access.full": "Accès complet",
+  "agentSettings.busyMessage.appDefaultQueue": "Par défaut de l’app (File d’attente)",
+  "agentSettings.busyMessage.appDefaultSteer": "Par défaut de l’app (Orienter)",
+  "agentSettings.busyMessage.queue": "File d’attente",
+  "agentSettings.busyMessage.steer": "Orienter",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
 
   "agentSettings.notifications.title": "Notifications",
   "agentSettings.notifications.description":

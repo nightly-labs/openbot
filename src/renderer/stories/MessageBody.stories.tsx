@@ -237,6 +237,25 @@ export const DataTableNarrow: Story = {
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="320px" />,
 };
 
+export const DataTableLongText: Story = {
+  args: {
+    message: {
+      ...message,
+      id: "message-data-table-long-text",
+      body: [
+        "| Step | Owner | Notes | Reference |",
+        "| --- | --- | --- | --- |",
+        "| Migrate | Research | Copy every workspace to the new layout, then confirm that each conversation still opens with its attachments and its full history. | https://openbot.run/docs/guides/workspaces/migrating-an-existing-workspace-to-the-new-layout |",
+        "| Verify | Review | Run the checks on a clean profile and compare the results with the previous release before you approve the change. | `bun run test:desktop -- src/renderer/src/features/conversation/MessageRendering.test.tsx` |",
+        "| Ship | Release | Write the release notes. | `OPENBOT_RELEASE_CHANNEL_OVERRIDE_FOR_INTERNAL_TESTING_ONLY` |",
+      ].join("\n"),
+      status: undefined,
+      attachments: [],
+    },
+  },
+  render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="720px" />,
+};
+
 export const ComparisonTable: Story = {
   args: {
     message: {

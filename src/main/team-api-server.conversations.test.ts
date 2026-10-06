@@ -1,4 +1,5 @@
 import { analyticsRange, emptyAnalyticsTotals } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 // @vitest-environment node
 
 // What a remote client reads back from one agent service: the agent list, the conversation and
@@ -19,6 +20,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { TEAM_PROTOCOL_V5 } from "@openbot/contracts/team-protocol/v5";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   createAgents,
@@ -102,15 +104,16 @@ describe("TeamApiServer conversations", () => {
     const [chief] = localAgents;
     assert(chief);
     const createAgent = vi.fn(
-      async (input: CreateAgentInput): Promise<AgentSummary> => ({
-        ...chief,
-        id: "trip-planner",
-        name: input.name,
-        title: "",
-        description: input.description,
-        avatarSeed: input.avatarSeed,
-        avatarHue: input.avatarHue,
-      }),
+      (input: CreateAgentInput): Effect.Effect<AgentSummary> =>
+        Effect.sync(() => ({
+          ...chief,
+          id: "trip-planner",
+          name: input.name,
+          title: "",
+          description: input.description,
+          avatarSeed: input.avatarSeed,
+          avatarHue: input.avatarHue,
+        })),
     );
     const legacyConversation = {
       ...localConversation,
@@ -127,10 +130,12 @@ describe("TeamApiServer conversations", () => {
     const { agentId: localAgentId, ...localConversationRest } = localConversation;
     const wireConversation = { ...localConversationRest, botId: localAgentId };
     const wireLegacyConversation = { ...wireConversation, messages: legacyConversation.messages };
-    const sendMessage = vi.fn<TeamApiAgents["sendMessage"]>(async () => ({
-      messageId: "message-tagged",
-      deliveries: [],
-    }));
+    const sendMessage = vi.fn<TeamApiAgents["sendMessage"]>(() =>
+      Effect.sync(() => ({
+        messageId: "message-tagged",
+        deliveries: [],
+      })),
+    );
     const usage: AccountUsage = {
       limits: [
         {
@@ -140,7 +145,7 @@ describe("TeamApiServer conversations", () => {
         },
       ],
     };
-    const getUsage = vi.fn(async () => usage);
+    const getUsage = vi.fn(() => Effect.sync(() => usage));
     const analytics = {
       ...analyticsRange("chief"),
       collectionStartedAt: "2026-09-01T00:00:00Z",
@@ -153,26 +158,29 @@ describe("TeamApiServer conversations", () => {
     const { agentId: _agentId, ...report } = analytics;
     const hostAnalytics = { ...report, agents: [], providerDaily: [] };
     const getHostAnalytics = vi.fn(() => hostAnalytics);
-    const readConversationPageFor = vi.fn(async (...args: unknown[]) => {
-      const options = isDynamicRecord(args[4]) ? args[4] : {};
-      const messages = localConversation.messages.filter((message) => {
-        if (options.excludeRoutineEvents && message.itemType?.startsWith("routine-event:")) return false;
-        if (options.excludeRoutineRunEvents && message.itemType?.startsWith("routine-run-event:")) return false;
-        if (options.excludeHostedSiteEvents && message.itemType?.startsWith("hosted-site-event:")) return false;
-        return true;
-      });
-      return {
-        ...localConversation,
-        messages,
-        references: {},
-        pageInfo: { hasOlder: false, olderCursor: null },
-        readState: {
-          unreadCount: 0,
-          firstUnreadMessageId: null,
-          throughMessageId: options.excludeHostedSiteEvents ? "message-1" : "hosted-site-event-1",
-        },
-      };
-    });
+    const readConversationPageFor = vi.fn((...args: unknown[]) =>
+      Effect.sync(() => {
+        const options = isDynamicRecord(args[4]) ? args[4] : {};
+        const messages = localConversation.messages.filter((message) => {
+          if (options.excludeRoutineEvents && message.itemType?.startsWith("routine-event:")) return false;
+          if (options.excludeRoutineRunEvents && message.itemType?.startsWith("routine-run-event:")) return false;
+          if (options.excludeHostedSiteEvents && message.itemType?.startsWith("hosted-site-event:")) return false;
+          return true;
+        });
+        return {
+          ...localConversation,
+          messages,
+          references: {},
+          // The day rail's unloaded length is local IPC only; every released adapter drops it.
+          pageInfo: { hasOlder: false, olderCursor: null, olderCount: 40, oldestAt: "2026-09-01T00:00:00.000Z" },
+          readState: {
+            unreadCount: 0,
+            firstUnreadMessageId: null,
+            throughMessageId: options.excludeHostedSiteEvents ? "message-1" : "hosted-site-event-1",
+          },
+        };
+      }),
+    );
     const listConversationReads = vi.fn((_memberId: string, options: { excludeHostedSiteEvents?: boolean } = {}) => ({
       chief: {
         unreadCount: 0,
@@ -180,11 +188,13 @@ describe("TeamApiServer conversations", () => {
         throughMessageId: options.excludeHostedSiteEvents ? "message-1" : "hosted-site-event-1",
       },
     }));
-    const markConversationUnread = vi.fn(async (_agentId: string, _memberId: string) => ({
-      unreadCount: 1,
-      firstUnreadMessageId: "message-1",
-      throughMessageId: null,
-    }));
+    const markConversationUnread = vi.fn((_agentId: string, _memberId: string) =>
+      Effect.sync(() => ({
+        unreadCount: 1,
+        firstUnreadMessageId: "message-1",
+        throughMessageId: null,
+      })),
+    );
     const agents = createAgents({
       listAgents: () => localAgents,
       getUsage,
@@ -193,22 +203,24 @@ describe("TeamApiServer conversations", () => {
       createAgent,
       listConversationReads,
       markConversationUnread,
-      readConversationFor: async (agentId: string, _memberId: string) => ({
-        ...localConversation,
-        agentId,
-        readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "hosted-site-event-1" },
-      }),
+      readConversationFor: (agentId: string, _memberId: string) =>
+        Effect.sync(() => ({
+          ...localConversation,
+          agentId,
+          readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "hosted-site-event-1" },
+        })),
       readConversationPageFor,
-      markConversationRead: async (
+      markConversationRead: (
         _agentId: string,
         _memberId: string,
         throughMessageId: string | null,
         options: { excludeHostedSiteEvents?: boolean } = {},
-      ) => ({
-        unreadCount: 0,
-        firstUnreadMessageId: null,
-        throughMessageId: options.excludeHostedSiteEvents ? throughMessageId : "hosted-site-event-1",
-      }),
+      ) =>
+        Effect.sync(() => ({
+          unreadCount: 0,
+          firstUnreadMessageId: null,
+          throughMessageId: options.excludeHostedSiteEvents ? throughMessageId : "hosted-site-event-1",
+        })),
       sendMessage,
     });
     const { base } = await start({ agents });
@@ -346,6 +358,15 @@ describe("TeamApiServer conversations", () => {
       excludeRoutineRunEvents: false,
       excludeHostedSiteEvents: false,
     });
+    for (const capabilities of [TEAM_CURRENT_CAPABILITIES, TEAM_PROTOCOL_V1_CAPABILITIES]) {
+      const page = await jsonRequest(base, "/v1/agents/chief/conversation-page?limit=10", {
+        token: token,
+        capabilities: [...capabilities],
+      });
+      expect(page).toMatchObject({ pageInfo: { hasOlder: false, olderCursor: null } });
+      expect(page).not.toHaveProperty("pageInfo.olderCount");
+      expect(page).not.toHaveProperty("pageInfo.oldestAt");
+    }
     await expect(jsonRequest(base, "/v1/agents/conversation-reads", { token: token })).resolves.toEqual({
       chief: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "message-1" },
     });
@@ -386,12 +407,26 @@ describe("TeamApiServer conversations", () => {
         text: taggedMessage,
         attachmentDraftIds: [],
         replyToMessageId: null,
+        timezone: "Europe/Warsaw",
       },
     });
     // The host names the member it authenticated; the request body cannot name a sender.
+    // Protocol 3 drops the sender's timezone, so the host keeps its own zone.
     expect(sendMessage).toHaveBeenCalledWith(
       { agentId: "chief", text: taggedMessage, attachmentDraftIds: [], replyToMessageId: null },
       { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+      undefined,
+    );
+    await jsonRequest(base, "/v1/agents/chief/messages", {
+      token: token,
+      protocol: TEAM_PROTOCOL_V5,
+      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+      body: { text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null, timezone: "Europe/Warsaw" },
+    });
+    expect(sendMessage).toHaveBeenLastCalledWith(
+      { agentId: "chief", text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null },
+      { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+      "Europe/Warsaw",
     );
     await expect(
       jsonRequest(base, "/v1/agents/chief/conversation/read", {

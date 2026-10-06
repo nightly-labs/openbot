@@ -190,6 +190,9 @@ export const messages = {
   "customProvider.agents.description": "OpenBot'un bu bilgisayarda başlattığı ACP ajanları.",
   "customProvider.agents.empty": "Henüz özel ajan yok.",
   "customProvider.agents.add": "Ajan ekle",
+  "customProvider.agents.restart": "Ajanları yeniden başlat",
+  "customProvider.agents.cancelRestart": "Yeniden başlatmayı iptal et",
+  "customProvider.agents.restartPending": "Özel ajanlar mevcut görevler durduktan sonra yeniden başlatılacak.",
   "customProvider.agents.commandMissing": "{command} · Komut bulunamadı",
   "customProvider.agents.envCount": {
     one: "1 değişken",

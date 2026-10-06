@@ -18,3 +18,9 @@ export const HARNESS_WAIT_TIMEOUT_MS = 10_000;
 
 /** Vitest's per-test budget. Strictly greater, so a wait deadline always reports first. */
 export const TEST_TIMEOUT_MS = HARNESS_WAIT_TIMEOUT_MS * 2;
+
+/**
+ * The retry waits of a move that a test refuses on purpose, one for each retry, as in production.
+ * Nothing in the test is busy, so a wait only has to give the event loop a turn.
+ */
+export const HELD_FILE_RETRY_WAITS_MS: readonly number[] = [1, 1, 1, 1];

@@ -9,10 +9,12 @@
 // an empty roster and a roster of people who went offline look nothing alike to a user.
 
 import type { TeamPresenceSnapshot } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 
 export interface RemotePresenceCacheOptions {
   // How to ask a server for its current roster. Injected so this file never names a route.
-  fetchSnapshot: (serverId: string) => Promise<TeamPresenceSnapshot>;
+  fetchSnapshot: (serverId: string) => Effect.Effect<TeamPresenceSnapshot, RemoteWorkflowError>;
   // Called only for snapshots the server volunteered.
   onSnapshot: (serverId: string, snapshot: TeamPresenceSnapshot) => void;
 }
@@ -35,17 +37,19 @@ export class RemotePresenceCache {
 
   // A stale roster beats an error for a view that already had one, so a failed refresh falls back to
   // the cache and only throws when there is nothing to fall back to.
-  async refresh(serverId: string): Promise<TeamPresenceSnapshot> {
-    try {
-      const snapshot = await this.#fetchSnapshot(serverId);
-      this.#snapshots.set(serverId, snapshot);
-      return structuredClone(snapshot);
-    } catch (error) {
-      const cached = this.#snapshots.get(serverId);
-      if (cached) return structuredClone(cached);
-      throw error;
-    }
-  }
+
+  readonly refresh = Effect.fn("RemotePresence.refresh")(function* (this: RemotePresenceCache, serverId: string) {
+    return yield* this.#fetchSnapshot(serverId).pipe(
+      Effect.map((snapshot) => {
+        this.#snapshots.set(serverId, snapshot);
+        return structuredClone(snapshot);
+      }),
+      Effect.catch((failure) => {
+        const cached = this.#snapshots.get(serverId);
+        return cached ? Effect.succeed(structuredClone(cached)) : Effect.fail(failure);
+      }),
+    );
+  }).bind(this);
 
   accept(serverId: string, snapshot: TeamPresenceSnapshot): void {
     this.#snapshots.set(serverId, snapshot);

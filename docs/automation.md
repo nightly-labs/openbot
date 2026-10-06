@@ -66,6 +66,10 @@ interrupts sends it again.
 
 Answer: `202 { "runId": string, "deliveryId": string | null }`.
 
+`202` means that the run is in the queue, not that it ran. When the agent's provider account is at
+its usage limit, the run waits in the queue, with its payload, and starts after the reset. A routine
+set to skip at the limit drops the run instead, and its run history shows it as cancelled.
+
 | Status | Reason |
 | --- | --- |
 | 400 | The body is not JSON, or `payload` is not a string. |

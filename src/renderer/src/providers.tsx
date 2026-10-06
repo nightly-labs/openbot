@@ -20,7 +20,7 @@ import { createSimpleContext } from "./simple-context";
  * Coding providers (Codex, Claude, Grok) as two paths the renderer reconciles: managed
  * `providerRuntimes` snapshots from main, and the older installed-CLI sign-in state via
  * `AgentStatus`. Consumers pick handlers through `providerRuntimeDownloadsAvailable()`.
- * Nested under `agents` so the edge stays one-way; see docs/ARCHITECTURE.md.
+ * Nested under `agents` so the edge stays one-way; see docs/architecture/change-rules.md.
  */
 const Providers = createSimpleContext({
   name: "Providers",

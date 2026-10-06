@@ -96,6 +96,9 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.notConnected": "Not connected",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
+  "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
+  // The category row in the 1Password page's information.
+  "marketplace.app.onePasswordCategory": "Login and Credential Management",
   "marketplace.app.yourApps": "Your apps",
   "marketplace.app.moreApps": "More apps",
   "marketplace.app.server": "Server",

@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { readScriptArguments } from "../script-arguments";
 import {
   assertMutationAllowed,
   connectToDevApp,
@@ -56,31 +57,63 @@ const DEFAULT_CPU_INTERVAL_MS = 5_000;
 // lost by asking rarely.
 const MIN_CPU_INTERVAL_MS = 1_000;
 
+const USAGE = [
+  "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu|memory> [flags]",
+  "",
+  "Target:     --instance=<id> | --port=<port>, --service=<app|test-client>, --page=<target-id|url-substring>",
+  "click/type: --role=<role> --name=<name> [--text=<text>] [--submit] [--exact] --allow-mutations",
+  "Waiting:    --wait-for=<role>,<name>, --timeout=<ms>",
+  "screenshot: --out=<path>",
+  "cpu:        --duration=<ms> --interval=<ms> --label=<name> --compare=<report.json> --out=<path>",
+  "memory:     --label=<name> --heap-snapshot=<target-id|url-substring> --out=<path>",
+].join("\n");
+
+const OPTIONS = {
+  "allow-mutations": { type: "boolean" },
+  compare: { type: "string" },
+  duration: { type: "string" },
+  exact: { type: "boolean" },
+  "heap-snapshot": { type: "string" },
+  instance: { type: "string" },
+  interval: { type: "string" },
+  label: { type: "string" },
+  name: { type: "string" },
+  out: { type: "string" },
+  page: { type: "string" },
+  port: { type: "string" },
+  role: { type: "string" },
+  service: { type: "string" },
+  submit: { type: "boolean" },
+  text: { type: "string" },
+  timeout: { type: "string" },
+  "wait-for": { type: "string" },
+} as const;
+
+type Flags = NonNullable<ReturnType<typeof readScriptArguments<typeof OPTIONS>>>["values"];
+type StringFlag = {
+  [Name in keyof typeof OPTIONS]: (typeof OPTIONS)[Name]["type"] extends "string" ? Name : never;
+}[keyof typeof OPTIONS];
+
 // `null` means the flag is absent, `""` means it was passed empty. The two
 // differ for `--text=`, which legitimately clears a field.
-function flagValue(name: string): string | null {
-  const passed = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  return passed === undefined ? null : passed.slice(name.length + 1);
+function flagValue(flags: Flags, name: StringFlag): string | null {
+  return flags[name] ?? null;
 }
 
-function hasFlag(name: string): boolean {
-  return process.argv.includes(name);
-}
-
-function requireFlagValue(name: string): string {
-  const value = flagValue(name);
-  if (value === null || value === "") throw new Error(`Missing required ${name}=<value>.`);
+function requireFlagValue(flags: Flags, name: StringFlag): string {
+  const value = flagValue(flags, name);
+  if (value === null || value === "") throw new Error(`Missing required --${name}=<value>.`);
   return value;
 }
 
-function requireTextFlag(): string {
-  const value = flagValue("--text");
+function requireTextFlag(flags: Flags): string {
+  const value = flagValue(flags, "text");
   if (value === null) throw new Error("Missing required --text=<value>.");
   return value;
 }
 
-function readTimeout(): number {
-  const raw = flagValue("--timeout");
+function readTimeout(flags: Flags): number {
+  const raw = flagValue(flags, "timeout");
   if (raw === null) return DEFAULT_TIMEOUT_MS;
   const timeout = Number(raw);
   if (!Number.isInteger(timeout) || timeout <= 0 || timeout > 120_000) {
@@ -92,8 +125,8 @@ function readTimeout(): number {
 // Dev is meant to be fully testable, so any window can be driven - but the
 // aim has to be deliberate. An empty selector would match every target and
 // land wherever the list happens to start.
-function readPageSelector(): string | null {
-  const raw = flagValue("--page");
+function readPageSelector(flags: Flags): string | null {
+  const raw = flagValue(flags, "page");
   if (raw === null) return null;
   if (raw.trim() === "") throw new Error("--page=<target-id|url-substring> cannot be empty.");
   return raw;
@@ -102,25 +135,25 @@ function readPageSelector(): string | null {
 // Honoured by every command: before the capture for `snapshot` and
 // `screenshot`, after the action for `click` and `type`, which is where the
 // race actually is.
-function readWaitTarget(): WaitTarget | null {
-  const raw = flagValue("--wait-for");
+function readWaitTarget(flags: Flags): WaitTarget | null {
+  const raw = flagValue(flags, "wait-for");
   if (raw === null) return null;
   if (raw.trim() === "") throw new Error("--wait-for=<role>,<name> cannot be empty.");
   return parseWaitTarget(raw);
 }
 
-function readMilliseconds(name: string, fallback: number, minimum: number, maximum: number): number {
-  const raw = flagValue(name);
+function readMilliseconds(flags: Flags, name: StringFlag, fallback: number, minimum: number, maximum: number): number {
+  const raw = flagValue(flags, name);
   if (raw === null) return fallback;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
-    throw new Error(`${name} must be an integer of ${minimum}..${maximum} ms.`);
+    throw new Error(`--${name} must be an integer of ${minimum}..${maximum} ms.`);
   }
   return value;
 }
 
-function readService(): DevInstanceService {
-  const raw = flagValue("--service");
+function readService(flags: Flags): DevInstanceService {
+  const raw = flagValue(flags, "service");
   if (raw === null || raw === "app") return "app";
   if (raw === "test-client") return "test-client";
   throw new Error("--service must be app or test-client.");
@@ -140,13 +173,13 @@ interface AutomationTarget {
 // and wins. Otherwise the registry decides, and the record of the worktree
 // this command runs in is the one an agent almost always means - the default
 // port is a last resort, kept read-only by `instanceNamed: false`.
-function resolveTarget(records: DevInstanceRecord[], service: DevInstanceService): AutomationTarget {
+function resolveTarget(flags: Flags, records: DevInstanceRecord[], service: DevInstanceService): AutomationTarget {
   const explicitPort = resolveAutomationPort(
-    flagValue("--port") ?? undefined,
+    flagValue(flags, "port") ?? undefined,
     process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT,
   );
-  const requestedInstance = flagValue("--instance");
-  if (requestedInstance !== null && flagValue("--port") !== null) {
+  const requestedInstance = flagValue(flags, "instance");
+  if (requestedInstance !== null && flagValue(flags, "port") !== null) {
     throw new Error("Pass either --instance=<id> or --port=<port>, not both: they can name different instances.");
   }
   if (explicitPort.explicit && requestedInstance === null) {
@@ -221,17 +254,23 @@ function readComparisonReport(path: string) {
   return report;
 }
 
-async function measureCpu(target: AutomationTarget): Promise<void> {
-  const durationMs = readMilliseconds("--duration", DEFAULT_CPU_DURATION_MS, MIN_CPU_INTERVAL_MS, MAX_CPU_DURATION_MS);
-  const intervalMs = readMilliseconds("--interval", DEFAULT_CPU_INTERVAL_MS, MIN_CPU_INTERVAL_MS, durationMs);
-  const label = flagValue("--label") ?? "run";
-  const comparePath = flagValue("--compare");
+async function measureCpu(flags: Flags, target: AutomationTarget): Promise<void> {
+  const durationMs = readMilliseconds(
+    flags,
+    "duration",
+    DEFAULT_CPU_DURATION_MS,
+    MIN_CPU_INTERVAL_MS,
+    MAX_CPU_DURATION_MS,
+  );
+  const intervalMs = readMilliseconds(flags, "interval", DEFAULT_CPU_INTERVAL_MS, MIN_CPU_INTERVAL_MS, durationMs);
+  const label = flagValue(flags, "label") ?? "run";
+  const comparePath = flagValue(flags, "compare");
   const baseline = comparePath === null || comparePath === "" ? null : readComparisonReport(comparePath);
   // Resolved before the run, not after it: a rejected `--out` should cost the
   // developer nothing, and finding out at the end throws a minute of sampling
   // away. `--compare` stays relative to the working directory, because it only
   // reads and the usual call passes the path an earlier run printed.
-  const out = flagValue("--out");
+  const out = flagValue(flags, "out");
   const outPath = out === null || out === "" ? null : resolveWritablePath(CPU_ROOT, out, ".json", "CPU reports");
   const browser = await openDevBrowser(target.port, logger, { ownerPid: target.pid });
   let profile: Awaited<ReturnType<typeof profileCpu>>;
@@ -250,11 +289,11 @@ async function measureCpu(target: AutomationTarget): Promise<void> {
   process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
 }
 
-async function measureMemory(target: AutomationTarget): Promise<void> {
-  const label = flagValue("--label") ?? "run";
-  const out = flagValue("--out");
+async function measureMemory(flags: Flags, target: AutomationTarget): Promise<void> {
+  const label = flagValue(flags, "label") ?? "run";
+  const out = flagValue(flags, "out");
   const outPath = out === null || out === "" ? null : resolveWritablePath(MEMORY_ROOT, out, ".json", "Memory reports");
-  const heapSelector = flagValue("--heap-snapshot");
+  const heapSelector = flagValue(flags, "heap-snapshot");
   if (heapSelector !== null && heapSelector.trim() === "") {
     throw new Error("--heap-snapshot=<target-id|url-substring> cannot be empty.");
   }
@@ -287,7 +326,10 @@ async function measureMemory(target: AutomationTarget): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const command = process.argv[2];
+  const parsed = readScriptArguments({ usage: USAGE, options: OPTIONS, maxPositionals: 1 });
+  if (parsed === null) return;
+  const flags = parsed.values;
+  const [command] = parsed.positionals;
   if (command === "instances") {
     // Every diagnostic on stderr goes through the logger, which redacts. This
     // is the one place a registry field reaches stdout raw, and `projectRoot`
@@ -311,11 +353,9 @@ async function main(): Promise<void> {
     command !== "cpu" &&
     command !== "memory"
   ) {
-    throw new Error(
-      "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu|memory> [flags]",
-    );
+    throw new Error(USAGE);
   }
-  const target = resolveTarget(readDevInstanceRecords(), readService());
+  const target = resolveTarget(flags, readDevInstanceRecords(), readService(flags));
   logger.info(`target ${target.description}`);
   if (command === "pages") {
     const browser = await openDevBrowser(target.port, logger, { ownerPid: target.pid });
@@ -331,33 +371,33 @@ async function main(): Promise<void> {
   // the app. So it stays out of the mutation gate below and works against an
   // instance nobody named.
   if (command === "cpu") {
-    await measureCpu(target);
+    await measureCpu(flags, target);
     return;
   }
   if (command === "memory") {
-    await measureMemory(target);
+    await measureMemory(flags, target);
     return;
   }
   if (command === "click" || command === "type") {
     assertMutationAllowed({
       command,
-      allowMutations: hasFlag("--allow-mutations"),
+      allowMutations: flags["allow-mutations"] ?? false,
       instanceNamed: target.instanceNamed,
       target: target.description,
     });
   }
-  const role = command === "click" || command === "type" ? parseAutomationRole(requireFlagValue("--role")) : null;
-  const name = command === "click" || command === "type" ? requireFlagValue("--name") : null;
-  const text = command === "type" ? requireTextFlag() : null;
+  const role = command === "click" || command === "type" ? parseAutomationRole(requireFlagValue(flags, "role")) : null;
+  const name = command === "click" || command === "type" ? requireFlagValue(flags, "name") : null;
+  const text = command === "type" ? requireTextFlag(flags) : null;
   // Substring matching is the default because control names carry context --
   // "Sign in to OpenCode" reads better than an exact label. `--exact` is for
   // the names that nest: a "Settings" gear beside "View agent settings".
-  const exact = hasFlag("--exact");
-  const timeoutMs = readTimeout();
-  const waitTarget = readWaitTarget();
+  const exact = flags.exact ?? false;
+  const timeoutMs = readTimeout(flags);
+  const waitTarget = readWaitTarget(flags);
   const session = await connectToDevApp(target.port, logger, {
     expectedRendererPort: target.expectedRendererPort,
-    pageSelector: readPageSelector(),
+    pageSelector: readPageSelector(flags),
     ownerPid: target.pid,
   });
   try {
@@ -375,14 +415,14 @@ async function main(): Promise<void> {
       const snapshot = await snapshotPage(session.page, logger);
       process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
     } else if (command === "type" && role && name && text !== null) {
-      logger.info(`type role=${role} name=${name} chars=${text.length} submit=${hasFlag("--submit")}`);
-      await typeByRole(session.page, role, name, text, timeoutMs, hasFlag("--submit"), exact);
+      logger.info(`type role=${role} name=${name} chars=${text.length} submit=${flags.submit ?? false}`);
+      await typeByRole(session.page, role, name, text, timeoutMs, flags.submit ?? false, exact);
       await settle();
       const snapshot = await snapshotPage(session.page, logger);
       process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
     } else if (command === "screenshot") {
       await settle();
-      const out = resolveScreenshotPath(SCREENSHOT_ROOT, flagValue("--out"), Date.now());
+      const out = resolveScreenshotPath(SCREENSHOT_ROOT, flagValue(flags, "out"), Date.now());
       await screenshotTo(session.page, out, logger);
       process.stdout.write(`${JSON.stringify({ screenshot: reportableScreenshotPath(out, process.cwd()) })}\n`);
     }

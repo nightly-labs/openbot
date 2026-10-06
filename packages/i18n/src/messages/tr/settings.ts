@@ -32,6 +32,9 @@ export const messages = {
   "settings.externalLinks.description": "Konuşmalardaki bağlantıların nerede açılacağını seçin.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
+  "settings.busyMessage.description":
+    "Ajan çalışırken gönderdiğiniz mesaj, kuyrukta beklemek yerine bir sonraki adımda mevcut işe eklenir. ChatGPT ve Claude yönlendirebilir; diğer sağlayıcılar mesajı kuyruğa alır.",
   "settings.autonomy.title": "Ajan özerkliği",
   "settings.turbo.title": "Turbo modu",
   "settings.turbo.description":
@@ -230,6 +233,14 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot indirilmiş bir güncellemeye yeniden başlar. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
+  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
+  "settings.updates.idleRestart.title": "OpenBot'u Yeniden Başlat",
+  "settings.updates.idleRestart.relaunchDescription":
+    "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
+  "settings.updates.idleRestart.updateDescription":
+    "OpenBot hiçbir ajan çalışmadığında {target} sürümünü yükler. Yeni rutin çalıştırmaları o zamana kadar bekler.",
+  "settings.updates.idleRestart.relaunch": "Boştayken yeniden başlat",
+  "settings.updates.idleRestart.update": "Boştayken yükle",
   "settings.updates.allowRemote.title": "Sunucu yöneticilerinden gelen güncellemelere izin ver",
   "settings.updates.allowRemote.description":
     "Bu sunucunun sahipleri ve yöneticileri bir güncelleme indirebilir ve bu bilgisayarda OpenBot'u yeniden başlatabilir.",

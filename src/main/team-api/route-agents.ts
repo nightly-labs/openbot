@@ -25,7 +25,11 @@ import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limi
 import type { CreateAgentInput, DuplicateAgentResult } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
+import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
+import type { AgentDuplicationFailed } from "../../backend/agent/duplication-gate";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -56,7 +60,7 @@ export interface AgentRouteDependencies {
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
-  duplicateAgent: (agentId: string, operationId: string) => Promise<DuplicateAgentResult>;
+  duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
 }
 
 export async function routeAgents(
@@ -117,10 +121,15 @@ export async function routeAgents(
     if (url.pathname === TEAM_API_ROUTES.agents.generateProfile) {
       return json(
         200,
-        await agents.generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections),
+        await runCauseEffect(
+          agents.generateProfile(parseGenerateAgentProfile(body), sidebarLayout.getSnapshot().sections),
+        ),
       );
     }
-    return json(200, await agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout, memberSender(member)));
+    return json(
+      200,
+      await runCauseEffect(agents.saveProfile(parseSaveAgentProfile(body), sidebarLayout, memberSender(member))),
+    );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.messages.search) {
     const query = url.searchParams.get("q") ?? "";
@@ -149,18 +158,19 @@ export async function routeAgents(
     const action = parseSidebarLayoutAction(await readJson(request));
     if ("agentId" in action) requireVisible(action.agentId);
     if ("beforeAgentId" in action) requireVisible(action.beforeAgentId);
-    const layout = await sidebarLayout.mutate(action, agents.sidebarChatIds());
+    const layout = await runCauseEffect(sidebarLayout.mutate(action, agents.sidebarChatIds()));
     return json(200, layout);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {
-    return json(200, await agents.getUsage());
+    return json(200, await runCauseEffect(agents.getUsage()));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
-    // Only ids the shipped peers accept: their model list decoders fail closed on the whole array, and
-    // `isAgentModel` now also accepts `=` and `,`, which no released protocol knows.
+    // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
+    // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
+    const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
     return json(
       200,
-      (await agents.listModels()).filter((model) => V5_AGENT_MODEL.test(model.id)),
+      (await agents.listModels()).filter((model) => modelId.test(model.id)),
     );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all) {
@@ -173,7 +183,7 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await agents.createAgent(input, undefined, undefined, memberSender(member)));
+    return json(201, await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member))));
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
@@ -194,24 +204,24 @@ export async function routeAgents(
       return json(200, agents.getAnalytics(input));
     }
     if (method === "GET" && action === "usage") {
-      return json(200, await agents.getUsage(agentId));
+      return json(200, await runCauseEffect(agents.getUsage(agentId)));
     }
     if (method === "GET" && action === "skills") {
-      return json(200, (await skills?.listInstalledForChatTags(agentId)) ?? []);
+      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId)) : []);
     }
     if (method === "PATCH" && !action) {
       const input = agentUpdate(await readJson(request), agentId);
       if (input.provider !== undefined) requireVisibleProvider({ provider: input.provider });
-      return json(200, await agents.updateAgent(input));
+      return json(200, await runCauseEffect(agents.updateAgent(input)));
     }
     if (method === "POST" && action === "duplicate") {
       const body = await readJson(request);
-      return json(201, await duplicateAgent(agentId, stringField(body, "operationId")));
+      return json(201, await runCauseEffect(duplicateAgent(agentId, stringField(body, "operationId"))));
     }
     if (method === "DELETE" && !action) {
       if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
-      await agents.deleteAgent(agentId);
-      await sidebarLayout.removeAgent(agentId);
+      await runCauseEffect(agents.deleteAgent(agentId));
+      await runCauseEffect(sidebarLayout.removeAgent(agentId));
       return empty(204);
     }
     if (action === "avatar") {
@@ -221,10 +231,10 @@ export async function routeAgents(
           throw new HttpError(415, sourceText("error.team.avatarType"));
         }
         const bytes = await readBinary(request, AVATAR_IMAGE_LIMITS.storedBytes);
-        return json(200, await agents.setAvatar(agentId, { mimeType, bytes }));
+        return json(200, await runCauseEffect(agents.setAvatar(agentId, { mimeType, bytes })));
       }
       if (method === "DELETE") {
-        return json(200, await agents.setAvatar(agentId, null));
+        return json(200, await runCauseEffect(agents.setAvatar(agentId, null)));
       }
       if (method === "GET") {
         const avatar = agents.resolveAvatar(agentId);
@@ -252,32 +262,38 @@ export async function routeAgents(
 
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.prompt) {
     const body = await readJson(request);
-    await agents.respondToPrompt({
-      requestId: promptRequestId(body.requestId),
-      answers: promptAnswers(body.answers),
-    });
+    await runCauseEffect(
+      agents.respondToPrompt({
+        requestId: promptRequestId(body.requestId),
+        answers: promptAnswers(body.answers),
+      }),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.approval) {
     const body = await readJson(request);
-    await agents.respondToApproval({
-      requestId: promptRequestId(body.requestId),
-      decision: approvalDecision(body.decision),
-    });
+    await runCauseEffect(
+      agents.respondToApproval({
+        requestId: promptRequestId(body.requestId),
+        decision: approvalDecision(body.decision),
+      }),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === BROWSER_SECRET_RESPONSE_PATH) {
     if (!capabilities.has("browser-secret-handoff"))
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
-    await agents.respondToBrowserSecret(parseBrowserSecretResponse(await readJson(request)));
+    await runCauseEffect(agents.respondToBrowserSecret(parseBrowserSecretResponse(await readJson(request))));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.browserTakeover) {
     const body = await readJson(request);
-    await agents.respondToBrowserTakeover({
-      requestId: promptRequestId(body.requestId),
-      decision: browserTakeoverDecision(body.decision),
-    });
+    await runCauseEffect(
+      agents.respondToBrowserTakeover({
+        requestId: promptRequestId(body.requestId),
+        decision: browserTakeoverDecision(body.decision),
+      }),
+    );
     return empty(204);
   }
 

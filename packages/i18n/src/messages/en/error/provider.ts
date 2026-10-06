@@ -150,6 +150,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAuthenticatedAccount": "{provider} did not return an authenticated account.",
   "error.provider.cliActivateFailed": "OpenBot could not activate the managed CLI.",
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
+  "error.provider.opencodeCredentialsRejected":
+    "The model provider rejected the API key. Fix the OpenCode key in Settings, or the provider's key with `opencode auth login`. Then try again or choose another model.\n{detail}",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -192,6 +194,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.clineNotStarted": "Cline could not start. Run `cline --version` in a terminal.",
   "error.provider.clineVersionUnreadable": "Unable to read the Cline CLI version.",
   "error.provider.clineSignIn": "Sign in with Cline or set CLINE_API_KEY to use Cline.",
+  "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",

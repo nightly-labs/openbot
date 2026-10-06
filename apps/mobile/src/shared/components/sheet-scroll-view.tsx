@@ -1,10 +1,10 @@
 import { HeaderHeightContext, HeaderShownContext } from "expo-router/react-navigation";
-import { type PropsWithChildren, type ReactNode, useContext } from "react";
-import { type ScrollViewProps, View } from "react-native";
+import { type PropsWithChildren, type ReactNode, useContext, useState } from "react";
+import { type LayoutChangeEvent, type ScrollViewProps, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { withUniwind } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
-import { isIOS } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 const StyledKeyboardAwareScrollView = withUniwind(KeyboardAwareScrollView);
 
@@ -18,6 +18,8 @@ interface SheetScrollViewProps extends PropsWithChildren {
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   showsVerticalScrollIndicator?: boolean;
+  /** False stops the scroll that keeps a focused field and the content above the keyboard. */
+  keyboardAware?: boolean;
 }
 
 export function SheetScrollView({
@@ -31,22 +33,37 @@ export function SheetScrollView({
   keyboardDismissMode,
   keyboardShouldPersistTaps,
   showsVerticalScrollIndicator = false,
+  keyboardAware = true,
 }: SheetScrollViewProps) {
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const headerShown = useContext(HeaderShownContext);
   const nativeHeader = isIOS && headerShown && !header;
   const showCustomEdge = scrollEdgeEffect && !nativeHeader;
+  // Android: the sheet finds its scroll view only when it lays out, so nested scrolling is on from
+  // the first render. A drag that starts on the list then goes to the list, and at the top of the list
+  // a downward drag moves the sheet. A list that cannot scroll never takes the drag, so the content is
+  // always 1 point taller than the list.
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const androidScrollProps = isAndroid
+    ? {
+        nestedScrollEnabled: true,
+        onLayout: (event: LayoutChangeEvent) => setViewportHeight(event.nativeEvent.layout.height),
+        contentContainerStyle: viewportHeight > 0 ? { minHeight: viewportHeight + 1 } : undefined,
+      }
+    : null;
 
   return (
     <View style={{ flex: 1 }}>
       <StyledKeyboardAwareScrollView
         className={className}
+        enabled={keyboardAware}
         bottomOffset={16}
         disableScrollOnKeyboardHide
         mode="insets"
         automaticallyAdjustKeyboardInsets={false}
         style={{ flex: 1 }}
         alwaysBounceVertical={false}
+        {...androidScrollProps}
         overScrollMode="auto"
         contentInsetAdjustmentBehavior={
           nativeHeader ? (headerOverlaysContent ? "automatic" : "never") : contentInsetAdjustmentBehavior

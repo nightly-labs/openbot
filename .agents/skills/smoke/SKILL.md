@@ -56,9 +56,9 @@ Choose the smallest stack that covers the plan:
 
 | Plan needs | Command |
 | --- | --- |
-| Desktop renderer or main process | `bun run dev --isolated` |
+| Desktop renderer or main process | `bun run dev` |
 | Two clients: teams, invitations, sharing, Team API | `bun run dev:test-client` |
-| Browser client at `/app` or public web | `bun run dev:api --isolated` (add `bun run dev --isolated` when a desktop host is also necessary) |
+| Browser client at `/app` or public web | `bun run dev:api` (add `bun run dev` when a desktop host is also necessary) |
 | iOS app | `bun run dev:mobile` |
 
 Rules:
@@ -69,7 +69,7 @@ Rules:
 - Start the stack with `run_in_background`. Wait for the ports that the
   supervisor prints, or poll `bun run dev:status` until the service is
   live. Use the ports that the stack reports, never a fixed port.
-- Use `--isolated` so that the test does not change the shared
+- Do not pass `--shared`, so that the test does not change the shared
   `OpenBot Dev` profile. A new profile gets the showcase data of
   `bun run dev:seed`.
 - Do not run `dev:reset`, or `dev:seed` without `--dry-run`, on a profile

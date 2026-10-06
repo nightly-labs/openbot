@@ -10,8 +10,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import type { BrowserOperationError } from "../browser-effects";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import {
@@ -32,7 +34,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import {
   isForeignReasoningError,
@@ -44,6 +46,7 @@ import {
   toThreadItem,
 } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
+import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
@@ -56,7 +59,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   clearControls(): void;
   endControl(threadId: string, turnId: string): void;
   /** Deleting an agent closes the tabs it owned, which nothing else can reach once it is gone. */
-  close(tabId: string): Promise<void>;
+  close(tabId: string): Effect.Effect<void, BrowserOperationError>;
 }
 
 export interface TurnHooks {
@@ -65,11 +68,18 @@ export interface TurnHooks {
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   /** Closes a provider session the provider refuses; the next turn opens a new one with the transcript. */
-  dropRefusedSession(agentId: string, externalThreadId: string): void;
+  dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
   /** A finished tool step, for product analytics only. It never reaches a renderer or a remote client. */
   emitToolUsage(usage: ToolUsageSignal): void;
+  /** The model this turn was started with, or null when the drain no longer knows it. */
+  turnModel(agentId: string, turnId: string): string | null;
+  /**
+   * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
+   * when the delivery is not an active channel assignment that can go back.
+   */
+  requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
 }
 
 export interface TurnLifecycleOptions {
@@ -84,6 +94,7 @@ export interface TurnLifecycleOptions {
   compaction: ContextCompaction;
   images: ImageGenRuntime;
   deltas: DeltaBuffer;
+  usageLimits: UsageLimitGate;
   hooks: TurnHooks;
 }
 
@@ -108,10 +119,12 @@ export class TurnLifecycle {
   readonly #compaction: ContextCompaction;
   readonly #images: ImageGenRuntime;
   readonly #deltas: DeltaBuffer;
+  readonly #usageLimits: UsageLimitGate;
   readonly #hooks: TurnHooks;
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
-  readonly #turnAssociations = new Map<string, Promise<void>>();
+  #scope = Scope.makeUnsafe();
+  readonly #turnAssociations = new Map<string, Deferred.Deferred<void, TurnOperationFailed>>();
   /**
    * The last error a provider reported for each running turn. The provider sends it just before
    * `turn/completed`, which carries only the status, so without this a failed delivery keeps no
@@ -121,11 +134,15 @@ export class TurnLifecycle {
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
+   * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
+   * and the echo of the user's message do not count.
    */
   readonly #runningTurns = new Map<
     string,
-    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean }
+    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean; acted: boolean }
   >();
+  /** Running turns a provider plan refused, with the reset in epoch seconds when the provider gave it. */
+  readonly #limitedTurns = new Map<string, number | null>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
   /**
@@ -146,6 +163,7 @@ export class TurnLifecycle {
     this.#compaction = options.compaction;
     this.#images = options.images;
     this.#deltas = options.deltas;
+    this.#usageLimits = options.usageLimits;
     this.#hooks = options.hooks;
   }
 
@@ -188,15 +206,18 @@ export class TurnLifecycle {
     this.#hooks.emitRuntimeSnapshot();
   }
 
-  dispose(): void {
+  readonly dispose = Effect.fn("TurnLifecycle.dispose")(function* (this: TurnLifecycle) {
+    yield* Scope.close(this.#scope, Exit.void);
+    this.#scope = Scope.makeUnsafe();
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#limitedTurns.clear();
     this.#runningTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
     this.#itemTurns.clear();
-  }
+  }).bind(this);
 
   /**
    * Ends each turn a client ran when the runtime stops it for a reason other than an exit: a
@@ -204,18 +225,27 @@ export class TurnLifecycle {
    * process sends no `turn/completed` and `#handleExit` skips it, so without this its turns stay
    * active, and its deliveries running, until OpenBot restarts.
    */
-  interruptTurnsOf(client: AgentClient): void {
+  readonly interruptTurnsOf = Effect.fn("TurnLifecycle.interruptTurnsOf")(function* (
+    this: TurnLifecycle,
+    client: AgentClient,
+  ) {
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
       this.#attention.clearForTurn(turn.threadId, turnId);
-      void this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").catch((error) => {
-        this.#hooks.emitError("turn_completion_failed", error, turn.agentId);
-      });
+      yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#hooks.emitError("turn_completion_failed", failure.cause, turn.agentId)),
+        ),
+      );
     }
-  }
+  }).bind(this);
 
-  handleNotification(notification: AppServerNotification, source: AgentClient): void {
+  readonly handleNotification = Effect.fn("TurnLifecycle.handleNotification")(function* (
+    this: TurnLifecycle,
+    notification: AppServerNotification,
+    source: AgentClient,
+  ) {
     const params = notification.params;
     const threadId = getString(params, "threadId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
@@ -243,7 +273,7 @@ export class TurnLifecycle {
 
     switch (notification.method) {
       case "account/login/completed": {
-        this.#providers.completeCodexLogin(params, source, decodeAccountLoginCompletedResult);
+        yield* this.#providers.completeCodexLogin(params, source, decodeAccountLoginCompletedResult);
         return;
       }
       case "turn/started": {
@@ -252,19 +282,26 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
-        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now(), produced: false });
+        this.#runningTurns.set(turnId, {
+          client: source,
+          agentId,
+          threadId,
+          startedAt: Date.now(),
+          produced: false,
+          acted: false,
+        });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         this.#failedTurns.delete(agentId);
         const origin = this.#mailbox.startingDeliveryForAgent(agentId)?.delivery.sender.kind ?? "unknown";
-        const association = this.#associateStartedTurn(agentId, turnId, snapshot);
+        const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
         this.#turnAssociations.set(turnId, association);
-        void association.finally(() => {
-          if (this.#turnAssociations.get(turnId) === association) {
-            this.#turnAssociations.delete(turnId);
-          }
-        });
+        yield* Effect.gen({ self: this }, function* () {
+          const exit = yield* Effect.exit(this.#associateStartedTurn(agentId, turnId, snapshot));
+          yield* Deferred.done(association, exit);
+          if (this.#turnAssociations.get(turnId) === association) this.#turnAssociations.delete(turnId);
+        }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
         return;
@@ -277,7 +314,7 @@ export class TurnLifecycle {
         if (!turnId || !item) return;
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
+        this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
@@ -289,7 +326,7 @@ export class TurnLifecycle {
         }
         const threadItem = toThreadItem(item);
         if (!threadItem) return;
-        this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
+        yield* this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
         return;
       }
       case "item/reasoning/summaryTextDelta":
@@ -302,7 +339,6 @@ export class TurnLifecycle {
         const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         let message = snapshot.messages.find((candidate) => candidate.id === itemId);
@@ -310,6 +346,11 @@ export class TurnLifecycle {
           message = newAssistantMessage(itemId, turnId);
           snapshot.messages.push(message);
         }
+        // Claude streams its thinking as message deltas on a commentary item, which is not an answer.
+        this.#markProduced(
+          turnId,
+          notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
+        );
         if (notification.method.startsWith("item/reasoning/")) {
           if (message.itemType !== "commentary") {
             message.itemType = "commentary";
@@ -352,9 +393,11 @@ export class TurnLifecycle {
           this.#compaction.finish(agentId, threadId, status);
           return;
         }
-        void this.#completeTurn(agentId, threadId, turnId, status).catch((error) => {
-          this.#hooks.emitError("turn_completion_failed", error, agentId);
-        });
+        yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => this.#hooks.emitError("turn_completion_failed", failure.cause, agentId)),
+          ),
+        );
         return;
       }
       case "thread/tokenUsage/updated": {
@@ -368,7 +411,13 @@ export class TurnLifecycle {
         return;
       }
       case "account/rateLimits/updated": {
-        this.#providers.refreshCodexUsage();
+        yield* this.#providers.refreshCodexUsage();
+        return;
+      }
+      case USAGE_LIMIT_METHOD: {
+        const turnId = getString(params, "turnId");
+        const resetsAt = isRecord(params) && typeof params.resetsAt === "number" ? params.resetsAt : null;
+        if (turnId && this.#runningTurns.has(turnId)) this.#limitedTurns.set(turnId, resetsAt);
         return;
       }
       case "error":
@@ -392,16 +441,33 @@ export class TurnLifecycle {
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
         }
-        if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
-          this.#providers.refreshUsageAfterLimit(source);
+        if (
+          error?.codexErrorInfo === "usageLimitExceeded" ||
+          isUsageLimitDiagnostic(message) ||
+          (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
+        ) {
+          // Only a plan window resets by itself. A spent balance fails as before, with its reason.
+          const planLimit =
+            isPlanLimitDiagnostic(message) ||
+            (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
+          if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+          }
+          yield* this.#providers.refreshUsageAfterLimit(source);
           return;
         }
         this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }
     }
-  }
+  }).bind(this);
 
-  async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
+  readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    status: string,
+  ) {
     const running = this.#runningTurns.get(turnId);
     this.#runningTurns.delete(turnId);
     const reportedError = this.#turnErrors.get(turnId);
@@ -412,12 +478,17 @@ export class TurnLifecycle {
       status === "failed" &&
       reportedError !== undefined &&
       isForeignReasoningError(reportedError);
+    const limited = status === "failed" && this.#limitedTurns.has(turnId);
+    const resetsAt = this.#limitedTurns.get(turnId) ?? null;
+    this.#limitedTurns.delete(turnId);
     this.#deltas.flushTurn(turnId);
-    await this.#images.waitForOperations(threadId, turnId);
-    await this.#turnAssociations.get(turnId)?.catch(() => undefined);
+    yield* this.#images.waitForOperations(threadId, turnId);
+    const association = this.#turnAssociations.get(turnId);
+    if (association) yield* Deferred.await(association).pipe(Effect.catch(() => Effect.void));
     this.#memories.finishTurn(turnId, status);
-    // A refused session is closed below, so it is not compacted.
-    const shouldCompact = !refused && this.#compaction.reserve(agentId, threadId);
+    // A refused session is closed below, and a spent plan would refuse the summary turn too, so
+    // neither is compacted.
+    const shouldCompact = !refused && !limited && this.#compaction.reserve(agentId, threadId);
     this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     snapshot.activeTurnId = null;
@@ -430,22 +501,51 @@ export class TurnLifecycle {
       !this.#conversation.isExecutionThread(snapshot.threadId) &&
       deliveries.every(({ delivery }) => !this.#refusedRetries.has(delivery.id));
     if (retry) {
-      await this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
+      yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
       return;
     }
-    if (status === "failed") this.#failedTurns.set(agentId, turnId);
-    else this.#failedTurns.delete(agentId);
+    // The plan refused the turn before it did anything that a second run would repeat, so its
+    // messages wait in the queue for the reset. A channel task goes back to its channel's queue
+    // instead: an assignment that waited here would reserve the whole host until the reset.
+    const repeatable = limited && running !== undefined && !running.acted && deliveries.length > 0;
+    const channelTurn = this.#conversation.isExecutionThread(snapshot.threadId);
+    const requeue = repeatable && !channelTurn;
     for (const message of snapshot.messages) {
       if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
-      message.status = normalizeCompletionStatus(status);
+      message.status = normalizeCompletionStatus(repeatable ? "interrupted" : status);
       markIncompleteImageGeneration(message, message.status);
     }
     // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
     for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
+    // The limit belongs to the model the turn ran on, which the agent may have left since.
+    const model = this.#hooks.turnModel(agentId, turnId);
+    if (requeue) {
+      yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+      // After the requeue, so a routine set to skip finds its run back in the queue.
+      yield* this.#usageLimits.reached(agentId, resetsAt, model);
+      this.#hooks.scheduleDrain(agentId);
+      return;
+    }
+    if (limited) yield* this.#usageLimits.reached(agentId, resetsAt, model);
+    else if (status === "completed") yield* this.#usageLimits.completed(agentId, model);
+    // After the limit is recorded, so the channel does not assign the task to this agent again
+    // before the reset. A channel that took the task back ends this turn as interrupted.
+    let requeued = repeatable && channelTurn;
+    for (const { delivery } of requeued ? deliveries : []) {
+      if (yield* this.#hooks.requeueChannelDelivery(delivery.id)) continue;
+      requeued = false;
+      break;
+    }
+    const outcome = requeued ? "interrupted" : status;
+    if (outcome === "failed") this.#failedTurns.set(agentId, turnId);
+    else this.#failedTurns.delete(agentId);
     const failure = refused
       ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
       : reportedError;
-    if (refused) this.#hooks.emitError("agent_error", failure, agentId);
+    if (refused) {
+      yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      this.#hooks.emitError("agent_error", failure, agentId);
+    }
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
@@ -461,18 +561,20 @@ export class TurnLifecycle {
           message.text.trim(),
       );
     if (deliveries.length > 0) {
-      const terminal = status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "completed";
+      const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {
         this.#refusedRetries.delete(delivery.delivery.id);
         const reason = terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null;
-        await this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason);
+        yield* this.#mailbox
+          .markTerminal(delivery.delivery.id, terminal, reason)
+          .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
       // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
       // that wants no answer, so only a teammate that asked for a result gets one.
       if (!this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed" && latestAssistant) {
         for (const delivery of deliveries)
-          await this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
+          yield* this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
       }
       // The requester holds the answers of the other teammates until each request has ended, so
       // this end can release them, also when this turn failed and sends no result.
@@ -481,10 +583,12 @@ export class TurnLifecycle {
       }
     }
     if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
-      await this.#store.updatePreview(agentId, latestAssistant.text);
+      yield* this.#store
+        .updatePreview(agentId, latestAssistant.text)
+        .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     }
-    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status });
+    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
     if (deliveries.length > 0) {
       try {
         this.#mailboxSync.emitQueue(agentId);
@@ -498,13 +602,12 @@ export class TurnLifecycle {
       agentId,
       threadId: this.#conversation.publicThreadId(agentId, threadId),
       turnId,
-      status,
+      status: outcome,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
-    if (refused) this.#hooks.dropRefusedSession(agentId, threadId);
-    if (shouldCompact) await this.#compaction.request(agentId, threadId);
+    if (shouldCompact) yield* this.#compaction.request(agentId, threadId);
     else this.#hooks.scheduleDrain(agentId);
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Queues the deliveries of a turn once more, after the provider refused the session's history.
@@ -512,16 +615,33 @@ export class TurnLifecycle {
    * session repeats nothing. The turn ends as interrupted, which no one is told of as a failure,
    * and the queued delivery starts again at once.
    */
-  async #retryRefusedTurn(
+  readonly #retryRefusedTurn = Effect.fn("TurnLifecycle.retryRefusedTurn")(function* (
+    this: TurnLifecycle,
     agentId: string,
     threadId: string,
     turnId: string,
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
-  ): Promise<void> {
+  ) {
+    for (const { delivery } of deliveries) this.#refusedRetries.add(delivery.id);
+    yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+    yield* this.#hooks.dropRefusedSession(agentId, threadId);
+    this.#hooks.scheduleDrain(agentId);
+  }, Effect.uninterruptible);
+
+  /** Puts the deliveries of a turn the provider refused back at their place in the queue, and ends the turn as interrupted. */
+  readonly #requeueTurn = Effect.fn("TurnLifecycle.requeueTurn")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    deliveries: readonly DeliveryContext[],
+  ) {
     for (const { delivery } of deliveries) {
-      this.#refusedRetries.add(delivery.id);
-      await this.#mailbox.requeueRefused(delivery.id);
+      yield* this.#mailbox
+        .requeueRefused(delivery.id)
+        .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: "interrupted" });
@@ -539,30 +659,45 @@ export class TurnLifecycle {
       status: "interrupted",
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
-    this.#hooks.dropRefusedSession(agentId, threadId);
-    this.#hooks.scheduleDrain(agentId);
-  }
+  }, Effect.uninterruptible);
 
-  #markProduced(turnId: string): void {
+  #markProduced(turnId: string, acted: boolean): void {
     const running = this.#runningTurns.get(turnId);
-    if (running) running.produced = true;
+    if (!running) return;
+    running.produced = true;
+    if (acted) running.acted = true;
   }
 
-  async #associateStartedTurn(agentId: string, turnId: string, snapshot: ConversationSnapshot): Promise<void> {
-    const deliveries = this.#mailbox.startingDeliveriesForAgent(agentId);
+  readonly #associateStartedTurn = Effect.fn("TurnLifecycle.associateStartedTurn")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+  ) {
+    const deliveries = yield* turnStep(() => this.#mailbox.startingDeliveriesForAgent(agentId));
     if (deliveries.length === 0) return;
-    try {
+    yield* Effect.gen({ self: this }, function* () {
       for (const { delivery } of deliveries) {
-        await this.#mailbox.markRunning(delivery.id, turnId);
-        this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
+        yield* this.#mailbox
+          .markRunning(delivery.id, turnId)
+          .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
+        yield* turnStep(() => this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id));
       }
-      this.#mailboxSync.emitQueue(agentId);
-    } catch (error) {
-      this.#hooks.emitError("delivery_turn_association_failed", error, agentId);
-    }
-  }
+      yield* turnStep(() => this.#mailboxSync.emitQueue(agentId));
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId)),
+      ),
+    );
+  }, Effect.uninterruptible);
 
-  async #relayAgentResult(agentId: string, turnId: string, delivery: DeliveryContext, text: string): Promise<void> {
+  readonly #relayAgentResult = Effect.fn("TurnLifecycle.relayAgentResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    delivery: DeliveryContext,
+    text: string,
+  ) {
     if (delivery.delivery.sender.kind !== "agent") return;
     const messageId = delivery.delivery.messageId;
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
@@ -578,16 +713,18 @@ export class TurnLifecycle {
     )
       return;
 
-    await this.#mailbox.enqueue({
-      sender: { kind: "agent", agentId },
-      recipientAgentIds: [recipientAgentId],
-      text,
-      replyToMessageId: messageId,
-      // The requested result, not a new request. The chain-origin guard above already stops a
-      // second relay; this is what tells the recipient it owes no acknowledgement for one.
-      expectsReply: false,
-      idempotencyKey: `auto-result:${turnId}:${messageId}`,
-    });
+    yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId },
+        recipientAgentIds: [recipientAgentId],
+        text,
+        replyToMessageId: messageId,
+        // The requested result, not a new request. The chain-origin guard above already stops a
+        // second relay; this is what tells the recipient it owes no acknowledgement for one.
+        expectsReply: false,
+        idempotencyKey: `auto-result:${turnId}:${messageId}`,
+      })
+      .pipe(Effect.mapError((failure) => new TurnOperationFailed({ cause: failure.cause })));
     const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
     if (senderSnapshot) {
       this.#mailboxSync.syncMailboxMessages(senderSnapshot);
@@ -595,12 +732,19 @@ export class TurnLifecycle {
     }
     this.#mailboxSync.emitQueue(recipientAgentId);
     this.#hooks.scheduleDrain(recipientAgentId);
-  }
+  }, Effect.uninterruptible);
 
-  #applyItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): void {
+  readonly #applyItem = Effect.fn("TurnLifecycle.applyItem")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    item: ThreadItem,
+    completed: boolean,
+  ) {
     const usage = completed ? toolUsage(item) : null;
     if (usage) this.#hooks.emitToolUsage({ ...usage, agentId, turnId });
-    if (this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
+    if (yield* this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
     if (toolProgress) {
       this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
@@ -618,7 +762,7 @@ export class TurnLifecycle {
     message.status = completed ? "completed" : "streaming";
     this.#itemTurns.set(item.id, turnId);
     this.#conversation.emitConversation(snapshot);
-  }
+  });
 
   /**
    * Shows a turn's plan as one message, which each update replaces. The first update places it in
@@ -689,4 +833,22 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
+}
+
+export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>()("TurnOperationFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+function turnStep<A>(run: () => A): Effect.Effect<A, TurnOperationFailed> {
+  return Effect.try({ try: run, catch: (cause) => new TurnOperationFailed({ cause }) });
+}
+
+/**
+ * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
+ * the provider's echo of the user's message are not repeated work.
+ */
+function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+  if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
+  if (item.type !== "agentMessage") return true;
+  return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
 }

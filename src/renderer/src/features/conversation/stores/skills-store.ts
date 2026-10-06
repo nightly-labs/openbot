@@ -11,6 +11,7 @@ export interface SkillsStoreDeps {
 
 export function createSkillsStore(deps: SkillsStoreDeps) {
   const [installedSkills, setInstalledSkills] = createSignal<InstalledSkill[]>([]);
+  const [installedSkillsLoadFailed, setInstalledSkillsLoadFailed] = createSignal(false);
   const [installedSkillsRetry, setInstalledSkillsRetry] = createSignal(0);
   let installedSkillsRequest = 0;
   let installedSkillsSourceId: string | undefined;
@@ -43,6 +44,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
       installedSkillsSourceId = undefined;
       failedInstalledSkillsAttempt = undefined;
       setInstalledSkills([]);
+      setInstalledSkillsLoadFailed(false);
       return;
     }
     if (visibility === "hidden") return;
@@ -50,10 +52,12 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     if (installedSkillsSourceId !== sourceId) {
       installedSkillsSourceId = sourceId;
       setInstalledSkills([]);
+      setInstalledSkillsLoadFailed(false);
     }
     if (support === "unsupported") {
       failedInstalledSkillsAttempt = undefined;
       setInstalledSkills([]);
+      setInstalledSkillsLoadFailed(false);
       return;
     }
     const connectionSequence = untrack(() => deps.props.server?.connectionSequence) ?? 0;
@@ -64,15 +68,18 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
         if (request !== installedSkillsRequest) return;
         failedInstalledSkillsAttempt = undefined;
         setInstalledSkills(skills);
+        setInstalledSkillsLoadFailed(false);
       })
       .catch(() => {
         if (request !== installedSkillsRequest) return;
         failedInstalledSkillsAttempt = { serverId, sourceId, connectionSequence };
+        setInstalledSkillsLoadFailed(true);
         // Preserve an already loaded same-agent catalog when a refresh fails.
       });
   });
 
   return {
     installedSkills,
+    installedSkillsLoadFailed,
   };
 }

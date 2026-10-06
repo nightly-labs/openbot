@@ -14,14 +14,16 @@ import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CAPABILITY } from "./providers-v3";
+import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
-import { TEAM_PROTOCOL_V5_CAPABILITIES } from "./v5";
+import { TEAM_PROTOCOL_V6_CAPABILITIES } from "./v6";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -59,6 +61,7 @@ export {
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
+  PROVIDERS_V4_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -66,11 +69,12 @@ export {
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SECRET_CAPABILITY,
-  ...TEAM_PROTOCOL_V5_CAPABILITIES,
+  ...TEAM_PROTOCOL_V6_CAPABILITIES,
   "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
@@ -98,6 +102,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
+  PROVIDERS_V4_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   TEAM_MEMBER_LEAVE_CAPABILITY,
@@ -107,6 +112,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_PUBLISH_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
+  TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -161,4 +167,12 @@ export function isHostAnalyticsRoute(method: string, path: string): boolean {
 
 export function isAgentCreateRoute(method: string, path: string): boolean {
   return method === "POST" && new URL(path, "http://openbot.invalid").pathname === "/v1/agents";
+}
+
+/**
+ * The agent message route. Its request carries the sender's `timezone` and `clientMessageId` beside
+ * the frozen keys.
+ */
+export function isAgentMessageRoute(method: string, path: string): boolean {
+  return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }

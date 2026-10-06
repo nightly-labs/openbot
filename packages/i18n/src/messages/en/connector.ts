@@ -147,4 +147,55 @@ export const messages = defineMessages("connector", {
   "connector.slack.removeEffectKept": "The conversations and the Slack Orchestrator stay in OpenBot.",
   "connector.slack.keep": "Keep connected",
   "connector.slack.close": "Close",
+  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
+  "connector.onePassword.title": "1Password",
+  "connector.onePassword.description":
+    "Share a dedicated 1Password vault with OpenBot through a service account, so agents can sign in to sites in the OpenBot browser.",
+  "connector.onePassword.howItWorks":
+    "Connecting sets up a “Shared with OpenBot” vault in your 1Password account and a service account that can read only that vault. OpenBot fills saved logins in its browser on this computer, so only the items you move into that vault are ever shared. Agents never see a password.",
+  "connector.onePassword.connect": "Connect 1Password",
+  // The three setup steps before a connection, each with the one button it needs.
+  "connector.onePassword.setupTitle": "Set up",
+  "connector.onePassword.stepCliTitle": "Install the 1Password CLI",
+  "connector.onePassword.stepCliChecking": "Looking for the 1Password CLI on this computer",
+  "connector.onePassword.stepCliInstalling": "Downloading the 1Password CLI from 1Password",
+  // {version} is a version number, such as 2.39.0.
+  "connector.onePassword.stepCliReady": "Version {version} is installed.",
+  "connector.onePassword.stepCliMissing":
+    "OpenBot downloads it from 1Password into its own folder. It needs no administrator password.",
+  "connector.onePassword.stepCliManual":
+    "OpenBot cannot install it on this computer. Install it from 1Password, then come back to this page.",
+  "connector.onePassword.installCli": "Install",
+  "connector.onePassword.stepAppTitle": "Turn on the CLI integration",
+  "connector.onePassword.stepAppDescription":
+    "In the 1Password app, open Settings > Developer and turn on “Integrate with 1Password CLI”.",
+  "connector.onePassword.stepAppReady": "The 1Password app lets the CLI create the shared vault.",
+  "connector.onePassword.openApp": "Open 1Password",
+  "connector.onePassword.checkAgain": "Check again",
+  "connector.onePassword.stepVaultTitle": "Create the shared vault",
+  "connector.onePassword.stepVaultDescription":
+    "OpenBot creates the vault “Shared with OpenBot” and a service account that can only read it. 1Password asks you to approve.",
+  "connector.onePassword.useToken": "Use a service account token instead",
+  "connector.onePassword.tokenLabel": "Service account token",
+  "connector.onePassword.tokenPlaceholder": "ops_…",
+  "connector.onePassword.connectWithToken": "Connect",
+  "connector.onePassword.approveInApp": "Approve the request in the 1Password app",
+  "connector.onePassword.cancel": "Cancel",
+  "connector.onePassword.chooseAccountTitle": "Choose an account",
+  "connector.onePassword.chooseAccountDescription": "OpenBot creates the shared vault in the account you choose.",
+  "connector.onePassword.useAccount": "Use this account",
+  "connector.onePassword.vaultTitle": "Shared vault",
+  "connector.onePassword.vaultDescription":
+    "Move a login into this vault in 1Password to let agents sign in with it. Remove it to stop.",
+  "connector.onePassword.loginsLoading": "Reading the logins from 1Password",
+  // {count} is a number, such as 3.
+  "connector.onePassword.loginCount": { one: "{count} login", other: "{count} logins" },
+  "connector.onePassword.disconnect": "Disconnect",
+  "connector.onePassword.disconnectTitle": "Disconnect 1Password",
+  "connector.onePassword.disconnectSummary":
+    "OpenBot forgets the token. The vault and the service account stay in 1Password; remove them there if you no longer need them.",
+  "connector.onePassword.actionFailed": "OpenBot could not change the 1Password connection.",
+  "connector.onePassword.statusConnected": "Connected",
+  "connector.onePassword.statusConnecting": "Connecting",
+  "connector.onePassword.statusNotSetUp": "Not set up",
 });

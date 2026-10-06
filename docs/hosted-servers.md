@@ -171,10 +171,11 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
 OpenBot ships no AI subscription, so a new server has no provider connected. When its owner or an
 admin opens a server with no agent, the app shows a provider step before the first-agent form. The
 sandbox browser is on Xvfb, where nobody can see it, so each sign-in finishes on the user's own device
-over `providers-v3`: Codex and Grok show a device code, and Claude shows a page whose code the user
-pastes back into the app. The Claude sign-in runs under `script` from util-linux (package
+over `providers-v3` and `providers-v4`: Codex, Grok and Cline show a device code, Claude shows a page
+whose code the user pastes back into the app, and Cursor shows a page that signs the host's CLI in by
+itself. The Claude sign-in runs under `script` from util-linux (package
 `bsdutils`, in every Ubuntu and Debian image). See
-[Admin capabilities](ARCHITECTURE.md#admin-capabilities) for the routes.
+[Admin capabilities](architecture/servers.md#admin-capabilities) for the routes.
 
 ## Members
 

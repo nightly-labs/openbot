@@ -63,8 +63,8 @@ export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginS
   if (!isHttpsUrl(value.verificationUrl) || !isNumber(value.expiresAt)) {
     throw new Error("Invalid code login response.");
   }
-  if (value.kind === "paste") {
-    return { kind: "paste", verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
+  if (value.kind === "paste" || value.kind === "link") {
+    return { kind: value.kind, verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
   }
   if (
     value.kind !== "code" ||

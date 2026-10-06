@@ -1,0 +1,271 @@
+/*
+ * Where the reader is in a long chat, on the right edge of the transcript. The public site's reading
+ * progress draws the same rail for its articles.
+ *
+ * One segment per day, as long as the day. The part the reader has passed is OpenBot's lilac, and the
+ * segment they are in glows at the point they have reached. Pointing at the rail brings in the day
+ * titles through a blur, over a scrim with no edge.
+ *
+ * The anchor sticks to the top of the scroll container with the viewport's height, and its negative
+ * margin gives that height back, so the transcript under it does not move.
+ */
+.chat-scroll-rail {
+  /* A muted neutral with a trace of the logo lilac: the full lilac pulls the eye while the reader reads. */
+  --chat-scroll-rail-accent: color-mix(in srgb, var(--openbot-logo-production) 25%, var(--openbot-text-muted));
+  --chat-scroll-rail-track: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  --chat-scroll-rail-glow: color-mix(in srgb, var(--chat-scroll-rail-accent) 60%, transparent);
+  --chat-scroll-rail-ease: var(--openbot-ease-out);
+  --chat-scroll-rail-duration: var(--openbot-duration-island-content);
+  --chat-scroll-rail-quick: var(--openbot-duration-overlay);
+  --chat-scroll-rail-blur: 8px;
+
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  pointer-events: none;
+}
+
+/* Only the bars take the pointer until the rail opens, so the messages beside it stay selectable.
+   The nav reaches into the container's side padding, so the bars stand beside the messages. */
+.chat-scroll-rail-nav {
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--chat-scroll-rail-inset, 0px));
+  width: min(260px, 70%);
+  height: min(64%, 600px);
+  display: flex;
+  flex-direction: column;
+  padding: var(--openbot-space-3) 0;
+  opacity: 0;
+  transform: translate(var(--openbot-space-2), -50%);
+  transition:
+    opacity var(--chat-scroll-rail-quick) ease,
+    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease);
+}
+
+.chat-scroll-rail[data-visible="true"] .chat-scroll-rail-nav,
+.chat-scroll-rail-nav:has(:focus-visible) {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.chat-scroll-rail-nav:hover,
+.chat-scroll-rail-nav:has(:focus-visible) {
+  pointer-events: auto;
+}
+
+/* A scrim in the transcript colour, with no edge of its own. It darkens only where the titles are,
+   so they stay legible over a wide message, and over empty space it does not show at all. */
+.chat-scroll-rail-surface {
+  position: absolute;
+  inset: calc(-1 * var(--openbot-space-8)) 0 calc(-1 * var(--openbot-space-8)) calc(-1 * var(--openbot-space-8));
+  background: linear-gradient(
+    to left,
+    var(--openbot-bg-canvas) 0%,
+    color-mix(in srgb, var(--openbot-bg-canvas) 92%, transparent) 55%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-text-primary) var(--openbot-space-8),
+    var(--openbot-text-primary) calc(100% - var(--openbot-space-8)),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity var(--openbot-duration-slow) ease;
+}
+
+.chat-scroll-rail-eyebrow {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 var(--openbot-space-3);
+  padding: 0 var(--openbot-space-4) 0 var(--openbot-space-4);
+  color: var(--openbot-text-dim);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity var(--openbot-duration-slow) ease;
+}
+
+.chat-scroll-rail-count {
+  color: var(--openbot-logo-production);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Each day keeps room for its title. A chat with more days than the rail holds scrolls the list
+   inside the rail, so every day stays in reach; the list keeps the current day in view. */
+.chat-scroll-rail-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  list-style: none;
+}
+
+.chat-scroll-rail-item {
+  flex-basis: 0;
+  min-height: 22px;
+  display: flex;
+}
+
+.chat-scroll-rail .chat-scroll-rail-link {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: var(--openbot-space-3);
+  padding: 0 0 0 var(--openbot-space-4);
+  border-radius: 0;
+  color: var(--openbot-text-muted);
+  font-weight: inherit;
+  text-decoration: none;
+  outline: none;
+}
+
+.chat-scroll-rail-item[data-state="read"] .chat-scroll-rail-link {
+  color: var(--openbot-text-secondary);
+}
+
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-link,
+.chat-scroll-rail .chat-scroll-rail-link:hover,
+.chat-scroll-rail .chat-scroll-rail-link:focus-visible {
+  color: var(--openbot-text-primary);
+  text-decoration: none;
+}
+
+.chat-scroll-rail-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: -3px;
+  font-size: var(--openbot-text-sm);
+  line-height: 18px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  filter: blur(var(--chat-scroll-rail-blur));
+  transform: translateX(var(--openbot-space-2));
+  transition:
+    color var(--openbot-duration-slow) ease,
+    opacity var(--openbot-duration-slow) ease,
+    filter var(--openbot-duration-slow) ease,
+    transform var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease);
+}
+
+.chat-scroll-rail-link:focus-visible .chat-scroll-rail-label {
+  text-decoration: underline;
+  text-decoration-color: var(--chat-scroll-rail-accent);
+  text-underline-offset: 4px;
+}
+
+/* A hit area wider than the 2px bar it holds. The bar is 5-7px from the edge, inside the 12px
+   padding the narrowest transcript keeps, so it does not cover a message. */
+.chat-scroll-rail-bar {
+  position: relative;
+  width: 20px;
+  flex: none;
+  padding-bottom: var(--openbot-space-1);
+}
+
+.chat-scroll-rail[data-visible="true"] .chat-scroll-rail-bar {
+  pointer-events: auto;
+}
+
+.chat-scroll-rail-bar::before,
+.chat-scroll-rail-fill {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 5px;
+  bottom: var(--openbot-space-1);
+  width: 2px;
+  border-radius: var(--openbot-radius-pill);
+  transition:
+    width var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
+    right var(--chat-scroll-rail-quick) var(--chat-scroll-rail-ease),
+    background-color var(--chat-scroll-rail-quick) ease;
+}
+
+.chat-scroll-rail-bar::before {
+  background: var(--chat-scroll-rail-track);
+}
+
+.chat-scroll-rail-fill {
+  background: var(--chat-scroll-rail-accent);
+  transform: scaleY(var(--chat-scroll-rail-fill, 0));
+  transform-origin: top center;
+}
+
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::before,
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
+  right: 4.5px;
+  width: 3px;
+}
+
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-fill {
+  box-shadow: 0 0 10px var(--chat-scroll-rail-glow);
+}
+
+/* The reading head: where the reader is inside the current day. */
+.chat-scroll-rail-item[data-state="active"] .chat-scroll-rail-bar::after {
+  content: "";
+  position: absolute;
+  top: calc((100% - var(--openbot-space-1)) * var(--chat-scroll-rail-fill, 0));
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--chat-scroll-rail-accent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--chat-scroll-rail-accent) 18%, transparent),
+    0 0 12px var(--chat-scroll-rail-glow);
+  transform: translateY(-50%);
+}
+
+.chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface {
+  opacity: 1;
+  transition: opacity var(--openbot-duration-overlay) ease;
+}
+
+.chat-scroll-rail-nav:hover .chat-scroll-rail-eyebrow,
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-eyebrow {
+  opacity: 1;
+}
+
+.chat-scroll-rail-nav:hover .chat-scroll-rail-label,
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+  transition:
+    color var(--openbot-duration-slow) ease,
+    opacity var(--chat-scroll-rail-quick) ease calc(var(--chat-scroll-rail-index, 0) * 18ms),
+    filter var(--chat-scroll-rail-quick) ease calc(var(--chat-scroll-rail-index, 0) * 18ms),
+    transform var(--chat-scroll-rail-duration) var(--chat-scroll-rail-ease)
+    calc(var(--chat-scroll-rail-index, 0) * 18ms);
+}
+
+/* The rules above name their own transitions, which outrank the global reduced-motion rule, so the
+   titles would still slide and blur in. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav,
+  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *,
+  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *::before,
+  .chat-scroll-rail[data-visible] .chat-scroll-rail-nav *::after {
+    transition: none;
+  }
+}

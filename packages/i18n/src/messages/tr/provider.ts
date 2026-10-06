@@ -38,6 +38,8 @@ export const messages = {
   "provider.action.checkForUpdates": "Güncellemeleri denetle",
   "provider.lastError": "Son hata: {detail}",
   "provider.action.copyDiagnostics": "Tanılama bilgilerini kopyala",
+  "provider.action.cancelRestart": "Yeniden başlatmayı iptal et",
+  "provider.restartPending": "Mevcut görevler durduktan sonra yeniden başlatılır",
   "provider.action.install": "Yükle",
   "provider.action.signIn": "Giriş yap",
   "provider.action.signInWithCode": "Kod ile giriş yap",
@@ -68,6 +70,8 @@ export const messages = {
   "provider.codeLogin.pasteSubmit": "Devam et",
   "provider.codeLogin.pasteExpired": "Bu giriş işlemi durduruldu.",
   "provider.codeLogin.pasteExpiresIn": "Sizi bekliyor. Bu giriş işlemi {time} içinde sona erecek.",
+  "provider.codeLogin.linkTitle": "{name} hesabına başka bir cihazda giriş yapın",
+  "provider.codeLogin.linkStep": "{name} hesabına giriş yapın. OpenBot kendiliğinden devam eder.",
 
   "provider.picker.noEndpoints": "Henüz uç nokta yok",
   "provider.picker.customCounts": "{endpoints} · {agents}",

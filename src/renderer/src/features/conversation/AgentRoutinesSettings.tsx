@@ -1,6 +1,28 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
-import { Button, CirclePause, Clock3, ConfirmDialog, Input, Plus, Switch, Textarea, toast } from "@openbot/ui";
+import {
+  ROUTINE_LIMIT_POLICIES,
+  type RoutineFields,
+  type RoutineLimitPolicy,
+  type RoutineRunFields,
+  type RoutineSchedule,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
+import {
+  Button,
+  CirclePause,
+  Clock3,
+  ConfirmDialog,
+  Input,
+  Plus,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Switch,
+  Textarea,
+  toast,
+} from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
@@ -43,7 +65,13 @@ interface RoutineDraft {
   /** Saved as it is until the user changes a chip, so a rename keeps a schedule the chips cannot show. */
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
+  limitPolicy: RoutineLimitPolicy;
 }
+
+const LIMIT_POLICY_LABELS = {
+  wait: "routine.settings.limitPolicy.wait",
+  skip: "routine.settings.limitPolicy.skip",
+} as const satisfies Record<RoutineLimitPolicy, AppTextKey>;
 
 const NEW_ROUTINE_SCHEDULE: RoutineScheduleDraft = { kind: "daily", days: ROUTINE_EVERY_DAY, time: "09:00" };
 
@@ -171,6 +199,8 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         name: current.name === base.name ? routine.name : current.name,
         instruction: current.instruction === base.instruction ? routine.instruction : current.instruction,
         active: current.active === base.active ? routine.active : current.active,
+        limitPolicy:
+          current.limitPolicy === (base.limitPolicy ?? "wait") ? (routine.limitPolicy ?? "wait") : current.limitPolicy,
         ...(scheduleEdited
           ? {}
           : {
@@ -194,6 +224,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       active: routine.active,
       schedule: structuredClone(routine.trigger.schedule),
       scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
+      limitPolicy: routine.limitPolicy ?? "wait",
     });
     void loadRuns(routine.id);
   }
@@ -212,6 +243,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       active: true,
       schedule: routineScheduleFromDraft(NEW_ROUTINE_SCHEDULE),
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
+      limitPolicy: "wait",
     });
   }
 
@@ -308,6 +340,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         schedule: current.schedule,
+        limitPolicy: current.limitPolicy,
       });
       setRoutines((items) => {
         const next = [saved, ...items.filter((routine) => routine.id !== saved.id)];
@@ -574,6 +607,28 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
               </label>
+              <Show when={props.port.limitPolicy}>
+                <div class="settings-field">
+                  <span id="agent-routine-limit-policy-label">{t("routine.settings.limitPolicy")}</span>
+                  <Select<RoutineLimitPolicy>
+                    options={[...ROUTINE_LIMIT_POLICIES]}
+                    value={current().limitPolicy}
+                    onChange={(limitPolicy) => {
+                      if (limitPolicy) changeDraft((value) => ({ ...value, limitPolicy }));
+                    }}
+                    itemComponent={(item) => (
+                      <SelectItem item={item.item}>{t(LIMIT_POLICY_LABELS[item.item.rawValue])}</SelectItem>
+                    )}
+                  >
+                    <SelectTrigger aria-labelledby="agent-routine-limit-policy-label">
+                      <SelectValue<RoutineLimitPolicy>>
+                        {(state) => t(LIMIT_POLICY_LABELS[state.selectedOption()])}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent />
+                  </Select>
+                </div>
+              </Show>
 
               <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
             </div>

@@ -104,8 +104,9 @@ docker exec -it openbot openbot login
 See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits.
 
 > [!IMPORTANT]
-> The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
-> warning. Check the release checksum or GitHub build attestation before you run the installer.
+> Windows releases are signed by `SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ`. Older
+> releases are not code-signed. SmartScreen can still warn about a new release. Check the release
+> checksum or GitHub build attestation before you run the installer.
 
 ### Agent setup
 
@@ -217,15 +218,17 @@ and seeds the isolated profile. Set it as the worktree setup command of your age
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
 The command deletes the app and test-client development profiles plus the legacy host profile,
-including `openbot.db` and its WAL files. It does not change the production profile, agent
-workspaces, `~/.codex`, or `~/.claude`.
+including `openbot.db` and its WAL files. It prints each profile before it deletes it, and it
+deletes nothing while a dev app has one of them open. It does not change the production profile,
+the worktree profiles that `bun run dev` opens (`OpenBot Dev wt-<hash>`), agent workspaces,
+`~/.codex`, or `~/.claude`.
 
 `bun run dev` seeds a development profile it creates, so a first start already shows this data.
-To replace a profile that exists, quit the dev app, then run:
+`bun run dev:seed` replaces the shared `OpenBot Dev` profile. To use it, quit the dev app, then run:
 
 ```bash
 bun run dev:seed
-bun run dev
+bun run dev --shared
 ```
 
 The seeded agents run on `opencode-go/muse-spark-1.3-contributor` at medium effort while this
@@ -239,10 +242,12 @@ team chat data. It dates every record backwards from the run, so the transcripts
 Yesterday. It does not add live queue items, open routine runs, or queued channel tasks, so it
 starts no model turn.
 Use `bun run dev:seed --dry-run` to inspect the target and fixture counts without changing files.
+`dev:seed`, `dev:reset`, `dev:verify`, `dev:bench`, and `dev:automation` print their usage for
+`--help` and change nothing. They stop with exit code 2 on an option that they do not know.
 
 ### Marketplace launch catalog
 
-Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:local`, then start or reuse `bun run dev --isolated`. Search **OpenBot** in Marketplace to review its Skills and Agents. This seed adds catalog records without resetting app data.
+Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:local`, then start or reuse `bun run dev`. Search **OpenBot** in Marketplace to review its Skills and Agents. This seed adds catalog records without resetting app data.
 
 `bun run marketplace:build` creates the launch bundles. `bun run marketplace:publish:production` is a dry run; production writes require explicit flags and admin credentials. See the [catalog and publication guide](marketplace/production-catalog/README.md).
 
@@ -271,14 +276,15 @@ The import adds each agent's name, instructions, avatar, skills, routines, and m
 ## Commands
 
 The browser client is served at `/app` by the public web app. For local development, run
-`bun run dev:api --isolated` and open `/app` on the API URL printed by the supervisor. Use
-`bun run dev --isolated` when a desktop host is also needed.
+`bun run dev:api` and open `/app` on the API URL printed by the supervisor. Use
+`bun run dev` when a desktop host is also needed.
 Use `bun run storybook` and **Web → Workspace → Connected** for shared UI test data.
 See [web client delivery](docs/web-client.md) for the release gate and focused checks.
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. `--hosting=test` signs the app in to the `test` account Worker, on a profile that all worktrees share, so that a hosted server is a real VM; see [docs/hosted-servers.md](docs/hosted-servers.md#real-servers-from-a-development-build). A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
+| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`. Each worktree opens a profile of its own, keyed to its path; `--shared` opens the shared `OpenBot Dev` profile instead. `--isolated` is still accepted and changes nothing. A profile that you used before stays on disk unchanged. `--hosting=test` signs the app in to the `test` account Worker, on a profile that all worktrees share, so that a hosted server is a real VM; see [docs/hosted-servers.md](docs/hosted-servers.md#real-servers-from-a-development-build). A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. Before it starts, it runs `bun install --frozen-lockfile` and `bun run api:migrate:local` only when `bun.lock`, a workspace `package.json`, a patch, or a migration changed since their last successful run. The stamps are in `node_modules` and `apps/auth-api/.wrangler/state/v3/d1`, and each `bun install` writes the install stamp too; delete one to run its step again. |
+| `OPENBOT_SKIP_SKIA=1 bun install --frozen-lockfile` | Install without the ~700 MB copy of the React Native Skia native libraries that the root `postinstall` makes for mobile builds. Use it for desktop or API work. Before a native mobile build, run `bun run --cwd apps/mobile setup:skia`, or install again without the flag. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
@@ -294,7 +300,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
 | `bun run api:migrate:remote` | Apply D1 migrations to the configured remote database. |
 | `bun run api:deploy` | Build and deploy the account API to Cloudflare Workers. It sets the Stripe, boat, claim and OpenPanel secret sets that are in the production environment. A set that is not there keeps the value that the Worker has. |
-| `bun run api:stripe:bootstrap` | Create or update the Stripe plan catalog and the Customer Portal settings from `STRIPE_SECRET_KEY` in the encrypted `apps/auth-api/.env.shared` (a value in `apps/auth-api/.env.dev` replaces it). It refuses a live key unless you add `--live`. For local webhooks, run `stripe listen --forward-to localhost:<API port>/v1/stripe/webhook` and put the signing secret in `STRIPE_WEBHOOK_SECRET`. See [Billing](docs/ARCHITECTURE.md#billing). |
+| `bun run api:stripe:bootstrap` | Create or update the Stripe plan catalog and the Customer Portal settings from `STRIPE_SECRET_KEY` in the encrypted `apps/auth-api/.env.shared` (a value in `apps/auth-api/.env.dev` replaces it). It refuses a live key unless you add `--live`. For local webhooks, run `stripe listen --forward-to localhost:<API port>/v1/stripe/webhook` and put the signing secret in `STRIPE_WEBHOOK_SECRET`. See [Billing](docs/architecture/servers.md#billing). |
 | `bun run hosting:setup --target=production\|test` | Set up the Stripe catalog, the Customer Portal, and the Stripe and boat webhooks of one account server, and store the webhook signing secrets: production in the `cloudflare-production` GitHub Environment, test in `apps/auth-api/.env.shared`. See [hosted servers](docs/hosted-servers.md#production). |
 | `bun run hosting:template` | Build the boat named snapshot that new hosted servers start from. Needs `BOAT_TEMPLATE_API_KEY` and `--version`, `--appimage-url`, `--appimage-sha256` and `--auth-api-url`. See [hosted servers](docs/hosted-servers.md). |
 | `bun run remote:up` | Build and start the self-hosted Signal, coturn, and ACME stack. |
@@ -302,11 +308,11 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run remote:check:compose` | Validate both Docker Compose configurations alone, without a running daemon. |
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
-| `bun run dev:slack` | Start the same stack as `bun run dev`, with a `cloudflared` quick tunnel to Signal, so that Slack can send the development Slack app's events to the agents on this computer. It reads `OPENBOT_DEV_SLACK_SIGNING_SECRET` from the ignored `.env.slack-dev`, and needs `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID` in `apps/auth-api/.env.dev`. Takes the same options as `bun run dev`, such as `--isolated`. See [docs/messaging.md](docs/messaging.md#test-slack-locally). |
+| `bun run dev:slack` | Start the same stack as `bun run dev`, with a `cloudflared` quick tunnel to Signal, so that Slack can send the development Slack app's events to the agents on this computer. It reads `OPENBOT_DEV_SLACK_SIGNING_SECRET` from the ignored `.env.slack-dev`, and needs `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID` in `apps/auth-api/.env.dev`. Takes the same options as `bun run dev`, such as `--shared`. See [docs/messaging.md](docs/messaging.md#test-slack-locally). |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
 | `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. `--scale=agents:N,messages:M,channels:C,channelMessages:K,attachments:A` adds generated agents, chat history, channel history and large images to the showcase data, for memory and CPU measurements. |
-| `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
-| `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
+| `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. It refuses while a dev app has one of these profiles open. |
+| `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. `registryDirectory` is the directory it read: `~/Library/Caches/OpenBot/dev` on macOS, `$XDG_RUNTIME_DIR/openbot-dev` (else `~/.cache/openbot/dev`) on Linux, `%LOCALAPPDATA%\OpenBot\openbot-dev-instances` on Windows, or `OPENBOT_DEV_REGISTRY_DIR` when set. It does not depend on `TMPDIR`. |
 | `bun run dev:verify` | Print a stable JSON verification plan for this worktree: `ready`/`reasons` for safe checks, setup state, changed files and affected surfaces, nearby tests, runtime state, `qa.required`/`qa.ready`/`qa.reasons`, the renderer QA loop, safe `runnableCommands`, and all suggested `commands`. Add `--run` to execute only the safe non-mutating checks in the plan. Renderer QA follows `snapshot → action with --wait-for → snapshot → screenshot` when appearance matters. |
 | `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |
 | `bun run dev:forget` | Drop this worktree's stack record without signalling anything, for the one case `dev:stop` refuses to resolve on its own. It is also the only command that reads a dead record: nothing else deletes one, because a reader that removes what it judged can remove a record the supervisor rewrote in between. Takes the same `--pid=` and `--all`. |
@@ -315,17 +321,19 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run dev:cpu` | Measure idle CPU on the running dev app, per process kind and per page. `--duration=<ms>` (default 60000), `--interval=<ms>` (default 5000), `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/cpu/`, and refused if it would leave that directory or pass through a symbolic link) and `--compare=<file>` for a before/after delta. Read-only. Take a baseline before a change and a second run after it: only the difference between two runs on the same machine is a result, because a dev build carries the Vite server and the source maps as well. |
 | `bun run dev:memory` | Measure the running dev app's memory once: resident memory per process kind (main, renderer, GPU, provider CLIs and their MCP servers), with the dev tooling kept out of the app total, plus JS heap and DOM counters per page. `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/memory/`) and `--heap-snapshot=<target-id\|url-substring>` to also write a V8 heap snapshot of one page to that directory. Read-only. |
-| `bun run dev:bench` | Run repeatable RAM and CPU scenarios on the built app (`bun run build` first). Each run seeds a bench profile of its own, starts the built app, samples the process tree every second (resident memory, macOS physical footprint and CPU per process kind, provider memory per CLI) with the main-process and page heaps, drives the scenario, and reads a settled state after garbage collection. `--scenario=<id\|prefix\|all>` (required; without it the command lists the scenarios), `--runs=<n>` (default 3; the report shows the median and range), `--label=<name>`, `--compare=<report.json>` and `--cpu-profile` (records the app window's JavaScript for 15 s after the first run settles, as a `.cpuprofile` for DevTools). Reports go to `.openbot-build/dev-automation/bench/`. Turn scenarios (`s5` to `s9`) use the real claude, opencode and grok CLIs and spend model quota. It never touches a dev instance or your own profile, and `bun run dev:stop` stops an app a failed run left behind. |
+| `bun run dev:bench` | Run repeatable RAM and CPU scenarios on the built app (`bun run build` first). Each run seeds a bench profile of its own, starts the built app, samples the process tree every second (resident memory, macOS physical footprint and CPU per process kind, provider memory per CLI) with the main-process and page heaps, drives the scenario, and reads a settled state after garbage collection. `--scenario=<id\|prefix\|all>` (required; without it the command lists the scenarios), `--runs=<n>` (default 3; the report shows the median and range), `--label=<name>`, `--compare=<report.json>`, `--cpu-profile` (records the app window's JavaScript for 15 s after the first run settles, as a `.cpuprofile` for DevTools), `--frames` (counts frames slower than 17 ms and 50 ms while the scenario runs; the loop keeps the renderer drawing, so CPU readings rise) and `--call-counts` (V8 call counts per function while the scenario runs, top 25 in a `-call-counts.json` file; slows JavaScript). Every run also reports the startup marks (`startup.*`, ms) and the app window's layout and style recalculation counts, script and task time, and long tasks (`render.*`). Reports go to `.openbot-build/dev-automation/bench/`. Turn scenarios (`s5` to `s9`) use the real claude, opencode and grok CLIs and spend model quota. It never touches a dev instance or your own profile, and `bun run dev:stop` stops an app a failed run left behind. |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
 | `bun run typecheck` | Check all 12 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run knip:check` | Find unused files, exports, and types, unused or unlisted dependencies, and unresolved imports in all workspaces. CI runs it. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `@openbot/ui`, palette tokens instead of colour, size, radius and transition literals. Checks renderer and shared UI source. |
 | `bun run check:assets` | Fail when a tracked image or video file is outside the product asset directories. Pull request screenshots go in the pull request body. |
+| `bun run check:doc-links` | Fail when a link in a tracked Markdown file names a Markdown file that does not exist, or an anchor that the file does not have. |
 | `bun run verify:preload` | After `bun run build`, run the built preload with a fake Electron. Fail when it loads a module that a sandboxed preload cannot load, uses `import()`, or exposes a method that `IPC_ENDPOINTS` does not name. |
-| `bun run types:ratchet` | Hold each TypeScript option in `tools/typescript/type-baseline.json` to its error count per file in every project that extends `tsconfig.base.json`. A new error fails. `--write` and `--add=<option>` work as in `lint:ratchet`. |
-| `bun run i18n:check` | Check the translation catalogs: key prefixes, placeholders, plural forms, ambiguous source text, and unused keys. `--json` writes `.openbot-build/i18n-report.json`. See [docs/i18n.md](docs/i18n.md). |
-| `bun run lint:ratchet` | Hold each Biome rule in `tools/biome/lint-baseline.json` to its finding count per file. A new finding fails. Add `--write` after a fix to lower the baseline, or `--add=<rule>` to start a rule at its current counts. |
+| `bun run types:ratchet` | Hold each TypeScript option in `tools/typescript/type-baseline.json` to its error count per file in every project that extends `tsconfig.base.json`. A new error fails. Add `--write` after a fix to lower the baseline, or `--add=<option>` to start an option at its current counts. |
+| `bun run i18n:check` | Check the translation catalogs: key prefixes, placeholders, plural forms, ambiguous source text, and unused keys. `--fix` puts translated keys in the English order. `--json` writes `.openbot-build/i18n-report.json`. See [docs/i18n.md](docs/i18n.md). |
 | `bun run test:backend` | Run backend tests only. |
+| `bun run test:changed` | Run, on one worker, only the desktop and mobile test files that import a file changed since `origin/main`, including staged, unstaged and untracked files. It stops with an error when `origin/main` is missing. A change to a vitest config, a setup file or `package.json` selects no test. See [docs/development-checks.md](docs/development-checks.md#focused-tests). |
+| `bun run test:related -- <source>...` | Run, on one worker, only the test files that import the named source files. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
@@ -383,8 +391,9 @@ only the credential in secure storage for revocation retries at startup, on retu
 and on the next connection attempt. Remote revocation completes when the account API is reachable.
 
 For manual team testing, `bun run dev:test-client` starts a complete two-client harness. The second
-client uses the isolated `OpenBot Dev Test Client` profile and renderer port 5174. `dev:reset` also
-removes that profile and the legacy `OpenBot Dev Host` profile. It does not remove the downloaded
+client uses the `OpenBot Dev Test Client wt-<hash>` profile of this worktree (`OpenBot Dev Test Client`
+with `--shared`) and renderer port 5174. `dev:reset` removes the shared one and the legacy
+`OpenBot Dev Host` profile. It does not remove the downloaded
 provider CLIs, which the whole computer shares. Press `Ctrl+C` in the runner terminal
 to stop only the processes started by that runner, or run `bun run dev:stop` from the worktree once
 that terminal is gone. Never stop a dev stack with `pkill -f electron` or `pkill -f bun`: on a
@@ -524,7 +533,7 @@ described above.
 
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 and x64 release, an unsigned Windows x64 release, and unsigned Linux x64
+signed and notarized macOS ARM64 and x64 release, a signed Windows x64 release, and unsigned Linux x64
 and arm64 AppImages in GitHub Actions. After the release is published, the workflow pushes the Docker
 image to `ghcr.io/nightly-labs/openbot`.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account

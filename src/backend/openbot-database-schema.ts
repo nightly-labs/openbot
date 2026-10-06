@@ -305,7 +305,8 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-// Migrations 17, 22, 23, 24 and 26 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// Migrations 17, 22, 23, 24 and 26 widen the provider CHECK and migration 28 removes it, so the fresh schema is no
+// longer the v8 baseline here either.
 // One line rather than the whole table: the substitution then survives any later baseline edit that does
 // not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
 const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
@@ -313,7 +314,7 @@ const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provi
 const V17_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),`;
 
 // Migration 22 adds the Antigravity provider. This list is frozen with the migration: do not derive it
-// from `AGENT_PROVIDERS`, because a later provider must get its own migration.
+// from `AGENT_PROVIDERS`, because a shipped migration must always write the same table.
 const V22_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),`;
 
 // Migration 23 adds `acp`, the one provider of every custom ACP agent. Frozen with the migration, like V22.
@@ -324,6 +325,24 @@ const V24_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider I
 
 // Migration 26 adds the Cline provider. Frozen with the migration, like V22.
 const V26_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),`;
+
+// Migration 28 removes the provider CHECK, so a new provider no longer needs a table rebuild. The write path
+// validates the provider instead: `ProviderSessions.bindProviderSession` and the thread replay accept only
+// `AGENT_PROVIDERS`. Frozen with the migration.
+const V28_PROVIDER_SESSIONS_COLUMN_SQL = `provider TEXT NOT NULL,`;
+
+// Migration 27 adds what a routine does while the provider plan of its agent is spent. Frozen with the
+// migration. ADD COLUMN appends the declaration at the end of the stored CREATE statement, so the latest
+// schema puts it last as well. Both routine tables end with a column, not a table constraint.
+const V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL = `limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip'))`;
+
+const BASELINE_AGENT_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS agent_routines_agent`;
+
+const V19_CHANNEL_ROUTINES_END_SQL = `    last_event_sequence INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS channel_routines_channel`;
 
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
@@ -379,16 +398,32 @@ const ANALYTICS_DATE_INDEX_SQL = `
 
 const LATEST_SCHEMA_SQL =
   substituteOnce(
-    substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
-    BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-    V26_PROVIDER_SESSIONS_CHECK_SQL,
+    substituteOnce(
+      substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
+      BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
+      V28_PROVIDER_SESSIONS_COLUMN_SQL,
+    ),
+    BASELINE_AGENT_ROUTINES_END_SQL,
+    withRoutineLimitPolicy(BASELINE_AGENT_ROUTINES_END_SQL),
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
   CHANNEL_SCHEMA_SQL +
-  CHANNEL_SETTINGS_SCHEMA_SQL +
+  substituteOnce(
+    CHANNEL_SETTINGS_SCHEMA_SQL,
+    V19_CHANNEL_ROUTINES_END_SQL,
+    withRoutineLimitPolicy(V19_CHANNEL_ROUTINES_END_SQL),
+  ) +
   MCP_SERVERS_SCHEMA_SQL +
   MESSAGING_SCHEMA_SQL;
+
+/** The end of a routine table with the migration 27 column after its last one. */
+function withRoutineLimitPolicy(tableEnd: string): string {
+  return tableEnd.replace(
+    "last_event_sequence INTEGER NOT NULL\n",
+    `last_event_sequence INTEGER NOT NULL,\n    ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}\n`,
+  );
+}
 
 // Silence here would ship new installs a table the migrations never produce, so an edit to the baseline
 // that moves this declaration out from under the substitution has to be loud.
@@ -510,6 +545,18 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // The same rebuild as migrations 17, 22, 23 and 24, with foreign keys off for the same reason.
     disableForeignKeys: true,
     up: migrateProviderSessionsForCline,
+  },
+  {
+    version: 27,
+    // Adds a column with a constant default to two tables: no rebuild, so no foreign-key pause and no
+    // vacuum. Every existing routine keeps waiting, which is what it did before.
+    up: addRoutineLimitPolicy,
+  },
+  {
+    version: 28,
+    // The same rebuild as migrations 17, 22, 23, 24 and 26, with foreign keys off for the same reason.
+    disableForeignKeys: true,
+    up: removeProviderSessionsCheck,
   },
 ];
 
@@ -788,6 +835,22 @@ function migrateProviderSessionsForCline(db: DatabaseSync): void {
   widenProviderSessionsCheck(db, "'cline'", V26_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v26");
 }
 
+// Migration 27 adds the routine limit policy to the agent and the channel routine tables.
+function addRoutineLimitPolicy(db: DatabaseSync): void {
+  for (const table of ["projection_agent_routines", "projection_channel_routines"]) {
+    // A development profile that ran this version before it shipped has the column already.
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (columns.some((column) => isDynamicRecord(column) && column.name === "limit_policy")) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${V27_ROUTINE_LIMIT_POLICY_COLUMN_SQL}`);
+  }
+}
+
+// Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the
+// CHECK, and a rebuild of a table that has none, which a replay over a new database meets, keeps every row.
+function removeProviderSessionsCheck(db: DatabaseSync): void {
+  rebuildProviderSessions(db, V28_PROVIDER_SESSIONS_COLUMN_SQL, "projection_provider_sessions_v28");
+}
+
 // Migrations 17, 22, 23, 24 and 26 share this SQL. Each migration gives its own CHECK line and staging table name, so the
 // SQL that migration 17 runs is the same text as before this function was shared.
 function widenProviderSessionsCheck(
@@ -800,12 +863,16 @@ function widenProviderSessionsCheck(
     .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
     .get();
   if (!isDynamicRecord(row) || !isString(row.sql) || row.sql.includes(providerLiteral)) return;
+  rebuildProviderSessions(db, providerCheckSql, stagingTable);
+}
 
+// The rebuild that migrations 17, 22, 23, 24, 26 and 28 run. `providerColumnSql` is the whole provider column line.
+function rebuildProviderSessions(db: DatabaseSync, providerColumnSql: string, stagingTable: string): void {
   db.exec(`
     CREATE TABLE ${stagingTable} (
       id TEXT PRIMARY KEY,
       thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
-      ${providerCheckSql}
+      ${providerColumnSql}
       external_session_id TEXT NOT NULL,
       model TEXT NOT NULL,
       effort TEXT NOT NULL,

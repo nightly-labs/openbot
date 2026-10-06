@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 // What is true of the router as a whole, rather than of one domain: that it comes down when it is
@@ -51,7 +54,8 @@ describe("TeamApiServer teardown", () => {
         closeMemberSession: unreachable,
         revokeTeamSession: unreachable,
         revokeMember: unreachable,
-        stop: () => Promise.reject(new Error("The remote screen would not come down.")),
+        stop: () =>
+          Effect.fail(new RemoteWorkflowError({ cause: new Error("The remote screen would not come down.") })),
       },
     });
 
@@ -71,8 +75,8 @@ describe("TeamApiServer teardown", () => {
       browser: createBrowser(),
     });
 
-    const starts = Promise.all([api.start(), api.start()]);
-    await api.stop();
+    const starts = Promise.all([runCauseEffect(api.start()), runCauseEffect(api.start())]);
+    await runCauseEffect(api.stop());
     const [first, second] = await starts;
 
     expect(second).toBe(first);
@@ -92,7 +96,7 @@ describe("TeamApiServer compatibility", () => {
     expect(compatibility.status).toBe(200);
     await expect(compatibility.json()).resolves.toMatchObject({
       appVersion: "0.4.0",
-      protocol: { minimum: 1, maximum: 5 },
+      protocol: { minimum: 1, maximum: 6 },
       capabilities: expect.arrayContaining(["browser-control", "remote-desktop", TEAM_SEMANTIC_TAGS_CAPABILITY]),
     });
 
@@ -101,7 +105,7 @@ describe("TeamApiServer compatibility", () => {
     await expect(missing.json()).resolves.toMatchObject({ code: "client_update_required" });
 
     const newerClient = await fetch(`${base}/v1/identity`, {
-      headers: { [TEAM_PROTOCOL_VERSION_HEADER]: "6", [TEAM_APP_VERSION_HEADER]: "0.5.0" },
+      headers: { [TEAM_PROTOCOL_VERSION_HEADER]: "7", [TEAM_APP_VERSION_HEADER]: "0.5.0" },
     });
     expect(newerClient.status).toBe(426);
     await expect(newerClient.json()).resolves.toMatchObject({ code: "host_update_required" });
@@ -114,16 +118,18 @@ describe("TeamApiServer compatibility", () => {
 
   it("serves installed skill summaries", async () => {
     const { start, signIn } = await createTeamApiFixture("skills", { configure: true });
-    const listInstalledForChatTags = vi.fn(async () => [
-      {
-        skillId: "skill-1",
-        slug: "release-notes",
-        name: "Release Notes",
-        installedVersion: 1,
-        availableVersion: 2,
-        state: "update-available" as const,
-      },
-    ]);
+    const listInstalledForChatTags = vi.fn(() =>
+      Effect.sync(() => [
+        {
+          skillId: "skill-1",
+          slug: "release-notes",
+          name: "Release Notes",
+          installedVersion: 1,
+          availableVersion: 2,
+          state: "update-available" as const,
+        },
+      ]),
+    );
     const { base } = await start({
       skills: { listInstalledForChatTags },
     });
@@ -321,7 +327,7 @@ describe("TeamApiServer routing", () => {
   it("answers every path the shared route table builds", async () => {
     const { root, start, signIn } = await createTeamApiFixture("routes", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));
-    await sidebarLayout.initialize();
+    await Effect.runPromise(sidebarLayout.initialize());
     const { base } = await start({
       agents: createAgents({ listAgents: () => [] }),
       sidebarLayout,

@@ -38,6 +38,9 @@ export const messages = {
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.busyMessage.title": "Orienter les agents pendant leur travail",
+  "settings.busyMessage.description":
+    "Un message envoyé pendant le travail d’un agent rejoint son travail en cours à l’étape suivante, au lieu d’attendre dans la file. ChatGPT et Claude peuvent orienter ; les autres fournisseurs mettent le message en attente.",
   "settings.autonomy.title": "Autonomie de l’agent",
   "settings.turbo.title": "Mode Turbo",
   "settings.turbo.description":

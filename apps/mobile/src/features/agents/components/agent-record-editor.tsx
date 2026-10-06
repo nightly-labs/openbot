@@ -1,4 +1,4 @@
-import { Host, Picker, Switch } from "@expo/ui";
+import { Host, Switch } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateRoutineInput,
@@ -9,6 +9,12 @@ import {
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import {
+  type RoutineScheduleDraft,
+  routineDraftProblemCode,
+  routineScheduleFromDraft,
+  routineScheduleToDraft,
+} from "@openbot/team-client/routine-schedule-draft";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -22,10 +28,9 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { RoutineTimePicker } from "./routine-schedule-time";
+import { RoutineScheduleFields } from "./routine-schedule-fields";
 
-// 2023-01-01 is a Sunday, so day 0 is Sunday, as in cron.
-const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+const DEFAULT_SCHEDULE: RoutineSchedule = { kind: "daily", time: "09:00" };
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
   const navigation = useNavigation();
@@ -185,7 +190,7 @@ export function RoutineEditor({
     queryKey: QueryKey;
   };
 }) {
-  const { t, format } = useText();
+  const { t } = useText();
   const workspace = useMobileWorkspace();
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
@@ -211,20 +216,25 @@ export function RoutineEditor({
   const { theme } = useUniwind();
   const [finished, setFinished] = useState(false);
   const [savedDraft, setSavedDraft] = useState<string | null>(null);
-  const [edits, setEdits] = useState<{ name?: string; instruction?: string; schedule?: RoutineSchedule }>({});
+  const [edits, setEdits] = useState<{ name?: string; instruction?: string; schedule?: RoutineScheduleDraft }>({});
   const name = edits.name ?? routine?.name ?? "";
   const instruction = edits.instruction ?? routine?.instruction ?? "";
-  const schedule = edits.schedule ?? routine?.trigger.schedule ?? { kind: "daily", time: "09:00" };
+  const savedSchedule = routine?.trigger.schedule ?? DEFAULT_SCHEDULE;
+  // The form edits a draft; an untouched schedule saves as it is, so a kind the form cannot show stays.
+  const scheduleDraft = edits.schedule ?? routineScheduleToDraft(savedSchedule);
+  const scheduleProblem = routineDraftProblemCode(scheduleDraft);
+  const schedule = edits.schedule && !scheduleProblem ? routineScheduleFromDraft(edits.schedule) : savedSchedule;
   const setName = (name: string) => setEdits((current) => ({ ...current, name }));
   const setInstruction = (instruction: string) => setEdits((current) => ({ ...current, instruction }));
-  const setSchedule = (schedule: RoutineSchedule) => setEdits((current) => ({ ...current, schedule }));
+  const setSchedule = (schedule: RoutineScheduleDraft) => setEdits((current) => ({ ...current, schedule }));
   const [timezone, setTimezone] = useState(routine?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const initialTimezone = useRef(timezone);
-  const draft = JSON.stringify({ name, instruction, schedule, timezone });
+  const draft = JSON.stringify({ name, instruction, schedule: edits.schedule ?? savedSchedule, timezone });
   const nameChanged = name.trim() !== (routine?.name ?? "");
   const instructionChanged = instruction.trim() !== (routine?.instruction ?? "");
   const scheduleChanged =
-    JSON.stringify(schedule) !== JSON.stringify(routine?.trigger.schedule ?? { kind: "daily", time: "09:00" });
+    edits.schedule !== undefined &&
+    (scheduleProblem !== null || JSON.stringify(schedule) !== JSON.stringify(savedSchedule));
   const dirty = routine
     ? nameChanged || instructionChanged || scheduleChanged
     : draft !==
@@ -232,7 +242,7 @@ export function RoutineEditor({
         JSON.stringify({
           name: "",
           instruction: "",
-          schedule: { kind: "daily", time: "09:00" },
+          schedule: DEFAULT_SCHEDULE,
           timezone: initialTimezone.current,
         }));
   useRecordDraftGuard(dirty && !finished, action.pending);
@@ -240,7 +250,7 @@ export function RoutineEditor({
     if (finished) router.back();
   }, [finished]);
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
-  const validTime = isRoutineSchedule(schedule);
+  const validTime = scheduleProblem === null && isRoutineSchedule(schedule);
   async function save() {
     if (port) {
       if (routine)
@@ -295,134 +305,29 @@ export function RoutineEditor({
         maxLength={INPUT_LIMITS.routineInstruction}
         onChangeText={setInstruction}
       />
-      <SettingsSection>
-        <SettingsRow
-          trailing={
-            <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-              <Picker
-                selectedValue={schedule.kind}
-                enabled={!disabled}
-                onValueChange={(kind) => {
-                  if (kind === "daily" || kind === "weekdays") setSchedule({ kind, time: "09:00" });
-                  else if (kind === "weekly") setSchedule({ kind, weekday: 1, time: "09:00" });
-                  else if (kind === "monthly") setSchedule({ kind, day: 1, time: "09:00" });
-                  else if (kind === "hourly") setSchedule({ kind, minute: 0 });
-                  else if (kind === "custom") setSchedule({ kind, expression: "0 9 * * *" });
-                }}
-              >
-                <Picker.Item label={t("mobile.agent.record.schedule.daily")} value="daily" />
-                <Picker.Item label={t("mobile.agent.record.schedule.weekdays")} value="weekdays" />
-                <Picker.Item label={t("mobile.agent.record.schedule.hourly")} value="hourly" />
-                <Picker.Item label={t("mobile.agent.record.schedule.weekly")} value="weekly" />
-                <Picker.Item label={t("mobile.agent.record.schedule.monthly")} value="monthly" />
-                <Picker.Item label={t("mobile.agent.record.schedule.custom")} value="custom" />
-                {schedule.kind === "advanced" || schedule.kind === "interval" ? (
-                  <Picker.Item label={t("mobile.agent.record.schedule.current")} value={schedule.kind} />
-                ) : null}
-              </Picker>
-            </Host>
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.record.schedule")}</Typography.Paragraph>
-        </SettingsRow>
-        {schedule.kind === "daily" ||
-        schedule.kind === "weekdays" ||
-        schedule.kind === "weekly" ||
-        schedule.kind === "monthly" ? (
-          <RoutineTimePicker
-            time={schedule.time}
-            disabled={disabled}
-            onChange={(time) => setSchedule({ ...schedule, time })}
-          />
-        ) : schedule.kind === "custom" ? (
-          <View className="p-4">
-            <SheetFormField
-              appearance="soft"
-              label={t("mobile.agent.record.cronExpression")}
-              value={schedule.expression}
-              maxLength={INPUT_LIMITS.routineCron}
-              editable={!disabled}
-              onChangeText={(expression) => setSchedule({ kind: "custom", expression })}
-            />
-          </View>
-        ) : schedule.kind === "hourly" ? null : (
-          <SettingsRow>
-            <Typography.Paragraph>{t("mobile.agent.record.scheduleKept")}</Typography.Paragraph>
-          </SettingsRow>
-        )}
-        {schedule.kind === "weekly" ? (
-          <SettingsRow
-            trailing={
-              <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Picker
-                  selectedValue={schedule.weekday}
-                  enabled={!disabled}
-                  onValueChange={(weekday) => setSchedule({ ...schedule, weekday })}
-                >
-                  {WEEKDAYS.map((weekday) => (
-                    <Picker.Item
-                      key={weekday}
-                      label={format.date(Date.UTC(2023, 0, 1 + weekday), { weekday: "long", timeZone: "UTC" })}
-                      value={weekday}
-                    />
-                  ))}
-                </Picker>
-              </Host>
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.record.day")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {schedule.kind === "monthly" ? (
-          <SettingsRow
-            trailing={
-              <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Picker
-                  selectedValue={schedule.day}
-                  enabled={!disabled}
-                  onValueChange={(day) => setSchedule({ ...schedule, day })}
-                >
-                  {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
-                    <Picker.Item key={day} label={String(day)} value={day} />
-                  ))}
-                </Picker>
-              </Host>
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.record.dayOfMonth")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {schedule.kind === "hourly" ? (
-          <SettingsRow
-            trailing={
-              <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Picker
-                  selectedValue={schedule.minute}
-                  enabled={!disabled}
-                  onValueChange={(minute) => setSchedule({ ...schedule, minute })}
-                >
-                  {Array.from({ length: 60 }, (_, minute) => minute).map((minute) => (
-                    <Picker.Item key={minute} label={String(minute).padStart(2, "0")} value={minute} />
-                  ))}
-                </Picker>
-              </Host>
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.record.minute")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-        {routine ? (
-          <SettingsRow
-            trailing={
-              <Typography type="body-sm" className="text-grouped-secondary">
-                {routine.timezone}
-              </Typography>
-            }
-          >
-            <Typography.Paragraph>{t("mobile.agent.record.timeZone")}</Typography.Paragraph>
-          </SettingsRow>
-        ) : null}
-      </SettingsSection>
+      <RoutineScheduleFields
+        draft={scheduleDraft}
+        disabled={disabled}
+        onChange={setSchedule}
+        footer={
+          routine ? (
+            <SettingsRow
+              trailing={
+                <Typography type="body-sm" className="text-grouped-secondary">
+                  {routine.timezone}
+                </Typography>
+              }
+            >
+              <Typography.Paragraph>{t("mobile.agent.record.timeZone")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null
+        }
+      />
+      {routine?.trigger.schedule.kind === "interval" && edits.schedule === undefined ? (
+        <Typography.Paragraph type="body-xs" className="-mt-3 px-4 text-grouped-secondary">
+          {t("mobile.agent.record.scheduleKept")}
+        </Typography.Paragraph>
+      ) : null}
       {!routine ? (
         <SheetFormField
           label={t("mobile.agent.record.timeZone")}

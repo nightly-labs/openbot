@@ -1,5 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { createMemo, Show } from "solid-js";
+import { createMemo, Loading, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
@@ -14,9 +14,9 @@ import { SchedulePanel } from "./features/schedule/SchedulePanel";
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
-import { AgentUsagePanel } from "./features/usage/AgentUsagePanel";
 import { useUsage } from "./features/usage/usage-context";
 import { useLayout } from "./layout";
+import { AgentUsagePanel } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceFrame } from "./WorkspaceFrame";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
@@ -80,12 +80,14 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
             <Show
               when={usage.state.view === "schedule"}
               fallback={
-                <AgentUsagePanel
-                  serverId={serverId()}
-                  hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
-                  agentId={usage.state.agentId}
-                  onBack={usage.closeUsage}
-                />
+                <Loading>
+                  <AgentUsagePanel
+                    serverId={serverId()}
+                    hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
+                    agentId={usage.state.agentId}
+                    onBack={usage.closeUsage}
+                  />
+                </Loading>
               }
             >
               <SchedulePanel

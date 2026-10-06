@@ -18,6 +18,7 @@ export const messages = defineMessages("prompt", {
   "prompt.customPlaceholder": "Type your own answer",
   "prompt.question.customAnswerFor": "Custom answer for: {question}",
   "prompt.question.skip": "Skip",
+  "prompt.question.submitAnswer": "Submit answer",
   "prompt.question.emptyTitle": "No questions are waiting.",
   "prompt.question.emptyBody": "The agent will continue when it needs another decision.",
   "prompt.choice.hint": "Pick whatever fits, or type your own.",

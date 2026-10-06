@@ -1,4 +1,5 @@
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import type { AgentMessage } from "@openbot/ui/data";
 import {
   calculateChatScrollMargin,
   chatHistoryBoundaryReached,
@@ -17,6 +18,7 @@ import {
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { currentText } from "@openbot/ui/text";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { groupAgentMessageMarkers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
@@ -39,6 +41,8 @@ export interface ScrollStoreDeps {
   markingRead: () => boolean;
   setMarkingRead: (reading: boolean) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
+  /** The user's messages the host has not drawn yet. They follow the transcript. */
+  pendingMessages: () => AgentMessage[];
   elements: ScrollElements;
   sticky: ScrollStickyState;
 }
@@ -55,11 +59,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
-  const drawnMessages = createMemo(() =>
-    summarizeRoutineRunMessages(
+  const drawnMessages = createMemo(() => [
+    ...summarizeRoutineRunMessages(
       deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
     ),
-  );
+    ...deps.pendingMessages(),
+  ]);
   /*
    * The unread divider sits on the first unread row the timeline draws. A silent answer has no row,
    * so the divider moves to the next row that has one; read state keeps the stored message. A
@@ -74,6 +79,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   });
   /* A group of agent messages stops at the unread divider, so the divider keeps its row. */
   const timelineMessages = createMemo(() => groupAgentMessageMarkers(drawnMessages(), unreadBoundaryMessageId()));
+  /*
+   * A row finds its message by id. The virtualizer gives a row its new index one tick after the list
+   * changes, so a lookup by index draws the neighbouring message in the row for that tick.
+   */
+  const timelineIndexById = createMemo(
+    () => new Map<VirtualItem["key"], number>(timelineMessages().map((message, index) => [message.id, index])),
+  );
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),
@@ -250,6 +262,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     clearNewMessages,
     messageVirtualizer,
     timelineMessages,
+    timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,

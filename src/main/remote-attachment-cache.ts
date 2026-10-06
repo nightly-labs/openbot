@@ -1,3 +1,6 @@
+import { Deferred, Effect } from "effect";
+import type { RemoteWorkflowError } from "./remote-service-effects";
+
 // Remote attachments that this computer already downloaded, held in memory for a short time.
 //
 // A chat image reaches the renderer through `openbot-remote-attachment`, which answers `no-store`,
@@ -24,7 +27,10 @@ interface CacheEntry {
 export class RemoteAttachmentCache {
   // A `Map` iterates in insertion order, so the first entry is the least recently used.
   readonly #entries = new Map<string, CacheEntry>();
-  readonly #pending = new Map<string, { serverId: string; request: Promise<RemoteAttachment> }>();
+  readonly #pending = new Map<
+    string,
+    { serverId: string; request: Deferred.Deferred<RemoteAttachment, RemoteWorkflowError> }
+  >();
   // A download that started before `forget` or `clear` must not store its result after it.
   readonly #generations = new Map<string, number>();
   #epoch = 0;
@@ -35,7 +41,12 @@ export class RemoteAttachmentCache {
     this.#now = now;
   }
 
-  get(serverId: string, attachmentId: string, download: () => Promise<RemoteAttachment>): Promise<RemoteAttachment> {
+  readonly get = Effect.fn("RemoteAttachments.get")(function* (
+    this: RemoteAttachmentCache,
+    serverId: string,
+    attachmentId: string,
+    download: () => Effect.Effect<RemoteAttachment, RemoteWorkflowError>,
+  ) {
     this.#removeExpired();
     const key = JSON.stringify([serverId, attachmentId]);
     const entry = this.#entries.get(key);
@@ -43,22 +54,27 @@ export class RemoteAttachmentCache {
       this.#delete(key, entry);
       this.#entries.set(key, entry);
       this.#bytes += entry.attachment.bytes.byteLength;
-      return Promise.resolve(entry.attachment);
+      return entry.attachment;
     }
     const pending = this.#pending.get(key);
-    if (pending) return pending.request;
+    if (pending) return yield* Deferred.await(pending.request);
     const generation = this.#generation(serverId);
-    const request = download()
-      .then((attachment) => {
-        if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment);
-        return attachment;
-      })
-      .finally(() => {
-        if (this.#pending.get(key)?.request === request) this.#pending.delete(key);
-      });
+    const request = Deferred.makeUnsafe<RemoteAttachment, RemoteWorkflowError>();
     this.#pending.set(key, { serverId, request });
-    return request;
-  }
+    return yield* download().pipe(
+      Effect.tap((attachment) =>
+        Effect.sync(() => {
+          if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment);
+        }),
+      ),
+      Effect.onExit((exit) => Deferred.done(request, exit)),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#pending.get(key)?.request === request) this.#pending.delete(key);
+        }),
+      ),
+    );
+  });
 
   forget(serverId: string): void {
     this.#generations.set(serverId, (this.#generations.get(serverId) ?? 0) + 1);

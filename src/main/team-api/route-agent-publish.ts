@@ -4,6 +4,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { AGENT_PUBLISH_CAPABILITY, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { parsePublishAgentTemplate } from "../ipc/agent-template-handlers";
 import { requireString } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
@@ -31,9 +32,10 @@ export async function routeAgentPublish(
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
-    if (route === "preview") return json(200, previewBody(await agentTemplates.preview(agentId(body))));
-    if (route === "publish") return json(200, publicationBody(await agentTemplates.publish(publishInput(body))));
-    await agentTemplates.unpublish(agentId(body));
+    if (route === "preview") return json(200, previewBody(await runCauseEffect(agentTemplates.preview(agentId(body)))));
+    if (route === "publish")
+      return json(200, publicationBody(await runCauseEffect(agentTemplates.publish(publishInput(body)))));
+    await runCauseEffect(agentTemplates.unpublish(agentId(body)));
     return json(200, {});
   } catch (error) {
     // A signed-out host, a secret in the instructions or a failed upload is a sentence for the admin,

@@ -1,8 +1,71 @@
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import type { RemoteTicketClaims } from "../src/protocol";
 import { SignalService, type SignalSocket } from "../src/signal-service";
+import { RemoteTokenError } from "../src/tokens";
+import { runSignal } from "./signal-runtime";
 
 describe("SignalService", () => {
+  it("removes an interrupted Slack delivery before accepting a late response", async () => {
+    const service = new SignalService(
+      {
+        ...fakeTokens(),
+        verifySlackRoute: () => Effect.succeed({ teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+        validateSlackRoute: () => Effect.succeed(["T1"]),
+      },
+      8,
+    );
+    const ingress = socket("ingress");
+    service.connect(ingress);
+    await runSignal(
+      service,
+      service.receive(
+        ingress,
+        JSON.stringify({
+          type: "hello",
+          version: 1,
+          peer: "ingress",
+          token: "host-ticket",
+          slackRoute: "route",
+        }),
+      ),
+    );
+    const controller = new AbortController();
+    const pending = runSignal(
+      service,
+      service.deliverSlack("A1", "T1", {
+        kind: "events",
+        body: new TextEncoder().encode("private request"),
+        retryNum: null,
+        retryReason: null,
+      }),
+      controller.signal,
+    );
+    const rejected = expect(pending).rejects.toThrow();
+    try {
+      await vi.waitFor(() => expect(ingress.messages.at(-1)).toContain('"type":"slack-delivery"'));
+      const delivery = JSON.parse(ingress.messages.at(-1) ?? "{}");
+      controller.abort();
+      await rejected;
+      await runSignal(
+        service,
+        service.receive(
+          ingress,
+          JSON.stringify({
+            type: "slack-delivery-result",
+            version: 1,
+            requestId: delivery.requestId,
+            status: 200,
+          }),
+        ),
+      );
+      expect(ingress.messages.at(-1)).toContain('"code":"permission_denied"');
+    } finally {
+      controller.abort();
+      await service.close();
+    }
+  });
+
   it("notifies only authenticated devices of the changed account without disconnecting them", async () => {
     const service = new SignalService(fakeTokens(), 8);
     const host = socket("host");
@@ -56,7 +119,7 @@ describe("SignalService", () => {
       client.messages.some((message) => message.includes('"type":"ready"') && message.includes('"connectionId":"')),
     ).toBe(true);
 
-    service.disconnect(client);
+    await runSignal(service, service.disconnect(client));
     expect(host.messages.some((message) => message.includes('"type":"disconnect"'))).toBe(false);
 
     const resumed = socket("client-resumed");
@@ -85,7 +148,7 @@ describe("SignalService", () => {
 
   it("validates initial tickets while a restarted Signal can have missed revocations", async () => {
     const tokens = fakeTokens();
-    tokens.validateClaims = vi.fn().mockResolvedValue(false);
+    tokens.validateClaims = vi.fn().mockReturnValue(Effect.succeed(false));
     const service = new SignalService(tokens, 8);
     const host = socket("host");
     await hello(service, host, "host-ticket", "host");
@@ -100,10 +163,13 @@ describe("SignalService", () => {
     try {
       const tokens = fakeTokens();
       const verifyTicket = tokens.verifyTicket;
-      tokens.verifyTicket = async (token) => ({
-        ...(await verifyTicket(token)),
-        sessionExpiresAt: Math.floor(Date.now() / 1_000) + 1,
-      });
+      tokens.verifyTicket = (token) =>
+        verifyTicket(token).pipe(
+          Effect.map((claims) => ({
+            ...claims,
+            sessionExpiresAt: Math.floor(Date.now() / 1_000) + 1,
+          })),
+        );
       const service = new SignalService(tokens, 8);
       const host = socket("host");
       await hello(service, host, "host-ticket", "host");
@@ -120,7 +186,10 @@ describe("SignalService", () => {
     const host = socket("idle-host");
     await hello(service, host, "host-ticket", "host");
 
-    await service.receive(host, JSON.stringify({ type: "turn-refresh", version: 1, connectionId: null }));
+    await runSignal(
+      service,
+      service.receive(host, JSON.stringify({ type: "turn-refresh", version: 1, connectionId: null })),
+    );
 
     expect(host.messages.at(-1)).toContain('"type":"ready"');
     expect(host.messages.at(-1)).toContain('"connectionId":null');
@@ -134,7 +203,7 @@ describe("SignalService", () => {
     await hello(service, host, "host-ticket", "host");
     await hello(service, client, "client-ticket", "client");
 
-    service.disconnect(host);
+    await runSignal(service, service.disconnect(host));
     const resumedHost = socket("host-resumed");
     await hello(service, resumedHost, "resume-host", "host");
     const ready = [...client.messages]
@@ -145,9 +214,12 @@ describe("SignalService", () => {
     expect(resumedHost.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(true);
     expect(resumedHost.messages.at(-1)).toContain('"resumed":true');
 
-    await service.receive(
-      client,
-      JSON.stringify({ type: "ice-restart", version: 1, connectionId: connectionId ?? "missing", channel: "team" }),
+    await runSignal(
+      service,
+      service.receive(
+        client,
+        JSON.stringify({ type: "ice-restart", version: 1, connectionId: connectionId ?? "missing", channel: "team" }),
+      ),
     );
     expect(resumedHost.messages.at(-1)).toContain('"type":"ice-restart"');
     expect(client.closed).toBe(false);
@@ -175,7 +247,7 @@ describe("SignalService", () => {
       await hello(service, host, "host-ticket", "host");
       await hello(service, client, "client-ticket", "client");
 
-      service.disconnect(client);
+      await runSignal(service, service.disconnect(client));
       expect(host.messages.some((message) => message.includes('"type":"disconnect"'))).toBe(false);
       await vi.advanceTimersByTimeAsync(30_000);
       expect(host.messages.at(-1)).toContain('"type":"disconnect"');
@@ -250,24 +322,30 @@ describe("SignalService", () => {
       expect(service.metrics().activePeerConnections).toBe(2);
       const secondId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
       expect(secondId).toEqual(expect.any(String));
-      await service.receive(
-        host,
-        JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "second-only" }),
+      await runSignal(
+        service,
+        service.receive(
+          host,
+          JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "second-only" }),
+        ),
       );
       expect(second.messages.at(-1)).toContain("second-only");
       expect(first.messages.some((message) => message.includes("second-only"))).toBe(false);
-      await service.receive(
-        first,
-        JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "cross-device" }),
+      await runSignal(
+        service,
+        service.receive(
+          first,
+          JSON.stringify({ type: "offer", version: 1, channel: "team", connectionId: secondId, sdp: "cross-device" }),
+        ),
       );
       expect(first.messages.at(-1)).toContain('"code":"permission_denied"');
 
-      service.disconnect(first);
+      await runSignal(service, service.disconnect(first));
       const resumed = socket("resumed-client");
       await hello(service, resumed, "resume-client", "client");
       expect(service.metrics().activePeerConnections).toBe(2);
       expect(second.closed).toBe(false);
-      service.disconnect(host);
+      await runSignal(service, service.disconnect(host));
       const recoveredHost = socket("recovered-host");
       await hello(service, recoveredHost, "resume-host", "host");
       expect(service.metrics().activePeerConnections).toBe(2);
@@ -278,15 +356,18 @@ describe("SignalService", () => {
       expect(second.closed).toBe(false);
       expect(service.metrics().activePeerConnections).toBe(1);
       const remainingId = JSON.parse(second.messages.at(-1) ?? "{}").connectionId;
-      await service.receive(
-        recoveredHost,
-        JSON.stringify({
-          type: "answer",
-          version: 1,
-          channel: "team",
-          connectionId: remainingId,
-          sdp: "still-connected",
-        }),
+      await runSignal(
+        service,
+        service.receive(
+          recoveredHost,
+          JSON.stringify({
+            type: "answer",
+            version: 1,
+            channel: "team",
+            connectionId: remainingId,
+            sdp: "still-connected",
+          }),
+        ),
       );
       expect(second.messages.at(-1)).toContain("still-connected");
     },
@@ -296,7 +377,10 @@ describe("SignalService", () => {
     const service = new SignalService(fakeTokens(), 8);
     const host = socket("legacy-host");
     service.connect(host);
-    await service.receive(host, JSON.stringify({ type: "hello", version: 1, peer: "host", token: "host-ticket" }));
+    await runSignal(
+      service,
+      service.receive(host, JSON.stringify({ type: "hello", version: 1, peer: "host", token: "host-ticket" })),
+    );
     const first = socket("first");
     await hello(service, first, "client-ticket", "client");
     const second = socket("second");
@@ -317,21 +401,20 @@ describe("SignalService", () => {
     // Hold the next verification open, so the socket can close in the middle of it.
     const verifyTicket = tokens.verifyTicket;
     const verification = deferred();
-    tokens.verifyTicket = vi.fn(async (token: string) => {
-      await verification.promise;
-      return await verifyTicket(token);
-    });
+    tokens.verifyTicket = vi.fn((token: string) =>
+      Effect.promise(() => verification.promise).pipe(Effect.flatMap(() => verifyTicket(token))),
+    );
 
     const client = socket("client");
     service.connect(client);
-    const authenticating = service.receive(
-      client,
-      JSON.stringify({ type: "hello", version: 1, peer: "client", token: "client-ticket" }),
+    const authenticating = runSignal(
+      service,
+      service.receive(client, JSON.stringify({ type: "hello", version: 1, peer: "client", token: "client-ticket" })),
     );
     expect(tokens.verifyTicket).toHaveBeenCalledOnce();
 
     // The teardown runs first. It finds no peer, because `#authenticate` has not registered one yet.
-    service.disconnect(client);
+    await runSignal(service, service.disconnect(client));
     verification.resolve();
     await authenticating;
 
@@ -353,7 +436,7 @@ describe("SignalService", () => {
     expect(service.connect(rejected)).toBe(false);
     expect(rejected.messages.at(-1)).toContain('"code":"rate_limited"');
 
-    service.disconnect(pending);
+    await runSignal(service, service.disconnect(pending));
     const host = socket("host");
     const client = socket("client");
     await hello(service, host, "host-ticket", "host");
@@ -388,24 +471,27 @@ function fakeTokens() {
     exp: now + 300,
   });
   return {
-    verifyTicket: async (token: string) => {
-      if (token === "host-ticket") return claims("host", "host-jti");
-      if (token === "stale-host-ticket") return claims("host", "stale-host-jti");
-      if (token === "client-ticket") return claims("member", "client-jti");
-      if (token === "fresh-client-ticket") return claims("member", "fresh-client-jti");
-      if (token === "second-client-ticket") return claims("member", "second-client-jti", "second-client-session");
-      if (token === "owner-ticket") return claims("owner", "owner-jti");
-      if (token === "current-host-ticket") return claims("host", "current-host-jti", "host-session", 2);
-      if (token === "current-client-ticket") return claims("member", "current-client-jti", "client-session", 2);
-      throw new Error("not an initial ticket");
-    },
-    verifyResumeToken: async (token: string) => {
-      if (token === "resume-client") return claims("member", "resume-jti");
-      if (token === "resume-host") return claims("host", "resume-host-jti");
-      throw new Error("not a resume token");
-    },
-    validateClaims: async () => true,
-    issueResumeToken: async (value: RemoteTicketClaims) => `resume-${value.role === "host" ? "host" : "client"}`,
+    verifyTicket: (token: string) =>
+      Effect.gen(function* () {
+        if (token === "host-ticket") return claims("host", "host-jti");
+        if (token === "stale-host-ticket") return claims("host", "stale-host-jti");
+        if (token === "client-ticket") return claims("member", "client-jti");
+        if (token === "fresh-client-ticket") return claims("member", "fresh-client-jti");
+        if (token === "second-client-ticket") return claims("member", "second-client-jti", "second-client-session");
+        if (token === "owner-ticket") return claims("owner", "owner-jti");
+        if (token === "current-host-ticket") return claims("host", "current-host-jti", "host-session", 2);
+        if (token === "current-client-ticket") return claims("member", "current-client-jti", "client-session", 2);
+        return yield* new RemoteTokenError({ message: "not an initial ticket" });
+      }),
+    verifyResumeToken: (token: string) =>
+      Effect.gen(function* () {
+        if (token === "resume-client") return claims("member", "resume-jti");
+        if (token === "resume-host") return claims("host", "resume-host-jti");
+        return yield* new RemoteTokenError({ message: "not a resume token" });
+      }),
+    validateClaims: () => Effect.succeed(true),
+    issueResumeToken: (value: RemoteTicketClaims) =>
+      Effect.succeed(`resume-${value.role === "host" ? "host" : "client"}`),
     iceServers: () => [{ urls: "stun:turn.example.com:3478" }],
   };
 }
@@ -443,8 +529,11 @@ function deferred() {
 
 async function hello(service: SignalService, target: SignalSocket, token: string, peer: "host" | "client") {
   service.connect(target);
-  await service.receive(
-    target,
-    JSON.stringify({ type: "hello", version: 1, peer, token, ...(peer === "host" ? { multiplex: true } : {}) }),
+  await runSignal(
+    service,
+    service.receive(
+      target,
+      JSON.stringify({ type: "hello", version: 1, peer, token, ...(peer === "host" ? { multiplex: true } : {}) }),
+    ),
   );
 }
