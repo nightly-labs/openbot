@@ -230,6 +230,10 @@ jobs:
           Start-Sleep -Seconds 1200
           Test-ProbeSigning "delayed"
 
+      - name: Log out of Azure Artifact Signing
+        if: always()
+        run: az account clear
+
   # Each architecture builds on a runner of its own kind. The install scripts run every provider
   # runtime they download, and Whisper and the remote desktop runtime are built or verified for the
   # runner's architecture, so one runner cannot produce both. The ARM64 job keeps the asset names
@@ -587,6 +591,12 @@ jobs:
             bun run dist:win
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Signing ends with the build. The later steps, which include third-party actions, get no Azure
+      # session and no cached signing token.
+      - name: Log out of Azure Artifact Signing
+        if: always() && env.WINDOWS_SIGNED == 'true'
+        run: az account clear
 
       - name: Verify packaged application metadata and launch
         shell: pwsh

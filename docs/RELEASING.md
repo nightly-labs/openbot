@@ -62,7 +62,8 @@ A tag build signs the Windows release with Azure Artifact Signing. It needs no s
   `repo:nightly-labs@100160810/openbot@1332461149:environment:release`, because this repository uses
   GitHub's immutable OIDC subject format. A dry run has no environment, so it cannot sign.
 - The `windows` job logs in with `azure/login`, caches a token for the signing service, and runs
-  `bun run dist:win --config electron-builder.windows-signing.yml`. That overlay adds
+  `bun run dist:win --config electron-builder.windows-signing.yml`, then runs `az account clear`, so
+  the steps after the build have no Azure session. That overlay adds
   `win.azureSignOptions` and `forceCodeSigning`. electron-builder signs `OpenBot.exe`, every `.exe` from
   `extraResources` (Whisper, the remote desktop runtime, and the Computer Use driver), the NSIS
   installer, and its uninstaller. The provider CLIs are not packaged on Windows, so their vendor
