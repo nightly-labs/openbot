@@ -30,11 +30,6 @@ export const messages = defineMessages("webClient", {
   "webClient.notice.join": "Join with invitation",
   "webClient.notice.reconnect": "Reconnect",
   "webClient.notice.refreshHosts": "Refresh hosts",
-  "webClient.uncertain.title": "Check whether your message arrived",
-  "webClient.uncertain.description":
-    "The connection ended before delivery was confirmed. Refresh and check the conversation before sending again. Your message will not be sent again automatically.",
-  "webClient.uncertain.refresh": "Refresh conversation",
-  "webClient.uncertain.checked": "I checked the conversation",
   "webClient.agent.modelsFailed": "Could not load the host models.",
   "webClient.agent.refreshFailed":
     "The agent was created, but the workspace could not refresh. Reload before trying again.",

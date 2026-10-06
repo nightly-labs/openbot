@@ -35,16 +35,7 @@ import {
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import {
-  Alert,
-  AlertActions,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  hasVisibleToasts,
-  toast,
-} from "@openbot/ui";
+import { hasVisibleToasts, toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
@@ -1555,42 +1546,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             <Conversation
               runtime={runtime}
               onOpenMarketplace={() => setMarketplaceOpen(true)}
-              notice={
-                <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
-                  <Alert class="web-connection-notice" tone="warning" role="status">
-                    <AlertContent>
-                      <AlertTitle>{t("webClient.uncertain.title")}</AlertTitle>
-                      <AlertDescription>{t("webClient.uncertain.description")}</AlertDescription>
-                      <AlertActions>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={workspace.state.busy}
-                          onClick={() => void workspace.run(workspace.refresh)}
-                        >
-                          {t("webClient.uncertain.refresh")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={workspace.state.busy}
-                          onClick={() => {
-                            workspace.acknowledgeSend();
-                            const key = `${server()?.id}:${workspace.state.selectedId}`;
-                            controller.setComposerErrors((current) => {
-                              const next = { ...current };
-                              delete next[key];
-                              return next;
-                            });
-                          }}
-                        >
-                          {t("webClient.uncertain.checked")}
-                        </Button>
-                      </AlertActions>
-                    </AlertContent>
-                  </Alert>
-                </Show>
-              }
               agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
               accountUsage={accountUsage()}
               // As in the desktop app on a joined host: an owner or admin downloads the host's
@@ -1664,20 +1619,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 await workspace.runtime.setAvatar(agentId, image);
                 await workspace.refresh();
               }}
-              onSendMessage={async (text, attachments, replyTo, target) => {
+              onSendMessage={async (text, attachments, replyTo, target, clientMessageId) => {
                 // A sent prompt is what a notification later reports, so the browser asks here, from the user's action.
                 requestWebNotificationPermission();
                 const id = target?.agentId ?? workspace.state.selectedId;
-                if (!id || (target && target.serverId !== server()?.id) || id !== workspace.state.selectedId)
-                  return false;
-                const sent = await workspace.send(text, attachments, replyTo);
-                if (!sent)
-                  controller.setComposerErrors((current) => ({
-                    ...current,
-                    [`${server()?.id}:${id}`]:
-                      workspace.state.conversations[id]?.sendError ?? t("webClient.error.checkConversation"),
-                  }));
-                return sent;
+                // A send for a host the user has left would reach the one they opened instead.
+                if (!id || (target && target.serverId !== server()?.id))
+                  return { error: t("webClient.error.checkConversation") };
+                return workspace.send(id, text, attachments, replyTo, clientMessageId);
               }}
               onMarkRead={workspace.markRead}
               onLoadOlder={() => void workspace.older()}

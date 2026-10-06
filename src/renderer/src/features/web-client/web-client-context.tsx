@@ -47,10 +47,6 @@ interface WebConversation {
   draft: string;
   attachments: AttachmentSummary[];
   loading: boolean;
-  sending: boolean;
-  uncertain: boolean;
-  /** Why the last send failed. The composer shows it; it is not a workspace error. */
-  sendError: string | null;
 }
 interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
@@ -687,13 +683,6 @@ export function createWebWorkspace(
         draft.conversations = {};
         draft.queues = {};
         draft.hiddenIds = [];
-      } else {
-        for (const item of Object.values(draft.conversations)) {
-          if (item.sending) {
-            item.sending = false;
-            item.uncertain = true;
-          }
-        }
       }
       draft.approvals = [];
       draft.prompts = [];
@@ -912,9 +901,6 @@ export function createWebWorkspace(
         draft: "",
         attachments: [],
         loading: true,
-        sending: false,
-        uncertain: false,
-        sendError: null,
       };
     });
     try {
@@ -972,68 +958,33 @@ export function createWebWorkspace(
       reloadPromise = null;
     }
   }
-  async function send(textOverride?: string, attachmentsOverride?: string[], replyToMessageId: string | null = null) {
-    const id = selectedId;
-    if (!id || state.status !== "online") return false;
-    const item = state.conversations[id];
-    if (
-      !item ||
-      item.sending ||
-      item.uncertain ||
-      (!(textOverride ?? item.draft).trim() && !(attachmentsOverride ?? item.attachments).length)
-    )
-      return false;
+  /**
+   * Sends one message to an agent of the open host. The chat shows it as pending and the answer says
+   * whether it arrived; a failure is never resent here. `clientMessageId` lets the host drop a retry.
+   */
+  async function send(
+    id: string,
+    text: string,
+    attachmentDraftIds: string[],
+    replyToMessageId: string | null = null,
+    clientMessageId?: string,
+  ): Promise<{ messageId: string } | { error: string }> {
+    const { t, errorMessage } = currentText();
+    if (state.status !== "online") return { error: t("chat.errorStatus.send") };
+    if (text.length > INPUT_LIMITS.messageText) return { error: t("webClient.error.messageTooLong") };
     const current = generation;
-    const text = textOverride ?? item.draft;
-    if (text.length > INPUT_LIMITS.messageText) {
-      setState((draft) => {
-        const conversation = draft.conversations[id];
-        if (conversation) conversation.sendError = currentText().t("webClient.error.messageTooLong");
-      });
-      return false;
-    }
-    setState((draft) => {
-      const conversation = draft.conversations[id];
-      if (!conversation) return;
-      conversation.sending = true;
-      conversation.sendError = null;
-    });
+    let messageId: string;
     try {
-      await runtime.send(
-        id,
-        text,
-        attachmentsOverride ?? item.attachments.map((attachment) => attachment.id),
-        replyToMessageId,
-      );
-      if (current !== generation || disposed) return false;
-      setState((draft) => {
-        const value = draft.conversations[id];
-        if (!value) return;
-        value.draft = "";
-        value.attachments = [];
-      });
-      try {
-        await refresh();
-      } catch (error) {
-        if (current === generation) report(error);
-      }
-      return true;
-    } catch {
-      if (current !== generation || disposed) return false;
-      setState((draft) => {
-        const conversation = draft.conversations[id];
-        if (!conversation) return;
-        conversation.uncertain = true;
-        conversation.sendError = currentText().t("webClient.error.deliveryUnconfirmed");
-      });
-      return false;
-    } finally {
-      if (current === generation && !disposed)
-        setState((draft) => {
-          const conversation = draft.conversations[id];
-          if (conversation) conversation.sending = false;
-        });
+      messageId = await runtime.send(id, text, attachmentDraftIds, replyToMessageId, clientMessageId);
+    } catch (error) {
+      return { error: errorMessage(error, t("webClient.error.deliveryUnconfirmed")) };
     }
+    // The next pending send of the chat waits for this answer, so the history reload runs beside it.
+    if (current === generation && !disposed)
+      refresh().catch((error: unknown) => {
+        if (current === generation) report(error);
+      });
+    return { messageId };
   }
   /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
   function markRead() {
@@ -1315,16 +1266,6 @@ export function createWebWorkspace(
         setState((draft) => {
           const conversation = draft.conversations[id];
           if (conversation) conversation.draft = text;
-        });
-    },
-    acknowledgeSend() {
-      const id = selectedId;
-      if (id)
-        setState((draft) => {
-          const conversation = draft.conversations[id];
-          if (!conversation) return;
-          conversation.uncertain = false;
-          conversation.sendError = null;
         });
     },
     async upload(file: File) {

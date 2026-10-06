@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
@@ -47,6 +47,7 @@ import type {
   McpServerConfig,
   McpTestResult,
   ProviderCodeLoginStart,
+  QueuedMessageReceipt,
   QueueSnapshot,
   RemoveMcpServerInput,
   ReorderQueueInput,
@@ -89,7 +90,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, type AgentRemovalFailed } from "./agent/agent-removal";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
@@ -250,12 +251,17 @@ export interface AgentServiceOptions {
   hostMemory?: HostMemory | null;
 }
 
+/** How long a user send's `clientMessageId` answers a retry. A retry follows a lost reply, not a day. */
+const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly messaging: MessagingThreads;
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new ProfileClients();
   #scope = Scope.makeUnsafe();
+  /** User sends still before their mailbox write, by idempotency key: a retry joins the first call. */
+  readonly #pendingUserSends = new Map<string, Deferred.Deferred<QueuedMessageReceipt, AgentLifecycleFailed>>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -2528,12 +2534,41 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * `sender` is the person the host saw send it. It is not part of `SendMessageInput`: the caller of
    * that input, a renderer or a Team API body, never names who it is. `timezone` is the zone of a
    * Team API member's client, when it sent one.
+   *
+   * A `clientMessageId` the same sender used for this agent within a day returns the first receipt. The
+   * key is a hash, so it fits the identifier bound whatever the ids are, and has no `:`-separated
+   * turn id for the mailbox to read.
    */
   readonly sendMessage = Effect.fn("AgentService.sendMessage")(function* (
     this: AgentService,
     input: SendMessageInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+  ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
+    if (!input.clientMessageId) return yield* this.#sendUserMessage(input, sender, timezone);
+    const idempotencyKey = `user-send:${createHash("sha256")
+      .update(JSON.stringify([sender?.id ?? null, input.agentId, input.clientMessageId]))
+      .digest("hex")}`;
+    // Every user message adds a key, and the map is persisted whole, so keys older than the window go.
+    this.#mailbox.forgetIdempotencyKeys("user-send:", new Date(Date.now() - USER_SEND_RETRY_WINDOW_MS));
+    const stored = this.#mailbox.receiptForKey(idempotencyKey);
+    if (stored) return stored;
+    const pending = this.#pendingUserSends.get(idempotencyKey);
+    if (pending) return yield* Deferred.await(pending);
+    const send = Deferred.makeUnsafe<QueuedMessageReceipt, AgentLifecycleFailed>();
+    this.#pendingUserSends.set(idempotencyKey, send);
+    return yield* this.#sendUserMessage(input, sender, timezone, idempotencyKey).pipe(
+      Effect.onExit((exit) => Deferred.done(send, exit)),
+      Effect.ensuring(Effect.sync(() => this.#pendingUserSends.delete(idempotencyKey))),
+    );
+  }).bind(this);
+
+  readonly #sendUserMessage = Effect.fn("AgentService.sendUserMessage")(function* (
+    this: AgentService,
+    input: SendMessageInput,
+    sender: ConversationMessageSender | undefined,
+    timezone: string | undefined,
+    idempotencyKey?: string,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -2566,6 +2601,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         text: input.text,
         draftIds: input.attachmentDraftIds ?? [],
         replyToMessageId: input.replyToMessageId ?? null,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       })
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause })),
