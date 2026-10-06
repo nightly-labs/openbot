@@ -4,10 +4,15 @@ A hosted server is an OpenBot server that runs in a [boat](https://boat.dev) san
 when the user's computer is off. Each server is one boat sandbox for one account. The sandbox runs
 the Linux build of OpenBot on the boat desktop. The server runs while it is in use. After 15 minutes with no
 use, the Worker stops it and keeps its data. The next client starts it again, and the Worker cron
-starts it before its next routine run. A connected client counts as use for 1 hour after its last
-request or typing event (`CLIENT_USE_WINDOW_MS`). A desktop app that is open in the background keeps
-a connection to each stored server but sends no request, so it does not keep the server on for
-longer than that. When the user comes back, the app starts the stopped server again.
+starts it before its next routine run. A connected client counts as use for 5 minutes after its
+last user action (`CLIENT_USE_WINDOW_MS`): a request that changes data, or a typing event. Reads and
+the requests that a client sends with no user action (polls, previews, mark-read) do not count
+(`src/main/team-api/client-use.ts`). So an app that is open but not used does not keep the server on:
+it stops 15 to 30 minutes after the last action (see the cron interval below). The desktop and the web client then show the server
+as asleep, and the next key press or click wakes it.
+
+To run the same build on your own computer, see [self-hosted servers](self-hosted-server.md). It
+uses the scripts and units of this page with `mode` set to `self`.
 
 The Worker enables hosted servers only when it has the boat and Stripe secrets and
 `HOSTED_SERVER_TEMPLATE`, and only for the account IDs or emails in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
@@ -75,8 +80,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    `POST /v2/hosting/claims/redeem`, signs in as the owner, keeps the host ID, and publishes the
    host. `registerHost` refuses the host ID for any other account.
 5. **In use.** OpenBot checks each minute whether the server is in use: an agent works, a remote
-   desktop or browser view is open, a file moves, or a remote client is connected (an open Team API
-   event stream) and sent a request or a typing event in the last hour. It sends
+   desktop view is open, a file moves, or a remote client is connected (an open Team API event
+   stream) and sent a user action or a typing event in the last 5 minutes. A key press or pointer
+   input in a browser view is a user action. An open browser view with no input does not count,
+   because a view that the user forgot would keep the server on. It sends
    `POST /v2/hosting/servers/:id/activity` with `{inUse, nextRunAt}` and the session from its claim:
    at once when the use starts, then at most each 5 minutes while the use continues, and each time
    the next routine run changes. The Worker accepts only that session, not the owner's own sessions.
@@ -103,13 +110,24 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    create and resume sends `ttlSeconds: 7200`, so boat stops a sandbox that the Worker loses. An
    activity report extends the time (`PATCH /sandboxes/:id`) when less than 1 hour is left
    (`lease_until`). When boat stops a server in use at the end of its lease, the Worker resumes it.
-6. **Start after a failure.** A client that cannot reach the host calls
-   `POST /v2/hosting/servers/:id/wake` (owner or member; 404 for a host that is not a hosted
-   server). This resumes a `stopped` sandbox or one in `error`. The desktop does this when Signal
-   answers `host_unavailable`, at most once a minute for each host. The web client does this when a
-   connection fails, then connects again every 5 seconds. The mobile app does the same for the
-   selected server while the app is in the foreground. A server whose plan ended answers
-   `402 plan_required`.
+6. **Start after a failure.** A client that cannot reach the host first calls
+   `GET /v2/hosting/servers/:id/status` (owner or member; 404 for a host that is not a hosted
+   server). It returns `{serverId, state, error, sleeping}` and writes nothing, so it does not count
+   as use. `sleeping` is true when the server stopped for no use (`desired_state = 'idle'`). Then:
+   - A sleeping server stays asleep. The client shows it as asleep and calls
+     `POST /v2/hosting/servers/:id/wake` on the next key press or click, or when the user selects
+     the server. Without this check, an open client would wake the server each time it stops.
+   - Any other server that the client cannot reach (a lease end, a crash, `error`) gets a wake at
+     once. This resumes a `stopped` sandbox or one in `error`.
+   - A network error gives no wake. A Worker with no status route (404 with another error code) gets
+     the old wake path.
+
+   The desktop asks for each stored hosted server when Signal answers `host_unavailable`, at most
+   once a minute for each host, and wakes only the selected server while the app has focus. After a
+   wake, it connects again every 5 seconds for at most 5 minutes. The web client does the same for
+   its one server, and checks a sleeping server again every 5 minutes. The mobile app has no status
+   check: it wakes the selected server while the app is in the foreground. A server whose plan ended
+   answers `402 plan_required`.
 
    A paid server whose setup failed has no sandbox. A wake (Retry in the add server dialog) sets
    it up again at once, and the cron does this 10 minutes after each failure. Each attempt sends
@@ -276,7 +294,7 @@ servers, their webhooks and the cron continue.
 7. **Check.** After the deploy, sign in with an allowed account, add a Starter server, pay, and
    connect from the desktop and the web client. Delete the server at the end.
 
-The cron runs each 5 minutes in production. An idle server stops 15 to 20 minutes after its last
+The cron runs each 5 minutes in production. An idle server stops 15 to 30 minutes after its last
 use, and the checks that repair a missed webhook run at most 5 minutes late.
 
 ## Build the server template

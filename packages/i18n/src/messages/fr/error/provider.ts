@@ -65,6 +65,8 @@ export const messages = {
     "Le téléchargement de l’environnement d’exécution a échoué au contrôle d’intégrité.",
   "error.provider.runtimeReplacing":
     "Impossible d’installer l’environnement d’exécution, car une autre instance le remplace.",
+  "error.provider.runtimeFilesInUse":
+    "Impossible d’installer l’environnement d’exécution, car un autre programme a ses fichiers ouverts. Fermez-le et réessayez.",
   "error.provider.metadataHttp":
     "Le téléchargement des métadonnées de l’environnement d’exécution a échoué avec HTTP {status}.",
   "error.provider.metadataIntegrity":
@@ -150,6 +152,10 @@ export const messages = {
   "error.provider.bunVersionUnreadable": "Impossible de lire la version de l’environnement d’exécution Bun.",
   "error.provider.connectBeforeProfile": "Connectez le fournisseur sélectionné avant de générer un profil.",
   "error.provider.cliNotReady": "La CLI {provider} n’est pas prête ou n’est pas connectée.",
+  "error.provider.cliTimedOut":
+    "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. OpenBot va réessayer.",
+  "error.provider.cliTimedOutRefresh":
+    "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. Actualisez les fournisseurs pour réessayer.",
   "error.provider.noCodeSignIn": "{provider} ne permet pas de se connecter avec un code.",
   "error.provider.codeLoginNoLink": "Le fournisseur n’a pas affiché de lien de connexion. Réessayez.",
   "error.provider.codeLoginNotWaiting": "Aucune connexion n’attend de code. Relancez la connexion.",
@@ -200,6 +206,17 @@ export const messages = {
   "error.provider.cursorNotStarted": "L’agent Cursor a été trouvé, mais sa version est illisible.",
   "error.provider.cursorVersionUnreadable": "Impossible de lire la version de l’agent Cursor.",
   "error.provider.cursorSignIn": "Connectez-vous avec Cursor ou définissez CURSOR_API_KEY pour utiliser Cursor.",
+  "error.provider.clineArchivePath": "L’archive Cline contient un chemin inattendu.",
+  "error.provider.clinePackageMismatch":
+    "Le paquet Cline ne correspond pas au catalogue des environnements d’exécution.",
+  "error.provider.clineChecksum": "La somme de contrôle de l’environnement d’exécution Cline ne correspond pas.",
+  "error.provider.clineLicenseChecksum": "La somme de contrôle de la licence Cline ne correspond pas.",
+  "error.provider.clineMissing": "Cline n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
+  "error.provider.clineOutdated":
+    "La CLI Cline {version} est trop ancienne. OpenBot nécessite la version 3.0.68 ou plus récente.",
+  "error.provider.clineNotStarted": "Cline n’a pas pu démarrer. Exécutez `cline --version` dans un terminal.",
+  "error.provider.clineVersionUnreadable": "Impossible de lire la version de la CLI Cline.",
+  "error.provider.clineSignIn": "Connectez-vous avec Cline ou définissez CLINE_API_KEY pour utiliser Cline.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",

@@ -32,7 +32,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
-import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import {
   isForeignReasoningError,
@@ -44,6 +44,7 @@ import {
   toThreadItem,
 } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
+import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
   onChanged(listener: (tabs: BrowserTab[], activeTabId: string | null) => void): () => void;
@@ -70,6 +71,13 @@ export interface TurnHooks {
   redactMcp(text: string): string;
   /** A finished tool step, for product analytics only. It never reaches a renderer or a remote client. */
   emitToolUsage(usage: ToolUsageSignal): void;
+  /** The model this turn was started with, or null when the drain no longer knows it. */
+  turnModel(agentId: string, turnId: string): string | null;
+  /**
+   * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
+   * when the delivery is not an active channel assignment that can go back.
+   */
+  requeueChannelDelivery(deliveryId: string): boolean;
 }
 
 export interface TurnLifecycleOptions {
@@ -84,6 +92,7 @@ export interface TurnLifecycleOptions {
   compaction: ContextCompaction;
   images: ImageGenRuntime;
   deltas: DeltaBuffer;
+  usageLimits: UsageLimitGate;
   hooks: TurnHooks;
 }
 
@@ -108,6 +117,7 @@ export class TurnLifecycle {
   readonly #compaction: ContextCompaction;
   readonly #images: ImageGenRuntime;
   readonly #deltas: DeltaBuffer;
+  readonly #usageLimits: UsageLimitGate;
   readonly #hooks: TurnHooks;
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
@@ -121,11 +131,15 @@ export class TurnLifecycle {
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta: a refused turn is run again only without one.
+   * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
+   * and the echo of the user's message do not count.
    */
   readonly #runningTurns = new Map<
     string,
-    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean }
+    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean; acted: boolean }
   >();
+  /** Running turns a provider plan refused, with the reset in epoch seconds when the provider gave it. */
+  readonly #limitedTurns = new Map<string, number | null>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
   /**
@@ -146,6 +160,7 @@ export class TurnLifecycle {
     this.#compaction = options.compaction;
     this.#images = options.images;
     this.#deltas = options.deltas;
+    this.#usageLimits = options.usageLimits;
     this.#hooks = options.hooks;
   }
 
@@ -192,6 +207,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#limitedTurns.clear();
     this.#runningTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
@@ -252,7 +268,14 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
-        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now(), produced: false });
+        this.#runningTurns.set(turnId, {
+          client: source,
+          agentId,
+          threadId,
+          startedAt: Date.now(),
+          produced: false,
+          acted: false,
+        });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
@@ -277,7 +300,7 @@ export class TurnLifecycle {
         if (!turnId || !item) return;
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
+        this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
@@ -302,7 +325,6 @@ export class TurnLifecycle {
         const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
-        this.#markProduced(turnId);
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         let message = snapshot.messages.find((candidate) => candidate.id === itemId);
@@ -310,6 +332,11 @@ export class TurnLifecycle {
           message = newAssistantMessage(itemId, turnId);
           snapshot.messages.push(message);
         }
+        // Claude streams its thinking as message deltas on a commentary item, which is not an answer.
+        this.#markProduced(
+          turnId,
+          notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
+        );
         if (notification.method.startsWith("item/reasoning/")) {
           if (message.itemType !== "commentary") {
             message.itemType = "commentary";
@@ -371,6 +398,12 @@ export class TurnLifecycle {
         this.#providers.refreshCodexUsage();
         return;
       }
+      case USAGE_LIMIT_METHOD: {
+        const turnId = getString(params, "turnId");
+        const resetsAt = isRecord(params) && typeof params.resetsAt === "number" ? params.resetsAt : null;
+        if (turnId && this.#runningTurns.has(turnId)) this.#limitedTurns.set(turnId, resetsAt);
+        return;
+      }
       case "error":
       case "warning": {
         // A notification that carries no `message` says only that something went wrong. The method
@@ -392,7 +425,18 @@ export class TurnLifecycle {
           // The turn's completion runs it again or reports it in words the user can act on.
           if (isForeignReasoningError(message)) return;
         }
-        if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
+        if (
+          error?.codexErrorInfo === "usageLimitExceeded" ||
+          isUsageLimitDiagnostic(message) ||
+          (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
+        ) {
+          // Only a plan window resets by itself. A spent balance fails as before, with its reason.
+          const planLimit =
+            isPlanLimitDiagnostic(message) ||
+            (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
+          if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+          }
           this.#providers.refreshUsageAfterLimit(source);
           return;
         }
@@ -412,12 +456,16 @@ export class TurnLifecycle {
       status === "failed" &&
       reportedError !== undefined &&
       isForeignReasoningError(reportedError);
+    const limited = status === "failed" && this.#limitedTurns.has(turnId);
+    const resetsAt = this.#limitedTurns.get(turnId) ?? null;
+    this.#limitedTurns.delete(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
     this.#memories.finishTurn(turnId, status);
-    // A refused session is closed below, so it is not compacted.
-    const shouldCompact = !refused && this.#compaction.reserve(agentId, threadId);
+    // A refused session is closed below, and a spent plan would refuse the summary turn too, so
+    // neither is compacted.
+    const shouldCompact = !refused && !limited && this.#compaction.reserve(agentId, threadId);
     this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     snapshot.activeTurnId = null;
@@ -433,15 +481,38 @@ export class TurnLifecycle {
       await this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
       return;
     }
-    if (status === "failed") this.#failedTurns.set(agentId, turnId);
-    else this.#failedTurns.delete(agentId);
+    // The plan refused the turn before it did anything that a second run would repeat, so its
+    // messages wait in the queue for the reset. A channel task goes back to its channel's queue
+    // instead: an assignment that waited here would reserve the whole host until the reset.
+    const repeatable = limited && running !== undefined && !running.acted && deliveries.length > 0;
+    const channelTurn = this.#conversation.isExecutionThread(snapshot.threadId);
+    const requeue = repeatable && !channelTurn;
     for (const message of snapshot.messages) {
       if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
-      message.status = normalizeCompletionStatus(status);
+      message.status = normalizeCompletionStatus(repeatable ? "interrupted" : status);
       markIncompleteImageGeneration(message, message.status);
     }
     // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
     for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
+    // The limit belongs to the model the turn ran on, which the agent may have left since.
+    const model = this.#hooks.turnModel(agentId, turnId);
+    if (requeue) {
+      await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+      // After the requeue, so a routine set to skip finds its run back in the queue.
+      this.#usageLimits.reached(agentId, resetsAt, model);
+      this.#hooks.scheduleDrain(agentId);
+      return;
+    }
+    if (limited) this.#usageLimits.reached(agentId, resetsAt, model);
+    else if (status === "completed") this.#usageLimits.completed(agentId, model);
+    // After the limit is recorded, so the channel does not assign the task to this agent again
+    // before the reset. A channel that took the task back ends this turn as interrupted.
+    const outcome =
+      repeatable && channelTurn && deliveries.every(({ delivery }) => this.#hooks.requeueChannelDelivery(delivery.id))
+        ? "interrupted"
+        : status;
+    if (outcome === "failed") this.#failedTurns.set(agentId, turnId);
+    else this.#failedTurns.delete(agentId);
     const failure = refused
       ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
       : reportedError;
@@ -461,7 +532,7 @@ export class TurnLifecycle {
           message.text.trim(),
       );
     if (deliveries.length > 0) {
-      const terminal = status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "completed";
+      const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {
         this.#refusedRetries.delete(delivery.delivery.id);
         const reason = terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null;
@@ -484,7 +555,7 @@ export class TurnLifecycle {
       await this.#store.updatePreview(agentId, latestAssistant.text);
       this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     }
-    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status });
+    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });
     if (deliveries.length > 0) {
       try {
         this.#mailboxSync.emitQueue(agentId);
@@ -498,7 +569,7 @@ export class TurnLifecycle {
       agentId,
       threadId: this.#conversation.publicThreadId(agentId, threadId),
       turnId,
-      status,
+      status: outcome,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
     if (refused) this.#hooks.dropRefusedSession(agentId, threadId);
@@ -519,8 +590,21 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
   ): Promise<void> {
+    for (const { delivery } of deliveries) this.#refusedRetries.add(delivery.id);
+    await this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+    this.#hooks.dropRefusedSession(agentId, threadId);
+    this.#hooks.scheduleDrain(agentId);
+  }
+
+  /** Puts the deliveries of a turn the provider refused back at their place in the queue, and ends the turn as interrupted. */
+  async #requeueTurn(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    deliveries: readonly DeliveryContext[],
+  ): Promise<void> {
     for (const { delivery } of deliveries) {
-      this.#refusedRetries.add(delivery.id);
       await this.#mailbox.requeueRefused(delivery.id);
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
@@ -539,13 +623,13 @@ export class TurnLifecycle {
       status: "interrupted",
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
-    this.#hooks.dropRefusedSession(agentId, threadId);
-    this.#hooks.scheduleDrain(agentId);
   }
 
-  #markProduced(turnId: string): void {
+  #markProduced(turnId: string, acted: boolean): void {
     const running = this.#runningTurns.get(turnId);
-    if (running) running.produced = true;
+    if (!running) return;
+    running.produced = true;
+    if (acted) running.acted = true;
   }
 
   async #associateStartedTurn(agentId: string, turnId: string, snapshot: ConversationSnapshot): Promise<void> {
@@ -689,4 +773,14 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);
   }
+}
+
+/**
+ * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
+ * the provider's echo of the user's message are not repeated work.
+ */
+function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+  if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
+  if (item.type !== "agentMessage") return true;
+  return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
 }

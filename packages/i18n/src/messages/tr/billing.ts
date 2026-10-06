@@ -1,4 +1,35 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "billing.title": "Faturalandırma",
+  "billing.description": "Her sunucunun kendi planı vardır. Ödemeyi Stripe işler.",
+  "billing.loading": "Faturalandırma yükleniyor…",
+  "billing.unavailable": "Faturalandırma bu hesap sunucusunda kullanılamıyor.",
+  "billing.loadFailed": "Faturalandırma yüklenemedi.",
+  "billing.portalFailed": "Faturalandırma yönetimi açılamadı.",
+  "billing.servers.title": "Sunucu planları",
+  "billing.manage": "Ödeme yöntemi ve faturalar",
+  "billing.opening": "Açılıyor…",
+  "billing.empty": "Sunucularınızın hiçbirinin bir planı yok.",
+  "billing.paymentFailed": "Bir ödeme başarısız oldu. Planı sürdürmek için ödeme yöntemini güncelleyin.",
+  "billing.interval.month": "Aylık",
+  "billing.interval.year": "Yıllık",
+  "billing.plan.starter": "Başlangıç",
+  "billing.plan.standard": "Standart",
+  "billing.plan.pro": "Pro",
+  "billing.server.unnamed": "Adsız sunucu",
+  "billing.server.summary": "{plan} · {size} GB",
+  "billing.server.price.month": "{amount} / ay",
+  "billing.server.price.year": "{amount} / yıl",
+  "billing.server.renews": "{date} tarihinde yenilenir",
+  "billing.server.ends": "{date} tarihinde sona erer",
+  "billing.status.trialing": "Deneme",
+  "billing.status.paymentFailed": "Ödeme başarısız",
+  "billing.status.paused": "Duraklatıldı",
+  "billing.action.menu": "{server} için plan işlemleri",
+  "billing.action.change": "Planı değiştir",
+  "billing.action.cancel": "Planı iptal et",
+  "billing.action.renew": "Planı yenile",
+  "billing.action.updatePayment": "Ödeme yöntemini güncelle",
+} as const satisfies PartialTranslation<typeof source>;

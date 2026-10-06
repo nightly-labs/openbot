@@ -24,6 +24,7 @@ import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
+import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "./send-shortcut";
 
 interface DirectConversationProps {
   member: TeamPresenceMember;
@@ -40,6 +41,11 @@ interface DirectConversationProps {
   onLoadOlder?: () => void;
   onOpenMessage?: (messageId: string) => Promise<void>;
   onTypingChange: (typing: boolean) => void;
+  /**
+   * Which chord sends the message. Enter keeps the current behavior; in the modifier mode
+   * plain Enter adds a line. The renderer resolves the platform and passes it.
+   */
+  sendShortcut?: SendShortcut;
 }
 
 export function DirectConversation(props: DirectConversationProps) {
@@ -425,7 +431,14 @@ export function DirectConversation(props: DirectConversationProps) {
             disabled={sending()}
             onValueChange={updateText}
             onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+              // The browser owns the key that commits an IME composition. Safari sends it
+              // after `compositionend` without `isComposing`; keyCode 229 marks it.
+              if (event.isComposing || event.keyCode === 229) return;
+              const shortcut = props.sendShortcut ?? "enter";
+              // Enter to send keeps the previous chord: every Enter without Shift sends.
+              if (shortcut === "enter") {
+                if (event.key !== "Enter" || event.shiftKey) return;
+              } else if (!isSendShortcutKey(event, shortcut)) return;
               event.preventDefault();
               void send();
             }}
@@ -434,6 +447,8 @@ export function DirectConversation(props: DirectConversationProps) {
             variant="default"
             type="button"
             aria-label={t("conversation.direct.send")}
+            aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
+            title={t(sendShortcutHintKey(props.sendShortcut ?? "enter", "send"))}
             disabled={!text().trim() || sending()}
             onClick={() => void send()}
           >

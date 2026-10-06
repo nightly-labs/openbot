@@ -79,6 +79,7 @@ import type {
   ExternalDestination,
   HostUpdateSettingsChange,
   HostUpdateStatus,
+  IdleRestartTarget,
   MacPermissionId,
   ProviderRuntimeSnapshot,
   SaveSetupInput,
@@ -199,7 +200,15 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type {
+  AddSlackOrchestratorInput,
+  AddSlackOrchestratorResult,
+  SetSlackEnabledInput,
+  SlackOverview,
+  SlackWorkspaceInput,
+} from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type { OnePasswordConnectInput, OnePasswordConnectorStatus } from "./ipc-onepassword-connector";
 import type {
   DetectedModelServer,
   DiscoverModelsInput,
@@ -228,6 +237,8 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   Routine,
+  RoutineCalendar,
+  RoutineCalendarInput,
   RoutineRun,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -423,6 +434,13 @@ export const IPC_ENDPOINTS = {
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     refreshAgentProviders: request<undefined, AgentStatus>()("app:refresh-agent-providers"),
     /**
+     * Restarts one provider's process after the turns that run on it end, and reads its version,
+     * account and models again. It answers when the restart is scheduled; the provider's status has
+     * `restartPending` until it is done. `cancelProviderRestart` removes one that still waits.
+     */
+    restartProvider: request<AgentProviderId, AgentStatus>()("app:restart-provider"),
+    cancelProviderRestart: request<AgentProviderId, AgentStatus>()("app:cancel-provider-restart"),
+    /**
      * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
      * so the version they end on is whatever that updater fetches, which owes nothing to the version
      * OpenBot pins for the runtime it manages.
@@ -469,6 +487,10 @@ export const IPC_ENDPOINTS = {
     presentation: event<DynamicIslandPresentation>()("dynamic-island:presentation"),
     preference: event<DynamicIslandPreference>()("dynamic-island:preference"),
     geometry: event<DynamicIslandGeometry>()("dynamic-island:geometry"),
+    /** The notch of the built-in display, or null when it has none. The Settings preview draws it. */
+    getBuiltInDisplayGeometry: request<undefined, DynamicIslandGeometry>()(
+      "dynamic-island:get-built-in-display-geometry",
+    ),
     performAction: request<DynamicIslandAction, void>()("dynamic-island:perform-action"),
     performHaptic: request<undefined, void>()("dynamic-island:perform-haptic"),
     action: event<DynamicIslandAction>()("dynamic-island:action"),
@@ -561,6 +583,19 @@ export const IPC_ENDPOINTS = {
       "provider-admin:delete-custom-provider",
     ),
   },
+  // The Slack workspaces where this computer's agents answer. Only the host's own desktop can use
+  // these: a connect opens a Slack page in this computer's browser, and the page returns to this
+  // computer's `openbot://` link. A token only travels towards the host; no result carries one.
+  messaging: {
+    getSlackOverview: request<undefined, SlackOverview>()("messaging:get-slack-overview"),
+    connectSlackWorkspace: request<undefined, void>()("messaging:connect-slack-workspace"),
+    disconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:disconnect-slack-workspace"),
+    reconnectSlackWorkspace: request<SlackWorkspaceInput, void>()("messaging:reconnect-slack-workspace"),
+    setSlackEnabled: request<SetSlackEnabledInput, void>()("messaging:set-slack-enabled"),
+    addSlackOrchestrator: request<AddSlackOrchestratorInput, AddSlackOrchestratorResult>()(
+      "messaging:add-slack-orchestrator",
+    ),
+  },
   // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`
   // reach this computer only; these take the server, so a remote admin reaches the host. The
   // identity result is the server as the list shows it after the change.
@@ -585,6 +620,22 @@ export const IPC_ENDPOINTS = {
     openVerification: request<undefined, void>()("github-connector:open-verification"),
     openInstall: request<undefined, void>()("github-connector:open-install"),
     changed: event<GitHubConnectorStatus>()("github-connector:changed"),
+  },
+  // The 1Password connection of this computer. Local only, like `githubConnector`. The token goes
+  // from the renderer to main once, in `connectWithToken`; every answer is the status only.
+  onePasswordConnector: {
+    status: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:status"),
+    // Looks again for the CLI and the 1Password app's CLI integration, for a page that opens or regains focus.
+    checkSetup: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:check-setup"),
+    // Downloads the CLI release that main pins, into a folder that OpenBot owns.
+    installCli: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:install-cli"),
+    // Opens the 1Password app, or its download page when it is not installed.
+    openApp: request<undefined, void>()("onepassword-connector:open-app"),
+    connect: request<OnePasswordConnectInput, OnePasswordConnectorStatus>()("onepassword-connector:connect"),
+    connectWithToken: request<string, OnePasswordConnectorStatus>()("onepassword-connector:connect-with-token"),
+    cancel: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:cancel"),
+    disconnect: request<undefined, OnePasswordConnectorStatus>()("onepassword-connector:disconnect"),
+    changed: event<OnePasswordConnectorStatus>()("onepassword-connector:changed"),
   },
   hostedSites: {
     // The sites of one server. A joined server answers through `hosted-sites-v1`.
@@ -653,6 +704,9 @@ export const IPC_ENDPOINTS = {
     getPreference: request<undefined, UpdatePreference>()("update:get-preference"),
     setPreference: request<UpdatePreferenceChange, UpdatePreference>()("update:set-preference"),
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
+    // The user of this computer restarts OpenBot, or installs the update, when no work runs.
+    restartWhenIdle: request<IdleRestartTarget, UpdateStatus>()("update:restart-when-idle"),
+    cancelIdleRestart: request<undefined, UpdateStatus>()("update:cancel-idle-restart"),
     event: event<UpdateStatus>()("update:event"),
     // A preference that an admin of a joined server changed on this computer.
     preference: event<UpdatePreference>()("update:preference-event"),
@@ -739,6 +793,10 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<DeleteRoutineInput, void>()("agent:delete-routine"),
     testRoutine: scopedRequest<TestRoutineInput, RoutineRun>()("agent:test-routine"),
     listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
+    /** The shell command a local script uses to run the routine. It names the token file, not the token. */
+    automationRunCommand: scopedRequest<TestRoutineInput, string>()("agent:automation-run-command"),
+    // Every routine of the host, of agents and channels, with its runs in a range.
+    routineCalendar: scopedRequest<RoutineCalendarInput, RoutineCalendar>()("agent:routine-calendar"),
   },
   channelMemories: {
     listChannelMemories: scopedRequest<string, ChannelMemory[]>()("agent:channel-memories:list"),

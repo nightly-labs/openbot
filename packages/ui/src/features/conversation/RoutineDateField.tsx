@@ -141,6 +141,7 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
           variant="ghost"
           size="icon-xs"
           disabled={!canGoBack()}
+          data-cuelume-tap="navigate"
           onClick={() => showMonth(-1)}
         >
           <ChevronLeft aria-hidden="true" />
@@ -152,6 +153,7 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
           label={text.t("routine.date.nextMonth")}
           variant="ghost"
           size="icon-xs"
+          data-cuelume-tap="navigate"
           onClick={() => showMonth(1)}
         >
           <ChevronRight aria-hidden="true" />
@@ -181,6 +183,7 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
                     : text.format.date(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
                 }
                 aria-pressed={key === props.value ? "true" : "false"}
+                data-cuelume-tap="select"
                 aria-current={!props.yearly && key === todayKey() ? "date" : undefined}
                 onFocus={() => setFocusKey(key)}
                 onKeyDown={(event: KeyboardEvent) => moveFocus(event, key)}

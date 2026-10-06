@@ -48,8 +48,8 @@ export interface DeliveryPromptSources {
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind"> | null;
-  /** The prompt a channel task sends in place of the delivery text. */
-  channelText?: string;
+  /** The prompt a channel task or an external message sends in place of the delivery text. */
+  executionText?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames);
-  let text = sources.channelText ?? (displayText || "The user shared attached local files.");
+  let text = sources.executionText ?? (displayText || "The user shared attached local files.");
   if (delivery.sender.kind === "user" && delivery.replyToMessageId) {
     const referenced = snapshot.messages.find((message) => message.id === delivery.replyToMessageId);
     text = [

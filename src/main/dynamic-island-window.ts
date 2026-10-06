@@ -83,6 +83,12 @@ export class DynamicIslandWindowController {
     return this.#presentation;
   }
 
+  /** The notch of the built-in display, or null when there is no built-in display or it has no notch. */
+  get builtInDisplayGeometry(): DynamicIslandNotchSize | null {
+    const builtIn = this.#options.getDisplays().find((display) => display.internal);
+    return (builtIn && dynamicIslandNotchSizeForDisplay(builtIn)) ?? null;
+  }
+
   get mainRendererIds(): ReadonlySet<number> {
     const window = this.#options.getMainWindow();
     return new Set(window && !window.isDestroyed() ? [window.webContents.id] : []);
@@ -188,7 +194,8 @@ export class DynamicIslandWindowController {
       return;
     }
     const window = await this.#ensureMainWindow();
-    this.#options.presentMainWindow(window);
+    // A dismissal changes only the island, so the main window stays where it is.
+    if (action.type !== "dismiss-failure") this.#options.presentMainWindow(window);
     if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
       throw new Error(sourceText("error.backend.windowTemporarilyUnavailable"));
     }

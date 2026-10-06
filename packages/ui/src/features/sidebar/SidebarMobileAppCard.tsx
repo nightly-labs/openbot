@@ -40,6 +40,7 @@ export function SidebarMobileAppCard(props: { onCopyInvite: () => Promise<void>;
           size="icon-xs"
           variant="ghost"
           label={t("sidebar.mobileApp.dismiss")}
+          data-cuelume-tap="close"
           onClick={() => props.onDismiss()}
         >
           <X aria-hidden="true" />

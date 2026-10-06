@@ -16,7 +16,8 @@ export function skillExamplePrompt(
   return skill.examplePrompt?.trim() || t("skill.preview.examplePrompt");
 }
 
-function skillInstructions(skill: MarketplaceSkillDetail): string {
+/** The SKILL.md body without its first heading, when that heading only repeats the name. */
+export function skillInstructions(skill: MarketplaceSkillDetail): string {
   const instructions = skill.instructions || skill.description;
   const [first, ...rest] = instructions.split(/\r?\n/u);
   return first?.replace(/^#\s+/u, "").trim() === skill.name ? rest.join("\n").trim() : instructions;

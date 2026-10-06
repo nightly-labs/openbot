@@ -101,6 +101,7 @@ export function ImageGallery(props: {
                 class={["image-gallery-tile", { "image-gallery-tile-missing": isMissing() }]}
                 data-attachment-id={image.id}
                 disabled={isMissing() && !props.onDownload}
+                data-cuelume-tap={isMissing() ? undefined : "open"}
                 aria-label={
                   !isMissing()
                     ? t("chat.image.preview", { name: image.name })
@@ -421,6 +422,7 @@ export function ImageLightbox(props: {
                 class="image-lightbox-action"
                 aria-label={t("chat.image.lightbox.close")}
                 title={t("chat.image.lightbox.close")}
+                data-cuelume-tap="close"
                 onClick={close}
               >
                 <CloseIcon />
@@ -476,6 +478,7 @@ export function ImageLightbox(props: {
                 type="button"
                 class="image-lightbox-step image-lightbox-step-previous image-lightbox-chrome"
                 aria-label={t("chat.image.lightbox.previous")}
+                data-cuelume-tap="navigate"
                 onClick={() => step(-1)}
               >
                 <ChevronLeft aria-hidden="true" />
@@ -486,6 +489,7 @@ export function ImageLightbox(props: {
                 type="button"
                 class="image-lightbox-step image-lightbox-step-next image-lightbox-chrome"
                 aria-label={t("chat.image.lightbox.next")}
+                data-cuelume-tap="navigate"
                 onClick={() => step(1)}
               >
                 <ChevronRight aria-hidden="true" />
@@ -502,6 +506,7 @@ export function ImageLightbox(props: {
                     class="image-lightbox-thumb"
                     aria-label={t("chat.image.preview", { name: entry.name })}
                     aria-current={position() === index() ? "true" : undefined}
+                    data-cuelume-tap="navigate"
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
                     <img src={entry.previewUrl ?? ""} alt="" decoding="async" draggable={false} />

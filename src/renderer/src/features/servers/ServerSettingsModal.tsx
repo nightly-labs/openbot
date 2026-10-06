@@ -31,10 +31,9 @@ import {
   Sparkles,
   Tabs,
   Text,
-  toast,
   UsersRound,
 } from "@openbot/ui";
-import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
+import type { AgentProfile } from "@openbot/ui/data";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
 import {
@@ -43,7 +42,11 @@ import {
 } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
+import { ConnectorsPanel } from "../connectors/ConnectorsPanel";
 import type { GitHubConnectorController } from "../connectors/github-connector";
+import type { OnePasswordConnectorController } from "../connectors/onepassword-connector";
+import type { SlackConnectorController } from "../connectors/slack-connector";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
@@ -137,10 +140,16 @@ export interface ServerSettingsModalProps {
    */
   agentImport?: ServerImportOptions | undefined;
   /**
-   * The Connectors section appears only when a caller supplies this: the GitHub connection belongs
-   * to this computer, so a remote server and a build without a GitHub App pass nothing.
+   * The Connectors section appears only when a caller supplies one of these: the GitHub connection
+   * and the Slack apps belong to this computer, so a remote server passes neither, and a build
+   * without a GitHub App passes no GitHub.
    */
   githubConnector?: GitHubConnectorController | undefined;
+  /** This computer's 1Password connection. A remote server passes none. */
+  onePasswordConnector?: OnePasswordConnectorController | undefined;
+  slackConnector?: SlackConnectorController | undefined;
+  /** This computer's agents, for the Slack page. */
+  connectorAgents?: AgentProfile[] | undefined;
   /**
    * The Updates section appears only when a caller supplies this: a remote host with
    * `host-update-v1` that this member administers.
@@ -220,7 +229,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       await action();
       return true;
     } catch (error) {
-      toast.error(t("server.settings.actionFailedTitle"), {
+      actionToast.error(t("server.settings.actionFailedTitle"), {
         description: errorMessage(error, t("server.settings.actionFailed")),
       });
       return false;
@@ -239,7 +248,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     busy,
     run,
     showCopyError() {
-      toast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
+      actionToast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
     },
   };
   const general = createServerGeneralSection(host, { onSetUpDesktop: () => setSection("desktop") });
@@ -544,7 +553,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.import.title)}</span>
               </Tabs.Trigger>
             </Show>
-            <Show when={props.githubConnector}>
+            <Show when={props.githubConnector || props.onePasswordConnector || props.slackConnector}>
               <Tabs.Trigger class="settings-modal-nav-item" value="connectors">
                 <Plug aria-hidden="true" />
                 <span>{t(sections.connectors.title)}</span>
@@ -660,26 +669,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Tabs.Content>
           )}
         </Show>
-        <Show when={props.githubConnector}>
-          {(github) => (
-            <Tabs.Content
-              value="connectors"
-              class="settings-modal-tab-panel server-settings-panel"
-              data-tab="connectors"
-            >
-              <GitHubConnectorPanel
-                status={github().status()}
-                busy={github().busy()}
-                repositories={github().repositories()}
-                repositoriesError={github().repositoriesError()}
-                onConnect={github().connect}
-                onCancel={github().cancel}
-                onDisconnect={github().disconnect}
-                onOpenVerification={github().openVerification}
-                onOpenInstall={github().openInstall}
-              />
-            </Tabs.Content>
-          )}
+        <Show when={props.githubConnector || props.onePasswordConnector || props.slackConnector}>
+          <Tabs.Content value="connectors" class="settings-modal-tab-panel server-settings-panel" data-tab="connectors">
+            <ConnectorsPanel
+              github={props.githubConnector}
+              onePassword={props.onePasswordConnector}
+              slack={props.slackConnector}
+              agents={props.connectorAgents ?? []}
+            />
+          </Tabs.Content>
         </Show>
       </SettingsDialogShell>
 

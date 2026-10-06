@@ -1,19 +1,26 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   assertStorageUsageScope,
+  CHANNEL_CHATS_CAPABILITY,
   decodeAgentAdminSettings,
+  decodeChannelRoutineRuns,
+  decodeChannelRoutines,
+  decodeChannelSummaries,
   decodeInstalledSkills,
   decodeStorageUsage,
   isAgentMemory,
   isAgentModelOption,
   isQueueSnapshot,
   isRoutine,
+  isRoutineRun,
+  type RoutineCalendarOwner,
   STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -23,7 +30,9 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/que
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { readHostAnalytics } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   installAgentTemplate,
   listAgentSkills,
@@ -35,7 +44,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
-import { ignoreResponse } from "@/features/workspace/model/workspace-records";
+import { decodeAgentSummaries, ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
 
@@ -61,6 +70,8 @@ type HostRequestActions = Pick<
   | "loadAgentModels"
   | "loadAgentMemories"
   | "loadAgentRoutines"
+  | "loadRoutineCalendar"
+  | "loadHostAnalytics"
   | "searchMessages"
   | "loadAgentSkills"
   | "setAgentSkillEnabled"
@@ -208,6 +219,22 @@ export function createHostRequestActions({
         undefined,
         serverId,
       ),
+    loadRoutineCalendar: (input, serverId) =>
+      buildRoutineCalendar(
+        { from: new Date(input.from), to: new Date(input.to) },
+        new Date(),
+        routineCalendarSource(
+          request,
+          serverId,
+          capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
+        ),
+      ),
+    loadHostAnalytics: (input, serverId) =>
+      readHostAnalytics(
+        (method, path, decode) => request(method, path, decode, undefined, serverId),
+        capabilities.get(serverId) ?? [],
+        input,
+      ),
     searchMessages: (query, serverId, cursor) =>
       request(
         "GET",
@@ -332,6 +359,59 @@ export function createHostRequestActions({
       );
       return result;
     },
+  };
+}
+
+/** The routes that the desktop calendar reads from a remote host, so both place the same runs. */
+function routineCalendarSource(request: WorkspaceRequest, serverId: string, channels: boolean): RoutineCalendarSource {
+  return {
+    owners: async () => {
+      // A host from before channels rejects the channel routes; its agents still have routines.
+      const [agents, channelList] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries, undefined, serverId),
+        channels ? request("GET", CHANNEL_ROUTES.list, decodeChannelSummaries, undefined, serverId) : [],
+      ]);
+      return [
+        ...agents.map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
+        ...channelList
+          .filter((channel) => !channel.archived)
+          .map((channel): RoutineCalendarOwner => ({ kind: "channel", channelId: channel.id })),
+      ];
+    },
+    routines: (owner) =>
+      owner.kind === "agent"
+        ? request(
+            "GET",
+            TEAM_API_ROUTES.agent.routines(owner.agentId),
+            (value) => {
+              if (!Array.isArray(value) || !value.every(isRoutine))
+                throw new Error("The host returned invalid routines.");
+              return value;
+            },
+            undefined,
+            serverId,
+          )
+        : request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: owner.channelId }, serverId),
+    runs: (owner, routineId, limit) =>
+      owner.kind === "agent"
+        ? request(
+            "GET",
+            `${TEAM_API_ROUTES.agent.routineRuns(owner.agentId, routineId)}?limit=${limit}`,
+            (value) => {
+              if (!Array.isArray(value) || !value.every(isRoutineRun))
+                throw new Error("The host returned an invalid routine history.");
+              return value;
+            },
+            undefined,
+            serverId,
+          )
+        : request(
+            "POST",
+            CHANNEL_ROUTES.routineRuns,
+            decodeChannelRoutineRuns,
+            { channelId: owner.channelId, routineId, limit },
+            serverId,
+          ),
   };
 }
 

@@ -9,8 +9,8 @@ import { SiteNavigationMenu } from "./SiteNavigationMenu";
 export interface SiteHeaderProps {
   /**
    * The landing page has its own download section, so its button scrolls to it.
-   * Every other page addresses the landing route and its fragment: there is no
-   * download section there for a bare "#download" to find.
+   * Every other page opens /download: there is no download section there for a
+   * bare "#download" to find.
    */
   page: "landing" | "content";
 }
@@ -27,11 +27,20 @@ export function SiteHeader(props: SiteHeaderProps) {
         variant="secondary"
         size="sm"
         icon="contact"
-        class="site-header-secondary"
+        class="site-header-secondary site-header-contact"
       >
         Contact
       </Button>
-      <ButtonLink to="/app" variant="secondary" size="sm" icon="arrow-right" class="site-header-secondary">
+      {/* A full page load: the /app route brings the desktop document styles, which stop the site page from
+          scrolling. A preload on hover or a client-side visit would add them to this page. */}
+      <ButtonLink
+        to="/app"
+        reloadDocument
+        variant="secondary"
+        size="sm"
+        icon="arrow-right"
+        class="site-header-secondary"
+      >
         App
       </ButtonLink>
       {props.page === "landing" ? (
@@ -39,7 +48,7 @@ export function SiteHeader(props: SiteHeaderProps) {
           Download
         </Button>
       ) : (
-        <ButtonLink to="/" hash="download" variant="primary" size="sm" icon="download">
+        <ButtonLink to="/download" variant="primary" size="sm" icon="download">
           Download
         </ButtonLink>
       )}

@@ -62,6 +62,28 @@ describe("stderr diagnostics", () => {
     expect(messages).toEqual(["the agent wrote {", "and then stopped"]);
   });
 
+  // What `console.error("Error handling request", message, error)` in the ACP SDK writes. Read line
+  // by line, the user got `Error handling request {` and `message: 'Internal error',` as toasts (#1193).
+  it("keeps a util.inspect dump whole and ends it at the first line that is not indented", () => {
+    const { messages, stream } = collect();
+    const dump = [
+      "Error handling request {",
+      "  jsonrpc: '2.0',",
+      "  id: 3,",
+      "  method: 'session/prompt',",
+      "  params: { sessionId: 'abc', text: 'it is {open' }",
+      "} {",
+      "  code: -32603,",
+      "  message: 'Internal error',",
+      "  data: { details: '401 Unauthorized' }",
+      "}",
+    ].join("\n");
+    stream.push(dump.slice(0, 30));
+    stream.push(`${dump.slice(30)}\nnext line\nError: can't {connect\n`);
+
+    expect(messages).toEqual([dump, "next line", "Error: can't {connect"]);
+  });
+
   // One pass over the text, whatever its shape: a payload that stays open over many lines used to be
   // read again from its start at every one of them.
   it("reads a long unterminated payload without rescanning it", () => {

@@ -1,4 +1,77 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/remoteDesktop";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "remoteDesktop.controlFailed": "Uzaktan kontrol başarısız oldu. Yeniden bağlanıp tekrar deneyin.",
+  "remoteDesktop.startFailed": "Uzaktan kontrol başlatılamadı.",
+  "remoteDesktop.disconnectFailed": "Uzaktan kontrol bağlantısı kesilemedi.",
+  "remoteDesktop.switchDisplayFailed": "Paylaşılan monitör değiştirilemedi.",
+  "remoteDesktop.workspaceLabel": "Uzaktan kontrol",
+  "remoteDesktop.displayLabel": "Uzak ekran",
+  "remoteDesktop.selectDisplay": "Ekran seçin",
+  "remoteDesktop.backToOpenBot": "OpenBot'a Dön",
+  "remoteDesktop.disconnect": "Bağlantıyı kes",
+  "remoteDesktop.viewerTitle": "Sunshine uzak masaüstü",
+  "remoteDesktop.viewerLoadFailed": "Moonlight görüntüleyicisi yüklenemedi.",
+  "remoteDesktop.streamNotReady":
+    "Ana bilgisayar akışı başlatmadı. Sunshine ana bilgisayarda durmuş olabilir. Yeniden deneyin.",
+  "remoteDesktop.hostOfflineTitle": "Ana makine çevrim dışı",
+  "remoteDesktop.hostOfflineMessage": "Masaüstünü açmadan önce ana makineye yeniden bağlanın.",
+  "remoteDesktop.openFailed": "Masaüstü açılamadı",
+  "remoteDesktop.notSharingTitle": "{name} ekranını paylaşmıyor",
+  "remoteDesktop.notSharingDescription":
+    "Ana makine OpenBot'un ekranını kaydetmesini engelliyor. O bilgisayarda Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı bölümünü açın, OpenBot'u etkinleştirin ve burada tekrar deneyin.",
+  "remoteDesktop.setup.check.screenRecording": "Ekran Kaydı",
+  "remoteDesktop.setup.check.accessibility": "Erişilebilirlik",
+  "remoteDesktop.setup.check.service": "Sunshine hizmeti",
+  "remoteDesktop.setup.check.displays": "Ekran kullanılabilirliği",
+  "remoteDesktop.setup.check.guiSession": "macOS kullanıcı oturumu",
+  "remoteDesktop.setup.state.notChecked": "Denetlenmedi",
+  "remoteDesktop.setup.state.checking": "Denetleniyor…",
+  "remoteDesktop.setup.state.allowed": "İzin verildi",
+  "remoteDesktop.setup.state.blocked": "Engellendi",
+  "remoteDesktop.setup.state.unavailable": "Kullanılamıyor",
+  "remoteDesktop.setup.state.failed": "Denetim başarısız",
+  "remoteDesktop.setup.state.available": "Kullanılabilir",
+  "remoteDesktop.setup.checkFailed": "Uzak masaüstü kurulumu denetlenemedi.",
+  "remoteDesktop.setup.openFailed": "macOS kurulumu açılamadı.",
+  "remoteDesktop.setup.cleanupUnconfirmed": "Test bağlantısı temizlik onaylanmadan önce sona erdi.",
+  "remoteDesktop.setup.endSessionFirst":
+    "Bir test başlatmadan önce bu bilgisayarın uzak masaüstü oturumunu sonlandırın.",
+  "remoteDesktop.setup.startFailed": "Uzak masaüstü testi başlatılamadı.",
+  "remoteDesktop.setup.connectionLost": "Test bağlantısı kesildi.",
+  "remoteDesktop.setup.hostUpdateRequired":
+    "İzinleri kontrol etmek ve uzak masaüstünü test etmek için ana makinedeki OpenBot'u güncelleyin.",
+  "remoteDesktop.setup.permissions": "İzinler",
+  "remoteDesktop.setup.checked": "Denetlendi",
+  "remoteDesktop.setup.checkAgain": "Tekrar denetle",
+  "remoteDesktop.setup.grantAccess": "{name} erişimine izin ver",
+  "remoteDesktop.setup.grant": "İzin ver",
+  "remoteDesktop.setup.grantHelp":
+    "Sunshine hesabını Mac'te açık tutun. Bu hesapta Sistem Ayarları → Gizlilik ve Güvenlik bölümünden erişim izni verin. İzin Ver seçeneği bir yardımcı pencere açar. Sunshine.app uygulamasını izin listesine sürükleyin.",
+  "remoteDesktop.setup.restartRequired":
+    "Sunshine yeniden başlatma gerektiriyor. Etkin uzak masaüstü oturumlarını sonlandırın, ardından tekrar kontrol edin. Etkin oturumlar yeniden başlatılmayacaktır.",
+  "remoteDesktop.setup.showInFinder": "Sunshine'ı Finder'da Göster",
+  "remoteDesktop.setup.liveTest": "Canlı bağlantı testi",
+  "remoteDesktop.setup.liveTestLocal": "Bu Mac'te görüntüyü, fareyi ve klavyeyi test edin.",
+  "remoteDesktop.setup.liveTestRemote":
+    "Test, ana makinede geçici bir panel açar. Önce diğer uzak oturumlar sonlandırılmalıdır. Girdi panelin içinde kalır.",
+  "remoteDesktop.setup.testSummary": "Video: {video} · Resim: {picture} · Fare: {mouse} · Klavye: {keyboard}",
+  "remoteDesktop.setup.received": "alındı",
+  "remoteDesktop.setup.notReceived": "alınmadı",
+  "remoteDesktop.setup.confirmed": "onaylandı",
+  "remoteDesktop.setup.notConfirmed": "onaylanmadı",
+  "remoteDesktop.setup.notTested": "test edilmedi",
+  "remoteDesktop.setup.waiting": "bekleniyor",
+  "remoteDesktop.setup.testLocal": "Bu Mac'te test et",
+  "remoteDesktop.setup.testRemote": "Uzak masaüstünü test et",
+  "remoteDesktop.setup.videoFailed": "Test video bağlantısı başarısız oldu.",
+  "remoteDesktop.setup.inputInstructions":
+    "Ana makine hedefine tıklayın, ardından {code} yazın. Fare: {mouse}. Klavye: {keyboard}.",
+  "remoteDesktop.setup.videoOnly":
+    "Yalnızca video testi. Fare ve klavye testi, güncellenmiş Sunshine çalışma zamanını gerektirir.",
+  "remoteDesktop.setup.pictureConfirmed": "Görüntü onaylandı",
+  "remoteDesktop.setup.seeDesktop": "Masaüstümü görebiliyorum",
+  "remoteDesktop.setup.seeTestPanel": "Test panelini görebiliyorum",
+  "remoteDesktop.setup.finishTest": "Testi bitir",
+} as const satisfies PartialTranslation<typeof source>;

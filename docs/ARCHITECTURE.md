@@ -10,13 +10,14 @@ apps/
   auth-api/          Public web and /app browser entry, accounts, memberships, connection tickets, and billing
   mobile/            Expo React Native client for remote team hosts
   site-router/       Cloudflare Worker that serves published sites from private R2 storage
+  slack-app/         Slack CLI projects with the OpenBot Slack app manifests (production, development)
 packages/
   ui/                Shared SolidJS controls and primitive styles for desktop, web, and Storybook
   brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
   i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
-  team-client/       Shared team connection, recovery, WebRTC framing, and Dynamic Island state
+  team-client/       Shared team connection, recovery, WebRTC framing, Dynamic Island state, and routine schedules
   user-errors/       Shared user-facing error messages for desktop and mobile
 remote/
   api/               Bun Signal service for SDP, ICE, ticket checks, and TURN credentials
@@ -102,7 +103,7 @@ routes. A member or role change revokes every session on the host; the browser r
 the directory still lists the host. `ConversationRuntime.admin` carries the skills and shared-table
 calls to the agent settings panel, which shows only Skills and Tables in the browser. Memories,
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
-route. `web-marketplace.ts` gives `SkillsMarketplaceModal` its calls: the public catalog routes of
+route. `web-marketplace.ts` gives `MarketplaceModal` its calls: the public catalog routes of
 the account service that serves `/app` (`@openbot/team-client/marketplace-catalog`), and installs on
 the host over `skills-admin-v1`, `agent-install-v1`, `agent-update-v1`, and `mcp-servers-v1`. Try skill and a plugin
 prompt add a line to the agent's draft, as on desktop. A shared agent page also links
@@ -333,16 +334,32 @@ Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
 would refuse.
 
+## Local script runs
+
+`src/main/automation-server.ts` is a loopback HTTP listener through which a local script runs a
+routine of an agent that allows it. [docs/automation.md](automation.md) has the routes and the
+commands. The listener runs only while at least one agent has `allowAutomation`, and binds
+`127.0.0.1` on a free port. It writes the URL and a new bearer token to `<userData>/automation/`
+(folder `0700`, files `0600`) and deletes them when it stops. It refuses any request with an
+`Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it.
+
+A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
+kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
+crash. The flag is in `agent_json` and needs no migration; a profile without it is off. Only the user
+changes it, on the computer that runs the agent: the Team API parser and the agent profile tools do
+not accept it, the remote IPC branch refuses it, and duplication does not copy it. When the flag is
+on, the developer instructions name the two file paths, never the token.
+
 ## Provider CLI updates
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, `x.ai/cli/stable`
+`releases/latest` for Codex, the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, and the ACP registry entries `antigravity-acp` for Gemini and `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and npm `dist.integrity` for Claude and OpenCode. x.ai and the ACP registry publish no hash,
+Codex and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
 so a Grok, Gemini or Cursor release is trusted on TLS alone. A Gemini release must stay on
 `dl.google.com/agy-extensions/releases` and keep the pinned command name. A Cursor release must use
 the pinned `downloads.cursor.com/lab` path for its target, with a build that starts with the
@@ -499,7 +516,7 @@ can take minutes. The end of the turn cancels the request, so the agent keeps wa
 also when the provider returns control while the call runs. In the smoke runs, Codex `exec` did this
 about every 30 seconds. After an error or a cancel, the agent does not point to a takeover window.
 When the agent reaches a service in the browser and the plugin for it is not in its tools, the answer
-ends with a fixed sentence: install the plugin in Marketplace, on the Plugins tab, or enable it in MCP
+ends with a fixed sentence: install the plugin in Marketplace, on the Apps tab, or enable it in MCP
 servers. The sentence names both actions because `read_agent` and the agent's tools show only enabled
 servers, so an agent cannot tell a disabled plugin from a missing one.
 
@@ -649,7 +666,8 @@ the saved messages, and can be tried again when the provider connects or the app
 
 Current remote connections use Team API protocol v5 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
-uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only.
+uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only,
+except the Slack requests of an agent's Slack app (see [Messaging connections](#messaging-connections)).
 OpenBot Mobile uses the same ticket, authentication transcript, framing, RPC codec, and event stream.
 In Expo Go, an Expo DOM component owns the browser `RTCPeerConnection` inside a hidden WebView and
 passes only serializable, validated commands and events to the native React UI; no native WebRTC
@@ -897,7 +915,7 @@ environment values, URLs, or headers, because they can hold secrets. `install_lo
 it they act on the caller. `uninstall_skill` never removes skill files that the user changed.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
-user widens them again, and only the user changes auto-approve and MCP servers. A new agent gets
+user widens them again, and only the user changes auto-approve, MCP servers and local script runs. A new agent gets
 the access and Computer Use limits of the agent that creates it, so a Workspace-only agent cannot
 get around its sandbox through a teammate. There is no creation step for skills or routines in
 the UI.
@@ -919,6 +937,29 @@ missing or outdated fingerprints are replaced before the next turn, using the ex
 handoff while retaining the public thread, agent identity, workspace, and stored conversation.
 Unchanged fingerprints resume the existing session. Pending history handoffs are written before
 the replacement is bound, reloaded after restart, and removed after a turn accepts the handoff.
+
+The same handoff carries a chat to another provider after a provider switch. It holds the user and
+assistant messages after the last context-reset marker, with attachment names only. OpenBot stores
+no tool steps, so the work log comes from the providers. At the switch, before the old sessions are
+retired, `ThreadLifecycle.readWorkSteps` reads each active session with `thread/read` through the
+client that holds it, with a 10-second limit. The switch then checks again that no turn started.
+Only after the switch is stored, `saveWorkSteps` writes the rendered steps of the 60 newest turns to
+`provider-work-steps/<sha256(session id)>` (mode 0600), or `{}` for a session with none. The sessions
+are retired before the write, so a turn that starts during it keeps its new session and reads the
+provider instead. The file is
+deleted and reconciled with the other session files, and a file that does not parse counts as no
+capture. A session without a capture, such as one that no client held, is read when the
+handoff is built: only the three newest, on their own providers, with a stopped CLI started again
+and one 10-second limit for the start and the read. From the turns that match a transcript message,
+`renderTurnSteps` adds a work log: commands with exit code and output tail, changed file paths, tool
+calls, searches and progress notes. Each field is redacted before it is cut, and each turn has a
+size limit. Reasoning, diffs, images and other provider-private state stay with the provider that
+made them. A failed capture or read leaves that session's steps out. Codex returns tool steps from
+its stored rollout. Claude returns only notes. An ACP agent keeps only the text and thinking of its
+turns, so it also gives only notes, and only while its process holds the session: the handoff read
+sends no `cwd`, as the boot backfill does, so a session that the process released is not opened
+again. That handoff read uses the shared provider process, so a session that ran in a Workspace only
+process gives no steps unless the switch captured it.
 
 The optional `agent-profile-generation` Team API endpoints remain available. They use a separate
 provider client with tools restricted and validate drafts before returning them. Their save path
@@ -989,7 +1030,7 @@ The OpenPanel Growth dashboard uses a session funnel from `landing_viewed` to
 Break down the funnel by `acquisition_source`, then `source_platform` once schema version 8
 events reach OpenPanel. Historical events do not contain the new platform property.
 
-The `/download/*` Worker handlers fall back to the releases page when the GitHub manifest cannot be
+The `/download/<os>/latest` Worker handler falls back to the releases page when the GitHub manifest cannot be
 read. That fallback is written to the Worker log, not to OpenPanel: a server event has no session,
 and the landing dashboards are defined on sessions.
 
@@ -1031,6 +1072,12 @@ Tool and media fees are outside the estimate. Stored estimates retain their pric
 Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
 inert until Back, so conversation drafts and settings survive navigation. Agent settings opens
 the same report with an agent filter. Host changes clear the filter and stale responses are rejected.
+The iPhone app opens Usage from the server menu in a sheet. It reads the same route through
+`readHostAnalytics` in `@openbot/team-client` and shows the per-agent rows; a row or the header
+filter narrows the report to one agent. The agent Usage page reads the same route with the agent
+filter, so its chart has the provider split too; a host without `host-analytics` gets the
+agent-scoped route and one area. The series pivot is in `@openbot/team-client/usage-series`, which
+the desktop chart also reads.
 
 `host:get-analytics` and the optional `host-analytics` capability expose `GET /v1/analytics`.
 The host queries its local usage tables once for the date range and optional agent filter; it does
@@ -1039,7 +1086,7 @@ host-wide response carries per-agent rows that the client labels from the agent 
 reads. The same pass also groups by day and provider, which is what lets the chart draw one area
 per provider over a shared baseline; a cell carries only the token count and the cost estimate,
 because those are the two measures the chart reads. Both arrays are on the host report only, which
-is why the agent-scoped route, its codec and the mobile screen are unchanged. Session and turn identities include agent and provider. HTTP and
+is why the agent-scoped route and its codec are unchanged. Session and turn identities include agent and provider. HTTP and
 WebRTC use an explicit host analytics codec. Existing agent analytics and account limits keep their
 contracts. All authenticated team members can read these aggregates; no additional analytics data
 is stored by the account service or Signal service.
@@ -1089,8 +1136,8 @@ A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `delet
 attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
 It keeps a path that another live record uses, and it deletes only a real path under the Transfers
 folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
-shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
-`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote`,
+`logs/update` and `logs/providers` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
 
 `storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
 exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen
@@ -1322,6 +1369,28 @@ create an agent, or add one from a template, the marketplace or an import, when 
 it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id `cursor` before the
 provider existed stays visible.
 
+### Cline
+
+The Cline provider (id `cline`) starts the Cline CLI with `cline --acp`. The runtime manager
+downloads the npm platform package `@cline/cli-<os>-<arch>` and stages all of it except
+`package.json`: the CLI finds `extensions/plugin-sandbox-bootstrap.js` next to its `bin` folder. The
+npm packages have no license file, so staging downloads `LICENSE` from the `cli-v<version>` tag and
+checks the pinned hash. `resolveClineCli` refuses a CLI older than 3.0.68.
+
+By default the CLI runs its sessions in a hub process that it detaches and that other Cline
+processes share. That process outlives OpenBot and is outside a Workspace only sandbox, so every
+Cline process, the sign-in included, gets `CLINE_SESSION_BACKEND_MODE=local` and
+`CLINE_NO_AUTO_UPDATE=1` (`CLINE_ENV` in `provider-drivers.ts`). Sign in is an ACP `authenticate`
+call with `cline`, as for Gemini. `CLINE_API_KEY` in the environment also signs the CLI in.
+`clineStatePaths` lets a confined process write `~/.cline/data` and protects the global settings,
+the MCP and connector settings, and the cron, task and connector databases there. The agents,
+skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. Cline answers a lost
+session with the ACP error `-32002`, which `AcpAgentClient` reads as a missing session. Migration 26
+adds `cline` to `projection_provider_sessions`.
+
+No Team API protocol knows `cline`. The host hides Cline agents, models, status, and sign-in state
+from every peer, as for Cursor.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -1340,11 +1409,17 @@ The provider `acp` runs ACP programs that the user saves. The model id names the
 `<agentId>/<model>`, or `<agentId>/default` for an agent that lists no models. So `agent_json` does
 not change, and the agent id pattern (`CUSTOM_AGENT_ID_PATTERN`) has no `_`, which `isAgentModel`
 refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one `AcpAgentClient`
-for each agent, which it starts when a thread first needs it. It adds the prefix `<agentId>:` to
-session ids and to the ids of requests that an agent sends, and removes it on the way back, so two
-agents that give the same session id stay apart. A thread on another agent than its model reads as
-a missing session, and the runtime hands the conversation over as for a provider switch. When a
-process that serves a thread exits, the router exits, and every custom agent restarts.
+for each agent and working folder, which it starts when a thread first needs it: an agent can serve
+one folder for each process (Command Code refuses a session in a second folder). `model/list` uses
+one more process for each agent, in a private temporary folder, so the probe session never opens on
+a process that serves a thread. A session id gets the prefix `<agentId>:<folderTag>:` (12 hex
+characters of the SHA-256 of the folder), so two agents, or two folders of one agent, that give the
+same session id stay apart; a session saved before this keeps its `<agentId>:<sessionId>` id, and
+the folder of its resume finds its process. Requests that an agent sends get an id of the router's
+own. A thread on another agent than its model reads as a missing session, and the
+runtime hands the conversation over as for a provider switch. When a process that serves a thread
+exits, the router exits, and every custom agent restarts. When a model list process exits, the
+next list starts another.
 
 `src/main/custom-agent-store.ts` keeps `custom-agents.json`: env names in plain text and all env
 values in one `safeStorage` ciphertext. `list()` returns summaries; only the backend gets the
@@ -1486,6 +1561,90 @@ memory and routine editors share their controls with agent settings and use chan
 Channel settings have no provider or model controls because each member retains its own runtime.
 No account API, Signal, IPC contract, or database migration changes are required for mobile channels.
 
+## Messaging connections
+
+The agents of a computer can answer in an external chat platform. Slack is the first platform;
+[messaging.md](messaging.md) has the setup, the limits and how to add a platform. Every workspace
+installs the one OpenBot Slack app (`apps/slack-app`), and the workspace is linked to the host that
+connected it. People mention @OpenBot or send it a direct message. The workspace's Slack Orchestrator,
+an agent that the connect dialog adds, receives each new conversation, asks its teammates and posts
+the answer. Every answer comes from OpenBot.
+
+- **Install.** The desktop asks `POST /v2/slack/authorize` for Slack's install URL, with a one-use host
+  key. The Worker exchanges the code at `/v2/slack/callback`, because the app's client secret lives
+  there. It links the workspace to the host in D1 (`slack_workspace_routes`: team, host, account; no
+  token) and seals the bot token to the host key (`@openbot/contracts/slack-workspace-grant`). The
+  page `/slack/connect` opens `openbot://slack-workspace`. Only the account that linked a workspace
+  can move it to another of its hosts; another account gets `slack_workspace_taken`.
+- **Events.** Slack posts every workspace's events and button presses to one URL,
+  `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's
+  signing secret, answers `url_verification`, and reads only the app ID and the workspace ID. Each
+  signing secret is bound to its app, and a route is one app in one workspace, so the production and
+  development apps can share a workspace. It passes the exact body to the `ingress` socket (`SlackIngress` in main, a plain `ws` client: no WebRTC, so no hidden
+  window) that holds a route ticket for that workspace, and returns the host's answer within 2.5 s,
+  or 503 so that Slack sends it again. The route ticket is an ES256 JWT that `apps/auth-api` signs
+  with its own key for a host that proves its machine token. It names only the workspaces that D1
+  links to that host, expires after 5 minutes, and the host asks for a new one each time the socket
+  connects. Each workspace in the ticket carries the time D1 linked it. When a workspace is unlinked
+  or moved, the Worker sends Signal `slack-route-revoked` through the signed auth-event outbox:
+  Signal drops the route and refuses tickets with that link or an older one, so a host that lost the
+  workspace cannot keep it with the ticket it holds. Signal keeps these revocations in memory, so for
+  one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
+  like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
+  signing secret.
+
+The code has two halves. `MessagingThreads` (`src/backend/messaging/`) is built by `AgentService`
+beside `ChannelService` and knows no platform. `MessagingService` is built in the main process and
+owns the live connections, through one `MessagingDriver` per platform: an adapter for its API and a
+transport for its events. `messaging-types.ts` is the seam; the core never reads a platform payload.
+
+- **Storage.** Migration 25 adds `projection_messaging_connections` (one per workspace, with its
+  orchestrator agent) and `projection_messaging_threads` (one per external conversation, with the
+  agent that answers it).
+  Tokens are not in the database: `MessagingCredentialStore` keeps the bot token encrypted by
+  `safeStorage`, keyed by connection, and only its state crosses IPC.
+- **Orchestrator.** A message in a thread that has a link goes to the link's agent. A new conversation
+  goes to the workspace's orchestrator; without one, Slack is told that no agent answers. The
+  orchestrator is a normal agent (`slack-orchestrator.ts`): its description is its standing remit, and
+  it starts with five memories, which are facts only, because the model reads memories as data. It
+  gives work to one teammate with `send_message`; the request carries `messagingReturn`, so the
+  teammate's answer runs as a follow-up turn in the same Slack thread. A turn that only asked a
+  teammate posts "A teammate is working on it" (`MessagingThreads.awaitsTeammate`). It goes in the
+  sidebar's Integrations section, which `MessagingService` creates the first time; the renderer shows
+  that section collapsed.
+- **Execution threads.** Each Slack thread is a link with its own execution thread in
+  `projection_threads`, as a channel-agent pair is. A direct message is answered in a thread under
+  it, so each one is its own conversation. `MessagingThreads.event` takes that thread's conversation
+  and turn events, so the public chat, the renderer and Team peers never see them. Approvals still
+  reach the host.
+- **Deliveries.** An external message is a mailbox message from `user` with a `messaging` origin
+  (link, author, platform message). No new sender kind, so the frozen Team protocol codecs are
+  unchanged. The queue and the public chat hide it like channel work. A request the agent sends from
+  a Slack turn carries `messagingReturn`, the origin of that turn; `MailboxStore.enqueue` gives the
+  answer to it that origin as `messaging`, so the answer runs in the same execution thread, and its
+  turn posts to Slack as a follow-up. `DrainScheduler` asks `MessagingThreads.prepare` for the thread
+  and the prompt, which frames the text as external input and adds earlier messages of the thread.
+- **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
+  work and behind channel work that holds the host. The Slack thread shows a waiting post.
+- **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status
+  with a Stop button, replaces it with the answer, uploads the files the agent attached, and sets
+  reactions. It serializes the posts of one conversation, so a fast turn cannot race its status. No
+  post names the agent.
+- **Approvals and stop.** An approval of a messaging thread is also posted with buttons. Only the
+  Slack user whose message started the turn can answer or stop it; the host can always answer. The
+  button value is a random token that exists only in memory.
+- **Channels.** When a connection starts, OpenBot joins every public channel it is not in
+  (`conversations.list`, `conversations.join`, scope `channels:join`), so people can mention it with
+  no invitation. It joins each new public channel on `channel_created`. A private channel needs
+  `/invite`.
+- **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
+  covers a restart. Events that arrive while no socket is open are lost after Slack's retries.
+- **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents shows each
+  workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
+  orchestrator on the model the user picks (`messaging:*`). A remote server shows
+  no Slack page, because the install returns to the host's own browser. A live connection counts as
+  use, so a hosted server does not idle out.
+
 ## Skill folders and MCP configuration
 
 A skill follows the [Agent Skills specification](https://agentskills.io/specification): a folder
@@ -1494,16 +1653,17 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor, Cline |
 | `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode, Cursor |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
 | `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
+| `<workspace>/.cline/skills/`, `<workspace>/.clinerules/skills/` | the user, the agent | Cline |
 | `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
 | `~/.claude/skills/` | the user | Claude Code, OpenCode |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
 
-A confined agent (Grok, OpenCode, Gemini or Cursor, not in Full access) cannot write the workspace
+A confined agent (Grok, OpenCode, Gemini, Cursor or Cline, not in Full access) cannot write the workspace
 skill folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
@@ -1512,7 +1672,7 @@ does not make links. `.openbot/skills-lock.json` in the workspace records the fi
 `.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
 marker.
 
-`src/main/skill-folder-discovery.ts` lists all other skills in the five workspace folders as
+`src/main/skill-folder-discovery.ts` lists all other skills in the seven workspace folders as
 `workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
 they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
 skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
@@ -1525,12 +1685,32 @@ same for every agent, and each provider CLI changes its home-folder rules withou
 
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
-`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor and Gemini
-CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
+`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor, Cline and
+Gemini CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
 provider when the session starts. Claude starts with `strictMcpConfig`, so it ignores `.mcp.json`
 and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
 environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
 `safeStorage`.
+
+The 1Password connector is built in and has no SQLite row. `src/main/onepassword-connector-service.ts`
+runs the user's `op` CLI once to create the vault "Shared with OpenBot" and a `read_items` service
+account, or takes a pasted service account token. Before Connect, the page shows three setup steps
+that `checkSetup()` reads: a CLI of 2.18 or later (the user's own on `PATH`, else the copy that
+`src/main/onepassword-cli-installer.ts` downloads, with a SHA-256 pinned per target, into
+`<userData>/provider-state/1password-cli`), the 1Password app's CLI integration (`op account list`
+answers at least one account), and Connect. The service keeps only the token in
+`openbot-onepassword-connector-v1.json`, encrypted with `safeStorage`. It reads the vault with
+`@1password/sdk` and implements `PasswordVault` (`src/backend/password-vault.ts`). The developer
+instructions tell agents about the vault only while `PasswordVault.connected()` is true, read at
+each session start and resume, because most users have no vault. The agent service
+uses it in two places: `openbot_browser.list_logins` returns the logins saved for the tab's HTTPS
+site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
+authenticator request for a saved login by filling it through the same `prepareSecret` path as the
+secure card, with no card. On an origin where an agent ran `evaluate` during this app session,
+`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because the agent's script
+could read the filled fields. A login matches by 1Password's autofill rule, on the registrable domain
+with private suffixes such as `github.io` counted. Agents and providers never receive the token, a
+password or a code.
 
 The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
 in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps
@@ -1609,7 +1789,7 @@ files the message already has, and adds new ones.
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
 
-See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Apps tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, generated from `marketplace/plugin-catalog/`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
 
 ## Agent templates
 
@@ -1766,6 +1946,12 @@ sandbox. On a hosted server only, main reads the memory of the machine, and the 
 turns while it is low and limits the turns that run at the same time. See
 [hosted servers](hosted-servers.md) for the flow, the configuration, the memory guards and the template.
 
+A self-hosted server uses the same Linux build, scripts and units on the owner's own computer, with
+`/opt/OpenBot/hosted/mode` set to `self`. It has no claim: main starts in server mode
+(`src/main/server-mode.ts`, `OPENBOT_SERVER=1`), and the `openbot` terminal command signs it in over
+a Unix socket in the 0700 runtime directory of the service user. Main publishes the host after each
+sign-in. See [self-hosted servers](self-hosted-server.md).
+
 ## Shared UI package
 
 `@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,
@@ -1788,6 +1974,13 @@ stylesheet is exported as `@openbot/ui/features/conversation/conversation.css`; 
 import it in the same cascade position as the former renderer stylesheet. This file is an ordered
 manifest of component styles in `features/conversation/styles/`. Preserve import order: later
 surface and responsive rules override earlier component rules.
+
+`@openbot/ui/features/marketplace/*` renders the Marketplace window: the Agents, Apps and Skills
+tabs, and a page for each listing. It reads a typed `MarketplaceModel` and holds no data of its
+own. The renderer's `marketplace-controller.ts` builds the model on the injected `MarketplaceCalls`,
+and `MarketplaceModal` adds the connect and uninstall dialogs. `WorkspaceOverlays` creates one
+`GitHubConnectorController`; the GitHub app page and Server settings › Connectors show the same
+`GitHubConnectorPanel` from it.
 
 `AgentSettingsPanel` owns the form draft, ordered save queue, avatar editor, and model controls.
 Its renderer adapter owns persisted width and native memories, routines, skills, and tables,

@@ -1,4 +1,67 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/update";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "update.action.check": "Güncellemeleri denetle",
+  "update.action.checking": "Güncellemeler denetleniyor…",
+  "update.action.download": "Güncellemeyi indir",
+  "update.action.downloading": "Güncelleme indiriliyor…",
+  "update.action.restart": "Güncellemek için yeniden başlat",
+  "update.action.restarting": "Yeniden başlatılıyor…",
+  "update.action.retryDownload": "İndirmeyi tekrar dene",
+  "update.managedByHost": "Ana makine tarafından yönetiliyor",
+  "update.upToDate": "Güncel",
+
+  "update.provider.update": "Güncelle",
+  "update.provider.upToDate": "{name} güncel",
+  "update.provider.checking": "{name} güncellemeleri denetleniyor",
+  "update.provider.available": "{name} güncellemesi mevcut",
+  "update.provider.updating": "{name} güncelleniyor",
+  "update.provider.failed": "{name} güncellemesi başarısız oldu",
+  "update.provider.settingUp": "Ayarlanıyor",
+  "update.provider.interrupted": "Güncelleme kesintiye uğradı. Tekrar deneyin.",
+  "update.provider.unknownVersion": "bilinmeyen sürüm",
+  "update.provider.remoteHost": "Sağlayıcı CLI güncellemeleri, onları barındıran bilgisayarda çalışır.",
+  "update.provider.unavailable": "Sağlayıcı güncellemeleri kullanılamıyor.",
+  "update.provider.downloadsUnavailable": "Sağlayıcı indirmeleri kullanılamıyor.",
+  "update.provider.startFailed": "Güncelleme başlatılamadı. Tekrar deneyin.",
+  "update.provider.showDetails": "Ayrıntıları göster",
+  "update.provider.hideDetails": "Ayrıntıları gizle",
+
+  "update.scheduled.title": "{name} bir OpenBot güncellemesi zamanladı",
+  "update.scheduled.automaticTitle": "OpenBot bir güncelleme yüklüyor",
+  "update.scheduled.whenIdle": "OpenBot, ajanlar boştayken yeniden başlar.",
+  "update.scheduled.now": "OpenBot, güncelleme indirildiğinde yeniden başlar.",
+  "update.scheduled.cancel": "Güncellemeyi iptal et",
+  "update.scheduled.cancelFailed": "Güncelleme iptal edilemedi.",
+
+  // Bu bilgisayarın kullanıcısının istediği yeniden başlatma. Hiçbir çalışma kalmayana kadar bekler.
+  "update.idleRestart.relaunchTitle": "Ajanlar boştayken OpenBot yeniden başlatılır",
+  "update.idleRestart.updateTitle": "Ajanlar boştayken OpenBot güncellemeyi yükler",
+  "update.idleRestart.description": "Yeni rutin çalıştırmaları yeniden başlatmaya kadar bekler.",
+  "update.idleRestart.waitingFor": "{reasons} bekleniyor.",
+  "update.idleRestart.cancel": "Yeniden başlatmayı iptal et",
+  "update.idleRestart.cancelFailed": "Yeniden başlatma iptal edilemedi.",
+  "update.idleRestart.requestFailed": "Yeniden başlatma zamanlanamadı.",
+  "update.idleRestart.failedTitle": "OpenBot yeniden başlatılmadı",
+
+  "update.whatsNew.title": "OpenBot'taki yenilikler",
+  "update.whatsNew.description": "OpenBot'un bu sürümündeki yeni özellikler ve değişiklikler.",
+  "update.whatsNew.version": "Sürüm {version}",
+  "update.whatsNew.updatedFrom": "{from} sürümünden {to} sürümüne güncellendi",
+  "update.whatsNew.group.added": "Yeni",
+  "update.whatsNew.group.changed": "İyileştirildi",
+  "update.whatsNew.group.fixed": "Düzeltildi",
+  "update.whatsNew.notices": "Güncellemeden sonra bunu yapın",
+  "update.whatsNew.showFixes": { one: "{count} düzeltmeyi göster", other: "{count} düzeltmeyi göster" },
+  "update.whatsNew.hideFixes": "Düzeltmeleri gizle",
+  "update.whatsNew.loading": "Sürüm notları yükleniyor…",
+  "update.whatsNew.failed.title": "Sürüm notları yüklenemedi",
+  "update.whatsNew.failed.body":
+    "Çevrim içi olduğunuzdan emin olun ve tekrar deneyin. Tüm değişiklikler tam sürüm günlüğünde de gösterilir.",
+  "update.whatsNew.empty.title": "Bu sürümde yeni özellik yok",
+  "update.whatsNew.empty.body":
+    "Bu sürümde burada gösterilecek bir not yok. Tüm değişiklikler tam sürüm günlüğünde gösterilir.",
+  "update.whatsNew.changelog": "Tam sürüm günlüğü",
+  "update.whatsNew.done": "Anladım",
+} as const satisfies PartialTranslation<typeof source>;

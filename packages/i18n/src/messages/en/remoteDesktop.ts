@@ -12,6 +12,8 @@ export const messages = defineMessages("remoteDesktop", {
   "remoteDesktop.disconnect": "Disconnect",
   "remoteDesktop.viewerTitle": "Sunshine remote desktop",
   "remoteDesktop.viewerLoadFailed": "The Moonlight viewer could not load.",
+  "remoteDesktop.streamNotReady":
+    "The host did not start the stream. Sunshine may have stopped on the host. Try again.",
   "remoteDesktop.hostOfflineTitle": "Host is offline",
   "remoteDesktop.hostOfflineMessage": "Reconnect to the host before you open its desktop.",
   "remoteDesktop.openFailed": "Could not open the desktop",

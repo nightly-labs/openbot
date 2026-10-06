@@ -5,6 +5,7 @@ import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentA
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
@@ -15,11 +16,14 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { planItems, planTitle } from "../../app-message-projection";
+import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { groupedMessageIds } from "./agent-message-timeline";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
 
 /**
@@ -85,6 +89,8 @@ export function ConversationTimeline() {
     messageVirtualizer,
     newMessageCount,
     timelineMessages,
+    timelineIndexById,
+    unreadBoundaryMessageId,
     moveChatSearch,
     openExternalMessageUrl,
     openMoreMessageId,
@@ -170,6 +176,9 @@ export function ConversationTimeline() {
     const routine = props.routines?.find((candidate) => candidate.id === cardMarker.routineId);
     return routine && { action: cardMarker.action, routine, agentId };
   };
+  /** A suggestion this client can draw is a card. One for an app it does not know keeps the marker. */
+  const suggestionMarker = (marker: ChatActionMarkerModel) =>
+    marker.kind === "marketplace-suggestion" && marketplaceSuggestionKnown(marker.appId) ? marker : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
@@ -247,7 +256,16 @@ export function ConversationTimeline() {
           >
             <For each={virtualMessageRows()}>
               {(virtualRow) => {
-                const message = createMemo(() => timelineMessages()[virtualRow.index]);
+                // The row's own message, found by id: `virtualRow.index` can be stale for a tick.
+                const index = createMemo(() => timelineIndexById().get(virtualRow.key));
+                const message = createMemo(() => {
+                  const current = index();
+                  return current === undefined ? undefined : timelineMessages()[current];
+                });
+                const previousMessage = () => {
+                  const current = index();
+                  return current === undefined ? undefined : timelineMessages()[current - 1];
+                };
                 const initialMessage = untrack(message);
                 if (!initialMessage) return null;
                 const animateEntrance = untrack(
@@ -262,7 +280,7 @@ export function ConversationTimeline() {
                 const dayMarker = createMemo(() => {
                   const current = message();
                   if (!current) return null;
-                  const previous = timelineMessages()[virtualRow.index - 1];
+                  const previous = previousMessage();
                   if (current.createdAt) return dayMarkerLabel(previous?.createdAt, current.createdAt, { t, format });
                   return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });
@@ -275,8 +293,8 @@ export function ConversationTimeline() {
                 const continuesRun = createMemo(() => {
                   const current = message();
                   if (!current) return false;
-                  if (current.id === props.firstUnreadMessageId || current.actionMarker) return false;
-                  const previous = timelineMessages()[virtualRow.index - 1];
+                  if (current.id === unreadBoundaryMessageId() || current.actionMarker) return false;
+                  const previous = previousMessage();
                   return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
                     previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
                     startsDay: dayMarker() !== null,
@@ -308,8 +326,8 @@ export function ConversationTimeline() {
                 const groupedWithMarker = createMemo(() => {
                   const current = message();
                   if (!current?.actionMarker) return false;
-                  if (current.id === props.firstUnreadMessageId) return false;
-                  const previous = timelineMessages()[virtualRow.index - 1];
+                  if (current.id === unreadBoundaryMessageId()) return false;
+                  const previous = previousMessage();
                   return previous !== undefined && markerRowEndsWithMarker(previous);
                 });
                 if (markerOnly) {
@@ -332,7 +350,7 @@ export function ConversationTimeline() {
                           </div>
                         )}
                       </Show>
-                      <Show when={message()?.id === props.firstUnreadMessageId}>
+                      <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
@@ -340,70 +358,87 @@ export function ConversationTimeline() {
                           }}
                         />
                       </Show>
-                      <article
-                        data-chat-search-message={message()?.id}
-                        class={{ "chat-action-entry-animated": animateEntrance }}
-                      >
-                        <Show when={message()?.actionMarker ?? initialActionMarker}>
-                          {(marker) => (
-                            <Show
-                              when={routineCard(message() ?? initialMessage, marker())}
-                              fallback={
-                                <ChatActionMarker
-                                  onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
-                                  marker={marker()}
-                                  agents={props.agents}
-                                  announce={animateEntrance}
-                                  routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
-                                  onSelectAgent={props.onSelectAgent}
-                                  onOpenRoutine={openRoutineSettings}
-                                  onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                />
-                              }
-                            >
-                              {(card) => {
-                                const latestMessageId = () => latestRoutineMessageIds().get(card().routine.id);
-                                const rowMessageId = () => message()?.id ?? initialMessage.id;
-                                return (
-                                  <RoutineChatCard
-                                    action={card().action}
-                                    routine={card().routine}
-                                    agentId={card().agentId}
-                                    latest={latestMessageId() === rowMessageId()}
-                                    onOpenRoutine={openRoutineSettings}
-                                    onShowLatest={
-                                      props.onOpenSearchMessage
-                                        ? () => {
-                                            const messageId = latestMessageId();
-                                            if (!messageId) return;
-                                            setRoutineCardFocus(messageId);
-                                            void props.onOpenSearchMessage?.(messageId);
-                                          }
-                                        : undefined
-                                    }
-                                    focusRequested={routineCardFocus() === rowMessageId()}
-                                    onFocusHandled={() => setRoutineCardFocus(null)}
-                                  />
-                                );
-                              }}
-                            </Show>
-                          )}
-                        </Show>
-                        <Show
-                          when={
-                            initialMessage.exchange?.direction === "incoming" &&
-                            (message()?.attachments?.length ?? 0) > 0
-                          }
+                      <ChatRowBoundary>
+                        <article
+                          data-chat-search-message={message()?.id}
+                          data-chat-search-group={groupedMessageIds(message())}
+                          class={{ "chat-action-entry-animated": animateEntrance }}
                         >
-                          <div class="chat-action-attachments">
-                            <AttachmentCards
-                              attachments={message()?.attachments ?? []}
-                              onPreview={(attachment) => void previewAttachment(attachment)}
-                              onAction={attachmentAction}
-                            />
-                          </div>
-                        </Show>
-                      </article>
+                          <Show when={message()?.actionMarker ?? initialActionMarker}>
+                            {(marker) => (
+                              <Show
+                                when={routineCard(message() ?? initialMessage, marker())}
+                                fallback={
+                                  <Show
+                                    when={suggestionMarker(marker())}
+                                    fallback={
+                                      <ChatActionMarker
+                                        onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
+                                        marker={marker()}
+                                        agents={props.agents}
+                                        announce={animateEntrance}
+                                        routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
+                                        onSelectAgent={props.onSelectAgent}
+                                        onOpenRoutine={openRoutineSettings}
+                                        onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                      />
+                                    }
+                                  >
+                                    {(suggestion) => (
+                                      <MarketplaceSuggestionChatCard
+                                        messageId={message()?.id ?? initialMessage.id}
+                                        appId={suggestion().appId}
+                                        localServer={props.server?.kind === "local"}
+                                        onOpenMarketplaceApp={props.onOpenMarketplaceApp}
+                                      />
+                                    )}
+                                  </Show>
+                                }
+                              >
+                                {(card) => {
+                                  const latestMessageId = () => latestRoutineMessageIds().get(card().routine.id);
+                                  const rowMessageId = () => message()?.id ?? initialMessage.id;
+                                  return (
+                                    <RoutineChatCard
+                                      action={card().action}
+                                      routine={card().routine}
+                                      agentId={card().agentId}
+                                      latest={latestMessageId() === rowMessageId()}
+                                      onOpenRoutine={openRoutineSettings}
+                                      onShowLatest={
+                                        props.onOpenSearchMessage
+                                          ? () => {
+                                              const messageId = latestMessageId();
+                                              if (!messageId) return;
+                                              setRoutineCardFocus(messageId);
+                                              void props.onOpenSearchMessage?.(messageId);
+                                            }
+                                          : undefined
+                                      }
+                                      focusRequested={routineCardFocus() === rowMessageId()}
+                                      onFocusHandled={() => setRoutineCardFocus(null)}
+                                    />
+                                  );
+                                }}
+                              </Show>
+                            )}
+                          </Show>
+                          <Show
+                            when={
+                              initialMessage.exchange?.direction === "incoming" &&
+                              (message()?.attachments?.length ?? 0) > 0
+                            }
+                          >
+                            <div class="chat-action-attachments">
+                              <AttachmentCards
+                                attachments={message()?.attachments ?? []}
+                                onPreview={(attachment) => void previewAttachment(attachment)}
+                                onAction={attachmentAction}
+                              />
+                            </div>
+                          </Show>
+                        </article>
+                      </ChatRowBoundary>
                     </div>
                   );
                 }
@@ -428,7 +463,7 @@ export function ConversationTimeline() {
                           </div>
                         )}
                       </Show>
-                      <Show when={message()?.id === props.firstUnreadMessageId}>
+                      <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
@@ -436,20 +471,22 @@ export function ConversationTimeline() {
                           }}
                         />
                       </Show>
-                      <article
-                        data-chat-search-message={message()?.id}
-                        class={{ "message-entry-animated": animateEntrance }}
-                      >
-                        <Show when={plan()}>
-                          {(current) => (
-                            <TaskList
-                              items={planItems(current(), message()?.streaming === true)}
-                              title={planTitle(current())}
-                              defaultOpen={untrack(() => initialMessage.streaming === true)}
-                            />
-                          )}
-                        </Show>
-                      </article>
+                      <ChatRowBoundary>
+                        <article
+                          data-chat-search-message={message()?.id}
+                          class={{ "message-entry-animated": animateEntrance }}
+                        >
+                          <Show when={plan()}>
+                            {(current) => (
+                              <TaskList
+                                items={planItems(current(), message()?.streaming === true)}
+                                title={planTitle(current())}
+                                defaultOpen={untrack(() => initialMessage.streaming === true)}
+                              />
+                            )}
+                          </Show>
+                        </article>
+                      </ChatRowBoundary>
                     </div>
                   );
                 }
@@ -483,7 +520,7 @@ export function ConversationTimeline() {
                         </div>
                       )}
                     </Show>
-                    <Show when={message()?.id === props.firstUnreadMessageId}>
+                    <Show when={message()?.id === unreadBoundaryMessageId()}>
                       <UnreadMessagesDivider
                         elementRef={(element) => {
                           setUnreadMessagesDividerElement(element);
@@ -491,92 +528,94 @@ export function ConversationTimeline() {
                         }}
                       />
                     </Show>
-                    <Show
-                      when={message()?.questionPrompt}
-                      keyed
-                      fallback={
-                        <ChatMessageRow
-                          message={message() ?? initialMessage}
-                          author={author()}
-                          showAuthor={author().kind === "member" ? !continuesRun() : undefined}
-                          showTime={!continuesRun()}
-                          animate={animateEntrance}
-                          agents={props.agents}
-                          skills={installedSkills()}
-                          referencedMessage={referencedMessage()}
-                          referencedAuthorName={referencedAuthorName()}
-                          reactions={displayedReactions()}
-                          reactionOverflowCount={message()?.reactionSummary?.overflowCount}
-                          onRemoveReaction={() => {
-                            const currentMessage = message();
-                            if (currentMessage) void reactToMessage(currentMessage, null);
-                          }}
-                          data-chat-search-message={message()?.id}
-                          onSelectAgent={props.onSelectAgent}
-                          onOpenLink={(url) => void openExternalMessageUrl(url)}
-                          onPreview={(attachment) => void previewAttachment(attachment)}
-                          onAttachmentAction={attachmentAction}
-                          onOpenSharedFile={openSharedFile}
-                          onOpenWorkspaceFile={openWorkspaceFile}
-                          onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
-                          onDownload={(attachment) => attachmentAction(attachment, "download")}
-                          actions={
-                            <MessageActions
-                              message={message() ?? initialMessage}
-                              pickerOpen={openReactionMessageId() === message()?.id}
-                              moreOpen={openMoreMessageId() === message()?.id}
-                              expandedEmoji={expandedEmojiMessageId() === message()?.id}
-                              copied={copiedMessageId() === message()?.id}
-                              onTogglePicker={() => {
-                                const messageId = message()?.id;
-                                if (!messageId) return;
-                                setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
-                                setOpenMoreMessageId(null);
-                                setExpandedEmojiMessageId(null);
-                              }}
-                              onToggleMore={() => {
-                                const messageId = message()?.id;
-                                if (!messageId) return;
-                                setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
-                                setOpenReactionMessageId(null);
-                                setExpandedEmojiMessageId(null);
-                              }}
-                              onExpandEmoji={() => {
-                                const messageId = message()?.id;
-                                if (!messageId) return;
-                                setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
-                              }}
-                              onReact={(emoji) => {
-                                const currentMessage = message();
-                                if (currentMessage) void reactToMessage(currentMessage, emoji);
-                              }}
-                              onReply={() => {
-                                const currentMessage = message();
-                                if (currentMessage) replyToMessage(currentMessage);
-                              }}
-                              onCopy={() => {
-                                const currentMessage = message();
-                                if (currentMessage) void copyMessage(currentMessage);
-                              }}
-                            />
-                          }
-                        />
-                      }
-                    >
-                      {(questionPrompt) => (
-                        <Show when={questionPrompt.resolution} keyed>
-                          {(resolution) => (
-                            <article data-chat-search-message={message()?.id} class="question-prompt-history-entry">
-                              <QuestionPromptBubble
-                                questions={questionPrompt.questions}
-                                resolution={resolution}
-                                onSubmit={async () => false}
+                    <ChatRowBoundary>
+                      <Show
+                        when={message()?.questionPrompt}
+                        keyed
+                        fallback={
+                          <ChatMessageRow
+                            message={message() ?? initialMessage}
+                            author={author()}
+                            showAuthor={author().kind === "member" ? !continuesRun() : undefined}
+                            showTime={!continuesRun()}
+                            animate={animateEntrance}
+                            agents={props.agents}
+                            skills={installedSkills()}
+                            referencedMessage={referencedMessage()}
+                            referencedAuthorName={referencedAuthorName()}
+                            reactions={displayedReactions()}
+                            reactionOverflowCount={message()?.reactionSummary?.overflowCount}
+                            onRemoveReaction={() => {
+                              const currentMessage = message();
+                              if (currentMessage) void reactToMessage(currentMessage, null);
+                            }}
+                            data-chat-search-message={message()?.id}
+                            onSelectAgent={props.onSelectAgent}
+                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                            onPreview={(attachment) => void previewAttachment(attachment)}
+                            onAttachmentAction={attachmentAction}
+                            onOpenSharedFile={openSharedFile}
+                            onOpenWorkspaceFile={openWorkspaceFile}
+                            onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
+                            onDownload={(attachment) => attachmentAction(attachment, "download")}
+                            actions={
+                              <MessageActions
+                                message={message() ?? initialMessage}
+                                pickerOpen={openReactionMessageId() === message()?.id}
+                                moreOpen={openMoreMessageId() === message()?.id}
+                                expandedEmoji={expandedEmojiMessageId() === message()?.id}
+                                copied={copiedMessageId() === message()?.id}
+                                onTogglePicker={() => {
+                                  const messageId = message()?.id;
+                                  if (!messageId) return;
+                                  setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
+                                  setOpenMoreMessageId(null);
+                                  setExpandedEmojiMessageId(null);
+                                }}
+                                onToggleMore={() => {
+                                  const messageId = message()?.id;
+                                  if (!messageId) return;
+                                  setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
+                                  setOpenReactionMessageId(null);
+                                  setExpandedEmojiMessageId(null);
+                                }}
+                                onExpandEmoji={() => {
+                                  const messageId = message()?.id;
+                                  if (!messageId) return;
+                                  setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
+                                }}
+                                onReact={(emoji) => {
+                                  const currentMessage = message();
+                                  if (currentMessage) void reactToMessage(currentMessage, emoji);
+                                }}
+                                onReply={() => {
+                                  const currentMessage = message();
+                                  if (currentMessage) replyToMessage(currentMessage);
+                                }}
+                                onCopy={() => {
+                                  const currentMessage = message();
+                                  if (currentMessage) void copyMessage(currentMessage);
+                                }}
                               />
-                            </article>
-                          )}
-                        </Show>
-                      )}
-                    </Show>
+                            }
+                          />
+                        }
+                      >
+                        {(questionPrompt) => (
+                          <Show when={questionPrompt.resolution} keyed>
+                            {(resolution) => (
+                              <article data-chat-search-message={message()?.id} class="question-prompt-history-entry">
+                                <QuestionPromptBubble
+                                  questions={questionPrompt.questions}
+                                  resolution={resolution}
+                                  onSubmit={async () => false}
+                                />
+                              </article>
+                            )}
+                          </Show>
+                        )}
+                      </Show>
+                    </ChatRowBoundary>
                   </div>
                 );
               }}
@@ -605,6 +644,7 @@ export function ConversationTimeline() {
                 <QuestionPromptBubble
                   questions={entry.prompt.questions}
                   elementRef={setRequiredInteractionElement}
+                  sendShortcut={deviceSendShortcut(props.platform)}
                   onSubmit={props.onAnswerPrompt}
                   onResolutionPresented={() =>
                     props.onPromptResolutionPresented?.(

@@ -1,11 +1,17 @@
-import { type ApprovalAutomationPreference, agentAutoApprovalEnabled } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
+import {
+  type ApprovalAutomationPreference,
+  agentAutoApprovalEnabled,
+  type DynamicIslandGeometry,
+} from "@openbot/contracts/ipc";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onSettled } from "solid-js";
+import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
+import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
@@ -40,12 +46,19 @@ const Settings = createSimpleContext({
 
     const [analyticsPreferenceLoaded, setAnalyticsPreferenceLoaded] = createSignal<boolean | null>(null);
     const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = createSignal(false);
+    // Undefined until main answers. The Settings preview then draws the notch it had before.
+    const [builtInDisplayGeometry, setBuiltInDisplayGeometry] = createSignal<DynamicIslandGeometry | undefined>();
     /**
      * The plugin an `openbot://plugins/<slug>` link asked for, held beside the open flag because the
      * marketplace is loaded lazily: the slug has to outlive the chunk load that shows it. It is a
      * slug and never a listing, so the link cannot describe what the user is about to install.
      */
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
+    /**
+     * Set with the slug when the person pressed Connect on a suggestion card in the chat, so the
+     * page starts the connect step. A link never sets it.
+     */
+    const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
     /**
      * The template an `openbot://agents/<id>` link named. The install dialog reads the template by
      * this id and installs only after the user presses Add agent.
@@ -57,7 +70,20 @@ const Settings = createSimpleContext({
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
+      sendShortcut: readSendShortcutMode(),
+      soundFeedback: isActionSoundEnabled(),
+      soundTheme: readActionSoundTheme(),
     });
+    // The mode also changes outside this dialog: another window, or the web Preferences tab on
+    // the same page. The shared signal carries those changes into the displayed settings value.
+    // Two-arg form: compute tracks the signal, apply writes the store outside tracking.
+    const sendShortcutMode = useSendShortcutMode();
+    createEffect(
+      () => sendShortcutMode(),
+      (mode) => {
+        setGeneralSettings((current) => (current.sendShortcut === mode ? current : { ...current, sendShortcut: mode }));
+      },
+    );
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,
       defaultAutoApprove: false,
@@ -117,6 +143,12 @@ const Settings = createSimpleContext({
       if (previous.taskCompletionSound !== value.taskCompletionSound) {
         setCompletionSoundEnabled(value.taskCompletionSound);
       }
+      if (previous.sendShortcut !== value.sendShortcut) {
+        setSendShortcutMode(value.sendShortcut);
+      }
+      if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
+        setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");
+      }
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);
@@ -145,7 +177,9 @@ const Settings = createSimpleContext({
           .catch(() => {
             setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
             const { t } = currentText();
-            toast.error(previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"));
+            actionToast.error(
+              previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"),
+            );
           })
           .finally(() => setTurboModePending(false));
       }
@@ -352,6 +386,10 @@ const Settings = createSimpleContext({
           })),
         )
         .catch(() => undefined);
+      void settingsPort()
+        .dynamicIsland.getBuiltInDisplayGeometry()
+        .then((geometry) => setBuiltInDisplayGeometry(geometry))
+        .catch(() => undefined);
     });
 
     const sendTestNotification = () => settingsPort().notifications.test();
@@ -360,6 +398,7 @@ const Settings = createSimpleContext({
     return {
       analyticsPreferenceLoaded,
       generalSettings,
+      builtInDisplayGeometry,
       turboModePending,
       updateGeneralSettings,
       sendTestNotification,
@@ -375,6 +414,8 @@ const Settings = createSimpleContext({
       setSkillsMarketplaceOpen,
       pendingPluginSlug,
       setPendingPluginSlug,
+      pendingPluginConnect,
+      setPendingPluginConnect,
       pendingAgentTemplateId,
       setPendingAgentTemplateId,
     };

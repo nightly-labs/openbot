@@ -108,6 +108,22 @@ const cursorArtifactSchema = z.object({
   files: z.record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u), sha256Schema),
 });
 
+/**
+ * Cline ships one npm package per target: a Bun-compiled CLI in `bin/`, and the files it finds beside
+ * that folder. `extensions/plugin-sandbox-bootstrap.js` runs the user's plugins, so it is hashed as
+ * the program is. The archive hash covers the other files, such as the hub webview, at download.
+ */
+const clineArtifactSchema = z.object({
+  package: z.string().regex(/^@cline\/cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)$/u),
+  asset: z.string().regex(/^cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  assetSha256: sha256Schema,
+  binarySha256: sha256Schema,
+  bootstrapSha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["cline", "cline.exe"]),
+});
+
 const agentRuntimeLockSchema = z.object({
   schemaVersion: z.literal(1),
   codex: z.object({
@@ -235,6 +251,24 @@ const agentRuntimeLockSchema = z.object({
       "linux-x64": cursorArtifactSchema,
       "linux-arm64": cursorArtifactSchema,
       "win32-x64": cursorArtifactSchema,
+    }),
+  }),
+  /**
+   * The Cline CLI. Its version is the npm version, and its source tag is `cli-v<version>`, which the
+   * licence is read from.
+   */
+  cline: z.object({
+    registry: z.literal("https://registry.npmjs.org"),
+    repository: z.literal("https://github.com/cline/cline"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    license: z.literal("Apache-2.0"),
+    licenseSha256: sha256Schema,
+    artifacts: z.object({
+      "darwin-arm64": clineArtifactSchema,
+      "darwin-x64": clineArtifactSchema,
+      "linux-x64": clineArtifactSchema,
+      "linux-arm64": clineArtifactSchema,
+      "win32-x64": clineArtifactSchema,
     }),
   }),
 });

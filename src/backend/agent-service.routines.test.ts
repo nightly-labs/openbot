@@ -10,6 +10,7 @@ import {
   createTestService,
   expectOpenBotToolError,
   FakeAgentClient,
+  firstInputText,
   inputRecords,
   notification,
   openBotToolPayload,
@@ -409,6 +410,48 @@ describe.sequential("AgentService: routines", () => {
         (message) => routineRunConversationEvent(message)?.status ?? [],
       ),
     ).toContain("succeeded");
+  });
+
+  it("sends a local script's payload with the routine and keeps it in the run for recovery", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+    const agent = await store.getOrCreate("chief");
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Build watcher",
+      instruction: "Read the build result and tell me what failed.",
+      active: false,
+      timezone: "Europe/Warsaw",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+    const input = { agentId: agent.id, routineId: routine.id, payload: "build 42 failed: 3 tests" };
+
+    await expect(service.runRoutineFromAutomation(input)).rejects.toThrow();
+    await service.updateAgent({ agentId: agent.id, allowAutomation: true });
+    const run = await service.runRoutineFromAutomation(input);
+
+    // `resumePendingRuns` sends the stored instruction again, so the payload survives a restart.
+    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 1 })[0]?.instruction).toContain(
+      "build 42 failed: 3 tests",
+    );
+    await waitFor(() => clients.get("codex")?.requests.some((request) => request.method === "turn/start") === true);
+    const prompt = firstInputText(
+      clients.get("codex")?.requests.find((request) => request.method === "turn/start")?.params,
+    );
+    expect(prompt).toContain("Read the build result and tell me what failed.");
+    expect(prompt).toContain("build 42 failed: 3 tests");
+    expect(run.deliveryId).not.toBeNull();
   });
 
   it("lets an agent react to the current user message without replacing the user's reaction", async () => {

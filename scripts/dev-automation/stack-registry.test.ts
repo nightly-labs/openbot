@@ -5,7 +5,7 @@
 // a record outlives the supervisor for as long as its detached children hold
 // the ports, and the conflict query separates a second `bun run dev` in this
 // worktree from the sibling worktrees that are supposed to run beside it.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -90,7 +90,14 @@ describe("dev stack liveness", () => {
     // Pruning the record there frees a port that is still bound, and the next
     // worktree takes it and fails to bind. `sh` plays the leader, `sleep` the
     // survivor.
-    const leader = spawn("sh", ["-c", "sleep 30 &"], { detached: true, stdio: "ignore" });
+    const leader =
+      process.platform === "win32"
+        ? spawn(
+            "powershell.exe",
+            ["-NoProfile", "-Command", "Start-Process powershell -ArgumentList '-NoProfile -Command Start-Sleep 30'"],
+            { stdio: "ignore" },
+          )
+        : spawn("sh", ["-c", "sleep 30 &"], { detached: true, stdio: "ignore" });
     const pid = leader.pid ?? 0;
     await new Promise<void>((resolveExit) => leader.once("exit", () => resolveExit()));
     try {
@@ -101,7 +108,23 @@ describe("dev stack liveness", () => {
       const record = stack({ supervisorPid: 0x3fffffff, processes: [{ name: "app", pid, startedAt: Date.now() }] });
       expect(isDevStackLive(record)).toBe(true);
     } finally {
-      process.kill(-pid, "SIGKILL");
+      if (process.platform === "win32") {
+        try {
+          execFileSync(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-Command",
+              `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${pid}" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`,
+            ],
+            { stdio: "ignore" },
+          );
+        } catch {
+          // Process already stopped
+        }
+      } else {
+        process.kill(-pid, "SIGKILL");
+      }
     }
   });
 

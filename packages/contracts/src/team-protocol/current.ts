@@ -162,3 +162,8 @@ export function isHostAnalyticsRoute(method: string, path: string): boolean {
 export function isAgentCreateRoute(method: string, path: string): boolean {
   return method === "POST" && new URL(path, "http://openbot.invalid").pathname === "/v1/agents";
 }
+
+/** The agent message route. Its request carries the sender's `timezone` beside the frozen keys. */
+export function isAgentMessageRoute(method: string, path: string): boolean {
+  return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
+}

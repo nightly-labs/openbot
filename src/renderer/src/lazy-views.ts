@@ -53,6 +53,6 @@ export const ServerSettingsModal = lazy(() =>
 export const SettingsModal = lazy(() =>
   import("./features/settings/SettingsModal").then((module) => ({ default: module.SettingsModal })),
 );
-export const SkillsMarketplaceModal = lazy(() =>
-  import("./features/settings/SkillsMarketplaceModal").then((module) => ({ default: module.SkillsMarketplaceModal })),
+export const MarketplaceModal = lazy(() =>
+  import("./features/settings/MarketplaceModal").then((module) => ({ default: module.MarketplaceModal })),
 );

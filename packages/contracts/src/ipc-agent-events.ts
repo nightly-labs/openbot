@@ -2,6 +2,7 @@
 // is a union over the payloads the other modules own. It imports their guards rather than restating
 // their rules, which is what lets each guard live beside the type it validates.
 
+import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentRuntimeSnapshot, isAgentRuntimeSnapshot } from "./ipc-agent-runtime";
 import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
@@ -87,7 +88,18 @@ export type AgentEvent =
   | { type: "runtime-snapshot"; snapshot: AgentRuntimeSnapshot }
   | { type: "browser-changed"; tabs: BrowserTab[]; activeTabId: string | null }
   | { type: "browser-control-changed"; state: BrowserControlState }
-  | { type: "error"; agentId?: string; code: string; message: string };
+  | { type: "error"; agentId?: string; code: string; message: string }
+  /**
+   * A provider plan refused a turn, once per limit. The queues of its agents wait for the reset.
+   * Local only: the released Team API event adapters do not carry it. `resetsAt` is in epoch seconds.
+   */
+  | {
+      type: "usage-limit-reached";
+      agentId: string;
+      provider: AgentProviderId;
+      resetsAt: number | null;
+      agentCount: number;
+    };
 
 export function isAgentEvent(value: unknown): value is AgentEvent {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
@@ -205,6 +217,15 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isDynamicRecord(value.state);
     case "error":
       return isString(value.code) && isString(value.message);
+    case "usage-limit-reached":
+      return (
+        isIdentifier(value.agentId) &&
+        isAgentProvider(value.provider) &&
+        (value.resetsAt === null || (isNumber(value.resetsAt) && Number.isFinite(value.resetsAt))) &&
+        isNumber(value.agentCount) &&
+        Number.isSafeInteger(value.agentCount) &&
+        value.agentCount >= 0
+      );
     default:
       return false;
   }

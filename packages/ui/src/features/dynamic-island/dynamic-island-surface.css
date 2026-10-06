@@ -125,6 +125,27 @@ body:has(.dynamic-island-surface),
   height: 100%;
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-xs);
+  transition:
+    border-radius var(--openbot-duration-slow) var(--openbot-ease-out),
+    filter var(--openbot-duration-slow) var(--openbot-ease-out),
+    scale var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+/* While the island moves, the logo blurs more than the ear around it, so it reads as a shape in
+   motion, gets a little smaller, and half closes its eyes. All three follow the size of the move
+   (`--dynamic-island-compact-motion`, 0 to 1): a slow slider step barely changes the logo, and a
+   large move changes it in full. A large move also rounds its corners a little. These are
+   transitions, not a keyframe pulse, so they are interruptible and a drag keeps one steady state.
+   The logo is sharp and square again as the island settles. The squint scales the eye group, not
+   the eyes, so the blink keeps running. */
+.dynamic-island-shell[data-compact-resize] .dynamic-island-surface-logo {
+  --app-logo-eye-squint: calc(1 - 0.45 * var(--dynamic-island-compact-motion, 1));
+  filter: blur(calc(0.8px * var(--dynamic-island-compact-motion, 1)));
+  scale: calc(1 - 0.03 * var(--dynamic-island-compact-motion, 1));
+}
+
+.dynamic-island-shell[data-compact-motion="large"] .dynamic-island-surface-logo {
+  border-radius: var(--openbot-radius-sm);
 }
 
 .dynamic-island-external.dynamic-island-idle .dynamic-island-surface-logo {
@@ -141,34 +162,161 @@ body:has(.dynamic-island-surface),
   flex: 0 0 20px;
 }
 
+/* The idle greeting is a little larger than the 14px trailing slot of a status. */
+.dynamic-island-idle .dynamic-island-trailing-content {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
 .dynamic-island-surface-idle-greeting {
   position: relative;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   display: block;
   flex: 0 0 auto;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
-  font-size: var(--openbot-text-md);
+  font-size: var(--openbot-text-xl);
   line-height: 1;
+  transition:
+    opacity var(--openbot-duration-slow) var(--openbot-ease-out),
+    scale var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
+/* While the island moves, the greeting gets a little fainter, as much as the move is large. When
+   a large move lands, it pops: a short overshoot with a small tilt each way, then rest. A small move,
+   such as one slow slider step, has no pop, so a slow drag stays quiet. */
+.dynamic-island-shell[data-compact-resize] .dynamic-island-surface-idle-greeting {
+  opacity: calc(1 - 0.1 * var(--dynamic-island-compact-motion, 1));
+}
+
+.dynamic-island-shell[data-compact-settled] .dynamic-island-surface-idle-greeting {
+  animation: dynamic-island-greeting-pop 600ms var(--dynamic-island-greeting-pop-ease);
+}
+
+/* One damped spring (damping 0.5, response 0.4s, with a push), sampled, so the pop is one smooth
+   overshoot to about 1.01 and back, not a curve per keyframe. The tilt rides the same spring. */
+.dynamic-island-shell {
+  --dynamic-island-greeting-pop-ease: linear(
+    0,
+    0.571 4.2%,
+    1.01 8.3%,
+    1.306 12.5%,
+    1.467 16.7%,
+    1.517 20.8%,
+    1.485 25.0%,
+    1.403 29.2%,
+    1.297 33.3%,
+    1.188 37.5%,
+    1.09 41.7%,
+    1.013 45.8%,
+    0.96 50.0%,
+    0.928 54.2%,
+    0.916 58.3%,
+    0.919 62.5%,
+    0.931 66.7%,
+    0.947 70.8%,
+    0.965 75.0%,
+    0.982 79.2%,
+    0.995 83.3%,
+    1.005 87.5%,
+    1.011 91.7%,
+    1.013 95.8%,
+    1
+  );
+}
+
+@keyframes dynamic-island-greeting-pop {
+  from {
+    opacity: 0.9;
+    scale: 0.98;
+    rotate: -1deg;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+
+/* One greeting hands over to the next: the old one shrinks a little and blurs as it fades, and the
+   new one comes out of the blur, so the two read as one change. */
 .dynamic-island-surface-idle-greeting-layer {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   opacity: 0;
-  transition: opacity 250ms var(--openbot-ease-out);
+  transition:
+    opacity 600ms var(--openbot-ease-in-out),
+    scale 650ms var(--openbot-ease-in-out),
+    filter 600ms var(--openbot-ease-in-out);
 }
 
-/* Mirrors the logo: its 20px box sits 10px from the left edge, this 14px box sits 6px from the right. */
+@media (prefers-reduced-motion: no-preference) {
+  .dynamic-island-surface-idle-greeting-layer:not([data-active]) {
+    scale: 0.88;
+    filter: blur(2px);
+  }
+}
+
+/* Mirrors the logo: its 20px box sits 10px from the left edge, this 16px box sits 6px from the right. */
 .dynamic-island-external.dynamic-island-idle .dynamic-island-surface-idle-greeting-layer {
-  transform: translateX(-7px);
+  transform: translateX(-6px);
 }
 
 .dynamic-island-surface-idle-greeting[data-active-slot="0"] .dynamic-island-surface-idle-greeting-layer:first-child,
 .dynamic-island-surface-idle-greeting[data-active-slot="1"] .dynamic-island-surface-idle-greeting-layer:last-child {
   opacity: 1;
+}
+
+/* Each greeting is a small 3D card with a front and a back face. `idle-greeting-motion.ts` moves it
+   once as it shows: it turns the wave, the smile and the raised hands, and lights up and twinkles
+   each sparkle. Reduce motion turns the motions off, so the front face stays. */
+.dynamic-island-surface-idle-greeting-layer {
+  perspective: 60px;
+}
+
+.dynamic-island-surface-idle-greeting-card {
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
+}
+
+.dynamic-island-surface-idle-greeting-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+}
+
+.dynamic-island-surface-idle-greeting-face-back {
+  transform: rotateY(180deg);
+}
+
+/* Each copy of the sparkles glyph shows one star, through a star-shaped mask a little larger than the
+   star. The transform origin is the star's centre, so it twinkles in place. */
+.dynamic-island-surface-idle-greeting-face:has(.dynamic-island-surface-idle-greeting-sparkle) {
+  display: grid;
+}
+
+.dynamic-island-surface-idle-greeting-sparkle {
+  grid-area: 1 / 1;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+}
+
+.dynamic-island-surface-idle-greeting-sparkle-large {
+  transform-origin: 60% 48%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M60%207.9Q70.3%2036.0%2094.2%2048Q70.3%2060.0%2060%2088.1Q49.7%2060.0%2025.8%2048Q49.7%2036.0%2060%207.9Z'/%3E%3C/svg%3E");
+}
+
+.dynamic-island-surface-idle-greeting-sparkle-upper {
+  transform-origin: 24% 28%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M24%207.4Q28.2%2021.8%2038.2%2028Q28.2%2034.2%2024%2048.6Q19.8%2034.2%209.8%2028Q19.8%2021.8%2024%207.4Z'/%3E%3C/svg%3E");
+}
+
+.dynamic-island-surface-idle-greeting-sparkle-lower {
+  transform-origin: 36% 70%;
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M36%2051.1Q40.8%2064.3%2051.9%2070Q40.8%2075.7%2036%2088.9Q31.2%2075.7%2020.1%2070Q31.2%2064.3%2036%2051.1Z'/%3E%3C/svg%3E");
 }
 
 .dynamic-island-surface-avatar-stack {

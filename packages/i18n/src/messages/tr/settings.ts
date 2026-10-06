@@ -53,6 +53,19 @@ export const messages = {
   "settings.testNotification.openSettingsFailed": "Sistem ayarları açılamadı.",
   "settings.taskSound.title": "Bir görev bittiğinde ses çal",
   "settings.taskSound.description": "Tamamlanan görevler için kısa bir ses kullanın.",
+  "settings.soundFeedback.title": "İşlem sesleri",
+  "settings.soundFeedback.description": "Mesaj göndermek gibi işlemleri onaylamak için kısa sesler kullanın.",
+  "settings.soundTheme.label": "Ses teması",
+  "settings.soundTheme.off": "Kapalı",
+  "settings.soundTheme.offHint": "Sessiz",
+  "settings.soundTheme.warm": "Sıcak",
+  "settings.soundTheme.warmHint": "Cam ve ahşap",
+  "settings.soundTheme.mech": "Mekanik",
+  "settings.soundTheme.mechHint": "Tık ve mandal",
+  "settings.soundTheme.bubble": "Köpüklü",
+  "settings.soundTheme.bubbleHint": "Damla ve baloncuk",
+  "settings.soundTheme.press": "Tuşlu",
+  "settings.soundTheme.pressHint": "Klavye tuşları",
   "settings.notch.title": "Davranış",
   "settings.notch.show.title": "Durumu MacBook çentiğinde göster",
   "settings.notch.show.description": "Ajan etkinliğini ve dikkat gerektiren ögeleri her ekranın üst kısmında gösterin.",
@@ -217,6 +230,14 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot indirilmiş bir güncellemeye yeniden başlar. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
+  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
+  "settings.updates.idleRestart.title": "OpenBot'u Yeniden Başlat",
+  "settings.updates.idleRestart.relaunchDescription":
+    "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
+  "settings.updates.idleRestart.updateDescription":
+    "OpenBot hiçbir ajan çalışmadığında {target} sürümünü yükler. Yeni rutin çalıştırmaları o zamana kadar bekler.",
+  "settings.updates.idleRestart.relaunch": "Boştayken yeniden başlat",
+  "settings.updates.idleRestart.update": "Boştayken yükle",
   "settings.updates.allowRemote.title": "Sunucu yöneticilerinden gelen güncellemelere izin ver",
   "settings.updates.allowRemote.description":
     "Bu sunucunun sahipleri ve yöneticileri bir güncelleme indirebilir ve bu bilgisayarda OpenBot'u yeniden başlatabilir.",
@@ -244,7 +265,7 @@ export const messages = {
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB bellek, {disk} GB depolama",
   "settings.hostedServers.creating": "Oluşturuluyor…",
   "settings.hostedServers.usageNote":
-    "Bir sunucu 15 dakika kullanılmadığında durur ve bir mesaj veya zamanlanmış bir rutin için tekrar başlar. Ajanları ve rutinleri bu bilgisayar kapalıyken çalışır.",
+    "Bir sunucu son mesajdan veya değişiklikten yaklaşık 15 dakika sonra durur, bir uygulama açık olsa bile. Uygulamada bir tuşa basmak veya tıklamak, bir mesaj ya da zamanlanmış bir rutin onu tekrar başlatır. Ajanları ve rutinleri bu bilgisayar kapalıyken çalışır.",
   "settings.hostedServers.empty": "Henüz barındırılan bir sunucunuz yok.",
   "settings.hostedServers.state.awaitingPayment": "Ödeme bekleniyor",
   "settings.hostedServers.state.planEnded": "Plan sona erdi",

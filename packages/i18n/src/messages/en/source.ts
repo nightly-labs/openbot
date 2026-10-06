@@ -11,6 +11,7 @@ import { messages as errorImport } from "./error/import";
 import { messages as errorKind } from "./error/kind";
 import { messages as errorMarketplace } from "./error/marketplace";
 import { messages as errorMcp } from "./error/mcp";
+import { messages as errorMessaging } from "./error/messaging";
 import { messages as errorProvider } from "./error/provider";
 import { messages as errorRemote } from "./error/remote";
 import { messages as errorSite } from "./error/site";
@@ -22,6 +23,7 @@ import { messages as errorVoice } from "./error/voice";
 import { messages as statusAgent } from "./status/agent";
 import { messages as statusComputerUse } from "./status/computerUse";
 import { messages as statusHost } from "./status/host";
+import { messages as statusMessaging } from "./status/messaging";
 import { messages as statusProvider } from "./status/provider";
 import { messages as statusRemote } from "./status/remote";
 import { messages as statusUpdate } from "./status/update";
@@ -49,7 +51,9 @@ export const source = {
   ...errorMcp,
   ...errorConnector,
   ...errorStorage,
+  ...errorMessaging,
   ...statusHost,
+  ...statusMessaging,
   ...statusRemote,
   ...statusAgent,
   ...statusProvider,

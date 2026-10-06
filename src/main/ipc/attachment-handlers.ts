@@ -53,7 +53,7 @@ export interface AttachmentIpcDependencies {
     | "prepareImportedAttachments"
     | "discardDraftAttachment"
     | "resolveSharedFile"
-    | "resolveWorkspaceFile"
+    | "resolveLocalWorkspaceFile"
   >;
   mailbox: Pick<MailboxStore, "resolveAttachment">;
   remoteServers: Pick<
@@ -154,8 +154,11 @@ export function attachmentIpcHandlers({
       }),
       openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
-          const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
-          await openPath(workspaceFile.path);
+          const workspaceFile = await service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path);
+          // A file outside the workspace can be anything on the computer, including a program, so it is
+          // shown in the file manager rather than run.
+          if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
+          else shell.showItemInFolder(workspaceFile.path);
         },
         remote: async (parsed, serverId) => {
           const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
@@ -176,7 +179,7 @@ export function attachmentIpcHandlers({
       }),
       previewWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
-          const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
+          const workspaceFile = await service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path);
           return localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size);
         },
         remote: async (parsed, serverId) => {

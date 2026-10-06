@@ -227,6 +227,7 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
         instruction: input.instruction.trim(),
         active: input.active,
         timezone: input.timezone,
+        limitPolicy: input.limitPolicy ?? "wait",
         trigger: nextTrigger(id, input.schedule, now),
         createdAt: now,
         updatedAt: now,
@@ -244,6 +245,7 @@ export function createMockChannels(emit: (event: AgentEvent) => void, agentName:
         ...(input.name === undefined ? {} : { name: input.name.trim() }),
         ...(input.instruction === undefined ? {} : { instruction: input.instruction.trim() }),
         ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
         ...(input.schedule === undefined ? {} : { trigger: nextTrigger(current.id, input.schedule, now) }),
         updatedAt: now,
       };

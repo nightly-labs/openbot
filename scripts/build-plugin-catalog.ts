@@ -139,7 +139,7 @@ export interface PluginDetail {
 
 /**
  * Reads the catalog source, validates every listing, and writes the three
- * generated outputs: the renderer literal the Plugins tab reads, the Worker
+ * generated outputs: the renderer literal the Apps tab reads, the Worker
  * module the JSON routes will serve, and the offline snapshot shipped with
  * the app. With `check`, it fails when a checked-in file differs from a
  * fresh build, so a hand edit cannot ship.
@@ -313,7 +313,10 @@ function parseServer(slug: string, value: unknown): PluginServer {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
       throw new Error(`Plugin ${slug} server needs a command and args.`);
     }
-    const args = value.args.every(isString) ? [...value.args] : [];
+    if (!value.args.every(isString)) {
+      throw new Error(`Plugin ${slug} server args must all be strings: ${JSON.stringify(value.args)}.`);
+    }
+    const args = [...value.args];
     return auth
       ? { name: value.name, transport: "stdio", command: value.command, args, auth }
       : { name: value.name, transport: "stdio", command: value.command, args };

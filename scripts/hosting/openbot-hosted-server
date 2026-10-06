@@ -2,10 +2,21 @@
 # openbot.service runs this as the sandbox user. It waits for the env file that openbot-hosted-env
 # writes, starts a D-Bus session with an unlocked keyring so that Electron `safeStorage` can keep
 # the account session, and runs OpenBot on the boat desktop.
+#
+# On a self-hosted server (`mode` is `self`, which openbot-server-setup writes) there is no claim and
+# no boat desktop: OpenBot starts with `OPENBOT_SERVER=1` on a virtual display, and its owner signs
+# it in with `openbot login`.
 set -euo pipefail
 umask 077
 state="$HOME/.config/openbot-hosted"
+mode=hosted
+if [ -r /opt/OpenBot/hosted/mode ] && [ "$(</opt/OpenBot/hosted/mode)" = self ]; then mode=self; fi
 
+if [ "${1:-}" != --in-session ] && [ "$mode" = self ]; then
+  mkdir -p "$state"
+  chmod 0700 "$state"
+  exec dbus-run-session -- "$0" --in-session
+fi
 if [ "${1:-}" != --in-session ]; then
   # The setup script starts after the sandbox is ready, so on the first boot this runs first.
   for _ in $(seq 1 300); do
@@ -17,15 +28,23 @@ if [ "${1:-}" != --in-session ]; then
 fi
 
 # Read only the expected keys. The file is data, not a script.
-while IFS='=' read -r key value; do
-  case $key in
-    OPENBOT_HOSTED_HOST_ID | OPENBOT_HOSTED_CLAIM) export "$key=$value" ;;
-  esac
-done <"$state/env"
-while IFS='=' read -r key value; do
-  [ "$key" = OPENBOT_AUTH_API_URL ] && export "$key=$value"
-done </opt/OpenBot/hosted/openbot.env
-export OPENBOT_HOSTED_SERVER=1
+if [ "$mode" = hosted ]; then
+  while IFS='=' read -r key value; do
+    case $key in
+      OPENBOT_HOSTED_HOST_ID | OPENBOT_HOSTED_CLAIM) export "$key=$value" ;;
+    esac
+  done <"$state/env"
+  export OPENBOT_HOSTED_SERVER=1
+else
+  # The control socket of `openbot`. It goes in the runtime directory that openbot.service makes.
+  export OPENBOT_SERVER=1
+fi
+# A self-hosted server has this file only when its install named another account server.
+if [ -r /opt/OpenBot/hosted/openbot.env ]; then
+  while IFS='=' read -r key value; do
+    if [ "$key" = OPENBOT_AUTH_API_URL ]; then export "$key=$value"; fi
+  done </opt/OpenBot/hosted/openbot.env
+fi
 
 # Each server makes its own keyring password on its first start, so no two servers share one.
 # The password only lets the daemon open the keyring without a person; the file is 0600.
@@ -77,14 +96,15 @@ export GNOME_KEYRING_CONTROL
 # The boat desktop is a lightdm session of this user on :0, with a window manager. OpenBot shows its
 # windows there, so boat's desktop viewer and OpenBot remote desktop show the same screen, and a click
 # moves the keyboard focus to another window. After a resume, boat can start that session after this
-# service. A sandbox that has no desktop session uses a virtual display.
+# service. A sandbox that has no desktop session, and a self-hosted server, use a virtual display.
 for _ in $(seq 1 60); do
+  [ "$mode" = self ] && break
   if DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority" xdpyinfo >/dev/null 2>&1; then
     export DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority"
     exec /opt/OpenBot/app/openbot --password-store=gnome-libsecret
   fi
   sleep 2
 done
-echo "The boat desktop session did not start. OpenBot uses a virtual display." >&2
+if [ "$mode" = hosted ]; then echo "The boat desktop session did not start. OpenBot uses a virtual display." >&2; fi
 exec xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret

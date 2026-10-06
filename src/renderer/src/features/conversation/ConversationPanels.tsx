@@ -1,6 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { actionToast } from "../../action-toast";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
@@ -95,7 +95,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               void conversationPort()
                 .storage.openLocation({ agentId })
                 .catch((error) =>
-                  toast.error(t("conversation.panels.openWorkspaceFailed"), {
+                  actionToast.error(t("conversation.panels.openWorkspaceFailed"), {
                     description: errorMessage(error, t("conversation.panels.tryAgain")),
                   }),
                 )
@@ -274,6 +274,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               }
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               computerUseEditable={props.server?.kind === "local"}
+              automationEditable={props.server?.kind === "local"}
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
               onCreateSkill={

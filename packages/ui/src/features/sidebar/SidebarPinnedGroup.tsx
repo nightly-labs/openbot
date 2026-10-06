@@ -33,7 +33,7 @@ export function SidebarPinnedGroup() {
     startNativeItemDragging,
     stopSidebarDragging,
   } = useSidebarScope();
-  const { t } = useText();
+  const { t, format } = useText();
   const chatName = (chat: SidebarChatItem) => (chat.kind === "agent" ? chat.agent.name : chat.channel.name);
   const chatIsActive = (chat: SidebarChatItem) =>
     chat.kind === "agent" ? props.activeAgentId === chat.id : props.activeChannelId === chat.id;
@@ -66,7 +66,9 @@ export function SidebarPinnedGroup() {
               const stateLabel = () => {
                 if (item.chat.kind !== "agent") return "";
                 const state = props.agentStates[item.chat.id];
-                return state?.kind === "routine" || state?.kind === "waiting" ? sidebarAgentStateLabel(state, t) : "";
+                return state?.kind === "routine" || state?.kind === "waiting" || state?.kind === "limited"
+                  ? sidebarAgentStateLabel(state, t, format)
+                  : "";
               };
               const rowLabel = () => {
                 if (item.chat.kind === "channel") return t("sidebar.pinned.channel", { name: name() });
@@ -117,6 +119,7 @@ export function SidebarPinnedGroup() {
                       aria-label={rowLabel()}
                       title={stateLabel() || undefined}
                       aria-pressed={active() ? "true" : "false"}
+                      data-cuelume-navigate=""
                       onClick={() => selectChat(item.chat)}
                     >
                       <Switch>
@@ -141,7 +144,7 @@ export function SidebarPinnedGroup() {
                                 </Show>
                               </span>
                               <Show when={props.agentStates[agent().id]}>
-                                {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t)}</span>}
+                                {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t, format)}</span>}
                               </Show>
                             </>
                           )}

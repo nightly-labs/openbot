@@ -1,9 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { RoutineFields, RoutineRunFields, RoutineRunStatus, RoutineSchedule } from "@openbot/contracts/ipc";
-import { isRoutineSchedule } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type {
+  RoutineFields,
+  RoutineLimitPolicy,
+  RoutineRunFields,
+  RoutineRunStatus,
+  RoutineSchedule,
+} from "@openbot/contracts/ipc";
+import { isRoutineSchedule, ROUTINE_LIMIT_POLICIES } from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import {
+  nextRoutineOccurrence,
+  normalizeRoutineSchedule,
+  RoutineInputError,
+  validateRoutineSchedule,
+} from "@openbot/team-client/routine-schedule";
 import {
   databaseRows,
   optionalStringColumn,
@@ -11,12 +23,6 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
-import {
-  nextRoutineOccurrence,
-  normalizeRoutineSchedule,
-  RoutineInputError,
-  validateRoutineSchedule,
-} from "./routine-schedule";
 
 /**
  * Three table names, one owner column and one handle column are the whole difference between an
@@ -66,6 +72,7 @@ export interface RoutineInputFields {
   active: boolean;
   timezone: string;
   schedule: RoutineSchedule;
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 export interface RoutineUpdateFields {
@@ -74,6 +81,7 @@ export interface RoutineUpdateFields {
   instruction?: string;
   active?: boolean;
   schedule?: RoutineSchedule;
+  limitPolicy?: RoutineLimitPolicy;
 }
 
 /**
@@ -81,6 +89,12 @@ export interface RoutineUpdateFields {
  * subclasses re-name the owner and the handle, so `AgentRoutineStore` keeps the public signatures
  * its callers already use.
  */
+/** The time from a hold of the routines to the restart that the hold waited for. */
+export interface RoutineHoldWindow {
+  since: Date;
+  until: Date;
+}
+
 export class RoutineStore {
   constructor(
     protected readonly database: OpenBotDatabase,
@@ -88,7 +102,8 @@ export class RoutineStore {
   ) {}
 
   protected get routineColumns(): string {
-    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, created_at, updated_at`;
+    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, created_at,
+            updated_at`;
   }
 
   protected get runColumns(): string {
@@ -139,9 +154,9 @@ export class RoutineStore {
         const sequence = sequences[0] ?? 0;
         db.prepare(
           `INSERT INTO ${routineTable} (
-             routine_id, ${ownerColumn}, name, instruction, active, timezone, created_at, updated_at,
+             routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, created_at, updated_at,
              last_event_sequence
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           routineId,
           ownerId,
@@ -149,6 +164,7 @@ export class RoutineStore {
           input.instruction.trim(),
           input.active ? 1 : 0,
           input.timezone,
+          input.limitPolicy ?? "wait",
           createdAt,
           createdAt,
           sequence,
@@ -167,6 +183,7 @@ export class RoutineStore {
     const schedule = normalizeRoutineSchedule(input.schedule ?? current.trigger.schedule, now);
     this.#validateInput(name, instruction, current.timezone, schedule);
     const active = input.active ?? current.active;
+    const limitPolicy = input.limitPolicy ?? current.limitPolicy ?? "wait";
     const reactivating = !current.active && active;
     const updatedAt = now.toISOString();
     const { commandPrefix, eventPrefix, routineAggregate, routineTable, triggerTable, ownerColumn } = this.tables;
@@ -184,9 +201,18 @@ export class RoutineStore {
         const sequence = sequences[0] ?? 0;
         db.prepare(
           `UPDATE ${routineTable}
-           SET name = ?, instruction = ?, active = ?, updated_at = ?, last_event_sequence = ?
+           SET name = ?, instruction = ?, active = ?, limit_policy = ?, updated_at = ?, last_event_sequence = ?
            WHERE routine_id = ? AND ${ownerColumn} = ?`,
-        ).run(name.trim(), instruction.trim(), active ? 1 : 0, updatedAt, sequence, input.routineId, ownerId);
+        ).run(
+          name.trim(),
+          instruction.trim(),
+          active ? 1 : 0,
+          limitPolicy,
+          updatedAt,
+          sequence,
+          input.routineId,
+          ownerId,
+        );
         if (input.schedule) {
           db.prepare(`DELETE FROM ${triggerTable} WHERE routine_id = ?`).run(input.routineId);
           this.#insertTrigger(db, input.routineId, current.timezone, schedule, updatedAt, sequence, now);
@@ -336,7 +362,7 @@ export class RoutineStore {
         .prepare(
           `SELECT trigger.trigger_id, trigger.next_run_at, trigger.schedule_json, routine.routine_id,
                   routine.${ownerColumn}, routine.name, routine.instruction, routine.active, routine.timezone,
-                  routine.created_at, routine.updated_at
+                  routine.limit_policy, routine.created_at, routine.updated_at
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
            WHERE routine.active = 1 AND trigger.next_run_at <= ?
@@ -391,9 +417,14 @@ export class RoutineStore {
     );
   }
 
-  /** Missed occurrences are dropped, never replayed: a closed app must not wake into a backlog. */
-  skipMissed(now = new Date()): void {
+  /**
+   * Missed occurrences are dropped, never replayed: a closed app must not wake into a backlog. A
+   * trigger that came due while a restart held the routines stays due, so it runs once now.
+   */
+  skipMissed(now = new Date(), held?: RoutineHoldWindow): void {
     for (const routine of this.#allActive()) {
+      const due = Date.parse(routine.trigger.nextRunAt);
+      if (held && due >= held.since.getTime() && due <= held.until.getTime()) continue;
       const next = nextRoutineOccurrence(routine.trigger.schedule, routine.timezone, now).toISOString();
       this.advanceTrigger(routine.id, routine.trigger.id, next);
     }
@@ -483,6 +514,8 @@ export class RoutineStore {
 
   #routine(row: DynamicRecord): OwnedRoutine {
     const routineId = requiredStringColumn(row, "routine_id");
+    const limitPolicy = requiredStringColumn(row, "limit_policy");
+    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
     return {
       id: routineId,
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
@@ -507,6 +540,7 @@ export class RoutineStore {
           updatedAt: requiredStringColumn(trigger, "updated_at"),
         };
       })(),
+      limitPolicy,
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };

@@ -1,6 +1,6 @@
 import type { ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
-import { Bell, BellOff, ChartArea, Check, ChevronRight, type ContextMenu } from "@openbot/ui";
+import { Bell, BellOff, CalendarClock, ChartArea, Check, ChevronRight, type ContextMenu } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -53,10 +53,11 @@ export interface ServerActionCallbacks {
   onSetMuted?: ((serverId: string, muted: boolean, durationMs?: number) => void) | undefined;
   onSetNotificationLevel?: ((serverId: string, level: ServerNotificationLevel) => void) | undefined;
   onOpenUsage?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  onOpenSchedule?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   onOpenSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
 }
 
-/** Mute, notification level, usage and settings for one server. */
+/** Mute, notification level, usage, schedule and settings for one server. */
 export function ServerActionItems(
   props: ServerActionCallbacks & {
     menu: ServerActionMenu;
@@ -147,6 +148,12 @@ export function ServerActionItems(
         <Menu.Item onSelect={() => props.onOpenUsage?.(props.server.id, props.trigger())}>
           <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
           <span>{t("server.rail.usage")}</span>
+        </Menu.Item>
+      </Show>
+      <Show when={props.onOpenSchedule}>
+        <Menu.Item onSelect={() => props.onOpenSchedule?.(props.server.id, props.trigger())}>
+          <CalendarClock class="agent-context-icon size-4" aria-hidden="true" />
+          <span>{t("server.rail.schedule")}</span>
         </Menu.Item>
       </Show>
       <Show when={props.onOpenSettings}>

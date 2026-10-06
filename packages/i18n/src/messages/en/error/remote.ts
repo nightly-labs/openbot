@@ -26,6 +26,14 @@ export const messages = defineMessages("error.remote", {
   "error.remote.localTestListenerUnavailable": "The local test listener is unavailable.",
   "error.remote.localTestNotFound": "Local test session not found.",
   "error.remote.runtimeUnavailable": "Remote desktop runtime is not available.",
+  "error.remote.sunshineStartFailed":
+    "Sunshine did not start on the host. Check the remote desktop logs on the host, then try again.",
+  "error.remote.moonlightStartFailed":
+    "Moonlight Web did not start on the host. Check the remote desktop logs on the host, then try again.",
+  "error.remote.pairingFailed":
+    "Moonlight could not pair with Sunshine on the host. Try again. If the problem continues, restart OpenBot on the host.",
+  "error.remote.runtimeStartFailed":
+    "The remote desktop runtime did not start on the host. Check the remote desktop logs on the host, then try again.",
   "error.remote.hostUnreachable": "The host is not reachable.",
   "error.remote.signInToHostAgain": "Sign in to this host again.",
   "error.remote.invalidData": "The host returned invalid data.",
@@ -116,6 +124,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.pairedIdentityChanged":
     "The paired desktop identity is missing or changed. Scan a new code from that desktop.",
   "error.remote.permanentInviteNoEmail": "Permanent invitations cannot be sent by email.",
+  "error.remote.selfHostedInviteNoEmail":
+    "An invitation from a self-hosted account service cannot be sent by email. Copy the link.",
   "error.remote.inviteOtherService": "This invitation belongs to another OpenBot service.",
   "error.remote.inviteFingerprintMismatch": "The invitation host identity does not match its fingerprint.",
   "error.remote.inviteHostKeyMissing": "The invitation host key is missing.",

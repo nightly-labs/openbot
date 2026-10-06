@@ -917,7 +917,7 @@ describe("ServerSettingsModal", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
     expect(screen.getByText("Server Owner")).toBeInTheDocument();
     expect(screen.queryByText("Alice Chen")).not.toBeInTheDocument();
-    expect(screen.getByText("1 members")).toBeInTheDocument();
+    expect(screen.getByText("1 member")).toBeInTheDocument();
   });
 
   it("lets the owner remove an inactive legacy member before inviting them again", async () => {
@@ -938,7 +938,7 @@ describe("ServerSettingsModal", () => {
       />
     ));
     await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
-    expect(screen.getByText("1 members")).toBeInTheDocument();
+    expect(screen.getByText("1 member")).toBeInTheDocument();
     const trigger = screen.getByRole("button", { name: "Actions for Alice Chen" });
     await fireEvent.pointerDown(trigger, { button: 0 });
     await fireEvent.pointerUp(trigger, { button: 0 });

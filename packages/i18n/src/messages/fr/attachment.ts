@@ -18,6 +18,6 @@ export const messages = {
   "attachment.error.openFile": "Impossible d’ouvrir ce fichier. Réessayez.",
   "attachment.error.fileFallback": "Fichier",
   "attachment.error.fileNotFound":
-    "« {name} » est introuvable. Demandez à l’agent de créer ou de restaurer le fichier, puis cliquez à nouveau sur le lien.",
+    "« {name} » est introuvable à cet emplacement. Il a peut-être été déplacé ou supprimé.",
   "attachment.error.previewFile": "Impossible d’afficher l’aperçu de « {name} ». Réessayez.",
 } as const satisfies PartialTranslation<typeof source>;

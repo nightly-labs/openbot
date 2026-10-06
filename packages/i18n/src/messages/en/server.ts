@@ -112,6 +112,10 @@ export const messages = defineMessages("server", {
   "server.state.offline": "offline",
   "server.state.error": "error",
   "server.state.incompatible": "incompatible",
+  "server.state.sleeping": "asleep",
+  "server.state.waking": "waking",
+  "server.sleep.tooltipSleeping": "{name} is asleep because nobody used it. Press a key or click to wake it.",
+  "server.sleep.tooltipWaking": "{name} is waking. This takes about a minute.",
   "server.menu.open": "Open server menu for {name}",
   "server.menu.label": "Server menu",
   "server.menu.layout": "Server layout",
@@ -128,6 +132,7 @@ export const messages = defineMessages("server", {
   "server.rail.mute": "Mute server",
   "server.rail.notificationSettings": "Notification settings",
   "server.rail.usage": "Usage",
+  "server.rail.schedule": "Routines",
   "server.rail.settings": "Server settings",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
@@ -141,6 +146,10 @@ export const messages = defineMessages("server", {
   "server.compatibility.versionMismatchTitle": "Different OpenBot versions on {name}",
   "server.compatibility.versionMismatchDescription":
     "The connection uses protocol {protocol}. Some newer features may be unavailable. Client {clientVersion}; host {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Update OpenBot on {name} to use all features. The connection uses protocol {protocol}. Client {clientVersion}; host {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Update this OpenBot app to use all features. The connection uses protocol {protocol}. Client {clientVersion}; host {hostVersion}.",
   "server.connection.failedTitle": "The connection failed",
   "server.connection.failedDescription":
     "Could not connect to this server. Check that the host is online and try again.",
@@ -230,7 +239,7 @@ export const messages = defineMessages("server", {
   "server.members.publishToInvite": "Publish the server in General to invite new people.",
   "server.members.saveIdentityFirst": "Save the server identity in General first.",
   "server.members.title": "Server members",
-  "server.members.count": { other: "{count} members" },
+  "server.members.count": { one: "{count} member", other: "{count} members" },
   "server.members.limitCount": { other: "{count} of {limit} members" },
   "server.members.search": "Search members",
   "server.members.noMatch": "No members match this search.",

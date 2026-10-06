@@ -8,7 +8,14 @@
 // would push it into all three.
 
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
-import { type IceServer, SIGNAL_PROTOCOL_VERSION, type SignalChannel, type SignalServerMessage } from "./messages";
+import {
+  type IceServer,
+  SIGNAL_PROTOCOL_VERSION,
+  type SignalChannel,
+  type SignalServerMessage,
+  SLACK_DELIVERY_BODY_BYTES_LIMIT,
+  type SlackDeliveryKind,
+} from "./messages";
 
 /**
  * Returns `null` for a frame whose `type` this version does not know: a newer Signal service may add
@@ -81,6 +88,17 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       };
     case "disconnect":
       return { type: kind, version, connectionId: identifier(value.connectionId) };
+    case "slack-delivery":
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        teamId: identifier(value.teamId),
+        kind: deliveryKind(value.kind),
+        retryNum: value.retryNum === null ? null : retryNumber(value.retryNum),
+        retryReason: value.retryReason === null ? null : identifier(value.retryReason),
+        bodyBase64: deliveryBody(value.bodyBase64),
+      };
     default:
       return null;
   }
@@ -132,6 +150,28 @@ function mLineIndex(value: unknown): number {
 function flag(value: unknown): boolean {
   if (!isBoolean(value)) invalid();
   return value;
+}
+
+function retryNumber(value: unknown): number {
+  const candidate = integer(value);
+  if (candidate < 0) invalid();
+  return candidate;
+}
+
+function deliveryKind(value: unknown): SlackDeliveryKind {
+  if (value !== "events" && value !== "interactivity") invalid();
+  return value;
+}
+
+// Base64 of at most the body limit.
+function deliveryBody(value: unknown): string {
+  const candidate = text(value);
+  if (
+    candidate.length > Math.ceil(SLACK_DELIVERY_BODY_BYTES_LIMIT / 3) * 4 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/u.test(candidate)
+  )
+    invalid();
+  return candidate;
 }
 
 function channel(value: unknown): SignalChannel {

@@ -7,12 +7,18 @@ import { type ReactNode, useEffect, useState } from "react";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
+import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
+import {
+  refreshHostedServerAvailability,
+  useHostedServerAvailability,
+} from "@/features/servers/model/hosted-server-checkout";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
 import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { haptics } from "@/shared/lib/haptics";
+import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
@@ -39,6 +45,8 @@ function serverDetail(server: MobileServer, t: MobileTranslate): string {
   const pending = server.state === "connecting" && server.initialConnectionPending;
   return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server, t)}` : label;
 }
+
+function ignoreLongPress(): void {}
 
 function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
   return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
@@ -69,7 +77,11 @@ export function ServerDrawerContent({
   const localServers = servers.filter((server) => server.kind === "local");
   const remoteIds = servers.filter((server) => server.kind !== "local").map((server) => server.id);
   const canReorder = remoteIds.length > 1;
-  const menuActions: MenuAction[] = [{ id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" }];
+  const menuActions: MenuAction[] = [
+    { id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" },
+    { id: "routines", title: t("mobile.server.drawer.routines"), image: "calendar" },
+    { id: "usage", title: t("mobile.server.drawer.usage"), image: "chart.bar" },
+  ];
   if (canReorder)
     menuActions.push({ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" });
 
@@ -86,19 +98,38 @@ export function ServerDrawerContent({
     setDragging(false);
   }, [open]);
 
+  // As on desktop, the plus button opens the plans when the account can create hosted servers and
+  // the feature flag of this build allows the purchase.
+  const accountCanCreate = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  const cloudServersOn = useMobileFeature(session.apiUrl, "cloudServers");
+  const canCreateServer = accountCanCreate && cloudServersOn;
+  useEffect(() => {
+    if (!open) return;
+    void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
+    void refreshMobileFeatures(session.apiUrl);
+  }, [open, session]);
+
   function move(serverId: string, targetIndex: number) {
     const next = moveServerId(remoteIds, serverId, targetIndex);
     if (next.join("\n") !== remoteIds.join("\n")) onReorder(next);
   }
 
   const openOptions = (serverId: string) => onNavigate({ pathname: "/server-settings", params: { serverId } });
+  const openRoutines = (serverId: string) => onNavigate({ pathname: "/server-routines", params: { serverId } });
+  const openUsage = (serverId: string) => onNavigate({ pathname: "/server-usage", params: { serverId } });
 
   function renderRow(serverItem: MobileServer, width?: number) {
     const selected = serverItem.id === activeServerId;
     const remoteIndex = remoteIds.indexOf(serverItem.id);
     const serverLabel = serverKindLabel(serverItem, t);
     const accessibilityActions = [
-      ...(editing ? [] : [{ name: "options", label: t("mobile.server.drawer.serverOptions") }]),
+      ...(editing
+        ? []
+        : [
+            { name: "options", label: t("mobile.server.drawer.serverOptions") },
+            { name: "routines", label: t("mobile.server.drawer.routines") },
+            { name: "usage", label: t("mobile.server.drawer.usage") },
+          ]),
       ...(remoteIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
       ...(remoteIndex >= 0 && remoteIndex < remoteIds.length - 1
         ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }]
@@ -114,11 +145,16 @@ export function ServerDrawerContent({
         onAccessibilityAction={(event) => {
           const action = event.nativeEvent.actionName;
           if (action === "options") openOptions(serverItem.id);
+          if (action === "routines") openRoutines(serverItem.id);
+          if (action === "usage") openUsage(serverItem.id);
           if (action === "moveUp") move(serverItem.id, remoteIndex - 1);
           if (action === "moveDown") move(serverItem.id, remoteIndex + 1);
         }}
         className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
+        // The native context menu does not cancel this touch. Without a long-press handler, lifting the
+        // finger after the menu opens counts as a tap and closes the drawer under the open menu.
+        onLongPress={editing ? undefined : ignoreLongPress}
         style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 8, opacity: pressed ? 0.58 : 1, width })}
       >
         <ServerAvatar server={serverItem} />
@@ -164,6 +200,8 @@ export function ServerDrawerContent({
         actions={menuActions}
         onPressAction={(event) => {
           if (event.nativeEvent.event === "options") openOptions(serverItem.id);
+          if (event.nativeEvent.event === "routines") openRoutines(serverItem.id);
+          if (event.nativeEvent.event === "usage") openUsage(serverItem.id);
           if (event.nativeEvent.event === "reorder") setEditing(true);
         }}
       >
@@ -233,11 +271,11 @@ export function ServerDrawerContent({
           </ServerDrawerIconButton>
         ) : (
           <ServerDrawerIconButton
-            accessibilityLabel={t("mobile.server.drawer.join")}
+            accessibilityLabel={canCreateServer ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
             color={mutedColor}
             fallbackVariant="filled"
             systemName="plus"
-            onPress={() => onNavigate("/add-server")}
+            onPress={() => onNavigate(canCreateServer ? "/hosted-server" : "/add-server")}
           >
             <Plus color={mutedColor} size={18} strokeWidth={2} />
           </ServerDrawerIconButton>

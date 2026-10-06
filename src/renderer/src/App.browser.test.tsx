@@ -1483,7 +1483,7 @@ describe("OpenBot connected desktop shell", () => {
     const missingError = new Error(
       `Error invoking remote method 'agent:preview-${source}-file': Error: ENOENT: no such file or directory, realpath '${path}'`,
     );
-    const missingMessage = `“${filename}” was not found. Ask the agent to create or restore the file, then click the link again.`;
+    const missingMessage = `“${filename}” was not found at this path. It may have been moved or deleted.`;
     const preview = {
       name: filename,
       size: 13,
@@ -1608,6 +1608,70 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.previewSharedFile).toHaveBeenCalledWith({ path: sharedPath });
     expect(window.openbot.agent.openSharedFile).not.toHaveBeenCalled();
   });
+
+  it("sends each agent's edited-file links with that agent's id, also after a reload", async () => {
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: agentId === "chief" ? "thread-chief" : null,
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: `edited-${agentId}`,
+          author: "assistant",
+          text:
+            agentId === "chief"
+              ? "Edited [edited.ts](file:///Users/me/my%20project/edited.ts), [page.tsx](/Users/me/project/page.tsx:12) and [menu.txt](file:///tmp/OpenBot/Shared/my%20menu.txt)."
+              : "Edited [notes.md](notes.md).",
+          createdAt: "2026-08-24T12:16:00.000Z",
+          status: "completed",
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    }));
+    vi.mocked(window.openbot.agent.previewWorkspaceFile).mockImplementation(async ({ path }) => ({
+      name: path.split("/").at(-1) ?? "",
+      size: 6,
+      mimeType: "text/plain",
+      previewKind: "text",
+      bytes: new TextEncoder().encode(`body of ${path}`),
+    }));
+
+    const view = render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open workspace file edited.ts" }));
+    expect(await screen.findByText("body of /Users/me/my%20project/edited.ts")).toBeInTheDocument();
+    expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenLastCalledWith({
+      agentId: "chief",
+      path: "/Users/me/my%20project/edited.ts",
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Open workspace file page.tsx:12" }));
+    expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenLastCalledWith({
+      agentId: "chief",
+      path: "/Users/me/project/page.tsx:12",
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Open shared file my menu.txt" }));
+    await waitFor(() =>
+      expect(window.openbot.agent.previewSharedFile).toHaveBeenCalledWith({ path: "/tmp/OpenBot/Shared/my menu.txt" }),
+    );
+
+    await fireEvent.click(screen.getByRole("button", { name: /^Sales Outbound/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open workspace file notes.md" }));
+    expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenLastCalledWith({
+      agentId: "sales-outbound",
+      path: "notes.md",
+    });
+
+    view.unmount();
+    vi.mocked(window.openbot.agent.previewWorkspaceFile).mockClear();
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open workspace file notes.md" }));
+    expect(await screen.findByText("body of notes.md")).toBeInTheDocument();
+    expect(window.openbot.agent.previewWorkspaceFile).toHaveBeenCalledExactlyOnceWith({
+      agentId: "sales-outbound",
+      path: "notes.md",
+    });
+  });
+
   it("opens an attached file in the right sidebar rather than a modal", async () => {
     const attached = attachment("att-brief", "launch-brief.md", "pdf");
     vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({

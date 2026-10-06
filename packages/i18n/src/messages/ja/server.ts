@@ -87,6 +87,10 @@ export const messages = {
   "server.compatibility.versionMismatchTitle": "{name} の OpenBot のバージョンが異なります",
   "server.compatibility.versionMismatchDescription":
     "この接続はプロトコル {protocol} を使用しています。一部の新しい機能は使用できない場合があります。クライアント {clientVersion}、ホスト {hostVersion}。",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "すべての機能を使うには、{name} の OpenBot を更新してください。この接続はプロトコル {protocol} を使用しています。クライアント {clientVersion}、ホスト {hostVersion}。",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "すべての機能を使うには、この OpenBot アプリを更新してください。この接続はプロトコル {protocol} を使用しています。クライアント {clientVersion}、ホスト {hostVersion}。",
   "server.connection.failedTitle": "接続に失敗しました",
   "server.connection.failedDescription":
     "このサーバーに接続できませんでした。ホストがオンラインであることを確認して、もう一度お試しください。",

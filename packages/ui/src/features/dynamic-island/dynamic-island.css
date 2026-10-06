@@ -123,10 +123,9 @@
   height: var(--dynamic-island-notch-height);
   display: grid;
   /* The ears share the width that is left: a fixed floor here pushed the trailing ear out of a
-     narrow island. The width limits keep each ear wide enough for its content. */
-  grid-template-columns:
-    minmax(0, 1fr) var(--dynamic-island-notch-width)
-    minmax(0, 1fr);
+     narrow island. The width limits keep each ear wide enough for its content. The middle track
+     takes the safe zone's width, so a resize can move the zone on the surface's spring. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   border: 0;
   border-radius: inherit;
@@ -186,8 +185,15 @@
   transform-origin: center;
   transition:
     color var(--openbot-duration-normal) var(--openbot-ease-out),
+    filter var(--openbot-duration-slow) var(--openbot-ease-out),
     opacity var(--openbot-duration-island-content) cubic-bezier(0.22, 1.08, 0.36, 1),
     transform var(--openbot-duration-island-content) cubic-bezier(0.22, 1.08, 0.36, 1);
+}
+
+/* The compact content blurs a little while it moves with the surface, as much as the move is large.
+   The blur bridges the old and the new place, and a transition keeps it interruptible. */
+.dynamic-island-shell[data-compact-resize] .dynamic-island-ear-content {
+  filter: blur(calc(0.4px * var(--dynamic-island-compact-motion, 1)));
 }
 
 .dynamic-island-hover-content {

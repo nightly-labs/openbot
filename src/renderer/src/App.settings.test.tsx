@@ -26,7 +26,7 @@ describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
     // Load the real lazy panels before measuring their visible behavior under CI load.
     await import("./features/conversation/AgentSettingsPanel");
-    await import("./features/settings/SkillsMarketplaceModal");
+    await import("./features/settings/MarketplaceModal");
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
@@ -39,7 +39,8 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(addFromMarketplace);
     expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
-    expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();
+    // The skills dialog opens again and reads the list again, so the button is enabled after the read.
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Add from marketplace" })[0]).toBeEnabled());
   });
   beforeEach(() => {
     installOpenbotStub();
@@ -1094,5 +1095,31 @@ describe("OpenBot connected desktop shell", () => {
     if (!listener) throw new Error("Settings did not subscribe to the Preferences menu event.");
     listener();
     expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
+  });
+
+  it("follows another window's send shortcut change and keeps other settings", async () => {
+    window.localStorage.setItem("openbot:send-shortcut-mode", "enter");
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const shortcut = () => screen.getByRole("button", { name: /Send shortcut/ });
+    await waitFor(() => expect(shortcut()).toHaveTextContent("Enter to send"));
+    expect(await screen.findByRole("switch", { name: "Launch OpenBot at login" })).toBeChecked();
+
+    await fireEvent.pointerDown(shortcut(), { pointerType: "mouse", button: 0 });
+    await fireEvent.click(await screen.findByRole("option", { name: "⌘Enter to send" }));
+    await waitFor(() => expect(window.localStorage.getItem("openbot:send-shortcut-mode")).toBe("mod-enter"));
+    await waitFor(() => expect(shortcut()).toHaveTextContent("⌘Enter to send"));
+
+    // Another window switches back; this display follows without touching other settings.
+    window.localStorage.setItem("openbot:send-shortcut-mode", "enter");
+    window.dispatchEvent(new StorageEvent("storage", { key: "openbot:send-shortcut-mode" }));
+    await waitFor(() => expect(shortcut()).toHaveTextContent("Enter to send"));
+    expect(await screen.findByRole("switch", { name: "Launch OpenBot at login" })).toBeChecked();
+
+    // Reselecting through the settings path writes storage and refreshes the display.
+    await fireEvent.pointerDown(shortcut(), { pointerType: "mouse", button: 0 });
+    await fireEvent.click(await screen.findByRole("option", { name: "⌘Enter to send" }));
+    await waitFor(() => expect(window.localStorage.getItem("openbot:send-shortcut-mode")).toBe("mod-enter"));
+    await waitFor(() => expect(shortcut()).toHaveTextContent("⌘Enter to send"));
   });
 });

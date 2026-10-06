@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { exportJWK, generateKeyPair, importJWK, jwtVerify } from "jose";
+import { decodeJwt, exportJWK, generateKeyPair, importJWK, jwtVerify } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { AuthService } from "../src/server/auth-service";
 import { sha256 } from "../src/server/crypto";
@@ -15,9 +15,9 @@ import {
 } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
-/** The account server reads the plan of a host for its member limit. */
+/** The account server reads the plan of a host for its member limit, and its Slack workspaces. */
 function applyPlanMigrations(database: DatabaseSync): void {
-  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql"]) {
+  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql", "0025_slack_workspace_routes.sql"]) {
     database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
   }
 }
@@ -523,6 +523,8 @@ describe("RemoteControlPlane", () => {
       REMOTE_TICKET_KEY_ID: "test-key",
       REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
       REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
+      SLACK_ROUTE_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
+      SLACK_ROUTE_KEY_ID: "test-key",
     };
     const controlPlane = new RemoteControlPlane(bindings, {
       now: () => 1_000,
@@ -572,6 +574,60 @@ describe("RemoteControlPlane", () => {
     await expect(controlPlane.issueHostTicket("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
       code: "host_unauthorized",
     });
+    // A Slack route ticket routes a workspace's messages to a host, so only that host's credential
+    // gets one, and it names only the workspaces linked to that host.
+    await expect(controlPlane.issueSlackRoute("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
+      code: "host_unauthorized",
+    });
+    database
+      .prepare(
+        `INSERT INTO slack_workspace_routes(team_id, host_id, account_id, app_id, bot_user_id, connected_at)
+         VALUES ('T1', 'host-1', 'owner', 'A1', 'U1', 1)`,
+      )
+      .run();
+    const route = await controlPlane.issueSlackRoute("host-1", registration.machineToken);
+    expect(route.teams).toEqual(["T1"]);
+    expect(decodeJwt(route.ticket)).toMatchObject({
+      aud: "openbot-slack-route",
+      hid: "host-1",
+      teams: [{ id: "T1", appId: "A1", linkedAt: 1 }],
+    });
+    await expect(
+      controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1"),
+    ).rejects.toMatchObject({ code: "host_unauthorized" });
+    // After Signal starts, it keeps only the links that D1 still has.
+    await expect(
+      controlPlane.validateSlackRoute({
+        hostId: "host-1",
+        teams: [
+          { id: "T1", appId: "A1", linkedAt: 1 },
+          { id: "T2", appId: "A1", linkedAt: 1 },
+        ],
+      }),
+    ).resolves.toEqual(["T1"]);
+    await expect(
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 0 }] }),
+    ).resolves.toEqual([]);
+    await expect(
+      controlPlane.validateSlackRoute({ hostId: "host-2", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+    ).resolves.toEqual([]);
+    // Another app's link to the same workspace is not this one.
+    await expect(
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A2", linkedAt: 1 }] }),
+    ).resolves.toEqual([]);
+    const revocations = () =>
+      webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "slack-route-revoked");
+    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
+    expect((await controlPlane.issueSlackRoute("host-1", registration.machineToken)).teams).toEqual([]);
+    // Signal drops the route, so the host cannot keep the workspace with the ticket it holds.
+    expect(revocations()).toEqual([
+      { type: "slack-route-revoked", appId: "A1", teamId: "T1", through: expect.any(Number) },
+    ]);
+    await expect(
+      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+    ).resolves.toEqual([]);
+    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
+    expect(revocations()).toHaveLength(1);
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });

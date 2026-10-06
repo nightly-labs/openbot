@@ -25,4 +25,6 @@ export const messages = {
   "update.provider.unavailable": "プロバイダーのアップデートは利用できません。",
   "update.provider.downloadsUnavailable": "プロバイダーのダウンロードは利用できません。",
   "update.provider.startFailed": "アップデートを開始できませんでした。もう一度お試しください。",
+  "update.provider.showDetails": "詳細を表示",
+  "update.provider.hideDetails": "詳細を隠す",
 } as const satisfies PartialTranslation<typeof source>;

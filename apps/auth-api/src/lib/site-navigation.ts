@@ -25,6 +25,8 @@ export interface ArticleNavigationSection {
   /** One line under the panel, next to the link to the index. */
   summary: string;
   indexLabel: string;
+  /** Where the trigger itself goes: the panel is a preview of this page. */
+  indexRoute: ContentCollection["indexRoute"];
   collection: ContentCollection;
   articles: readonly CollectionArticle[];
 }
@@ -45,6 +47,7 @@ export type SiteNavigationSection = ArticleNavigationSection | PluginNavigationS
 const COLLECTION_COPY: Record<HeaderCollectionId, { summary: string; indexLabel: string }> = {
   news: { summary: "What shipped, and why it matters.", indexLabel: "All news" },
   guides: { summary: "Learn OpenBot one step at a time.", indexLabel: "All guides" },
+  compare: { summary: "How OpenBot differs from other agent apps.", indexLabel: "All comparisons" },
 };
 
 export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
@@ -54,6 +57,7 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
       id: collection.id,
       label: collection.name,
       ...COLLECTION_COPY[collection.id],
+      indexRoute: collection.indexRoute,
       collection,
       articles: collection.articles.slice(0, PANEL_ARTICLE_COUNT),
     }),

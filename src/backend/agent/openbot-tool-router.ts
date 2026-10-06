@@ -12,12 +12,15 @@ import type {
 import {
   agentComputerUseEnabled,
   isMessageReaction,
+  marketplaceSuggestionItemType,
   skillConversationEventItemType,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { z } from "zod";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
@@ -50,6 +53,8 @@ import {
 import {
   createAgentToolSchema,
   listModelsToolSchema,
+  PROFILE_TOOL_NAMES,
+  profileToolErrorMessage,
   readAgentToolSchema,
   updateProfileToolSchema,
 } from "./profile-tools";
@@ -59,6 +64,8 @@ import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import type { AgentBrowserHost } from "./turn-lifecycle";
+
+const logger = createOpenBotLogger("openbot-tool-router");
 
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
@@ -74,6 +81,8 @@ export interface OpenBotToolRouterHooks {
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
   enabledMcpServers(): McpServerConfig[];
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** Masks the MCP secret values and handoff values that `redactText` does not know. */
+  redactMcp(text: string): string;
   /** True while the provider runs a turn for this agent, a context compaction included. */
   runsTurn(agentId: string): boolean;
   /** `false` when the turn no longer runs or `mayStop` refuses, so no stop was sent. */
@@ -210,7 +219,9 @@ export class OpenBotToolRouter {
               request.id,
               request.params.tool === "upload_files"
                 ? await this.#browserUploads.uploadFiles(agentId, params)
-                : await this.#browser.handleDynamicTool(params),
+                : request.params.tool === "list_logins"
+                  ? await this.#attention.listVaultLogins(params)
+                  : await this.#browser.handleDynamicTool(params),
             );
             return;
           }
@@ -223,7 +234,15 @@ export class OpenBotToolRouter {
               await this.#attention.surfaceHostedSiteApproval(client, request, request.params, request.params.tool);
               return;
             }
-            client.respond(request.id, await this.#handleOpenBotTool(request.params));
+            const tool = request.params.tool;
+            const response = await this.#handleOpenBotTool(request.params).catch((error: unknown) => {
+              // The calling agent can correct a profile request, so it gets the reason as a failed tool result.
+              if (!PROFILE_TOOL_NAMES.has(tool)) throw error;
+              const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
+              if (!(error instanceof z.ZodError)) logger.warn("A profile tool failed.", { tool, error: message });
+              return openBotToolFailure(message);
+            });
+            client.respond(request.id, response);
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${request.params.namespace}`);
@@ -488,7 +507,7 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "create_agent") {
-      const args = createAgentToolSchema.parse(params.arguments);
+      const args = createAgentToolSchema.parse(params.arguments, { reportInput: true });
       const hue = args.avatarHue ?? null;
       const caller = this.#requireAgent(senderAgentId);
       const listed = this.#hooks.listModels();
@@ -566,7 +585,7 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "update_profile") {
-      const args = updateProfileToolSchema.parse(params.arguments);
+      const args = updateProfileToolSchema.parse(params.arguments, { reportInput: true });
       const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, access, computerUse, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");
@@ -654,6 +673,31 @@ export class OpenBotToolRouter {
     const tableResult = await handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
     if (tableResult) return tableResult;
 
+    if (params.tool === "suggest_marketplace_app") {
+      const args = params.arguments;
+      if (!isRecord(args) || !isString(args.app) || !isPluginSlug(args.app)) {
+        throw new Error("app must be a Marketplace plugin slug, or github.");
+      }
+      const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+      snapshot.messages.push({
+        id: randomUUID(),
+        turnId: params.turnId,
+        author: "system",
+        source: "system",
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        itemType: marketplaceSuggestionItemType({ appId: args.app }),
+        // The card reads the app from the item type. A client without the card shows this line.
+        text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
+      });
+      const persisted = this.#store.database.persistConversation(snapshot, "marketplace.suggested", {
+        appId: args.app,
+      });
+      this.#conversation.setSnapshot(senderAgentId, persisted);
+      this.#conversation.publishConversation(persisted);
+      return openBotToolResult({ status: "suggested", app: args.app });
+    }
+
     if (params.tool === "react_to_user_message") {
       const args = params.arguments;
       if (!isRecord(args) || !isMessageReaction(args.emoji)) {
@@ -704,6 +748,11 @@ export class OpenBotToolRouter {
       throw new Error("expectsReply must be a boolean.");
     }
 
+    // A request from a Slack turn: the teammate's answer goes back to that Slack thread.
+    const messagingReturn = this.#mailbox
+      .findDeliveriesByTurn(senderAgentId, params.turnId)
+      .map(({ delivery }) => this.#mailbox.messagingOrigin(delivery.id))
+      .find((origin) => origin !== null);
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "agent", agentId: senderAgentId },
       recipientAgentIds: recipientValues,
@@ -711,6 +760,7 @@ export class OpenBotToolRouter {
       sourcePaths: paths,
       replyToMessageId: replyToMessageId ?? null,
       expectsReply,
+      ...(messagingReturn ? { messagingReturn } : {}),
       idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
     });
     for (const recipient of recipientValues) {

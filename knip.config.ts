@@ -31,6 +31,8 @@ const config: KnipConfig = {
     "taskkill.exe",
     // Makes throwaway certificates for the Sunshine port isolation test.
     "openssl",
+    // Tunnels Slack to the local Signal and account API in `bun run dev:slack`.
+    "cloudflared",
   ],
   workspaces: {
     ".": {

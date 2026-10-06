@@ -47,8 +47,86 @@ export function assertOwnerOnlyDirectory(
   }
 }
 
+// SIDs that may own or write the registry on Windows besides this user:
+// BUILTIN\Administrators, which owns what an elevated shell creates, and
+// LocalSystem, both in the default %LOCALAPPDATA% ACL; and CREATOR OWNER, which
+// a record inherits as this user, because this user creates every record.
+const WINDOWS_ADMINISTRATORS_SID = "S-1-5-32-544";
+const WINDOWS_TRUSTED_WRITER_SIDS = [WINDOWS_ADMINISTRATORS_SID, "S-1-5-18", "S-1-3-0"];
+
+// Rights that let an account replace a record: write and append data, write
+// attributes, delete, change permissions, take ownership, and the generic
+// write and all bits.
+const WINDOWS_WRITE_RIGHTS = "0x500D0156";
+
+// The Windows form of the uid and mode checks: the owner, then every allow
+// entry that grants write rights, inherit-only ones too, because a record
+// gets its permissions from the entries of this directory. SIDs, not account
+// names: names are localized. The path goes through the environment, so
+// PowerShell never parses it. An ACL that cannot be read fails closed, like a
+// foreign one.
+function assertWindowsOwnerOnlyDirectory(directory: string): void {
+  let lines: string[];
+  try {
+    lines = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "$sid = [System.Security.Principal.SecurityIdentifier]; " +
+          "$acl = Get-Acl -LiteralPath $env:OPENBOT_REGISTRY_DIRECTORY; " +
+          "$acl.GetOwner($sid).Value; " +
+          "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; " +
+          "$acl.GetAccessRules($true, $true, $sid) | Where-Object { " +
+          "$_.AccessControlType -eq 'Allow' -and " +
+          `([int]$_.FileSystemRights -band ${WINDOWS_WRITE_RIGHTS}) } | ForEach-Object { $_.IdentityReference.Value }`,
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, OPENBOT_REGISTRY_DIRECTORY: directory },
+        timeout: 5_000,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    )
+      .trim()
+      .split(/\s+/);
+  } catch (error) {
+    throw new Error(
+      `Could not read the permissions of ${directory}, so dev instances will not be published there. ` +
+        "Remove it and start `bun run dev` again.",
+      { cause: error },
+    );
+  }
+  const [owner, currentUser, ...writers] = lines;
+  if (!owner || !currentUser || (owner !== currentUser && owner !== WINDOWS_ADMINISTRATORS_SID)) {
+    throw new Error(
+      `${directory} is not owned by this user, so dev instances will not be published there. ` +
+        "Remove it and start `bun run dev` again.",
+    );
+  }
+  const otherWriters = writers.filter((sid) => sid !== currentUser && !WINDOWS_TRUSTED_WRITER_SIDS.includes(sid));
+  if (otherWriters.length > 0) {
+    throw new Error(
+      `${directory} is writable by other accounts (${otherWriters.join(", ")}). ` +
+        "Remove it and start `bun run dev` again: a registry another account can write lets it choose " +
+        "which app an automation command drives.",
+    );
+  }
+}
+
 export function assertRegistryDirectoryOwnership(directory: string): void {
   const stats = lstatSync(directory);
+  if (process.platform === "win32") {
+    if (stats.isSymbolicLink()) {
+      throw new Error(
+        `${directory} is not owned by this user, so dev instances will not be published there. ` +
+          "Remove it and start `bun run dev` again.",
+      );
+    }
+    assertWindowsOwnerOnlyDirectory(directory);
+    return;
+  }
   assertOwnerOnlyDirectory(directory, {
     uid: stats.uid,
     mode: stats.mode,
@@ -184,13 +262,37 @@ export function verifyRecordedProcess(
   return isRecordedProcess(entry, startedAt) ? "live" : "gone";
 }
 
+// Windows has no process groups. An orphan keeps its ParentProcessId, so the
+// nearest question is whether a process the leader started still runs. Windows
+// reuses pids soon: when another process holds the pid now, only children
+// older than that process can be the leader's.
+function hasWindowsChildProcess(pid: number): boolean {
+  try {
+    const reported = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$parent = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}"; ` +
+          `$children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = ${pid}"); ` +
+          "if ($parent) { $children = @($children | Where-Object { $_.CreationDate -lt $parent.CreationDate }) }; " +
+          "$children.Count",
+      ],
+      { encoding: "utf8", timeout: 5_000, stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return Number(reported) > 0;
+  } catch {
+    return false;
+  }
+}
+
 // Whether *anything* is left in the process group a detached child leads. A
 // group outlives its leader: electron-vite exits, and the Electron it started
 // keeps the renderer port. Signal 0 to the negated pid asks about the group,
 // and EPERM is a yes - the group exists and belongs to somebody else.
 export function isProcessGroupAlive(pid: number, platform: NodeJS.Platform = process.platform): boolean {
-  // Windows has no process groups to ask about.
-  if (platform === "win32") return false;
+  if (platform === "win32") return hasWindowsChildProcess(pid);
   try {
     process.kill(-pid, 0);
     return true;

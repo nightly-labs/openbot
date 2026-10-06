@@ -126,6 +126,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 }}
                 variant="ghost"
                 type="button"
+                data-cuelume-tap="close"
                 disabled={pending()}
                 onClick={() => props.onCancel()}
               >
@@ -137,6 +138,8 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 }}
                 variant={tone() === "destructive" ? "destructive" : "default"}
                 type="button"
+                data-cuelume-tap={tone() === "destructive" ? "close" : ""}
+                data-cuelume-emphasis={tone() === "destructive" ? "strong" : undefined}
                 class="ui-confirm-dialog-confirm"
                 loading={pending()}
                 loadingLabel={props.pendingLabel}

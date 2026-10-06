@@ -26,6 +26,8 @@ export function ReferenceChip(props: {
   class?: string;
   style?: JSX.CSSProperties;
   onClick?: (event: MouseEvent) => void;
+  /** Sound cue for the click. The default is `open`. */
+  "data-cuelume-tap"?: string;
 }) {
   const content = () => (
     <>
@@ -57,6 +59,7 @@ export function ReferenceChip(props: {
         style={props.style}
         title={props.name}
         aria-label={`Open ${props.kind} ${props.name}`}
+        data-cuelume-tap={props["data-cuelume-tap"] ?? "open"}
         onClick={(event) => props.onClick?.(event)}
       >
         {content()}

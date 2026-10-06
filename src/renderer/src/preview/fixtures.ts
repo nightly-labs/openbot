@@ -569,6 +569,22 @@ export const STORY_SERVERS: ServerSummary[] = [
     role: "owner",
     active: false,
   },
+  // The stopped hosted server in `mock-hosted-servers.ts`, so the rail shows the sleep indicator.
+  {
+    id: "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
+    name: "Research server",
+    logoUrl: null,
+    notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
+    kind: "remote",
+    state: "offline",
+    apiUrl: null,
+    remoteDesktopAvailable: false,
+    role: "owner",
+    active: false,
+    hostedSleep: "sleeping",
+  },
 ];
 
 export const STORY_BROWSER_TABS: BrowserTab[] = [
@@ -1426,7 +1442,7 @@ export const STORY_MARKETPLACE_AGENT_DETAILS: Record<string, MarketplaceAgentDet
  * real server (`mcp.aave.com`) so the page is reviewed against the lengths a published listing
  * really has, rather than against text written to fit the layout.
  */
-export const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
+const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
   id: "plugin-aave",
   slug: "aave",
   name: "Aave",

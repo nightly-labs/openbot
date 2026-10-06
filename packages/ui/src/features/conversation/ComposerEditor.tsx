@@ -15,6 +15,7 @@ import { currentText, type TextValue, useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
+import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
   agentId: string | undefined;
@@ -30,6 +31,11 @@ interface ComposerEditorProps {
   focusRequest?: number;
   onValueChange: (value: string) => void;
   onSubmit: () => void;
+  /**
+   * Which chord sends the message. Enter keeps the current behavior; the platform modifier with
+   * Enter sends and plain Enter adds a line. The renderer resolves the platform and passes it.
+   */
+  sendShortcut?: SendShortcut;
   onOpenAttachment?: (attachment: DraftAttachment) => void;
   /** Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it. */
   onPasteFiles?: (files: File[]) => void;
@@ -424,7 +430,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     });
   }
 
-  function handleMentionPickerKeyDown(event: KeyboardEvent): boolean {
+  function handleMentionPickerKeyDown(event: KeyboardEvent, sendShortcut: SendShortcut): boolean {
     if (!mention()) return false;
     const options = matchingOptions();
     if (event.key === "Escape") {
@@ -443,6 +449,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       moveActiveOption(-1, options.length);
       return true;
     }
+    // The modifier send chord submits instead of picking a suggestion. In the Enter mode the
+    // chord is plain Enter, which keeps selecting the suggestion as before.
+    if (sendShortcut !== "enter" && isSendShortcutKey(event, sendShortcut)) return false;
     if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
       event.preventDefault();
       const option = options[activeOption()];
@@ -493,12 +502,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   function handleKeyDown(event: KeyboardEvent) {
     if (props.disabled) return;
+    const sendShortcut: SendShortcut = props.sendShortcut ?? "enter";
     /*
      * The browser owns the IME composition buffer. The key that starts a composition comes before
      * `compositionstart` and without `isComposing`; Chromium marks it with keyCode 229 ("Process").
      */
     if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
-    if (handleMentionPickerKeyDown(event)) return;
+    if (handleMentionPickerKeyDown(event, sendShortcut)) return;
     if (event.key === "Backspace" && removeAutomaticMentionSpace()) {
       event.preventDefault();
       return;
@@ -548,6 +558,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return;
     }
     if (event.key === "Enter") {
+      if (sendShortcut !== "enter" && !isSendShortcutKey(event, sendShortcut)) {
+        event.preventDefault();
+        if (!editor) return;
+        insertLineBreak(editor);
+        emitValue();
+        updateMention();
+        scrollToEndIfCaretAtEnd();
+        return;
+      }
       event.preventDefault();
       props.onSubmit();
     }
@@ -626,6 +645,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-disabled={props.disabled ? "true" : "false"}
         aria-multiline="true"
         spellcheck="true"
+        data-cuelume-type=""
         onFocus={() => ensureEditorSelection(true)}
         onInput={() => {
           emitValue();

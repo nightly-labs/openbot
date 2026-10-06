@@ -2,7 +2,12 @@ import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
 import { CONTENT_COLLECTIONS } from "./content";
 import { type CollectionId, type ContentCollection, findArticle } from "./content-collection";
-import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
+import {
+  OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_DOWNLOAD_LINKS,
+  OPENBOT_DOWNLOAD_PAGE_LINKS,
+  OPENBOT_LINKS,
+} from "./landing-links";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -37,6 +42,7 @@ type LandingPlacement =
   | "header"
   | "hero"
   | "download_section"
+  | "download_page"
   | "footer"
   | "content_index"
   | "content_article"
@@ -48,6 +54,7 @@ const LANDING_PLACEMENTS = [
   "header",
   "hero",
   "download_section",
+  "download_page",
   "footer",
   "content_index",
   "content_article",
@@ -58,6 +65,7 @@ const LANDING_PLACEMENTS = [
 /** The platforms the landing page can send a visitor to a download for. */
 type LandingDownloadPlatform = "linux" | "macos" | "windows";
 type LandingDestination =
+  | "download_page"
   | "download_section"
   | "news"
   | "guides"
@@ -75,15 +83,22 @@ type LandingDestination =
   | "product_hunt";
 
 type CollectionIndexRoute = ContentCollection["indexRoute"];
+type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
 /**
  * The screens a report may name. Article paths carry the slug so one article can be told from
  * another, and `safeScreenPath` keeps the set closed at runtime as well as in the type.
  */
-export type LandingScreenPath = "/" | "/join" | CollectionIndexRoute | `${CollectionIndexRoute}/${string}`;
+export type LandingScreenPath =
+  | "/"
+  | "/join"
+  | DownloadPagePath
+  | CollectionIndexRoute
+  | `${CollectionIndexRoute}/${string}`;
 
 const FIXED_SCREEN_PATHS = [
   "/",
   "/join",
+  ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
   "/news",
   "/guides",
   "/compare",
@@ -141,16 +156,19 @@ function createOpenPanelClient(options: OpenPanelOptions): OpenPanelClient {
   };
 }
 
-/** The download route each platform uses, reversed so a click can name the platform it asked for. */
+/** The download routes of each platform, reversed so a click can name the platform it asked for. */
 const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [OPENBOT_DOWNLOAD_LINKS.macos, "macos"],
   [OPENBOT_DOWNLOAD_LINKS.windows, "windows"],
   [OPENBOT_DOWNLOAD_LINKS.linux, "linux"],
+  [OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos, "macos"],
+  [OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux, "linux"],
 ]);
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.download, "download_section"],
   [OPENBOT_LINKS.downloadFromOtherPage, "download_section"],
+  ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS).map((path) => [path, "download_page"] as const),
   [OPENBOT_LINKS.news, "news"],
   [OPENBOT_LINKS.guides, "guides"],
   [OPENBOT_LINKS.contact, "contact"],
@@ -518,6 +536,7 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   if (link.closest(".landing-hero")) return "hero";
   if (link.closest(".landing-download")) return "download_section";
   if (link.closest(".landing-footer")) return "footer";
+  if (link.closest(".download-page")) return "download_page";
   // Without these, every link inside an article body reports "other", which makes
   // the article pages indistinguishable from each other in the report.
   if (link.closest(".post-index")) return "content_index";

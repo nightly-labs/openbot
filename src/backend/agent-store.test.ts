@@ -338,6 +338,32 @@ describe("AgentStore", () => {
     });
   });
 
+  it("keeps local scripts off for a profile stored before the setting, and for a damaged value", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    const agent = await store.createAgent(AGENT_PROFILE_INPUT);
+    await store.updateAgent({ agentId: agent.id, allowAutomation: true });
+    const allowAutomation = async () => {
+      const reopened = new AgentStore(userData, home);
+      await reopened.initialize();
+      return reopened.list().find((candidate) => candidate.id === agent.id)?.allowAutomation;
+    };
+    const setStored = (sql: string, ...values: string[]) =>
+      store.database.connection
+        .prepare(`UPDATE projection_agents SET agent_json = ${sql} WHERE agent_id = ?`)
+        .run(...values, agent.id);
+
+    expect(await allowAutomation()).toBe(true);
+    setStored("json_remove(agent_json, '$.allowAutomation')");
+    expect(await allowAutomation()).toBeUndefined();
+    setStored("json_set(agent_json, '$.allowAutomation', ?)", "yes");
+    expect(await allowAutomation()).toBeUndefined();
+  });
+
   it("migrates version 1 avatars to stable id seeds", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-store-"));
     temporaryRoots.push(root);

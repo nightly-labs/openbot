@@ -7,10 +7,11 @@ import { SignalService } from "./signal-service";
 import { RemoteTokenService, signServiceRequest } from "./tokens";
 
 const config = readRemoteApiConfig();
-const tokens = new RemoteTokenService(config, async (claims) => {
-  const body = JSON.stringify(claims);
+/** A request to the account service, signed with the auth webhook secret. */
+const askControlPlane = (path: string, payload: unknown) => {
+  const body = JSON.stringify(payload);
   const timestamp = Math.floor(Date.now() / 1_000).toString();
-  const response = await fetch(new URL("/v2/remote/resume/validate", config.controlPlaneUrl), {
+  return fetch(new URL(path, config.controlPlaneUrl), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -20,9 +21,22 @@ const tokens = new RemoteTokenService(config, async (claims) => {
     body,
     signal: AbortSignal.timeout(5_000),
   });
-  if (!response.ok) return false;
-  return z.object({ valid: z.boolean() }).parse(await response.json()).valid;
-});
+};
+const tokens = new RemoteTokenService(
+  config,
+  async (claims) => {
+    const response = await askControlPlane("/v2/remote/resume/validate", claims);
+    if (!response.ok) return false;
+    return z.object({ valid: z.boolean() }).parse(await response.json()).valid;
+  },
+  {
+    validateSlackRoute: async (hostId, teams) => {
+      const response = await askControlPlane("/v2/remote/slack-route/validate", { hostId, teams });
+      if (!response.ok) throw new Error("The account service did not confirm the Slack route.");
+      return z.object({ teams: z.array(z.string()) }).parse(await response.json()).teams;
+    },
+  },
+);
 await tokens.initialize();
 const signal = new SignalService(
   tokens,

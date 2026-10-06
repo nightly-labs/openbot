@@ -125,7 +125,8 @@ export function mergeProviderHistory(
   provider?: AgentProviderId,
 ): ConversationSnapshot {
   if (provider === "claude") {
-    return mergeConversationSnapshots(stored, reconcileClaudeHistory(stored, imported));
+    const kept = { ...stored, messages: stored.messages.filter((message) => !isStoredClaudeNotice(message)) };
+    return mergeConversationSnapshots(kept, reconcileClaudeHistory(kept, imported));
   }
   const importedIds = new Set(imported.messages.map((message) => message.id));
   const importedAssistantMessages = new Set(
@@ -256,6 +257,43 @@ function isClaudeNarration(message: ConversationMessage): boolean {
     message.itemType === "commentary" &&
     Boolean(message.turnId) &&
     message.id !== `${message.turnId}:reasoning`
+  );
+}
+
+/**
+ * A notice Claude Code adds to its session as a user message, when a background task ends or a
+ * restart finds one that did not. Claude answers it in a turn of its own, but the user did not write it.
+ */
+export function isClaudeTaskNotification(text: string): boolean {
+  return text.startsWith("<task-notification>");
+}
+
+/** The SDK drops the transcript's `isCompactSummary` flag, so the summary's fixed opening identifies it. */
+export function isClaudeCompactionSummary(text: string): boolean {
+  return text.startsWith("This session is being continued from a previous conversation that ran out of context.");
+}
+
+/** Claude records a slash command that it runs itself, and the command's output, as user entries in these tags. */
+export function isClaudeLocalCommand(text: string): boolean {
+  return /^<(?:command-name|local-command-stdout|local-command-stderr)>/.test(text.trimStart());
+}
+
+/** Claude records a user interrupt as a user entry with this text. */
+export function isClaudeInterruptMarker(text: string): boolean {
+  return /^\[Request interrupted by user[^\]]*\]$/.test(text.trim());
+}
+
+/* Earlier builds imported Claude's notices as user messages. Nobody sent those. The reply that
+   followed a compaction summary stays: no stored field proves which live answer it repeats.
+   A message sent through the mailbox keeps its delivery. An imported notice has none. */
+function isStoredClaudeNotice(message: ConversationMessage): boolean {
+  return (
+    message.author === "user" &&
+    !message.delivery &&
+    (isClaudeTaskNotification(message.text) ||
+      isClaudeLocalCommand(message.text) ||
+      isClaudeInterruptMarker(message.text) ||
+      isClaudeCompactionSummary(message.text))
   );
 }
 

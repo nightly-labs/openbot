@@ -101,7 +101,7 @@ export function PluginPage(props: PluginPageProps) {
               <div class="plugin-hero-heading">
                 {/* The mark as an icon, in the square a reader looks for when they are about to
                     install something, and the listing's own icon wherever the catalog holds one:
-                    that is the picture the app's Plugins tab shows, already drawn as a square. A
+                    that is the picture the app's Apps tab shows, already drawn as a square. A
                     listing without one falls back to the gradient this page's artwork carries, with
                     the drawn mark on it, so the tile is never empty. */}
                 <div class="plugin-hero-mark">
@@ -125,7 +125,7 @@ export function PluginPage(props: PluginPageProps) {
                 href={createOpenBotPluginUrl(props.plugin.slug)}
                 browserHref={createWebAppPluginPath(props.plugin.slug)}
                 label="Open in OpenBot"
-                downloadCopy={`${props.plugin.name} installs from inside OpenBot. Get the app, then open this plugin from its Plugins tab.`}
+                downloadCopy={`${props.plugin.name} installs from inside OpenBot. Get the app, then open this plugin from its Apps tab.`}
               />
             </div>
           </header>

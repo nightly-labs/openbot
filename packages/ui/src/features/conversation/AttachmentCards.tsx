@@ -89,6 +89,7 @@ export function AttachmentCards(props: {
                 disabled={isMissing(attachment) || !canPreviewAttachment(attachment)}
                 aria-label={t("attachment.preview", { name: attachment.name })}
                 data-attachment-id={attachment.id}
+                data-cuelume-tap="open"
                 onClick={(event) => props.onPreview(attachment, event.currentTarget)}
               >
                 <Show

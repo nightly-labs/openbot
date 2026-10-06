@@ -2,6 +2,8 @@ import type { RoutineSchedule } from "@openbot/contracts/ipc";
 import type { AppMessages } from "@openbot/i18n";
 import { currentText, type TextValue } from "../../text";
 
+export { routineTimeMinutes } from "@openbot/team-client/routine-schedule-draft";
+
 export interface RoutineSelectOption {
   value: string;
   label: string;
@@ -80,9 +82,4 @@ export function formatRoutineClock(value: string, text: RoutineText = currentTex
 export function routineClockText(time: string, pm: boolean, text: RoutineText = currentText()): string {
   const meridiem = pm ? text.t("routine.clock.pm") : text.t("routine.clock.am");
   return text.t("routine.clock.withMeridiem", { time, meridiem });
-}
-
-export function routineTimeMinutes(value: string): number {
-  const [hour = 0, minute = 0] = value.split(":").map(Number);
-  return hour * 60 + minute;
 }

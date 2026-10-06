@@ -29,6 +29,7 @@ import {
   verifyRemoteServiceSignature,
 } from "./remote-control-plane";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
+import { SlackAppError, SlackAppService } from "./slack-app";
 import { requireWorkerBindings, type TeamInviteEmailDelivery } from "./types";
 
 export function requestAuthService(): AuthService {
@@ -273,6 +274,19 @@ export function verifyRemoteServiceRequest(request: Request, body: string): Prom
 
 export function remoteControlPlaneErrorResponse(error: unknown): Response {
   if (error instanceof RemoteControlPlaneError) return apiError(error.status, error.code, error.message);
+  return authErrorResponse(error);
+}
+
+export function requestSlackApp(): SlackAppService {
+  const bindings = requireWorkerBindings(env);
+  // The events are already in D1 and the cron redelivers them, so the answer does not wait.
+  return new SlackAppService(bindings, {
+    flushAuthEvents: async () => waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now())),
+  });
+}
+
+export function slackAppErrorResponse(error: unknown): Response {
+  if (error instanceof SlackAppError) return apiError(error.status, error.code, error.message);
   return authErrorResponse(error);
 }
 

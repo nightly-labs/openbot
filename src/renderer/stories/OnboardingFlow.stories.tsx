@@ -17,6 +17,7 @@ import { createFakeCodeLogin } from "./code-login-fixture";
 import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
+import { createStorySoundFeedback } from "./sound-feedback-fixture";
 
 const setupState: AppSetupState = { completed: false, preferredProvider: null, preferredModel: null };
 
@@ -79,7 +80,7 @@ const bothConnectingAgentStatus: AgentStatus = {
   })),
 };
 
-/** A new computer: no provider is downloaded yet, Gemini and Cursor included. */
+/** A new computer: no provider is downloaded yet, Gemini, Cursor and Cline included. */
 const lazyProviders: AgentProviderStatus[] = [
   ...(noProvidersConnectedAgentStatus.providers ?? []).map(
     ({ connectionState: _connectionState, ...provider }): AgentProviderStatus => ({
@@ -90,6 +91,7 @@ const lazyProviders: AgentProviderStatus[] = [
   ),
   { id: "antigravity", state: "not-installed", version: null, message: null },
   { id: "cursor", state: "not-installed", version: null, message: null },
+  { id: "cline", state: "not-installed", version: null, message: null },
 ];
 const lazyProviderAgentStatus: AgentStatus = { ...noProvidersConnectedAgentStatus, providers: lazyProviders };
 
@@ -109,6 +111,7 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   grok: { phase: "not-downloaded", progress: null, message: null, version: null },
   antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
   cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+  cline: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 
@@ -164,7 +167,7 @@ function RefreshResettingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviderAgentStatus.providers?.map((provider) =>
-    provider.id === "opencode" || provider.id === "antigravity" || provider.id === "cursor"
+    provider.id === "opencode" || provider.id === "antigravity" || provider.id === "cursor" || provider.id === "cline"
       ? provider
       : { ...provider, state: "sign-in-required" },
   ),
@@ -444,6 +447,11 @@ export const NarrowProviderVersions: Story = {
 
 export const OptionalPermissions: Story = {
   render: (storyArgs) => <MockedOnboardingFlow args={storyArgs} permissions />,
+};
+
+/** Adds the sound feedback step after the computer step. Press Next twice to reach it. */
+export const SoundFeedback: Story = {
+  render: (storyArgs) => <MockedOnboardingFlow args={{ ...storyArgs, soundFeedback: createStorySoundFeedback() }} />,
 };
 
 export const NoProvidersConnected: Story = {

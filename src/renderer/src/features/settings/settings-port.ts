@@ -11,7 +11,10 @@ export interface SettingsPort {
   onOpenSettings: OpenBotDesktopApi["onOpenSettings"];
   setAnalyticsPreference: OpenBotDesktopApi["setAnalyticsPreference"];
   setApprovalAutomation: OpenBotDesktopApi["setApprovalAutomation"];
-  dynamicIsland: Pick<OpenBotDesktopApi["dynamicIsland"], "getPreference" | "setPreference">;
+  dynamicIsland: Pick<
+    OpenBotDesktopApi["dynamicIsland"],
+    "getBuiltInDisplayGeometry" | "getPreference" | "setPreference"
+  >;
   notifications: Pick<OpenBotDesktopApi["notifications"], "getPreference" | "openSettings" | "setPreference" | "test">;
   update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;
 }

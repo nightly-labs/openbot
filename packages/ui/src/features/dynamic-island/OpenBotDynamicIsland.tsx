@@ -12,6 +12,7 @@ import type {
 import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT,
+  DYNAMIC_ISLAND_SIZE_LIMITS,
   dynamicIslandCompactHeight,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -49,6 +50,7 @@ import {
   untrack,
 } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { playIdleGreetingMotion } from "./idle-greeting-motion";
 import {
   animateModeLayers,
   type CapturedModeLayerState,
@@ -68,7 +70,7 @@ export interface OpenBotDynamicIslandProps {
   presentation: DynamicIslandPresentation;
   state: DynamicIslandViewState;
   displayMode?: "notch" | "island";
-  notchSize?: DynamicIslandNotchSize;
+  notchSize?: DynamicIslandNotchSize | undefined;
   /** The build that draws the island. Its logo color tells a dev or preview build from a release. */
   variant?: AppVariant;
   /** The user-chosen compact width, as a percent of the default. The physical notch never shrinks. */
@@ -86,6 +88,24 @@ const COMPACT_INDICES = [0, 1, 2] as const;
 const ROW_INDICES = [0, 1, 2] as const;
 const IDLE_GREETING_EMOJIS = ["👋", "😊", "🙌", "✨"] as const;
 type IdleGreetingEmoji = (typeof IDLE_GREETING_EMOJIS)[number];
+/** Each greeting has a small motion of its own when it shows; the CSS finds it by this name. */
+const IDLE_GREETING_NAMES = {
+  "👋": "wave",
+  "😊": "smile",
+  "🙌": "cheer",
+  "✨": "sparkles",
+} as const satisfies Record<IdleGreetingEmoji, string>;
+/**
+ * The emoji on the back of a greeting's 3D card. The card turns to it as the greeting moves: the
+ * wave turns into heart hands, the smile spins into a grin, and the raised hands turn to clap.
+ * Heart hands, not a thumbs up or an OK hand: those two are rude in some places.
+ */
+const IDLE_GREETING_BACKS: Record<IdleGreetingEmoji, string | undefined> = {
+  "👋": "🫶",
+  "😊": "😄",
+  "🙌": "👏",
+  "✨": undefined,
+};
 const IDLE_GREETING_INTERVAL = 8_000;
 const QUESTION_SWAP_EXIT_DURATION = 200;
 const QUESTION_SWAP_ENTER_DURATION = 320;
@@ -113,8 +133,13 @@ const STATUS_COMPACT_ISLAND_MIN_WIDTH = 212;
 const STATUS_COMPACT_NAME_MAX_WIDTH = { notch: 72, island: 96 } as const;
 /** The narrowest idle ear beside a notch: the 20px logo, its 16px edge inset and a 4px gap. */
 const IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH = COMPACT_LEADING_SIZE + 20;
+/**
+ * The narrowest idle island on a built-in display with no notch: the 20px logo and the 16px greeting,
+ * each 16px from its edge, with a 16px gap between them.
+ */
+const IDLE_COMPACT_NO_NOTCH_MIN_WIDTH = 16 + COMPACT_LEADING_SIZE + 16 + 16 + 16;
 /** The narrowest idle capsule: the logo and the greeting with their insets and a gap between them. */
-const IDLE_COMPACT_ISLAND_MIN_WIDTH = 72;
+const IDLE_COMPACT_ISLAND_MIN_WIDTH = 74;
 
 interface SharedLeadingMotion {
   notch: { x: number; y: number; scale: number };
@@ -330,6 +355,51 @@ function scaleCompactWidth(width: number, floor: number, percent: number, minimu
   return Math.max(Math.min(minimum, width), Math.ceil((floor + ((width - floor) * percent) / 100) / 2) * 2);
 }
 
+/**
+ * The idle compact width for a width setting, or undefined for the default width. The Settings
+ * preview reads it to scale the widest setting into its frame.
+ */
+export function openBotIdleCompactWidth(
+  displayMode: "notch" | "island" | undefined,
+  notchSize: DynamicIslandNotchSize | undefined,
+  percent: number,
+): number | undefined {
+  if (percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
+  if (displayMode === "island") {
+    if (percent < DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) {
+      return interpolateIdleWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, IDLE_COMPACT_ISLAND_MIN_WIDTH, percent);
+    }
+    return scaleCompactWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, 0, percent, IDLE_COMPACT_ISLAND_MIN_WIDTH);
+  }
+  if (!notchSize && percent < DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) {
+    return interpolateIdleWidth(
+      STATUS_COMPACT_NOTCH_WIDTH + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2,
+      IDLE_COMPACT_NO_NOTCH_MIN_WIDTH,
+      percent,
+    );
+  }
+  // A built-in display with no notch reports no size. Its gap is only a style, so it shrinks with
+  // the width; a physical notch is hardware and keeps its width.
+  const notchWidth = notchSize?.width ?? scaleCompactWidth(STATUS_COMPACT_NOTCH_WIDTH, 0, percent);
+  return scaleCompactWidth(
+    notchWidth + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2,
+    notchWidth,
+    percent,
+    notchSize ? notchWidth + IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH * 2 : IDLE_COMPACT_NO_NOTCH_MIN_WIDTH,
+  );
+}
+
+/**
+ * An idle width below 100%, on a line from the smallest width at the lowest setting to the default
+ * width at 100%. Each step of the setting then changes the island. A scale from zero reached the
+ * smallest width at about 30%, so the lowest steps gave the same island.
+ */
+function interpolateIdleWidth(defaultWidth: number, minimum: number, percent: number): number {
+  const lowest = DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent.min;
+  const progress = Math.max(0, (percent - lowest) / (DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent - lowest));
+  return Math.ceil((minimum + (defaultWidth - minimum) * progress) / 2) * 2;
+}
+
 function clampCompactWidth(width: number, minimum: number, maximum: number): number {
   const evenWidth = Math.ceil(width / 2) * 2;
   return Math.min(maximum, Math.max(minimum, evenWidth));
@@ -379,7 +449,12 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const islandNotchSize = (): DynamicIslandNotchSize | undefined => {
     if (props.notchSize || props.displayMode === "island") return props.notchSize;
     if (widthPercent() === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
-    return { width: physicalNotchWidth(), height: DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT };
+    // The gap is only a style here, so it gives way before an ear gets narrower than its content.
+    const earRoom = (compactWidth() ?? Number.POSITIVE_INFINITY) - IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH * 2;
+    return {
+      width: Math.max(0, Math.min(physicalNotchWidth(), earRoom)),
+      height: DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT,
+    };
   };
   // The shared motion below is placed from these widths, so the size is applied here rather than
   // in the island primitive: the avatar and badge then land on the resized ears.
@@ -401,18 +476,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const compactWidth = () => {
     const geometry = compactGeometry();
     if (geometry) return props.displayMode === "island" ? geometry.island.width : geometry.notch.width;
-    const percent = widthPercent();
-    if (percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
-    if (props.displayMode === "island") {
-      return scaleCompactWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, 0, percent, IDLE_COMPACT_ISLAND_MIN_WIDTH);
-    }
-    const notchWidth = physicalNotchWidth();
-    return scaleCompactWidth(
-      notchWidth + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2,
-      notchWidth,
-      percent,
-      notchWidth + IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH * 2,
-    );
+    return openBotIdleCompactWidth(props.displayMode, props.notchSize, widthPercent());
   };
   const compactHeight = () => {
     const percent = heightPercent();
@@ -562,6 +626,8 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
         onStateChange={changeState}
         compactWidth={compactWidth()}
         compactHeight={compactHeight()}
+        // A mode change moves its own layers from the old place to the new one, in step with the surface.
+        compactContentFollowsResize={!modeTransitioning()}
         sharedMotion={{
           leading: sharedLeading()?.[props.displayMode === "island" ? "island" : "notch"],
           trailing: sharedTrailing()?.[props.displayMode === "island" ? "island" : "notch"],
@@ -782,14 +848,56 @@ function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
   );
 }
 
+/** A greeting as a card with a front and a back face, so its motion can turn it in 3D. */
+/**
+ * The sparkles glyph drawn three times, each copy masked to one star, so each star can light up and
+ * twinkle on its own. Together the three copies are the whole glyph.
+ */
+const SPARKLE_STAR_CLASSES = [
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-large",
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-upper",
+  "dynamic-island-surface-idle-greeting-sparkle dynamic-island-surface-idle-greeting-sparkle-lower",
+] as const;
+
+function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
+  return (
+    <span class="dynamic-island-surface-idle-greeting-card">
+      <span class="dynamic-island-surface-idle-greeting-face">
+        <Show when={props.emoji === "✨"} fallback={props.emoji}>
+          <For each={SPARKLE_STAR_CLASSES}>{(starClass) => <span class={starClass}>{props.emoji}</span>}</For>
+        </Show>
+      </span>
+      <Show when={IDLE_GREETING_BACKS[props.emoji]}>
+        {(back) => (
+          <span class="dynamic-island-surface-idle-greeting-face dynamic-island-surface-idle-greeting-face-back">
+            {back()}
+          </span>
+        )}
+      </Show>
+    </span>
+  );
+}
+
 function IdleGreetingEmoji(): JSX.Element {
   const [index, setIndex] = createSignal(0);
   const [activeSlot, setActiveSlot] = createSignal<0 | 1>(0);
   const [firstEmoji, setFirstEmoji] = createSignal<IdleGreetingEmoji>(IDLE_GREETING_EMOJIS[0]);
   const [secondEmoji, setSecondEmoji] = createSignal<IdleGreetingEmoji>(IDLE_GREETING_EMOJIS[0]);
   let animationFrame: number | undefined;
+  const layers: [HTMLSpanElement | undefined, HTMLSpanElement | undefined] = [undefined, undefined];
+  // Each layer keeps its motion until it shows again, so the one that fades out keeps its last pose.
+  const motions: [Animation[], Animation[]] = [[], []];
+
+  function playMotion(slot: 0 | 1, emoji: IdleGreetingEmoji): void {
+    for (const motion of motions[slot]) motion.cancel();
+    motions[slot] = [];
+    const layer = layers[slot];
+    if (!layer || prefersReducedMotion()) return;
+    motions[slot] = playIdleGreetingMotion(IDLE_GREETING_NAMES[emoji], layer);
+  }
 
   onSettled(() => {
+    playMotion(0, IDLE_GREETING_EMOJIS[0]);
     const timer = setInterval(() => {
       const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
       const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
@@ -799,11 +907,13 @@ function IdleGreetingEmoji(): JSX.Element {
       animationFrame = requestAnimationFrame(() => {
         setIndex(nextIndex);
         setActiveSlot(nextSlot);
+        playMotion(nextSlot, nextEmoji);
       });
     }, IDLE_GREETING_INTERVAL);
     return () => {
       clearInterval(timer);
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+      for (const motion of [...motions[0], ...motions[1]]) motion.cancel();
     };
   });
 
@@ -815,8 +925,26 @@ function IdleGreetingEmoji(): JSX.Element {
       data-island-spatial-anchor="end"
       aria-hidden="true"
     >
-      <span class="dynamic-island-surface-idle-greeting-layer">{firstEmoji()}</span>
-      <span class="dynamic-island-surface-idle-greeting-layer">{secondEmoji()}</span>
+      <span
+        ref={(element) => {
+          layers[0] = element;
+        }}
+        class="dynamic-island-surface-idle-greeting-layer"
+        data-greeting={IDLE_GREETING_NAMES[firstEmoji()]}
+        data-active={activeSlot() === 0 ? "true" : undefined}
+      >
+        <IdleGreetingCard emoji={firstEmoji()} />
+      </span>
+      <span
+        ref={(element) => {
+          layers[1] = element;
+        }}
+        class="dynamic-island-surface-idle-greeting-layer"
+        data-greeting={IDLE_GREETING_NAMES[secondEmoji()]}
+        data-active={activeSlot() === 1 ? "true" : undefined}
+      >
+        <IdleGreetingCard emoji={secondEmoji()} />
+      </span>
     </span>
   );
 }
@@ -943,19 +1071,35 @@ function FailureContent(props: {
       status={t("island.status.failed")}
       description={props.item.detail ?? t("island.failure.fallback")}
       action={
-        <Button
-          size="sm"
-          onClick={() =>
-            props.onAction({
-              type: "open-failure",
-              serverId: props.serverId,
-              agentId: props.item.agent.id,
-              turnId: props.item.turnId,
-            })
-          }
-        >
-          <ExternalLink aria-hidden="true" /> {t("island.action.openDetails")}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              props.onAction({
+                type: "dismiss-failure",
+                serverId: props.serverId,
+                agentId: props.item.agent.id,
+                turnId: props.item.turnId,
+              })
+            }
+          >
+            {t("island.action.dismiss")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() =>
+              props.onAction({
+                type: "open-failure",
+                serverId: props.serverId,
+                agentId: props.item.agent.id,
+                turnId: props.item.turnId,
+              })
+            }
+          >
+            <ExternalLink aria-hidden="true" /> {t("island.action.openDetails")}
+          </Button>
+        </>
       }
     />
   );

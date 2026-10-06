@@ -1,14 +1,15 @@
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
-import { Progress, TOAST_DURATION, toast } from "@openbot/ui";
+import { Button, Progress, TOAST_DURATION, toast } from "@openbot/ui";
 import { createDigitRoll } from "@openbot/ui/digit-roll";
 import {
   type ProviderUpdate,
   type ProviderUpdatePresentation,
   presentProviderUpdate,
 } from "@openbot/ui/features/provider-updates/provider-update";
+import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createRoot, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createRoot, createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
 
 /**
  * The provider update, as one notification the user acts on and then watches.
@@ -64,14 +65,71 @@ function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
  * so the box the user pressed Update on answers in the same place.
  * "Setting up" has no measurable end, so its bar is indeterminate and the percentage goes away
  * rather than sitting at a number that has stopped moving.
+ *
+ * A failure explains itself in a sentence that can be long. It wraps, stops after a few lines, and
+ * a button under it opens the rest, so the words stay inside the box and Retry stays where it is.
+ * The button is there only when lines are cut off. Whether they are is a measurement of the laid
+ * out line, made again when the text or the width changes.
  */
 function ProviderUpdateDetail(props: {
   provider: AgentProviderId;
   presentation: ProviderUpdatePresentation;
+  expanded: boolean;
+  clamped: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  onClampedChange: (clamped: boolean) => void;
 }): JSX.Element {
+  const { t } = currentText();
+  const lineId = createUniqueId();
+  let line: HTMLSpanElement | undefined;
+
+  // An open line shows everything, so it cannot say whether the closed one cuts anything off.
+  function measure(failed: boolean, expanded: boolean): void {
+    if (!line || expanded) return;
+    props.onClampedChange(failed && line.scrollHeight > line.clientHeight);
+  }
+
+  // The text is read here only so that a new sentence is measured again.
+  createEffect(
+    () => ({
+      detail: props.presentation.detail,
+      failed: props.presentation.failed,
+      expanded: props.expanded,
+    }),
+    (state) => measure(state.failed, state.expanded),
+  );
+  // The toast is built before it is on screen, and its width can change after, so the first real
+  // measurement comes from here.
+  onSettled(() => {
+    if (!line || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure(props.presentation.failed, props.expanded));
+    observer.observe(line);
+    return () => observer.disconnect();
+  });
+
   return (
     <>
-      <span class="provider-update-toast-line">{props.presentation.detail}</span>
+      <span
+        ref={(element) => (line = element)}
+        id={lineId}
+        class="provider-update-toast-line"
+        data-failed={props.presentation.failed ? "true" : undefined}
+        data-expanded={props.expanded ? "true" : undefined}
+      >
+        {props.presentation.detail}
+      </span>
+      <Show when={props.presentation.failed && (props.clamped || props.expanded)}>
+        <Button
+          variant="link"
+          size="xs"
+          class="provider-update-toast-details"
+          aria-expanded={props.expanded ? "true" : "false"}
+          aria-controls={lineId}
+          onClick={() => props.onExpandedChange(!props.expanded)}
+        >
+          {props.expanded ? t("update.provider.hideDetails") : t("update.provider.showDetails")}
+        </Button>
+      </Show>
       <Show when={props.presentation.busy}>
         <span class="provider-update-toast-progress">
           <Progress
@@ -102,6 +160,18 @@ function ProviderUpdateActionLabel(props: { presentation: ProviderUpdatePresenta
     <span class="provider-update-toast-action" data-idle={props.presentation.actionLabel ? undefined : "true"}>
       {props.presentation.actionLabel}
     </span>
+  );
+}
+
+function samePresentation(a: ProviderUpdatePresentation, b: ProviderUpdatePresentation): boolean {
+  return (
+    a.updatable === b.updatable &&
+    a.busy === b.busy &&
+    a.failed === b.failed &&
+    a.actionLabel === b.actionLabel &&
+    a.title === b.title &&
+    a.detail === b.detail &&
+    a.progress === b.progress
   );
 }
 
@@ -159,13 +229,32 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
   if (open) return open;
 
   const parts = createRoot((dispose) => {
-    const [current, setCurrent] = createSignal(presentation);
+    // Main pushes one snapshot for every percent of every download, and each one is presented again
+    // for every update in flight. A presentation that says what is on screen already changes nothing.
+    const [current, setCurrent] = createSignal(presentation, { equals: samePresentation });
+    // What changes the height of the toast: the lines it shows, not the percentage on one of them.
+    // "Setting up" keeps the title of the download before it and loses the percentage, so the words
+    // of the title alone are not enough.
+    const layout = createMemo(() => {
+      const { title, detail, busy, failed, progress, actionLabel } = current();
+      return JSON.stringify([title, detail, busy, failed, progress === null, actionLabel ?? null]);
+    });
+    // Whether the failure's sentence is cut off, and whether the user opened it. Both change the
+    // height of the toast, so they live here, where the title can read them.
+    const [clamped, setClamped] = createSignal(false);
+    const [expanded, setExpanded] = createSignal(false);
     // Read at click time, so the button that offered the update is the button that retries it.
     let act = (): void => {};
     let offered: string | null = null;
 
     const live: LiveProviderUpdateToast = {
-      present: (next) => setCurrent(next),
+      present: (next) => {
+        const previous = untrack(current);
+        setCurrent(next);
+        // A retry closes the old failure, so the next one opens at its first lines. A retry that
+        // fails before it starts goes from one failure to the next, so new words close it too.
+        if (!next.failed || next.detail !== previous.detail) setExpanded(false);
+      },
       setAct: (next) => {
         act = next;
       },
@@ -181,10 +270,30 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
       offeredVersion: () => offered,
       // The title is the one thing given as a function. Sonner re-measures the toast whenever the
       // title or the description changes, and the other two are elements that keep their identity
-      // for the whole flow, so this read of the signal is what keeps the recorded height honest.
-      title: () => current().title,
+      // for the whole flow, so these reads are what keep the recorded height honest. Opening or
+      // cutting off the failure's sentence changes the height without changing the title's words,
+      // so the title reads those two as well.
+      //
+      // It does not read the percentage. A measurement sets the toast's height to `auto` for a
+      // moment, which stops the height transition of the stack, and a download measured on every
+      // percent made concurrent updates jump and spend the CPU on layout.
+      title: () => {
+        clamped();
+        expanded();
+        layout();
+        return untrack(current).title;
+      },
       icon: providerIcon(provider),
-      description: <ProviderUpdateDetail provider={provider} presentation={current()} />,
+      description: (
+        <ProviderUpdateDetail
+          provider={provider}
+          presentation={current()}
+          expanded={expanded()}
+          clamped={clamped()}
+          onExpandedChange={setExpanded}
+          onClampedChange={setClamped}
+        />
+      ),
       label: <ProviderUpdateActionLabel presentation={current()} />,
       // Sonner deletes a toast after its action unless the click is defaultPrevented. Staying is
       // what lets one notification carry the offer, the download and the outcome.

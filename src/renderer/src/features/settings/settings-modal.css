@@ -326,6 +326,17 @@
   box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
+.settings-dynamic-island-preview-fit {
+  /* The island hangs below the 1px frame edge, so the edge runs over it and the notch shoulders
+     curve out of it, as they do out of the top edge of a display. */
+  margin-top: 1px;
+  display: flex;
+  justify-content: center;
+  transform-origin: top center;
+  scale: var(--settings-dynamic-island-preview-scale, 1);
+  transition: scale var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
 .settings-dynamic-island-preview-caption {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -524,6 +535,12 @@
 .provider-picker-embedded .provider-picker-option-selection {
   min-height: 64px;
   padding: var(--openbot-space-3) 0;
+}
+
+/* The row has no inline padding of its own here, so the message moves left to stay under the name. */
+.provider-picker-embedded .provider-picker-check-error.provider-picker-used-by {
+  margin-top: calc(-1 * var(--openbot-space-4));
+  padding: 0 0 var(--openbot-space-3) 54px;
 }
 
 .provider-picker-embedded .provider-picker-option + .provider-picker-option,
@@ -973,4 +990,13 @@
 /* The logo color description breaks after its first clause, as the catalog text says. */
 .settings-modal .ui-item-description.settings-logo-color-description {
   white-space: pre-line;
+}
+
+/* The sound theme cards are too wide to sit beside the text, so they wrap below it. */
+.settings-sound-theme-row {
+  flex-wrap: wrap;
+}
+
+.settings-sound-theme-row > .sound-theme-picker {
+  flex-basis: 100%;
 }

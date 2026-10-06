@@ -586,5 +586,64 @@
         }
       }
     }
+  },
+  "cline": {
+    "registry": "https://registry.npmjs.org",
+    "repository": "https://github.com/cline/cline",
+    "version": "3.0.68",
+    "license": "Apache-2.0",
+    "licenseSha256": "f704446a5f1271608805598b557e4288cf8580477ea038c9c3d8b361f693f6b8",
+    "artifacts": {
+      "darwin-arm64": {
+        "package": "@cline/cli-darwin-arm64",
+        "asset": "cli-darwin-arm64-3.0.68.tgz",
+        "assetSha256": "e203a3905ba7fd6dea88d749e4153e3bd0e5ddbd034bf31c458e3d96078f13b5",
+        "binarySha256": "e4449df3db2ac4379294f4b119b6205bf857eea97f4c40094e51ce5c0bd6d71f",
+        "bootstrapSha256": "a2e72aa3324ca97ad20fbd1a2e2d4315869aed1dbaa00367554f4ae2609157a9",
+        "downloadBytes": 32900445,
+        "installedBytes": 120000000,
+        "executable": "cline"
+      },
+      "darwin-x64": {
+        "package": "@cline/cli-darwin-x64",
+        "asset": "cli-darwin-x64-3.0.68.tgz",
+        "assetSha256": "36b28d60786f5db8d4824dfdd3b1486941e680c2c61428e6a570546120c6fcd9",
+        "binarySha256": "f896ddf10f92a63a9ba122d925767c3a73b84f3edf4b633213f594d432e3e31d",
+        "bootstrapSha256": "a2e72aa3324ca97ad20fbd1a2e2d4315869aed1dbaa00367554f4ae2609157a9",
+        "downloadBytes": 35432995,
+        "installedBytes": 130000000,
+        "executable": "cline"
+      },
+      "linux-x64": {
+        "package": "@cline/cli-linux-x64",
+        "asset": "cli-linux-x64-3.0.68.tgz",
+        "assetSha256": "a979929090eb9a934b3907e2cf519368964d6a35e96079d6db4fc89caad98ab1",
+        "binarySha256": "7ae2e730f192f320c11e2c36dc0219c6738555bd9eab1e6b3ee4d7bcc353c146",
+        "bootstrapSha256": "a2e72aa3324ca97ad20fbd1a2e2d4315869aed1dbaa00367554f4ae2609157a9",
+        "downloadBytes": 49918778,
+        "installedBytes": 170000000,
+        "executable": "cline"
+      },
+      "linux-arm64": {
+        "package": "@cline/cli-linux-arm64",
+        "asset": "cli-linux-arm64-3.0.68.tgz",
+        "assetSha256": "5e0ad56ba4c494c437f6dcdc2557c165478e05e1800e1fe6f7d476e4fd4c84f2",
+        "binarySha256": "886b6b5b9edec4a036ff9a7e19e94733d0a35063f074f56d6a64f7b77b2010e7",
+        "bootstrapSha256": "a2e72aa3324ca97ad20fbd1a2e2d4315869aed1dbaa00367554f4ae2609157a9",
+        "downloadBytes": 49689972,
+        "installedBytes": 170000000,
+        "executable": "cline"
+      },
+      "win32-x64": {
+        "package": "@cline/cli-windows-x64",
+        "asset": "cli-windows-x64-3.0.68.tgz",
+        "assetSha256": "6b74427cbb946337e3f994eab06b4d4dd5cc1cc69a49b2054d3c8d9f68ae67a4",
+        "binarySha256": "c504153dd13f29e9aa0dbc173609acbb857d4bd603c2f58623b435fe95d57946",
+        "bootstrapSha256": "a2e72aa3324ca97ad20fbd1a2e2d4315869aed1dbaa00367554f4ae2609157a9",
+        "downloadBytes": 46770348,
+        "installedBytes": 150000000,
+        "executable": "cline.exe"
+      }
+    }
   }
 }

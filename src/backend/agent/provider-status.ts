@@ -35,6 +35,8 @@ export function providerFailureStatus(
   // custom endpoint. The fixed strings below need no redaction, but the CLI's own text does.
   const message = redactText(error instanceof Error ? error.message : String(error));
   if (error instanceof CodexCliError) {
+    // A CLI that did not answer in time is not broken, so the message must not ask for a reinstall.
+    if (error.code === "timeout") return { state: "error", version: version ?? null, message };
     if (provider === "codex" || provider === "claude") {
       const label = provider === "codex" ? "ChatGPT" : "Claude";
       const bundledMessage =

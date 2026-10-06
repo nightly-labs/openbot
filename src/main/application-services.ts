@@ -29,8 +29,9 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentStatus,
   AppVariant,
@@ -42,6 +43,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
@@ -52,6 +54,8 @@ import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
+import { MessagingService } from "../backend/messaging/messaging-service";
+import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
@@ -69,6 +73,7 @@ import {
 } from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
+import { AutomationServer } from "./automation-server";
 import { BillingDesktopService } from "./billing-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
@@ -108,6 +113,7 @@ import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
+import { IdleRestart } from "./idle-restart";
 import { LanguageService } from "./language-service";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -128,12 +134,16 @@ import {
 import { ManagedSkillService } from "./managed-skill-service";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { MessagingCredentialStore } from "./messaging-credential-store";
 import { probeModels } from "./model-server-probe";
 import { NotificationPreferenceStore } from "./notification-preference-store";
+import { OnePasswordConnectorService } from "./onepassword-connector-service";
+import { OnePasswordConnectorStore } from "./onepassword-connector-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
-import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
+import { startProviderLog } from "./provider-log";
+import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
@@ -142,6 +152,8 @@ import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
+import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -149,6 +161,8 @@ import {
 } from "./session-configuration";
 import { readSetupState } from "./setup-store";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
+import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-dev-callback-server";
+import { SlackIngress } from "./slack-ingress";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
@@ -189,10 +203,13 @@ const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
+const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 /** The MCP sign-ins. Separate from the keys above: a key is typed by the user, a token is not. */
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 /** The one GitHub sign-in of this computer, with the same cipher as the MCP sign-ins. */
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
+/** The 1Password service account token of this computer, with the same cipher. */
+const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -211,11 +228,13 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 
 const TEARDOWN_ORDER = {
   updater: 10,
+  idleRestart: 11,
   hostUpdateCoordinator: 12,
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
   hostedServerMemory: 16,
+  serverMode: 17,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -227,14 +246,24 @@ const TEARDOWN_ORDER = {
   remoteServers: 60,
   voice: 70,
   remoteDesktop: 80,
+  // Before the host and the service: no new external message arrives while they stop.
+  messaging: 85,
+  // After the connections that hold it.
+  slackIngress: 86,
   host: 90,
   teamWebRtcBridge: 100,
   mcpOAuthRedirect: 105,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
+  // Before the agent service, so no script starts a run while the service stops.
+  automation: 108,
+  // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
+  onePasswordConnector: 109,
   service: 110,
   // Last, so the turns that end while the services stop are still written.
   trace: 120,
+  // After the service, so the lines its providers write while they stop are kept.
+  providerLog: 121,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -251,6 +280,8 @@ export interface ApplicationServiceContext {
   developmentTestClientEnabled: boolean;
   /** Set only in a hosted server VM. */
   hostedServer: HostedServerEnvironment | null;
+  /** Set only in a self-hosted server that `install-server.sh` installed. */
+  serverMode: ServerModeEnvironment | null;
   /** Set only by `bun run dev --hosting=test`. */
   hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
@@ -267,9 +298,12 @@ export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
+  /** The Slack connections of the agents on this host. */
+  messaging: MessagingService;
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   githubConnector: GitHubConnectorService;
+  onePasswordConnector: OnePasswordConnectorService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   browser: BrowserHost;
@@ -281,6 +315,8 @@ export interface ApplicationServices {
   hostUpdateCoordinator: HostUpdateCoordinator;
   /** The update restart that an admin of a joined server asked for (`host-update-v1`). */
   requestedUpdate: RequestedUpdate;
+  /** The restart that the user of this computer asked for, when no work runs. */
+  idleRestart: IdleRestart;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -299,6 +335,8 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   hostedServers: HostedServerDesktopService;
+  /** The terminal control of a self-hosted server. Null in every other build. */
+  serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -354,6 +392,7 @@ export async function createApplicationServices({
   developmentRemoteRole,
   developmentTestClientEnabled,
   hostedServer,
+  serverMode: serverModeEnvironment,
   hostingDeveloperKey,
   macHapticFeedback,
   teardown,
@@ -363,6 +402,12 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
+  // First, so the provider lines of the whole startup reach the file.
+  teardown.push(
+    TEARDOWN_ORDER.providerLog,
+    "the provider log",
+    startProviderLog(join(app.getPath("userData"), "logs")),
+  );
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -478,6 +523,7 @@ export async function createApplicationServices({
     (serverId) => {
       if (!remoteServers.list().some((server) => server.id === serverId)) remoteServers.invalidateDirectory();
     },
+    (serverId) => remoteServers.hostedServerStarting(serverId),
   );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -526,6 +572,7 @@ export async function createApplicationServices({
   const setupFile = join(app.getPath("userData"), SETUP_FILE);
   const analyticsPreferenceFile = join(app.getPath("userData"), ANALYTICS_PREFERENCE_FILE);
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
+  const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
   const setupState = await readSetupState(setupFile);
   const analyticsPreference = await readAnalyticsPreference(analyticsPreferenceFile);
   // Loaded before the first window and before the application menu is built, so every native
@@ -686,6 +733,23 @@ export async function createApplicationServices({
   });
   await githubConnector.load();
   teardown.push(TEARDOWN_ORDER.githubConnector, "the GitHub connection", () => githubConnector.dispose());
+  /*
+   * The 1Password connection. The browser fills logins from it, so the agent service reads it. The
+   * login list is read from 1Password in the background; startup does not wait for it.
+   */
+  const onePasswordCliTarget = runtimeTarget(process.platform, process.arch);
+  const onePasswordConnector = new OnePasswordConnectorService({
+    store: new OnePasswordConnectorStore(join(app.getPath("userData"), ONEPASSWORD_CONNECTOR_FILE), secretCipher),
+    hostName: hostname(),
+    appVersion: app.getVersion(),
+    // Outside every root an agent can write, like the GitHub tool files.
+    cliInstall: onePasswordCliTarget
+      ? { directory: join(app.getPath("userData"), "provider-state", "1password-cli"), target: onePasswordCliTarget }
+      : null,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  await onePasswordConnector.load();
+  teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () => onePasswordConnector.dispose());
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -855,12 +919,114 @@ export async function createApplicationServices({
     // handing every provider a command it cannot start.
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
     githubConnector,
+    passwordVault: onePasswordConnector,
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
     deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // Listens only while an agent allows local scripts; see `AutomationServer`.
+  const automation = new AutomationServer({
+    root: store.automationRoot,
+    listAgents: () => service.listAgents(),
+    listRoutines: (agentId) => service.listRoutines(agentId),
+    runRoutine: (input) => service.runRoutineFromAutomation(input),
+  });
+  service.on("event", (event) => {
+    if (event.type === "agents-changed") void automation.sync();
+  });
+  teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => automation.stop());
+  /*
+   * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
+   * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
+   */
+  const messagingCredentials = new MessagingCredentialStore(
+    join(app.getPath("userData"), MESSAGING_CREDENTIAL_FILE),
+    secretCipher,
+  );
+  const messagingCredentialLoadError = await messagingCredentials.load();
+  if (messagingCredentialLoadError)
+    logger.warn(
+      `OpenBot could not read the messaging token file (${messagingCredentialLoadError.name}). It was left unchanged.`,
+    );
+  // The Signal socket that brings the events of the Slack workspaces linked to this host. The host
+  // id is read when the socket opens, and the team store is built further down, so it starts as "no
+  // name yet".
+  let slackIngressHostId: () => string | null = () => null;
+  const slackIngress = new SlackIngress({
+    hostId: () => slackIngressHostId(),
+    signedIn: () => {
+      try {
+        centralAuth.getSignedInUser();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    issueTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
+    issueSlackRoute: (hostId) => centralAuth.issueSlackRoute(hostId),
+  });
+  teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack ingress socket", () => slackIngress.dispose());
+  // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
+  // dev app and not to an installed OpenBot that owns `openbot://`.
+  const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
+  const messaging = new MessagingService({
+    threads: service.messaging,
+    agents: {
+      listAgents: () => service.listAgents(),
+      respondToApproval: (input) => service.respondToApproval(input),
+      onEvent: (listener) => {
+        service.on("event", listener);
+        return () => service.off("event", listener);
+      },
+      createAgentProfile: (input) => service.createAgentProfile(input),
+      createMemory: (input) => service.createMemory(input),
+    },
+    credentials: messagingCredentials,
+    drivers: [slackDriver({ ingress: slackIngress })],
+    downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
+    ingress: slackIngress,
+    sidebar: sidebarLayout,
+    slackApp: {
+      authorize: (input) => {
+        const hostId = slackIngressHostId();
+        if (!hostId) throw new Error(sourceText("error.messaging.relayUnavailable"));
+        return centralAuth.requestAuthorized(
+          "/v2/slack/authorize",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              hostId,
+              ...input,
+              ...(developmentSlackCallbackPort > 0
+                ? { returnUrl: `http://127.0.0.1:${developmentSlackCallbackPort}${SLACK_DEV_CALLBACK_PATH}` }
+                : {}),
+            }),
+          },
+          (value) => requiredString(decodeRecord(value, "Slack sign-in"), "authorizeUrl"),
+        );
+      },
+      unlink: async (workspaceId) => {
+        const hostId = slackIngressHostId();
+        if (hostId) await centralAuth.unlinkSlackWorkspace(hostId, workspaceId);
+      },
+      openExternal: (url) => shell.openExternal(url),
+    },
+  });
+  // Not awaited: a connection waits for Slack, and the app does not wait for it.
+  void messaging.start().catch((error) => logger.warn("Messaging connections did not start.", toLogValue(error)));
+  teardown.push(TEARDOWN_ORDER.messaging, "the messaging connections", () => messaging.stop());
+  if (developmentSlackCallbackPort > 0) {
+    // As `openbot://` does for a packaged build, a finished install brings OpenBot to the front.
+    const callback = await startSlackDevCallbackServer(developmentSlackCallbackPort, async (nonce, grant) => {
+      const received = await messaging.completeSlackWorkspace(nonce, grant);
+      if (received) app.focus({ steal: true });
+      return received;
+    });
+    teardown.push(TEARDOWN_ORDER.slackIngress, "the Slack development callback", () => callback.close());
+  }
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
   githubConnector.onAgentAccessChanged(() => service.notifyGitHubConnectorChanged());
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no
@@ -945,7 +1111,7 @@ export async function createApplicationServices({
       caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
         join(userData, name),
       ),
-      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update"), join(userData, "logs", "providers")],
       runtimes: providerRuntimeRoot({
         appData: app.getPath("appData"),
         userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
@@ -989,6 +1155,8 @@ export async function createApplicationServices({
     join(app.getPath("userData"), TEAM_FILE),
   );
   await teamStore.initialize();
+  slackIngressHostId = () => teamStore.getIdentity()?.serverId ?? null;
+  slackIngress.reconnect();
   // After `teamStore.initialize()` and before `HostService`, which reads the account it activates.
   if (developmentRemoteRole) {
     await applyDevelopmentRemoteAccount({
@@ -1241,9 +1409,13 @@ export async function createApplicationServices({
     },
     {
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
+      selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
-      onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),
+      hostedServers: {
+        unavailable: (serverId, wake) => hostedServers.unavailableHost(serverId, wake),
+        wake: (serverId) => hostedServers.wake(serverId),
+      },
       webrtcTransport: new TeamWebRtcClientTransport({
         bridge: teamWebRtcBridge,
         listHosts: () => centralAuth.listRemoteHosts(),
@@ -1371,6 +1543,7 @@ export async function createApplicationServices({
           return siblings;
         }
       : undefined,
+    currentUid: typeof process.getuid === "function" ? process.getuid() : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -1384,7 +1557,8 @@ export async function createApplicationServices({
     // from the moment the runtime exists, so this waits only for what is left of it, and a
     // failure here must not keep the agents down.
     await computerUseWarmUp.catch(() => undefined);
-    await service.initialize();
+    await service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
+    await automation.sync();
   });
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
@@ -1423,6 +1597,29 @@ export async function createApplicationServices({
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () => remoteUpdate.dispose());
+  const idleRestart = new IdleRestart({
+    updater,
+    describeReadiness: describeRestartReadiness,
+    holdRoutines: () => service.holdRoutines(),
+    releaseRoutines: () => service.releaseRoutines(),
+    recordHold: (window) => {
+      try {
+        if (window) writeRoutineHold(routineHoldFile, window);
+        else clearRoutineHold(routineHoldFile);
+      } catch (error) {
+        // The restart goes on: the next start then skips the held routines as missed.
+        logger.warn("The routine hold could not be saved.", toLogValue(error));
+      }
+    },
+    relaunch: () => {
+      // A development build only quits: its supervisor stops the stack, and a relaunched Electron
+      // would run outside it with no renderer server.
+      if (app.isPackaged) app.relaunch();
+      app.quit();
+    },
+    log: (message) => logger.info(message),
+  });
+  teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -1441,10 +1638,14 @@ export async function createApplicationServices({
     );
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
+      // A live Slack connection counts: stopped, the server could not hear the next message. An open
+      // browser view does not: a view that the user forgot would keep the server running. Input in
+      // the view counts as client use.
       inUse: () =>
         service.hasActiveWork().length > 0 ||
-        host.describeRestartBlockers().length > 0 ||
-        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+        messaging.hasLiveConnection() ||
+        host.describeRestartBlockers().some((reason) => reason !== "browser-view") ||
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientUseAt() ?? 0) < CLIENT_USE_WINDOW_MS),
       nextRunAt: () => {
         const dueAt = service.nextRoutineDueAt();
         return dueAt ? Date.parse(dueAt) : null;
@@ -1462,6 +1663,35 @@ export async function createApplicationServices({
       hostedServerActivity.stop(),
     );
   }
+  const serverMode = serverModeEnvironment
+    ? new ServerMode({
+        environment: serverModeEnvironment,
+        version: app.getVersion(),
+        centralAuth,
+        host,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      })
+    : null;
+  if (serverMode) {
+    // Without the socket the server still runs, and the log says why nobody can sign it in.
+    await serverMode
+      .listen()
+      .catch((error) => logger.error("The server control socket did not start:", toLogValue(error)));
+    // Nobody presses Retry on a server either. A server that is signed out has nothing to publish.
+    const serverStartRetry = new HostedServerStartRetry({
+      hostPhase: () => host.getStatus().phase,
+      startHost: async () => {
+        if (centralAuth.getState().status === "error") await centralAuth.retry();
+        await serverMode.publish();
+      },
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    serverStartRetry.start();
+    teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
+      serverStartRetry.stop();
+      await serverMode.close();
+    });
+  }
   await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
@@ -1472,8 +1702,10 @@ export async function createApplicationServices({
     service,
     providerRuntimes,
     providerCredentials,
+    messaging,
     mcpOAuth,
     githubConnector,
+    onePasswordConnector,
     mailbox,
     storageUsage,
     browser,
@@ -1491,6 +1723,7 @@ export async function createApplicationServices({
     agentInitialization,
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
+    idleRestart,
     describeRestartReadiness,
     sidebarLayout,
     host,
@@ -1501,6 +1734,7 @@ export async function createApplicationServices({
     hostedSites,
     billing,
     hostedServers,
+    serverMode,
     customProviders,
     customProviderChanges,
     customAgentChanges,

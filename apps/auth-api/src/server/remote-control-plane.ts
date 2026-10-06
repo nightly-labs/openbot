@@ -3,6 +3,12 @@ import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import {
+  SLACK_ROUTE_AUDIENCE,
+  SLACK_ROUTE_TEAMS_LIMIT,
+  SLACK_ROUTE_TTL_SECONDS,
+  type SlackRouteTeam,
+} from "@openbot/contracts/signal-protocol/slack-route";
+import {
   REMOTE_TICKET_AUDIENCE,
   REMOTE_TICKET_PROTOCOL_VERSION,
   type RemoteMemberRole,
@@ -38,7 +44,7 @@ export class RemoteControlPlaneError extends Error {
 }
 
 /** A SQL condition and its binds, which a statement adds to its WHERE clause. */
-interface SqlCondition {
+export interface SqlCondition {
   sql: string;
   binds: unknown[];
 }
@@ -175,6 +181,33 @@ export class RemoteTicketSigner {
   }
 }
 
+/**
+ * Signs the Slack route ticket that names the workspaces linked to a host. It uses its own key,
+ * which the public JWKS also lists, so each key can rotate on its own.
+ */
+export class SlackRouteSigner {
+  readonly #keyId: string;
+  readonly #privateJwk: JWK;
+  #key: Awaited<ReturnType<typeof importJWK>> | null = null;
+
+  constructor(config: TicketSignerConfig) {
+    this.#keyId = requiredIdentifier(config.keyId, "Slack route key ID");
+    parseJwks(config.publicJwks, this.#keyId);
+    this.#privateJwk = parseJwk(config.privateJwk);
+  }
+
+  async issue(input: { hostId: string; teams: SlackRouteTeam[]; now: number }): Promise<string> {
+    this.#key ??= await importJWK(this.#privateJwk, "ES256");
+    const issuedAt = Math.floor(input.now / 1_000);
+    return new SignJWT({ hid: input.hostId, teams: input.teams })
+      .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + SLACK_ROUTE_TTL_SECONDS)
+      .setAudience(SLACK_ROUTE_AUDIENCE)
+      .sign(this.#key);
+  }
+}
+
 /** One signer for each key: the JWKS parse and the key import are too costly for every request. */
 const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
 
@@ -196,6 +229,7 @@ function sharedTicketSigner(config: TicketSignerConfig): RemoteTicketSigner {
 export class RemoteControlPlane {
   readonly #database: D1Database;
   readonly #signer: RemoteTicketSigner;
+  readonly #slackRouteSigner: SlackRouteSigner | null;
   readonly #webhookUrl: string | null;
   readonly #webhookSecret: string | null;
   readonly #fetch: RemoteFetch;
@@ -211,6 +245,8 @@ export class RemoteControlPlane {
       | "REMOTE_TICKET_KEY_ID"
       | "REMOTE_AUTH_WEBHOOK_URL"
       | "REMOTE_AUTH_WEBHOOK_SECRET"
+      | "SLACK_ROUTE_PRIVATE_JWK"
+      | "SLACK_ROUTE_KEY_ID"
     >,
     options: { fetch?: RemoteFetch; now?: () => number; schedule?: (delivery: Promise<void>) => void } = {},
   ) {
@@ -223,6 +259,14 @@ export class RemoteControlPlane {
       publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
       keyId: bindings.REMOTE_TICKET_KEY_ID,
     });
+    this.#slackRouteSigner =
+      bindings.SLACK_ROUTE_PRIVATE_JWK && bindings.SLACK_ROUTE_KEY_ID
+        ? new SlackRouteSigner({
+            privateJwk: bindings.SLACK_ROUTE_PRIVATE_JWK,
+            publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
+            keyId: bindings.SLACK_ROUTE_KEY_ID,
+          })
+        : null;
     this.#webhookUrl = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null;
     this.#webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
@@ -1095,10 +1139,7 @@ export class RemoteControlPlane {
   }
 
   async issueHostTicket(hostId: string, machineToken: string) {
-    const host = await this.#host(hostId);
-    if (!host?.machine_token_hash || host.machine_token_hash !== (await sha256(machineToken))) {
-      throw new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
-    }
+    const host = await this.authenticateHost(hostId, machineToken);
     return this.#signer.issue({
       sessionId: `host-${hostId}`,
       hostId,
@@ -1111,8 +1152,68 @@ export class RemoteControlPlane {
     });
   }
 
+  /**
+   * The route ticket that the host's Signal `ingress` socket presents: the Slack workspaces linked to
+   * this host, signed. The host asks for a new one each time the socket connects.
+   */
+  async issueSlackRoute(hostId: string, machineToken: string): Promise<{ ticket: string; teams: string[] }> {
+    if (!this.#slackRouteSigner) {
+      throw new RemoteControlPlaneError(503, "slack_not_configured", "Slack routing is not configured.");
+    }
+    await this.authenticateHost(hostId, machineToken);
+    const rows = await this.#database
+      .prepare(
+        "SELECT team_id, app_id, connected_at FROM slack_workspace_routes WHERE host_id = ? ORDER BY connected_at DESC LIMIT ?",
+      )
+      .bind(hostId, SLACK_ROUTE_TEAMS_LIMIT)
+      .all<{ team_id: string; app_id: string; connected_at: number }>();
+    const teams = rows.results.map((row) => ({ id: row.team_id, appId: row.app_id, linkedAt: row.connected_at }));
+    return {
+      ticket: await this.#slackRouteSigner.issue({ hostId, teams, now: this.#now() }),
+      teams: teams.map((team) => team.id),
+    };
+  }
+
+  /** The workspaces of a route ticket that D1 still links to the host, with the same link. */
+  async validateSlackRoute(input: { hostId: string; teams: SlackRouteTeam[] }): Promise<string[]> {
+    if (input.teams.length === 0) return [];
+    const rows = await this.#database
+      .prepare("SELECT team_id, app_id, connected_at FROM slack_workspace_routes WHERE host_id = ?")
+      .bind(input.hostId)
+      .all<{ team_id: string; app_id: string; connected_at: number }>();
+    const linked = new Map(rows.results.map((row) => [row.team_id, row]));
+    return input.teams
+      .filter((team) => {
+        const row = linked.get(team.id);
+        return row?.app_id === team.appId && row.connected_at === team.linkedAt;
+      })
+      .map((team) => team.id);
+  }
+
+  /** Unlinks a Slack workspace from this host, after the host disconnected it or Slack uninstalled it. */
+  async disconnectSlackWorkspace(hostId: string, machineToken: string, teamId: string): Promise<void> {
+    await this.authenticateHost(hostId, machineToken);
+    const link = await this.#database
+      .prepare("SELECT app_id FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
+      .bind(teamId, hostId)
+      .first<{ app_id: string }>();
+    if (!link) return;
+    const now = this.#now();
+    // Signal drops the route now, so the host cannot keep the workspace with the ticket it holds.
+    await this.#database.batch([
+      this.#authEventStatement({ type: "slack-route-revoked", appId: link.app_id, teamId, through: now }, now, {
+        sql: "EXISTS (SELECT 1 FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?)",
+        binds: [teamId, hostId],
+      }),
+      this.#database
+        .prepare("DELETE FROM slack_workspace_routes WHERE team_id = ? AND host_id = ?")
+        .bind(teamId, hostId),
+    ]);
+    await this.#flushAuthEvents();
+  }
+
   /** Checks the credential that a host received when it registered. */
-  async authenticateHost(hostId: string, machineToken: string): Promise<void> {
+  async authenticateHost(hostId: string, machineToken: string): Promise<RemoteHostRow> {
     const host = await this.#host(hostId);
     const expected = host?.machine_token_hash ?? "";
     const provided = await sha256(machineToken);
@@ -1120,9 +1221,10 @@ export class RemoteControlPlane {
     for (let index = 0; index < provided.length; index += 1) {
       difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
     }
-    if (!expected || difference !== 0) {
+    if (!host || !expected || difference !== 0) {
       throw new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
     }
+    return host;
   }
 
   async #requireRole(hostId: string, userId: string, roles: RemoteMemberRole[]): Promise<RemoteMembershipRow> {
@@ -1233,7 +1335,7 @@ export async function notifyAccountProfileChanged(
 }
 
 /** Queues one event for Signal. `remote/api` decodes each event type with its own schema. */
-function authEventStatement(
+export function authEventStatement(
   database: D1Database,
   event: RemoteAuthEvent,
   now: number,

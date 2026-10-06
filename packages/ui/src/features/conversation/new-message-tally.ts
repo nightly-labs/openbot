@@ -67,7 +67,28 @@ export function tallyNewMessages(
 export function countableTimelineMessage(message: AgentMessage): boolean {
   if (message.author === "you") return false;
   if (message.kind === "thinking" || message.kind === "plan") return false;
+  if (silentAgentAnswer(message)) return false;
   // A routine notice or a lifecycle marker carries no message of its own.
   if (message.actionMarker && !message.exchange) return false;
   return true;
+}
+
+/**
+ * A finished agent answer with nothing to draw. An agent ends a turn with no text when it has
+ * nothing to tell the user, for example after a teammate update that needs no reply. The row stays
+ * in the conversation, so read state still reaches it, but the timeline shows no empty bubble.
+ */
+export function silentAgentAnswer(message: AgentMessage): boolean {
+  return (
+    message.author === "agent" &&
+    (message.kind ?? "text") === "text" &&
+    !message.streaming &&
+    !message.status &&
+    !message.actionMarker &&
+    !message.questionPrompt &&
+    !message.imageGeneration &&
+    !message.attachments?.length &&
+    !message.reactions?.length &&
+    !message.body.trim()
+  );
 }

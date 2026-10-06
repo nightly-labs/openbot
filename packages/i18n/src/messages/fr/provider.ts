@@ -46,6 +46,8 @@ export const messages = {
   "provider.action.restart": "Redémarrer",
   "provider.action.updateTo": "Mettre à jour vers {version}",
   "provider.action.checkForUpdates": "Rechercher des mises à jour",
+  "provider.lastError": "Dernière erreur : {detail}",
+  "provider.action.copyDiagnostics": "Copier les diagnostics",
   "provider.action.install": "Installer",
   "provider.action.signIn": "Se connecter",
   "provider.action.signInWithCode": "Se connecter avec un code",

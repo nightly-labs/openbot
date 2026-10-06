@@ -95,7 +95,9 @@ export type SidebarAgentState =
   | { kind: "working" }
   | { kind: "responded" }
   | { kind: "unread"; count: number }
-  | { kind: "routine"; phase: SidebarRoutinePhase; count: number };
+  | { kind: "routine"; phase: SidebarRoutinePhase; count: number }
+  /** The provider plan is spent, so the queue waits. `resetsAt` is in epoch seconds, `null` when unknown. */
+  | { kind: "limited"; resetsAt: number | null };
 
 /** A pin paired with the chat it names, so the pinned strip renders the same two kinds the list does. */
 export type ResolvedPinnedItem = { ref: SidebarPinnedItem; chat: SidebarChatItem };

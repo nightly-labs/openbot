@@ -1,7 +1,8 @@
 # OpenBot Remote
 
-This directory holds our own control plane for WebRTC connections. The Remote API relays SDP and ICE only.
-Files, chats, commands and video never pass through the Remote API or Cloudflare.
+This directory holds our own control plane for WebRTC connections. The Remote API relays SDP and ICE.
+Team files, chats, commands and video never pass through the Remote API or Cloudflare. The one exception
+is the OpenBot Slack app: see [Slack requests](#slack-requests).
 
 ## Flow
 
@@ -27,6 +28,26 @@ Ending a session and changing access both write a revocation event to a durable 
 to deliver it to Signal immediately. If Signal is unreachable, the Worker retries the delivery from cron. An
 ordinary reconnect still does not ask Cloudflare. Ended and expired sessions are removed after the 10-minute
 validation window.
+
+## Slack requests
+
+The OpenBot Slack app sends the events and button presses of every workspace to one request URL,
+`https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's signing
+secret, answers Slack's `url_verification` challenge, and reads only the app ID (`api_app_id`) and
+the workspace ID. `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`,
+because the production and development apps share Signal. A request must name the app whose secret
+signed it, so one app's secret cannot reach the other app's hosts; a malformed value turns off only
+the Slack route. Then Signal passes the exact request body to the `ingress` socket of the host that
+the app and workspace are linked to, and returns the host's answer, or 503 when no host holds the workspace or the
+host does not answer in 2.5 seconds. Slack then sends the request again.
+
+An `ingress` socket names its workspaces with a Slack route ticket: an ES256 JWT with the audience
+`openbot-slack-route`, signed by the Worker with `SLACK_ROUTE_PRIVATE_JWK` (key id
+`SLACK_ROUTE_KEY_ID`) for the workspaces, each with its app, that the account service links to that
+host. Its public key
+must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the Worker, or
+`REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
+`SLACK_SIGNING_SECRET`, the Slack route answers 503.
 
 ## Production requirements
 
@@ -80,5 +101,12 @@ Reconnecting one session replaces only that session's Signal socket. Disconnecti
 must not end another device's session. Legacy hosts that omit `multiplex` keep the one-client limit:
 a second session receives `host_busy` without interrupting the first.
 
+`REMOTE_MAX_CONNECTIONS_PER_USER` (default 32) limits the authenticated Signal sockets of one account.
+Published hosts and clients share it. Each open desktop, phone, or browser keeps a socket for each
+saved host. A reconnect of the same session does not count its old socket. Change the value on the
+Signal server: a desktop environment does not change it.
+
 See [the issue #325 deployment procedure](../docs/remote-session-deployment.md) for the production evidence,
 a Signal-only update, rollback commands, and the required desktop/mobile checks.
+
+To run Signal with your own account service, see [Self-hosted remote access](../docs/self-hosting.md).

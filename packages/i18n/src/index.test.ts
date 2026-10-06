@@ -8,6 +8,8 @@ describe("resolveLocale", () => {
     expect(resolveLocale("system", "fr")).toBe("fr");
     expect(resolveLocale("system", "ja-JP")).toBe("ja");
     expect(resolveLocale("system", "ja")).toBe("ja");
+    expect(resolveLocale("system", "pt-BR")).toBe("pt");
+    expect(resolveLocale("system", "pt-PT")).toBe("pt");
     expect(resolveLocale("system", "tr-TR")).toBe("tr");
     expect(resolveLocale("system", "tr")).toBe("tr");
   });
@@ -19,6 +21,7 @@ describe("resolveLocale", () => {
   it("lets an explicit choice override the computer", () => {
     expect(resolveLocale("fr", "ja-JP")).toBe("fr");
     expect(resolveLocale("ja", "en-US")).toBe("ja");
+    expect(resolveLocale("pt", "en-US")).toBe("pt");
     expect(resolveLocale("tr", "en-US")).toBe("tr");
     expect(resolveLocale("en", "ja-JP")).toBe("en");
   });
@@ -28,13 +31,16 @@ describe("translateFor", () => {
   it("returns the translation for the locale", () => {
     expect(translateFor("fr")("menu.stopAllAgents")).toBe("Arrêter tous les agents");
     expect(translateFor("ja")("menu.stopAllAgents")).toBe("すべてのエージェントを停止");
+    expect(translateFor("pt")("menu.stopAllAgents")).toBe("Parar todos os agentes");
     expect(translateFor("tr")("menu.stopAllAgents")).toBe("Tüm ajanları durdur");
     expect(translateFor("en")("menu.stopAllAgents")).toBe("Stop all agents");
   });
 
-  it("uses French plural forms", () => {
+  it("uses translated plural forms", () => {
     expect(translateFor("fr")("provider.endpointCount", { count: 1 })).toBe("1 point de terminaison");
     expect(translateFor("fr")("provider.endpointCount", { count: 2 })).toBe("2 points de terminaison");
+    expect(translateFor("pt")("provider.endpointCount", { count: 0 })).toBe("0 endpoint");
+    expect(translateFor("pt")("provider.endpointCount", { count: 2 })).toBe("2 endpoints");
   });
 });
 
@@ -113,6 +119,18 @@ describe("plural forms without Intl.PluralRules", () => {
       sourceLocale: "en",
     });
     expect(japanese("replies", { count: 1 })).toBe("1 件の返信");
+
+    const portuguese = createTranslate({
+      source,
+      translation: { replies: { one: "{count} resposta", many: "{count} de respostas", other: "{count} respostas" } },
+      locale: "pt",
+      sourceLocale: "en",
+    });
+    expect(portuguese("replies", { count: 0 })).toBe("0 resposta");
+    expect(portuguese("replies", { count: -1 })).toBe("-1 resposta");
+    expect(portuguese("replies", { count: 1.5 })).toBe("1.5 resposta");
+    expect(portuguese("replies", { count: 2 })).toBe("2 respostas");
+    expect(portuguese("replies", { count: 1_000_000 })).toBe("1000000 de respostas");
 
     const turkish = createTranslate({
       source,

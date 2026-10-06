@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { posix } from "node:path";
 
 export function resolveDevelopmentAppDataRoot(
   platform: NodeJS.Platform = process.platform,
@@ -7,7 +7,7 @@ export function resolveDevelopmentAppDataRoot(
   homeDirectory = homedir(),
 ): string {
   if (platform === "darwin") {
-    return join(homeDirectory, "Library", "Application Support");
+    return posix.join(homeDirectory, "Library", "Application Support");
   }
 
   if (platform === "win32") {
@@ -18,5 +18,5 @@ export function resolveDevelopmentAppDataRoot(
     return appData;
   }
 
-  return environment.XDG_CONFIG_HOME?.trim() || join(homeDirectory, ".config");
+  return environment.XDG_CONFIG_HOME?.trim() || posix.join(homeDirectory, ".config");
 }

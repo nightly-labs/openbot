@@ -12,6 +12,13 @@
 // of that scan (bracket depth, whether it is inside a string) is what survives between chunks. A
 // scan that started again at each newline would walk the whole record every time, which a CLI could
 // turn into seconds of blocked main process with one long payload.
+//
+// A Node CLI also writes objects through `console.error`, which prints them as `util.inspect` text
+// rather than JSON: `Error handling request {` on one line, then indented `key: 'value',` lines and a
+// closing `}`. Its keys have no quotes, so the JSON test above read the first line as a sentence, and
+// the user got `Error handling request {` as an error toast, with each later line that held the word
+// "error" as another one (#1193). Such a dump is held as one record too. Its strings never span a
+// line and every line inside it is indented, so a line that is not ends it, whatever its brackets say.
 
 /** What a record may grow to before it is read anyway. One line of provider stderr is far shorter. */
 const DEFAULT_LIMIT = 64 * 1024;
@@ -75,12 +82,17 @@ export function createDiagnosticStream(options: {
   let depth = 0;
   let inString = false;
   let escaped = false;
+  /** Set while the payload being read is `util.inspect` text, not JSON. */
+  let inspect = false;
+  /** The quote that opened the string being read. JSON has only `"`; `util.inspect` uses all three. */
+  let quote = '"';
   /**
    * An opening bracket whose kind is still undecided, with `at` the place the search for the first
    * character after it goes on. `{` at the end of a chunk may open a record or end a sentence, and
-   * the text that decides it has not arrived yet.
+   * the text that decides it has not arrived yet. `newline` and `indented` say whether that search
+   * crossed a line end, and whether the line after it starts with a space.
    */
-  let undecided: { open: number; at: number } | null = null;
+  let undecided: { open: number; at: number; newline: boolean; indented: boolean } | null = null;
   /** Set while the rest of a record that went over the bound is being read and thrown away. */
   let dropping = false;
 
@@ -89,6 +101,7 @@ export function createDiagnosticStream(options: {
     depth = 0;
     inString = false;
     escaped = false;
+    inspect = false;
     undecided = null;
   }
 
@@ -106,20 +119,34 @@ export function createDiagnosticStream(options: {
   }
 
   /**
-   * Decides whether the held bracket opens what a serializer wrote. `{"headers":` is a record;
-   * `note {` is a sentence, and holding a sentence open would keep every line after it unread until
-   * the bound. Answers `false` while only spaces follow the bracket, so the decision waits for text
-   * rather than being guessed.
+   * Decides whether the held bracket opens what a serializer wrote. `{"headers":` is a record, and
+   * so is a bracket that ends its line with an indented line under it, which is how `util.inspect`
+   * prints a multi-line object; `note {` is a sentence, and holding a sentence open would keep every
+   * line after it unread until the bound. Answers `false` while only spaces follow the bracket, so
+   * the decision waits for text rather than being guessed.
    */
-  function decideUndecided(held: { open: number; at: number }): boolean {
+  function decideUndecided(held: NonNullable<typeof undecided>): boolean {
     for (; held.at < pending.length; held.at += 1) {
       const char = pending[held.at];
-      if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
+      if (char === "\n") {
+        held.newline = true;
+        held.indented = false;
+        continue;
+      }
+      if (char === " " || char === "\t") {
+        if (held.newline && pending[held.at - 1] === "\n") held.indented = true;
+        continue;
+      }
+      if (char === "\r") continue;
       undecided = null;
       // Back to the bracket either way: as the first level of a payload, or as one more character of
       // the line it sits in.
       cursor = held.open + 1;
       if (char === '"' || char === "{" || char === "[") depth = 1;
+      else if (held.indented && char !== "}" && char !== "]") {
+        depth = 1;
+        inspect = true;
+      }
       return true;
     }
     return false;
@@ -133,14 +160,34 @@ export function createDiagnosticStream(options: {
       }
       if (cursor >= pending.length) return;
       const char = pending[cursor];
+      if (depth > 0 && inspect && char === "\n") {
+        const next = pending[cursor + 1];
+        // The first character of the next line says whether the dump goes on, and it has not arrived.
+        if (next === undefined) return;
+        inString = false;
+        escaped = false;
+        if (next !== " " && next !== "\t" && next !== "}" && next !== "]") {
+          // A line that is not indented is not part of the dump, so the record ends here even when
+          // the brackets read so far do not balance.
+          takeRecord(cursor);
+          continue;
+        }
+        cursor += 1;
+        continue;
+      }
       if (depth > 0) {
         if (inString) {
           if (escaped) escaped = false;
           else if (char === "\\") escaped = true;
-          else if (char === '"') inString = false;
-        } else if (char === '"') inString = true;
-        else if (char === "{" || char === "[") depth += 1;
-        else if (char === "}" || char === "]") depth -= 1;
+          else if (char === quote) inString = false;
+        } else if (char === '"' || (inspect && (char === "'" || char === "`"))) {
+          inString = true;
+          quote = char;
+        } else if (char === "{" || char === "[") depth += 1;
+        else if (char === "}" || char === "]") {
+          depth -= 1;
+          if (depth === 0) inspect = false;
+        }
         cursor += 1;
         continue;
       }
@@ -149,7 +196,7 @@ export function createDiagnosticStream(options: {
         continue;
       }
       if (char === "{" || char === "[") {
-        undecided = { open: cursor, at: cursor + 1 };
+        undecided = { open: cursor, at: cursor + 1, newline: false, indented: false };
         continue;
       }
       cursor += 1;
@@ -165,7 +212,9 @@ export function createDiagnosticStream(options: {
       // The bound was passed inside a record. What was read is emitted, and the rest of that same
       // record is read on and dropped: shown as a record of its own it would be half a payload, and
       // half a payload is the half the redactor cannot name.
-      pending = "";
+      // A dump that waits at the end of a line keeps that newline: the next line decides whether the
+      // dump goes on, and without it that line is dropped as the rest of the dump.
+      pending = inspect && depth > 0 && pending.endsWith("\n") ? "\n" : "";
       cursor = 0;
       // An undecided bracket loses its place with the text it pointed into. It counts as a payload,
       // which keeps the rest of the record held back rather than passed on.
@@ -174,6 +223,7 @@ export function createDiagnosticStream(options: {
         depth = 1;
         inString = false;
         escaped = false;
+        inspect = false;
       }
       dropping = true;
     },

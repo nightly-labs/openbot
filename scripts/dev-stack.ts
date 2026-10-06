@@ -126,7 +126,7 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
       // signalling a group this record can no longer claim.
       logger.error(
         `The ${entry.name} process group ${entry.pid} outlived its leader and cannot be attributed to this stack. ` +
-          `Find what holds ${record.ports.map((port) => port.port).join(", ")} with lsof, and stop it yourself.`,
+          `Find what holds ${record.ports.map((port) => port.port).join(", ")} with ${process.platform === "win32" ? "netstat -ano" : "lsof"}, and stop it yourself.`,
       );
       unresolved = true;
     }

@@ -25,6 +25,7 @@ const localizer = createSourceLocalizer({
       },
     },
     ja: {},
+    pt: {},
     tr: {},
   },
 });

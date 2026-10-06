@@ -42,7 +42,8 @@
 
 .app-logo-eye-motion {
   pointer-events: none;
-  transform: translate(var(--app-logo-eye-x, 0%), var(--app-logo-eye-y, 0%));
+  /* `--app-logo-eye-squint` half closes both eyes for a moment. The blink animates the eyes inside. */
+  transform: translate(var(--app-logo-eye-x, 0%), var(--app-logo-eye-y, 0%)) scaleY(var(--app-logo-eye-squint, 1));
   transform-origin: center;
   transition: transform var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1);
 }

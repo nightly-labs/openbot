@@ -4,6 +4,7 @@ import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
+import type { MessagingThreads } from "../messaging/messaging-threads";
 import { decodeTurnResponse } from "../protocol";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -12,11 +13,13 @@ import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { ProfileSave } from "./profile-save";
+import { isPlanLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 import { TurnSlots } from "./turn-slots";
+import type { UsageLimitGate } from "./usage-limit-gate";
 import { codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
 
 /** Shown to the user when a message names a model of an endpoint that was taken out. */
@@ -37,6 +40,8 @@ export interface DrainHooks {
    * generic redaction: it does not know which values this machine's MCP servers were given.
    */
   redactMcp(text: string): string;
+  /** Gives a channel task back to its channel after a spent plan refused it; false when it cannot go back. */
+  requeueChannelDelivery(deliveryId: string): boolean;
 }
 
 export interface DrainSchedulerOptions {
@@ -51,8 +56,10 @@ export interface DrainSchedulerOptions {
   routines: RoutineScheduler;
   threads: ThreadLifecycle;
   memory: MemoryHold;
+  usageLimits: UsageLimitGate;
   hooks: DrainHooks;
   channels?: ChannelService;
+  messaging?: MessagingThreads;
 }
 
 /**
@@ -77,12 +84,14 @@ export class DrainScheduler {
   readonly #routines: RoutineScheduler;
   readonly #threads: ThreadLifecycle;
   readonly #memory: MemoryHold;
+  readonly #usageLimits: UsageLimitGate;
   readonly #slots: TurnSlots;
   /** Agents that a full set of turn slots held back. A drain that may free a slot tries them again. */
   readonly #slotWaiters = new Set<string>();
   #wakingSlotWaiters = false;
   readonly #hooks: DrainHooks;
   readonly #channels: ChannelService | undefined;
+  readonly #messaging: MessagingThreads | undefined;
   readonly #drainingAgents = new Set<string>();
   /**
    * The model each agent's running turn was started with, by turn id. The agent record can be moved
@@ -113,8 +122,10 @@ export class DrainScheduler {
     this.#routines = options.routines;
     this.#threads = options.threads;
     this.#memory = options.memory;
+    this.#usageLimits = options.usageLimits;
     this.#hooks = options.hooks;
     this.#channels = options.channels;
+    this.#messaging = options.messaging;
     this.#slots = new TurnSlots({
       limit: () => this.#memory.turnLimit(),
       agentIds: () => this.#store.list().map((agent) => agent.id),
@@ -138,7 +149,8 @@ export class DrainScheduler {
       this.#profileSave.mayDrain(agentId) &&
       this.#duplication.mayDrain(agentId) &&
       this.#compaction.mayDrain(agentId) &&
-      this.#routines.mayDrain(agentId)
+      this.#routines.mayDrain(agentId) &&
+      this.#usageLimits.mayDrain(agentId)
     );
   }
 
@@ -260,7 +272,7 @@ export class DrainScheduler {
       const assignment = this.#channels?.store.assignmentForDelivery(context.delivery.id);
       const publicThreadId = assignment
         ? this.#channels?.store.context(assignment.channelId, assignment.agentId).threadId
-        : agent?.threadId;
+        : (this.#messaging?.threadForDelivery(context.delivery.id) ?? agent?.threadId);
       const session =
         agent && publicThreadId ? this.#store.database.activeProviderSession(publicThreadId, agent.provider) : null;
       if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
@@ -278,9 +290,15 @@ export class DrainScheduler {
   async startDelivery(context: DeliveryContext): Promise<void> {
     const { delivery } = context;
     const channelDelivery = this.#channels ? this.#channels.store.assignmentForDelivery(delivery.id) !== null : false;
-    // The teammate answers that start in this turn too. A channel task always runs alone. The
-    // person's message goes last, so the turn answers it with the answers already read.
-    const companions = channelDelivery ? [] : this.#mailbox.repliesToStartWith(delivery.id);
+    const messagingDelivery = this.#messaging?.ownsDelivery(delivery.id) ?? false;
+    // The teammate answers that start in this turn too. A channel task and an external message
+    // always run alone; a teammate's answer in an external conversation takes the other answers to
+    // the same request. The person's message goes last, so the turn answers it with the answers
+    // already read.
+    const companions =
+      channelDelivery || (messagingDelivery && delivery.sender.kind !== "agent")
+        ? []
+        : this.#mailbox.repliesToStartWith(delivery.id);
     let batch = delivery.sender.kind === "user" ? [...companions, context] : [context, ...companions];
     let confirmedTurnId: string | null = null;
     const claimed = this.#deliveryProviders(delivery.recipientAgentId);
@@ -294,6 +312,9 @@ export class DrainScheduler {
     // Released in the `finally` when no turn starts: a start that fails uses no provider memory.
     const releaseReservation = this.#memory.reserveTurn();
     let turnMayRun = false;
+    // The model this start asks for. The agent can move to another one while `turn/start` waits, and
+    // a plan limit belongs to the model the provider refused.
+    let requestedModel: string | null = null;
     try {
       for (const item of batch) await this.#mailbox.markStarting(item.delivery.id);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -314,6 +335,7 @@ export class DrainScheduler {
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
+      requestedModel = agent.model;
       // The endpoint was removed while this agent was busy, so no other model could be given to it
       // then. The old process would still answer on the removed endpoint, with the credentials it
       // started with, until it restarts. Thrown rather than failed here: the catch below also ends
@@ -325,11 +347,21 @@ export class DrainScheduler {
       this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id);
       const client = await this.#providers.ensureAgentClient(agent);
-      const execution = this.#channels ? await this.#channels.prepare(context) : null;
-      if (channelDelivery && !execution) {
+      const execution = messagingDelivery
+        ? await this.#messaging?.prepare(context)
+        : this.#channels
+          ? await this.#channels.prepare(context)
+          : null;
+      if ((channelDelivery || messagingDelivery) && !execution) {
         const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
         if (current?.status === "starting")
-          await this.#mailbox.markTerminal(delivery.id, "interrupted", "The channel was deleted before starting.");
+          await this.#mailbox.markTerminal(
+            delivery.id,
+            "interrupted",
+            channelDelivery
+              ? "The channel was deleted before starting."
+              : "The messaging thread was removed before starting.",
+          );
         return;
       }
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
@@ -357,7 +389,7 @@ export class DrainScheduler {
             snapshot,
             routineRun:
               item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
-            channelText: execution?.text,
+            executionText: execution?.text,
           }),
         ),
         [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
@@ -464,6 +496,24 @@ export class DrainScheduler {
         return;
       }
       const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+      // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
+      // a channel task goes back to its channel, so that its assignment does not reserve the host.
+      if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
+        if (!channelDelivery) {
+          for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
+          this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+          // After the restore, so a routine set to skip finds its run back in the queue.
+          this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
+          return;
+        }
+        // Before the requeue, so the channel does not assign the task to this agent again at once.
+        this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
+        if (this.#hooks.requeueChannelDelivery(delivery.id)) {
+          await this.#mailbox.markTerminal(delivery.id, "interrupted", null);
+          this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+          return;
+        }
+      }
       await this.#mailbox.markTerminal(delivery.id, "failed", reason);
       // The provider did not read the answers that were to start with it, so they wait for the next turn.
       for (const { delivery: companion } of batch) {
@@ -471,6 +521,7 @@ export class DrainScheduler {
       }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
+      this.#messaging?.deliveryFailed(delivery.id);
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
       this.scheduleDrain(delivery.recipientAgentId);
       // The requester may hold the other answers until this request ends.

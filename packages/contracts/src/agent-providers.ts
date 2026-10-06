@@ -19,7 +19,16 @@ import { isOneOf } from "./runtime-values";
  * the per-provider argv, palette tokens and runtime-lock schemas, which belong to the driver, the
  * stylesheet and the lock file.
  */
-export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor", "acp"] as const;
+export const AGENT_PROVIDERS = [
+  "codex",
+  "claude",
+  "grok",
+  "opencode",
+  "antigravity",
+  "cursor",
+  "cline",
+  "acp",
+] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
 export function isAgentProvider(value: unknown): value is AgentProviderId {
@@ -61,7 +70,7 @@ export interface AgentProviderDescriptor {
    * The workspace skill folders the CLI reads by itself, in its own order. OpenBot writes only
    * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
    * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
-   * and the skill paths in Google's Antigravity ACP server and in the Cursor CLI.
+   * and the skill paths in Google's Antigravity ACP server, in the Cursor CLI and in the Cline CLI.
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
@@ -173,6 +182,23 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
     workspaceEnforcement: "confined-process",
   },
+  // The Cline CLI (`cline --acp`). Sign-in is the ACP `cline` method, which opens a browser. A Cline
+  // account runs the free models; `CLINE_API_KEY` in the environment also signs in.
+  cline: {
+    id: "cline",
+    displayName: "Cline",
+    cliName: "Cline CLI",
+    onboardingDescription: "Free models with a Cline account",
+    signInMessage: "Sign in with Cline or set CLINE_API_KEY to use Cline.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "cline",
+    pickerOrder: 6,
+    codeSignIn: false,
+    skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
+    workspaceEnforcement: "confined-process",
+  },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
   // provider CHECK lists grow by one word only once.
@@ -186,7 +212,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "acp",
-    pickerOrder: 6,
+    pickerOrder: 7,
     codeSignIn: false,
     skillFolders: [".agents/skills"],
     workspaceEnforcement: "confined-process",
@@ -234,6 +260,7 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "opencode",
   "antigravity",
   "cursor",
+  "cline",
 ] as const satisfies readonly AgentProviderId[];
 export type ManagedProviderId = (typeof MANAGED_RUNTIME_PROVIDERS)[number];
 
@@ -245,7 +272,12 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  * The providers that stay on the computer that runs OpenBot. The Team API does not carry them, so a
  * joined server's settings do not list them.
  */
-export const LOCAL_ONLY_PROVIDERS = ["antigravity", "cursor", "acp"] as const satisfies readonly AgentProviderId[];
+export const LOCAL_ONLY_PROVIDERS = [
+  "antigravity",
+  "cursor",
+  "cline",
+  "acp",
+] as const satisfies readonly AgentProviderId[];
 
 export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
   return isOneOf(LOCAL_ONLY_PROVIDERS, provider);

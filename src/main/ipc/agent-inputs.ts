@@ -36,6 +36,9 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  ROUTINE_LIMIT_POLICIES,
+  type RoutineCalendarInput,
+  type RoutineLimitPolicy,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
@@ -52,7 +55,7 @@ import {
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { PayloadDecoder } from "../trusted-ipc";
@@ -225,6 +228,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     active: value.active,
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
+    ...optionalLimitPolicy(value.limitPolicy),
   };
 }
 
@@ -243,8 +247,15 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
+}
+
+function optionalLimitPolicy(value: unknown): { limitPolicy?: RoutineLimitPolicy } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_LIMIT_POLICIES, value)) throw new Error("Invalid routine limit policy.");
+  return { limitPolicy: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -257,6 +268,18 @@ export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
 
 export function parseTestRoutine(value: unknown): TestRoutineInput {
   return parseDeleteRoutine(value);
+}
+
+/** The range is a whole number of instants the host reads in one pass, so its length is limited. */
+export function parseRoutineCalendar(value: unknown): RoutineCalendarInput {
+  if (!isObject(value)) throw new Error("Invalid routine calendar request.");
+  const from = new Date(requireString(value.from, "from"));
+  const to = new Date(requireString(value.to, "to"));
+  const length = to.getTime() - from.getTime();
+  if (Number.isNaN(length) || length <= 0 || length > INPUT_LIMITS.routineCalendarDays * 86_400_000) {
+    throw new Error("Invalid routine calendar range.");
+  }
+  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {
@@ -314,6 +337,7 @@ export function parseCreateChannelRoutine(value: unknown): CreateChannelRoutineI
     active: value.active,
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
+    ...optionalLimitPolicy(value.limitPolicy),
   };
 }
 
@@ -332,6 +356,7 @@ export function parseUpdateChannelRoutine(value: unknown): UpdateChannelRoutineI
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -508,6 +533,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.computerUse !== undefined) {
     if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
     result.computerUse = value.computerUse;
+  }
+  if (value.allowAutomation !== undefined) {
+    if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
+    result.allowAutomation = value.allowAutomation;
   }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");

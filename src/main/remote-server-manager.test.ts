@@ -136,6 +136,35 @@ describe("remote server links", () => {
     }
   });
 
+  it("does not send the token of another service's invitation to a self-hosted service", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-self-hosted-invite-"));
+    const transport = fakeWebRtcTransport();
+    const previewInvite = vi.spyOn(transport, "previewInvite");
+    const acceptInvite = vi.spyOn(transport, "acceptInvite");
+    const manager = new RemoteServerManager(
+      join(directory, "servers.json"),
+      { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
+      { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com" },
+      { webrtcTransport: transport, selfHostedApiOrigin: "https://api.example.com" },
+    );
+    const inviteUrl = new URL("https://openbot.run/join");
+    inviteUrl.searchParams.set("api", "https://api.openbot.run/");
+    inviteUrl.searchParams.set("server", "00000000-0000-4000-8000-000000000000");
+    inviteUrl.searchParams.set("fingerprint", "a".repeat(43));
+    inviteUrl.searchParams.set("invite", "b".repeat(43));
+    try {
+      await manager.initialize();
+      const input = { inviteUrl: inviteUrl.toString() };
+      await expect(manager.previewInvite(input)).rejects.toThrow("another OpenBot service");
+      await expect(manager.join(input)).rejects.toThrow("another OpenBot service");
+      expect(previewInvite).not.toHaveBeenCalled();
+      expect(acceptInvite).not.toHaveBeenCalled();
+    } finally {
+      await manager.stop();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("disconnects a stored WebRTC host removed from the authenticated directory", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-webrtc-revoked-host-"));
     const statePath = join(directory, "servers.json");

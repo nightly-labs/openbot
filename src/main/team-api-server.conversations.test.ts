@@ -19,6 +19,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { TEAM_PROTOCOL_V5 } from "@openbot/contracts/team-protocol/v5";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   createAgents,
@@ -386,12 +387,26 @@ describe("TeamApiServer conversations", () => {
         text: taggedMessage,
         attachmentDraftIds: [],
         replyToMessageId: null,
+        timezone: "Europe/Warsaw",
       },
     });
     // The host names the member it authenticated; the request body cannot name a sender.
+    // Protocol 3 drops the sender's timezone, so the host keeps its own zone.
     expect(sendMessage).toHaveBeenCalledWith(
       { agentId: "chief", text: taggedMessage, attachmentDraftIds: [], replyToMessageId: null },
       { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+      undefined,
+    );
+    await jsonRequest(base, "/v1/agents/chief/messages", {
+      token: token,
+      protocol: TEAM_PROTOCOL_V5,
+      capabilities: [...TEAM_CURRENT_CAPABILITIES],
+      body: { text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null, timezone: "Europe/Warsaw" },
+    });
+    expect(sendMessage).toHaveBeenLastCalledWith(
+      { agentId: "chief", text: "Every day at 8", attachmentDraftIds: [], replyToMessageId: null },
+      { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+      "Europe/Warsaw",
     );
     await expect(
       jsonRequest(base, "/v1/agents/chief/conversation/read", {

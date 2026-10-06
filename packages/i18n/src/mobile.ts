@@ -3,6 +3,7 @@ import { createTranslate, type MessageParams, type Translate } from "./message";
 import { type AppMobileMessages, enMobile } from "./messages/en/mobile";
 import { frMobile } from "./messages/fr/mobile";
 import { jaMobile } from "./messages/ja/mobile";
+import { ptMobile } from "./messages/pt/mobile";
 import { trMobile } from "./messages/tr/mobile";
 
 /**
@@ -15,7 +16,7 @@ export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale 
 export { localizeSourceText, sourceText } from "./source-text";
 export type { AppMobileMessages };
 
-const catalogs = { en: enMobile, fr: frMobile, ja: jaMobile, tr: trMobile } as const;
+const catalogs = { en: enMobile, fr: frMobile, ja: jaMobile, pt: ptMobile, tr: trMobile } as const;
 
 export type MobileTranslate = Translate<AppMobileMessages>;
 

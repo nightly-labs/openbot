@@ -363,6 +363,95 @@ describe("TeamApiServer events", () => {
     expect((await closed).code).toBe(1011);
   }, 30_000);
 
+  it("serves a turn to every client when one of them cannot take the post-turn snapshot", async () => {
+    const agentEvents = new EventEmitter();
+    // These agents are OpenCode peers: a protocol 1 client cannot see one, a protocol 5 client sees
+    // all of them. Their wire fields sit at the frozen caps, so 100 of them carry the protocol 5
+    // snapshot past its byte limit and leave the protocol 1 one almost empty.
+    const opencodeAgent = (index: number, large: boolean): AgentSummary => ({
+      id: `opencode-agent-${index}`,
+      provider: "opencode",
+      name: large ? "n".repeat(80) : "OpenCode Agent",
+      title: "Lead",
+      description: "",
+      notifications: true,
+      model: "gpt-5.6-luna",
+      reasoningEffort: "medium",
+      threadId: `thread-opencode-${index}`,
+      workspacePath: "",
+      preview: large ? "p".repeat(240) : "",
+      updatedAt: null,
+      avatarSeed: large ? "a".repeat(128) : "opencode",
+      avatarHue: null,
+      avatarUrl: large ? `https://example.invalid/${"u".repeat(2_000)}` : null,
+    });
+    // One small agent until both clients are ready, so neither socket is closed by the byte limit.
+    let agents: AgentSummary[] = [opencodeAgent(0, false)];
+    const { store, start } = await createTeamApiFixture("oversized-turn-snapshot", { configure: true });
+    const { port } = await start({
+      agents: createAgents(
+        {
+          listAgents: () => agents,
+          getRuntimeSnapshot: () => ({
+            ...createAgents().getRuntimeSnapshot(),
+            agents,
+            latestMessages: agents.map((agent, index) => ({
+              agentId: agent.id,
+              id: `message-${index}`,
+              text: "Answer ready.",
+              createdAt: "2026-08-29T10:00:00.000Z",
+            })),
+          }),
+        },
+        agentEvents,
+      ),
+    });
+    const login = await store.login("owner", "correct horse battery");
+    const received = new Map<string, Array<{ type: string }>>();
+    const open = async (name: string, capabilities: string[]): Promise<WebSocket> => {
+      const messages: Array<{ type: string }> = [];
+      received.set(name, messages);
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+        "openbot-team-v1",
+        `openbot-token.${login.sessionToken}`,
+      ]);
+      const presence = nextJsonEvent(socket);
+      await new Promise<void>((resolve, reject) => {
+        socket.addEventListener("open", () => resolve(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("WebSocket did not open.")), { once: true });
+      });
+      socket.addEventListener("message", (message) => messages.push(JSON.parse(String(message.data))));
+      await presence;
+      const initialSnapshot = nextJsonEvent(socket);
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+      await expect(initialSnapshot).resolves.toMatchObject({ type: "runtime-snapshot" });
+      return socket;
+    };
+    // The oversized client connects first, so the broadcast loop reaches it before the other one.
+    const oversized = await open("oversized", ["agent-runtime-snapshots", "local-providers"]);
+    const fits = await open("fits", ["agent-runtime-snapshots"]);
+    const typesOf = (name: string) => received.get(name)?.map((message) => message.type) ?? [];
+    for (const messages of received.values()) messages.length = 0;
+    // Protocol 5 reads all 100 of these agents, so its post-turn snapshot no longer fits.
+    agents = Array.from({ length: 100 }, (_, index) => opencodeAgent(index, true));
+    agentEvents.emit("event", {
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-1",
+      status: "completed",
+    });
+    // The turn reaches both clients. Only the client whose snapshot does not fit loses the snapshot.
+    await vi.waitFor(() => {
+      expect(typesOf("oversized").filter((type) => type === "turn-completed")).toHaveLength(1);
+      expect(typesOf("fits").filter((type) => type === "turn-completed")).toHaveLength(1);
+    });
+    await vi.waitFor(() => expect(typesOf("fits").filter((type) => type === "runtime-snapshot")).toHaveLength(1));
+    expect(typesOf("oversized").filter((type) => type === "runtime-snapshot")).toHaveLength(0);
+    oversized.close();
+    fits.close();
+  }, 30_000);
+
   it("keeps legacy event clients connected without sending runtime snapshots", async () => {
     const { store, start } = await createTeamApiFixture("legacy-events", { configure: true });
     const login = await store.login("owner", "correct horse battery");

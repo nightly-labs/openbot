@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  clineStatePaths,
   confineSpawnTarget,
   cursorConfinedEnv,
   cursorStatePaths,
@@ -110,6 +111,25 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(confinedWrite(join(root, ".cursor", "projects", "a", ".workspace-trusted"), cursor)).toBe(false);
     expect(confinedWrite(join(root, ".cursor", "projects", "a", "mcp-approvals.json"), cursor)).toBe(false);
     expect(confinedWrite(join(workspace, ".cursor", "mcp.json"), cursor)).toBe(false);
+  });
+
+  it("lets Cline write its sessions and sign-in, and denies its settings, hooks, skills and schedules", async () => {
+    const cline = clineStatePaths({}, root);
+    const data = join(root, ".cline", "data");
+    // The driver makes the data folder before it starts the sandbox.
+    await mkdir(data, { recursive: true });
+    expect(confinedWrite(join(data, "db", "sessions.db"), cline)).toBe(true);
+    expect(confinedWrite(join(data, "sessions", "a", "messages.json"), cline)).toBe(true);
+    expect(confinedWrite(join(data, "settings", "providers.json"), cline)).toBe(true);
+    expect(confinedWrite(join(data, "settings", "global-settings.json"), cline)).toBe(false);
+    expect(confinedWrite(join(data, "settings", "cline_mcp_settings.json"), cline)).toBe(false);
+    expect(confinedWrite(join(data, "db", "cron.db"), cline)).toBe(false);
+    expect(confinedWrite(join(data, "db", "tasks.db-wal"), cline)).toBe(false);
+    expect(confinedWrite(join(data, "connectors", "settings.json"), cline)).toBe(false);
+    expect(confinedWrite(join(root, ".cline", "hooks", "start.sh"), cline)).toBe(false);
+    expect(confinedWrite(join(root, ".cline", "skills", "a", "SKILL.md"), cline)).toBe(false);
+    expect(confinedWrite(join(workspace, ".clinerules", "rules.md"), cline)).toBe(false);
+    expect(confinedWrite(join(workspace, ".cline", "skills", "a", "SKILL.md"), cline)).toBe(false);
   });
 });
 

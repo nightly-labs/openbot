@@ -26,4 +26,6 @@ export const messages = {
   "update.provider.unavailable": "Les mises à jour des fournisseurs ne sont pas disponibles.",
   "update.provider.downloadsUnavailable": "Les téléchargements des fournisseurs ne sont pas disponibles.",
   "update.provider.startFailed": "La mise à jour n’a pas pu démarrer. Réessayez.",
+  "update.provider.showDetails": "Afficher les détails",
+  "update.provider.hideDetails": "Masquer les détails",
 } as const satisfies PartialTranslation<typeof source>;

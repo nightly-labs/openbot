@@ -1,10 +1,10 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { Button, Checkbox, Heading, Text, Toaster } from "@openbot/ui";
+import { Button, Checkbox, Heading, Text, Toaster, toast } from "@openbot/ui";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { type ProviderUpdate, providerUpdatesToAnnounce } from "@openbot/ui/features/provider-updates/provider-update";
-import { createEffect, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   dismissProviderUpdateToast,
@@ -12,7 +12,7 @@ import {
   showProviderUpdateToast,
 } from "../src/features/provider-updates/provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor"] as const;
+const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "cursor", "cline"] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
   claude: "Claude",
@@ -20,6 +20,7 @@ const NAMES: Record<ManagedProviderId, string> = {
   opencode: "OpenCode",
   antigravity: "Gemini",
   cursor: "Cursor",
+  cline: "Cline",
 };
 const INSTALLED: Record<ManagedProviderId, string> = {
   codex: "0.149.1",
@@ -28,6 +29,7 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   opencode: "1.18.30",
   antigravity: "1.2.1",
   cursor: "2026.09.28-64d2043",
+  cline: "3.0.68",
 };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
@@ -38,6 +40,7 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   opencode: null,
   antigravity: null,
   cursor: null,
+  cline: null,
 };
 
 /** Fast enough to finish in a couple of seconds, slow enough to read. */
@@ -53,6 +56,7 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     opencode: { phase: "ready", progress: 100, message: null, version: INSTALLED.opencode },
     antigravity: { phase: "ready", progress: 100, message: null, version: INSTALLED.antigravity },
     cursor: { phase: "ready", progress: 100, message: null, version: INSTALLED.cursor },
+    cline: { phase: "ready", progress: 100, message: null, version: INSTALLED.cline },
   };
 }
 
@@ -62,12 +66,18 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
  * cleanup. `mock-openbot.ts` still stubs `providerRuntimes` inert, and no contract carries
  * `availableVersion` yet, so props are the only honest source for these states today.
  */
-function ProviderUpdateFlow(props: { controls?: boolean }) {
+function ProviderUpdateFlow(props: {
+  controls?: boolean;
+  /** The first update fails with this message instead of the short default. */
+  failure?: string;
+  /** Two other notifications open beside the update, so the stack has something to make room for. */
+  companions?: boolean;
+}) {
   const [runtimes, setRuntimes] = createSignal(readyRuntimes());
   const [provider, setProvider] = createSignal<AgentProviderId>("claude");
   // One update fails, and the flag is spent when it does, so the Retry after it succeeds. The
   // playground puts the switch under the reader.
-  const [failNext, setFailNext] = createSignal(false);
+  const [failNext, setFailNext] = createSignal(untrack(() => props.failure !== undefined));
   const failToggleId = createUniqueId();
   const timers = new Set<number>();
   const running = new Set<AgentProviderId>();
@@ -107,7 +117,11 @@ function ProviderUpdateFlow(props: { controls?: boolean }) {
       if (failNext() && progress >= 56) {
         setFailNext(false);
         clearTimers();
-        setRuntime(id, { phase: "download-error", progress: 55, message: "The update was interrupted." });
+        setRuntime(id, {
+          phase: "download-error",
+          progress: 55,
+          message: props.failure ?? "The update was interrupted.",
+        });
         return;
       }
       setRuntime(id, { phase: "downloading", progress });
@@ -163,9 +177,24 @@ function ProviderUpdateFlow(props: { controls?: boolean }) {
     },
   );
 
+  onSettled(() => {
+    if (!props.companions) return;
+    toast.info("New model available", {
+      id: "provider-update-companion-model",
+      description: "Open model settings to review its capabilities before you switch.",
+      duration: Number.POSITIVE_INFINITY,
+    });
+    toast.success("Workspace saved", {
+      id: "provider-update-companion-saved",
+      duration: Number.POSITIVE_INFINITY,
+    });
+  });
+
   onCleanup(() => {
     clearTimers();
     for (const id of PROVIDERS) dismissProviderUpdateToast(id);
+    toast.dismiss("provider-update-companion-model");
+    toast.dismiss("provider-update-companion-saved");
   });
 
   const options = (): ProviderPickerOption[] =>
@@ -217,7 +246,17 @@ function ProviderUpdateFlow(props: { controls?: boolean }) {
 const meta = {
   title: "Setup/ProviderUpdates",
   component: ProviderUpdateFlow,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    viewport: {
+      options: {
+        toastNarrow: {
+          name: "Toast — 420 × 760",
+          styles: { width: "420px", height: "760px" },
+        },
+      },
+    },
+  },
 } satisfies Meta<typeof ProviderUpdateFlow>;
 
 export default meta;
@@ -235,3 +274,29 @@ export const Playground: Story = {
 
 /** The offer, on both surfaces at once. */
 export const UpdateAvailable: Story = {};
+
+/**
+ * Text that `userErrorMessage` lets through: under its length limit, with no path or stack trace,
+ * and with an address that has no place to break.
+ */
+const LONG_FAILURE =
+  "OpenBot could not update the Claude CLI. The registry at https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.250.tgz answered with a checksum that does not match the published package, so the download stopped before it replaced the version you have.";
+
+/**
+ * Press Update: the download fails with a long reason. The reason stops after three lines, and
+ * "Show details" opens the rest. Retry and the close control stay clear of the text.
+ */
+export const LongFailure: Story = {
+  render: () => <ProviderUpdateFlow controls failure={LONG_FAILURE} />,
+};
+
+/** The same failure with two other notifications open. Hover the stack, then open the details. */
+export const LongFailureStacked: Story = {
+  render: () => <ProviderUpdateFlow controls companions failure={LONG_FAILURE} />,
+};
+
+/** The same failure at the narrow width where the toasts take the full window. */
+export const LongFailureNarrow: Story = {
+  globals: { viewport: "toastNarrow" },
+  render: () => <ProviderUpdateFlow controls companions failure={LONG_FAILURE} />,
+};

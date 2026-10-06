@@ -107,6 +107,77 @@ export function claudeModelName(id: string): string | null {
   return variant ? `${name} (${variant.toUpperCase()} context)` : name;
 }
 
+/**
+ * Known free OpenCode ids are a discovery safety net, not a claim that an unauthenticated provider
+ * is ready. They are inserted only after OpenCode has authenticated and its model discovery fails.
+ */
+export const OPENCODE_FREE_MODEL_FALLBACKS: AgentModelOption[] = [
+  {
+    provider: "opencode",
+    id: "opencode/big-pickle",
+    name: "Big Pickle",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/ling-3.0-flash-fin-free",
+    name: "Ling 3.0 Flash Fin Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/longcat-2.5-preview-free",
+    name: "LongCat 2.5 Preview Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/mimo-v2.6-flash-free",
+    name: "MiMo-V2.6-Flash Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/muse-spark-1.3-contributor-free",
+    name: "Muse Spark 1.3 Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/nemotron-3-ultra-free",
+    name: "Nemotron 3 Ultra Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/nemotron-3.5-lightning-free",
+    name: "Nemotron 3.5 Lightning Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "opencode",
+    id: "opencode/space-bunny-free",
+    name: "Space Bunny Free",
+    description: "Free OpenCode model.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+];
+
 export const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
@@ -175,3 +246,12 @@ export const FALLBACK_MODELS: AgentModelOption[] = [
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
 ];
+
+/**
+ * An empty or failed OpenCode response must not erase the last catalog, or leave the picker blank
+ * after a successful account check. Keep the safety net out of the initial list so a provider that
+ * explicitly reports sign-in-required does not look connected or usable.
+ */
+export function modelsAfterOpenCodeDiscoveryFailure(previous: AgentModelOption[]): AgentModelOption[] {
+  return previous.length ? previous : OPENCODE_FREE_MODEL_FALLBACKS;
+}

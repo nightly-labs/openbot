@@ -458,6 +458,45 @@ describe("TeamApiServer agents", () => {
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
+  // A shipped peer's list decoders fail closed on the whole array, and no released protocol knows
+  // `=` or `,` in a model id, so neither such a model nor an agent on one may reach a peer.
+  it("keeps a model id no released protocol knows off the model and agent lists", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");
+    const plain: AgentSummary = { ...source, id: "plain", provider: "claude", model: "claude-fable-5-1[1m]" };
+    const settings: AgentSummary = { ...plain, id: "settings", model: "claude-opus-5[effort=high,fast=false]" };
+    const option = { name: "Model", description: "", defaultReasoningEffort: "medium" as const };
+    const { start, signIn } = await createTeamApiFixture("unrepresentable-model", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      agents: createAgents({
+        listAgents: () => [plain, settings],
+        listModels: () => [
+          {
+            ...option,
+            provider: "claude",
+            id: "claude-opus-5[effort=high,fast=false]",
+            supportedReasoningEfforts: ["medium"],
+          },
+          { ...option, provider: "claude", id: "claude-fable-5-1[1m]", supportedReasoningEfforts: ["medium"] },
+        ],
+      }),
+    });
+    const token = await signIn({ protocol: 5, appVersion: "1.0.0" });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      [TEAM_PROTOCOL_VERSION_HEADER]: "5",
+      [TEAM_APP_VERSION_HEADER]: "1.0.0",
+    };
+    const models = await fetch(`${base}/v1/agents/models`, { headers });
+    expect(models.status).toBe(200);
+    expect((await models.json()).map((model: { id: string }) => model.id)).toEqual(["claude-fable-5-1[1m]"]);
+    const agents = await fetch(`${base}/v1/agents`, { headers });
+    expect(agents.status).toBe(200);
+    expect((await agents.json()).map((agent: AgentSummary) => agent.id)).toEqual(["plain"]);
+  });
+
   it("duplicates an agent through protocol v3 and places it after the source", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));

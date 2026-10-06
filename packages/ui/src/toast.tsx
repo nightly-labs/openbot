@@ -17,7 +17,14 @@ export function Toaster(props: ToasterProps): JSX.Element {
   let layer: HTMLDivElement | undefined;
   onSettled(() => {
     if (!layer) return;
-    const updateVisibility = () => setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+    const updateVisibility = () => {
+      setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+      // solid-sonner renders the close button, so mark it here for the close cue.
+      for (const button of layer?.querySelectorAll("[data-close-button]:not([data-cuelume-close])") ?? []) {
+        button.setAttribute("data-cuelume-close", "");
+        button.setAttribute("data-cuelume-emphasis", "subtle");
+      }
+    };
     // Track mounted toasts so native content stays behind their exit animation too.
     const observer = new MutationObserver(updateVisibility);
     observer.observe(layer, { childList: true, subtree: true });
@@ -34,7 +41,9 @@ export function Toaster(props: ToasterProps): JSX.Element {
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
         theme={props.theme ?? "dark"}
         position={props.position ?? "top-right"}
-        visibleToasts={props.visibleToasts ?? 3}
+        // A toast past the visible count stays hidden even when hover expands the stack, so an update
+        // offer would wait behind another. Six providers can offer an update at once.
+        visibleToasts={props.visibleToasts ?? 6}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}
         richColors={props.richColors ?? false}

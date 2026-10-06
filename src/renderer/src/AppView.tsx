@@ -5,6 +5,8 @@ import { useProviderDetection } from "./features/custom-providers/provider-detec
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useServerSelection } from "./features/servers/server-selection";
+import { useSettings } from "./features/settings/settings-context";
+import type { SoundFeedbackChoice } from "./features/settings/sound-feedback";
 import { StartupSplash } from "./features/startup/StartupSplash";
 import { AccountLogin, InitialSetup, OnboardingFlow } from "./lazy-views";
 import { usePlatform } from "./platform";
@@ -41,6 +43,19 @@ export function AppAccessGate() {
   const setupProviders = useSetupProviderProps();
   const detection = useProviderDetection();
   const { joinRemoteDuringSetup } = useServerSelection();
+  const { generalSettings, updateGeneralSettings } = useSettings();
+  const soundFeedback: SoundFeedbackChoice = {
+    get value() {
+      const settings = generalSettings();
+      return settings.soundFeedback ? settings.soundTheme : "off";
+    },
+    onChange: (value) =>
+      updateGeneralSettings({
+        ...generalSettings(),
+        soundFeedback: value !== "off",
+        ...(value === "off" ? {} : { soundTheme: value }),
+      }),
+  };
   const started = () => setup.setupLoaded() && platform.appInfo() !== null;
   const [splashShown, setSplashShown] = createSignal(true);
 
@@ -78,6 +93,7 @@ export function AppAccessGate() {
                         platform={platform.appInfo()?.platform ?? "darwin"}
                         onSave={setup.saveSetup}
                         onProviderStepShown={detection.scanOnce}
+                        soundFeedback={soundFeedback}
                       />
                     </Loading>
                   }

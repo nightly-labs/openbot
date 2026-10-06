@@ -1,4 +1,59 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/mobile/auth";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "mobile.auth.logo.animate": "OpenBot logosunu hareketlendir",
+  "mobile.auth.logo.animateHint": "Logonun göz kırpmasını sağlar",
+  "mobile.auth.scanQrCode": "QR kodunu tara",
+  "mobile.auth.closeScanner": "Tarayıcıyı kapat",
+  "mobile.auth.scanner.connectFailed": "Bağlanılamadı",
+  "mobile.auth.scanner.codeFailed": "Bu kod kullanılamadı",
+  "mobile.auth.scanner.scanAgain": "Tekrar tara",
+  "mobile.auth.scanner.connecting": "Telefonunuz bağlanıyor…",
+  "mobile.auth.scanner.readingInvitation": "Davet okunuyor…",
+  "mobile.auth.scanner.scanDesktop": "Masaüstü kodunu tarayın",
+  "mobile.auth.scanner.scanInvitation": "Davet kodunu tarayın",
+  "mobile.auth.scanner.verifying": "Tek seferlik kod doğrulanıyor.",
+  "mobile.auth.scanner.checkingServer": "Sunucu kimliği kontrol ediliyor.",
+  "mobile.auth.scanner.keepCentered": "QR kodunu çerçevenin içinde ortalanmış tutun.",
+  "mobile.auth.scanner.connectFallback": "OpenBot bu telefonu bağlayamadı.",
+  "mobile.auth.scanner.cameraFailed": "Kamera başlatılamadı. Tekrar deneyin.",
+  "mobile.auth.camera.title": "Kamera erişimi gerekli",
+  "mobile.auth.camera.pairingReason":
+    "OpenBot kamerayı yalnızca masaüstü uygulamasında gösterilen tek seferlik QR kodunu taramak için kullanır.",
+  "mobile.auth.camera.invitationReason": "OpenBot kamerayı yalnızca davet QR kodunu taramak için kullanır.",
+  "mobile.auth.camera.blocked":
+    "Kamera erişimi engellendi. Cihaz ayarlarından OpenBot için kamerayı etkinleştirin, ardından kodu taramak için buraya dönün.",
+  "mobile.auth.camera.allow": "Kamera erişimine izin ver",
+  "mobile.auth.camera.openSettings": "Ayarları aç",
+  "mobile.auth.signIn.title": "Ajanlarınız, her yerde.",
+  "mobile.auth.signIn.subtitle": "Bilgisayarınızdaki OpenBot'a bağlanın.",
+  "mobile.auth.signIn.helpTitle": "QR kodu nerede?",
+  "mobile.auth.signIn.helpStep1": "1. Bilgisayarınızda OpenBot'u açın.",
+  "mobile.auth.signIn.helpStep2": "2. Ayarlar → Mobile Connect bölümüne gidin.",
+  "mobile.auth.signIn.helpStep3": "3. QR kodu oluştur'u seçin, ardından buradan tarayın.",
+  "mobile.auth.error.sessionEnded": "Oturumunuz sona erdi. Masaüstünüzdeki OpenBot'tan yeni bir kod tarayın.",
+  "mobile.auth.error.connectionInProgress": "Başka bir bağlantı işlemi sürüyor. Bitmesini bekleyin.",
+  "mobile.auth.error.invalidCode": "Bu geçerli bir OpenBot Mobile Connect kodu değil.",
+  "mobile.auth.error.codeOutdated": "Güncellenmiş bir masaüstü uygulamasında yeni bir Mobile Connect kodu oluşturun.",
+  "mobile.auth.error.alreadySignedIn": "Zaten giriş yapmış durumdasınız. Başka bir hesap bağlamadan önce çıkış yapın.",
+  "mobile.auth.error.desktopUnreachable":
+    "OpenBot masaüstünüze ulaşamadı. Her iki cihazı da aynı Wi-Fi ağında tutun ve Yerel Ağ erişimine izin verin.",
+  "mobile.auth.error.accountServiceUnreachable":
+    "OpenBot hesap servisine ulaşamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "mobile.auth.error.codeExpired": "Bu Mobile Connect kodu geçersiz veya süresi dolmuş.",
+  "mobile.auth.error.revokePreviousFailed":
+    "Önceki mobil oturum iptal edilemedi. Bağlantınızı kontrol edin ve tekrar tarayın.",
+  "mobile.auth.error.verifyFailed": "OpenBot bu mobil oturumu doğrulayamadı.",
+  "mobile.auth.error.sessionsLoadFailed": "Hesap oturumları yüklenemedi. Tekrar deneyin.",
+  "mobile.auth.error.useSignOut": "Bu cihazın bağlantısını kesmek için Çıkış yap'ı kullanın.",
+  "mobile.auth.error.desktopSession": "Masaüstü oturumlarının bağlantısı mobilden kesilemez.",
+  "mobile.auth.error.disconnectFailed": "Bu oturumun bağlantısı kesilemedi. Yenileyin ve tekrar deneyin.",
+  "mobile.auth.error.nameLength": "3 ile 20 karakter arasında bir görünen ad girin.",
+  "mobile.auth.error.photoTooLarge": "512 KB'tan küçük bir fotoğraf seçin.",
+  "mobile.auth.error.photoInvalid": "Seçilen fotoğraf geçersiz. Başka bir görsel seçin.",
+  "mobile.auth.error.tooManyChanges": "Çok fazla değişiklik. Bir süre bekleyip tekrar deneyin.",
+  "mobile.auth.error.photoConflict": "Fotoğrafınız başka bir cihazda değiştirildi. Tekrar deneyin.",
+  "mobile.auth.error.profileSaveFailed": "Profiliniz kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+  "mobile.auth.error.signOutUnconfirmed": "Çıkış onaylanamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+} as const satisfies PartialTranslation<typeof source>;

@@ -24,6 +24,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CreateAgentInput, DuplicateAgentResult } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
@@ -155,7 +156,12 @@ export async function routeAgents(
     return json(200, await agents.getUsage());
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
-    return json(200, await agents.listModels());
+    // Only ids the shipped peers accept: their model list decoders fail closed on the whole array, and
+    // `isAgentModel` now also accepts `=` and `,`, which no released protocol knows.
+    return json(
+      200,
+      (await agents.listModels()).filter((model) => V5_AGENT_MODEL.test(model.id)),
+    );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.all) {
     return json(200, agents.listAgents());

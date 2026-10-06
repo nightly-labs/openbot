@@ -5,7 +5,7 @@ One developer bundle per directory: `plugins/<slug>/plugin.json`.
 `scripts/build-plugin-catalog.ts` validates the source and writes three
 generated outputs; never edit those by hand:
 
-- `src/renderer/src/features/settings/marketplace-plugin-catalog.ts` (Plugins tab)
+- `src/renderer/src/features/settings/marketplace-plugin-catalog.ts` (Apps tab)
 - `apps/auth-api/src/lib/plugin-catalog.generated.ts` (Worker JSON routes)
 - `resources/plugin-catalog/` (offline snapshot shipped with the app)
 

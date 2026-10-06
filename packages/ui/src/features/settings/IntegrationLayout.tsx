@@ -1,7 +1,7 @@
 /**
  * The parts that every integration page shares: the logo on its tile, the status pill, the page
  * header, the danger zone, and the connect dialog with OpenBot and the other app side by side.
- * GitHub uses them today. Slack and Discord use the same layout when they ship.
+ * GitHub and Slack use them. Discord uses the same layout when it ships.
  */
 
 import { AppLogo } from "@openbot/brand";
@@ -34,6 +34,30 @@ export function GitHubMark(props: { class?: string | undefined }) {
   return (
     <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d={GITHUB_MARK_PATH} />
+    </svg>
+  );
+}
+
+const SLACK_MARK_PATH =
+  "M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z";
+
+/** Slack's mark, for the same reason. */
+export function SlackMark(props: { class?: string | undefined }) {
+  return (
+    <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={SLACK_MARK_PATH} />
+    </svg>
+  );
+}
+
+const ONEPASSWORD_MARK_PATH =
+  "M12 0c6.627 0 12 5.373 12 12 0 6.628-5.373 12-12 12S0 18.628 0 12C0 5.373 5.373 0 12 0m-.893 4.86c-.485 0-.727.001-.913.095a.87.87 0 0 0-.378.379c-.094.185-.095.428-.095.912v2.747c0 .12 0 .182.016.238q.02.075.065.138a1 1 0 0 0 .175.162l.695.564c.113.092.17.139.19.194a.22.22 0 0 1 0 .15c-.02.056-.077.102-.19.194l-.695.564a1 1 0 0 0-.175.162.4.4 0 0 0-.065.138 1 1 0 0 0-.016.238v6.019c0 .485 0 .728.095.913a.87.87 0 0 0 .378.378c.186.094.428.094.913.094h1.786c.485 0 .727 0 .913-.094a.87.87 0 0 0 .378-.378c.095-.185.095-.428.095-.913v-2.747c0-.12 0-.182-.016-.238a.4.4 0 0 0-.065-.138 1 1 0 0 0-.175-.162l-.695-.564c-.113-.092-.17-.138-.191-.193a.22.22 0 0 1 0-.152c.02-.055.078-.1.19-.193l.696-.564a1 1 0 0 0 .175-.162.4.4 0 0 0 .065-.138 1 1 0 0 0 .016-.238V6.246c0-.484 0-.727-.095-.912a.87.87 0 0 0-.378-.379c-.186-.094-.428-.094-.913-.094Z";
+
+/** 1Password's mark, for the same reason. */
+export function OnePasswordMark(props: { class?: string | undefined }) {
+  return (
+    <svg class={props.class} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={ONEPASSWORD_MARK_PATH} />
     </svg>
   );
 }
@@ -222,7 +246,13 @@ export function WizardDialog(
               </Dialog.Title>
             }
           />
-          <IconButton class="integration-dialog-close" label={props.closeLabel} variant="ghost" onClick={props.onClose}>
+          <IconButton
+            class="integration-dialog-close"
+            label={props.closeLabel}
+            variant="ghost"
+            data-cuelume-tap="close"
+            onClick={props.onClose}
+          >
             <X />
           </IconButton>
         </Dialog.Content>

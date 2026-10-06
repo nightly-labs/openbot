@@ -1,0 +1,8 @@
+/* The schedule fills the pane the usage report uses, and scrolls inside it. */
+.schedule-pane {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-6);
+}

@@ -9,5 +9,9 @@ export function formatUpdatedAt(value: string | null, format: AppFormat = curren
   if (date.toDateString() === today.toDateString()) {
     return format.date(date, { hour: "2-digit", minute: "2-digit" });
   }
-  return format.date(date, { month: "short", day: "numeric" });
+  // "Mar 4" is ambiguous when the list holds a message from this year and one from last year, so
+  // the year is shown whenever it is not the current one.
+  return date.getFullYear() === today.getFullYear()
+    ? format.date(date, { month: "short", day: "numeric" })
+    : format.date(date, { month: "short", day: "numeric", year: "numeric" });
 }

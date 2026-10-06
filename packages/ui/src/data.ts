@@ -50,19 +50,30 @@ export interface RoutineRunMarkerTransition {
   timestamp: string;
 }
 
+export interface AgentMessageMarkerModel {
+  kind: "agent-message";
+  direction: "incoming" | "outgoing";
+  sourceAgentId: string;
+  targetDeliveries: Array<{ agentId: string; status: QueueDeliveryStatus }>;
+  status: AgentDeliveryMarkerStatus;
+  timestamp: string;
+  messageId: string;
+  replyToMessageId: string | null;
+  /** The sender asked for no answer, so the marker names it as information rather than a request. */
+  expectsReply: boolean;
+}
+
 export type ChatActionMarkerModel =
   | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
+  | AgentMessageMarkerModel
+  /**
+   * Consecutive agent messages, oldest first, drawn as one row. Only the timeline joins them: each
+   * stored message keeps its own marker. `timestamp` is the time of the newest message.
+   */
   | {
-      kind: "agent-message";
-      direction: "incoming" | "outgoing";
-      sourceAgentId: string;
-      targetDeliveries: Array<{ agentId: string; status: QueueDeliveryStatus }>;
-      status: AgentDeliveryMarkerStatus;
+      kind: "agent-message-group";
+      messages: Array<{ id: string; marker: AgentMessageMarkerModel }>;
       timestamp: string;
-      messageId: string;
-      replyToMessageId: string | null;
-      /** The sender asked for no answer, so the marker names it as information rather than a request. */
-      expectsReply: boolean;
     }
   | {
       kind: "routine-lifecycle";
@@ -96,6 +107,8 @@ export type ChatActionMarkerModel =
       timestamp: string;
     }
   | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
+  | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   | {
@@ -165,6 +178,8 @@ export interface AgentProfile {
   access?: AgentAccess;
   /** Absent means on. Absent for an agent on a remote host too, which does not share it. */
   computerUse?: boolean;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  allowAutomation?: boolean;
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;

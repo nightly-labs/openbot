@@ -84,8 +84,22 @@ export function withDatabaseTransaction<T>(
   // The scope is cleared first because publishing can re-enter this function, which must then open
   // its own transaction instead of joining one that is already committed.
   openTransactions.delete(database);
-  for (const effect of scope.commit) effect();
-  onCommit?.();
+  // Every effect runs, so a throw from one does not skip the rest. The rows are already durable,
+  // and an effect that keeps memory in step with them is the only thing left to put it back.
+  const failures: unknown[] = [];
+  const runEffect = (effect: (() => void) | undefined): void => {
+    try {
+      effect?.();
+    } catch (error) {
+      failures.push(error);
+    }
+  };
+  for (const effect of scope.commit) runEffect(effect);
+  runEffect(onCommit);
+  // One failure keeps its own message, because a single failing listener already names the cause.
+  // Several report together, so no cause is lost.
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, sourceText("error.agent.commitEffectsFailed"));
   return result;
 }
 

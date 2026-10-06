@@ -99,6 +99,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Free models, no account needed": "onboarding.provider.freeModels",
   "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
   "Cursor plan or API key": "onboarding.provider.cursorPlan",
+  "Free models with a Cline account": "onboarding.provider.clineAccount",
 };
 
 /**
@@ -450,6 +451,7 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
     if (!props.onDownloadProvider) return;
     keepProviderRows();
     setError("");
+    setProviderErrors((current) => ({ ...current, [provider]: undefined }));
     setProviderSelectedByUser(true);
     setSelectedProvider(provider);
     try {

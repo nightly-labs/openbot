@@ -1,4 +1,5 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
@@ -170,6 +171,33 @@ const Providers = createSimpleContext({
       }
     }
 
+    /**
+     * Restarts a provider of this computer after its turns end. A joined host has no such action:
+     * its provider API has no restart, so the caller offers none there.
+     */
+    async function restartProvider(provider: AgentProviderId): Promise<void> {
+      await changeProviderRestart(provider, providersPort().restartProvider);
+    }
+
+    async function cancelProviderRestart(provider: AgentProviderId): Promise<void> {
+      await changeProviderRestart(provider, providersPort().cancelProviderRestart);
+    }
+
+    /** A failed restart is also on the provider's status; this reports a request that main refused. */
+    async function changeProviderRestart(
+      provider: AgentProviderId,
+      request: (provider: AgentProviderId) => Promise<AgentStatus>,
+    ): Promise<void> {
+      try {
+        const status = await request(provider);
+        flush(() => applyAgentStatus(status));
+      } catch (error) {
+        const { t, errorMessage } = currentText();
+        const title = t("app.provider.restartFailed", { name: agentProviderDescriptor(provider).displayName });
+        toast.error(title, { description: errorMessage(error, title) });
+      }
+    }
+
     onSettled(() => {
       return () => {
         pendingProviderConnections.clear();
@@ -218,6 +246,8 @@ const Providers = createSimpleContext({
       codeLogin,
       openProviderInstallGuide,
       refreshAgentProviders,
+      restartProvider,
+      cancelProviderRestart,
     };
   },
 });

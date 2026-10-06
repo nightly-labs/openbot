@@ -156,11 +156,11 @@ export class QueueControls {
   async reorder(input: ReorderQueueInput): Promise<void> {
     if (input.deliveryIds.some((id) => this.#hooks.channelAssignment(id)))
       throw new Error(sourceText("error.backend.useChannelTaskControlsWork"));
-    // The queue the user reads holds no channel work, so the order it sends names the normal
-    // messages alone, and the mailbox reads the whole queued order. Channel work stays at the head:
-    // it reserved the agent before these messages arrived.
-    const channelDeliveryIds = this.#mailbox.queuedChannelDeliveryIds(input.agentId);
-    await this.#mailbox.reorderQueue(input.agentId, [...channelDeliveryIds, ...input.deliveryIds]);
+    // The queue the user reads holds no channel or messaging work, so the order it sends names the
+    // normal messages alone, and the mailbox reads the whole queued order. That work stays at the
+    // head: it reserved the agent before these messages arrived.
+    const executionDeliveryIds = this.#mailbox.queuedExecutionDeliveryIds(input.agentId);
+    await this.#mailbox.reorderQueue(input.agentId, [...executionDeliveryIds, ...input.deliveryIds]);
     this.#mailboxSync.emitQueue(input.agentId);
   }
 

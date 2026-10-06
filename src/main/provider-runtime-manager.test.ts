@@ -28,9 +28,27 @@ import {
   providerRuntimeRoot,
 } from "./provider-runtime-manager";
 
+/** How many moves of a stage answer the way Windows does while a file inside it is still open. */
+const heldStage = vi.hoisted(() => ({ renames: 0 }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    rename: async (from: Parameters<typeof actual.rename>[0], to: Parameters<typeof actual.rename>[1]) => {
+      if (heldStage.renames > 0 && /[\\/]\.staging-/u.test(String(from))) {
+        heldStage.renames -= 1;
+        throw Object.assign(new Error(`EPERM: operation not permitted, rename '${String(from)}'`), { code: "EPERM" });
+      }
+      await actual.rename(from, to);
+    },
+  };
+});
+
 const roots: string[] = [];
 
 afterEach(async () => {
+  heldStage.renames = 0;
   vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -847,6 +865,39 @@ describe("ProviderRuntimeManager", () => {
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
 
+  // Windows refuses to move a stage while its version check or an antivirus scan still has the
+  // binary open, with the same codes it gives for an occupied destination. The destination is vacant,
+  // and no other instance exists.
+  it("installs when the staged runtime is held open for a moment", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
+    await manager.initialize();
+    // More than the 15 moves that three passes of `renameIfVacant` try: a scan can hold the stage for
+    // longer than one wait.
+    heldStage.renames = 16;
+
+    await manager.downloadAndWait("grok");
+
+    expect(heldStage.renames).toBe(0);
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+  });
+
+  it("reports a stage held open, not another instance, when the wait runs out", async () => {
+    const root = await temporaryRoot();
+    const fixture = grokFixture();
+    const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads"), heldStageWaitMs: 0 });
+    await manager.initialize();
+    heldStage.renames = Number.POSITIVE_INFINITY;
+
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow(
+      "The runtime could not be installed because another program has its files open. Close it and try again.",
+    );
+
+    expect(manager.getStatus().providers.grok.phase).toBe("download-error");
+    expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
+  });
+
   it("keeps partial transfers out of the store the computer shares", async () => {
     const root = await temporaryRoot();
     const downloadRoot = join(await temporaryRoot(), "profile-downloads");
@@ -1440,6 +1491,7 @@ interface SiblingOptions {
   updateRuntime?: ProviderRuntimeManagerOptions["updateRuntime"];
   /** Counts what was asked for, to tell a skipped transfer from a repeated one. */
   onFetch?: (url: string) => void;
+  heldStageWaitMs?: number;
 }
 
 /** A manager on a store it shares with another, with a profile download directory of its own. */
@@ -1455,6 +1507,7 @@ function siblingManager(
     architecture: "arm64",
     lock: fixture.lock,
     updateRuntime: options.updateRuntime,
+    heldStageWaitMs: options.heldStageWaitMs,
     fetchImpl: async (input) => {
       const url = String(input);
       options.onFetch?.(url);

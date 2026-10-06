@@ -225,6 +225,9 @@ the encrypted environment. The private and public keys must use ES256. The Signa
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
 
+To deploy your own copy of this Worker with your own Signal, see
+[Self-hosted remote access](../../docs/self-hosting.md).
+
 ### Live Activity relay
 
 `POST /v2/remote/hosts/:hostId/live-activity` forwards a sealed iPhone Live Activity update from a

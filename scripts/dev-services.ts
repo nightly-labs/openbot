@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { get as getEncryptedValue } from "@dotenvx/dotenvx";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { cliSpawnTarget } from "../src/backend/cli";
 import {
   developmentInstanceIdForWorktree,
   developmentUserDataName,
@@ -27,8 +28,10 @@ import {
   removeDevStackRecord,
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
+import { attachSlackTunnels } from "./dev-slack-tunnels";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
+import { resolvePackageBin } from "./package-bin";
 import { prepareDevelopmentEnvironment } from "./prepare-dev-environment";
 
 const logger = createOpenBotLogger("dev-services");
@@ -121,7 +124,7 @@ export function createDevelopmentServiceSpec(
   }
 
   if (name === "remote") {
-    const dotenvx = join(projectRoot, "node_modules", ".bin", process.platform === "win32" ? "dotenvx.cmd" : "dotenvx");
+    const dotenvx = resolvePackageBin(projectRoot, "dotenvx");
     return {
       name,
       executable: dotenvx,
@@ -147,12 +150,7 @@ export function createDevelopmentServiceSpec(
 
   const isTestClient = name === "test-client";
   const outputDirectory = isTestClient ? "out-dev-test-client" : "out-dev-app";
-  const electronVite = join(
-    projectRoot,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "electron-vite.cmd" : "electron-vite",
-  );
+  const electronVite = resolvePackageBin(projectRoot, "electron-vite");
   return {
     name,
     executable: electronVite,
@@ -239,7 +237,7 @@ function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv)
   });
 }
 
-const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated", "--hosting=test"] as const;
+const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated", "--hosting=test", "--slack"] as const;
 /** The deployed `test` account Worker. It creates real hosted server VMs for the accounts on its allow list. */
 const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
 
@@ -260,6 +258,9 @@ export interface DevelopmentInvocation {
   // is a real boat VM that can reach its Worker and Signal. The app gets one profile for this that
   // all worktrees share: its account session belongs to the test Worker, not the local one.
   hostingTest: boolean;
+  // Open a public HTTPS tunnel to Signal and to the account API, so that Slack can reach a managed
+  // Slack app's host. See `dev-slack-tunnels.ts`.
+  slack: boolean;
 }
 
 export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
@@ -277,6 +278,7 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     force: args.includes("--force"),
     isolated: args.includes("--isolated"),
     hostingTest: args.includes("--hosting=test"),
+    slack: args.includes("--slack"),
   };
 }
 
@@ -300,7 +302,7 @@ async function readHostingDeveloperKey(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, isolated, hostingTest } = parseDevelopmentTarget(process.argv.slice(2));
+  const { target, dryRun, force, isolated, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Generated apps/auth-api/.env.dev for local development.");
   }
@@ -349,12 +351,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  // After the lock, because seeding a profile takes long enough that a sibling
-  // worktree should not wait behind it to choose its own ports.
-  const seed = developmentProfileToSeed(specs);
-  if (seed) seedDevelopmentProfile(seed.profile, seed.env);
+  // After the ports are known, and before any service reads the Signal address. The tunnels close
+  // when this process exits, which is when the stack stops: `runDevelopmentServices` returns as soon
+  // as the services have started.
+  const closeSlackTunnels = slack ? await attachSlackTunnels(specs, projectRoot) : null;
 
-  await runDevelopmentServices(specs, stack);
+  try {
+    // After the lock, because seeding a profile takes long enough that a sibling
+    // worktree should not wait behind it to choose its own ports.
+    const seed = developmentProfileToSeed(specs);
+    if (seed) seedDevelopmentProfile(seed.profile, seed.env);
+
+    await runDevelopmentServices(specs, stack);
+  } catch (error) {
+    closeSlackTunnels?.();
+    throw error;
+  }
 }
 
 // The ports the stack won, under the label a developer reads in
@@ -510,12 +522,14 @@ async function runDevelopmentServices(specs: DevelopmentServiceSpec[], stack: De
 
   try {
     for (const spec of specs) {
-      const child = spawn(spec.executable, spec.args, {
+      const target = cliSpawnTarget(spec.executable, spec.args);
+      const child = spawn(target.command, target.args, {
         cwd: spec.cwd,
         env: spec.env,
         stdio: "inherit",
         shell: false,
         detached: process.platform !== "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
       });
       processes.set(spec.name, child);
       if (stack && child.pid) {

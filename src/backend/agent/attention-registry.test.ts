@@ -23,6 +23,7 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import type { PasswordVault, VaultLogin } from "../password-vault";
 
 let root: string;
 let service: AgentService | null = null;
@@ -1125,6 +1126,8 @@ it.each(["submitted", "takeover"] as const)(
       ...fakeBrowser(tabs),
       prepareSecret: async () => ({
         request: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+        agentScriptedOrigin: false,
+        vaultFillable: false,
         submit,
         cancel,
       }),
@@ -1242,4 +1245,107 @@ it("returns the secure input refusal so the agent can request takeover", async (
     ],
   });
   expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+});
+
+describe("filling from the shared password vault", () => {
+  const PASSWORD = "vault-only-hunter2";
+  const LOGIN: VaultLogin = { id: "login-1", title: "Example", username: "ada@example.com", hasOneTimePassword: false };
+  const passwordArguments = {
+    tabId: "auth-tab",
+    method: "password",
+    targets: [{ kind: "ref", ref: "e1", revision: 1 }],
+    submission: "enter",
+  };
+
+  async function startSignIn(logins: VaultLogin[], agentScriptedOrigin = false, vaultFillable = true) {
+    const client = new FakeAgentClient("codex");
+    const tabs: BrowserTab[] = [];
+    const submit = vi.fn(async (_secret: string) => "submitted" as const);
+    const browser = {
+      ...fakeBrowser(tabs),
+      prepareSecret: async () => ({
+        request: { method: "password" as const, origin: "https://example.com", digits: 6 },
+        agentScriptedOrigin,
+        vaultFillable,
+        submit,
+        cancel: vi.fn(),
+      }),
+    };
+    const passwordVault: PasswordVault = {
+      connected: () => true,
+      loginsFor: async () => logins,
+      secretFor: async (loginId, origin, kind) =>
+        loginId === LOGIN.id && origin === "https://example.com" && kind === "password" ? PASSWORD : null,
+    };
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      browser,
+      passwordVault,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(structuredClone(event)));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Sign in" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!started || !threadId) throw new Error("Turn did not start.");
+    tabs.push({
+      id: "auth-tab",
+      title: "Sign in",
+      url: "https://example.com/login",
+      ownerThreadId: started.threadId,
+      ownerAgentId: "chief",
+      loading: false,
+    });
+    const call = (id: string, tool: string, args: unknown) =>
+      client.emit("request", {
+        method: "item/tool/call",
+        id,
+        params: { namespace: "openbot_browser", tool, threadId, turnId: started.turnId, callId: id, arguments: args },
+      });
+    return { client, events, submit, call };
+  }
+
+  it("fills the one saved login without a card, and never shows the password to the agent", async () => {
+    const { client, events, submit, call } = await startSignIn([LOGIN]);
+    call("list", "list_logins", { tabId: "auth-tab" });
+    await waitFor(() => client.responses.length === 1);
+    expect(JSON.stringify(client.responses[0]?.result)).toContain(LOGIN.username);
+
+    call("fill", "submit_secret", passwordArguments);
+    await waitFor(() => client.responses.length === 2);
+    expect(submit).toHaveBeenCalledWith(PASSWORD);
+    expect(client.responses[1]?.result).toMatchObject({ success: true });
+    expect(events.some((event) => event.type === "browser-takeover-requested")).toBe(false);
+    expect(JSON.stringify(events)).not.toContain(PASSWORD);
+    expect(JSON.stringify(client.responses)).not.toContain(PASSWORD);
+  });
+
+  it("opens the card when the vault has no login for the site", async () => {
+    const { events, submit, call } = await startSignIn([]);
+    call("fill", "submit_secret", passwordArguments);
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  // A listener that the agent's own script put on the page would read the password as it is filled.
+  it("opens the card instead of filling on a site where the agent ran its own script", async () => {
+    const { events, submit, call } = await startSignIn([LOGIN], true);
+    call("fill", "submit_secret", { ...passwordArguments, loginId: LOGIN.id });
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  // A search box in a GET form would put the password in a URL that the agent can read.
+  it("opens the card instead of filling a field that is not a password field", async () => {
+    const { events, submit, call } = await startSignIn([LOGIN], false, false);
+    call("fill", "submit_secret", { ...passwordArguments, loginId: LOGIN.id });
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
+    expect(submit).not.toHaveBeenCalled();
+  });
 });

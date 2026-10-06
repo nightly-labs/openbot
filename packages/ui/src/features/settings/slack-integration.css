@@ -1,0 +1,122 @@
+/* Server settings > Connectors > Slack. */
+
+.slack-integration {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+.slack-integration-note {
+  margin-top: var(--openbot-space-2);
+}
+
+.slack-integration-stack {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  justify-items: start;
+}
+
+/* ------------------------------------------------ remove dialog */
+
+.slack-effects {
+  display: grid;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.slack-effects li {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-2);
+}
+
+.slack-effects li + li {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.slack-effect-icon {
+  display: inline-grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+}
+
+.slack-effect-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.slack-effects li[data-tone="danger"] .slack-effect-icon {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.slack-effects li[data-tone="success"] .slack-effect-icon {
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success);
+}
+
+/* ------------------------------------------------ connect dialog */
+
+.slack-checklist {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  font-size: var(--openbot-text-sm);
+}
+
+.slack-checklist li {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.slack-checklist li[data-state="done"] {
+  color: var(--openbot-text-secondary);
+}
+
+.slack-checklist li[data-state="done"] svg {
+  color: var(--openbot-success);
+}
+
+.slack-checklist-dot {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.slack-waiting {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.slack-orchestrator-card {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.slack-orchestrator-model {
+  display: grid;
+  gap: var(--openbot-space-1);
+}

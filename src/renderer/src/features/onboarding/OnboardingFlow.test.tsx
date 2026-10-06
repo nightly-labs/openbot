@@ -293,6 +293,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const [agentStatus, setAgentStatus] = createSignal(initialAgentStatus);
@@ -376,6 +377,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const onDownloadProvider = vi.fn();
@@ -462,6 +464,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "ready", progress: 100, message: null, version: "1.18.27" },
     };
     const onConnectProvider = vi.fn();
@@ -523,6 +526,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     });
     const view = render(() => (
@@ -554,11 +558,9 @@ describe("OnboardingFlow", () => {
 
     setRuntimeStatuses((current) => ({
       ...current,
-      codex: { phase: "download-error", progress: null, message: "Network error", version: null },
+      codex: { phase: "download-error", progress: null, message: "The connection was reset.", version: null },
     }));
-    expect(
-      await view.findByText("ChatGPT could not be downloaded. Retry the download to continue."),
-    ).toBeInTheDocument();
+    expect(await view.findByText("ChatGPT could not be set up: The connection was reset.")).toBeInTheDocument();
     expect(view.getByRole("button", { name: "Retry ChatGPT" })).toBeEnabled();
 
     setRuntimeStatuses((current) => ({
@@ -589,6 +591,7 @@ describe("OnboardingFlow", () => {
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
       antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       cursor: { phase: "not-downloaded", progress: null, message: null, version: null },
+      cline: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const view = render(() => (

@@ -11,6 +11,7 @@ import {
   useContext,
 } from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
+import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
 import { conversationRuntime } from "./conversation-runtime";
@@ -310,6 +311,8 @@ export function createConversationViewScope(props: ConversationProps) {
     clearNewMessages,
     messageVirtualizer,
     timelineMessages,
+    timelineIndexById,
+    unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,
     updateUnreadDividerVisibility,
@@ -535,12 +538,14 @@ export function createConversationViewScope(props: ConversationProps) {
   }
 
   onSettled(() => {
+    const importSounds = createAttachmentImportSounds();
     const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
       if (event.type === "started") {
         const target = currentTarget();
         if (target?.serverId === event.serverId) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
+          importSounds.started(event.requestId);
         }
         setAttachmentBusy(true);
         setScopedComposerError(null);
@@ -549,6 +554,7 @@ export function createConversationViewScope(props: ConversationProps) {
         resources.importTargetAgents.delete(event.requestId);
         setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
+          importSounds.finished(event.requestId, "error");
           setConversationErrors((current) => ({
             ...current,
             [composerDraftKey(target)]: event.message,
@@ -557,6 +563,9 @@ export function createConversationViewScope(props: ConversationProps) {
       } else {
         const target = resources.importTargetAgents.get(event.requestId);
         if (target) {
+          // A cancelled import completes with no attachments.
+          if (event.attachments.length > 0) importSounds.finished(event.requestId, "success");
+          else importSounds.cancel(event.requestId);
           void addAttachments(event.attachments, target).finally(() => {
             resources.importTargetAgents.delete(event.requestId);
             setAttachmentBusy(resources.importTargetAgents.size > 0);
@@ -662,6 +671,7 @@ export function createConversationViewScope(props: ConversationProps) {
       scrollResizeObserver?.disconnect();
       scrollResizeObserver = undefined;
       unsubscribeImport();
+      importSounds.dispose();
       keyboardTarget.removeEventListener("keydown", escapeListener);
       keyboardWindow.removeEventListener("keydown", closeActiveRemoteBrowserTab);
       keyboardTarget.removeEventListener("keydown", chatSearchListener);
@@ -679,8 +689,10 @@ export function createConversationViewScope(props: ConversationProps) {
     ({ request, agentId, loaded }) => {
       if (!request || request.agentId !== agentId || !loaded || request.nonce === lastHandledMessageFocusNonce) return;
       requestAnimationFrame(() => {
+        // A message in a group of agent messages has no row of its own, so the group row is the target.
+        const messageId = CSS.escape(request.messageId);
         const target = scrollElement?.querySelector<HTMLElement>(
-          `[data-chat-search-message="${CSS.escape(request.messageId)}"]`,
+          `[data-chat-search-message="${messageId}"], [data-chat-search-group~="${messageId}"]`,
         );
         if (!target) return;
         lastHandledMessageFocusNonce = request.nonce;
@@ -793,35 +805,34 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
+  function resetPanelsForAgent(agentId: string | undefined, panel: string | undefined): void {
+    const previousAgentId = lastPanelAgentId;
+    lastPanelAgentId = agentId;
+    clearRoutineSettingsRequest();
+    resources.filePreviewRequestGeneration += 1;
+    const preview = untrack(sidebarFilePreview);
+    if (preview && preview.ownerAgentId !== agentId) {
+      setSidebarFilePreview(null);
+      setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
+    }
+    if (
+      !previousAgentId ||
+      !agentId ||
+      (panel !== "settings" && panel !== "profile" && panel !== "file-preview" && panel !== "files")
+    )
+      return;
+    setRightPanels((current) => ({ ...current, [agentId]: "none" }));
+  }
+
+  // One effect, so a settings request that selects the agent opens its panel after the agent change
+  // closes the old one. As two effects, either order was possible.
   createEffect(
     () => {
       const agentId = props.agent?.id;
-      return { agentId, panel: agentId ? rightPanels()[agentId] : undefined };
+      return { agentId, panel: agentId ? rightPanels()[agentId] : undefined, request: props.settingsRequest };
     },
-    ({ agentId, panel }) => {
-      if (agentId === lastPanelAgentId) return;
-      const previousAgentId = lastPanelAgentId;
-      lastPanelAgentId = agentId;
-      clearRoutineSettingsRequest();
-      resources.filePreviewRequestGeneration += 1;
-      const preview = untrack(sidebarFilePreview);
-      if (preview && preview.ownerAgentId !== agentId) {
-        setSidebarFilePreview(null);
-        setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
-      }
-      if (
-        !previousAgentId ||
-        !agentId ||
-        (panel !== "settings" && panel !== "profile" && panel !== "file-preview" && panel !== "files")
-      )
-        return;
-      setRightPanels((current) => ({ ...current, [agentId]: "none" }));
-    },
-  );
-
-  createEffect(
-    () => ({ request: props.settingsRequest, agentId: props.agent?.id }),
-    ({ request, agentId }) => {
+    ({ agentId, panel, request }) => {
+      if (agentId !== lastPanelAgentId) resetPanelsForAgent(agentId, panel);
       if (!request || agentId !== request.agentId || request.nonce === lastHandledSettingsRequestNonce) return;
       lastHandledSettingsRequestNonce = request.nonce;
       if (request.routine) openRoutineSettings(request.routine);
@@ -1111,6 +1122,8 @@ export function createConversationViewScope(props: ConversationProps) {
     markingRead,
     messageVirtualizer,
     timelineMessages,
+    timelineIndexById,
+    unreadBoundaryMessageId,
     moveChatSearch,
     newMessageCount,
     openAttachmentPicker,

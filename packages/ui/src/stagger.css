@@ -33,19 +33,6 @@
   transform: translateY(0);
   filter: blur(0);
 }
-/* Exit decouples from the stagger: same fade for every line,
-   no Y return, no blur — so the disappearance reads as a
-   single quiet fade instead of a reverse reveal. */
-.t-stagger.is-hiding .t-stagger-line {
-  opacity: 0;
-  transform: translateY(0);
-  filter: blur(0);
-  transition:
-    opacity var(--openbot-duration-slow) ease,
-    transform 0s linear,
-    filter 0s linear;
-  transition-delay: 0s;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .t-stagger-line {

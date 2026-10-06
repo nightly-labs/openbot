@@ -14,7 +14,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want your agents on your own computer, with Claude and the other AI plans you already pay for, such as ChatGPT, Gemini or Grok: the app is free and needs no account. Choose Claude Cowork if you use only Claude, and you want an agent in Anthropic's cloud that keeps working with no computer of yours on.",
   chooseOpenBot: [
-    "You want Claude, ChatGPT, Gemini and Grok agents in one team, or your own model.",
+    "You want Claude, ChatGPT, Gemini, Grok and Cursor agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in Anthropic's cloud.",
     "You want a team of agents that give work to each other, each with its own job.",
     "You want a free app that works without an account, and source code that you can read.",
@@ -31,7 +31,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       icon: "cpu",
       topic: "Models and plans",
       openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival:
         "Claude models only, with your paid Claude plan. Companies can also use Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry.",
       better: "openbot",
@@ -41,16 +41,15 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       topic: "Where agents work",
       openbot: "On the computer that runs OpenBot.",
       rival:
-        "In Anthropic's cloud, by default. Earlier desktop setups can still run sessions in a virtual machine on your computer.",
+        "In Anthropic's cloud. From 6 October 2026, new tasks on Pro and Max run only in the cloud; tasks already started on your computer stay there.",
       better: "openbot",
     },
     {
       icon: "cloud",
       topic: "When your computer is off",
       openbot:
-        "Agents keep working on the computer or server that runs OpenBot. Only that computer must stay on, not your laptop.",
+        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
       rival: "Cloud sessions keep working when you close your laptop, and scheduled tasks run with no device online.",
-      better: "rival",
     },
     {
       icon: "phone",
@@ -87,6 +86,14 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
       better: "openbot",
     },
     {
+      icon: "globe",
+      topic: "Where you can use it",
+      openbot:
+        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      rival:
+        "In the countries where Anthropic offers Claude, which include the US, the EU, the UK and Switzerland, but not China or Russia. The app is in 11 languages.",
+    },
+    {
       icon: "devices",
       topic: "Apps",
       openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
@@ -108,7 +115,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       title: "Models and the plans you pay for",
       openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
         "Claude Cowork runs on Claude models, and it is available on the paid Claude plans: Pro, Max, Team and Enterprise. Companies can also use it through Amazon Bedrock, Google Cloud or Microsoft Foundry. Anthropic describes no way to use models from other companies. Cowork uses your plan's limits faster than chat.",
       better: "openbot",
@@ -116,9 +123,9 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       title: "Where the work happens",
       openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
       rival:
-        "Claude Cowork sessions run in the cloud by default: the agent loop and the code run on Anthropic's servers, and sessions and files are saved to your Claude account. They keep working when you close your laptop, and scheduled tasks run with no device online. Existing desktop setups can still run sessions locally, in a Linux virtual machine on your computer. On Team plans, cloud sessions are on by default; on Enterprise, an owner turns them on.",
+        "Claude Cowork sessions run in the cloud by default: the agent loop and the code run on Anthropic's servers, and sessions and files are saved to your Claude account. They keep working when you close your laptop, and scheduled tasks run with no device online. Existing desktop setups can still run sessions locally, in a Linux virtual machine on your computer, but from 6 October 2026, new tasks on Pro and Max run only in the cloud. On Team plans, cloud sessions are on by default; on Enterprise, an owner turns them on.",
       better: "openbot",
     },
     {
@@ -131,14 +138,14 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       title: "How agents work as a team",
       openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
       rival:
         "Claude Cowork is one agent that can break a complex task into smaller parts and give them to sub-agents that work at the same time. You cannot share a session with other people, but you can share the artifacts it makes. On Team and Enterprise plans, members can share projects, and owners can turn Cowork off for the organisation.",
     },
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. OpenBot keeps no other copy. On a hosted OpenBot server, the database is on that server in the EU. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
         "Cloud sessions and their files are saved to your Claude account. Local files that a cloud session opens through the desktop app are processed on Anthropic's servers, not only on your computer. On Pro and Max, you can opt out of model training; if you allow it, Anthropic can keep your data for up to 5 years. A deleted conversation leaves Anthropic's storage within 30 days.",
       better: "openbot",
@@ -158,7 +165,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       question: "Can I use my Claude plan with OpenBot?",
       answer:
-        "Yes. OpenBot runs Claude Code with your own Claude plan, so the Claude plan that you pay for works in OpenBot too. Next to it, Codex uses your ChatGPT plan, Gemini a Google AI Pro or Ultra plan, and Grok CLI your Grok account or an xAI API key. OpenBot adds no charge of its own.",
+        "Yes. OpenBot runs Claude Code with your own Claude plan, so the Claude plan that you pay for works in OpenBot too. Next to it, Codex uses your ChatGPT plan, Gemini a Google AI Pro or Ultra plan, Grok CLI your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
     },
     {
       question: "Is Claude Cowork still a separate product?",
@@ -168,7 +175,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       question: "Does Claude Cowork run on my computer?",
       answer:
-        "By default, no: sessions run in Anthropic's cloud, and local files that a session opens are processed on Anthropic's servers. Existing desktop setups can still run sessions in a virtual machine on your computer.",
+        "By default, no: sessions run in Anthropic's cloud, and local files that a session opens are processed on Anthropic's servers. From 6 October 2026, new tasks on Pro and Max run only in the cloud; tasks already started in a virtual machine on your computer stay there.",
     },
     {
       question: "Is Claude Cowork free?",
@@ -178,7 +185,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       question: "Do agents keep working when my laptop is closed?",
       answer:
-        "Yes, with both. Claude Cowork works in Anthropic's cloud, so no computer of yours must stay on. OpenBot agents work on the computer or server that runs OpenBot: keep that computer on, and connect from your laptop or phone.",
+        "Yes, with both. Claude Cowork works in Anthropic's cloud, so no computer of yours must stay on. OpenBot agents work on the computer or server that runs OpenBot: keep that computer on, or use a hosted OpenBot server, and connect from your laptop or phone.",
     },
     {
       question: "Is Claude Cowork open source?",
@@ -215,6 +222,8 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     },
     { label: "Install Claude Desktop", url: `${CLAUDE_HELP}/10065433-install-claude-desktop` },
     { label: "Claude release notes", url: `${CLAUDE_HELP}/12138966-release-notes` },
+    { label: "Countries where Claude is offered", url: "https://www.anthropic.com/supported-countries" },
+    { label: "Claude in your language", url: `${CLAUDE_HELP}/10769299-using-claude-in-your-preferred-language` },
     { label: "Claude pricing", url: "https://claude.com/pricing" },
     { label: "Claude download", url: "https://claude.com/download" },
     {
@@ -230,5 +239,5 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
-  checkedAt: "2026-09-27",
+  checkedAt: "2026-10-02",
 };

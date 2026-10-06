@@ -1,0 +1,130 @@
+/* Marketplace suggestion: an app or skill an agent suggests in the chat, with its connect action. */
+
+.marketplace-suggestion.conversation-interaction-card {
+  display: grid;
+  container-type: inline-size;
+  width: 100%;
+  max-width: 520px;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3);
+}
+
+.marketplace-suggestion-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* The listing icon keeps its tile border here, as on a dark chat its own fill meets the card. */
+.marketplace-suggestion .marketplace-suggestion-icon {
+  width: var(--openbot-control-lg);
+  height: var(--openbot-control-lg);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+}
+
+.marketplace-suggestion .marketplace-suggestion-icon img {
+  border-radius: inherit;
+}
+
+.marketplace-suggestion-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+/* In a narrow chat the action takes its own row, so the name keeps the width. */
+@container (max-width: 360px) {
+  .marketplace-suggestion-header {
+    flex-wrap: wrap;
+  }
+
+  .marketplace-suggestion-heading {
+    flex-basis: calc(100% - var(--openbot-control-lg) - var(--openbot-control-md) - 2 * var(--openbot-space-3));
+  }
+
+  .marketplace-suggestion-action {
+    order: 1;
+    width: 100%;
+  }
+
+  .marketplace-suggestion-action > .ui-button {
+    width: 100%;
+  }
+}
+
+.marketplace-suggestion-title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-suggestion .marketplace-suggestion-name {
+  height: auto;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.marketplace-suggestion-description {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-suggestion-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.marketplace-suggestion-done[data-slot="badge"] {
+  gap: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-pill);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.marketplace-suggestion-done svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.marketplace-suggestion-unavailable {
+  display: flex;
+  margin: 0;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.marketplace-suggestion-unavailable svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  margin-top: var(--openbot-space-0-5);
+  color: var(--openbot-text-muted);
+}
+
+.marketplace-suggestion-dismissed {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}

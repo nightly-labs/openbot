@@ -43,6 +43,12 @@ export function createSidebarPreferences(options: { scope: () => string }) {
     });
   }
 
+  /** Collapses one section of the active scope, such as the Integrations section OpenBot just made. */
+  function collapseSidebarSection(sectionId: string): void {
+    if (collapsedSidebarSectionIds().includes(sectionId)) return;
+    toggleSidebarSection(sectionId);
+  }
+
   function updateActiveServerPins(update: (items: SidebarPinnedItem[]) => SidebarPinnedItem[]): void {
     const serverId = options.scope();
     setSidebarPinsByServer((current) => {
@@ -110,6 +116,7 @@ export function createSidebarPreferences(options: { scope: () => string }) {
   return {
     collapsedSidebarSectionIds,
     toggleSidebarSection,
+    collapseSidebarSection,
     pinnedSidebarItems,
     reconcileActiveServerPins,
     pinSidebarItem,

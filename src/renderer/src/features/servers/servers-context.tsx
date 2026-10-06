@@ -1,14 +1,16 @@
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, flush, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
 import { watchHostUpdate } from "./host-update-toast";
-import { remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
+import { olderAppSide, remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
 
 /**
@@ -88,6 +90,45 @@ const Servers = createSimpleContext({
       return serverSupportsCapability(activeServer(), capability);
     }
 
+    // The account service stops a hosted server that nobody uses. The selected server starts again on the
+    // user's next key or pointer press, not when the app only shows it.
+    createEffect(
+      () => {
+        const server = activeServer();
+        return server?.hostedSleep === "sleeping" ? server.id : null;
+      },
+      (serverId) => {
+        if (!serverId) return;
+        let active = true;
+        const addListeners = () => {
+          window.addEventListener("pointerdown", wake, true);
+          window.addEventListener("keydown", wake, true);
+        };
+        const removeListeners = () => {
+          window.removeEventListener("pointerdown", wake, true);
+          window.removeEventListener("keydown", wake, true);
+        };
+        const wake = () => {
+          removeListeners();
+          // A wake that does not start the server leaves it asleep, so the next input asks again.
+          void serversPort()
+            .hostedServers.wake(serverId)
+            .then(
+              (server) => WAKE_RECONNECT_STATES.has(server.state),
+              () => false,
+            )
+            .then((started) => {
+              if (!started && active) addListeners();
+            });
+        };
+        addListeners();
+        return () => {
+          active = false;
+          removeListeners();
+        };
+      },
+    );
+
     /** Opens Server Settings > Updates. The settings context below this one sets it. */
     let openHostUpdate: ((serverId: string) => void) | undefined;
     function setHostUpdateOpener(opener: ((serverId: string) => void) | undefined): void {
@@ -115,18 +156,28 @@ const Servers = createSimpleContext({
           const { t } = currentText();
           const opener = openHostUpdate;
           const serverId = server.id;
+          const older = olderAppSide(compatibility.localAppVersion, compatibility.hostAppVersion);
+          const descriptionParams = {
+            name: server.name,
+            protocol: String(compatibility.negotiatedProtocol),
+            clientVersion: compatibility.localAppVersion,
+            hostVersion: compatibility.hostAppVersion,
+          };
+          // The host action does not help when this app is the older side.
+          const offerUpdate = opener && administersUpdate && older !== "client";
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
-            description: t("server.compatibility.versionMismatchDescription", {
-              protocol: String(compatibility.negotiatedProtocol),
-              clientVersion: compatibility.localAppVersion,
-              hostVersion: compatibility.hostAppVersion,
-            }),
+            description:
+              older === "host"
+                ? t("server.compatibility.versionMismatchUpdateHostDescription", descriptionParams)
+                : older === "client"
+                  ? t("server.compatibility.versionMismatchUpdateClientDescription", descriptionParams)
+                  : t("server.compatibility.versionMismatchDescription", descriptionParams),
             action:
-              opener && administersUpdate
+              opener && offerUpdate
                 ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }
                 : undefined,
           });
-          if (opener && administersUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
+          if (offerUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
         }
         // An admin learns about a new version, or sees the download that runs, when the host connects.
         if (administersUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
@@ -237,7 +288,7 @@ const Servers = createSimpleContext({
       } catch (error) {
         pendingCompatibilityRetryServerId = null;
         const text = currentText();
-        toast.error(text.t("server.connection.failedTitle"), {
+        actionToast.error(text.t("server.connection.failedTitle"), {
           description: text.errorMessage(error, text.t("server.connection.failedDescription")),
         });
       }
@@ -253,7 +304,7 @@ const Servers = createSimpleContext({
         );
       } catch (error) {
         const text = currentText();
-        toast.error(text.t("server.notifications.changeFailedTitle"), {
+        actionToast.error(text.t("server.notifications.changeFailedTitle"), {
           description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
         });
       }
@@ -264,7 +315,7 @@ const Servers = createSimpleContext({
         applyServerSummaries(await serversPort().servers.setNotificationLevel({ serverId, level }));
       } catch (error) {
         const text = currentText();
-        toast.error(text.t("server.notifications.changeFailedTitle"), {
+        actionToast.error(text.t("server.notifications.changeFailedTitle"), {
           description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
         });
       }

@@ -21,6 +21,7 @@ import { latestIncomingConversationMessage } from "../conversation/conversation-
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { claimErrorToast, readableAgentError } from "./agent-error-text";
+import { createAgentEventSounds } from "./agent-event-sounds";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
@@ -67,6 +68,7 @@ export function AgentEventBridge() {
     setActiveTurns,
     setTurnProgress,
     setFailedTurns,
+    setUsageLimits,
     setQueues,
     setPendingPrompts,
     setPresentedPromptResolutions,
@@ -79,6 +81,9 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout } = useSidebar();
+  const playAgentEventSound = createAgentEventSounds((agentId) =>
+    agentList().some((agent) => agent.id === agentId && agent.notifications),
+  );
   let readRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
@@ -306,6 +311,7 @@ export function AgentEventBridge() {
       ),
     );
     setFailedTurns(Object.fromEntries(snapshot.failedTurns.map((turn) => [turn.agentId, turn.turnId])));
+    setUsageLimits(Object.fromEntries((snapshot.usageLimits ?? []).map((limit) => [limit.agentId, limit.resetsAt])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
     setPendingApprovals((current) => reconcileAttentionApprovals(current, snapshot));
@@ -319,6 +325,7 @@ export function AgentEventBridge() {
         return;
       }
       flush(() => handleAgentEvent(event));
+      playAgentEventSound(event);
     });
     return () => {
       readRefresh += 1;

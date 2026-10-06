@@ -83,3 +83,18 @@ export function remoteAdminServer(
 ): ServerSummary | undefined {
   return server?.kind === "remote" && serverCanAdminister(server, capability) ? server : undefined;
 }
+
+/**
+ * Which side of a connection runs the older OpenBot release, so a version notice can say what to
+ * update. Only the release numbers count. `null` when they are equal or one does not parse.
+ */
+export function olderAppSide(clientVersion: string, hostVersion: string): "client" | "host" | null {
+  const parse = (version: string) => /^v?(\d+)\.(\d+)\.(\d+)/u.exec(version)?.slice(1).map(Number) ?? null;
+  const [client, host] = [parse(clientVersion), parse(hostVersion)];
+  if (!client || !host) return null;
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (client[index] ?? 0) - (host[index] ?? 0);
+    if (difference !== 0) return difference > 0 ? "host" : "client";
+  }
+  return null;
+}

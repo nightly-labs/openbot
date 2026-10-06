@@ -44,10 +44,7 @@ export function SiteNavigationPanel(props: SiteNavigationPanelProps) {
       </Switch>
       <div class="site-panel-footer">
         <span class="site-panel-summary">{props.section.summary}</span>
-        <Link
-          class="site-panel-index"
-          to={props.section.kind === "articles" ? props.section.collection.indexRoute : props.section.indexRoute}
-        >
+        <Link class="site-panel-index" to={props.section.indexRoute}>
           {props.section.indexLabel}
           <LandingIcon name="arrow-right" />
         </Link>

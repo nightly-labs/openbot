@@ -26,7 +26,7 @@ describe("landing analytics", () => {
   it("tracks only allowlisted links and download metadata", () => {
     document.body.innerHTML = `
       <header class="landing-header"><a id="contact" href="${OPENBOT_LINKS.contact}">Contact</a></header>
-      <section class="landing-download"><a id="mac" href="/download/macos">Download</a></section>
+      <section class="landing-download"><a id="mac" href="/download/macos/latest">Download</a></section>
       <a id="private" href="https://private.example/secret">Private</a>
     `;
     const client = {
@@ -109,7 +109,7 @@ describe("landing analytics", () => {
   it("tracks the invitation page anonymously and removes its click listener", () => {
     document.body.innerHTML = `
       <a id="open" href="openbot://join?invite=private">Open app</a>
-      <a id="download" href="/download/macos">Download</a>
+      <a id="download" href="/download/macos/latest">Download</a>
     `;
     window.history.replaceState({}, "", "/join");
     const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
@@ -288,7 +288,7 @@ describe("landing analytics", () => {
           : analytics.start(document, "openbot.run");
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
       document.body.innerHTML =
-        '<section class="landing-download"><a href="/download/macos">Download macOS</a></section>';
+        '<section class="landing-download"><a href="/download/macos/latest">Download macOS</a></section>';
       const download = getByRole(document.body, "link", { name: "Download macOS" });
       download.addEventListener("click", (event) => event.preventDefault(), { once: true });
       download.click();
@@ -398,7 +398,7 @@ describe("landing analytics", () => {
   });
 
   it("keeps the platform on a Linux download click", () => {
-    document.body.innerHTML = `<section class="landing-download"><a id="linux" href="/download/linux">Linux</a></section>`;
+    document.body.innerHTML = `<section class="landing-download"><a id="linux" href="/download/linux/latest">Linux</a></section>`;
     window.history.replaceState({}, "", "/");
     const client = { setGlobalProperties: vi.fn(), track: vi.fn(), trackScreenView: vi.fn() };
     const analytics = new LandingAnalytics(() => client, true);

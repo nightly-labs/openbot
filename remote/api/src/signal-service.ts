@@ -1,3 +1,4 @@
+import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   decodeSignalClientMessage,
   encodeSignalServerMessage,
@@ -7,7 +8,14 @@ import {
   type SignalClientMessage,
   type SignalErrorCode,
   type SignalServerMessage,
+  type SlackDeliveryKind,
+  type SlackDeliveryStatus,
 } from "./protocol";
+
+/** The workspaces a verified route ticket names, each with the time it was linked to the host. */
+export interface SlackRoute {
+  teams: SlackRouteTeam[];
+}
 
 export interface RemoteTokenProvider {
   verifyTicket(token: string): Promise<RemoteTicketClaims>;
@@ -15,6 +23,10 @@ export interface RemoteTokenProvider {
   validateClaims(claims: RemoteTicketClaims): Promise<boolean>;
   issueResumeToken(claims: RemoteTicketClaims): Promise<string>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
+  /** The Slack workspaces a route ticket links to the host. Without it, no `ingress` socket connects. */
+  verifySlackRoute?(token: string, hostId: string): Promise<SlackRoute>;
+  /** The workspaces of a route that the account service still links to the host, with the same link. */
+  validateSlackRoute?(hostId: string, teams: SlackRouteTeam[]): Promise<string[]>;
   revokeHost?(hostId: string, authEpoch: number): void;
   revokeSession?(sessionId: string): void;
 }
@@ -29,10 +41,13 @@ export interface SignalSocket {
 interface AuthenticatedPeer {
   socket: SignalSocket;
   claims: RemoteTicketClaims;
-  peer: "host" | "client";
+  peer: "host" | "client" | "ingress";
   connectionId: string | null;
   resumed: boolean;
   multiplex: boolean;
+  // `ingress` only: the Slack workspaces whose requests this socket receives.
+  // The routes this socket holds: `<app ID>:<workspace ID>`.
+  slackTeams: string[];
 }
 
 interface ActiveConnection {
@@ -50,13 +65,61 @@ export interface SignalMetrics {
   relayedMessages: number;
   activeSockets: number;
   activePeerConnections: number;
+  slackDeliveries: number;
+  slackDeliveriesUnavailable: number;
 }
+
+/** One signed Slack request for a workspace. Signal passes it on and keeps nothing of it. */
+export interface SlackDelivery {
+  kind: SlackDeliveryKind;
+  retryNum: number | null;
+  retryReason: string | null;
+  body: Uint8Array;
+}
+
+export interface SlackDeliveryResponse {
+  status: SlackDeliveryStatus;
+  contentType?: "application/json" | "text/plain";
+  body?: string;
+}
+
+interface PendingDelivery {
+  socketId: string;
+  hostId: string;
+  bytes: number;
+  timer: ReturnType<typeof setTimeout>;
+  resolve(response: SlackDeliveryResponse): void;
+}
+
+export interface SlackDeliveryLimits {
+  /** How long Signal waits for the host. Slack gives up after 3 seconds. */
+  timeoutMilliseconds: number;
+  maximumPendingPerHost: number;
+  maximumPendingBytesPerHost: number;
+  maximumPending: number;
+}
+
+/**
+ * The bytes in flight to one host stay under the socket's 256 KB backpressure limit, which closes
+ * the socket when it is reached. A body travels as base64, a third larger than the body.
+ */
+const DEFAULT_SLACK_DELIVERY_LIMITS: SlackDeliveryLimits = {
+  timeoutMilliseconds: 2_500,
+  maximumPendingPerHost: 16,
+  maximumPendingBytesPerHost: 128 * 1024,
+  maximumPending: 1_000,
+};
+
+const UNAVAILABLE: SlackDeliveryResponse = { status: 503 };
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
 const SIGNAL_RECONNECT_GRACE_MILLISECONDS = 30_000;
 const INITIAL_TICKET_TTL_MILLISECONDS = 3 * 60_000;
 const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
+const INGRESS_RATE_FACTOR = 10;
+// Slack sends at most 30,000 events an hour for one app in one workspace.
+const SLACK_TEAM_RATE_FACTOR = 2;
 
 export class SignalService {
   readonly #tokens: RemoteTokenProvider;
@@ -66,6 +129,14 @@ export class SignalService {
   readonly #sockets = new Map<string, SignalSocket>();
   readonly #peers = new Map<string, AuthenticatedPeer>();
   readonly #hosts = new Map<string, Set<string>>();
+  // Slack workspace ID to the `ingress` socket that said hello last with a route ticket for it.
+  readonly #slackTeams = new Map<string, string>();
+  // The oldest link that each workspace still accepts: the link of its current route, or the moment
+  // after the account service revoked it. A host that lost a workspace keeps its last ticket until it
+  // expires; this keeps that ticket from taking the route back.
+  readonly #slackRouteFloor = new Map<string, number>();
+  readonly #pendingDeliveries = new Map<string, PendingDelivery>();
+  readonly #slackLimits: SlackDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #peerExpirationTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -74,6 +145,9 @@ export class SignalService {
   readonly #revokedSessions = new Map<string, number>();
   readonly #rateWindows = new Map<string, { startedAt: number; count: number }>();
   readonly #validateInitialTicketsUntil = Date.now() + INITIAL_TICKET_TTL_MILLISECONDS;
+  // The revocations below are in memory. Until every route ticket issued before this start has
+  // expired, the account service confirms each link.
+  readonly #validateSlackRoutesUntil = Date.now() + SLACK_ROUTE_TTL_SECONDS * 1_000;
   #lastRatePruneAt = 0;
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
@@ -82,6 +156,8 @@ export class SignalService {
     relayedMessages: 0,
     activeSockets: 0,
     activePeerConnections: 0,
+    slackDeliveries: 0,
+    slackDeliveriesUnavailable: 0,
   };
 
   constructor(
@@ -89,11 +165,13 @@ export class SignalService {
     maximumConnectionsPerUser: number,
     maximumConnectionsPerIp = 32,
     maximumMessagesPerMinute = 600,
+    slackLimits: SlackDeliveryLimits = DEFAULT_SLACK_DELIVERY_LIMITS,
   ) {
     this.#tokens = tokens;
     this.#maximumConnectionsPerUser = maximumConnectionsPerUser;
     this.#maximumConnectionsPerIp = maximumConnectionsPerIp;
     this.#maximumMessagesPerMinute = maximumMessagesPerMinute;
+    this.#slackLimits = slackLimits;
   }
 
   connect(socket: SignalSocket): boolean {
@@ -156,6 +234,20 @@ export class SignalService {
       if (this.#ownsConnection(peer, message.connectionId)) this.#dropConnection(message.connectionId, socket.id);
       return;
     }
+    if (message.type === "slack-delivery-result") {
+      const pending = this.#pendingDeliveries.get(message.requestId);
+      if (!pending || pending.socketId !== socket.id) {
+        this.#fail(socket, "permission_denied", "The delivery does not belong to this peer.");
+        return;
+      }
+      this.#settleDelivery(message.requestId, {
+        status: message.status,
+        ...(message.contentType && message.body !== undefined
+          ? { contentType: message.contentType, body: message.body }
+          : {}),
+      });
+      return;
+    }
     const connection = this.#connections.get(message.connectionId);
     if (!connection || (connection.client.id !== socket.id && connection.host.id !== socket.id)) {
       this.#fail(socket, "permission_denied", "The connection does not belong to this peer.");
@@ -179,6 +271,14 @@ export class SignalService {
       const hostSockets = this.#hosts.get(peer.claims.hostId);
       hostSockets?.delete(socket.id);
       if (hostSockets?.size === 0) this.#hosts.delete(peer.claims.hostId);
+    }
+    if (peer.peer === "ingress") {
+      for (const route of peer.slackTeams) {
+        if (this.#slackTeams.get(route) === socket.id) this.#slackTeams.delete(route);
+      }
+      for (const [requestId, pending] of [...this.#pendingDeliveries]) {
+        if (pending.socketId === socket.id) this.#settleDelivery(requestId, this.#unavailable());
+      }
     }
     for (const connection of [...this.#connections.values()]) {
       if (connection.client.id !== socket.id && connection.host.id !== socket.id) continue;
@@ -236,6 +336,16 @@ export class SignalService {
     }
   }
 
+  /** The account service unlinked a Slack workspace, or moved it, after `through`'s link. */
+  revokeSlackRoute(appId: string, teamId: string, through: number): void {
+    const route = slackRouteKey(appId, teamId);
+    const floor = this.#slackRouteFloor.get(route) ?? 0;
+    // A newer link already holds the route.
+    if (floor > through) return;
+    this.#slackRouteFloor.set(route, through + 1);
+    this.#slackTeams.delete(route);
+  }
+
   revokeSession(sessionId: string): void {
     this.#revokedSessions.set(sessionId, Math.floor(Date.now() / 1_000) + 24 * 60 * 60);
     this.#tokens.revokeSession?.(sessionId);
@@ -250,6 +360,75 @@ export class SignalService {
     }
   }
 
+  /**
+   * Passes one signed Slack request to the `ingress` socket of the workspace's host and waits for
+   * its answer. It resolves 503 when no host holds the workspace, the host is too busy, or it does
+   * not answer in time: Slack then sends the request again, so nothing needs to be kept here.
+   */
+  deliverSlack(appId: string, teamId: string, delivery: SlackDelivery): Promise<SlackDeliveryResponse> {
+    const socketId = this.#slackTeams.get(slackRouteKey(appId, teamId));
+    const ingress = socketId ? this.#peers.get(socketId) : undefined;
+    if (!ingress) return Promise.resolve(this.#unavailable());
+    const hostId = ingress.claims.hostId;
+    let hostPending = 0;
+    let hostBytes = 0;
+    for (const pending of this.#pendingDeliveries.values()) {
+      if (pending.hostId !== hostId) continue;
+      hostPending += 1;
+      hostBytes += pending.bytes;
+    }
+    const bytes = Math.ceil(delivery.body.byteLength / 3) * 4;
+    if (
+      this.#pendingDeliveries.size >= this.#slackLimits.maximumPending ||
+      hostPending >= this.#slackLimits.maximumPendingPerHost ||
+      hostBytes + bytes > this.#slackLimits.maximumPendingBytesPerHost
+    ) {
+      return Promise.resolve(this.#unavailable());
+    }
+    const requestId = randomIdentifier();
+    return new Promise((resolve) => {
+      const timer = setTimeout(
+        () => this.#settleDelivery(requestId, this.#unavailable()),
+        this.#slackLimits.timeoutMilliseconds,
+      );
+      timer.unref?.();
+      this.#pendingDeliveries.set(requestId, { socketId: ingress.socket.id, hostId, bytes, timer, resolve });
+      this.#metrics.slackDeliveries += 1;
+      this.#send(ingress.socket, {
+        type: "slack-delivery",
+        version: 1,
+        requestId,
+        teamId,
+        kind: delivery.kind,
+        retryNum: delivery.retryNum,
+        retryReason: delivery.retryReason,
+        bodyBase64: Buffer.from(delivery.body).toString("base64"),
+      });
+    });
+  }
+
+  /**
+   * The rate limit for the Slack route: by workspace for a signed request, by address for a refused
+   * one. A signed request is never limited by address, because Slack sends every app's events from
+   * shared addresses.
+   */
+  acceptSlackRequest(key: `team:${string}` | `address:${string}`): boolean {
+    return this.#acceptRateKey(`slack-${key}`, Date.now(), key.startsWith("team:") ? SLACK_TEAM_RATE_FACTOR : 1);
+  }
+
+  #settleDelivery(requestId: string, response: SlackDeliveryResponse): void {
+    const pending = this.#pendingDeliveries.get(requestId);
+    if (!pending) return;
+    this.#pendingDeliveries.delete(requestId);
+    clearTimeout(pending.timer);
+    pending.resolve(response);
+  }
+
+  #unavailable(): SlackDeliveryResponse {
+    this.#metrics.slackDeliveriesUnavailable += 1;
+    return UNAVAILABLE;
+  }
+
   metrics(): SignalMetrics {
     this.#pruneReplayCache();
     return { ...this.#metrics, activeSockets: this.#sockets.size, activePeerConnections: this.#connections.size };
@@ -262,6 +441,7 @@ export class SignalService {
     }
     let claims: RemoteTicketClaims;
     let usedInitialTicket = true;
+    let slackRoute: SlackRoute = { teams: [] };
     try {
       try {
         claims = await this.#tokens.verifyTicket(message.token);
@@ -276,11 +456,27 @@ export class SignalService {
         throw new Error("Revoked ticket.");
       }
       if (claims.role !== "host" && this.#revokedSessions.has(claims.sessionId)) throw new Error("Ended session.");
-      if (message.peer === "host" && claims.role !== "host") throw new Error("Host role required.");
+      if (message.peer !== "client" && claims.role !== "host") throw new Error("Host role required.");
       if (message.peer === "client" && claims.role === "host") throw new Error("Member role required.");
+      if (message.peer === "ingress") {
+        if (!message.slackRoute || !this.#tokens.verifySlackRoute) throw new Error("Slack route required.");
+        slackRoute = await this.#tokens.verifySlackRoute(message.slackRoute, claims.hostId);
+        if (Date.now() < this.#validateSlackRoutesUntil) {
+          if (!this.#tokens.validateSlackRoute) throw new Error("Slack route validation required.");
+          const linked = new Set(await this.#tokens.validateSlackRoute(claims.hostId, slackRoute.teams));
+          slackRoute = { teams: slackRoute.teams.filter((team) => linked.has(team.id)) };
+        }
+      }
       this.#pruneReplayCache();
       if (usedInitialTicket && this.#usedTicketIds.has(claims.jti)) throw new Error("Ticket was already used.");
-      if (this.#userConnectionCount(claims.userId) >= this.#maximumConnectionsPerUser) {
+      // A reconnect of the same logical session replaces its old socket below, so that socket does not
+      // count. A phone that changes network keeps a half-open socket until the idle timeout.
+      const replaced =
+        message.peer === "client" ? this.#connectionForSession(claims.hostId, claims.sessionId)?.client.id : undefined;
+      if (
+        message.peer !== "ingress" &&
+        this.#userConnectionCount(claims.userId, replaced) >= this.#maximumConnectionsPerUser
+      ) {
         this.#fail(socket, "rate_limited", "Too many active remote connections.", 1008);
         return;
       }
@@ -289,6 +485,11 @@ export class SignalService {
       this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
       return;
     }
+    // The socket can close while the ticket is verified. `disconnect` then finds no peer, so it
+    // cannot clear the peer, its timer and the host event this method creates. Return before it
+    // creates them. Nothing awaits between here and the registrations below, so the socket cannot
+    // close again first.
+    if (!this.#sockets.has(socket.id)) return;
     if (usedInitialTicket) this.#usedTicketIds.set(claims.jti, claims.exp);
     const peer: AuthenticatedPeer = {
       socket,
@@ -297,12 +498,29 @@ export class SignalService {
       connectionId: null,
       resumed: !usedInitialTicket,
       multiplex: message.peer === "host" && message.multiplex === true,
+      slackTeams: slackRoute.teams.map((team) => slackRouteKey(team.appId, team.id)),
     };
     this.#peers.set(socket.id, peer);
     this.#schedulePeerExpiration(peer);
     this.#metrics.acceptedConnections += 1;
     this.#metrics.activeSockets = this.#sockets.size;
     const resumeToken = await this.#tokens.issueResumeToken(claims);
+    if (message.peer === "ingress") {
+      for (const team of slackRoute.teams) {
+        const route = slackRouteKey(team.appId, team.id);
+        if (team.linkedAt < (this.#slackRouteFloor.get(route) ?? 0)) continue;
+        this.#slackRouteFloor.set(route, team.linkedAt);
+        this.#slackTeams.set(route, socket.id);
+      }
+      this.#send(socket, {
+        type: "ready",
+        version: 1,
+        connectionId: null,
+        resumeToken,
+        iceServers: this.#tokens.iceServers(claims),
+      });
+      return;
+    }
     if (message.peer === "host") {
       const hostSockets = this.#hosts.get(claims.hostId) ?? new Set<string>();
       hostSockets.add(socket.id);
@@ -504,9 +722,11 @@ export class SignalService {
     return Boolean(connection && (connection.client.id === peer.socket.id || connection.host.id === peer.socket.id));
   }
 
-  #userConnectionCount(userId: string): number {
+  #userConnectionCount(userId: string, exceptSocketId?: string): number {
     let total = 0;
-    for (const peer of this.#peers.values()) if (peer.claims.userId === userId) total += 1;
+    for (const peer of this.#peers.values()) {
+      if (peer.peer !== "ingress" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
+    }
     return total;
   }
 
@@ -517,12 +737,16 @@ export class SignalService {
   }
 
   #acceptMessage(socket: SignalSocket, now = Date.now()): boolean {
-    if (!this.#acceptRateKey(`ip:${socket.ip || socket.id}`, now)) return false;
     const peer = this.#peers.get(socket.id);
+    // An ingress socket answers the Slack requests of every workspace linked to its host, so it has a bucket of
+    // its own rather than a share of the account's and the address's. It can only answer requests
+    // Signal sent it, and the delivery limits bound those.
+    if (peer?.peer === "ingress") return this.#acceptRateKey(`ingress:${socket.id}`, now, INGRESS_RATE_FACTOR);
+    if (!this.#acceptRateKey(`ip:${socket.ip || socket.id}`, now)) return false;
     return peer ? this.#acceptRateKey(`user:${peer.claims.userId}`, now) : true;
   }
 
-  #acceptRateKey(key: string, now: number): boolean {
+  #acceptRateKey(key: string, now: number, factor = 1): boolean {
     this.#pruneRateWindows(now);
     const current = this.#rateWindows.get(key);
     if (!current || now - current.startedAt >= RATE_WINDOW_MILLISECONDS) {
@@ -535,7 +759,7 @@ export class SignalService {
       return true;
     }
     current.count += 1;
-    return current.count <= this.#maximumMessagesPerMinute;
+    return current.count <= this.#maximumMessagesPerMinute * factor;
   }
 
   #pruneReplayCache(nowSeconds = Math.floor(Date.now() / 1_000)): void {
@@ -570,4 +794,9 @@ function memberRole(role: RemoteTicketClaims["role"]): "owner" | "admin" | "memb
 
 function randomIdentifier(): string {
   return crypto.randomUUID().replaceAll("-", "");
+}
+
+/** One Slack app in one workspace. The production and development apps can share a workspace. */
+function slackRouteKey(appId: string, teamId: string): string {
+  return `${appId}:${teamId}`;
 }

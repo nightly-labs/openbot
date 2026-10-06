@@ -11,13 +11,25 @@ import {
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
-import { decodeRecordResponse, getRecord, getString } from "../protocol";
+import { decodeRecordResponse, getRecord, getString, isRecord } from "../protocol";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./provider-diagnostics";
+import { USAGE_LIMIT_METHOD } from "./usage-limit-gate";
 
 const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Shown when the endpoints changed under a generation that had not yet spawned its process. */
 const CANCELLED_MESSAGE = sourceText("error.agent.profileEndpointsChanged");
+
+/**
+ * A generation that a spent plan window refused. It reads as any failed generation, and it carries
+ * the reset in epoch seconds when the provider gave one, so a caller can hold the model's work.
+ */
+export class GenerationUsageLimitError extends Error {
+  constructor(readonly resetsAt: number | null) {
+    super(sourceText("error.agent.profileFailed"));
+  }
+}
 
 /** Owns a disposable provider session; no durable agent, tools, workspace or conversation is involved. */
 export async function generateProfile(
@@ -56,6 +68,7 @@ export async function generateTextWithoutTools(
   const cwd = await mkdtemp(join(tmpdir(), "openbot-profile-"));
   let timer: NodeJS.Timeout | undefined;
   let text = "";
+  let limit: { resetsAt: number | null } | null = null;
   const completion = new Promise<string>((resolve, reject) => {
     timer = setTimeout(() => reject(new Error(sourceText("error.agent.profileTimedOut"))), GENERATION_TIMEOUT_MS);
     client.once("exit", () => reject(new Error(sourceText("error.agent.profileDisconnected"))));
@@ -64,6 +77,19 @@ export async function generateTextWithoutTools(
       reject(new Error(sourceText("error.agent.profileToolUse")));
     });
     client.on("notification", (notification) => {
+      const params = notification.params;
+      if (notification.method === USAGE_LIMIT_METHOD) {
+        limit = { resetsAt: isRecord(params) && typeof params.resetsAt === "number" ? params.resetsAt : null };
+      }
+      if (notification.method === "error" && !(isRecord(params) && params.willRetry === true)) {
+        const error = getRecord(params, "error");
+        const message = getString(params, "message") ?? getString(error, "message") ?? "";
+        if (
+          isPlanLimitDiagnostic(message) ||
+          (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message))
+        )
+          limit ??= { resetsAt: null };
+      }
       if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
       if (notification.method === "item/completed") {
         const item = getRecord(notification.params, "item");
@@ -72,7 +98,10 @@ export async function generateTextWithoutTools(
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
         if (getString(turn, "status") === "completed") resolve(text);
-        else reject(new Error(sourceText("error.agent.profileFailed")));
+        else
+          reject(
+            limit ? new GenerationUsageLimitError(limit.resetsAt) : new Error(sourceText("error.agent.profileFailed")),
+          );
       }
       if (text.length > 32_000) reject(new Error(sourceText("error.agent.profileTooLarge")));
     });

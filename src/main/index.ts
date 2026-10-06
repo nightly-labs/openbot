@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
-import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import { parseInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import { type AppLogoColor, type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
-import { resolveLocale, translateFor } from "@openbot/i18n";
+import { createFormat, resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
 import {
@@ -55,7 +55,9 @@ import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
+import { messagingIpcHandlers } from "./ipc/messaging-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
+import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
@@ -80,6 +82,7 @@ import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
+import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
@@ -112,8 +115,10 @@ const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
-const developmentInviteLinkOptions = {
+const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, process.platform);
+const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
+  selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
 };
 const developmentRemoteDebuggingPort = !app.isPackaged
   ? readDevelopmentRemoteDebuggingPort(process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT)
@@ -213,14 +218,12 @@ let relaunchRequested = false;
  * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
  * answered by the sign-in that started it, and there is no such sign-in before the app is running.
  */
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" }>;
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" }>;
 
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
 // tells a link that arrives now to be sent rather than held.
-let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(
-  findDeepLink(process.argv, developmentInviteLinkOptions),
-);
+let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
@@ -253,6 +256,7 @@ const {
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
+  forwardOnePasswordConnectorStatus,
   forwardHostStatus,
   forwardRemoteDesktopSessions,
   forwardServers,
@@ -269,6 +273,7 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
+  getFormat: () => createFormat(services?.language.locale ?? "en"),
   desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
 });
 
@@ -387,6 +392,7 @@ function registerIpcHandlers({
   service,
   providerRuntimes,
   providerCredentials,
+  messaging,
   mailbox,
   browser,
   browserPictureInPicture,
@@ -396,6 +402,7 @@ function registerIpcHandlers({
   analyticsPreferenceFile,
   updatePreferenceFile,
   requestedUpdate,
+  idleRestart,
   approvalAutomation,
   agentAdminSettings,
   language,
@@ -410,6 +417,7 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   githubConnector,
+  onePasswordConnector,
   billing,
   hostedServers,
   customProviderChanges,
@@ -463,6 +471,7 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
     ...hostedSiteIpcHandlers({ hostedSites, remoteServers, getMainWindow, translate: language.translate }),
     ...githubConnectorIpcHandlers({ githubConnector }),
+    ...onePasswordConnectorIpcHandlers({ onePasswordConnector }),
     ...billingIpcHandlers({ billing }),
     ...hostedServerIpcHandlers({ hostedServers }),
     ...customProviderIpcHandlers(customProviderChanges),
@@ -482,7 +491,7 @@ function registerIpcHandlers({
         ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
         : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
     }),
-    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate }),
+    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate, idleRestart }),
     ...notificationIpcHandlers({
       notificationPreference,
       translate: language.translate,
@@ -518,6 +527,7 @@ function registerIpcHandlers({
       customProviders: customProviderChanges,
       remoteServers,
     }),
+    ...messagingIpcHandlers({ messaging }),
     ...mcpServerIpcHandlers({
       service,
       remoteServers,
@@ -624,7 +634,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
       } catch (error) {
         logger.error("Unable to synchronize the joined servers:", toLogValue(error));
       }
-      if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole })) await host.start();
+      // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
+      if (host && services?.serverMode) await services.serverMode.publish();
+      else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
+        await host.start();
     })
     .catch((error) => {
       logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
@@ -643,6 +656,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
 function acceptDeepLink(link: DeepLink): void {
   if (link.kind === "mcp-auth") {
     receiveMcpAuthorizationCode(link.state, link.code);
+    return;
+  }
+  if (link.kind === "slack-workspace") {
+    receiveSlackSignIn(link);
     return;
   }
   pendingDeepLink = link;
@@ -672,7 +689,25 @@ function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" ? link : null;
+  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" ? link : null;
+}
+
+/**
+ * Hands a Slack install the sealed token it is waiting for. As with an MCP grant, a link this run did
+ * not start does nothing and raises no window.
+ */
+function receiveSlackSignIn(link: Extract<DeepLink, { kind: "slack-workspace" }>): void {
+  const messaging = services?.messaging;
+  if (!messaging) return;
+  void messaging
+    .completeSlackWorkspace(link.nonce, link.grant)
+    .then((accepted) => {
+      const window = windowHolder.current;
+      if (accepted && window && !window.isDestroyed()) showMainWindow(window);
+    })
+    .catch(() => {
+      // The Slack settings show the connection's state. The error can quote Slack.
+    });
 }
 
 /**
@@ -688,7 +723,7 @@ function receiveMcpAuthorizationCode(state: string, code: string): void {
 }
 
 app.on("open-url", (event, url) => {
-  const link = parseDeepLink(url, developmentInviteLinkOptions);
+  const link = parseDeepLink(url, inviteLinkOptions);
   if (!link) return;
   event.preventDefault();
   acceptDeepLink(link);
@@ -697,7 +732,7 @@ app.on("open-url", (event, url) => {
 app.on("continue-activity", (event, type, _userInfo, details) => {
   if (type !== "NSUserActivityTypeBrowsingWeb" || !details.webpageURL) return;
   try {
-    parseInviteUrl(details.webpageURL, developmentInviteLinkOptions);
+    parseInviteUrl(details.webpageURL, inviteLinkOptions);
   } catch {
     return;
   }
@@ -710,7 +745,7 @@ if (!hasSingleInstanceLock) {
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
-    const deepLink = findDeepLink(argv, developmentInviteLinkOptions);
+    const deepLink = findDeepLink(argv, inviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
     const window = windowHolder.current;
     const hasMainWindow = Boolean(window && !window.isDestroyed());
@@ -725,7 +760,7 @@ if (!hasSingleInstanceLock) {
     else if (response === "relaunch" && !relaunchRequested) {
       relaunchRequested = true;
       // The new instance takes this launch's link, not the one this process may have started with.
-      const isLink = (value: string) => parseDeepLink(value, developmentInviteLinkOptions) !== null;
+      const isLink = (value: string) => parseDeepLink(value, inviteLinkOptions) !== null;
       const link = argv.find(isLink);
       const args = process.argv.slice(1).filter((value) => !isLink(value));
       app.relaunch({ args: link ? [...args, link] : args });
@@ -767,6 +802,7 @@ if (!hasSingleInstanceLock) {
         developmentRemoteRole,
         developmentTestClientEnabled,
         hostedServer,
+        serverMode,
         hostingDeveloperKey,
         macHapticFeedback,
         teardown,
@@ -827,6 +863,7 @@ if (!hasSingleInstanceLock) {
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
+      built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       remoteServers.on("changed", forwardServers);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
@@ -880,12 +917,19 @@ if (!hasSingleInstanceLock) {
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
       powerMonitor.on("resume", () => remoteServers.wake());
+      // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
+      powerMonitor.on("resume", () => built.messaging.resume());
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
       powerMonitor.on("suspend", () => routineWake.suspend());
       powerMonitor.on("resume", () => routineWake.resume());
       teardown.push(0, "routine wake", () => routineWake.dispose());
       const teamIdentity = teamStore.getIdentity();
-      if (
+      if (built.serverMode) {
+        const serverModeControl = built.serverMode;
+        void built.centralAuthInitialization
+          .then(() => serverModeControl.publish())
+          .catch((error) => logger.error("Unable to publish this server:", toLogValue(error)));
+      } else if (
         shouldAutoStartHost({
           configured: Boolean(teamIdentity),
           enabledOnLaunch: teamIdentity?.enabledOnLaunch ?? false,

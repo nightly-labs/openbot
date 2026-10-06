@@ -51,6 +51,7 @@ export function SidebarTopbar() {
               props.compact ? "sidebar-toggle-button" : "sidebar-marketplace-button",
             ]}
             onClick={() => (props.compact ? props.onExpand() : props.onOpenMarketplace())}
+            data-cuelume-tap={props.compact ? "open" : "navigate"}
             aria-label={props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.openMarketplace")}
             aria-controls={props.compact ? "agent-sidebar" : undefined}
             aria-expanded={props.compact ? "false" : undefined}

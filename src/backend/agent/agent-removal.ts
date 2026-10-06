@@ -4,6 +4,7 @@ import type { Logger } from "@openbot/logging";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
+import type { MessagingThreads } from "../messaging/messaging-threads";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { DrainScheduler } from "./drain-scheduler";
@@ -24,6 +25,7 @@ export interface AgentRemovalOptions {
   conversation: ConversationRuntime;
   browser: AgentBrowserHost;
   channels: ChannelService;
+  messaging: MessagingThreads;
   routines: RoutineScheduler;
   duplication: DuplicationGate;
   drain: DrainScheduler;
@@ -52,6 +54,7 @@ export class AgentRemoval {
   readonly #conversation: ConversationRuntime;
   readonly #browser: AgentBrowserHost;
   readonly #channels: ChannelService;
+  readonly #messaging: MessagingThreads;
   readonly #routines: RoutineScheduler;
   readonly #duplication: DuplicationGate;
   readonly #drain: DrainScheduler;
@@ -69,6 +72,7 @@ export class AgentRemoval {
     this.#conversation = options.conversation;
     this.#browser = options.browser;
     this.#channels = options.channels;
+    this.#messaging = options.messaging;
     this.#routines = options.routines;
     this.#duplication = options.duplication;
     this.#drain = options.drain;
@@ -128,6 +132,8 @@ export class AgentRemoval {
     try {
       // Keep session records available if private file removal needs a retry.
       for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
+      stage = "messaging";
+      await this.#messaging.deleteForAgent(agent.id);
       stage = "mailbox";
       await this.#mailbox.deleteAgentData(agent.id, this.#channels.store.allContextThreads());
       stage = "agent-files-and-record";

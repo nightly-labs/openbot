@@ -387,11 +387,11 @@ describe("OpenBot connected desktop shell", () => {
     const remote: ServerSummary = {
       ...testServer("remote-1", false),
       compatibility: {
-        localAppVersion: "0.4.0",
-        hostAppVersion: "0.3.0",
-        localProtocol: { minimum: 1, maximum: 1 },
-        hostProtocol: { minimum: 1, maximum: 1 },
-        negotiatedProtocol: 1,
+        localAppVersion: "0.25.1",
+        hostAppVersion: "0.24.0",
+        localProtocol: { minimum: 1, maximum: 5 },
+        hostProtocol: { minimum: 1, maximum: 5 },
+        negotiatedProtocol: 5,
         capabilities: [],
       },
       connectionSequence: 0,
@@ -403,6 +403,12 @@ describe("OpenBot connected desktop shell", () => {
 
     emitServers?.([local, { ...remote, connectionSequence: 1 }]);
     expect(await screen.findByText("Different OpenBot versions on Studio Mac")).toBeInTheDocument();
+    // The host runs the older release, so the notice asks for the host update, not this app's.
+    expect(
+      screen.getByText(
+        "Update OpenBot on Studio Mac to use all features. The connection uses protocol 5. Client 0.25.1; host 0.24.0.",
+      ),
+    ).toBeInTheDocument();
     emitServers?.([local, { ...remote, connectionSequence: 2 }]);
     await waitFor(() => expect(screen.getAllByText("Different OpenBot versions on Studio Mac")).toHaveLength(2));
   });

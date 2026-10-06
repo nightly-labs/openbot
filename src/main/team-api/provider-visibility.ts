@@ -2,28 +2,29 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot/contracts/team-protocol/v1";
 
 /**
- * Tells if a peer on this protocol must not see the provider. No protocol knows Cursor (`cursor`):
- * it stays on this computer. Protocols 1 to 4 do not know Gemini (`antigravity`) or custom ACP
- * agents (`acp`), and protocols 1 to 3 do not know OpenCode.
+ * Tells if a peer on this protocol must not see the provider. No protocol knows Cursor (`cursor`) or
+ * Cline (`cline`): they stay on this computer. Protocols 1 to 4 do not know Gemini (`antigravity`)
+ * or custom ACP agents (`acp`), and protocols 1 to 3 do not know OpenCode.
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
   return (
     value === "cursor" ||
+    value === "cline" ||
     (protocol < 5 && (value === "antigravity" || value === "acp")) ||
     (protocol < 4 && value === "opencode")
   );
 }
 
 /**
- * The same test for an object `id`. `acp` and `cursor` count only for a provider status row, which
- * has a `state`: a custom endpoint saved with that id before the provider existed is a peer-visible
- * endpoint, also in the `providers` list of a custom endpoint save or delete reply, and it must stay
- * one.
+ * The same test for an object `id`. `acp`, `cursor` and `cline` count only for a provider status
+ * row, which has a `state`: a custom endpoint saved with that id before the provider existed is a
+ * peer-visible endpoint, also in the `providers` list of a custom endpoint save or delete reply, and
+ * it must stay one.
  */
 function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
   const statusRow = listKey === "providers" && typeof value.state === "string";
   if (value.id === "acp") return protocol < 5 && statusRow;
-  if (value.id === "cursor") return statusRow;
+  if (value.id === "cursor" || value.id === "cline") return statusRow;
   return isPeerHiddenProvider(value.id, protocol);
 }
 
@@ -39,7 +40,7 @@ export function legacyProviderView(value: unknown, hiddenIds: ReadonlySet<string
 
 /**
  * Removes the named agents and the providers protocol 4 or 5 does not know. Protocol 4 knows
- * OpenCode; protocol 5 also knows Gemini and custom ACP agents. Neither knows Cursor.
+ * OpenCode; protocol 5 also knows Gemini and custom ACP agents. Neither knows Cursor or Cline.
  */
 export function hiddenAgentView(
   value: unknown,

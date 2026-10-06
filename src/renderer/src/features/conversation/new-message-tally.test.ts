@@ -3,6 +3,7 @@ import type { AgentMessage } from "@openbot/ui/data";
 import {
   anchorNewMessages,
   countableTimelineMessage,
+  silentAgentAnswer,
   type TimelineRow,
   tallyNewMessages,
 } from "@openbot/ui/features/conversation/new-message-tally";
@@ -128,5 +129,53 @@ describe("countableTimelineMessage", () => {
         message({ actionMarker: { kind: "unavailable", label: "Gone", timestamp: "now" }, exchange }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("silentAgentAnswer", () => {
+  it("matches a finished agent answer with nothing to draw", () => {
+    expect(silentAgentAnswer(message({ body: "" }))).toBe(true);
+    expect(silentAgentAnswer(message({ body: " \n" }))).toBe(true);
+  });
+
+  it("does not count a silent answer as a new message", () => {
+    expect(countableTimelineMessage(message({ body: "" }))).toBe(false);
+  });
+
+  it("keeps an empty row that still shows something", () => {
+    const exchange: AgentExchangeSummary = {
+      direction: "incoming",
+      messageId: "m1",
+      senderAgentId: "agent-1",
+      recipientAgentIds: ["agent-2"],
+      replyToMessageId: null,
+      deliveries: [],
+    };
+    const kept: Partial<AgentMessage>[] = [
+      { body: "Hello" },
+      { body: "", author: "you" },
+      { body: "", streaming: true },
+      { body: "", status: "Failed" },
+      { body: "", status: "Stopped" },
+      { body: "", kind: "plan" },
+      { body: "", kind: "question" },
+      { body: "", actionMarker: { kind: "unavailable", label: "Gone", timestamp: "now" }, exchange },
+      { body: "", reactions: [{ emoji: "👍", actor: { kind: "user" } }] },
+      {
+        body: "",
+        attachments: [
+          {
+            id: "file",
+            name: "report.pdf",
+            size: 1,
+            kind: "file",
+            mimeType: "application/pdf",
+            previewKind: "pdf",
+            previewUrl: null,
+          },
+        ],
+      },
+    ];
+    for (const overrides of kept) expect(silentAgentAnswer(message(overrides))).toBe(false);
   });
 });

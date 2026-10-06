@@ -26,6 +26,8 @@ import {
   type PlanUpdateStep,
   startClaudePlanTurn,
 } from "./agent/plan-updates";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import {
@@ -35,7 +37,13 @@ import {
   claudeWorkspaceSkillPlugin,
   claudeWriteOutsideRoots,
 } from "./claude-workspace-sandbox";
-import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
+import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag, cliSpawnTarget } from "./cli";
+import {
+  isClaudeCompactionSummary,
+  isClaudeInterruptMarker,
+  isClaudeLocalCommand,
+  isClaudeTaskNotification,
+} from "./conversation-snapshots";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
   agentMcpServers,
@@ -112,6 +120,11 @@ interface ActiveTurn {
   assistantMessages: Map<string, string>;
   thinkingMessages: Map<string, string>;
   toolCalls: Map<string, string>;
+  /**
+   * Set when Claude refuses the turn for a spent plan window. The refusal arrives as an assistant
+   * message that only states the limit, so its text is held here and not published as the answer.
+   */
+  usageLimit: { resetsAt: number | null; text: string | null } | null;
 }
 
 interface ThreadRuntime {
@@ -158,6 +171,10 @@ interface ClaudeStreamMessage {
   total_cost_usd?: number;
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
+  is_error?: boolean;
+  /** Why an assistant message is a refusal, such as `rate_limit`. */
+  error?: string;
+  rate_limit_info?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -470,11 +487,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   async #readAuthStatus(): Promise<DynamicRecord> {
     let stdout: unknown;
     let failure: unknown = null;
+    const target = cliSpawnTarget(this.#cli.executable, ["auth", "status", "--json"]);
     try {
-      ({ stdout } = await execFileAsync(this.#cli.executable, ["auth", "status", "--json"], {
+      ({ stdout } = await execFileAsync(target.command, target.args, {
         timeout: 5_000,
         maxBuffer: 64 * 1024,
-        shell: process.platform === "win32",
+        windowsVerbatimArguments: target.windowsVerbatimArguments,
         env: claudeEnvironment(this.#cli),
       }));
     } catch (error) {
@@ -483,6 +501,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     const status = parseAuthStatus(stdout);
     if (status && (failure === null || status.loggedIn === false)) return status;
+    // `execFile` marks a child it stopped at its timeout: a busy computer, not a failed check.
+    if (isDynamicRecord(failure) && failure.killed === true) throw new RequestTimeoutError("Claude", "account/read");
     throw failure ?? new Error("Claude returned an unreadable sign-in status.");
   }
 
@@ -652,6 +672,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       assistantMessages: new Map<string, string>(),
       thinkingMessages: new Map<string, string>(),
       toolCalls: new Map<string, string>(),
+      usageLimit: null,
     };
     runtime.activeTurn = activeTurn;
     startClaudePlanTurn(runtime.plan);
@@ -712,6 +733,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #handleMessage(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
+    if (message.type === "rate_limit_event") {
+      const info = message.rate_limit_info;
+      const turn = runtime.activeTurn;
+      if (turn && isDynamicRecord(info) && info.status === "rejected") {
+        turn.usageLimit = { resetsAt: claudeResetSeconds(info.resetsAt), text: turn.usageLimit?.text ?? null };
+      }
+      return;
+    }
+
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
@@ -729,6 +759,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const turn = runtime.activeTurn;
       const text = messageText(message.message);
       if (!turn || !message.uuid) return;
+      if (message.error === "rate_limit") {
+        // A spent balance does not reset, so it is not held: the turn fails with its own text.
+        if (isBalanceDiagnostic(text)) turn.usageLimit = null;
+        else if (turn.usageLimit || isPlanLimitDiagnostic(text)) {
+          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
+          return;
+        }
+      }
       const thinking = messageThinking(message.message);
       /* The deltas never announced this block, so its own order is all there is to say what came
          before it. Text the message placed there is narration, and only that much may go. */
@@ -803,19 +841,40 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       });
     const fallback = message.subtype === "success" ? message.result : "";
     const errors = message.errors ?? [];
+    const interrupted =
+      message.terminal_reason === "aborted_streaming" ||
+      message.terminal_reason === "aborted_tools" ||
+      errors.some((error) => /interrupt|abort/i.test(error));
     const turn = runtime.activeTurn;
     if (turn) {
       for (const [toolCallId, name] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
+      // A rejected window alone is not a failure: the request can still run on overage. Only the
+      // refusal message, or a request that then failed with an API error, ends the turn on the limit.
+      const limit = turn.usageLimit;
+      if (
+        limit &&
+        !interrupted &&
+        (limit.text !== null || (message.subtype === "success" && message.is_error === true)) &&
+        !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
+      ) {
+        this.emit("notification", {
+          method: USAGE_LIMIT_METHOD,
+          params: { threadId: runtime.id, turnId: turn.id, resetsAt: limit.resetsAt },
+        });
+        this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+        this.#completeTurn(
+          runtime,
+          "failed",
+          limit.text ?? (errors.join("\n") || fallback || sourceText("error.provider.usageLimitReached")),
+        );
+        return;
+      }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
       if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
-    const interrupted =
-      message.terminal_reason === "aborted_streaming" ||
-      message.terminal_reason === "aborted_tools" ||
-      errors.some((error) => /interrupt|abort/i.test(error));
     const status = interrupted ? "interrupted" : message.subtype === "success" ? "completed" : "failed";
     this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : null);
   }
@@ -1007,27 +1066,42 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
        so it is demoted as soon as the next one proves it was not the end of the turn. A restored
        thread otherwise reopens with the chat bubbles a live turn no longer draws. */
     let currentAnswer: ThreadItem | null = null;
+    /* Claude writes its compaction summary as a user entry, and the reply after it finishes a turn
+       the app already published live under that turn's own ID. Neither is restored. */
+    let skippingCompaction = false;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
       if (message.type === "user") {
-        if (!text) continue;
+        if (!text || isClaudeInterruptMarker(text)) continue;
+        if (isClaudeCompactionSummary(text)) {
+          skippingCompaction = true;
+          current = null;
+          continue;
+        }
+        skippingCompaction = false;
+        /* A task notification or a slash command still opens the turn that answers it. The user did not
+           write that text: the mailbox already holds the command as the user sent it. */
         current = {
           id: message.uuid,
           status: "completed",
-          items: [
-            {
-              id: message.uuid,
-              type: "userMessage",
-              clientId: message.uuid,
-              content: [{ type: "text", text }],
-            },
-          ],
+          items:
+            isClaudeTaskNotification(text) || isClaudeLocalCommand(text)
+              ? []
+              : [
+                  {
+                    id: message.uuid,
+                    type: "userMessage",
+                    clientId: message.uuid,
+                    content: [{ type: "text", text }],
+                  },
+                ],
         };
         turns.push(current);
         currentThinking = null;
         currentAnswer = null;
       } else if (message.type === "assistant") {
+        if (skippingCompaction) continue;
         const thinking = messageThinking(message.message);
         const endsStep = messageToolCalls(message.message).length > 0;
         if (!thinking && !text && !endsStep) continue;
@@ -1243,6 +1317,12 @@ function claudeUsageWindow(value: unknown, windowDurationMins: number): AccountR
     windowDurationMins,
     resetsAt: Number.isFinite(resetMilliseconds) ? resetMilliseconds / 1_000 : null,
   };
+}
+
+/** Claude reports a reset in epoch seconds. A value in milliseconds is converted, so both read the same. */
+function claudeResetSeconds(value: unknown): number | null {
+  if (!isNumber(value) || !Number.isFinite(value) || value <= 0) return null;
+  return value > 100_000_000_000 ? value / 1_000 : value;
 }
 
 function stringValue(value: unknown): string | null {

@@ -56,11 +56,18 @@ export interface ContentImageJob {
   withTitle: boolean;
   /** The two marks side by side, over the title. Only on the social card of a comparison. */
   lockup?: ContentImageLockup | undefined;
+  /** The mark of each app, in one row over the title. Only on the social card of a roundup. */
+  markRow?: readonly ContentImageMark[] | undefined;
 }
+
+/** A compared product's mark, or OpenBot's own logo. */
+export type ContentImageMark = RivalMarkName | "openbot";
 
 export interface ContentImageLockup {
   rivalMark: RivalMarkName;
   rivalName: string;
+  /** The left side when it is not OpenBot: a matchup of two other products. */
+  left?: { mark: RivalMarkName; name: string } | undefined;
 }
 
 export type ContentArtManifest = Record<string, string>;
@@ -102,6 +109,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       height: OG_HEIGHT,
       withTitle: true,
       lockup: comparisonLockup(collection, article.slug),
+      markRow: roundupMarkRow(collection, article.slug),
     },
     ...CONTENT_ART_SHAPES.map((shape) => ({
       // The one path builder, so the file written here and the file the page
@@ -117,9 +125,26 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
   ]);
 }
 
+// A field that is not given is left out of the hashed JSON, so the images of the
+// first comparisons keep their keys.
 function comparisonLockup(collection: ContentCollection, slug: string): ContentImageLockup | undefined {
-  const comparison = collection.id === "compare" ? COMPARISONS[slug] : undefined;
-  return comparison && { rivalMark: comparison.rival.mark, rivalName: comparison.rival.name };
+  const page = collection.id === "compare" ? COMPARISONS[slug] : undefined;
+  switch (page?.kind) {
+    case undefined:
+    case "openbot":
+      return page && { rivalMark: page.rival.mark, rivalName: page.rival.name };
+    case "matchup": {
+      const [a, b] = page.products;
+      return { rivalMark: b.mark, rivalName: b.name, left: { mark: a.mark, name: a.name } };
+    }
+    case "roundup":
+      return undefined;
+  }
+}
+
+function roundupMarkRow(collection: ContentCollection, slug: string): ContentImageMark[] | undefined {
+  const page = collection.id === "compare" ? COMPARISONS[slug] : undefined;
+  return page?.kind === "roundup" ? page.apps.map((app) => app.mark) : undefined;
 }
 
 /**
@@ -183,6 +208,9 @@ export async function readContentArtManifest(): Promise<ContentArtManifest> {
   return manifest;
 }
 
+/** Both formats, so an image left over in the other one is reported and deleted. */
+const CONTENT_ART_FILE = /\.(png|webp)$/;
+
 /** Every image in `CONTENT_ART_DIRECTORY`, as a bundle path. */
 export async function listContentArt(): Promise<string[]> {
   let entries: string[];
@@ -191,5 +219,5 @@ export async function listContentArt(): Promise<string[]> {
   } catch {
     return [];
   }
-  return entries.filter((entry) => entry.endsWith(".png")).map((entry) => entry.split(path.sep).join("/"));
+  return entries.filter((entry) => CONTENT_ART_FILE.test(entry)).map((entry) => entry.split(path.sep).join("/"));
 }

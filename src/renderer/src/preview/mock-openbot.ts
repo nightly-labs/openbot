@@ -102,7 +102,10 @@ import { createMockChannels } from "./mock-channels";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
+import { createMockMessaging } from "./mock-messaging";
+import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
+import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
@@ -359,6 +362,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       reasoningEffort: input.reasoningEffort ?? "low",
       access: input.access ?? "full",
       computerUse: input.computerUse ?? true,
+      ...(input.allowAutomation ? { allowAutomation: true } : {}),
       threadId: input.threadId ?? `thread-${id}`,
       workspacePath: input.workspacePath ?? `/mock/OpenBot/Agents/${id}`,
       preview: input.preview ?? "No messages yet",
@@ -377,6 +381,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     active: boolean;
     timezone: string;
     schedule: RoutineSchedule;
+    limitPolicy?: Routine["limitPolicy"];
   }): Routine {
     const now = new Date().toISOString();
     const routineId = crypto.randomUUID();
@@ -387,6 +392,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       instruction: input.instruction.trim(),
       active: input.active,
       timezone: input.timezone,
+      limitPolicy: input.limitPolicy ?? "wait",
       trigger: {
         id: crypto.randomUUID(),
         routineId,
@@ -473,6 +479,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         dynamicIslandPresentation = clone(presentation);
       },
       getPresentation: async () => clone(dynamicIslandPresentation),
+      getBuiltInDisplayGeometry: async () => ({ width: 192, height: 32 }),
       onPreference: () => () => undefined,
       onPresentation: () => () => undefined,
       onGeometry: () => () => undefined,
@@ -505,6 +512,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    // The preview runs no provider process, so a restart has nothing to wait for.
+    restartProvider: async () => clone(agentStatus),
+    cancelProviderRestart: async () => clone(agentStatus),
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there.
     startProviderCodeLogin: async () => ({
@@ -581,6 +591,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     githubConnector: createMockGitHubConnector(),
+    onePasswordConnector: createMockOnePasswordConnector(),
     billing: createMockBilling(),
     hostedServers: createMockHostedServers(),
     customProviders: {
@@ -679,6 +690,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(detectionSettings);
       },
     },
+    // Preview has one host, so every server answers for the same agents.
+    // The Slack Orchestrator of the preview is its first agent.
+    messaging: createMockMessaging(() => agents[0]?.id ?? "preview-agent"),
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
       // A host signs Claude in with a code its page shows, which the user pastes back.
@@ -1201,6 +1215,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           ...(input.name === undefined ? {} : { name: input.name.trim() }),
           ...(input.instruction === undefined ? {} : { instruction: input.instruction.trim() }),
           ...(input.active === undefined ? {} : { active: input.active }),
+          ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
           ...(input.schedule === undefined
             ? {}
             : {
@@ -1253,6 +1268,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(run);
       },
       listRoutineRuns: async (input) => clone((routineRuns.get(input.routineId) ?? []).slice(0, input.limit)),
+      automationRunCommand: async (input) =>
+        `curl -sS -X POST "$(cat '/mock/automation/url')/v1/agents/${input.agentId}/routines/${input.routineId}/run" -H @'/mock/automation/headers' -H 'Content-Type: application/json' -d '{"payload":""}'`,
+      routineCalendar: async (input) => mockRoutineCalendar(input, routines, routineRuns),
       readConversation: async (agentId) => ({
         ...clone(getSnapshot(agentId)),
         readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
@@ -1571,6 +1589,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       cancelScheduledRestart: async () => {
         const { scheduledRestart: _cancelled, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
+      // The preview never restarts: the restart waits for one agent turn until it is cancelled.
+      restartWhenIdle: async (target) => {
+        updateStatus = { ...updateStatus, idleRestart: { target, waitingFor: ["agent-turn"] } };
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
+      cancelIdleRestart: async () => {
+        const { idleRestart: _cancelled, ...rest } = updateStatus;
         updateStatus = rest;
         emit(updateListeners, updateStatus);
         return clone(updateStatus);

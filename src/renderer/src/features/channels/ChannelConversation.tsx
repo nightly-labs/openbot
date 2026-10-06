@@ -24,6 +24,7 @@ import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppe
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -47,6 +48,7 @@ import {
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { useText } from "@openbot/ui/text";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import {
   createEffect,
   createMemo,
@@ -63,6 +65,7 @@ import { planItems, planTitle } from "../../app-message-projection";
 import { channelAwaitingReplies } from "../../awaiting-replies";
 import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
@@ -77,12 +80,16 @@ const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPa
 /** What the open channel reads from the client around it. The channel itself comes from `useChannels()`. */
 export interface ChannelConversationProps {
   isOwnMessage: (authorId: string) => boolean;
+  /** The device with the keyboard on desktop. Web leaves it empty and the browser is detected. */
+  platform?: "darwin" | "win32" | "linux" | undefined;
   /** Keyed by agent id. */
   pendingApprovals: Record<string, AgentApproval | undefined>;
   /** Keyed by agent id. */
   pendingTakeovers: Record<string, BrowserTakeoverRequest | undefined>;
   browserTabs: BrowserTab[];
   onSelectAgent: (agentId: string) => void;
+  /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
+  localHost?: boolean;
 }
 
 export function ChannelConversation(props: ChannelConversationProps) {
@@ -126,7 +133,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
   });
   const routinesPort = createMemo(() => {
     const id = channelId();
-    return id ? channelRoutinesPort(id, runtime().agent) : null;
+    return id ? channelRoutinesPort(id, runtime().agent, props.localHost === true) : null;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.
@@ -269,6 +276,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
     () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
   );
   const firstUnreadId = createMemo(() => firstUnreadChannelMessageId(timeline(), unreadCount()));
+  /* A row finds its entry by id: the virtualizer gives a row its new index one tick after the list changes. */
+  const timelineIndexById = createMemo(
+    () => new Map<VirtualItem["key"], number>(timeline().map((entry, index) => [entry.id, index])),
+  );
   /* Every row anchors the count, but only another author's message adds to it. */
   const timelineRows = createMemo(() =>
     timeline().map((entry) => ({ id: entry.id, countable: countableTimelineMessage(entry.message) })),
@@ -674,7 +685,10 @@ export function ChannelConversation(props: ChannelConversationProps) {
               >
                 <For each={virtualMessageRows()}>
                   {(virtualRow) => {
-                    const entry = createMemo(() => timeline()[virtualRow.index]);
+                    const entry = createMemo(() => {
+                      const index = timelineIndexById().get(virtualRow.key);
+                      return index === undefined ? undefined : timeline()[index];
+                    });
                     const initialEntry = untrack(entry);
                     if (!initialEntry) return null;
                     const animate = markMessageSeen(page().channel.id, initialEntry.id);
@@ -708,101 +722,104 @@ export function ChannelConversation(props: ChannelConversationProps) {
                             }}
                           />
                         </Show>
-                        {initialEntry.message.actionMarker ? (
-                          <article class={{ "chat-action-entry-animated": animate }}>
-                            <ChatActionMarker
-                              marker={initialEntry.message.actionMarker}
+                        <ChatRowBoundary>
+                          {initialEntry.message.actionMarker ? (
+                            <article class={{ "chat-action-entry-animated": animate }}>
+                              <ChatActionMarker
+                                marker={initialEntry.message.actionMarker}
+                                agents={agentList()}
+                                announce={animate}
+                                onSelectAgent={(id) => {
+                                  channels.close();
+                                  selectAgent(id);
+                                }}
+                              />
+                            </article>
+                          ) : initialEntry.message.plan ? (
+                            <article class={{ "message-entry-animated": animate }}>
+                              <Show when={entry()?.message.plan ?? initialEntry.message.plan}>
+                                {(plan) => (
+                                  <TaskList
+                                    items={planItems(plan(), entry()?.message.streaming === true)}
+                                    title={planTitle(plan())}
+                                    defaultOpen={initialEntry.message.streaming === true}
+                                  />
+                                )}
+                              </Show>
+                            </article>
+                          ) : (
+                            <ChatMessageRow
+                              message={entry()?.message ?? initialEntry.message}
+                              author={entry()?.author ?? initialEntry.author}
+                              showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                              showTime={entry()?.showAuthor ?? initialEntry.showAuthor}
+                              animate={animate}
                               agents={agentList()}
-                              announce={animate}
+                              referencedMessage={referenced()?.message}
+                              referencedAuthorName={referenced()?.author.name}
                               onSelectAgent={(id) => {
                                 channels.close();
                                 selectAgent(id);
                               }}
-                            />
-                          </article>
-                        ) : initialEntry.message.plan ? (
-                          <article class={{ "message-entry-animated": animate }}>
-                            <Show when={entry()?.message.plan ?? initialEntry.message.plan}>
-                              {(plan) => (
-                                <TaskList
-                                  items={planItems(plan(), entry()?.message.streaming === true)}
-                                  title={planTitle(plan())}
-                                  defaultOpen={initialEntry.message.streaming === true}
-                                />
-                              )}
-                            </Show>
-                          </article>
-                        ) : (
-                          <ChatMessageRow
-                            message={entry()?.message ?? initialEntry.message}
-                            author={entry()?.author ?? initialEntry.author}
-                            showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
-                            showTime={entry()?.showAuthor ?? initialEntry.showAuthor}
-                            animate={animate}
-                            agents={agentList()}
-                            referencedMessage={referenced()?.message}
-                            referencedAuthorName={referenced()?.author.name}
-                            onSelectAgent={(id) => {
-                              channels.close();
-                              selectAgent(id);
-                            }}
-                            onOpenLink={(url) => {
-                              void runtime().openUrl(url);
-                            }}
-                            onPreview={(attachment) => void previewChannelAttachment(attachment)}
-                            onDownloadAttachments={downloadAttachments()}
-                            onAttachmentAction={channelAttachmentAction}
-                            onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
-                            actions={
-                              <MessageActions
-                                message={entry()?.message ?? initialEntry.message}
-                                authorName={entry()?.author.name ?? initialEntry.author.name}
-                                reactions={false}
-                                pickerOpen={false}
-                                moreOpen={openMoreMessageId() === initialEntry.id}
-                                expandedEmoji={false}
-                                copied={copiedMessageId() === initialEntry.id}
-                                onTogglePicker={() => {}}
-                                onToggleMore={() =>
-                                  setOpenMoreMessageId((current) =>
-                                    current === initialEntry.id ? null : initialEntry.id,
-                                  )
-                                }
-                                onExpandEmoji={() => {}}
-                                onReact={() => {}}
-                                onReply={
-                                  page().channel.archived
-                                    ? undefined
-                                    : () =>
-                                        setComposer((state) => {
-                                          state.reply = initialEntry.id;
-                                        })
-                                }
-                                onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
-                              />
-                            }
-                          >
-                            <Show when={entry()?.message.questionPrompt}>
-                              {(prompt) => (
-                                <QuestionPromptBubble
-                                  questions={prompt().questions}
-                                  resolution={prompt().resolution}
-                                  readOnly={page().channel.archived}
-                                  onSubmit={(answers) =>
-                                    page().channel.archived
-                                      ? Promise.resolve(false)
-                                      : channels.perform(() =>
-                                          runtime().agent.respondToPrompt({
-                                            requestId: prompt().requestId,
-                                            answers,
-                                          }),
-                                        )
+                              onOpenLink={(url) => {
+                                void runtime().openUrl(url);
+                              }}
+                              onPreview={(attachment) => void previewChannelAttachment(attachment)}
+                              onDownloadAttachments={downloadAttachments()}
+                              onAttachmentAction={channelAttachmentAction}
+                              onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
+                              actions={
+                                <MessageActions
+                                  message={entry()?.message ?? initialEntry.message}
+                                  authorName={entry()?.author.name ?? initialEntry.author.name}
+                                  reactions={false}
+                                  pickerOpen={false}
+                                  moreOpen={openMoreMessageId() === initialEntry.id}
+                                  expandedEmoji={false}
+                                  copied={copiedMessageId() === initialEntry.id}
+                                  onTogglePicker={() => {}}
+                                  onToggleMore={() =>
+                                    setOpenMoreMessageId((current) =>
+                                      current === initialEntry.id ? null : initialEntry.id,
+                                    )
                                   }
+                                  onExpandEmoji={() => {}}
+                                  onReact={() => {}}
+                                  onReply={
+                                    page().channel.archived
+                                      ? undefined
+                                      : () =>
+                                          setComposer((state) => {
+                                            state.reply = initialEntry.id;
+                                          })
+                                  }
+                                  onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
                                 />
-                              )}
-                            </Show>
-                          </ChatMessageRow>
-                        )}
+                              }
+                            >
+                              <Show when={entry()?.message.questionPrompt}>
+                                {(prompt) => (
+                                  <QuestionPromptBubble
+                                    questions={prompt().questions}
+                                    resolution={prompt().resolution}
+                                    readOnly={page().channel.archived}
+                                    sendShortcut={deviceSendShortcut(props.platform)}
+                                    onSubmit={(answers) =>
+                                      page().channel.archived
+                                        ? Promise.resolve(false)
+                                        : channels.perform(() =>
+                                            runtime().agent.respondToPrompt({
+                                              requestId: prompt().requestId,
+                                              answers,
+                                            }),
+                                          )
+                                    }
+                                  />
+                                )}
+                              </Show>
+                            </ChatMessageRow>
+                          )}
+                        </ChatRowBoundary>
                       </div>
                     );
                   }}
@@ -969,6 +986,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       agents={agentList().filter((agent) =>
                         page().channel.members.some((member) => member.agentId === agent.id),
                       )}
+                      sendShortcut={deviceSendShortcut(props.platform)}
                       attachments={composer.attachments}
                       ariaLabel={t("channel.composer.label")}
                       placeholder={t("channel.composer.placeholder", { name: page().channel.name })}
@@ -1003,6 +1021,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
                             variant="ghost"
                             class="voice-button"
                             aria-label={t("channel.composer.send")}
+                            aria-keyshortcuts={sendShortcutAriaKey(deviceSendShortcut(props.platform))}
+                            title={t(sendShortcutHintKey(deviceSendShortcut(props.platform), "send"))}
                             disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
                           >
                             <ArrowUp aria-hidden="true" />

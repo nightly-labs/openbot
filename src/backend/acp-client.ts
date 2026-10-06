@@ -27,7 +27,7 @@ import { redactText } from "@openbot/logging";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
-import { AgentProcessExitError, type AgentProvider } from "./agent-client";
+import { AgentProcessExitError, type AgentProvider, type DiagnosticOrigin } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { LineTooLongError, limitLineLength } from "./jsonl";
@@ -77,9 +77,9 @@ const MODEL_REASONING_PROBE_BUDGET_MS = 5_000;
 const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 
 /**
- * What the sweep leaves of the discovery deadline for the two requests that follow it: the restore of
- * the model the session opened on, and the close of the probe session. Both are one round trip, and
- * the catalog the caller waits for is already built when they run.
+ * What the sweep leaves of the discovery deadline for the request that follows it: the restore of the
+ * model the session opened on. It is one round trip, and the catalog the caller waits for is already
+ * built when it runs. The close of the probe session is not awaited and uses none of it.
  */
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
@@ -106,7 +106,7 @@ interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
   exit: [error: Error];
-  diagnostic: [message: string];
+  diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
 interface ProcessEnd {
@@ -129,6 +129,10 @@ interface AcpTurn {
   toolNames: Map<string, string>;
   /** The ACP `kind` of each tool call; a later update can omit it. */
   toolKinds: Map<string, string>;
+  /** Steered prompts that the agent refused while this turn ran; sent when the running prompt ends. */
+  deferredPrompts: ContentBlock[][];
+  /** The user stopped the turn, so no deferred prompt is sent. */
+  stopped: boolean;
   task: Promise<void>;
 }
 
@@ -303,6 +307,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #models: AcpModel[] = [];
   #signedIn = false;
   #stopping = false;
+  /**
+   * Each process that `stop()` ended while it still ran. Its stderr is the shutdown that OpenBot
+   * started. Held per process, not read from `#stopping`: a crash also calls `stop()`, and `start()`
+   * clears `#stopping` before the last stderr of the previous process is read.
+   */
+  readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
 
   constructor(
     cli: AgentCliInfo,
@@ -376,7 +386,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       redact: (text) => this.#redact(text),
       emit: (message) => {
         lastDiagnostic = message;
-        this.emit("diagnostic", message);
+        this.emit("diagnostic", message, { duringStop: this.#stoppedProcesses.has(child) });
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
@@ -399,6 +409,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   async stop(): Promise<void> {
     this.#stopping = true;
     const child = this.#process;
+    // After a crash `#process` is already null, so the crash reason stays an error for the user.
+    if (child && child.exitCode === null) this.#stoppedProcesses.add(child);
     this.#process = null;
     this.#connection = null;
     this.#initialized = null;
@@ -468,7 +480,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!this.running) throw new Error("ACP client is not running.");
     switch (method) {
       case "initialize":
-        await this.#ensureInitialized();
+        // The caller's timeout covers the first model discovery too: a CLI that was just installed
+        // can take minutes to answer both.
+        await this.#ensureInitialized(timeoutMs);
         return decoder({});
       case "account/read": {
         if (!this.#signedIn) return decoder({ account: null, requiresOpenaiAuth: false });
@@ -492,7 +506,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         );
       case "model/list":
         await this.#ensureInitialized();
-        if (this.#signedIn) this.#models = await this.#discoverModels(timeoutMs);
+        if (this.#signedIn) {
+          try {
+            this.#models = await this.#discoverModels(timeoutMs);
+          } catch (error) {
+            // Initialization already proved that OpenCode's catalogue works. A later refresh can
+            // time out while probing model options; keep the last successful list instead of making
+            // a connected provider appear to have no models. Other providers report the failure.
+            if (this.provider !== "opencode" || this.#models.length === 0) throw error;
+          }
+        }
         return decoder({
           data: this.#models.map((model) => ({
             model: model.id,
@@ -525,6 +548,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // A closed idle session has no turn to stop.
         if (this.#threads.isReleased(threadId)) return decoder({});
         const thread = this.#requireThread(threadId);
+        // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
+        if (thread.activeTurn) thread.activeTurn.stopped = true;
         this.#requireConnection().cancel({ sessionId: thread.id });
         return decoder({});
       }
@@ -547,9 +572,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  async #ensureInitialized(): Promise<void> {
+  async #ensureInitialized(timeoutMs = this.#requestTimeoutMs): Promise<void> {
     if (this.#initialized) return this.#initialized;
-    this.#initialized = this.#initialize();
+    this.#initialized = this.#initialize(timeoutMs);
     return this.#initialized;
   }
 
@@ -567,7 +592,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  async #initialize(): Promise<void> {
+  async #initialize(timeoutMs: number): Promise<void> {
     const connection = this.#requireConnection();
     this.#initialization = await withTimeout(
       connection.initialize({
@@ -575,12 +600,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: OPENBOT_ACP_CLIENT_INFO,
       }),
-      this.#requestTimeoutMs,
+      timeoutMs,
       "ACP initialization timed out.",
     );
     try {
       await this.options.authenticate?.(connection, this.#initialization);
-      this.#models = await this.#discoverModels();
+      this.#models = await this.#discoverModels(timeoutMs);
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }
@@ -607,13 +632,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         try {
           return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe), deadline);
         } finally {
-          // Bounded like the probes, and for the same reason: the catalog is complete by now, and an
-          // agent that is slow to close a session it is about to lose anyway must not take it away.
-          await this.#requestBefore(
-            () => connection.closeSession({ sessionId: probe.sessionId }),
-            deadline,
-            "session/close",
-          );
+          // Sent always, and not awaited. An agent can run one process per session, so a probe left
+          // open after a slow `session/new` used the deadline, or after `model/list` timed out, is one
+          // idle process until the app quits. Not awaited, because the catalog is complete by now, and
+          // an agent that is slow to close a session must not take it away.
+          void connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
         }
       })(),
       timeoutMs,
@@ -680,8 +703,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
-    // user's own next CLI session would start on a model they never chose. Half of the cleanup
-    // reserve, so the close that follows keeps the other half.
+    // user's own next CLI session would start on a model they never chose.
     if (selected !== option.currentValue) {
       await this.#requestBefore(
         () =>
@@ -690,7 +712,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             configId: option.id,
             value: option.currentValue,
           }),
-        Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS / 2, deadline),
+        Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS, deadline),
         "session/set_config_option",
       );
     }
@@ -719,7 +741,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       await this.#startThread(params, true);
     } catch (error) {
       // The next turn replaces the missing session, so the user has nothing to act on.
-      if (!(error instanceof MissingOpenCodeSessionError)) {
+      if (!(error instanceof MissingAcpSessionError)) {
         this.emit("diagnostic", this.#redact(`ACP session load for a read failed: ${String(error)}`));
       }
       return null;
@@ -852,6 +874,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * An agent that follows the protocol answers a session missing from its store with `-32002`, the
+   * resource-not-found error, naming the session. Cline does.
+   *
    * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
    * failure" as a fault of its internal server. Only a `session/list` that answers in full without
    * the session shows it is missing: the caller then replaces it and hands it the transcript. A
@@ -863,11 +888,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       return await connection.loadSession(request);
     } catch (error) {
+      if (isSessionNotFound(error, request.sessionId)) {
+        throw new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error);
+      }
       if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) throw error;
       failure = error;
     }
     const listing = await this.#sessionListing(connection, request);
-    if (listing === "absent") throw new MissingOpenCodeSessionError(request.sessionId, failure);
+    if (listing === "absent") {
+      throw new MissingAcpSessionError(
+        `OpenCode session not found: ${request.sessionId} (OpenCode service failure)`,
+        failure,
+      );
+    }
     await new Promise((resolve) => setTimeout(resolve, OPENCODE_LOAD_RETRY_MS));
     try {
       // The process can have stopped during the wait; this reports that instead of a closed stream.
@@ -979,9 +1012,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (steer) {
       // A steered message can want an answer, so an empty turn is again a failure to report.
       if (activeTurn) activeTurn.answerOptional = false;
+      // ACP has no steer request, and an agent can refuse a second prompt while one runs. The turn
+      // then sends the refused prompt after the running one ends, so the message is not lost.
       void this.#requireConnection()
         .prompt({ sessionId: thread.id, prompt: blocks })
         .catch((error) => {
+          if (activeTurn && thread.activeTurn === activeTurn) {
+            activeTurn.deferredPrompts.push(blocks);
+            return;
+          }
           this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(error)}`));
         });
       return { turn: { id: turnId, status: "inProgress" }, turnId };
@@ -998,6 +1037,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       messages: [],
       toolNames: new Map(),
       toolKinds: new Map(),
+      deferredPrompts: [],
+      stopped: false,
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
@@ -1021,12 +1062,29 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   async #consumePrompt(thread: AcpThread, turn: AcpTurn, prompt: ContentBlock[]): Promise<void> {
     try {
-      const response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt });
-      if (response.usage)
-        this.emit("notification", {
-          method: "openbot/usage",
-          params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
-        });
+      let response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt });
+      for (;;) {
+        if (response.usage)
+          this.emit("notification", {
+            method: "openbot/usage",
+            params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
+          });
+        const deferred = response.stopReason === "end_turn" && !turn.stopped ? turn.deferredPrompts.shift() : undefined;
+        if (!deferred) break;
+        // The reply to the earlier prompt is complete; the refused steer gets its own reply.
+        this.#completeThought(thread, turn);
+        this.#completeMessage(thread, turn, "final_answer");
+        const answered = turn.receivedOutput;
+        turn.receivedOutput = false;
+        try {
+          response = await this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred });
+        } catch (error) {
+          // The agent refused the steer again, so the earlier reply ends the turn.
+          this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(error)}`));
+          turn.receivedOutput = answered;
+          break;
+        }
+      }
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
       // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
       // to answer ends empty on purpose, and an error there costs no answer the user waits for.
@@ -1155,7 +1213,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeThought(thread, turn);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
-      const detail = this.#redact(String(error));
+      const detail = this.#redact(failureText(error));
       const message =
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
@@ -1562,13 +1620,32 @@ function isDynamicToolResult(value: unknown): value is DynamicToolResult {
   );
 }
 
-/** A session load that OpenCode failed while its internal server worked. */
-class MissingOpenCodeSessionError extends Error {
-  constructor(sessionId: string, cause: unknown) {
+/** A session that the agent does not have, so the caller opens a new one. */
+class MissingAcpSessionError extends Error {
+  constructor(message: string, cause: unknown) {
     // The wording is what `isMissingProviderSessionError` recognizes.
-    super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`, { cause });
-    this.name = "MissingOpenCodeSessionError";
+    super(message, { cause });
+    this.name = "MissingAcpSessionError";
   }
+}
+
+/** The protocol's resource-not-found error, for this session. */
+function isSessionNotFound(error: unknown, sessionId: string): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32002) return false;
+  const uri = isRecord(error.data) ? error.data.uri : undefined;
+  return uri === sessionId || error.message.includes(sessionId);
+}
+
+/**
+ * The text of a failed turn. When a handler in an ACP agent throws, the SDK answers `Internal error`
+ * and puts the thrown message in `data.details`, which `String(error)` leaves out (#1193).
+ */
+function failureText(error: unknown): string {
+  if (!(error instanceof RequestError) || !isRecord(error.data)) return String(error);
+  const details = error.data.details;
+  return typeof details === "string" && details && !error.message.includes(details)
+    ? `${String(error)}: ${details}`
+    : String(error);
 }
 
 /**

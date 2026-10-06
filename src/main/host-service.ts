@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
-import { createInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
   CentralAuthUser,
@@ -169,6 +169,7 @@ export class HostService extends EventEmitter<HostEvents> {
   readonly #api: TeamApiServer;
   readonly #remoteScreen: RemoteScreenGateway;
   readonly #browserView: BrowserViewGateway;
+  #lastBrowserViewInputAt: number | null = null;
   readonly #webrtcGateway: TeamWebRtcHostGateway | null;
   readonly #liveActivityPush: LiveActivityPushService | undefined;
   #status: HostStatus;
@@ -231,6 +232,9 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#browserView = new BrowserViewGateway({
       browser: options.browser,
       authenticate: (token) => options.store.authenticate(token),
+      onInput: () => {
+        this.#lastBrowserViewInputAt = Date.now();
+      },
     });
     const sendLiveActivityPush = options.sendLiveActivityPush;
     this.#liveActivityPush = sendLiveActivityPush
@@ -771,8 +775,12 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.connectedClientCount();
   }
 
-  lastClientRequestAt(): number | null {
-    return this.#api.lastClientRequestAt();
+  /** The last request that changed data, typing, or input in a browser view. */
+  lastClientUseAt(): number | null {
+    const request = this.#api.lastClientUseAt();
+    const view = this.#lastBrowserViewInputAt;
+    if (request === null || view === null) return request ?? view;
+    return Math.max(request, view);
   }
 
   announceRestart(state: HostRestartState, version: string | null): void {
@@ -982,17 +990,23 @@ export class HostService extends EventEmitter<HostEvents> {
     if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
     const remoteInviteApiUrl = this.#remoteInviteApiUrl();
     if (remoteInviteApiUrl && this.#options.createRemoteInvite) {
+      // The account service sends only an openbot.run link, and a self-hosted invitation is not one.
+      if (input.email && selfHostedApiOrigin(remoteInviteApiUrl))
+        throw new Error(sourceText("error.remote.selfHostedInviteNoEmail"));
       const invite = await this.#options.createRemoteInvite(identity.serverId, input);
       // The invitation belongs to the account that asked for it, so it stays on that host
       // and shows up in its invite list. What must not happen is emailing it under the new
       // account's authorization, or handing it back to the renderer the new account sees.
       this.#assertStillActiveHost(identity.serverId);
-      const inviteUrl = createInviteUrl({
-        apiUrl: remoteInviteApiUrl,
-        serverId: identity.serverId,
-        fingerprint: identity.fingerprint,
-        token: invite.token,
-      });
+      const inviteUrl = createInviteUrl(
+        {
+          apiUrl: remoteInviteApiUrl,
+          serverId: identity.serverId,
+          fingerprint: identity.fingerprint,
+          token: invite.token,
+        },
+        { selfHostedApiOrigin: selfHostedApiOrigin(remoteInviteApiUrl) },
+      );
       const result: InviteSummary = {
         id: invite.inviteId,
         role: input.role,

@@ -49,6 +49,9 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
             title={!layoutMutable() ? t("sidebar.section.layoutUnsupported") : undefined}
             aria-expanded={collapsed() ? "false" : "true"}
             aria-controls={`sidebar-section-body-${headerProps.sectionId}`}
+            data-cuelume-open={collapsed() ? "" : undefined}
+            data-cuelume-close={collapsed() ? undefined : ""}
+            data-cuelume-emphasis="subtle"
             onClick={(event: MouseEvent) => {
               if (!sidebarClickIsSuppressed(event)) props.onToggleSection(headerProps.sectionId);
             }}

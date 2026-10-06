@@ -80,6 +80,7 @@ function setup() {
       create: vi.fn(),
       checkout: vi.fn(),
       delete: vi.fn(),
+      status: vi.fn(),
       wake: vi.fn(),
     }),
     inviteEmailDelivery: () => ({ send: vi.fn().mockResolvedValue(undefined) }),

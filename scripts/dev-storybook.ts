@@ -7,9 +7,10 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { cliSpawnTarget } from "../src/backend/cli";
 import { withDevPortAllocation } from "./dev-automation/port-allocation";
 import {
   conflictingDevStacks,
@@ -20,6 +21,7 @@ import {
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
 import { findAvailablePort, stopOwnedProcesses } from "./dev-services";
+import { resolvePackageBin } from "./package-bin";
 
 const logger = createOpenBotLogger("dev-storybook");
 
@@ -54,7 +56,7 @@ export function parseStorybookInvocation(args: string[]): StorybookInvocation {
 }
 
 export function storybookExecutable(root = projectRoot): string {
-  return join(root, "node_modules", ".bin", process.platform === "win32" ? "storybook.cmd" : "storybook");
+  return resolvePackageBin(root, "storybook");
 }
 
 export function createStorybookStackRecord(port: number, supervisorPid: number, startedAt: number): DevStackRecord {
@@ -108,11 +110,13 @@ async function main(): Promise<void> {
   // `--exact-port` because the port is already reserved and probed. Letting
   // Storybook walk on its own would put it on a port the registry promised to
   // another worktree, which is the collision this script exists to prevent.
-  const child: ChildProcess = spawn(executable, ["dev", "--port", String(port), "--exact-port", ...passthrough], {
+  const target = cliSpawnTarget(executable, ["dev", "--port", String(port), "--exact-port", ...passthrough]);
+  const child: ChildProcess = spawn(target.command, target.args, {
     cwd: projectRoot,
     stdio: "inherit",
     shell: false,
     detached: process.platform !== "win32",
+    windowsVerbatimArguments: target.windowsVerbatimArguments,
   });
   if (child.pid) {
     stack.processes.push({ name: "storybook", pid: child.pid, startedAt: Date.now() });

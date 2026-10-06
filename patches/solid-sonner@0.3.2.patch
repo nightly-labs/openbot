@@ -1,5 +1,5 @@
 diff --git a/dist/index.js b/dist/index.js
-index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f615a245b50 100644
+index 897e18978b1cca852872afcf42c698a0766311d4..f657d50bc9f56b44dbfb600efd2b5e2d24958bc6 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,6 +1,5 @@
@@ -29,18 +29,42 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  		const unsubscribe = ToastState.subscribe((toastItem) => {
  			if (toastItem.dismiss) {
  				requestAnimationFrame(() => {
-@@ -532,8 +531,8 @@ function Toast(props) {
+@@ -523,17 +522,27 @@ function Toast(props) {
+ 	const swipeDirections = () => props.swipeDirections ?? getDefaultSwipeDirections(props.position);
+ 	const y = createMemo(() => props.position.split("-")[0]);
+ 	const x = createMemo(() => props.position.split("-")[1]);
+-	const heightIndex = createMemo(() => Math.max(0, props.heights.findIndex((height) => height.toastId === props.toast.id)));
++	// OpenBot patch: stack in list order, not mount order. Toasts raised in one tick mount together and
++	// each prepends its height, so `heights` came out reversed and a toast past `visibleToasts` held an
++	// empty slot between the visible ones. A toast being removed has no height and takes no slot.
++	const measuredToasts = createMemo(() => props.toasts.filter((toast) => props.heights.some((height) => height.toastId === toast.id)));
++	const heightIndex = createMemo(() => Math.max(0, measuredToasts().findIndex((toast) => toast.id === props.toast.id)));
+ 	const toastsHeightBefore = createMemo(() => {
+-		return props.heights.reduce((prev, curr, reducerIndex) => {
+-			if (reducerIndex >= heightIndex()) return prev;
+-			return prev + curr.height;
+-		}, 0);
++		return measuredToasts().slice(0, heightIndex()).reduce((prev, toast) => prev + (props.heights.find((height) => height.toastId === toast.id)?.height ?? 0), 0);
  	});
  	const offset = createMemo(() => heightIndex() * (props.gap ?? GAP) + toastsHeightBefore());
  	const isDocumentHidden = useIsDocumentHidden();
 -	createEffect(() => {
 -		remainingTime = duration();
++	// OpenBot patch: a toast that mounts behind another is still collapsed and scaled down, and its
++	// height animates. Measure the natural layout height, which no transform or transition changes.
++	function layoutHeight(element) {
++		const originalHeight = element.style.height;
++		element.style.height = "auto";
++		const height = element.offsetHeight;
++		element.style.height = originalHeight;
++		return height;
++	}
 +	createEffect(() => duration(), (nextDuration) => {
 +		remainingTime = nextDuration;
  	});
  	function deleteToast() {
  		setRemoved(true);
-@@ -568,7 +567,7 @@ function Toast(props) {
+@@ -568,29 +577,24 @@ function Toast(props) {
  		});
  	}
  	const icon = () => props.toast.icon ?? props.icons?.[toastType()] ?? getAsset(toastType());
@@ -48,8 +72,17 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
 +	onSettled(() => {
  		setMounted(true);
  		if (!toastRef) return;
- 		const height = toastRef.getBoundingClientRect().height;
-@@ -583,10 +582,8 @@ function Toast(props) {
+-		const height = toastRef.getBoundingClientRect().height;
++		const height = layoutHeight(toastRef);
+ 		setInitialHeight(height);
+ 		props.setHeights((h) => [{
+ 			toastId: props.toast.id,
+ 			toasterId: props.toast.toasterId,
+ 			height,
+ 			position: props.toast.position
+-		}, ...h]);
++		}, ...h.filter((entry) => entry.toastId !== props.toast.id)]);
+ 		onCleanup(() => {
  			props.setHeights((h) => h.filter((height) => height.toastId !== props.toast.id));
  		});
  	});
@@ -57,12 +90,17 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
 -		if (!mounted() || !toastRef) return;
 -		resolveContent(props.toast.title);
 -		resolveContent(props.toast.description);
+-		const originalHeight = toastRef.style.height;
+-		toastRef.style.height = "auto";
+-		const nextHeight = toastRef.getBoundingClientRect().height;
+-		toastRef.style.height = originalHeight;
 +	createEffect(() => [mounted(), resolveContent(props.toast.title), resolveContent(props.toast.description)], ([isMounted]) => {
 +		if (!isMounted || !toastRef) return;
- 		const originalHeight = toastRef.style.height;
- 		toastRef.style.height = "auto";
- 		const nextHeight = toastRef.getBoundingClientRect().height;
-@@ -605,7 +602,7 @@ function Toast(props) {
++		const nextHeight = layoutHeight(toastRef);
+ 		setInitialHeight(nextHeight);
+ 		props.setHeights((heights) => {
+ 			if (!heights.find((height) => height.toastId === props.toast.id)) return [{
+@@ -605,7 +609,7 @@ function Toast(props) {
  			} : height);
  		});
  	});
@@ -71,7 +109,7 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  		props.expanded,
  		props.interacting,
  		props.toast,
-@@ -635,13 +632,13 @@ function Toast(props) {
+@@ -635,13 +639,13 @@ function Toast(props) {
  		onCleanup(() => {
  			if (timeoutId) clearTimeout(timeoutId);
  		});
@@ -88,7 +126,7 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  	return (() => {
  		var _el$2 = _tmpl$5(), _el$5 = _el$2.firstChild, _el$6 = _el$5.firstChild;
  		_el$2.$$pointermove = (event) => {
-@@ -914,7 +911,7 @@ function Toast(props) {
+@@ -914,7 +918,7 @@ function Toast(props) {
  	})();
  }
  function Toaster(props) {
@@ -97,7 +135,7 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  		position: "bottom-right",
  		hotkey: ["altKey", "KeyT"],
  		theme: "light",
-@@ -952,15 +949,15 @@ function Toaster(props) {
+@@ -952,15 +956,15 @@ function Toaster(props) {
  			return toasts.filter(({ id }) => id !== toastToRemove.id);
  		});
  	};
@@ -116,7 +154,7 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  				});
  				return;
  			}
-@@ -970,14 +967,13 @@ function Toaster(props) {
+@@ -970,14 +974,13 @@ function Toaster(props) {
  				setToastsStore("toasts", indexOfExistingToast, reconcile(nextToast));
  				return;
  			}
@@ -134,7 +172,7 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  		if (theme !== "system") {
  			setActualTheme(theme);
  			return;
-@@ -996,10 +992,10 @@ function Toaster(props) {
+@@ -996,10 +999,10 @@ function Toaster(props) {
  			onCleanup(() => darkMediaQuery.removeListener(updateTheme));
  		}
  	});
@@ -148,8 +186,17 @@ index 897e18978b1cca852872afcf42c698a0766311d4..85be9ab3e5be71712f21968385ba3f61
  		const handleKeyDown = (event) => {
  			if (propsWithDefaults.hotkey.length > 0 && propsWithDefaults.hotkey.every((key) => event[key] || event.code === key)) {
  				setExpanded(true);
+@@ -1146,7 +1149,7 @@ function Toaster(props) {
+ 						}));
+ 						effect((_p$) => {
+ 							var _v$31 = propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir, _v$32 = className$2(), _v$33 = actualTheme(), _v$34 = {
+-								"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++								"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
+ 								"--gap": `${propsWithDefaults.gap}px`,
+ 								...propsWithDefaults.style,
+ 								...assignOffset(propsWithDefaults.offset, propsWithDefaults.mobileOffset)
 diff --git a/dist/index.jsx b/dist/index.jsx
-index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a9ae16ce3 100644
+index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..38ebcf50731d4b5d63c5a79b2227b4bf82f9b403 100644
 --- a/dist/index.jsx
 +++ b/dist/index.jsx
 @@ -1,12 +1,11 @@
@@ -203,18 +250,42 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  	});
  	return { toasts: activeToasts };
  }
-@@ -511,8 +510,8 @@ function Toast(props) {
+@@ -502,17 +501,27 @@ function Toast(props) {
+ 	const swipeDirections = () => props.swipeDirections ?? getDefaultSwipeDirections(props.position);
+ 	const y = createMemo(() => props.position.split("-")[0]);
+ 	const x = createMemo(() => props.position.split("-")[1]);
+-	const heightIndex = createMemo(() => Math.max(0, props.heights.findIndex((height) => height.toastId === props.toast.id)));
++	// OpenBot patch: stack in list order, not mount order. Toasts raised in one tick mount together and
++	// each prepends its height, so `heights` came out reversed and a toast past `visibleToasts` held an
++	// empty slot between the visible ones. A toast being removed has no height and takes no slot.
++	const measuredToasts = createMemo(() => props.toasts.filter((toast) => props.heights.some((height) => height.toastId === toast.id)));
++	const heightIndex = createMemo(() => Math.max(0, measuredToasts().findIndex((toast) => toast.id === props.toast.id)));
+ 	const toastsHeightBefore = createMemo(() => {
+-		return props.heights.reduce((prev, curr, reducerIndex) => {
+-			if (reducerIndex >= heightIndex()) return prev;
+-			return prev + curr.height;
+-		}, 0);
++		return measuredToasts().slice(0, heightIndex()).reduce((prev, toast) => prev + (props.heights.find((height) => height.toastId === toast.id)?.height ?? 0), 0);
  	});
  	const offset = createMemo(() => heightIndex() * (props.gap ?? GAP) + toastsHeightBefore());
  	const isDocumentHidden = useIsDocumentHidden();
 -	createEffect(() => {
 -		remainingTime = duration();
++	// OpenBot patch: a toast that mounts behind another is still collapsed and scaled down, and its
++	// height animates. Measure the natural layout height, which no transform or transition changes.
++	function layoutHeight(element) {
++		const originalHeight = element.style.height;
++		element.style.height = "auto";
++		const height = element.offsetHeight;
++		element.style.height = originalHeight;
++		return height;
++	}
 +	createEffect(() => duration(), (nextDuration) => {
 +		remainingTime = nextDuration;
  	});
  	function deleteToast() {
  		setRemoved(true);
-@@ -523,19 +522,29 @@ function Toast(props) {
+@@ -523,23 +532,30 @@ function Toast(props) {
  		}, TIME_BEFORE_UNMOUNT);
  	}
  	function getLoadingIcon() {
@@ -229,14 +300,14 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
 +	onSettled(() => {
  		setMounted(true);
 +		if (!toastRef) return;
-+		const height = toastRef.getBoundingClientRect().height;
++		const height = layoutHeight(toastRef);
 +		setInitialHeight(height);
 +		props.setHeights((h) => [{
 +			toastId: props.toast.id,
 +			toasterId: props.toast.toasterId,
 +			height,
 +			position: props.toast.position
-+		}, ...h]);
++		}, ...h.filter((entry) => entry.toastId !== props.toast.id)]);
 +		return () => {
 +			props.setHeights((h) => h.filter((height) => height.toastId !== props.toast.id));
 +		};
@@ -245,12 +316,17 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
 -		if (!mounted() || true) return;
 -		resolveContent(props.toast.title);
 -		resolveContent(props.toast.description);
+-		const originalHeight = toastRef.style.height;
+-		toastRef.style.height = "auto";
+-		const nextHeight = toastRef.getBoundingClientRect().height;
+-		toastRef.style.height = originalHeight;
 +	createEffect(() => [mounted(), resolveContent(props.toast.title), resolveContent(props.toast.description)], ([isMounted]) => {
 +		if (!isMounted || !toastRef) return;
- 		const originalHeight = toastRef.style.height;
- 		toastRef.style.height = "auto";
- 		const nextHeight = toastRef.getBoundingClientRect().height;
-@@ -554,7 +563,7 @@ function Toast(props) {
++		const nextHeight = layoutHeight(toastRef);
+ 		setInitialHeight(nextHeight);
+ 		props.setHeights((heights) => {
+ 			if (!heights.find((height) => height.toastId === props.toast.id)) return [{
+@@ -554,7 +570,7 @@ function Toast(props) {
  			} : height);
  		});
  	});
@@ -259,7 +335,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  		props.expanded,
  		props.interacting,
  		props.toast,
-@@ -581,17 +590,19 @@ function Toast(props) {
+@@ -581,17 +597,19 @@ function Toast(props) {
  		};
  		if (expanded || interacting || (props.pauseWhenPageIsHidden ?? true) && isDocumentHidden()) pauseTimer();
  		else startTimer();
@@ -285,7 +361,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  		"--index": props.index,
  		"--toasts-before": props.index,
  		"--z-index": props.toasts.length - props.index,
-@@ -668,7 +679,7 @@ function Toast(props) {
+@@ -668,7 +686,7 @@ function Toast(props) {
  		if (Math.abs(swipeAmount.x) > 0 || Math.abs(swipeAmount.y) > 0) setIsSwiped(true);
  	}}>
        <Show when={closeButton() && !props.toast.jsx && toastType() !== "loading"}>
@@ -294,7 +370,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  		if (disabled() || !dismissible()) return;
  		deleteToast();
  		props.toast.onDismiss?.(props.toast);
-@@ -723,7 +734,7 @@ function Toast(props) {
+@@ -723,7 +741,7 @@ function Toast(props) {
      </li>;
  }
  function Toaster(props) {
@@ -303,7 +379,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  		position: "bottom-right",
  		hotkey: ["altKey", "KeyT"],
  		theme: "light",
-@@ -742,7 +753,7 @@ function Toaster(props) {
+@@ -742,7 +760,7 @@ function Toaster(props) {
  	const possiblePositions = createMemo(() => {
  		return Array.from(/* @__PURE__ */ new Set([propsWithDefaults.position, ...filteredToasts().filter((toast) => toast.position).map((toast) => toast.position)]));
  	});
@@ -312,7 +388,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  	const [expanded, setExpanded] = createSignal(false);
  	const [interacting, setInteracting] = createSignal(false);
  	const [actualTheme, setActualTheme] = createSignal(initialTheme);
-@@ -756,37 +767,38 @@ function Toaster(props) {
+@@ -756,37 +774,38 @@ function Toaster(props) {
  	const toastDescriptionClassName = () => mergeDescriptionClassName(toastOptions()?.descriptionClassName, toastOptions()?.descriptionClass);
  	const toastClassName = () => mergeClassName(toastOptions()?.className, toastOptions()?.class);
  	const removeToast = (toastToRemove) => {
@@ -365,7 +441,7 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  		if (theme !== "system") {
  			setActualTheme(theme);
  			return;
-@@ -799,22 +811,22 @@ function Toaster(props) {
+@@ -799,22 +818,22 @@ function Toaster(props) {
  		updateTheme(darkMediaQuery);
  		try {
  			darkMediaQuery.addEventListener("change", updateTheme);
@@ -394,14 +470,16 @@ index 182e62e6b58b336cb75f31b92e30012d9a9f6f67..dc8b5032465498bcd086799a3f49da8a
  	});
  	onCleanup(() => {
  		if (lastFocusedElementRef()) {
-@@ -830,7 +842,9 @@ function Toaster(props) {
+@@ -830,8 +849,10 @@ function Toaster(props) {
  		const toastsByPosition = createMemo(() => filteredToasts().filter((toast) => !toast.position && index() === 0 || toast.position === position));
  		const heightsByPosition = createMemo(() => heights().filter((height) => index() === 0 && !height.position || height.position === position));
  		return <Show when={filteredToasts().length > 0}>
 -              <ol tabIndex={-1} ref={listRef} dir={propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir} class={className()} data-sonner-toaster data-sonner-theme={actualTheme()} data-y-position={y} data-x-position={x} style={{
+-			"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
 +              <ol tabIndex={-1} ref={(element) => {
 +                listRef = element;
 +              }} dir={propsWithDefaults.dir === "auto" ? getDocumentDirection() : propsWithDefaults.dir} class={className()} data-sonner-toaster data-sonner-theme={actualTheme()} data-y-position={y} data-x-position={x} style={{
- 			"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++			"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
  			"--width": `${TOAST_WIDTH}px`,
  			"--gap": `${propsWithDefaults.gap}px`,
+ 			...propsWithDefaults.style,

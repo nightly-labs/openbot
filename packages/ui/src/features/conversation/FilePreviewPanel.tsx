@@ -163,6 +163,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           type="button"
           class="browser-toolbar-button"
           aria-label={t("preview.panel.close")}
+          data-cuelume-tap="close"
           onClick={props.onClose}
         >
           <X class="browser-toolbar-icon" />

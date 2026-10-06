@@ -1,7 +1,9 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
+import { playActionSound } from "../../../action-sounds";
 import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
@@ -99,13 +101,13 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     ) {
       for (const attachment of selected)
         void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, target.serverId);
-      deps.setComposerError("Save is not confirmed. Retry Save to check the result.", target);
+      deps.setComposerError(t("composer.error.saveUnconfirmed"), target);
       return;
     }
     deps.clearConversationError(target);
     const key = composerDraftKey(target);
     const draft = deps.drafts()[key] ?? EMPTY_DRAFT;
-    const available = Math.max(0, 10 - draft.attachments.length);
+    const available = Math.max(0, INPUT_LIMITS.attachments - draft.attachments.length);
     const accepted = selected.slice(0, available);
     for (const attachment of selected.slice(available)) {
       void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, target.serverId);
@@ -139,7 +141,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       }
     }
     const currentDraft = deps.drafts()[key] ?? EMPTY_DRAFT;
-    const remaining = Math.max(0, 10 - currentDraft.attachments.length);
+    const remaining = Math.max(0, INPUT_LIMITS.attachments - currentDraft.attachments.length);
     for (const item of accepted.splice(remaining))
       void conversationRuntime(deps.props).agent.discardDraftAttachment(item.id, target.serverId);
     deps.setDrafts((current) => ({
@@ -149,7 +151,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         attachments: [...currentDraft.attachments, ...accepted],
       },
     }));
-    if (selected.length > accepted.length) deps.setComposerError("You can attach at most 10 files.", target);
+    if (selected.length > accepted.length)
+      deps.setComposerError(t("composer.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }), target);
     deps.setShowComposerActions(false);
   }
 
@@ -518,6 +521,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.clearConversationError(target);
       if (submittedSnapshot) deps.clearSubmittedDraft(target, submittedSnapshot);
       else deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: EMPTY_DRAFT }));
+    } else {
+      playActionSound("error");
     }
     return sent;
   }

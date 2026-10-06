@@ -272,6 +272,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
               class="provider-code-login-close"
               label={t("provider.codeLogin.closeLabel", { name: props.providerName })}
               variant="ghost"
+              data-cuelume-tap="close"
               onClick={props.onCancel}
             >
               <X />

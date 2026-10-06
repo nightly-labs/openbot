@@ -41,6 +41,7 @@ import {
   decodeAgentModels,
   decodeAgentStatusFromMain,
   decodeAgents,
+  decodeAutomationRunCommand,
   decodeDuplicateAgentResultFromMain,
   decodeHostAnalyticsFromMain,
   decodeMemories,
@@ -48,6 +49,7 @@ import {
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeRoutine,
+  decodeRoutineCalendar,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -87,6 +89,7 @@ import {
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
   decodeNullablePath,
+  decodeOnePasswordConnectorStatus,
   decodePendingAgentTemplate,
   decodePendingListing,
   decodeProviderDetectionSettings,
@@ -132,6 +135,7 @@ import {
   decodeDynamicIslandPreference,
   decodeDynamicIslandPresentation,
 } from "./dynamic-island-decoding";
+import { decodeAddSlackOrchestratorReply, decodeSlackOverviewReply } from "./messaging-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
   decodeAgentInstallation,
@@ -461,6 +465,8 @@ const openbotApi: OpenBotDesktopApi = {
   ...bridgeGroup(IPC_ENDPOINTS.providers, {
     connectProvider: decodeAgentStatusFromMain,
     refreshAgentProviders: decodeAgentStatusFromMain,
+    restartProvider: decodeAgentStatusFromMain,
+    cancelProviderRestart: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
     setProviderApiKey: decodeAgentStatusFromMain,
     clearProviderApiKey: decodeAgentStatusFromMain,
@@ -476,6 +482,7 @@ const openbotApi: OpenBotDesktopApi = {
     preference: decodeDynamicIslandPreference,
     presentation: decodeDynamicIslandPresentation,
     geometry: decodeDynamicIslandGeometry,
+    getBuiltInDisplayGeometry: decodeDynamicIslandGeometry,
     performAction: decodeVoid,
     performHaptic: decodeVoid,
     action: decodeDynamicIslandAction,
@@ -551,6 +558,17 @@ const openbotApi: OpenBotDesktopApi = {
     openInstall: decodeVoid,
     changed: decodeGitHubConnectorStatus,
   }),
+  onePasswordConnector: bridgeGroup(IPC_ENDPOINTS.onePasswordConnector, {
+    status: decodeOnePasswordConnectorStatus,
+    checkSetup: decodeOnePasswordConnectorStatus,
+    installCli: decodeOnePasswordConnectorStatus,
+    openApp: decodeVoid,
+    connect: decodeOnePasswordConnectorStatus,
+    connectWithToken: decodeOnePasswordConnectorStatus,
+    cancel: decodeOnePasswordConnectorStatus,
+    disconnect: decodeOnePasswordConnectorStatus,
+    changed: decodeOnePasswordConnectorStatus,
+  }),
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
@@ -596,6 +614,14 @@ const openbotApi: OpenBotDesktopApi = {
     listCustomProviders: decodeCustomProviders,
     saveCustomProvider: decodeCustomProviderResult,
     deleteCustomProvider: decodeCustomProviderResult,
+  }),
+  messaging: bridgeGroup(IPC_ENDPOINTS.messaging, {
+    getSlackOverview: decodeSlackOverviewReply,
+    connectSlackWorkspace: decodeVoid,
+    disconnectSlackWorkspace: decodeVoid,
+    reconnectSlackWorkspace: decodeVoid,
+    setSlackEnabled: decodeVoid,
+    addSlackOrchestrator: decodeAddSlackOrchestratorReply,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
@@ -649,6 +675,8 @@ const openbotApi: OpenBotDesktopApi = {
       deleteRoutine: decodeVoid,
       testRoutine: decodeRoutineRun,
       listRoutineRuns: decodeRoutineRuns,
+      automationRunCommand: decodeAutomationRunCommand,
+      routineCalendar: decodeRoutineCalendar,
     }),
     ...bridgeGroup(IPC_ENDPOINTS.channelMemories, {
       listChannelMemories: decodeChannelMemories,
@@ -735,6 +763,8 @@ const openbotApi: OpenBotDesktopApi = {
     getPreference: decodeUpdatePreference,
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,
+    restartWhenIdle: decodeUpdateStatus,
+    cancelIdleRestart: decodeUpdateStatus,
     event: decodeUpdateStatus,
     preference: decodeUpdatePreference,
   }),

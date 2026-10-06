@@ -16,7 +16,6 @@ export const messages = defineMessages("attachment", {
   "attachment.error.open": "Could not open or save this attachment. Try again.",
   "attachment.error.openFile": "Could not open this file. Try again.",
   "attachment.error.fileFallback": "File",
-  "attachment.error.fileNotFound":
-    "“{name}” was not found. Ask the agent to create or restore the file, then click the link again.",
+  "attachment.error.fileNotFound": "“{name}” was not found at this path. It may have been moved or deleted.",
   "attachment.error.previewFile": "Could not preview “{name}”. Try again.",
 });

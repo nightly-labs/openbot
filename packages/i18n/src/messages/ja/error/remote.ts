@@ -30,6 +30,14 @@ export const messages = {
   "error.remote.localTestListenerUnavailable": "ローカルテストのリスナーを利用できません。",
   "error.remote.localTestNotFound": "ローカルテストのセッションが見つかりません。",
   "error.remote.runtimeUnavailable": "リモートデスクトップのランタイムを利用できません。",
+  "error.remote.sunshineStartFailed":
+    "ホストで Sunshine を起動できませんでした。ホストのリモートデスクトップのログを確認してから、もう一度お試しください。",
+  "error.remote.moonlightStartFailed":
+    "ホストで Moonlight Web を起動できませんでした。ホストのリモートデスクトップのログを確認してから、もう一度お試しください。",
+  "error.remote.pairingFailed":
+    "ホストで Moonlight と Sunshine をペアリングできませんでした。もう一度お試しください。問題が続く場合は、ホストで OpenBot を再起動してください。",
+  "error.remote.runtimeStartFailed":
+    "ホストでリモートデスクトップのランタイムを起動できませんでした。ホストのリモートデスクトップのログを確認してから、もう一度お試しください。",
   "error.remote.hostUnreachable": "ホストに接続できません。",
   "error.remote.signInToHostAgain": "このホストにもう一度サインインしてください。",
   "error.remote.invalidData": "ホストが無効なデータを返しました。",
@@ -122,6 +130,8 @@ export const messages = {
   "error.remote.pairedIdentityChanged":
     "ペアリングしたデスクトップの ID がないか、変わっています。そのデスクトップで新しいコードをスキャンしてください。",
   "error.remote.permanentInviteNoEmail": "永続的な招待はメールで送信できません。",
+  "error.remote.selfHostedInviteNoEmail":
+    "セルフホストのアカウントサービスの招待はメールで送信できません。リンクをコピーしてください。",
   "error.remote.inviteOtherService": "この招待は別の OpenBot サービスのものです。",
   "error.remote.inviteFingerprintMismatch": "招待のホストの ID がフィンガープリントと一致しません。",
   "error.remote.inviteHostKeyMissing": "招待のホストキーがありません。",

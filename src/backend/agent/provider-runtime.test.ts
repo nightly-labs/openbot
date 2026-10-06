@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { teeLogLines } from "@openbot/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentProcessExitError, type AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -29,7 +30,8 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { createAcpRequestEchoReader, isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { OPENCODE_FREE_MODEL_FALLBACKS } from "./provider-models";
 import { PROVIDER_IDLE_RELEASE_MS, PROVIDER_UNASSIGNED_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
@@ -151,6 +153,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       opencode: 0,
       antigravity: 0,
       cursor: 0,
+      cline: 0,
       acp: 0,
     };
     const availableOrder: AgentProvider[] = [];
@@ -314,6 +317,72 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listModels().filter((model) => model.provider === "opencode")).toEqual([]);
   });
 
+  it("discovers OpenCode models when a reconnect signs in after sign-in-required", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    let opencodeClients = 0;
+    const { service: agentService } = await startService(root, {
+      client: (provider) => {
+        if (provider === "opencode") opencodeClients += 1;
+        return new FakeAgentClient(provider, "DONE", false, provider !== "opencode" || opencodeClients > 1);
+      },
+      preferredProvider: "opencode",
+    });
+    service = agentService;
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "opencode", state: "sign-in-required" }),
+    );
+    await service.connectProvider("opencode", vi.fn());
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "opencode", state: "available" }),
+    );
+    expect(
+      service
+        .listModels()
+        .filter((model) => model.provider === "opencode")
+        .map((model) => model.id),
+    ).toEqual(["opencode/example-model"]);
+  });
+
+  it.each(["throws", "returns empty"] as const)(
+    "offers the OpenCode free tier when discovery %s after the preferred provider fails to sign in",
+    async (discoveryFailure) => {
+      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      const { service: agentService, clientFor } = await startService(root, {
+        preferredProvider: "codex",
+        client: (provider) => {
+          // Reproduce the reported order: ChatGPT/Codex fails its account check first, then the
+          // authenticated OpenCode provider reports an unavailable catalog.
+          const client = new FakeAgentClient(
+            provider,
+            "DONE",
+            false,
+            provider !== "codex",
+            provider === "opencode" ? { "account/read": 25 } : {},
+          );
+          if (provider === "opencode") {
+            client.modelList = () => {
+              if (discoveryFailure === "throws") throw new Error("OpenCode model discovery timed out.");
+              return { data: [] };
+            };
+          }
+          return client;
+        },
+      });
+      service = agentService;
+
+      expect(service.getStatus().providers).toContainEqual(
+        expect.objectContaining({ id: "codex", state: "sign-in-required" }),
+      );
+      expect(service.getStatus().providers).toContainEqual(
+        expect.objectContaining({ id: "opencode", state: "available" }),
+      );
+      expect(clientFor("opencode")?.requests.some((request) => request.method === "model/list")).toBe(true);
+      expect(service.listModels().filter((model) => model.provider === "opencode")).toEqual(
+        OPENCODE_FREE_MODEL_FALLBACKS,
+      );
+    },
+  );
+
   it("restarts OpenCode on a changed key before it reports the change", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     let storedKey: string | null = null;
@@ -378,7 +447,10 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     const fallback = service.listModels();
     await service.initialize();
-    expect(service.listModels()).toEqual(fallback);
+    const catalog = service.listModels();
+    const byProviderAndId = (models: typeof catalog) =>
+      [...models].sort((left, right) => left.provider.localeCompare(right.provider) || left.id.localeCompare(right.id));
+    expect(byProviderAndId(catalog)).toEqual(byProviderAndId(fallback));
   });
 
   it.each(["codex", "claude", "grok"] as const)(
@@ -1159,6 +1231,45 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("keeps an MCP secret out of the provider log when a usage read fails", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) =>
+        new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
+          if (method === "account/rateLimits/read") throw new Error("Usage refused abcdef123456");
+        }),
+      bundledExecutables: {},
+    });
+    await service.initialize();
+    new McpServerStore(store.database).save({
+      id: "",
+      name: "Filesystem",
+      transport: "stdio",
+      enabled: true,
+      command: "/bin/echo",
+      args: [],
+      env: [{ key: "API_KEY", value: "abcdef123456" }],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "",
+      headers: [],
+    });
+    const lines: string[] = [];
+    const removeTee = teeLogLines(["provider-runtime"], (line) => lines.push(line));
+    try {
+      await service.getUsage();
+    } finally {
+      removeTee();
+    }
+
+    const failure = lines.find((line) => line.includes("Could not read provider usage."));
+    expect(failure).toContain("Usage refused");
+    expect(failure).not.toContain("abcdef123456");
+  });
+
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -1529,6 +1640,53 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
     ]);
+  });
+
+  it("keeps the ACP SDK copy of an error reply out of the toast, and logs no request body", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex did not start.");
+
+    // The records Cline's CLI wrote for a failed `session/new`, one per line, with an MCP secret.
+    const echo = [
+      "Error handling request {",
+      'jsonrpc: "2.0",',
+      "id: 1,",
+      'method: "session/new",',
+      "params: {",
+      'mcpServers: [ { name: "linear", env: [ { name: "TOKEN", value: "lin_secret_value" } ] } ],',
+      "},",
+      "} {",
+      "code: -32603,",
+      'message: "Internal error",',
+      "data: undefined,",
+      "}",
+    ];
+    for (const record of echo) client.emit("diagnostic", record);
+    client.emit("diagnostic", "ERROR codex: the model endpoint could not be reached");
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR codex: the model endpoint could not be reached" }),
+    ]);
+    const read = createAcpRequestEchoReader();
+    const results = echo.map(read);
+    expect(results.at(-1)).toEqual({ method: "session/new", error: "Internal error" });
+    expect(results.slice(0, -1).every((result) => result === null)).toBe(true);
   });
 
   it.each([

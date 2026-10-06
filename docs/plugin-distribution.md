@@ -1,14 +1,21 @@
 # Plugin distribution and sharing
 
-Status: partly built. The catalog source, the build, the Plugins tab, install and uninstall, the
-public pages and the deep link exist. The served catalog does not: steps 3 to 5 of
+Status: partly built. The catalog source, the build, the Apps tab of the Marketplace, install and
+uninstall, the public pages and the deep link exist. The served catalog does not: steps 3 to 5 of
 [Order of work](#8-order-of-work) are open. This document records the decisions.
+
+The catalog has no GitHub plugin. The built-in GitHub connector is the GitHub app, in the
+Marketplace and in Server settings › Connectors. An MCP row that the retired plugin saved stays,
+and the Marketplace shows it as a server that the user added. While that row is named `github`, it
+hides the connector's MCP server from agents (`src/backend/agent/mcp-gateway.ts`), so the user must
+remove it.
 
 ## Why this document exists
 
-The marketplace modal has a Plugins tab with a catalog list and a detail page
-(`src/renderer/src/features/settings/MarketplacePluginDetail.tsx`). The tab has an agent picker
-beside `Install plugin`, and a `Copy link` button. When this document was written, all of it read
+The marketplace modal had a Plugins tab with a catalog list and a detail page
+(`MarketplacePluginDetail.tsx`, now the Apps tab and the app page in
+`packages/ui/src/features/marketplace/`). The tab had an agent picker beside `Install plugin`, and a
+`Copy link` button. When this document was written, all of it read
 story fixtures.
 
 Two things are not decided:
@@ -32,7 +39,7 @@ This document answers three questions:
 | Catalog source | A static catalog on `openbot.run`. The app gets it and keeps a copy. |
 | Not used | The Worker and D1 route that the skills and agents marketplaces use. |
 | Submissions | Out of scope in this round. A plugin is added in the repository. |
-| Install target | The app (the MCP server) is host-global. The skills go to the agent in the picker. |
+| Install target | The app (the MCP server) is host-global. The skills go to the agent whose chat is open, else to the first agent. |
 | Scope | Catalog delivery and the public share link. |
 
 `projection_mcp_servers` does not change. No migration is necessary for this work.
@@ -218,8 +225,8 @@ mirror.
 
 ## 3. What "Install plugin" does
 
-The app is host-global. The skills are per agent. The user picks the agent in the picker on the
-listing page.
+The app is host-global. The skills are per agent. They go to the agent whose chat is open, else to
+the first agent. The app page has no agent picker.
 
 1. Read the detail, and check its hash.
 2. Check before any write: build the `McpServerConfig`, run `mcpConfigErrors`, and refuse a reserved
@@ -255,13 +262,13 @@ find a probable install, but it then offers "Reinstall" and not a version.
 
 ### 3.3 Uninstall
 
-Uninstall removes the plugin's skills from the agent in the picker, and the plugin's apps from the
-host. Nothing is silent: the listing shows `Uninstall plugin` in the install button's place, and a
+Uninstall removes the plugin's skills from that agent, and the plugin's apps from the
+host. Nothing is silent: the app page shows `Disconnect` in the Connect button's place, and a
 confirmation names every app row and every skill slug that is about to go before any of them does.
 While only part of a plugin is here - one app saved before a later one failed, or one removal that
 failed - the page offers both: the install can finish the job, and what is here can still go.
 
-Built, in `SkillsMarketplaceModal.tsx`:
+Built, in `src/renderer/src/features/settings/marketplace-controller.ts`:
 
 - the plan is read from this computer, not from the listing. An app the host does not hold and a
   skill the agent does not hold are not named and not removed;
@@ -361,8 +368,8 @@ file, so a share page stays readable for a reader who has no app.
 
 ### 4.4 In the app
 
-The link raises and focuses the window, and then opens Settings, Marketplace, the Plugins tab, and
-that listing. The transport copies the invite mechanism: an event `plugins:open-listing` and a
+The link raises and focuses the window, and then opens the Marketplace on the Apps tab, at that
+app's page. The transport copies the invite mechanism: an event `plugins:open-listing` and a
 request `plugins:take-pending-listing`, read in `src/renderer/src/app-bootstrap.tsx`. The pending
 value is necessary, because a message to a window that still loads is lost.
 
@@ -428,7 +435,7 @@ mandatory.
 | `src/main/ipc/plugin-handlers.test.ts` | The sender check runs before the payload is read. A bad slug is refused. The pending link is given one time. |
 | `src/main/plugin-catalog-service.test.ts` | A 304 answer, a wrong hash, the offline fallback, the choice between the snapshot and the cache, and a part-completed install. |
 | `src/main/ipc-channel-coverage.test.ts` | Exists. It fails until the channels are in the contracts, the preload and the mock. |
-| `src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx` | A slug opens the Plugins tab and that listing, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. For the uninstall: the confirmation names the app and the skill and removes neither, a confirmed uninstall removes the host row before the agent's skill, a cancel removes nothing, and a failed app removal still takes the skill, is reported, and still offers the uninstall, and a server that only shares the app's name is neither read as installed nor removable. |
+| `src/renderer/src/features/settings/MarketplaceModal.test.tsx` | A slug opens the app's page, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. For the uninstall: the confirmation names the app and the skill and removes neither, a confirmed uninstall removes the host row before the agent's skill, a cancel removes nothing, and a failed app removal still takes the skill, is reported, and still offers the uninstall, and a server that only shares the app's name is neither read as installed nor removable. |
 | `apps/auth-api/test/` page and metadata tests | The page shows the listing and both buttons. The canonical URL and the sitemap are correct. An unknown slug gives a 404. |
 
 ## 7. Open questions
@@ -463,12 +470,12 @@ Ordered by cost.
    read the generated catalog. The JSON route does not exist.
 4. The contract types, the channels, the decoders, the preload and the mock.
 5. `src/main/plugin-catalog-service.ts`: the request, the cache and the snapshot.
-6. ~~Connect the Plugins tab to the real data. Keep the fixtures for Storybook.~~ Partly done: the
+6. ~~Connect the Plugins tab (now the Apps tab) to the real data. Keep the fixtures for Storybook.~~ Partly done: the
    tab reads the generated `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`,
    built from `marketplace/plugin-catalog/`. Steps 3 to 5 replace that generated
    file with the served catalog; nothing the tab renders changes.
-7. Install and uninstall. Install is done: the page installs each pinned skill into the agent in the
-   picker, then saves the listing's MCP server through `saveMcpServer` on the selected host. It
+7. Install and uninstall. Install is done: the page installs each pinned skill into the agent whose
+   chat is open (else the first agent), then saves the listing's MCP server through `saveMcpServer` on the selected host. It
    reads the installed state back from `listMcpServers` and from the agent's installed skills, so a
    listing counts as installed only when both halves are present. A skill installs by published
    version through the optional `versionId` on `skills.install`, which the main process routes to
@@ -476,7 +483,7 @@ Ordered by cost.
    Uninstall is done as well: see 3.3. The MCP settings panel and the agent's skills panel still
    remove one piece at a time, for a user who wants only one of them.
 8. ~~The deep-link router and the share link.~~ Done. `src/main/deep-link-router.ts` decides which
-   kind an `openbot://` link is, `openbot://plugins/<slug>` opens that listing in the Plugins tab
+   kind an `openbot://` link is, `openbot://plugins/<slug>` opens that app's page in the Apps tab
    and installs nothing, and `openbot.run/plugins/<slug>` now answers, so the detail page offers
    `Copy link` again. The public pages read the same catalog the tab reads, from
    `packages/contracts/src/plugin-catalog.ts`.

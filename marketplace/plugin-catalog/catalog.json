@@ -1,11 +1,10 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "v1",
-  "updatedAt": "2026-09-19T00:00:00.000Z",
+  "updatedAt": "2026-09-30T00:00:00.000Z",
   "order": [
     "aave",
     "canva",
-    "github",
     "linear",
     "notion",
     "figma",
@@ -20,5 +19,5 @@
     "resend",
     "composio"
   ],
-  "featured": ["aave", "canva", "github", "notion", "figma"]
+  "featured": ["aave", "canva", "notion", "figma"]
 }

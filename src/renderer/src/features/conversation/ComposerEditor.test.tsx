@@ -17,6 +17,7 @@ function renderComposer(
   agents: AgentProfile[] = [],
   skills: InstalledSkill[] = [],
   mcpServers: McpServerConfig[] = [],
+  sendShortcut: "enter" | "meta-enter" | "ctrl-enter" = "enter",
 ) {
   const onSubmit = vi.fn();
   const onValueChange = vi.fn();
@@ -35,6 +36,7 @@ function renderComposer(
         placeholder="Message Chief"
         ariaLabel="Message Chief"
         disabled={false}
+        sendShortcut={sendShortcut}
         onValueChange={(nextValue) => {
           onValueChange(nextValue);
           setValue(nextValue);
@@ -161,5 +163,50 @@ describe("ComposerEditor", () => {
     renderComposer([], "@[Aave](mcp:mcp-aave) is down?", [], [], []);
 
     expect(screen.getByLabelText("Unavailable MCP server Aave")).toBeInTheDocument();
+  });
+
+  it("adds a line on plain Enter and sends on the modifier chord in modifier mode", async () => {
+    const { editor, onSubmit, onValueChange } = renderComposer([], "", [], [], [], "meta-enter");
+
+    await typeQuery(editor, "first");
+    await fireEvent.keyDown(editor, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onValueChange).toHaveBeenCalledWith("first\n"));
+    expect(editor.textContent).toContain("\n");
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, shiftKey: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("sends on Ctrl+Enter in modifier mode on other platforms", async () => {
+    const { editor, onSubmit } = renderComposer([], "", [], [], [], "ctrl-enter");
+
+    await typeQuery(editor, "first");
+    await fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(editor.textContent).toContain("first");
+  });
+
+  it("does not submit a Safari post-composition Enter in modifier mode", async () => {
+    const { editor, onSubmit } = renderComposer([], "", [], [], [], "meta-enter");
+
+    await fireEvent.compositionStart(editor);
+    await typeQuery(editor, "にほんご");
+    // Chromium: before compositionend, with isComposing.
+    await fireEvent.keyDown(editor, { key: "Enter", keyCode: 229, isComposing: true });
+    await fireEvent.compositionEnd(editor);
+    // Safari: after compositionend, without isComposing.
+    await fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // The send chord during composition belongs to the IME too.
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true, keyCode: 229, isComposing: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 });

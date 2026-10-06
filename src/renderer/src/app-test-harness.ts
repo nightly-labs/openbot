@@ -11,6 +11,7 @@ import {
   type ComputerUseState,
   type ConversationPage,
   DISCONNECTED_GITHUB_CONNECTOR,
+  DISCONNECTED_ONEPASSWORD_CONNECTOR,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
   type DynamicIslandAction,
@@ -112,6 +113,23 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
         state: "sign-in-required",
         connectionState: "connecting",
         version: "2026.09.28-64d2043",
+        message: null,
+      },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
+  cline: {
+    phase: "blocked",
+    cliVersion: "3.0.68",
+    auth: { kind: "unknown" },
+    providers: [
+      {
+        id: "cline",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "3.0.68",
         message: null,
       },
     ],
@@ -573,6 +591,7 @@ export function installOpenbotStub(): void {
       setPreference: vi.fn(async (preference) => ({ ...preference })),
       publishPresentation: vi.fn().mockResolvedValue(undefined),
       getPresentation: vi.fn().mockResolvedValue(null),
+      getBuiltInDisplayGeometry: vi.fn().mockResolvedValue({ width: 192, height: 32 }),
       performAction: vi.fn().mockResolvedValue(undefined),
       performHaptic: vi.fn().mockResolvedValue(undefined),
       onAction: vi.fn(dynamicIslandActionBridge.subscribe),
@@ -591,6 +610,9 @@ export function installOpenbotStub(): void {
     githubConnector: stubGroup(IPC_ENDPOINTS.githubConnector, "githubConnector", {
       status: vi.fn().mockResolvedValue(DISCONNECTED_GITHUB_CONNECTOR),
       repositories: vi.fn().mockResolvedValue({ repositories: [], total: 0 }),
+    }),
+    onePasswordConnector: stubGroup(IPC_ENDPOINTS.onePasswordConnector, "onePasswordConnector", {
+      status: vi.fn().mockResolvedValue(DISCONNECTED_ONEPASSWORD_CONNECTOR),
     }),
     billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
     hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
@@ -644,6 +666,7 @@ export function installOpenbotStub(): void {
       updateRoutine: notStubbed("agent.updateRoutine"),
       deleteRoutine: notStubbed("agent.deleteRoutine"),
       testRoutine: notStubbed("agent.testRoutine"),
+      automationRunCommand: notStubbed("agent.automationRunCommand"),
       saveMcpServer: notStubbed("agent.saveMcpServer"),
       removeMcpServer: notStubbed("agent.removeMcpServer"),
       setMcpServerEnabled: notStubbed("agent.setMcpServerEnabled"),
@@ -743,6 +766,7 @@ export function installOpenbotStub(): void {
       listMemories: vi.fn().mockResolvedValue([]),
       listRoutines: vi.fn().mockResolvedValue([]),
       listRoutineRuns: vi.fn().mockResolvedValue([]),
+      routineCalendar: vi.fn().mockResolvedValue({ routines: [], runs: [] }),
       listTables: vi.fn().mockResolvedValue([]),
       deleteTable: vi.fn().mockResolvedValue(undefined),
       createMemory: vi.fn().mockImplementation(async (input) => ({
@@ -1150,6 +1174,7 @@ export function installOpenbotStub(): void {
     }),
     providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),
     hostAdmin: stubGroup(IPC_ENDPOINTS.hostAdmin, "hostAdmin", {}),
+    messaging: stubGroup(IPC_ENDPOINTS.messaging, "messaging", {}),
     // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is
     // absent, and these tests cover that flow. A stub member switches every screen to downloads.
   } satisfies Omit<OpenBotDesktopApi, "providerRuntimes">;

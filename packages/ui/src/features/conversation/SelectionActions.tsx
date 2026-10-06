@@ -429,6 +429,7 @@ export function SelectionActionsBar(props: {
                 type="button"
                 class="selection-actions-icon-button"
                 aria-label={t("chat.selection.close")}
+                data-cuelume-tap="close"
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={props.onDismiss}
               >
@@ -517,6 +518,7 @@ export function SelectionActionsBar(props: {
                   class="selection-actions-icon-button selection-actions-expand"
                   aria-label={t(expanded() ? "chat.selection.showFewer" : "chat.selection.showMore")}
                   aria-expanded={expanded() ? "true" : "false"}
+                  data-cuelume-tap={expanded() ? "close" : "open"}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => setExpanded((value) => !value)}
                 >

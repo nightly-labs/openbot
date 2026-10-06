@@ -1,6 +1,7 @@
 import type { DynamicIslandNotchSize } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { useText } from "./text";
 import { cx, mix, prefersReducedMotion } from "./utils";
 
 export type DynamicIslandViewState = "compact" | "expanded";
@@ -44,6 +45,12 @@ export interface DynamicIslandProps {
   hoverContentMotion?: DynamicIslandHoverContentMotion;
   pointerToggle?: boolean;
   sharedMotion?: DynamicIslandSharedMotion;
+  /**
+   * Moves the compact content with the surface when the compact size changes, so the leading and
+   * trailing content never leave the surface. A consumer that animates its own content across a
+   * size change turns it off for that change. Defaults to true.
+   */
+  compactContentFollowsResize?: boolean;
   displayMode?: DynamicIslandDisplayMode;
   notchSize?: DynamicIslandNotchSize;
   ariaLive?: "off" | "polite" | "assertive";
@@ -53,6 +60,8 @@ export interface DynamicIslandProps {
 const HOVER_EXPAND_DELAY = 300;
 const HOVER_EXIT_DELAY = 100;
 const HOVER_WIDTH_GROWTH = 32;
+/** The compact height with no notch and no user size: `--dynamic-island-notch-height` in the CSS. */
+const DEFAULT_COMPACT_HEIGHT = 32;
 const HOVER_HEIGHT_GROWTH = 8;
 const CONTENT_EXIT_LEAD = 90;
 const PANEL_EXIT_DURATION = CONTENT_EXIT_LEAD + 450;
@@ -72,6 +81,19 @@ const CONTENT_EXIT_DURATION = 280;
 // content shrinking toward the notch after it, makes the panel withdraw instead of being sliced.
 const CONTENT_EXIT_FADE_OFFSET = 0.45;
 const CONTENT_BLUR = 4;
+// `data-compact-resize` marks the compact content as moving. It stays on while one resize follows
+// another, so a slider drag does not flash the motion styles on and off, and it goes at this part of
+// the spring, where the surface slows down, so the content is sharp again as the surface settles.
+const COMPACT_RESIZE_SETTLE = 0.6;
+// How far the compact row still has to go for the full motion styles. `--dynamic-island-compact-motion`
+// is that distance as 0 to 1, so the styles follow the size of the move: one slow slider step barely
+// blurs, and a jump across the range, or a fast drag the surface lags behind, blurs in full.
+const COMPACT_RESIZE_FULL_MOTION_DISTANCE = 120;
+const COMPACT_RESIZE_LARGE_MOTION = 0.5;
+// After a large move, `data-compact-settled` marks the landing for this long, so the compact content
+// can play a short arrival that is shorter than this. A small move, such as one slow slider step,
+// gets none.
+const COMPACT_SETTLED_DURATION = 700;
 const CONTENT_ENTER_DELAY = 90;
 const CONTENT_BLUR_OPEN_DURATION = 460;
 const CONTENT_BLUR_CLOSE_DURATION = 450;
@@ -92,6 +114,7 @@ export const DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH = 38;
  */
 export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   const local = props;
+  const { t } = useText();
   const panelId = `dynamic-island-${createUniqueId()}`;
   let shell: HTMLDivElement | undefined;
   let sizeTarget: HTMLDivElement | undefined;
@@ -105,6 +128,7 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   let hoverTrailingContent: HTMLSpanElement | undefined;
   let panelContent: HTMLDivElement | undefined;
   let toggleButton: HTMLButtonElement | undefined;
+  let notchSafeZone: HTMLSpanElement | undefined;
   let hoverExpandTimer: ReturnType<typeof setTimeout> | undefined;
   let hoverExitTimer: ReturnType<typeof setTimeout> | undefined;
   let panelExitTimer: ReturnType<typeof setTimeout> | undefined;
@@ -247,13 +271,16 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
   createSmoothSizeResize({
     container: () => shell,
     content: () => sizeTarget,
+    compactContent: () => [toggleButton, notchSafeZone],
+    compactContentEnabled: () => local.compactContentFollowsResize ?? true,
     silhouette: () => ({
       root: silhouetteRoot,
       body: silhouetteBody,
       leadingShoulder,
       trailingShoulder,
     }),
-    silhouetteTarget: () => islandSilhouetteTarget(viewState(), local.displayMode ?? "notch"),
+    silhouetteTarget: () =>
+      islandSilhouetteTarget(viewState(), local.displayMode ?? "notch", compactHeightScale(local)),
     sharedLeading: () => leadingContent,
     sharedLeadingEnabled: () => Boolean(local.sharedMotion?.leading),
     sharedLeadingTarget: () =>
@@ -363,7 +390,10 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
             type="button"
             aria-controls={panelId}
             aria-expanded={isExpanded() ? "true" : "false"}
-            aria-label={`${isExpanded() ? "Collapse" : "Expand"} ${local.label}`}
+            aria-label={t(isExpanded() ? "island.action.collapse" : "island.action.expand", { label: local.label })}
+            // A click that does not toggle gets no cue. The cue reads the state before the toggle.
+            data-cuelume-open={local.pointerToggle === false ? undefined : isExpanded() ? "close" : ""}
+            data-cuelume-emphasis="subtle"
             onClick={(event) => {
               if (event.detail > 0 && local.pointerToggle === false) return;
               toggle(event.detail === 0 ? "keyboard" : "pointer");
@@ -376,7 +406,7 @@ export function DynamicIsland(props: DynamicIslandProps): JSX.Element {
                 </span>
               </span>
             </span>
-            <span class="dynamic-island-notch-safe-zone" aria-hidden="true" />
+            <span ref={notchSafeZone} class="dynamic-island-notch-safe-zone" aria-hidden="true" />
             <span class="dynamic-island-ear dynamic-island-ear-trailing" aria-hidden="true">
               <span ref={trailingContent} class="dynamic-island-ear-content dynamic-island-trailing-content">
                 <span class="dynamic-island-trailing-compact">
@@ -430,6 +460,12 @@ function dynamicIslandStyle(props: DynamicIslandProps): string | undefined {
 interface SmoothSizeResizeOptions {
   container: () => HTMLElement | undefined;
   content: () => HTMLElement | undefined;
+  /**
+   * The compact row and the notch gap in it. They take a new compact size at once, so they follow
+   * the surface on the same spring.
+   */
+  compactContent: () => (HTMLElement | undefined)[];
+  compactContentEnabled: () => boolean;
   silhouette: () => {
     root: HTMLSpanElement | undefined;
     body: HTMLSpanElement | undefined;
@@ -451,16 +487,28 @@ interface IslandSilhouetteGeometry {
   capsuleRadius?: number;
 }
 
+/**
+ * The compact height against the height the island has by default. A lower island gets smaller
+ * bottom corners, and a higher one larger corners.
+ */
+function compactHeightScale(props: Pick<DynamicIslandProps, "compactHeight" | "notchSize">): number {
+  const base = props.notchSize?.height ?? DEFAULT_COMPACT_HEIGHT;
+  return (props.compactHeight ?? base) / base;
+}
+
 function islandSilhouetteTarget(
   state: DynamicIslandViewState,
   displayMode: DynamicIslandDisplayMode,
+  compactScale: number,
 ): IslandSilhouetteGeometry {
   if (displayMode === "island") {
     if (state === "expanded") return { topRadius: 0, bottomRadius: 0, capsuleRadius: 24 };
-    return { topRadius: 0, bottomRadius: 0, capsuleRadius: 16 };
+    return { topRadius: 0, bottomRadius: 0, capsuleRadius: 16 * compactScale };
   }
   if (state === "expanded") return { topRadius: 19, bottomRadius: 24 };
-  return { topRadius: 6, bottomRadius: 14 };
+  // A lower island loses its corners faster than its height, or a short island reads as a pill.
+  const cornerScale = compactScale < 1 ? compactScale * compactScale : compactScale;
+  return { topRadius: 6, bottomRadius: 14 * cornerScale };
 }
 
 interface SharedElementTransform {
@@ -555,9 +603,37 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
   let targetSharedTrailing = untrack(options.sharedTrailingTarget);
   let sharedLeadingEnabled = untrack(options.sharedLeadingEnabled);
   let sharedTrailingEnabled = untrack(options.sharedTrailingEnabled);
+  let compactContentEnabled = untrack(options.compactContentEnabled);
+  const previousCompactContentSizes = new Map<HTMLElement, { width: number; height: number } | undefined>();
+  let compactContentAnimating = false;
+  let compactResizeSettleTimer: ReturnType<typeof setTimeout> | undefined;
+  let compactSettledTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function clearCompactSettled(): void {
+    if (compactSettledTimer !== undefined) clearTimeout(compactSettledTimer);
+    compactSettledTimer = undefined;
+    options.container()?.removeAttribute("data-compact-settled");
+  }
+
+  function settleCompactResize(): void {
+    if (compactResizeSettleTimer !== undefined) clearTimeout(compactResizeSettleTimer);
+    compactResizeSettleTimer = undefined;
+    const container = options.container();
+    const landedLargeMove = container?.dataset.compactMotion === "large";
+    container?.removeAttribute("data-compact-resize");
+    container?.style.removeProperty("--dynamic-island-compact-motion");
+    container?.removeAttribute("data-compact-motion");
+    if (!container || !landedLargeMove) return;
+    clearCompactSettled();
+    container.dataset.compactSettled = "true";
+    compactSettledTimer = setTimeout(clearCompactSettled, COMPACT_SETTLED_DURATION);
+  }
 
   createEffect(options.silhouetteTarget, (target) => {
     targetSilhouette = target;
+  });
+  createEffect(options.compactContentEnabled, (enabled) => {
+    compactContentEnabled = enabled;
   });
   createEffect(
     () => ({
@@ -586,8 +662,10 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
   function finishAnimation(current?: Animation[]): void {
     if (current && animations !== current) return;
     animations = [];
+    compactContentAnimating = false;
     const container = options.container();
     container?.removeAttribute("data-resizing");
+    settleCompactResize();
   }
 
   onSettled(() => {
@@ -595,8 +673,7 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
       const container = options.container();
       const content = options.content();
       if (!container || !content) return;
-      const contentRect = content.getBoundingClientRect();
-      const nextSize = { width: contentRect.width, height: contentRect.height };
+      const nextSize = layoutSize(content);
       const previous = previousSize;
       const silhouette = options.silhouette();
       const targetGeometry = targetSilhouette;
@@ -609,7 +686,11 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
       previousSilhouette = targetGeometry;
       previousSharedLeading = targetSharedLeading;
       previousSharedTrailing = targetSharedTrailing;
+      const compactContent = options
+        .compactContent()
+        .filter((element): element is HTMLElement => element !== undefined);
       if (!previous) {
+        for (const element of compactContent) previousCompactContentSizes.set(element, readElementSize(element));
         writeContainerSize(container, nextSize);
         writeSilhouetteGeometry(silhouette, targetGeometry);
         if (sharedLeading) writeSharedTransform(sharedLeading, targetSharedLeading);
@@ -636,8 +717,18 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
         animations.length > 0
           ? readCurrentTransform(sharedTrailing, previousTrailingTransform ?? targetSharedTrailing)
           : (previousTrailingTransform ?? targetSharedTrailing);
+      const compactContentStarts = new Map(
+        compactContent.map((element) => [
+          element,
+          compactContentAnimating ? readElementSize(element) : previousCompactContentSizes.get(element),
+        ]),
+      );
 
       for (const active of animations) active.cancel();
+      compactContentAnimating = false;
+      // Read after the cancel, so the size is the CSS target and not a frame of the old animation.
+      const compactContentTargets = new Map(compactContent.map((element) => [element, readElementSize(element)]));
+      for (const [element, size] of compactContentTargets) previousCompactContentSizes.set(element, size);
       writeContainerSize(container, nextSize);
       writeSilhouetteGeometry(silhouette, targetGeometry);
       if (sharedLeading) writeSharedTransform(sharedLeading, targetSharedLeading);
@@ -691,6 +782,30 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
           ),
         );
       }
+      for (const element of compactContentEnabled ? compactContent : []) {
+        const elementStart = compactContentStarts.get(element);
+        const elementTarget = compactContentTargets.get(element);
+        if (!elementStart || !elementTarget || sizesMatch(elementStart, elementTarget)) continue;
+        current.push(element.animate(resizeKeyframes(elementStart, elementTarget, spring), animationOptions));
+        compactContentAnimating = true;
+      }
+      if (compactContentAnimating) {
+        // Tells the compact content that it moves, and which way the row goes.
+        const row = compactContent[0] && compactContentTargets.get(compactContent[0]);
+        const rowStart = compactContent[0] && compactContentStarts.get(compactContent[0]);
+        clearCompactSettled();
+        container.dataset.compactResize = row && rowStart && row.width < rowStart.width ? "shrink" : "grow";
+        const travel = row && rowStart ? Math.abs(row.width - rowStart.width) : COMPACT_RESIZE_FULL_MOTION_DISTANCE;
+        const motion = Math.min(1, travel / COMPACT_RESIZE_FULL_MOTION_DISTANCE);
+        container.style.setProperty("--dynamic-island-compact-motion", motion.toFixed(3));
+        // A style that cannot scale, such as a radius token, applies to a large move only. It stays
+        // until the motion settles, so a smaller step inside the same motion does not take it back.
+        if (motion >= COMPACT_RESIZE_LARGE_MOTION) container.dataset.compactMotion = "large";
+        if (compactResizeSettleTimer !== undefined) clearTimeout(compactResizeSettleTimer);
+        compactResizeSettleTimer = setTimeout(settleCompactResize, spring.response * 1_000 * COMPACT_RESIZE_SETTLE);
+      } else {
+        settleCompactResize();
+      }
       animations = current;
       void Promise.all(current.map((active) => active.finished))
         .then(() => {
@@ -708,7 +823,25 @@ function createSmoothSizeResize(options: SmoothSizeResizeOptions): void {
   onCleanup(() => {
     for (const active of animations) active.cancel();
     finishAnimation();
+    clearCompactSettled();
   });
+}
+
+/**
+ * The element's size before any transform of an ancestor. A consumer can scale the island, as the
+ * Settings preview does to fit a narrow frame, and the shell must still get the unscaled size.
+ */
+function layoutSize(element: HTMLElement): { width: number; height: number } {
+  const rect = element.getBoundingClientRect();
+  const ratio = element.offsetWidth > 0 && rect.width > 0 ? rect.width / element.offsetWidth : 1;
+  return { width: rect.width / ratio, height: rect.height / ratio };
+}
+
+function readElementSize(element: HTMLElement): { width: number; height: number } | undefined {
+  const computed = getComputedStyle(element);
+  const width = Number.parseFloat(computed.width);
+  const height = Number.parseFloat(computed.height);
+  return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : undefined;
 }
 
 function writeContainerSize(container: HTMLElement, size: { width: number; height: number }): void {

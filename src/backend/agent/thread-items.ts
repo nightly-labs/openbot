@@ -29,6 +29,7 @@ export function isMissingProviderSessionError(error: unknown, provider: AgentPro
       provider !== "opencode" &&
       provider !== "antigravity" &&
       provider !== "cursor" &&
+      provider !== "cline" &&
       provider !== "acp") ||
     !(error instanceof Error)
   ) {

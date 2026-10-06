@@ -38,6 +38,7 @@ import {
   X,
 } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { PluginIcon } from "@openbot/ui/features/marketplace/PluginIcon";
 import {
   GitHubMark,
   type IntegrationStatus,
@@ -48,7 +49,6 @@ import {
   WizardContent,
   type WizardProps,
 } from "@openbot/ui/features/settings/IntegrationLayout";
-import { PluginIcon } from "@openbot/ui/features/settings/MarketplacePluginDetail";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";

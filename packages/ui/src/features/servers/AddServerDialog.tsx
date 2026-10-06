@@ -278,6 +278,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
               tooltip={t("common.close")}
               variant="ghost"
               disabled={creating()}
+              data-cuelume-tap="close"
               onClick={() => requestClose()}
             >
               <X />

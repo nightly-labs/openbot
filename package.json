@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.26.0",
+  "version": "0.30.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -108,6 +108,7 @@
     "dev:apns-key": "bun scripts/dev-apns-key.ts",
     "dev:test-client": "bun scripts/dev-services.ts test-client",
     "dev:all": "bun scripts/dev-services.ts all",
+    "dev:slack": "bun scripts/dev-services.ts app --slack",
     "mobile": "bun run --cwd apps/mobile start",
     "mobile:go": "bun run --cwd apps/mobile start:go",
     "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
@@ -184,6 +185,7 @@
     "test:browser": "bun scripts/browser-smoke.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
     "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
+    "test:browser:canva-live": "bun scripts/browser-smoke.ts --canva-live",
     "test:codex": "bun scripts/codex-doctor.ts --strict",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",
     "test:filesystem": "bun scripts/filesystem-smoke.ts",
@@ -235,6 +237,7 @@
     "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --publish never"
   },
   "dependencies": {
+    "@1password/sdk": "0.5.0",
     "@agentclientprotocol/sdk": "1.4.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.263",
     "@anthropic-ai/sdk": "0.116.0",
@@ -256,6 +259,7 @@
     "@speed-highlight/core": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "class-variance-authority": "catalog:",
+    "cuelume": "0.2.4",
     "electron-updater": "6.8.9",
     "fflate": "catalog:",
     "jose": "catalog:",

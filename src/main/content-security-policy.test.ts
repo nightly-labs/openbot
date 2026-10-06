@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContentSecurityPolicy } from "./content-security-policy";
+import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 
 describe("buildContentSecurityPolicy", () => {
   it("allows the production analytics endpoint", () => {
@@ -41,5 +41,25 @@ describe("buildContentSecurityPolicy", () => {
     expect(buildContentSecurityPolicy(true, "ws://192.168.1.143:3101/v1/signal")).not.toContain(
       "ws://192.168.1.143:3101",
     );
+  });
+
+  it("adds only the origin of a self-hosted Signal to connect-src", () => {
+    const origin = readSelfHostedSignalOrigin("https://api.example.com", "wss://signal.example.com:8443/v1/signal");
+    const connect = buildContentSecurityPolicy(true, undefined, origin)
+      .split("; ")
+      .find((directive) => directive.startsWith("connect-src "));
+
+    expect(origin).toBe("wss://signal.example.com:8443");
+    expect(connect).toContain(" wss://signal.example.com:8443");
+    expect(readSelfHostedSignalOrigin(undefined, undefined)).toBeNull();
+  });
+
+  it.each([
+    [undefined, "wss://signal.example.com/v1/signal", "OPENBOT_REMOTE_SIGNAL_URL needs OPENBOT_AUTH_API_URL."],
+    ["https://api.example.com", "ws://signal.example.com/v1/signal", "must be a wss: URL"],
+    ["https://api.example.com", "https://signal.example.com/v1/signal", "must be a wss: URL"],
+    ["https://api.example.com", "wss://user:pass@signal.example.com/v1/signal", "must be a wss: URL"],
+  ])("refuses a self-hosted Signal URL with auth API %s and Signal %s", (authApiUrl, signalUrl, message) => {
+    expect(() => readSelfHostedSignalOrigin(authApiUrl, signalUrl)).toThrow(message);
   });
 });

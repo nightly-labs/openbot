@@ -5,6 +5,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",
+  "error.agent.commitEffectsFailed": "The transaction committed, but its saved effects failed.",
   "error.agent.settingsLocalOnly": "Agent settings can only be changed on the computer that runs the agent.",
   "error.agent.skillsLocalOnly": "Skills can only be changed on the computer that runs the agent.",
   "error.agent.addLocalOnly": "Agents can only be added on the computer that runs them.",
@@ -19,6 +20,14 @@ export const messages = defineMessages("error.agent", {
   "error.agent.initialMessageTooLong": "Initial message is too long.",
   "error.agent.setupCleanupFailed": "Agent setup failed and the incomplete agent could not be removed.",
   "error.agent.modelUnavailable": "The selected agent model is unavailable.",
+  "error.agent.modelProviderNotConnected":
+    'The selected agent model "{model}" is unavailable: {provider} is not connected.',
+  "error.agent.modelListEmpty":
+    'The selected agent model "{model}" is unavailable: {provider} listed no models. Last error: {detail}',
+  "error.agent.modelListEmptyNoError":
+    'The selected agent model "{model}" is unavailable: {provider} listed no models.',
+  "error.agent.modelNotInProviderList":
+    'The selected agent model "{model}" is unavailable: {provider} does not list it.',
   "error.agent.modelProviderMismatch": "The selected model does not belong to that provider.",
   "error.agent.modelNotListed": 'Model "{model}" is not available. Available models: {models}.',
   "error.agent.providerNotListed":
@@ -67,6 +76,11 @@ export const messages = defineMessages("error.agent", {
   // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
+  "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",
+  "error.agent.automationOff": "This agent does not allow local scripts to run its routines.",
+  "error.agent.automationPayloadTooLong": "The payload is longer than {limit} characters.",
+  "error.agent.automationRateLimited":
+    "Local scripts ran this agent's routines {limit} times in the last hour. Try again later.",
   "error.agent.workspaceOnlyMacOnly":
     "Workspace only is available for this provider on macOS only. Choose Full access in the agent settings.",
   "error.agent.lowMemory":

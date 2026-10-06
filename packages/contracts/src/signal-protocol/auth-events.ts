@@ -10,4 +10,8 @@ export type RemoteAuthEvent =
   // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
   | { type: "account-servers-changed"; userId: string }
   // Addressed to an account: its other devices re-read the account profile.
-  | { type: "account-profile-changed"; userId: string };
+  | { type: "account-profile-changed"; userId: string }
+  // A Slack workspace was unlinked from an app or moved to another host. Signal drops that app's route
+  // of the workspace when its link is from `through` (milliseconds) or before, and refuses route
+  // tickets with such a link.
+  | { type: "slack-route-revoked"; appId: string; teamId: string; through: number };

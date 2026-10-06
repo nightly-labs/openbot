@@ -4,7 +4,6 @@ import type {
   OpenBotDesktopApi,
   UpdateRestartMode,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
   AlertActions,
@@ -26,10 +25,11 @@ import {
   SettingsSection,
   SwitchField,
   TriangleAlert,
-  toast,
 } from "@openbot/ui";
+import { restartReasonKey } from "@openbot/ui/features/updates/restart-reasons";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { watchHostUpdate } from "./host-update-toast";
 
 /** The update calls of one server's host. The desktop reaches them through main. */
@@ -47,21 +47,6 @@ export interface ServerUpdateOptions {
 const POLL_MS = 1000;
 /** The wait after a read failed, so a host that restarts is not asked every second. */
 const RETRY_MS = 5000;
-
-const REASON_LABELS: Record<string, AppTextKey> = {
-  "agent-turn": "server.update.reason.agentTurn",
-  "queued-delivery": "server.update.reason.queuedDelivery",
-  "drain-task": "server.update.reason.drainTask",
-  "routine-run": "server.update.reason.routineRun",
-  "channel-work": "server.update.reason.channelWork",
-  "provider-process": "server.update.reason.providerProcess",
-  "remote-desktop": "server.update.reason.remoteDesktop",
-  "browser-view": "server.update.reason.browserView",
-  "file-transfer": "server.update.reason.fileTransfer",
-  "browser-control": "server.update.reason.browserControl",
-  "update-operation": "server.update.reason.updateOperation",
-  initialization: "server.update.reason.initialization",
-};
 
 /**
  * Server Settings > Updates: the OpenBot update of a joined server's host (`host-update-v1`). The
@@ -130,7 +115,7 @@ export function ServerUpdatePanel(
       const next = await call(props.serverId);
       if (current === generation) show(next);
     } catch (error) {
-      toast.error(t("server.settings.actionFailedTitle"), {
+      actionToast.error(t("server.settings.actionFailedTitle"), {
         description: errorMessage(error, t("server.settings.actionFailed")),
       });
     } finally {
@@ -154,9 +139,7 @@ export function ServerUpdatePanel(
   const disabled = () => !props.actionsAvailable || Boolean(busy()) || blocked();
   const version = (current: HostUpdateStatus) => current.availableVersion ?? current.currentVersion;
   const waitingFor = (current: HostUpdateStatus) =>
-    format.list(
-      current.restart?.waitingFor.map((reason) => t(REASON_LABELS[reason] ?? "server.update.reason.other")) ?? [],
-    );
+    format.list(current.restart?.waitingFor.map((reason) => t(restartReasonKey(reason))) ?? []);
 
   function message(current: HostUpdateStatus): string {
     const name = props.hostName;

@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
+  SLACK_ROUTE_AUDIENCE,
+  SLACK_ROUTE_TEAMS_LIMIT,
+  type SlackRouteTeam,
+} from "@openbot/contracts/signal-protocol/slack-route";
+import {
   createLocalJWKSet,
   createRemoteJWKSet,
   customFetch,
@@ -20,6 +25,7 @@ import {
   type RemoteTicketClaims,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
+import type { SlackRoute } from "./signal-service";
 
 // The resume token is this service's own, minted and verified here and never seen by the account
 // API, so its audience stays local while the ticket's comes from the shared contract.
@@ -44,6 +50,18 @@ const remoteTicketClaimsSchema = z.object({
   iat: z.number().int().nonnegative(),
   exp: z.number().int().nonnegative(),
 });
+const identifierSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/u);
+const slackRouteClaimsSchema = z.object({
+  hid: identifierSchema,
+  teams: z
+    .array(z.object({ id: identifierSchema, appId: identifierSchema, linkedAt: z.number().int().nonnegative() }))
+    .max(SLACK_ROUTE_TEAMS_LIMIT),
+});
+const SLACK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
 export class RemoteTokenService {
   readonly #ticketKey: JWTVerifyGetKey;
@@ -54,6 +72,7 @@ export class RemoteTokenService {
   readonly #turnPort: number;
   readonly #turnTlsPort: number;
   readonly #validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean>;
+  readonly #validateSlackRoute: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
   readonly #trustedResumeTokens = new Map<
     string,
     { expiresAt: number; hostId: string; sessionId: string; authEpoch: number }
@@ -65,7 +84,11 @@ export class RemoteTokenService {
       "ticketJwks" | "ticketJwksUrl" | "sessionSecret" | "turnSecret" | "turnHost" | "turnPort" | "turnTlsPort"
     >,
     validateResumeClaims: (claims: RemoteTicketClaims) => Promise<boolean> = async () => false,
-    options: { fetch?: FetchImplementation } = {},
+    options: {
+      fetch?: FetchImplementation;
+      // Asks the account service which links of a route are current. Without it, none is.
+      validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Promise<string[]>;
+    } = {},
   ) {
     if (config.ticketJwks) {
       this.#remoteTicketKey = null;
@@ -84,6 +107,7 @@ export class RemoteTokenService {
     this.#turnPort = config.turnPort;
     this.#turnTlsPort = config.turnTlsPort;
     this.#validateResumeClaims = validateResumeClaims;
+    this.#validateSlackRoute = options.validateSlackRoute ?? (async () => []);
   }
 
   async initialize(): Promise<void> {
@@ -101,6 +125,26 @@ export class RemoteTokenService {
       currentDate: now,
     });
     return decodeTicketClaims(payload, now);
+  }
+
+  /**
+   * The Slack workspaces that a route ticket links to `hostId`. Throws for a ticket that is expired,
+   * signed with another key, or minted for another host.
+   */
+  async verifySlackRoute(token: string, hostId: string, now = new Date()): Promise<SlackRoute> {
+    const { payload } = await jwtVerify(token, this.#ticketKey, {
+      audience: SLACK_ROUTE_AUDIENCE,
+      algorithms: ["ES256"],
+      requiredClaims: ["exp"],
+      currentDate: now,
+    });
+    const claims = slackRouteClaimsSchema.parse(payload);
+    if (claims.hid !== hostId) throw new Error("The Slack route belongs to another host.");
+    return { teams: claims.teams };
+  }
+
+  validateSlackRoute(hostId: string, teams: SlackRouteTeam[]): Promise<string[]> {
+    return this.#validateSlackRoute(hostId, teams);
   }
 
   validateClaims(claims: RemoteTicketClaims): Promise<boolean> {
@@ -222,6 +266,25 @@ export class RemoteTokenService {
       },
     ];
   }
+}
+
+/**
+ * Slack's request signature: `v0=` and the hex HMAC-SHA256 of `v0:<timestamp>:<body>` with the app's
+ * signing secret, for a timestamp at most five minutes old.
+ */
+export function verifySlackSignature(
+  body: Uint8Array,
+  timestamp: string,
+  signature: string,
+  secret: string,
+  now = Date.now(),
+): boolean {
+  if (!/^[0-9]{1,12}$/u.test(timestamp)) return false;
+  if (Math.abs(now / 1_000 - Number(timestamp)) > SLACK_SIGNATURE_TOLERANCE_SECONDS) return false;
+  const expected = `v0=${createHmac("sha256", secret).update(`v0:${timestamp}:`).update(body).digest("hex")}`;
+  const actualBytes = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export function verifyWebhookSignature(

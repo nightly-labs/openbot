@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import {
@@ -39,6 +39,7 @@ import {
 } from "./agent-service-test-harness";
 import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
+import { NO_PROVIDER_CREDENTIALS } from "./provider-drivers";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 // Every Codex session is given the plan tool.
@@ -1573,6 +1574,44 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ provider: "codex" });
   });
 
+  // A custom agent that starts slowly can answer `model/list` with nothing, and the router then lists
+  // only `<agent>/default`. That is no proof that the saved model is gone.
+  it("keeps a custom agent's saved model when the agent lists only its default after a restart", async () => {
+    let listed = ["goose/opus", "qwen/max"];
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "acp") client.modelList = () => ({ data: listed.map((model) => ({ model })) });
+        return client;
+      },
+      credentials: {
+        ...NO_PROVIDER_CREDENTIALS,
+        customAgents: () => [
+          { id: "goose", name: "Goose", command: "goose", args: [], env: [] },
+          { id: "qwen", name: "Qwen", command: "qwen", args: [], env: [] },
+        ],
+      },
+    });
+    service = agentService;
+    await store.getOrCreate("chief");
+    await store.getOrCreate("scout");
+    await service.updateAgent({ agentId: "chief", provider: "acp", model: "goose/opus", reasoningEffort: "high" });
+    await service.updateAgent({ agentId: "scout", provider: "acp", model: "qwen/max" });
+
+    listed = ["goose/default", "qwen/mini"];
+    await service.stop();
+    await service.initialize();
+
+    // Qwen listed models and dropped `max`, so scout moves. The update after it runs after the sweep.
+    await waitFor(() => service?.listAgents().find((agent) => agent.id === "scout")?.model === "qwen/mini");
+    await service.updateAgent({ agentId: "scout", model: "qwen/mini" });
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
+      provider: "acp",
+      model: "goose/opus",
+      reasoningEffort: "high",
+    });
+  });
+
   // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
   // models of an endpoint already removed are therefore still listed, and must not be chosen.
   it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
@@ -1702,7 +1741,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // Saved again under the same id, and a fresh process lists it, so both the list and the
     // selection accept it once more.
@@ -1743,7 +1782,9 @@ describe.sequential("AgentService: providers", () => {
     writes[0]?.();
     await removal;
 
-    await expect(selection).rejects.toThrow("The selected agent model is unavailable.");
+    await expect(selection).rejects.toThrow(
+      'The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.',
+    );
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "house/router-llm" });
   });
 
@@ -1791,7 +1832,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A restart that fails is reported as a provider status, not as a throw of its own, so what it
     // answers here says nothing about which process answers on the endpoint now.
@@ -1864,7 +1905,7 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
       service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
-    ).rejects.toThrow("The selected agent model is unavailable.");
+    ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A process that spawned after the removal read the files as they are, so its catalogue counts.
     expect(await service.reloadOpenCodeConfig()).toBe("restarted");
@@ -2468,6 +2509,64 @@ describe.sequential("AgentService: providers", () => {
     await expect(service.resolveWorkspaceFile("missing", page)).rejects.toThrow("Unknown agent");
   });
 
+  it("opens local links to files the agent edited anywhere, but serves remote members only the workspace", async () => {
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
+
+    const agent = await store.createAgent(CREATE_AGENT_INPUT);
+    const page = join(agent.workspacePath, "page.tsx");
+    const colonName = join(agent.workspacePath, "notes:2");
+    const outside = join(root, "project", "edited.ts");
+    const link = join(agent.workspacePath, "outside-link.ts");
+    await mkdir(dirname(outside), { recursive: true });
+    await writeFile(page, "export default function Page() {}\n");
+    await writeFile(colonName, "literal\n");
+    await writeFile(outside, "edited\n");
+    await symlink(outside, link);
+    const realPage = await realpath(page);
+    const realOutside = await realpath(outside);
+
+    for (const reference of ["page.tsx:12", "page.tsx:12:3", "page.tsx#L12", "page.tsx#L12-L20", "page.tsx#L12C3"]) {
+      await expect(service.resolveWorkspaceFile(agent.id, reference)).resolves.toMatchObject({
+        path: realPage,
+        insideWorkspace: true,
+      });
+    }
+    await expect(service.resolveWorkspaceFile(agent.id, "notes:2")).resolves.toMatchObject({
+      path: await realpath(colonName),
+    });
+    await expect(service.resolveWorkspaceFile(agent.id, "missing.ts:4")).rejects.toThrow(/ENOENT/u);
+
+    const home = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      await expect(service.resolveLocalWorkspaceFile(agent.id, "~/project/edited.ts:7")).resolves.toMatchObject({
+        path: realOutside,
+        insideWorkspace: false,
+      });
+      await expect(service.resolveWorkspaceFile(agent.id, "~/project/edited.ts")).rejects.toThrow(
+        "inside the agent workspace",
+      );
+    } finally {
+      process.env.HOME = home;
+    }
+
+    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).resolves.toMatchObject({
+      path: realOutside,
+      name: "edited.ts",
+      insideWorkspace: false,
+    });
+    await expect(service.resolveLocalWorkspaceFile(agent.id, link)).resolves.toMatchObject({ path: realOutside });
+    // The Team API and the web client call `resolveWorkspaceFile`; it keeps the workspace boundary.
+    await expect(service.resolveWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveWorkspaceFile(agent.id, link)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveLocalWorkspaceFile(agent.id, join(root, "project"))).rejects.toThrow("not a file");
+
+    await store.updateAgent({ agentId: agent.id, access: "workspace" });
+    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
+    await expect(service.resolveLocalWorkspaceFile(agent.id, page)).resolves.toMatchObject({ path: realPage });
+  });
+
   it("does not surface the skills context-budget notice as an agent error", async () => {
     process.env.OPENBOT_FAKE_WARNING = "Skill descriptions were shortened to fit the skills context budget.";
     const { store, mailbox } = stores(root);
@@ -2561,6 +2660,7 @@ describe.sequential("AgentService: providers", () => {
         { id: "opencode", state: "not-installed", version: null },
         { id: "antigravity", state: "not-installed", version: null },
         { id: "cursor", state: "not-installed", version: null },
+        { id: "cline", state: "not-installed", version: null },
         { id: "acp", state: "not-installed", version: null },
       ],
       // Unavailable because no Computer Use driver was given to this service. It no longer follows

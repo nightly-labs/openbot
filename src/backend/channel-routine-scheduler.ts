@@ -11,16 +11,19 @@ import type {
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { recordRestartActivity } from "./restart-activity";
-import { collapseMissedOccurrences } from "./routine-schedule";
+import type { RoutineHoldWindow } from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
 export interface ChannelRoutineHooks {
   changed(channelId: string): void;
   emitError(code: string, error: unknown): void;
   excludedChannels(): ReadonlySet<string>;
+  /** Whether a spent provider plan holds the queue of the channel's lead, who takes each routine request. */
+  usageLimited(channelId: string): boolean;
 }
 
 export interface ChannelRoutineSchedulerOptions {
@@ -146,13 +149,29 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     const channelId = this.#requireChannel(input.channelId);
     const routine = this.#routines.get(channelId, input.routineId);
     if (!routine) throw new Error(sourceText("error.backend.routineGone"));
-    const run = await this.#fire(routine, null, new Date().toISOString());
+    const now = new Date().toISOString();
+    // The run would wait for the reset, and a routine set to skip has no use for a late result.
+    const run =
+      routine.limitPolicy === "skip" && this.#hooks.usageLimited(channelId)
+        ? this.#routines.updateRunStatus(this.#routines.createRun(routine, null, "manual", now).id, "cancelled", null)
+        : await this.#fire(routine, null, now);
     this.#changed(channelId);
     return run;
   }
 
-  skipMissed(now: Date): void {
-    this.#routines.skipMissed(now);
+  /**
+   * Whether a spent plan drops this channel task: it belongs to an open run of a routine set to
+   * skip. The run is settled as cancelled here, before the task is.
+   */
+  skipAtLimit(channelId: string, requestMessageId: string): boolean {
+    const run = this.#routines.openRuns(channelId).find((item) => item.requestMessageId === requestMessageId);
+    if (!run || this.#routines.get(channelId, run.routineId)?.limitPolicy !== "skip") return false;
+    this.#settle(run, { status: "cancelled", error: null });
+    return true;
+  }
+
+  skipMissed(now: Date, held?: RoutineHoldWindow): void {
+    this.#routines.skipMissed(now, held);
   }
 
   /** The earliest channel routine, for the shared timer to compare against the other owners. */
@@ -176,6 +195,8 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
         // The trigger advances whether or not the fire succeeds, so a channel builds no backlog.
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changed.add(due.routine.channelId);
+        // A routine set to skip drops the occurrence while a spent plan would only make it wait.
+        if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
         await this.#fire(due.routine, due.triggerId, scheduledFor.toISOString());
       }
     } finally {

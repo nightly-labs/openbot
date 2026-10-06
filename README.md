@@ -6,7 +6,7 @@
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
 [Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
-OpenCode, Gemini, and [Cursor CLI](https://cursor.com/cli) through ACP. It gives every agent its own workspace and
+OpenCode, Gemini, [Cursor CLI](https://cursor.com/cli), and [Cline CLI](https://cline.bot/cli) through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +19,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, or Cursor sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, Gemini, Cursor, or Cline sessions and local workspaces.
 - Custom OpenAI-compatible endpoints and custom ACP agents, with detection of local model servers (Ollama, LM Studio) and installed agents.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
@@ -32,7 +32,7 @@ messaging in one desktop app.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
-Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor,
+Grok connects to xAI, Gemini connects to Google, Cursor connects to Cursor, Cline connects to Cline,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -73,6 +73,35 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 
 Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
+
+#### Linux server with no screen
+
+To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with
+systemd), install it from a terminal and sign in with an email code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+sudo openbot login
+```
+
+Then use it from the desktop app, the iPhone app or `openbot.run/app`. See
+[self-hosted servers](docs/self-hosted-server.md) for the options and the `openbot` commands.
+
+#### Docker
+
+The same server runs as a container (`linux/amd64` and `linux/arm64`). The seccomp profile lets the
+Electron sandbox stay on:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+docker run -d --name openbot --restart unless-stopped \
+  --security-opt seccomp=seccomp.json --security-opt no-new-privileges:true \
+  --shm-size 1g --stop-timeout 60 -v openbot-data:/data \
+  ghcr.io/nightly-labs/openbot:latest
+docker exec -it openbot openbot login
+```
+
+See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits.
 
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
@@ -130,6 +159,14 @@ Cursor uses a Cursor plan or a Cursor API key. OpenBot downloads and pins the Cu
 yourself, OpenBot uses it until a download exists. OpenBot never uses the `cursor` command, which
 starts the Cursor editor. Set `OPENBOT_CURSOR_PATH` to select an executable yourself. Cursor
 agents stay on this computer: team members do not see them.
+
+Cline uses a Cline account, which has free models with limits for each model. The provider of a
+free model can use your prompts to train models. OpenBot downloads and pins the Cline CLI (`cline`) when you
+select Download on the Cline row in More providers, and starts it with `cline --acp`. Sign in opens
+Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the environment used to
+launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
+exists. Set `OPENBOT_CLINE_PATH` to select an executable yourself. Cline agents stay on this
+computer: team members do not see them.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -265,6 +302,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run remote:check:compose` | Validate both Docker Compose configurations alone, without a running daemon. |
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
+| `bun run dev:slack` | Start the same stack as `bun run dev`, with a `cloudflared` quick tunnel to Signal, so that Slack can send the development Slack app's events to the agents on this computer. It reads `OPENBOT_DEV_SLACK_SIGNING_SECRET` from the ignored `.env.slack-dev`, and needs `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID` in `apps/auth-api/.env.dev`. Takes the same options as `bun run dev`, such as `--isolated`. See [docs/messaging.md](docs/messaging.md#test-slack-locally). |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
 | `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. `--scale=agents:N,messages:M,channels:C,channelMessages:K,attachments:A` adds generated agents, chat history, channel history and large images to the showcase data, for memory and CPU measurements. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
@@ -414,7 +452,7 @@ Cloudflare Workers
 - `src/renderer` contains the SolidJS interface.
 - `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
-- `packages/i18n` contains the interface text in English, French and Japanese for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.
+- `packages/i18n` contains the interface text in English, French, Japanese, Brazilian Portuguese and Turkish for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
 rules for new modules.
@@ -452,6 +490,7 @@ video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts m
   Antigravity ACP server that Gemini uses.
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
+- `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.
@@ -469,6 +508,8 @@ the configured HTTPS Cloudflare API. The client stores only an encrypted OpenBot
 authentication records from D1. The embedded browser uses a separate sandboxed Electron session and
 cannot access `window.openbot` or managed local attachments.
 
+To run your own account service, Signal and TURN, see [Self-hosted remote access](docs/self-hosting.md).
+
 ## Security
 
 Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not put credentials, private
@@ -484,7 +525,8 @@ described above.
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
 signed and notarized macOS ARM64 and x64 release, an unsigned Windows x64 release, and unsigned Linux x64
-and arm64 AppImages in GitHub Actions.
+and arm64 AppImages in GitHub Actions. After the release is published, the workflow pushes the Docker
+image to `ghcr.io/nightly-labs/openbot`.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account
 popover. Release signing secrets and the complete procedure are documented in
 [docs/RELEASING.md](docs/RELEASING.md).

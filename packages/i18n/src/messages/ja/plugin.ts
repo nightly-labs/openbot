@@ -6,8 +6,6 @@ export const messages = {
   "plugin.link.privacyPolicy": "プライバシーポリシー",
   "plugin.link.terms": "利用規約",
   "plugin.copyLink": "リンクをコピー",
-  "plugin.install": "プラグインをインストール",
-  "plugin.uninstall": "プラグインをアンインストール",
   "plugin.askPrompt": "{name} に質問：{prompt}",
   "plugin.section.apps": "アプリ",
   "plugin.section.skills": "スキル",
@@ -16,10 +14,10 @@ export const messages = {
   "plugin.info.category": "カテゴリ",
   "plugin.info.version": "バージョン",
 
-  "plugin.uninstallDialog.title": "{name} をアンインストールしますか？",
+  "plugin.uninstallDialog.title": "{name} の接続を解除しますか？",
   "plugin.uninstallDialog.description":
     "{name} がこのコンピュータにインストールしたものを削除します。このホストとこのエージェントのほかの部分は変わりません。",
-  "plugin.uninstallDialog.confirm": "アンインストール",
+  "plugin.uninstallDialog.confirm": "接続を解除",
   "plugin.uninstallDialog.appsLabel": "削除するアプリ：{number} 件",
   "plugin.uninstallDialog.appsTitle": "このホストから削除するアプリ",
   "plugin.uninstallDialog.appsNote":

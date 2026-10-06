@@ -169,6 +169,7 @@ export function FileList(props: FileListProps) {
               variant="ghost"
               class="file-list-filter"
               aria-pressed={query.type === filter.value ? "true" : "false"}
+              data-cuelume-tap="select"
               onClick={() =>
                 setQuery((draft) => {
                   draft.type = filter.value;

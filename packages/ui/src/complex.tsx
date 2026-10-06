@@ -12,6 +12,7 @@ import * as TabsPrimitive from "@kobalte/core/tabs";
 import * as TooltipPrimitive from "@kobalte/core/tooltip";
 import type { ValidComponent } from "@solidjs/web";
 import { useMenuMotion } from "./menu-motion";
+import { createPressedPopupCue } from "./utils";
 
 type OpenChangeHandler = (open: boolean) => void;
 
@@ -79,7 +80,7 @@ interface DialogApi {
 export const Dialog: DialogApi = {
   Root: (props) => <DialogPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />,
   Portal: (props) => <DialogPrimitive.Portal {...props} />,
-  Trigger: (props) => <DialogPrimitive.Trigger {...props} />,
+  Trigger: (props) => <DialogPrimitive.Trigger data-cuelume-open="" {...props} />,
   Overlay: (props) => <DialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />,
   Content: (props) => (
     <DialogPrimitive.Content
@@ -94,7 +95,7 @@ export const Dialog: DialogApi = {
   ),
   Title: (props) => <DialogPrimitive.Title {...props} />,
   Description: (props) => <DialogPrimitive.Description {...props} />,
-  CloseButton: (props) => <DialogPrimitive.CloseButton {...props} />,
+  CloseButton: (props) => <DialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
 };
 
 interface AlertDialogApi {
@@ -113,7 +114,7 @@ export const AlertDialog: AlertDialogApi = {
     <AlertDialogPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />
   ),
   Portal: (props) => <AlertDialogPrimitive.Portal {...props} />,
-  Trigger: (props) => <AlertDialogPrimitive.Trigger {...props} />,
+  Trigger: (props) => <AlertDialogPrimitive.Trigger data-cuelume-open="" {...props} />,
   Overlay: (props) => (
     <AlertDialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />
   ),
@@ -122,7 +123,7 @@ export const AlertDialog: AlertDialogApi = {
   ),
   Title: (props) => <AlertDialogPrimitive.Title {...props} />,
   Description: (props) => <AlertDialogPrimitive.Description {...props} />,
-  CloseButton: (props) => <AlertDialogPrimitive.CloseButton {...props} />,
+  CloseButton: (props) => <AlertDialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
 };
 
 interface DropdownMenuApi {
@@ -145,7 +146,17 @@ export const DropdownMenu: DropdownMenuApi = {
     <DropdownMenuPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />
   ),
   Portal: (props) => <DropdownMenuPrimitive.Portal {...props} />,
-  Trigger: (props) => <DropdownMenuPrimitive.Trigger {...props} />,
+  Trigger: (props) => {
+    const press = createPressedPopupCue();
+    return (
+      <DropdownMenuPrimitive.Trigger
+        data-cuelume-open={press.cue()}
+        data-cuelume-emphasis="subtle"
+        {...props}
+        ref={[props.ref, press.ref]}
+      />
+    );
+  },
   Content: (props) => {
     const motion = useMenuMotion();
     return (
@@ -162,10 +173,10 @@ export const DropdownMenu: DropdownMenuApi = {
     const motion = useMenuMotion();
     return <DropdownMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
   },
-  Item: (props) => <DropdownMenuPrimitive.Item {...props} />,
-  CheckboxItem: (props) => <DropdownMenuPrimitive.CheckboxItem {...props} />,
+  Item: (props) => <DropdownMenuPrimitive.Item data-cuelume-tap="" {...props} />,
+  CheckboxItem: (props) => <DropdownMenuPrimitive.CheckboxItem data-cuelume-toggle="" {...props} />,
   RadioGroup: (props) => <DropdownMenuPrimitive.RadioGroup {...props} />,
-  RadioItem: (props) => <DropdownMenuPrimitive.RadioItem {...props} />,
+  RadioItem: (props) => <DropdownMenuPrimitive.RadioItem data-cuelume-select="" {...props} />,
   Separator: (props) => <DropdownMenuPrimitive.Separator {...props} />,
 };
 
@@ -205,9 +216,9 @@ export const ContextMenu: ContextMenuApi = {
     const motion = useMenuMotion();
     return <ContextMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
   },
-  Item: (props) => <ContextMenuPrimitive.Item {...props} />,
+  Item: (props) => <ContextMenuPrimitive.Item data-cuelume-tap="" {...props} />,
   RadioGroup: (props) => <ContextMenuPrimitive.RadioGroup {...props} />,
-  RadioItem: (props) => <ContextMenuPrimitive.RadioItem {...props} />,
+  RadioItem: (props) => <ContextMenuPrimitive.RadioItem data-cuelume-select="" {...props} />,
   Separator: (props) => <ContextMenuPrimitive.Separator {...props} />,
 };
 
@@ -224,11 +235,23 @@ interface PopoverApi {
 export const Popover: PopoverApi = {
   Root: (props) => <PopoverPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />,
   Portal: (props) => <PopoverPrimitive.Portal {...props} />,
-  Trigger: (props) => <PopoverPrimitive.Trigger {...props} />,
+  Trigger: (props) => {
+    const context = PopoverPrimitive.usePopoverContext();
+    // Kobalte toggles the popover after the click cue reads this state.
+    return (
+      <PopoverPrimitive.Trigger
+        data-cuelume-open={context.isOpen() ? "close" : ""}
+        data-cuelume-emphasis="subtle"
+        {...props}
+      />
+    );
+  },
   Content: (props) => <PopoverPrimitive.Content {...props} />,
   Title: (props) => <PopoverPrimitive.Title {...props} />,
   Description: (props) => <PopoverPrimitive.Description {...props} />,
-  CloseButton: (props) => <PopoverPrimitive.CloseButton {...props} />,
+  CloseButton: (props) => (
+    <PopoverPrimitive.CloseButton data-cuelume-close="" data-cuelume-emphasis="subtle" {...props} />
+  ),
 };
 
 interface TooltipApi {
@@ -256,7 +279,7 @@ interface TabsApi {
 export const Tabs: TabsApi = {
   Root: (props) => <TabsPrimitive.Root {...props} />,
   List: (props) => <TabsPrimitive.List {...props} />,
-  Trigger: (props) => <TabsPrimitive.Trigger {...props} />,
+  Trigger: (props) => <TabsPrimitive.Trigger data-cuelume-select="" {...props} />,
   Content: (props) => <TabsPrimitive.Content {...props} />,
   Indicator: (props) => <TabsPrimitive.Indicator {...props} />,
 };
@@ -308,13 +331,23 @@ export const SelectPrimitive: SelectPrimitiveApi = {
   Label: (props) => <KobalteSelect.Label {...props} />,
   Description: (props) => <KobalteSelect.Description {...props} />,
   ErrorMessage: (props) => <KobalteSelect.ErrorMessage {...props} />,
-  Trigger: (props) => <KobalteSelect.Trigger {...props} />,
+  Trigger: (props) => {
+    const press = createPressedPopupCue();
+    return (
+      <KobalteSelect.Trigger
+        data-cuelume-open={press.cue()}
+        data-cuelume-emphasis="subtle"
+        {...props}
+        ref={[props.ref, press.ref]}
+      />
+    );
+  },
   Value: (props) => <KobalteSelect.Value {...props} />,
   HiddenSelect: (props) => <KobalteSelect.HiddenSelect {...props} />,
   Portal: (props) => <KobalteSelect.Portal {...props} />,
   Content: (props) => <KobalteSelect.Content {...props} />,
   Listbox: (props) => <KobalteSelect.Listbox {...props} />,
-  Item: (props) => <KobalteSelect.Item {...props} />,
+  Item: (props) => <KobalteSelect.Item data-cuelume-select="" {...props} />,
   ItemLabel: (props) => <KobalteSelect.ItemLabel {...props} />,
   ItemIndicator: (props) => <KobalteSelect.ItemIndicator {...props} />,
 };
@@ -343,13 +376,23 @@ export const Combobox: ComboboxApi = {
   Description: (props) => <ComboboxPrimitive.Description {...props} />,
   ErrorMessage: (props) => <ComboboxPrimitive.ErrorMessage {...props} />,
   Control: (props) => <ComboboxPrimitive.Control {...props} />,
-  Input: (props) => <ComboboxPrimitive.Input {...props} />,
-  Trigger: (props) => <ComboboxPrimitive.Trigger {...props} />,
+  Input: (props) => <ComboboxPrimitive.Input data-cuelume-type="" {...props} />,
+  Trigger: (props) => {
+    const press = createPressedPopupCue();
+    return (
+      <ComboboxPrimitive.Trigger
+        data-cuelume-open={press.cue()}
+        data-cuelume-emphasis="subtle"
+        {...props}
+        ref={[props.ref, press.ref]}
+      />
+    );
+  },
   HiddenSelect: (props) => <ComboboxPrimitive.HiddenSelect {...props} />,
   Portal: (props) => <ComboboxPrimitive.Portal {...props} />,
   Content: (props) => <ComboboxPrimitive.Content {...props} />,
   Listbox: (props) => <ComboboxPrimitive.Listbox {...props} />,
-  Item: (props) => <ComboboxPrimitive.Item {...props} />,
+  Item: (props) => <ComboboxPrimitive.Item data-cuelume-select="" {...props} />,
   ItemLabel: (props) => <ComboboxPrimitive.ItemLabel {...props} />,
   ItemIndicator: (props) => <ComboboxPrimitive.ItemIndicator {...props} />,
   Section: (props) => <ComboboxPrimitive.Section {...props} />,
@@ -366,7 +409,7 @@ interface ListboxApi {
 
 export const Listbox: ListboxApi = {
   Root: ListboxRootAdapter,
-  Item: (props) => <ListboxPrimitive.Item {...props} />,
+  Item: (props) => <ListboxPrimitive.Item data-cuelume-select="" {...props} />,
   ItemLabel: (props) => <ListboxPrimitive.ItemLabel {...props} />,
   ItemDescription: (props) => <ListboxPrimitive.ItemDescription {...props} />,
   ItemIndicator: (props) => <ListboxPrimitive.ItemIndicator {...props} />,

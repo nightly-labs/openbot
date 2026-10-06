@@ -239,16 +239,19 @@ describe("createDevInstanceRecord", () => {
 });
 
 describe("writeDevInstanceRecord permissions", () => {
-  it("keeps the registry directory and its records readable only by their owner", () => {
-    const directory = mkdtempSync(join(tmpdir(), "openbot-registry-mode-"));
-    writeDevInstanceRecord(record(), directory);
-    // The path is predictable and lives in a shared /tmp, so the mode is the
-    // only thing keeping another local account from reading which worktree a
-    // developer has open.
-    expect(statSync(directory).mode & 0o777).toBe(0o700);
-    expect(statSync(join(directory, "app-4242.json")).mode & 0o777).toBe(0o600);
-    rmSync(directory, { recursive: true, force: true });
-  });
+  it.skipIf(process.platform === "win32")(
+    "keeps the registry directory and its records readable only by their owner",
+    () => {
+      const directory = mkdtempSync(join(tmpdir(), "openbot-registry-mode-"));
+      writeDevInstanceRecord(record(), directory);
+      // The path is predictable and lives in a shared /tmp, so the mode is the
+      // only thing keeping another local account from reading which worktree a
+      // developer has open.
+      expect(statSync(directory).mode & 0o777).toBe(0o700);
+      expect(statSync(join(directory, "app-4242.json")).mode & 0o777).toBe(0o600);
+      rmSync(directory, { recursive: true, force: true });
+    },
+  );
 });
 
 describe("assertOwnerOnlyDirectory", () => {
@@ -273,7 +276,7 @@ describe("assertOwnerOnlyDirectory", () => {
     ).toThrow("not owned by this user");
   });
 
-  it("guards the reader too, not only the writer", () => {
+  it.skipIf(process.platform === "win32")("guards the reader too, not only the writer", () => {
     const directory = mkdtempSync(join(tmpdir(), "openbot-registry-read-"));
     writeDevInstanceRecord(record(), directory);
     chmodSync(directory, 0o777);

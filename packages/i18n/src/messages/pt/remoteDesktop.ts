@@ -1,0 +1,77 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/remoteDesktop";
+
+export const messages = {
+  "remoteDesktop.controlFailed": "O controle remoto falhou. Reconecte e tente novamente.",
+  "remoteDesktop.startFailed": "Não foi possível iniciar o controle remoto.",
+  "remoteDesktop.disconnectFailed": "Não foi possível desconectar o controle remoto.",
+  "remoteDesktop.switchDisplayFailed": "Não foi possível trocar o monitor compartilhado.",
+  "remoteDesktop.workspaceLabel": "Controle remoto",
+  "remoteDesktop.displayLabel": "Tela remota",
+  "remoteDesktop.selectDisplay": "Selecionar tela",
+  "remoteDesktop.backToOpenBot": "Voltar ao OpenBot",
+  "remoteDesktop.disconnect": "Desconectar",
+  "remoteDesktop.viewerTitle": "Área de trabalho remota do Sunshine",
+  "remoteDesktop.viewerLoadFailed": "Não foi possível carregar o visualizador Moonlight.",
+  "remoteDesktop.streamNotReady":
+    "O host não iniciou a transmissão. O Sunshine pode ter parado no host. Tente de novo.",
+  "remoteDesktop.hostOfflineTitle": "O computador anfitrião está offline",
+  "remoteDesktop.hostOfflineMessage": "Reconecte ao computador anfitrião antes de abrir sua área de trabalho.",
+  "remoteDesktop.openFailed": "Não foi possível abrir a área de trabalho",
+  "remoteDesktop.notSharingTitle": "{name} não está compartilhando a tela",
+  "remoteDesktop.notSharingDescription":
+    "O computador anfitrião impede o OpenBot de gravar a tela. Nesse computador, abra Ajustes do Sistema → Privacidade e Segurança → Gravação de Tela, ative o OpenBot e tente novamente aqui.",
+  "remoteDesktop.setup.check.screenRecording": "Gravação de Tela",
+  "remoteDesktop.setup.check.accessibility": "Acessibilidade",
+  "remoteDesktop.setup.check.service": "Serviço Sunshine",
+  "remoteDesktop.setup.check.displays": "Disponibilidade de telas",
+  "remoteDesktop.setup.check.guiSession": "Sessão do usuário no macOS",
+  "remoteDesktop.setup.state.notChecked": "Não verificado",
+  "remoteDesktop.setup.state.checking": "Verificando…",
+  "remoteDesktop.setup.state.allowed": "Permitido",
+  "remoteDesktop.setup.state.blocked": "Bloqueado",
+  "remoteDesktop.setup.state.unavailable": "Indisponível",
+  "remoteDesktop.setup.state.failed": "A verificação falhou",
+  "remoteDesktop.setup.state.available": "Disponível",
+  "remoteDesktop.setup.checkFailed": "Não foi possível verificar a configuração da área de trabalho remota.",
+  "remoteDesktop.setup.openFailed": "Não foi possível abrir os ajustes do macOS.",
+  "remoteDesktop.setup.cleanupUnconfirmed": "A conexão de teste terminou antes da confirmação da limpeza.",
+  "remoteDesktop.setup.endSessionFirst":
+    "Encerre a sessão de área de trabalho remota deste computador antes de iniciar um teste.",
+  "remoteDesktop.setup.startFailed": "Não foi possível iniciar o teste da área de trabalho remota.",
+  "remoteDesktop.setup.connectionLost": "A conexão de teste foi perdida.",
+  "remoteDesktop.setup.hostUpdateRequired":
+    "Atualize o OpenBot no computador anfitrião para verificar as permissões e testar a área de trabalho remota.",
+  "remoteDesktop.setup.permissions": "Permissões",
+  "remoteDesktop.setup.checked": "Verificado",
+  "remoteDesktop.setup.checkAgain": "Verificar novamente",
+  "remoteDesktop.setup.grantAccess": "Conceder acesso a {name}",
+  "remoteDesktop.setup.grant": "Conceder",
+  "remoteDesktop.setup.grantHelp":
+    "Mantenha a conta do Sunshine conectada no Mac. Nessa conta, conceda acesso em Ajustes do Sistema → Privacidade e Segurança. O botão Conceder abre uma janela auxiliar. Arraste Sunshine.app para a lista de permissões.",
+  "remoteDesktop.setup.restartRequired":
+    "O Sunshine precisa reiniciar. Encerre as sessões ativas de área de trabalho remota e verifique novamente. As sessões ativas não serão reiniciadas.",
+  "remoteDesktop.setup.showInFinder": "Mostrar Sunshine no Finder",
+  "remoteDesktop.setup.liveTest": "Teste de conexão ao vivo",
+  "remoteDesktop.setup.liveTestLocal": "Teste a imagem, o mouse e o teclado neste Mac.",
+  "remoteDesktop.setup.liveTestRemote":
+    "O teste abre um painel temporário no computador anfitrião. Encerre as outras sessões remotas primeiro. Os comandos ficam limitados ao painel.",
+  "remoteDesktop.setup.testSummary": "Vídeo: {video} · Imagem: {picture} · Mouse: {mouse} · Teclado: {keyboard}",
+  "remoteDesktop.setup.received": "recebido",
+  "remoteDesktop.setup.notReceived": "não recebido",
+  "remoteDesktop.setup.confirmed": "confirmado",
+  "remoteDesktop.setup.notConfirmed": "não confirmado",
+  "remoteDesktop.setup.notTested": "não testado",
+  "remoteDesktop.setup.waiting": "aguardando",
+  "remoteDesktop.setup.testLocal": "Testar neste Mac",
+  "remoteDesktop.setup.testRemote": "Testar área de trabalho remota",
+  "remoteDesktop.setup.videoFailed": "A conexão de vídeo do teste falhou.",
+  "remoteDesktop.setup.inputInstructions":
+    "Clique no alvo no computador anfitrião e digite {code}. Mouse: {mouse}. Teclado: {keyboard}.",
+  "remoteDesktop.setup.videoOnly":
+    "Somente teste de vídeo. O teste de mouse e teclado exige uma versão atualizada do Sunshine.",
+  "remoteDesktop.setup.pictureConfirmed": "Imagem confirmada",
+  "remoteDesktop.setup.seeDesktop": "Consigo ver minha área de trabalho",
+  "remoteDesktop.setup.seeTestPanel": "Consigo ver o painel de teste",
+  "remoteDesktop.setup.finishTest": "Concluir teste",
+} as const satisfies PartialTranslation<typeof source>;

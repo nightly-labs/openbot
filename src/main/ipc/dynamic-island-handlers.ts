@@ -39,6 +39,10 @@ export function dynamicIslandIpcHandlers({
       publishPresentation: authorizedHandler(fromMainRenderer, parseDynamicIslandPresentation, (_event, presentation) =>
         dynamicIsland.publish(presentation),
       ),
+      getBuiltInDisplayGeometry: eventHandler((event) => {
+        fromMainRenderer(event);
+        return dynamicIsland.builtInDisplayGeometry;
+      }),
       getPresentation: eventHandler((event) => {
         fromOverlayRenderer(event);
         return dynamicIsland.presentation;

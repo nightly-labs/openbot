@@ -9,7 +9,7 @@ export type SwitchSize = "sm" | "default";
 type SwitchAccessibilityProps = {
   "aria-label"?: string;
   "aria-labelledby"?: string;
-  "aria-describedby"?: string;
+  "aria-describedby"?: string | undefined;
 };
 
 type OpenBotSwitchProps = SwitchAccessibilityProps & {
@@ -248,6 +248,8 @@ export function Switch<T extends ValidComponent = "div">(props: SwitchProps<T>):
       data-slot="switch"
       data-size={props.size ?? "default"}
       data-pointer-focus={pointerFocus() ? "" : undefined}
+      // Kobalte flips the switch in its own click handler, so the cue has no on or off direction.
+      data-cuelume-toggle=""
       class={cx("ui-switch", props.class)}
       {...rootProps}
     >

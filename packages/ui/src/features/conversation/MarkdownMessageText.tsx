@@ -576,8 +576,10 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const sharedPath = sharedFileTarget(token.href);
-            const workspacePath = workspaceFileTarget(token.href);
+            const fileUrl = fileUrlPath(token.href);
+            // The shared-file resolver does not decode, and the workspace resolver does.
+            const sharedPath = sharedFileTarget(fileUrl === null ? token.href : decodedFileUrlPath(fileUrl));
+            const workspacePath = workspaceFileTarget(fileUrl ?? token.href);
             return url ? (
               <MessageLink url={url} title={token.title} onOpenLink={props.content.onOpenLink}>
                 {token.text === token.href ? (
@@ -885,6 +887,7 @@ function LocalFileLink(props: {
         props.kind === "shared" ? t("chat.file.openShared", { name }) : t("chat.file.openWorkspace", { name })
       }
       title={props.path}
+      data-cuelume-tap="open"
       onClick={() => props.onOpen(props.path)}
     >
       <AttachmentReferenceVisual name={name} />
@@ -1002,6 +1005,25 @@ function localFileTarget(value: string): string | null {
   const shared = sharedFileTarget(path);
   if (shared) return shared;
   return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
+}
+
+/**
+ * The path of a `file://` link, such as `file:///Users/me/a%20b.md` or `file:///C:/notes.md`. It stays
+ * percent-encoded like any other link target, so the workspace resolver decodes it once.
+ */
+function fileUrlPath(value: string): string | null {
+  const match = /^file:\/\/(?:localhost)?(\/.*)$/iu.exec(value.trim());
+  if (!match?.[1]) return null;
+  return /^\/[A-Za-z]:\//u.test(match[1]) ? match[1].slice(1) : match[1];
+}
+
+function decodedFileUrlPath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    // A literal percent sign can be part of a file name.
+    return path;
+  }
 }
 
 function workspaceFileTarget(value: string): string | null {

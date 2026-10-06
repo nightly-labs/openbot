@@ -48,13 +48,30 @@ a {
   text-decoration: none;
 }
 
-.t-stagger-line--4 {
-  transition-delay: calc(var(--stagger-stagger) * 3);
+/* The hero lines rise in with CSS when the page loads, not after hydration. The
+   text is the largest paint, and Chrome does not count it while its opacity is 0,
+   so the lines only move and sharpen: they never fade. */
+@keyframes landing-hero-in {
+  from {
+    transform: translateY(var(--stagger-distance));
+    filter: blur(var(--stagger-blur));
+  }
 }
 
-.landing-actions.t-stagger-line--4 {
-  transition-duration: 400ms;
-  transition-delay: var(--stagger-stagger);
+.landing-hero-line {
+  animation: landing-hero-in var(--stagger-dur) var(--stagger-ease) both;
+  animation-delay: calc(var(--landing-hero-line, 0) * var(--stagger-stagger));
+}
+
+.landing-actions.landing-hero-line {
+  animation-duration: 400ms;
+  animation-delay: var(--stagger-stagger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-line {
+    animation: none;
+  }
 }
 
 /* The wrap stacks two layers on the same coordinates. The
@@ -261,11 +278,13 @@ a {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
+  text-decoration: none;
   cursor: pointer;
   transition: color var(--openbot-duration-normal) ease;
 }
 
-.site-nav-trigger[aria-expanded="true"] {
+.site-nav-trigger[aria-expanded="true"],
+.site-nav-trigger[aria-current="page"] {
   color: var(--openbot-text-primary);
 }
 
@@ -277,11 +296,6 @@ a {
 /* A link with no panel: no chevron, so the padding is even on both sides. */
 .site-nav-link {
   padding: 0 14px;
-  text-decoration: none;
-}
-
-.site-nav-link[aria-current="page"] {
-  color: var(--openbot-text-primary);
 }
 
 .site-nav-chevron {
@@ -684,6 +698,14 @@ a {
   }
 }
 
+/* Just above the mobile header, the brand, the full menu and three buttons do
+   not fit in one row. Contact is also in the hero and the footer. */
+@media (min-width: 901px) and (max-width: 1040px) {
+  .site-header-actions > .site-header-contact {
+    display: none;
+  }
+}
+
 /* The header on a narrow screen: the brand, the download button and a menu
    button that opens the sheet. 900px is MOBILE_HEADER_QUERY in SiteMobileMenu. */
 @media (max-width: 900px) {
@@ -1014,6 +1036,12 @@ a {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 30px;
+}
+
+/* The one action after a Slack install sits in the middle. */
+.join-card-actions-single {
+  grid-template-columns: auto;
+  justify-content: center;
 }
 
 .join-card-disabled {
@@ -1871,6 +1899,1301 @@ a {
     landing-price-sheen 14s ease-in-out 1260ms infinite alternate;
 }
 
+/* The sections between the hero and the price: what it does, how it starts, and
+   the questions. Same width and heading as the download section. */
+.landing-section {
+  --landing-card-border: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  --landing-card-border-hover: color-mix(in srgb, var(--openbot-text-primary) 16%, transparent);
+  --landing-card-fill: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
+  color: var(--openbot-text-primary);
+}
+
+.landing-section-inner {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: clamp(96px, 10vw, 144px) clamp(20px, 4vw, 48px) 0;
+}
+
+.landing-section-heading {
+  max-width: 720px;
+}
+
+.landing-section-heading h2 {
+  margin: 0;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.landing-section-heading p {
+  max-width: 620px;
+  margin: 22px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* A bento on 12 columns: the team window is the tall tile on the left, and the
+   data tile has the colour of the macOS download card. Each picture is a piece
+   of the app, and it reacts when the pointer is on its tile. */
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 16px;
+  margin: clamp(48px, 6vw, 72px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Provider marks in their brand colours. Gemini's mark is a gradient. */
+.landing-section svg[data-provider] {
+  color: var(--openbot-provider-current);
+  fill: currentColor;
+}
+
+.landing-section svg[data-provider="antigravity"] {
+  fill: url(#landing-gemini-gradient);
+}
+
+.landing-paint-servers {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.landing-feature {
+  position: relative;
+  min-width: 0;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 28px;
+  background: var(--openbot-bg-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+.landing-feature:hover {
+  border-color: var(--landing-card-border-hover);
+  background: var(--openbot-bg-surface-raised);
+}
+
+.landing-feature[data-feature="team"] {
+  grid-column: 1 / 8;
+  grid-row: 1 / 3;
+}
+
+.landing-feature[data-feature="providers"] {
+  grid-column: 8 / 13;
+  grid-row: 1;
+}
+
+.landing-feature[data-feature="local"] {
+  grid-column: 8 / 13;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-areas: "copy visual";
+  border-color: var(--openbot-download-card-border);
+  background: var(--openbot-logo-production);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%);
+  color: var(--openbot-text-on-light);
+}
+
+.landing-feature[data-feature="persist"] {
+  grid-column: 1 / 6;
+  grid-row: 3;
+}
+
+.landing-feature[data-feature="browser"] {
+  grid-column: 6 / 10;
+  grid-row: 3;
+}
+
+.landing-feature[data-feature="queue"] {
+  grid-column: 10 / 13;
+  grid-row: 3;
+}
+
+.landing-feature-visual {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px 32px 0;
+}
+
+.landing-feature-copy {
+  padding: 28px 32px 32px;
+}
+
+.landing-feature h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.landing-feature p {
+  max-width: 44ch;
+  margin: 10px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.landing-feature[data-feature="local"] p {
+  color: var(--openbot-download-card-muted);
+}
+
+/* A window from the app: the channel, the data folder and the browser. */
+.landing-window {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--landing-card-border);
+  background: var(--openbot-bg-canvas);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 28%);
+}
+
+.landing-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--landing-card-border);
+}
+
+/* The channel runs off the right edge and fades out above the copy. */
+.landing-feature[data-feature="team"] .landing-feature-visual {
+  display: flex;
+  padding: 36px 0 0 36px;
+}
+
+.landing-team-window {
+  flex: 1;
+  margin-right: -24px;
+  border-radius: 20px 0 0;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+
+.landing-team-channel {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.landing-team-hash {
+  margin-right: 6px;
+  color: var(--openbot-text-muted);
+  font-weight: 400;
+}
+
+.landing-team-stack {
+  display: flex;
+  margin-left: auto;
+  padding-right: 24px;
+}
+
+.landing-team-stack > * + * {
+  margin-left: -4px;
+}
+
+/* Three agents hand one task down the line. */
+.landing-team {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 22px 28px 40px 22px;
+  list-style: none;
+}
+
+.landing-team-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* The selector outranks the generic `.agent-avatar` size rule, which loads with
+   the avatar's own code after this stylesheet. */
+.landing-feature .landing-team-avatar {
+  --landing-team-avatar-size: 46px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--landing-team-avatar-size);
+  height: var(--landing-team-avatar-size);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.landing-feature .landing-team-avatar-small {
+  --landing-team-avatar-size: 28px;
+  box-shadow: 0 0 0 2px var(--openbot-bg-canvas);
+  background: var(--openbot-bg-surface-raised);
+}
+
+/* The empty circle the Worker renders until the avatar loads. */
+.landing-feature .landing-team-avatar:empty {
+  background: var(--landing-card-fill);
+}
+
+.landing-feature .landing-team-avatar > svg {
+  display: block;
+  width: 128%;
+  height: 128%;
+  overflow: visible;
+  translate: 0 calc(var(--landing-team-avatar-size) * -0.14);
+}
+
+.landing-team-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.landing-team-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.landing-team-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.landing-team-time {
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-team-text {
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.landing-team-system {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.landing-team-system::before,
+.landing-team-system::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--landing-card-border);
+}
+
+/* The typing dots and the reply share one place: on hover the reply arrives. */
+.landing-team-next {
+  display: grid;
+}
+
+.landing-team-next > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-team-typing {
+  display: inline-flex;
+  align-self: start;
+  justify-self: start;
+  gap: 4px;
+  margin-left: 60px;
+  padding: 12px 14px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--landing-card-fill);
+}
+
+.landing-team-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+  animation: landing-typing 1200ms ease-in-out infinite;
+}
+
+.landing-team-typing span:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.landing-team-typing span:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+.landing-team-reply {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.landing-feature[data-feature="team"]:hover .landing-team-typing {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.landing-feature[data-feature="team"]:hover .landing-team-reply {
+  opacity: 1;
+  transform: none;
+  transition-delay: 120ms;
+}
+
+/* Two rows of providers that scroll the opposite way. Each track holds its
+   list twice, so moving it by half loops with no jump. The pointer stops them. */
+.landing-feature[data-feature="providers"] .landing-feature-visual {
+  padding: 36px 0 0;
+}
+
+.landing-marquee {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  /* The mask hides all that is outside this box, so leave room for a pill that
+     moves up on hover. */
+  padding-block: 4px;
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+}
+
+.landing-marquee-row {
+  /* Clip only the sides, so a pill that moves up on hover keeps its top edge. A clip,
+     unlike a scroll container, does not let a grid item shrink, so set the minimum. */
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.landing-marquee-track {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: landing-marquee 36s linear infinite;
+}
+
+.landing-marquee-row + .landing-marquee-row .landing-marquee-track {
+  animation-direction: reverse;
+}
+
+.landing-feature[data-feature="providers"]:hover .landing-marquee-track {
+  animation-play-state: paused;
+}
+
+.landing-provider-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px 10px 12px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--landing-card-fill);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.landing-provider-pill:hover {
+  border-color: color-mix(in srgb, var(--openbot-provider-current) 55%, transparent);
+  background: color-mix(in srgb, var(--openbot-provider-current) 12%, transparent);
+  transform: translateY(-2px);
+}
+
+.landing-provider-pill-logo {
+  width: 20px;
+  height: 20px;
+}
+
+/* The copy on the left, and the data folder that runs off the bottom right. */
+.landing-feature[data-feature="local"] .landing-feature-visual {
+  grid-area: visual;
+  align-self: end;
+  display: block;
+  place-items: normal;
+  padding: 32px 0 0;
+}
+
+.landing-feature[data-feature="local"] .landing-feature-copy {
+  grid-area: copy;
+  align-self: end;
+}
+
+.landing-local-window {
+  border-color: var(--openbot-download-card-border);
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 16px 0 0;
+  background: color-mix(in srgb, var(--openbot-text-primary) 42%, transparent);
+  box-shadow: 0 20px 44px color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
+}
+
+.landing-local-window .landing-window-bar {
+  padding: 11px 16px;
+  border-bottom-color: var(--openbot-download-card-border);
+}
+
+.landing-local-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.landing-lock {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing-feature[data-feature="local"]:hover .landing-lock-shackle {
+  animation: landing-lock-click 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-local-files {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+
+.landing-local-files li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 140ms ease;
+}
+
+.landing-local-files li:hover {
+  background: var(--openbot-download-card-chip);
+}
+
+.landing-local-folder {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--openbot-download-card-muted);
+}
+
+/* A chat with one agent. On hover the provider changes, and the next message
+   continues the same task. The thread has a fixed height, so the new messages
+   push the old ones up and the tile keeps its size. */
+.landing-feature[data-feature="persist"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-persist-window {
+  border-radius: 16px;
+}
+
+.landing-persist-window .landing-window-bar {
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+}
+
+.landing-persist-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 10px 6px 9px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 10px;
+  background: var(--landing-card-fill);
+}
+
+.landing-persist-swap {
+  display: grid;
+  overflow: hidden;
+}
+
+.landing-persist-provider {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-persist-provider + .landing-persist-provider {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.landing-feature[data-feature="persist"]:hover .landing-persist-provider {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.landing-feature[data-feature="persist"]:hover .landing-persist-provider + .landing-persist-provider {
+  opacity: 1;
+  transform: none;
+}
+
+.landing-persist-logo {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.landing-persist-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--openbot-text-muted);
+}
+
+.landing-persist-thread {
+  height: 178px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  margin: 0;
+  padding: 16px 16px 18px;
+  overflow: hidden;
+  list-style: none;
+  mask-image: linear-gradient(to bottom, transparent, #000 28px);
+}
+
+.landing-persist-request {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 9px 14px;
+  border-radius: 16px 16px 4px;
+  background: var(--openbot-bg-surface-raised);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.landing-persist-reply {
+  display: grid;
+  gap: 4px;
+}
+
+.landing-persist-reply .landing-team-text {
+  font-size: 14px;
+}
+
+.landing-persist-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.landing-persist-meta .landing-team-time {
+  font-weight: 400;
+}
+
+/* The later messages take no room until the pointer is on the tile. */
+.landing-persist-later {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: -14px;
+  opacity: 0;
+  transition:
+    grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease;
+}
+
+.landing-persist-later > ul {
+  min-height: 0;
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.landing-feature[data-feature="persist"]:hover .landing-persist-later {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+  transition-delay: 160ms;
+}
+
+/* The app's browser panel: tabs, a toolbar and a light page. Grace controls the
+   first tab. On hover she types into the form and continues. */
+.landing-feature[data-feature="browser"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-browser {
+  position: relative;
+  border-radius: 16px;
+}
+
+/* The sizes of the app's tabs: 28px high, on the bottom line of a 34px header.
+   The open tab has the toolbar's colour, so the two read as one piece. */
+.landing-browser-tabs {
+  display: flex;
+  height: 34px;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.landing-browser-tab {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  width: 148px;
+  height: 28px;
+  flex: 0 1 148px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 8px 8px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+}
+
+.landing-browser-tab[data-controlled] {
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+}
+
+.landing-browser-tab-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-browser-tab > svg,
+.landing-browser-new svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.landing-browser-new {
+  display: grid;
+  width: 24px;
+  height: 28px;
+  place-items: center;
+  color: var(--openbot-text-muted);
+}
+
+/* The agent's pointer takes the place of the page icon. */
+.landing-browser-control {
+  display: grid;
+  flex: none;
+  color: var(--openbot-accent-text);
+}
+
+.landing-browser-control svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.landing-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+}
+
+.landing-browser-toolbar svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.landing-browser-address {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  margin-left: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-browser-page {
+  display: grid;
+  justify-items: start;
+  padding: 18px 20px 22px;
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+}
+
+.landing-browser-heading {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.landing-browser-label {
+  margin-top: 12px;
+  color: color-mix(in srgb, var(--openbot-text-on-light) 60%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.landing-browser-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  margin-top: 5px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
+  border-radius: 8px;
+  font-size: 13px;
+  transition: border-color 160ms ease;
+}
+
+.landing-browser-typed {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.landing-browser-caret {
+  width: 1px;
+  height: 15px;
+  margin-left: 1px;
+  background: currentColor;
+  opacity: 0;
+}
+
+.landing-browser-submit {
+  margin-top: 12px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--openbot-text-on-light);
+  color: var(--openbot-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.landing-feature[data-feature="browser"]:hover .landing-browser-input {
+  border-color: color-mix(in srgb, var(--openbot-text-on-light) 55%, transparent);
+}
+
+/* One step for each character, as if typed. */
+.landing-feature[data-feature="browser"]:hover .landing-browser-typed {
+  max-width: 16ch;
+  transition: max-width 900ms steps(15) 200ms;
+}
+
+.landing-feature[data-feature="browser"]:hover .landing-browser-caret {
+  animation: landing-caret 1s steps(1) infinite;
+}
+
+/* One press when the email is typed. */
+.landing-feature[data-feature="browser"]:hover .landing-browser-submit {
+  animation: landing-press 240ms ease 1200ms;
+}
+
+/* The app's queue panel on top of the composer. On hover, the message in the
+   composer joins the queue. The wrapper keeps room for the new row, so the
+   tile does not change size. */
+.landing-feature[data-feature="queue"] .landing-feature-visual {
+  place-items: end stretch;
+}
+
+.landing-queue {
+  min-width: 0;
+  min-height: 186px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.landing-queue-panel {
+  position: relative;
+  margin: 0 10px -14px;
+  padding: 6px 5px 19px;
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: 14px;
+  background: var(--openbot-queue-surface);
+}
+
+.landing-queue-hold {
+  display: block;
+  overflow: hidden;
+  padding: 0 8px 4px 9px;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.landing-queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-queue-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 29px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  transition: background 140ms ease;
+}
+
+.landing-queue-row:hover {
+  background: var(--openbot-bg-surface-raised);
+}
+
+.landing-queue-row svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.landing-queue-row > svg {
+  color: var(--openbot-text-muted);
+}
+
+.landing-queue-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* As in the app, a row's buttons show when the pointer is on the row. They sit
+   on top of the end of the text, so the text has all the width until then. */
+.landing-queue-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 24px;
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(to right, transparent, var(--openbot-bg-surface-raised) 20px);
+  color: var(--openbot-text-muted);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.landing-queue-row:hover .landing-queue-actions {
+  opacity: 1;
+}
+
+.landing-queue-steer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.landing-queue-added {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease;
+}
+
+.landing-queue-added > .landing-queue-row {
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.landing-queue-added > .landing-queue-row > * {
+  margin-block: 6.5px;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-added {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition-delay: 180ms;
+}
+
+.landing-queue-composer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 16px;
+  background: var(--openbot-bg-canvas);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 28%);
+}
+
+.landing-queue-input {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  font-size: 14px;
+}
+
+.landing-queue-input > * {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    opacity 200ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-queue-placeholder {
+  color: var(--openbot-text-muted);
+  opacity: 0;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-draft {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-placeholder {
+  opacity: 1;
+  transition-delay: 200ms;
+}
+
+.landing-queue-send {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+  transition:
+    transform 140ms ease,
+    opacity 200ms ease;
+}
+
+.landing-queue-send-icon {
+  width: 15px;
+  height: 15px;
+  rotate: -90deg;
+}
+
+.landing-feature[data-feature="queue"]:hover .landing-queue-send {
+  opacity: 0.4;
+  transform: scale(0.9);
+}
+
+/* The heading stays beside the questions while they open. */
+.landing-faq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+  gap: clamp(40px, 6vw, 96px);
+}
+
+.landing-faq-heading {
+  position: sticky;
+  top: 96px;
+}
+
+.landing-faq-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 28px;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 160ms ease;
+}
+
+.landing-faq-contact:hover,
+.landing-faq-contact:focus-visible {
+  color: var(--openbot-logo-production);
+}
+
+.landing-faq-contact-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.landing-compare-links {
+  margin-top: clamp(72px, 8vw, 112px);
+}
+
+.landing-compare-links h3 {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.landing-compare-links ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A strip of the comparison's gradient with the two marks on it, and the name
+   under it, so a long name does not push the marks or the arrow out of line. */
+.landing-compare-links a {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--landing-card-border);
+  border-radius: 18px;
+  background: var(--openbot-bg-surface);
+  font-size: 15px;
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.landing-compare-links a:hover,
+.landing-compare-links a:focus-visible {
+  border-color: var(--landing-card-border-hover);
+  background: var(--openbot-bg-surface-raised);
+}
+
+.landing-compare-art {
+  position: relative;
+  display: flex;
+  height: 92px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-compare-marks {
+  position: relative;
+  display: flex;
+  pointer-events: none;
+}
+
+.landing-compare-mark {
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 24%);
+}
+
+.landing-compare-mark-rival {
+  margin-left: -8px;
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+}
+
+.landing-compare-label {
+  min-width: 0;
+  padding: 16px 44px 18px 20px;
+}
+
+.landing-compare-arrow {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 16px;
+  height: 16px;
+  color: var(--openbot-text-muted);
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.landing-compare-links a:hover .landing-compare-arrow {
+  color: var(--openbot-text-primary);
+  transform: translateX(2px);
+}
+
+.landing-section[data-revealed="false"]
+  :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
+  opacity: 0;
+}
+
+.landing-section[data-revealed="true"]
+  :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(120ms + var(--landing-index, 0) * 80ms);
+}
+
+.landing-section[data-revealed="true"] .landing-section-heading {
+  animation-delay: 0ms;
+}
+
+@media (max-width: 1100px) {
+  .landing-features-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .landing-feature[data-feature] {
+    grid-column: span 3;
+    grid-row: auto;
+  }
+
+  .landing-feature:is([data-feature="team"], [data-feature="local"]) {
+    grid-column: 1 / -1;
+  }
+
+  .landing-feature[data-feature="team"] .landing-feature-visual {
+    min-height: 400px;
+  }
+
+  .landing-compare-links ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .landing-section-inner {
+    padding: 88px 16px 0;
+  }
+
+  .landing-features-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .landing-feature[data-feature] {
+    grid-column: auto;
+  }
+
+  .landing-feature[data-feature="team"] .landing-feature-visual {
+    min-height: 360px;
+    padding: 24px 0 0 20px;
+  }
+
+  .landing-feature-copy {
+    padding: 24px 24px 28px;
+  }
+
+  .landing-marquee-row + .landing-marquee-row {
+    display: none;
+  }
+
+  .landing-feature[data-feature="local"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "visual"
+      "copy";
+  }
+
+  .landing-feature[data-feature="local"] .landing-feature-visual {
+    padding: 24px 0 0 24px;
+  }
+
+  .landing-faq-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .landing-faq-heading {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-compare-links ul {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .landing-compare-links a {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .landing-compare-art {
+    width: 96px;
+    height: 64px;
+  }
+
+  .landing-compare-mark {
+    width: 34px;
+    height: 34px;
+    padding: 7px;
+  }
+
+  .landing-compare-label {
+    flex: 1;
+    padding: 0 44px 0 16px;
+  }
+
+  .landing-compare-arrow {
+    bottom: auto;
+  }
+}
+
 .landing-footer {
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
@@ -2112,6 +3435,49 @@ a {
     opacity: 1;
     filter: blur(0.001px);
     transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-marquee {
+  to {
+    transform: translateX(calc(-50% - 5px));
+  }
+}
+
+@keyframes landing-lock-click {
+  40% {
+    transform: translateY(-3px);
+  }
+
+  75% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes landing-press {
+  50% {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes landing-caret {
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes landing-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
   }
 }
 
@@ -2538,6 +3904,19 @@ a {
 
   .landing-pricing [data-revealed] {
     opacity: 1;
+    animation: none;
+  }
+
+  .landing-section[data-revealed]
+    :is(.landing-section-heading, .landing-feature, .compare-faq-item, .landing-compare-links li) {
+    opacity: 1;
+    animation: none;
+  }
+
+  .landing-marquee-track,
+  .landing-team-typing span,
+  .landing-feature[data-feature="local"]:hover .landing-lock-shackle,
+  .landing-feature[data-feature="browser"]:hover :is(.landing-browser-caret, .landing-browser-submit) {
     animation: none;
   }
 
@@ -3611,9 +4990,10 @@ a {
   }
 }
 
-/* A heading that a section link opens sits clear of the top edge. */
+/* A heading or a roundup entry that a link opens sits clear of the top edge. */
 .post-article-body h2,
-.compare-article h2 {
+.compare-article h2,
+.compare-roundup-list > li {
   scroll-margin-top: 32px;
 }
 
@@ -3628,13 +5008,15 @@ a {
    its own lilac and the rival's is a quiet grey, so OpenBot is the side the eye
    goes to. Where one side is better, the page marks it in green
    (`--openbot-success`), with a check and a word, never with colour alone.
+   A page that compares two other apps (sides "a" and "b") gives both sides the
+   same quiet accent: it takes no side.
    ------------------------------------------------------------------------- */
 
 .compare-page [data-side="openbot"] {
   --compare-accent: var(--openbot-logo-production);
 }
 
-.compare-page [data-side="rival"] {
+.compare-page :is([data-side="rival"], [data-side="a"], [data-side="b"]) {
   --compare-accent: var(--openbot-text-muted);
 }
 
@@ -3750,7 +5132,7 @@ a {
   animation: compare-mark-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards;
 }
 
-.compare-mark[data-side="rival"] {
+.compare-mark:last-child {
   --compare-from: 10px;
 }
 
@@ -3867,6 +5249,11 @@ a {
   list-style: none;
 }
 
+/* A card alone in the last row takes the full row. */
+.compare-plan:last-child:nth-child(3n + 1) {
+  grid-column: 1 / -1;
+}
+
 .compare-plan {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -3877,6 +5264,18 @@ a {
   border: 1px solid var(--openbot-border);
   border-radius: 14px;
   background: var(--openbot-bg-surface);
+}
+
+/* On a page about two other apps, their two plans lead the grid. */
+.compare-plan[data-highlighted] {
+  border-color: color-mix(in srgb, var(--openbot-logo-production) 34%, var(--openbot-border));
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--openbot-logo-production) 10%, var(--openbot-transparent)),
+      var(--openbot-transparent) 62%
+    ),
+    var(--openbot-bg-surface);
 }
 
 .compare-plan-logo-frame {
@@ -4263,6 +5662,22 @@ a {
   line-height: 1.65;
 }
 
+/* The landing questions sit in a narrower column than a comparison's, so each
+   one gets more room. After the rules above, which these outrank. */
+.landing-faq-body .compare-faq-list {
+  margin-top: 0;
+}
+
+.landing-faq-body .compare-faq-question {
+  padding: 24px 2px;
+  font-size: 18px;
+}
+
+.landing-faq-body .compare-faq-answer {
+  padding-bottom: 24px;
+  font-size: 16px;
+}
+
 .compare-sources-note {
   max-width: 68ch;
   margin: 14px 0 0;
@@ -4294,11 +5709,194 @@ a {
   color: var(--openbot-text-dim);
 }
 
+/* The roundup: a wide table with one row per app, then a card per app with the
+   comparisons that include it. */
+.compare-roundup-disclosure {
+  max-width: 62ch;
+  margin: 12px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-roundup-table {
+  min-width: 880px;
+}
+
+.compare-roundup-table thead th:first-child {
+  width: 16%;
+}
+
+.compare-roundup-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 20px);
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-roundup-rank {
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.compare-roundup-best {
+  margin: 10px 0 0;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.compare-roundup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-roundup-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--openbot-logo-production);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.compare-roundup-link-icon {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--openbot-duration-normal) ease;
+}
+
+/* The benchmark chart: a table with a bar in each cell. Each agent has its own
+   colour, and the rows keep this order, so each pair of neighbours stays apart for
+   colour-blind readers. Checked with the dataviz palette check, dark mode, on
+   --openbot-bg-canvas: "#d95926,#3987e5,#199e70,#9085e9". Blue next to violet fails,
+   so do not reorder. Text stays in the text colours; only the bars are coloured. */
+.compare-bench-table tr[data-agent="claude-code"] {
+  --compare-bench-fill: var(--openbot-chart-storage-files);
+}
+
+.compare-bench-table tr[data-agent="codex"] {
+  --compare-bench-fill: var(--openbot-chart-storage-workspaces);
+}
+
+.compare-bench-table tr[data-agent="devin"] {
+  --compare-bench-fill: var(--openbot-chart-storage-chats);
+}
+
+.compare-bench-table tr[data-agent="antigravity"] {
+  --compare-bench-fill: var(--openbot-chart-storage-downloads);
+}
+
+.compare-bench-takeaway {
+  max-width: 62ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.4vw, 18px);
+  line-height: 1.6;
+}
+
+.compare-bench-table {
+  min-width: 680px;
+}
+
+.compare-bench-table thead th:first-child {
+  width: 34%;
+}
+
+.compare-bench-table td,
+.compare-bench-table th {
+  vertical-align: middle;
+}
+
+.compare-bench-hint {
+  display: block;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.compare-bench-agent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.compare-bench-agent .compare-table-logo {
+  flex: none;
+  margin-top: 1px;
+  color: var(--openbot-text-primary);
+}
+
+.compare-bench-name {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+}
+
+.compare-bench-model,
+.compare-bench-note {
+  display: block;
+  color: var(--openbot-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.compare-bench-note {
+  color: var(--openbot-text-dim);
+}
+
+/* The bar starts square at zero and ends round at its value; the value sits after
+   it. The track is the cell, so bars in one column share one scale. */
+.compare-bench-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-bench-bar {
+  flex: none;
+  width: calc(var(--compare-bench-share) * (100% - 64px));
+  min-width: 2px;
+  height: 14px;
+  border-radius: 0 4px 4px 0;
+  background: var(--compare-bench-fill);
+}
+
+.compare-bench-value {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compare-bench-credit {
+  max-width: 68ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-bench-credit a {
+  color: var(--openbot-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Scroll reveals. The heading leads; the parts under it follow in reading order,
    and the table rows and questions sweep in one by one. */
 .compare-section[data-revealed="false"] > *,
 .compare-section[data-revealed="false"] .compare-table tbody tr,
 .compare-section[data-revealed="false"] .compare-plan,
+.compare-section[data-revealed="false"] .compare-roundup-list > li,
 .compare-section[data-revealed="false"] .compare-faq-item {
   opacity: 0;
 }
@@ -4322,6 +5920,7 @@ a {
 
 .compare-section[data-revealed="true"] .compare-table tbody tr,
 .compare-section[data-revealed="true"] .compare-plan,
+.compare-section[data-revealed="true"] .compare-roundup-list > li,
 .compare-section[data-revealed="true"] .compare-faq-item {
   animation: landing-download-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(160ms + var(--compare-index, 0) * 70ms);
@@ -4409,6 +6008,32 @@ a {
   height: clamp(32px, 3.4vw, 44px);
 }
 
+/* A roundup puts every app's mark on the plate, in two rows, with no names and
+   no "vs". The marks fade in where they are. */
+.compare-mark-row {
+  grid-template-columns: repeat(7, auto);
+  gap: clamp(10px, 1.6vw, 20px);
+}
+
+.compare-mark-row .compare-mark {
+  --compare-from: 0px;
+  min-width: 0;
+}
+
+.compare-mark-row .compare-mark-logo {
+  width: clamp(26px, 3.2vw, 44px);
+  height: clamp(26px, 3.2vw, 44px);
+}
+
+.compare-mark-row.compare-marks-small {
+  gap: clamp(8px, 1vw, 12px);
+}
+
+.compare-mark-row.compare-marks-small .compare-mark-logo {
+  width: clamp(20px, 2vw, 26px);
+  height: clamp(20px, 2vw, 26px);
+}
+
 .compare-index-copy {
   padding: 16px 2px 0;
 }
@@ -4470,6 +6095,14 @@ a {
   .compare-plans-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .compare-plan:last-child:nth-child(3n + 1) {
+    grid-column: auto;
+  }
+
+  .compare-plan:last-child:nth-child(2n + 1) {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -4510,7 +6143,7 @@ a {
 
   .compare-table tr {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: var(--compare-table-columns, repeat(2, minmax(0, 1fr)));
   }
 
   /* Out of the grid but still in the table, so the brand headers keep their
@@ -4542,6 +6175,54 @@ a {
     min-width: 0;
     gap: 8px;
   }
+
+  /* The benchmark has three measures: one column each, under the agent. Each
+     header stays over its column, and the bar goes under the value. */
+  .compare-bench-table {
+    --compare-table-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .compare-bench-table thead th {
+    font-size: 13px;
+  }
+
+  .compare-bench-cell {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .compare-bench-bar {
+    width: calc(var(--compare-bench-share) * 100%);
+  }
+
+  /* Five columns do not fit as stacked cells: the roundup table keeps its
+     columns and scrolls in its frame. */
+  .compare-roundup-table,
+  .compare-roundup-table :is(thead, tbody, tr) {
+    display: revert;
+  }
+
+  .compare-roundup-table {
+    min-width: 720px;
+  }
+
+  .compare-roundup-table thead th:first-child {
+    position: static;
+    width: 16%;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    padding: 12px 14px;
+  }
+
+  .compare-roundup-table tbody th {
+    padding-bottom: 12px;
+  }
+
+  .compare-roundup-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -4553,6 +6234,10 @@ a {
 
   .compare-faq-question:hover .compare-faq-chevron {
     color: var(--openbot-text-primary);
+  }
+
+  .compare-roundup-links a:hover .compare-roundup-link-icon {
+    transform: translateX(2px);
   }
 
   .compare-index-card:hover .compare-index-card-arrow {
@@ -4575,6 +6260,7 @@ a {
   .compare-section[data-revealed] .compare-pair > :nth-child(n),
   .compare-section[data-revealed] .compare-table tbody tr,
   .compare-section[data-revealed] .compare-plan,
+  .compare-section[data-revealed] .compare-roundup-list > li,
   .compare-section[data-revealed] .compare-faq-item,
   .compare-index-grid[data-revealed] .compare-index-card,
   .compare-index-grid[data-revealed] .compare-index-card :is(.post-gradient, .compare-marks),
@@ -4585,6 +6271,7 @@ a {
 
   .compare-faq-item::details-content,
   .compare-faq-chevron,
+  .compare-roundup-link-icon,
   .compare-index-card-arrow {
     transition: none;
   }
@@ -7428,4 +9115,653 @@ a {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   /download and /download/<platform>.
+
+   The landing download cards grow into the page: each system keeps its card
+   colour, with dark text and dark buttons on it. Everything under the panel is
+   quiet rows on the canvas, so the colour stays the one loud thing.
+   ------------------------------------------------------------------------- */
+
+.download-main {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px) clamp(20px, 4vw, 48px) clamp(64px, 8vw, 112px);
+}
+
+.download-main[data-download-platform="macos"],
+.download-main [data-download-platform="macos"] {
+  --download-color: var(--openbot-logo-production);
+}
+
+.download-main[data-download-platform="windows"],
+.download-main [data-download-platform="windows"] {
+  --download-color: var(--openbot-logo-preview);
+}
+
+.download-main[data-download-platform="linux"],
+.download-main [data-download-platform="linux"] {
+  --download-color: var(--openbot-logo-dev);
+}
+
+.download-panel,
+.download-hub-card,
+.download-system-card {
+  border: 1px solid var(--openbot-download-card-border);
+  background: var(--download-color);
+  color: var(--openbot-text-on-light);
+}
+
+/* Platform page: the panel ---------------------------------------------- */
+
+.download-panel {
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.download-panel-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 40px;
+  padding: clamp(24px, 4.4vw, 60px) clamp(24px, 4.4vw, 60px) clamp(36px, 5vw, 68px);
+}
+
+.download-panel-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-download-card-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.download-panel-back-icon {
+  width: 16px;
+  height: 16px;
+  transform: scaleX(-1);
+}
+
+.download-panel-title {
+  margin: clamp(36px, 5vw, 64px) 0 0;
+  font-size: clamp(46px, 7.4vw, 104px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.94;
+  text-wrap: balance;
+}
+
+.download-panel-intro {
+  max-width: 50ch;
+  margin: clamp(20px, 2.4vw, 28px) 0 0;
+  color: var(--openbot-download-card-muted);
+  font-size: clamp(17px, 1.5vw, 19px);
+  line-height: 1.5;
+}
+
+.download-panel-installers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 28px;
+  margin: clamp(32px, 4vw, 44px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-panel-installers li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.download-panel-installer-detail {
+  padding-left: 4px;
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
+}
+
+.download-panel-logo {
+  width: clamp(120px, 17vw, 232px);
+  height: clamp(120px, 17vw, 232px);
+}
+
+.download-panel-specs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--openbot-download-card-border);
+}
+
+.download-panel-specs > div {
+  min-width: 0;
+  padding: 20px clamp(20px, 2.4vw, 32px) 24px;
+}
+
+.download-panel-specs > div + div {
+  border-left: 1px solid var(--openbot-download-card-border);
+}
+
+.download-panel-specs dt,
+.download-hub-card-specs dt {
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
+}
+
+.download-panel-specs dd {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+/* Installer buttons: dark on the system's colour ------------------------- */
+
+.download-installer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 24px 0 20px;
+  border: 1px solid var(--openbot-text-on-light);
+  border-radius: var(--openbot-radius-pill);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease,
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-installer-button[data-variant="primary"] {
+  background: var(--openbot-text-on-light);
+  color: var(--download-color);
+}
+
+.download-installer-button[data-variant="secondary"] {
+  background: var(--openbot-download-card-chip);
+  color: var(--openbot-text-on-light);
+}
+
+.download-installer-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.download-installer-button:focus-visible,
+.download-panel-back:focus-visible,
+.download-hub-card-link:focus-visible,
+.download-system-card:focus-visible {
+  outline: 3px solid var(--openbot-download-card-focus);
+  outline-offset: 3px;
+}
+
+/* Platform page: the rows under the panel -------------------------------- */
+
+.download-rows {
+  margin-top: clamp(56px, 8vw, 104px);
+}
+
+.download-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 300px) minmax(0, 1fr);
+  gap: 24px clamp(32px, 5vw, 80px);
+  padding: clamp(36px, 4.5vw, 56px) 0;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.download-row > * {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.download-row-title {
+  margin: 0;
+  font-size: clamp(24px, 2.4vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* The steps are a sequence, so each one is numbered, and a line joins them. */
+.download-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  counter-reset: download-step;
+  list-style: none;
+}
+
+.download-steps > li {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 20px;
+  padding-bottom: 32px;
+  counter-increment: download-step;
+}
+
+.download-steps > li:last-child {
+  padding-bottom: 0;
+}
+
+.download-steps > li::before {
+  content: counter(download-step);
+  grid-row: 1 / span 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--download-color, var(--openbot-border-strong));
+  border-radius: 50%;
+  background: var(--openbot-bg-canvas);
+  color: var(--download-color, var(--openbot-text-primary));
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.download-steps > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 48px;
+  bottom: 8px;
+  left: 19.5px;
+  width: 1px;
+  background: var(--openbot-border-strong);
+}
+
+.download-steps p {
+  grid-column: 2;
+  margin: 8px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.download-command {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  margin-top: 14px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.download-command pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-x: auto;
+  padding: 15px 18px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.download-command-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin: 9px 9px 9px 0;
+  padding: 0 12px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease;
+}
+
+.download-command-copy[data-state="copied"] {
+  color: var(--openbot-text-primary);
+}
+
+.download-command-copy:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.download-command-copy-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.download-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-notes li {
+  position: relative;
+  padding: 0 0 18px 24px;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.download-notes li + li {
+  padding-top: 18px;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.download-notes li::before {
+  content: "";
+  position: absolute;
+  top: 0.62em;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--download-color, var(--openbot-text-dim));
+}
+
+.download-notes li + li::before {
+  top: calc(18px + 0.62em);
+}
+
+.compare-faq-list.download-faq {
+  margin-top: -18px;
+  border-top: 0;
+}
+
+.download-system-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-system-card {
+  min-height: 108px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  border-radius: 20px;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-system-card-logo {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+
+.download-system-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.download-system-card-name {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.download-system-card-detail {
+  color: var(--openbot-download-card-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.download-system-card-arrow,
+.download-hub-card-link-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.download-system-card-arrow {
+  margin-left: auto;
+}
+
+.download-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 28px;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+}
+
+.download-resources a {
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-border-strong);
+  text-underline-offset: 3px;
+}
+
+/* Hub ------------------------------------------------------------------- */
+
+.download-hub-hero {
+  padding: clamp(28px, 6vw, 88px) 0 clamp(48px, 6vw, 80px);
+}
+
+.download-hub-title {
+  margin: 0;
+  font-size: clamp(56px, 11vw, 164px);
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 0.88;
+}
+
+.download-hub-intro {
+  max-width: 48ch;
+  margin: clamp(24px, 3vw, 36px) 0 clamp(28px, 3.4vw, 40px);
+  color: var(--openbot-text-secondary);
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.5;
+}
+
+.download-hub-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.download-hub-card {
+  min-width: 0;
+  min-height: 540px;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(26px, 2.6vw, 34px);
+  border-radius: 24px;
+}
+
+.download-hub-card-logo {
+  width: clamp(80px, 7.4vw, 104px);
+  height: clamp(80px, 7.4vw, 104px);
+}
+
+.download-hub-card-name {
+  margin: auto 0 0;
+  padding-top: 40px;
+  font-size: clamp(36px, 3.6vw, 50px);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.download-hub-card-specs {
+  margin: 22px 0 0;
+}
+
+.download-hub-card-specs > div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--openbot-download-card-border);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.download-hub-card-specs dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.download-hub-card-installers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.download-hub-card .download-installer-button {
+  height: 46px;
+  padding: 0 20px 0 16px;
+  font-size: 14px;
+}
+
+.download-hub-card-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 22px;
+  border-radius: var(--openbot-radius-xs);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.download-main > .download-resources {
+  margin-top: 32px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .download-installer-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .download-installer-button[data-variant="secondary"]:hover {
+    background: var(--openbot-download-card-border);
+  }
+
+  .download-panel-back:hover {
+    color: var(--openbot-text-on-light);
+  }
+
+  .download-system-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .download-system-card:hover .download-system-card-arrow,
+  .download-hub-card-link:hover .download-hub-card-link-icon {
+    transform: translateX(3px);
+  }
+
+  .download-command-copy:hover {
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+
+  .download-resources a:hover {
+    color: var(--openbot-text-primary);
+  }
+}
+
+/* Named transitions outrank the global reduced-motion rule, so the hover lift stops here. */
+@media (prefers-reduced-motion: reduce) {
+  .download-installer-button,
+  .download-system-card,
+  .download-system-card-arrow,
+  .download-hub-card-link-icon {
+    transition: none;
+  }
+
+  .download-installer-button:hover,
+  .download-system-card:hover,
+  .download-system-card:hover .download-system-card-arrow,
+  .download-hub-card-link:hover .download-hub-card-link-icon {
+    transform: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .download-hub-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .download-hub-card {
+    min-height: 0;
+  }
+
+  .download-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .download-panel-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Beside the back link, so the title keeps the full width of the panel. */
+  .download-panel-logo {
+    position: absolute;
+    top: 20px;
+    right: 22px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .download-panel-specs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .download-panel-specs > div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .download-panel-specs > div:nth-child(n + 3) {
+    border-top: 1px solid var(--openbot-download-card-border);
+  }
+
+  .download-system-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.landing-download-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 28px;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+}
+
+.landing-download-pages a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-border-strong);
+  text-underline-offset: 3px;
 }

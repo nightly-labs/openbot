@@ -7,6 +7,7 @@ import type {
   DynamicIslandPresentation,
   ExternalDestination,
   HostUpdateSettingsChange,
+  IdleRestartTarget,
   InstallMarketplaceAgentInput,
   InstallSkillInput,
   MacPermissionId,
@@ -29,6 +30,7 @@ import type {
   VerifyEmailCodeInput,
 } from "@openbot/contracts/ipc";
 import {
+  IDLE_RESTART_TARGETS,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
@@ -40,7 +42,14 @@ import {
   isSetApprovalAutomationInput,
   isSkillCategory,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  type DynamicRecord,
+  isBoolean,
+  isDynamicRecord,
+  isNumber,
+  isOneOf,
+  isString,
+} from "@openbot/contracts/runtime-values";
 import { validateProfileName } from "@openbot/contracts/validation";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, optionalBoolean, requireString } from "./validation";
@@ -85,6 +94,11 @@ export function parseAppLanguagePreference(input: unknown): SetAppLanguagePrefer
 export function parseAppLogoColorPreference(input: unknown): SetAppLogoColorPreferenceInput {
   if (!isDynamicRecord(input) || !isAppLogoColor(input.color)) throw new Error("Logo color is required.");
   return { color: input.color };
+}
+
+export function parseIdleRestartTarget(input: unknown): IdleRestartTarget {
+  if (!isOneOf(IDLE_RESTART_TARGETS, input)) throw new Error("A restart target is required.");
+  return input;
 }
 
 export function parseUpdatePreference(input: unknown): UpdatePreferenceChange {

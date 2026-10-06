@@ -1752,3 +1752,72 @@ export const NarrowActionMarkerSpacing: Story = {
     </section>
   ),
 };
+
+function agentExchangeMessage(
+  id: string,
+  direction: "incoming" | "outgoing",
+  otherAgentId: string,
+  time: string,
+  expectsReply = true,
+): RendererAgentMessage {
+  const timestamp = `2026-08-19T${time}:00.000Z`;
+  const sourceAgentId = direction === "outgoing" ? "chief" : otherAgentId;
+  const targetAgentId = direction === "outgoing" ? otherAgentId : "chief";
+  return {
+    id,
+    author: "agent",
+    body: "",
+    time,
+    createdAt: timestamp,
+    kind: "exchange",
+    exchange: {
+      direction,
+      messageId: id,
+      senderAgentId: sourceAgentId,
+      recipientAgentIds: [targetAgentId],
+      replyToMessageId: null,
+      deliveries: [],
+    },
+    actionMarker: {
+      kind: "agent-message",
+      direction,
+      sourceAgentId,
+      targetDeliveries: [{ agentId: targetAgentId, status: "completed" }],
+      status: "completed",
+      timestamp,
+      messageId: id,
+      replyToMessageId: null,
+      expectsReply,
+    },
+  };
+}
+
+/* Consecutive messages with other agents show as one row in the chat. */
+export const AgentMessageGroupInChat: Story = {
+  name: "Agent message group in chat",
+  args: {
+    messages: [
+      {
+        id: "group-user",
+        author: "you",
+        body: "Ask research and sales where the launch stands, then summarize.",
+        time: "09:00",
+        createdAt: "2026-08-19T09:00:00.000Z",
+        kind: "text",
+      },
+      agentExchangeMessage("group-1", "outgoing", "research", "09:01"),
+      agentExchangeMessage("group-2", "outgoing", "sales", "09:01"),
+      agentExchangeMessage("group-3", "incoming", "research", "09:03"),
+      agentExchangeMessage("group-4", "incoming", "sales", "09:04"),
+      agentExchangeMessage("group-5", "outgoing", "research", "09:05", false),
+      {
+        id: "group-agent",
+        author: "agent",
+        body: "Research has two sources left to confirm. Sales has 14 accounts ready for the launch email.",
+        time: "09:06",
+        createdAt: "2026-08-19T09:06:00.000Z",
+        kind: "text",
+      },
+    ],
+  },
+};

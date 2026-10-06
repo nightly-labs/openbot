@@ -72,7 +72,7 @@ const AAVE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/aave",
 };
 
@@ -113,67 +113,8 @@ const CANVA: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/canva",
-};
-
-const GITHUB: MarketplacePluginDetail = {
-  id: "plugin-github",
-  slug: "github",
-  name: "GitHub",
-  tagline: "Issues, pull requests and code",
-  description:
-    "GitHub lets agents review pull requests, open and triage issues, search code, and manage releases in the repositories a personal access token can reach. The token stays on this computer and travels as one Authorization header.",
-  category: "coding",
-  creatorName: "github.com",
-  iconUrl: "https://github.com/fluidicon.png",
-  version: "1.0.0",
-  prompts: [
-    { id: "prompt-pr-review", text: "Review my open pull requests and flag the riskiest one." },
-    { id: "prompt-issue-triage", text: "What issues were opened against my repos this week?" },
-    { id: "prompt-release-notes", text: "Draft release notes from merged pull requests since the last tag." },
-  ],
-  apps: [
-    {
-      id: "app-github-mcp",
-      name: "GitHub",
-      description:
-        "Issues, pull requests, code search, and releases, over GitHub's remote MCP server with a personal access token.",
-      iconUrl: "https://github.com/fluidicon.png",
-      server: {
-        name: "github",
-        transport: "http",
-        url: "https://api.githubcopilot.com/mcp/",
-        auth: [
-          {
-            id: "github-pat",
-            kind: "key",
-            label: "Personal access token",
-            fields: [
-              {
-                id: "token",
-                label: "Personal access token",
-                header: "Authorization",
-                prefix: "Bearer ",
-                placeholder: "github_pat_…",
-                hint: "GitHub Settings → Developer settings → Personal access tokens",
-              },
-            ],
-            docsUrl: "https://github.com/settings/tokens",
-            docsLabel: "Create a token",
-          },
-        ],
-      },
-    },
-  ],
-  websiteUrl: "https://github.com",
-  privacyPolicyUrl: "https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement",
-  termsUrl: "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service",
-  skills: [],
-  installs: 0,
-  featured: true,
-  updatedAt: "2026-09-19T00:00:00.000Z",
-  shareUrl: "https://openbot.run/plugins/github",
 };
 
 const LINEAR: MarketplacePluginDetail = {
@@ -213,7 +154,7 @@ const LINEAR: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/linear",
 };
 
@@ -254,7 +195,7 @@ const NOTION: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/notion",
 };
 
@@ -309,7 +250,7 @@ const FIGMA: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: true,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/figma",
 };
 
@@ -345,7 +286,7 @@ const PAPER: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/paper",
 };
 
@@ -385,7 +326,7 @@ const SENTRY: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/sentry",
 };
 
@@ -420,7 +361,7 @@ const CONTEXT7: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/context7",
 };
 
@@ -460,7 +401,7 @@ const STRIPE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/stripe",
 };
 
@@ -518,7 +459,7 @@ const POSTHOG: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/posthog",
 };
 
@@ -568,7 +509,7 @@ const AIRTABLE: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/airtable",
 };
 
@@ -626,7 +567,7 @@ const FIRECRAWL: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/firecrawl",
 };
 
@@ -678,7 +619,7 @@ const BRAVE_SEARCH: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/brave-search",
 };
 
@@ -730,7 +671,7 @@ const RESEND: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/resend",
 };
 
@@ -794,14 +735,13 @@ const COMPOSIO: MarketplacePluginDetail = {
   skills: [],
   installs: 0,
   featured: false,
-  updatedAt: "2026-09-19T00:00:00.000Z",
+  updatedAt: "2026-09-30T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/composio",
 };
 
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
-  GITHUB,
   LINEAR,
   NOTION,
   FIGMA,

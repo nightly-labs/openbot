@@ -29,6 +29,7 @@
 @import "@openbot/ui/features/channels/channel-activity.css";
 @import "@openbot/ui/features/usage/agent-usage-report.css";
 @import "./features/usage/usage.css";
+@import "./features/schedule/schedule.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";
 @import "@openbot/ui/features/import/agent-import.css";
@@ -38,13 +39,15 @@
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
 @import "@openbot/ui/features/settings/integration-layout.css";
 @import "@openbot/ui/features/settings/github-connector.css";
+@import "@openbot/ui/features/settings/onepassword-connector.css";
+@import "@openbot/ui/features/settings/slack-integration.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
-@import "./features/settings/skills-marketplace.css";
-@import "@openbot/ui/features/settings/marketplace-plugin-detail.css";
+@import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
+@import "@openbot/ui/features/settings/sound-theme-picker.css";
 @import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "@openbot/ui/features/custom-providers/custom-providers.css";

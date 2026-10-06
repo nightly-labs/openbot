@@ -27,6 +27,8 @@ const queueHoldChanged = vi.fn();
 const schedule = vi.fn();
 const interrupt = vi.fn(async () => undefined);
 const busy = vi.fn((_agentId: string) => false);
+/** The agents a spent plan holds, as the usage-limit gate reports them. */
+const limited = new Set<string>();
 const generate = vi.fn<ChannelTextModel>(async () => JSON.stringify({ agentId: "agent-a" }));
 let count = 0;
 const operationId = () => `command-${++count}`;
@@ -49,6 +51,7 @@ beforeEach(async () => {
   interrupt.mockClear();
   busy.mockReset();
   busy.mockReturnValue(false);
+  limited.clear();
   changed.mockClear();
   queueHoldChanged.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
@@ -57,6 +60,7 @@ beforeEach(async () => {
     schedule,
     interrupt,
     busy,
+    usageLimited: (agentId) => limited.has(agentId),
     changed,
     queueHoldChanged,
     error: (error) => {
@@ -87,6 +91,59 @@ async function send(text: string, recipientAgentId: string | null = "agent-a") {
   return required(service.store.tasks("channel-1")[0]);
 }
 describe("shared channel coordination", () => {
+  it("gives a task back to the queue at a spent plan, so it reserves nothing until the agent runs again", async () => {
+    const task = await send("Prepare the report");
+    const first = required(service.store.assignments("channel-1")[0]);
+    // The assignment reserves the host: another agent's own message cannot start.
+    expect(service.mayDrain("agent-b")).toBe(false);
+
+    busy.mockImplementation((agentId) => agentId === "agent-a");
+    expect(service.requeueForLimit(required(first.deliveryId))).toBe(true);
+    service.wake("channel-1");
+
+    expect(service.store.assignments("channel-1")).toEqual([
+      expect.objectContaining({ id: first.id, state: "interrupted" }),
+    ]);
+    expect(service.store.tasks("channel-1")).toEqual([
+      expect.objectContaining({ id: task.id, state: "queued", revision: task.revision + 1, error: null }),
+    ]);
+    expect(service.mayDrain("agent-b")).toBe(true);
+
+    busy.mockImplementation(() => false);
+    service.wake("channel-1");
+    await vi.waitFor(() =>
+      expect(service.store.assignments("channel-1").find((item) => item.id !== first.id)?.deliveryId).toBeTruthy(),
+    );
+  });
+
+  it("keeps a task queued when a spent plan refuses its routing turn, and routes it after the reset", async () => {
+    // The refusal is what records the hold, as the routing hook does in the service.
+    generate.mockImplementationOnce(async () => {
+      limited.add("agent-a");
+      throw new Error("The profile generation failed.");
+    });
+    await service.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: operationId(),
+        text: "Prepare the report",
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "queued", error: null })]),
+    );
+
+    limited.clear();
+    service.wake("channel-1");
+    await vi.waitFor(() => expect(service.store.assignments("channel-1").some((item) => item.deliveryId)).toBe(true));
+  });
+
   it("addresses one member and keeps the agent normal thread and provider session", async () => {
     const threadId = await data.store.ensureThreadId("agent-a");
     data.store.bindProviderSession("agent-a", "normal-provider-session");

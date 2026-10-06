@@ -1,14 +1,21 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { toast } from "@openbot/ui";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import { providerDiagnosticsText } from "@openbot/ui/features/provider-diagnostics/provider-diagnostics";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, Loading, Show } from "solid-js";
+import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
+import { resolveCreationModel } from "./features/agents/agent-creation-model";
 import { useAgents } from "./features/agents/agents-context";
-import { createGitHubConnector } from "./features/connectors/github-connector";
+import { createGitHubConnector, type GitHubConnectorController } from "./features/connectors/github-connector";
+import {
+  createOnePasswordConnector,
+  type OnePasswordConnectorController,
+} from "./features/connectors/onepassword-connector";
+import { createSlackConnector } from "./features/connectors/slack-connector";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
@@ -26,6 +33,7 @@ import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
+import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { useGlobalSearchSources } from "./global-search-sources";
 import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
@@ -62,14 +70,39 @@ interface AccountProps {
  * the components here read the desktop contexts and pass them on.
  */
 export function WorkspaceOverlays(props: AccountProps) {
+  const { activeServer } = useServers();
+  const { skillsMarketplaceOpen } = useSettings();
+  const { serverSettingsOpen, serverSettingsTarget } = useServerSettings();
+  /* One GitHub connection of this computer, which Server settings and the Marketplace both show.
+     A build with no GitHub App has none. */
+  const github = createGitHubConnector();
+  const githubFor = (server: ServerSummary | undefined) =>
+    server?.kind === "local" && github.status().available ? github : undefined;
+  /* The 1Password connection of this computer. The browser that fills its logins runs here too. */
+  const onePassword = createOnePasswordConnector();
+  const onePasswordFor = (server: ServerSummary | undefined) => (server?.kind === "local" ? onePassword : undefined);
+  /* The overlays mount with the app. A first read that failed then must not hide GitHub for good, and
+     the sign-in can change outside this window, so each window reads the status again when it opens. */
+  createEffect(
+    () => skillsMarketplaceOpen() || serverSettingsOpen(),
+    (open) => {
+      if (open) github.reload();
+    },
+  );
   return (
     <>
       <PermissionsReview account={props.account} />
-      <SkillsMarketplace />
+      <SkillsMarketplace
+        githubConnector={githubFor(activeServer())}
+        onePasswordConnector={onePasswordFor(activeServer())}
+      />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
-      <ServerSettings />
+      <ServerSettings
+        githubConnector={githubFor(serverSettingsTarget())}
+        onePasswordConnector={onePasswordFor(serverSettingsTarget())}
+      />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
       <RemoteDesktop />
@@ -114,8 +147,18 @@ function PermissionsReview(props: AccountProps) {
  * serves `agent-install-v1`, otherwise to this computer. An agent of a joined server is updated from
  * its listing only when its host serves `agent-update-v1`.
  */
-function SkillsMarketplace() {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
+function SkillsMarketplace(props: {
+  githubConnector: GitHubConnectorController | undefined;
+  onePasswordConnector: OnePasswordConnectorController | undefined;
+}) {
+  const {
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    pendingPluginSlug,
+    setPendingPluginSlug,
+    pendingPluginConnect,
+    setPendingPluginConnect,
+  } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
@@ -132,7 +175,13 @@ function SkillsMarketplace() {
       onOpenAgent={selectAgent}
       onAgentInstalled={openInstalledMarketplaceAgent}
       pluginSlug={pendingPluginSlug()}
-      onPluginSlugConsumed={() => setPendingPluginSlug(null)}
+      pluginConnect={pendingPluginConnect()}
+      onPluginSlugConsumed={() => {
+        setPendingPluginSlug(null);
+        setPendingPluginConnect(false);
+      }}
+      githubConnector={props.githubConnector}
+      onePasswordConnector={props.onePasswordConnector}
     />
   );
 }
@@ -207,13 +256,17 @@ function AddServer() {
  * Settings for one server, which is any server on the rail rather than the
  * active one - hence the target held by the domain instead of `activeServer()`.
  */
-function ServerSettings() {
+function ServerSettings(props: {
+  githubConnector: GitHubConnectorController | undefined;
+  onePasswordConnector: OnePasswordConnectorController | undefined;
+}) {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel, activeServer } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
-  const { agentStatus } = useAgents();
+  const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
+  const { setupState } = useSetup();
   const {
     toolRuntimeStatuses,
     providerAdminServerId,
@@ -225,6 +278,8 @@ function ServerSettings() {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    restartProvider,
+    cancelProviderRestart,
     codeLogin,
     providerKeys,
     hostCustomProviders,
@@ -240,8 +295,20 @@ function ServerSettings() {
     save: localAgents.saveCustomAgent,
     remove: localAgents.deleteCustomAgent,
     check: localAgents.checkCustomAgent,
+    // One process group runs every custom agent, so its restart is the restart of all of them.
+    get restartPending() {
+      return agentStatus().providers?.some((provider) => provider.id === "acp" && provider.restartPending) === true;
+    },
+    get lastError() {
+      return agentStatus().providers?.find((provider) => provider.id === "acp")?.lastError;
+    },
+    get diagnostics() {
+      const status = agentStatus().providers?.find((provider) => provider.id === "acp");
+      return status ? providerDiagnosticsText(status) : undefined;
+    },
+    restart: () => restartProvider("acp"),
+    cancelRestart: () => cancelProviderRestart("acp"),
   };
-  const github = createGitHubConnector();
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
    * over `providers-v1`, those of the host of the joined server on screen.
@@ -276,11 +343,28 @@ function ServerSettings() {
     setMcpServerEnabled,
     testMcpServer,
   } = useServerSettings();
-  // The overlay mounts with the app. A first read that failed then must not hide GitHub for good.
-  createEffect(serverSettingsOpen, (open) => {
-    if (open) github.reload();
-  });
-
+  // The Slack Orchestrator runs on this computer, so its picker lists this computer's models: none
+  // while a joined server is on screen, and then it starts on a new agent's default.
+  const { collapseSidebarSection } = useSidebar();
+  const slack = createSlackConnector(
+    undefined,
+    () => {
+      const options = modelOptions();
+      if (activeServer()?.kind !== "local" || options.length === 0) return undefined;
+      return {
+        modelOptions: options,
+        agentStatus: agentStatus(),
+        initial: resolveCreationModel(serverSetupChoice() ?? setupState(), options),
+        customProviders: localEndpoints.customProviders(),
+        customAgents: localAgents.customAgents(),
+      };
+    },
+    // The Integrations section starts collapsed: the orchestrator is not an agent people chat with
+    // every day. The collapse belongs to the local server, the one on screen when Slack connects.
+    (sectionId) => {
+      if (activeServer()?.kind === "local") collapseSidebarSection(sectionId);
+    },
+  );
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -341,6 +425,8 @@ function ServerSettings() {
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
+      onRestartProvider: local ? restartProvider : undefined,
+      onCancelProviderRestart: local ? cancelProviderRestart : undefined,
       get providerDetection() {
         return local ? detection.detection() : undefined;
       },
@@ -372,7 +458,7 @@ function ServerSettings() {
       },
       (error: unknown) => {
         const text = currentText();
-        toast.error(text.t("server.select.failedTitle"), {
+        actionToast.error(text.t("server.select.failedTitle"), {
           description: text.errorMessage(error, text.t("server.select.failedDescription")),
         });
         openServerSettings(server.id, null, "providers");
@@ -458,8 +544,12 @@ function ServerSettings() {
                 }
               : undefined
           }
-          // The GitHub connection belongs to this computer, and a build with no GitHub App has none.
-          githubConnector={server().kind === "local" && github.status().available ? github : undefined}
+          githubConnector={props.githubConnector}
+          onePasswordConnector={props.onePasswordConnector}
+          // Slack is connected on the computer that runs the agents: Slack opens this computer's browser
+          // and returns to its `openbot://` link.
+          slackConnector={server().kind === "local" ? slack : undefined}
+          connectorAgents={agentList()}
         />
       )}
     </Show>
@@ -493,6 +583,7 @@ function AppSettings(props: AccountProps) {
     setAppSettingsOpen,
     appSettingsTab,
     generalSettings,
+    builtInDisplayGeometry,
     updateGeneralSettings,
     appSettingsRestoreTarget,
     turboModePending,
@@ -507,9 +598,12 @@ function AppSettings(props: AccountProps) {
         value={generalSettings()}
         onValueChange={updateGeneralSettings}
         appInfo={platform.appInfo()}
+        builtInDisplayGeometry={builtInDisplayGeometry()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
         onCancelScheduledRestart={updates.cancelScheduledRestart}
+        onRestartWhenIdle={updates.restartWhenIdle}
+        onCancelIdleRestart={updates.cancelIdleRestart}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}

@@ -158,6 +158,94 @@ describe("QuestionPromptBubble", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
   });
 
+  it("keeps a modified Enter submitting in the default mode", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.input(input, { target: { value: "A working prototype" } });
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
+  });
+
+  it("holds plain Enter and submits on the modifier chord in modifier mode", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} sendShortcut="meta-enter" onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.input(input, { target: { value: "A working prototype" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // The send chord during composition belongs to the IME too.
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true, keyCode: 229, isComposing: true });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["A working prototype"] }));
+  });
+
+  it("submits a custom answer with the button in modifier mode, for a software keyboard", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      { id: "token", header: "Token", question: "Which token?", isSecret: true, options: null },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} sendShortcut="ctrl-enter" onSubmit={onSubmit} />);
+
+    await fireEvent.input(screen.getByLabelText(/Custom answer/), { target: { value: "secret-value" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ token: ["secret-value"] }));
+  });
+
+  it("leaves Enter that commits an IME composition to the browser", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const customQuestion: AgentPromptQuestion[] = [
+      {
+        id: "outcome",
+        header: "Outcome",
+        question: "What should the agent produce?",
+        isSecret: false,
+        options: null,
+      },
+    ];
+    render(() => <QuestionPromptBubble questions={customQuestion} onSubmit={onSubmit} />);
+
+    const input = screen.getByRole("textbox", { name: /Custom answer/ });
+    await fireEvent.compositionStart(input);
+    await fireEvent.input(input, { target: { value: "にほんご" } });
+    // Chromium: before compositionend, with isComposing.
+    await fireEvent.keyDown(input, { key: "Enter", keyCode: 229, isComposing: true });
+    await fireEvent.input(input, { target: { value: "日本語" } });
+    await fireEvent.compositionEnd(input);
+    // Safari: after compositionend, without isComposing.
+    await fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input).toHaveValue("日本語");
+
+    await fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ outcome: ["日本語"] }));
+  });
+
   it("blocks all prompt interaction while an answer is pending", async () => {
     const onSubmit = vi.fn(async () => true);
     render(() => <QuestionPromptBubble questions={questions} pending onSubmit={onSubmit} />);

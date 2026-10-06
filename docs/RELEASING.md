@@ -43,6 +43,12 @@ Create the `release` environment in `nightly-labs/openbot`, then add these envir
 Do not use an Apple Development certificate. Direct distribution and native macOS updates require a
 Developer ID Application certificate. Never commit signing credentials to the repository.
 
+The Docker image needs no secret: the `docker-publish` job pushes with `GITHUB_TOKEN`. After the
+first push, GHCR keeps the package `openbot` private. Open the package settings of
+`nightly-labs/openbot` once, make it public, and give the repository write access under **Manage
+Actions access**. (Not confirmed: a repository that pushes a new package usually gets this access
+already.)
+
 Windows signing credentials are not currently configured. The workflow explicitly verifies that the
 OpenBot executable and NSIS installer remain unsigned, while retaining package, runtime, updater,
 checksum, SBOM, and provenance checks.
@@ -161,6 +167,16 @@ above the extracted size. Do not commit the zip: Google's license does not allow
 set the archive SHA-256 and size, `installedBytes` above the extracted size, and the SHA-256 of
 each file in `files`. The paths in `files` are relative to `dist-package/`. Do not commit the
 archives: Cursor's terms do not allow redistribution.
+
+## Pin the Cline CLI
+
+`native-runtime.lock.json` pins the Cline CLI by hand. Read the npm `latest` version of
+`@cline/cli-darwin-arm64` and set `version`. For each target, download the platform package
+`@cline/cli-<os>-<arch>` (`windows-x64` for Windows) from `registry.npmjs.org`, and set the tarball
+SHA-256 and size, the SHA-256 of `bin/cline` (`bin/cline.exe` on Windows) and of
+`extensions/plugin-sandbox-bootstrap.js`, and `installedBytes` above the extracted size. The npm
+packages have no license file, so set `licenseSha256` to the SHA-256 of `LICENSE` at the
+`cli-v<version>` tag of `github.com/cline/cline`.
 
 ## Pin the OpenCode CLI
 
@@ -341,6 +357,12 @@ The workflow:
 9. publishes one non-draft GitHub Release only after all platform jobs pass. It joins the ARM64 and
    x64 `latest-mac.yml` files with `scripts/merge-mac-update-manifests.ts`: electron-updater selects
    the ZIP whose name contains `arm64` on Apple silicon and the other ZIP on Intel.
+10. builds a Docker image (`docker/Dockerfile`) from each Linux AppImage on a runner of that
+    architecture, after it checks the AppImage against its `SHA256SUMS` file. It starts each image
+    with `docker/seccomp.json`, waits for `openbot status`, and stops it, which must exit with 0;
+11. after the GitHub Release is published, pushes both images to `ghcr.io/nightly-labs/openbot`
+    with the tags `<version>-amd64` and `<version>-arm64`, joins them under `<version>`, `latest` and
+    `sha-<commit>`, and attests the build provenance of that image. See [Docker](docker.md).
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.
@@ -351,10 +373,10 @@ Before a tag, run the release path without publishing:
 gh workflow run release.yml --ref <branch> -f mode=dry-run
 ```
 
-The dry run runs the tag validation (without the tag and `main` checks), the Windows and Linux
-builds, and all their verification steps. It does not run the macOS job or the publish job, and it
-makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive, and an
-attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
+The dry run runs the tag validation (without the tag and `main` checks), the Windows, Linux and
+Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
+and it makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive,
+and an attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
 tag ref to check the macOS Host signing keychain.
 
 Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions

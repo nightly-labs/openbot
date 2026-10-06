@@ -152,14 +152,15 @@ export interface AutomationSnapshot {
 // a node named for a one-time code, a password or a token loses what was
 // entered - inline, and anywhere in its subtree, because a value does not
 // always arrive as the value of the control. `OtpInput` is the case that
-// matters: it clears the native input on every keystroke and rebuilds the code
-// as visible characters, which reach the tree as loose text under the group
-// that holds them.
+// matters: it shows the code as visible characters, which reach the tree as
+// loose text under the group that holds them, and its native input can hold
+// the same code under a name that is only a digit count.
 const SENSITIVE_CONTROL_NAME = /one[\s-]?time|passcode|password|\botp\b|secret|token|credential|api[\s_-]?key/iu;
 
 // One node of Playwright's aria YAML: indentation, role, quoted accessible
-// name, and either an inline value after the colon or an indented subtree.
-const NAMED_NODE = /^(\s*)- ([a-z]+) "((?:[^"\\]|\\.)*)"(?::(.*))?$/u;
+// name, states such as ` [disabled]`, and either an inline value after the
+// colon or an indented subtree. A disabled OTP group is still sensitive.
+const NAMED_NODE = /^(\s*)- ([a-z]+) "((?:[^"\\]|\\.)*)"((?: \[[^\]]*\])*)(?::(.*))?$/u;
 
 export function redactSensitiveSnapshotValues(yaml: string): string {
   const lines: string[] = [];
@@ -183,18 +184,24 @@ export function redactSensitiveSnapshotValues(yaml: string): string {
     const match = NAMED_NODE.exec(line);
     const name = match?.[3];
     if (match && name !== undefined && SENSITIVE_CONTROL_NAME.test(name)) {
-      const inline = match[4]?.trim() ?? "";
+      const inline = match[5]?.trim() ?? "";
       sensitiveIndents.push(indent);
       // The role and the name stay: an agent still has to see that the control
       // exists to aim `type` at it. Only what was entered goes.
       replaced = inline !== "";
-      lines.push(inline === "" ? line : `${match[1]}- ${match[2]} "${name}": [redacted]`);
+      lines.push(inline === "" ? line : `${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
+      continue;
+    }
+    if (match && sensitiveIndents.length > 0 && (match[5]?.trim() ?? "") !== "") {
+      // A named control inside a sensitive subtree keeps its name, which an
+      // agent navigates by, but not its value: a caller can name the `OtpInput`
+      // native input for the digit count, and that input holds the code.
+      lines.push(`${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
       continue;
     }
     if (sensitiveIndents.length === 0 || match) {
-      // Outside a sensitive subtree, or a named node inside one - a named node
-      // is structure the developer navigates by, and its own value is judged by
-      // its own name.
+      // Outside a sensitive subtree, or a named node inside one with no inline
+      // value - structure the developer navigates by.
       lines.push(line);
       continue;
     }

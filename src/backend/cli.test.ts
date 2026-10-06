@@ -325,6 +325,18 @@ describe("CLI spawn target", () => {
     expect(target.args).toEqual(["/d", "/s", "/c", '""C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\opencode.cmd" acp"']);
   });
 
+  it("keeps each argument of a Windows command shim whole and inert", () => {
+    const target = cliSpawnTarget(
+      "C:\\tools\\agent.cmd",
+      ["-f", "C:\\Jane Doe\\.env.dev", 'a"b & calc', "%PATH%", "C:\\dir with space\\"],
+      "win32",
+    );
+
+    expect(target.args.at(-1)).toBe(
+      '""C:\\tools\\agent.cmd" -f "C:\\Jane Doe\\.env.dev" "a""b & calc" "%%cd:~,%PATH%%cd:~,%" "C:\\dir with space\\\\""',
+    );
+  });
+
   it("uses no command processor away from Windows", () => {
     expect(cliSpawnTarget("/opt/homebrew/bin/opencode", ["acp"], "darwin")).toEqual({
       command: "/opt/homebrew/bin/opencode",

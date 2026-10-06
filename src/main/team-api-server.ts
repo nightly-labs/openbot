@@ -80,6 +80,7 @@ import { McpServerError } from "../backend/mcp-server-store";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { RemoteScreenError } from "./remote-screen-gateway";
+import { isClientUse } from "./team-api/client-use";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
 import {
@@ -194,7 +195,7 @@ export class TeamApiServer {
   readonly #lifecycle = new LifecycleGate<number>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
-  #lastClientRequestAt: number | null = null;
+  #lastClientUseAt: number | null = null;
   #agentListener: ((event: AgentEvent) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #localTypingAgentId: string | null = null;
@@ -361,11 +362,11 @@ export class TeamApiServer {
   }
 
   /**
-   * The last signed-in request or typing event from a client, or null for none. A client that is only
-   * open sends neither: it gets its updates on the event stream.
+   * The last user action from a client - a send, a change, or a typing event - or null for none. Reads,
+   * polls and mark-read do not count: a client that is only open does not keep a hosted server running.
    */
-  lastClientRequestAt(): number | null {
-    return this.#lastClientRequestAt;
+  lastClientUseAt(): number | null {
+    return this.#lastClientUseAt;
   }
 
   setLocalTyping(agentId: string | null, typing: boolean): void {
@@ -587,7 +588,7 @@ export class TeamApiServer {
       if (!authenticated || !token) {
         return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
       }
-      this.#lastClientRequestAt = Date.now();
+      if (isClientUse(method, url.pathname)) this.#lastClientUseAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
       const hidden = this.#hiddenAgentIds(context.protocol, context.capabilities);
       // Every protocol gets the projection, also with no hidden agent: a provider status row, a
@@ -857,7 +858,9 @@ export class TeamApiServer {
           encodingOptions,
         ) ?? undefined;
       if (!completionSnapshot) continue;
-      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return;
+      // The snapshot is this client's own. It does not fit, so this client loses the snapshot and
+      // keeps the turn, and the clients after it in the loop still get the turn.
+      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
     }
   }
@@ -1018,7 +1021,7 @@ export class TeamApiServer {
   }
 
   #setClientTyping(connection: EventClientState, agentId: string | null): void {
-    this.#lastClientRequestAt = Date.now();
+    this.#lastClientUseAt = Date.now();
     const changed = connection.typingAgentId !== agentId;
     connection.typingAgentId = agentId;
     if (connection.typingTimer) clearTimeout(connection.typingTimer);
@@ -1035,7 +1038,7 @@ export class TeamApiServer {
   }
 
   #setClientDirectTyping(connection: EventClientState, recipientMemberId: string | null): void {
-    this.#lastClientRequestAt = Date.now();
+    this.#lastClientUseAt = Date.now();
     const previousRecipientId = connection.directTypingRecipientId;
     const changed = previousRecipientId !== recipientMemberId;
     const recipientAlreadyActive = recipientMemberId

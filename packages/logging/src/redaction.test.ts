@@ -19,6 +19,8 @@ describe("redactText", () => {
   it("redacts provider secret prefixes", () => {
     expect(redactText("key sk-ant-abcdefgh1234 leaked")).toBe("key [redacted] leaked");
     expect(redactText("key xai-abcdefgh1234 leaked")).toBe("key [redacted] leaked");
+    expect(redactText("token xoxb-1234-5678-abcdefgh leaked")).toBe("token [redacted] leaked");
+    expect(redactText("token xapp-1-A0123-4567-abcdef leaked")).toBe("token [redacted] leaked");
   });
 
   it("leaves an ordinary word that starts like a provider prefix alone", () => {
