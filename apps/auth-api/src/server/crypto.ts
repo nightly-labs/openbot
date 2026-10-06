@@ -55,7 +55,7 @@ export function encodeBase64Url(value: Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-/** Throws when `value` is not base64url. */
+/** Throws when `atob` rejects `value`. It does not reject the `+` and `/` characters of standard base64. */
 export function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
