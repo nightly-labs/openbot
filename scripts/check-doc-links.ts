@@ -13,6 +13,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const LINK = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const HEADING = /^#{1,6}\s+(.+?)\s*#*\s*$/;
 const HTML_ANCHOR = /<a\s[^>]*(?:id|name)="([^"]+)"/g;
+const INLINE_CODE = /(`+)[^`]*?\1/g;
 
 const logger = createOpenBotLogger("check-doc-links");
 
@@ -28,8 +29,8 @@ function headingAnchor(heading: string): string {
     .replaceAll(" ", "-");
 }
 
-/** Lines outside fenced code blocks, with inline code removed. */
-function proseLines(text: string): string[] {
+/** The lines of `text`, with each line of a fenced code block left empty. */
+function linesOutsideFences(text: string): string[] {
   let fence: string | undefined;
   const lines: string[] = [];
   for (const line of text.split("\n")) {
@@ -39,7 +40,7 @@ function proseLines(text: string): string[] {
       lines.push("");
       continue;
     }
-    lines.push(fence === undefined ? line.replace(/(`+)[^`]*?\1/g, "") : "");
+    lines.push(fence === undefined ? line : "");
   }
   return lines;
 }
@@ -51,7 +52,8 @@ function anchors(path: string): Set<string> {
   const found = new Set<string>();
   const seen = new Map<string, number>();
   const text = readFileSync(path, "utf8");
-  for (const line of proseLines(text)) {
+  // A heading keeps its inline code: `headingAnchor` removes only the backticks, as GitHub does.
+  for (const line of linesOutsideFences(text)) {
     const heading = HEADING.exec(line)?.[1];
     if (heading !== undefined) {
       const anchor = headingAnchor(heading);
@@ -72,8 +74,8 @@ const failures: string[] = [];
 
 for (const file of files) {
   const path = join(ROOT, file);
-  proseLines(readFileSync(path, "utf8")).forEach((line, index) => {
-    for (const [, target] of line.matchAll(LINK)) {
+  linesOutsideFences(readFileSync(path, "utf8")).forEach((line, index) => {
+    for (const [, target] of line.replace(INLINE_CODE, "").matchAll(LINK)) {
       if (!target || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("/")) continue;
       const [linkPath = "", anchor] = target.split("#", 2);
       const targetPath = linkPath === "" ? path : normalize(join(dirname(path), decodeURIComponent(linkPath)));
