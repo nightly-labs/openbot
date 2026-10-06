@@ -2,6 +2,7 @@ import {
   LANDING_PREVIEW_READY_MESSAGE,
   LANDING_PREVIEW_START_MESSAGE,
 } from "@openbot/contracts/landing-preview-messages";
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { onCleanup, onSettled } from "solid-js";
 import { App } from "../App";
@@ -42,7 +43,7 @@ export function OpenBotPlayground(props: OpenBotPlaygroundProps) {
     controllerLoading = (dependencies.loadLandingController?.() ?? import("./landing-demo")).then((module) => {
       if (disposed) return;
       landingController = module.createLandingDemoController(mock, {
-        reducedMotion: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
+        reducedMotion: prefersReducedMotion(),
       });
       landingController.activate();
     });

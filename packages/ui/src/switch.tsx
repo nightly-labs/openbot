@@ -2,7 +2,7 @@ import type { PolymorphicProps } from "@kobalte/core/polymorphic";
 import * as SwitchPrimitive from "@kobalte/core/switch";
 import type { ComponentProps, JSX, ValidComponent } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, omit, onCleanup, Show, untrack } from "solid-js";
-import { cx } from "./utils";
+import { cx, prefersReducedMotion } from "./utils";
 
 export type SwitchSize = "sm" | "default";
 
@@ -39,7 +39,7 @@ function SwitchMotionThumb(props: SwitchMotionThumbProps): JSX.Element {
   let velocity = 0;
   let frame: number | undefined;
   let lastTimestamp: number | undefined;
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const reducedMotion = prefersReducedMotion();
 
   function paint(): void {
     if (!thumb) return;
