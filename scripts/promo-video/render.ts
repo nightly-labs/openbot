@@ -4,6 +4,7 @@
 //
 //   bun run promo:render               1920x1080, 60 fps, into .openbot-build/promo-video/
 //   bun run promo:render --video=team  the team video; the first run downloads its song
+//   bun run promo:render --video=pastel  the light, bouncy video with a synthesized soundtrack
 //   bun run promo:render --draft       960x540, 30 fps, fast encode
 //   bun run promo:render --still=1.05,3  one PNG per time, into stills/
 //   bun run promo:render --from=12 --to=15
@@ -40,7 +41,7 @@ const { values } = parseArgs({
   },
 });
 
-const videoName = z.enum(["promo", "team"]).parse(values.video);
+const videoName = z.enum(["promo", "team", "pastel"]).parse(values.video);
 const video = VIDEOS[videoName];
 const duration = video.duration;
 

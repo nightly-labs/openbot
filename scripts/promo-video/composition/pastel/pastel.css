@@ -1,0 +1,90 @@
+/* The pastel video: a light, soft world with dark plum type. Every color is a brand token mixed
+   with white or with the ink. */
+:root {
+  --pastel-white: var(--openbot-text-primary);
+  --pastel-ink: color-mix(in srgb, var(--openbot-logo-eye) 84%, var(--openbot-logo-production));
+  --pastel-ink-soft: color-mix(in srgb, var(--pastel-ink) 62%, transparent);
+  --pastel-shadow: color-mix(in srgb, var(--pastel-ink) 16%, transparent);
+  --pastel-lilac: var(--openbot-logo-production);
+  --pastel-lavender: color-mix(in srgb, var(--openbot-logo-production) 34%, var(--pastel-white));
+  --pastel-cream: color-mix(in srgb, var(--openbot-file-orange) 18%, var(--pastel-white));
+  --pastel-mint: color-mix(in srgb, var(--openbot-success) 22%, var(--pastel-white));
+  --pastel-mist: var(--openbot-onboarding-desktop-mist);
+  --pastel-pink: color-mix(in srgb, var(--openbot-file-pink) 42%, var(--pastel-white));
+  --pastel-peach: color-mix(in srgb, var(--openbot-file-orange) 45%, var(--pastel-white));
+  --pastel-sky: color-mix(in srgb, var(--openbot-file-blue) 42%, var(--pastel-white));
+  --pastel-aqua: color-mix(in srgb, var(--openbot-question-option) 42%, var(--pastel-white));
+  --pastel-butter: color-mix(in srgb, var(--openbot-warning) 34%, var(--pastel-white));
+  --pastel-green: var(--openbot-success);
+}
+
+body.pastel,
+body.pastel #stage {
+  background: var(--pastel-lavender);
+  color: var(--pastel-ink);
+}
+
+.pastel-wipe {
+  position: absolute;
+  inset: 0;
+}
+
+.pastel-shape {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.pastel-word {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pastel-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  border-radius: 56px;
+  box-shadow: 0 30px 80px var(--pastel-shadow);
+}
+
+.pastel-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pastel-text {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.pastel-mention {
+  display: inline-block;
+  padding: 2px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pastel-lilac) 55%, var(--pastel-white));
+  font-weight: 700;
+}
+
+canvas.pastel-confetti {
+  position: absolute;
+  inset: 0;
+  width: 1920px;
+  height: 1080px;
+}

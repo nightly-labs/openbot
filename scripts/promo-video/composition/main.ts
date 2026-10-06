@@ -1,7 +1,7 @@
 // The composition. `window.promo.seek(t)` draws the frame at `t` seconds; render.ts calls it once
 // per frame and takes a screenshot. Open the page with `?play` to watch it with sound.
 
-import { encodeWav, renderSoundtrack } from "./audio";
+import { renderSoundtrack } from "./audio";
 import { CUE, PROMISE_WORDS, PROVIDER_SWAPS, TRANSITIONS } from "./cues";
 import { createHook } from "./scenes/hook";
 import { createLocal } from "./scenes/local";
@@ -11,6 +11,7 @@ import { createPrice } from "./scenes/price";
 import { createPromise } from "./scenes/promise";
 import { createTeam } from "./scenes/team";
 import { createStage, drawGridPulse, moveCamera, registerPromo, splitColor } from "./stage";
+import { wavBase64 } from "./synth";
 import { beatPulse, clamp, DURATION, decay, spring } from "./timeline";
 
 /** Grid pulses: a bright ring runs out from the middle. */
@@ -78,18 +79,9 @@ async function build(): Promise<(t: number) => void> {
   };
 }
 
-function toBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let text = "";
-  for (let index = 0; index < bytes.length; index += 0x8000) {
-    text += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-  }
-  return btoa(text);
-}
-
 registerPromo({
   duration: DURATION,
   build,
   soundtrack: async () => ({ buffer: await renderSoundtrack(), offset: 0 }),
-  renderAudio: async () => toBase64(encodeWav(await renderSoundtrack())),
+  renderAudio: async () => wavBase64(await renderSoundtrack()),
 });
