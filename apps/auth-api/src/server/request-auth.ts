@@ -5,6 +5,7 @@ import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
+import { constantTimeEqual } from "./crypto";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { runApiEffect } from "./effect-runtime";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
@@ -324,13 +325,6 @@ export function bearerToken(request: Request): string | null {
   if (!authorization?.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length);
   return token && token.length <= 512 ? token : null;
-}
-
-function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) return false;
-  let difference = 0;
-  for (let index = 0; index < left.byteLength; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-  return difference === 0;
 }
 
 export function json(value: unknown, status = 200): Response {

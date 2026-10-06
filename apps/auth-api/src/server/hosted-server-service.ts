@@ -34,7 +34,7 @@ import {
   isBoatState,
   verifyBoatWebhookSignature,
 } from "./boat-client";
-import { deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
+import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -2014,12 +2014,7 @@ function isDeveloperKey(expected: string | undefined, provided: string | null | 
   const key = expected?.trim() ?? "";
   if (key.length < 32 || !provided) return false;
   const encoder = new TextEncoder();
-  const left = encoder.encode(key);
-  const right = encoder.encode(provided.trim());
-  if (left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-  return difference === 0;
+  return constantTimeEqual(encoder.encode(key), encoder.encode(provided.trim()));
 }
 
 function hostedClaim(secret: string, serverId: string) {

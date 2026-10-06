@@ -1,5 +1,6 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Context, Effect, Layer, Schema } from "effect";
+import { hexToBytes, importHmacSha256Key } from "./crypto";
 
 const BOAT_API_URL = "https://boat.dev/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -197,15 +198,10 @@ export const verifyBoatWebhookSignature = Effect.fn("verifyBoatWebhookSignature"
   const provided = input.signature.startsWith("v1=") ? input.signature.slice(3) : "";
   if (!/^[0-9a-f]{64}$/iu.test(provided)) return false;
   const key = yield* Effect.tryPromise({
-    try: () =>
-      crypto.subtle.importKey("raw", new TextEncoder().encode(input.secret), { name: "HMAC", hash: "SHA-256" }, false, [
-        "verify",
-      ]),
+    try: () => importHmacSha256Key(input.secret, "verify"),
     catch: () => new BoatApiError(502, "signature_verification_failed"),
   });
-  const bytes = new Uint8Array(32);
-  for (let index = 0; index < 32; index += 1)
-    bytes[index] = Number.parseInt(provided.slice(index * 2, index * 2 + 2), 16);
+  const bytes = hexToBytes(provided);
   return yield* Effect.tryPromise({
     try: () =>
       crypto.subtle.verify(
