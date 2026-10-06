@@ -1,6 +1,7 @@
 import { getPublicKeyAsync, hashes, signAsync, verifyAsync } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
+import { base64ToBytes, bytesToBase64 } from "./base64";
 
 class Ed25519Error extends Schema.TaggedError<Ed25519Error>()("Ed25519Error", { message: Schema.String }) {}
 
@@ -90,17 +91,4 @@ function decodePublicKeyPem(pem: string): Uint8Array {
     }
   }
   return spki.slice(ED25519_SPKI_PREFIX.length);
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
 }
