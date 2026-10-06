@@ -247,7 +247,7 @@ function createVerificationCommandPlan(
     commands.push("bun run check:ui");
     runnableCommandArgs.push(["run", "check:ui"]);
   }
-  if (surfaces.includes("renderer") && !isolatedApp) commands.push("bun run dev --isolated");
+  if (surfaces.includes("renderer") && !isolatedApp) commands.push("bun run dev");
   if (surfaces.includes("renderer")) {
     qaCommands.push("bun run dev:automation snapshot", "bun run dev:automation screenshot");
     commands.push(...qaCommands);
@@ -300,7 +300,9 @@ export function qaReadinessReasons(
   if (runtime.ambiguousApp) reasons.push("More than one app instance matches this worktree.");
   if (!runtime.appRunning && !runtime.ambiguousApp) reasons.push("No running app matches this worktree.");
   if (runtime.appRunning && !runtime.isolatedApp) {
-    reasons.push("The running app uses the default profile. Start bun run dev --isolated for isolated renderer QA.");
+    reasons.push(
+      "The running app uses the shared profile. Start bun run dev without --shared for isolated renderer QA.",
+    );
   }
   return reasons;
 }

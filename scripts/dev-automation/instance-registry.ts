@@ -12,9 +12,9 @@
 // and `bun run dev:stop` need.
 
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { devRuntimeDirectory } from "../../src/main/development-runtime-directory";
 import {
   assertRegistryDirectoryOwnership,
   ensureOwnerOnlyDirectory,
@@ -39,16 +39,11 @@ export interface DevInstanceRecord {
   startedAt: number;
 }
 
-// A per-user temporary directory, not the app data root: a record describes a
-// process, so losing every record on reboot is correct, and it keeps automation
-// discovery away from the SQLite profiles. On Windows, %LOCALAPPDATA% is used
-// because its NTFS ACLs are private to the user account.
+// The dev runtime directory, not the app data root: a record describes a
+// process, so it stays away from the SQLite profiles. It does not follow
+// TMPDIR, so every shell reads the registry that `bun run dev` wrote to.
 export function devInstanceRegistryDirectory(): string {
-  if (process.platform === "win32") {
-    const localAppData = process.env.LOCALAPPDATA?.trim() || join(homedir(), "AppData", "Local");
-    return join(localAppData, "OpenBot", "openbot-dev-instances");
-  }
-  return join(tmpdir(), "openbot-dev-instances");
+  return devRuntimeDirectory();
 }
 
 function recordPath(directory: string, record: Pick<DevInstanceRecord, "pid" | "service">): string {

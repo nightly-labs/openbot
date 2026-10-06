@@ -1,6 +1,6 @@
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,6 +13,7 @@ import {
   developmentUserDataName,
   readDevelopmentInstanceId,
 } from "../src/main/development-profile";
+import { developmentRemoteConnectionPath } from "../src/main/development-runtime-directory";
 import {
   type DevInstanceRecord,
   removeDevInstanceRecord,
@@ -237,7 +238,7 @@ function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv)
   });
 }
 
-const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated", "--hosting=test", "--slack"] as const;
+const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--shared", "--isolated", "--hosting=test", "--slack"] as const;
 /** The deployed `test` account Worker. It creates real hosted server VMs for the accounts on its allow list. */
 const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
 
@@ -248,12 +249,12 @@ export interface DevelopmentInvocation {
   // stacks in one worktree is nearly always a forgotten terminal, so it takes
   // saying so.
   force: boolean;
-  // Give this worktree a profile of its own, keyed to its path, instead of
-  // whichever suffix the renderer port happened to produce. The default keeps
-  // the shared `OpenBot Dev` profile; `--isolated` is for the times two
-  // worktrees must not see each other's conversations. Either way the profile
-  // is seeded on the start that creates it.
-  isolated: boolean;
+  // Open the shared `OpenBot Dev` profile instead of the profile of this
+  // worktree, which is keyed to its path. The default keeps two worktrees from
+  // seeing each other's conversations. `--isolated`, the old way to ask for the
+  // default, is still accepted and does nothing. Either way the profile is
+  // seeded on the start that creates it.
+  shared: boolean;
   // Sign the app in to the `test` account Worker instead of the local one, so that a hosted server
   // is a real boat VM that can reach its Worker and Signal. The app gets one profile for this that
   // all worktrees share: its account session belongs to the test Worker, not the local one.
@@ -272,11 +273,14 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     (argument) => argument.startsWith("--") && !DEVELOPMENT_OPTIONS.some((option) => option === argument),
   );
   if (unsupportedOption) throw new Error(`Unknown option: ${unsupportedOption}.`);
+  if (args.includes("--shared") && args.includes("--isolated")) {
+    throw new Error("Use --shared or --isolated, not both.");
+  }
   return {
     target,
     dryRun: args.includes("--dry-run"),
     force: args.includes("--force"),
-    isolated: args.includes("--isolated"),
+    shared: args.includes("--shared"),
     hostingTest: args.includes("--hosting=test"),
     slack: args.includes("--slack"),
   };
@@ -302,7 +306,7 @@ async function readHostingDeveloperKey(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, isolated, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
+  const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Generated apps/auth-api/.env.dev for local development.");
   }
@@ -317,9 +321,13 @@ async function main(): Promise<void> {
     sharedEnvironment.OPENBOT_DEV_REMOTE_ROLE = "none";
     logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
   }
-  if (isolated) {
-    sharedEnvironment.OPENBOT_DEV_INSTANCE_ID ??= developmentInstanceIdForWorktree(projectRoot);
+  if (!shared && !sharedEnvironment.OPENBOT_DEV_INSTANCE_ID) {
+    sharedEnvironment.OPENBOT_DEV_INSTANCE_ID = developmentInstanceIdForWorktree(projectRoot);
+    // The default changed from the shared profile, so a developer who expects their old data learns where it is.
+    logger.info("This worktree opens its own dev profile. Pass --shared to open the shared OpenBot Dev profile.");
   }
+  // The host and the test client of this stack find each other through a file named after it.
+  sharedEnvironment.OPENBOT_DEV_STACK_ID = String(process.pid);
 
   // Everything between reading the registry and publishing this stack's ports
   // happens under one machine-wide lock, so a sibling worktree starting at the
@@ -514,6 +522,10 @@ async function runDevelopmentServices(specs: DevelopmentServiceSpec[], stack: De
     // pids. Dropping it before the escalation would make anything that
     // survived SIGKILL an unrecorded orphan holding this worktree's ports.
     if (stack) removeDevStackRecord(stack);
+    // The host's handoff file holds the test client's session token, and no
+    // later stack reads it.
+    const app = specs.find((spec) => spec.name === "app");
+    if (app) rmSync(developmentRemoteConnectionPath(app.env), { force: true });
   };
 
   process.once("SIGINT", () => void stopAll("SIGTERM").then(() => process.exit(130)));

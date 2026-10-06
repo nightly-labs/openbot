@@ -5,6 +5,7 @@ import { chmodSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { developmentRemoteConnectionPath, devRuntimeDirectory } from "../../src/main/development-runtime-directory";
 import { createDevInstanceRecord, type DevelopmentServiceSpec } from "../dev-services";
 import {
   type DevInstanceRecord,
@@ -30,6 +31,39 @@ function record(overrides: Partial<DevInstanceRecord> = {}): DevInstanceRecord {
     ...overrides,
   };
 }
+
+describe("devRuntimeDirectory", () => {
+  // A registry that follows TMPDIR is a different registry in each shell, and `dev:status` then
+  // reports no stack while the app runs.
+  it("ignores TMPDIR on each platform", () => {
+    const environment = { TMPDIR: "/tmp/other", TEMP: "C:\\Temp" };
+    expect(devRuntimeDirectory("darwin", environment, "/Users/dev")).toBe("/Users/dev/Library/Caches/OpenBot/dev");
+    expect(devRuntimeDirectory("linux", { ...environment, XDG_RUNTIME_DIR: "/run/user/1000" }, "/home/dev")).toBe(
+      "/run/user/1000/openbot-dev",
+    );
+    expect(devRuntimeDirectory("linux", environment, "/home/dev")).toBe("/home/dev/.cache/openbot/dev");
+    expect(devRuntimeDirectory("win32", { ...environment, LOCALAPPDATA: "C:\\Users\\dev\\AppData\\Local" })).toBe(
+      "C:\\Users\\dev\\AppData\\Local\\OpenBot\\openbot-dev-instances",
+    );
+  });
+
+  it("takes an absolute override and refuses a relative one", () => {
+    expect(devRuntimeDirectory("linux", { OPENBOT_DEV_REGISTRY_DIR: "/srv/dev/" }, "/home/dev")).toBe("/srv/dev/");
+    expect(() => devRuntimeDirectory("linux", { OPENBOT_DEV_REGISTRY_DIR: "registry" }, "/home/dev")).toThrow(
+      "OPENBOT_DEV_REGISTRY_DIR must be an absolute path.",
+    );
+  });
+
+  it("gives each stack its own remote handoff file outside the instance records", () => {
+    const first = developmentRemoteConnectionPath({ OPENBOT_DEV_STACK_ID: "101" }, "/r");
+    const second = developmentRemoteConnectionPath({ OPENBOT_DEV_STACK_ID: "202" }, "/r");
+    expect(first).toBe(join("/r", "remote", "connection-101.json"));
+    expect(second).not.toBe(first);
+    expect(developmentRemoteConnectionPath({ OPENBOT_DEV_STACK_ID: "../x" }, "/r")).toBe(
+      join("/r", "remote", "connection-default.json"),
+    );
+  });
+});
 
 describe("selectDevInstance", () => {
   const here = record();

@@ -148,6 +148,13 @@ describe("development service runner", () => {
   it("rejects unknown targets and options", () => {
     expect(() => parseDevelopmentTarget(["other"])).toThrow("Unknown development target");
     expect(() => parseDevelopmentTarget(["all", "--watch"])).toThrow("Unknown option");
+    expect(() => parseDevelopmentTarget(["app", "--shared", "--isolated"])).toThrow("not both");
+  });
+
+  it("opens the worktree profile unless --shared is passed, and keeps --isolated as an alias", () => {
+    expect(parseDevelopmentTarget(["app"]).shared).toBe(false);
+    expect(parseDevelopmentTarget(["app", "--isolated"]).shared).toBe(false);
+    expect(parseDevelopmentTarget(["app", "--shared"]).shared).toBe(true);
   });
 
   it("takes a port a running stack has published as gone without probing it", async () => {
