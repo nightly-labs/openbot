@@ -4,19 +4,23 @@ import {
   Button,
   buttonVariants,
   Crown,
-  DropdownMenu,
   Input,
   ItemActions,
   ItemGroup,
+  Listbox,
   Plus,
+  Popover,
+  Search,
   Textarea,
   Tooltip,
 } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createStore, For, Show } from "solid-js";
+import { createEffect, createStore, For, onSettled, Show } from "solid-js";
 import { useChannels } from "./channels-context";
 import { toggleChannelMember } from "./channels-draft";
 
@@ -98,6 +102,60 @@ export function ChannelEditor(props: ChannelEditorProps) {
     }));
   const available = () =>
     agentList().filter((agent) => !channel()?.members.some((member) => member.agentId === agent.id));
+
+  /**
+   * The Add member picker. A team can hold more agents than the window has rows, so the picker
+   * filters by the search field the way the New channel dialog does, and its list scrolls.
+   */
+  const [picker, setPicker] = createStore<{ open: boolean; search: string; placement: "bottom-start" | "top-start" }>({
+    open: false,
+    search: "",
+    placement: "bottom-start",
+  });
+  const matching = () => {
+    const search = picker.search.toLowerCase();
+    return available().filter((agent) => `${agent.name} ${agent.description}`.toLowerCase().includes(search));
+  };
+  let pickerPanel: HTMLElement | undefined;
+  let pickerList: HTMLElement | undefined;
+  const pickerFades = createScrollFades();
+  onSettled(() => pickerFades.stop);
+  // A filter changes what overflows without always changing the list's own height.
+  createEffect(
+    () => matching(),
+    () => pickerFades.remeasure(),
+  );
+  let pickerSearch: HTMLInputElement | undefined;
+  let pickerTrigger: HTMLButtonElement | undefined;
+  /**
+   * Typing while an option has focus goes on in the search field. Kobalte's own typeahead cannot
+   * take a name with a space: the focused option takes Space as its select key before the
+   * typeahead sees it, so typing "Scale 9" would add whichever agent "Scale" had reached.
+   */
+  function typeIntoSearch(event: KeyboardEvent) {
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setPicker((state) => {
+      state.search += event.key;
+    });
+    pickerSearch?.focus();
+  }
+  function setPickerOpen(open: boolean) {
+    // The side is chosen once, where the window has more room. The menu stops at the room it has,
+    // so it never overflows and Kobalte would never flip it back: a search that shrinks the list
+    // would move it below the trigger, and clearing the search would leave it there, a few rows tall.
+    const trigger = pickerTrigger?.getBoundingClientRect();
+    setPicker((state) => {
+      state.open = open;
+      if (!open) state.search = "";
+      if (open && trigger)
+        state.placement = window.innerHeight - trigger.bottom >= trigger.top ? "bottom-start" : "top-start";
+    });
+    // A popover that is not modal does not move focus, so the search field takes it once it is on
+    // the page.
+    if (open) requestAnimationFrame(() => pickerSearch?.focus({ preventScroll: true }));
+  }
 
   /**
    * The command carries a whole draft, so every save sends the fields as they are on screen. That
@@ -326,29 +384,85 @@ export function ChannelEditor(props: ChannelEditorProps) {
               />
             )}
           </For>
-          <DropdownMenu.Root placement="bottom-start" modal={false}>
-            <DropdownMenu.Trigger
+          <Popover.Root
+            open={picker.open}
+            onOpenChange={setPickerOpen}
+            placement={picker.placement}
+            flip={false}
+            modal={false}
+          >
+            <Popover.Trigger
+              ref={pickerTrigger}
               class={buttonVariants({ variant: "ghost", class: "channel-member-add" })}
               disabled={!available().length}
             >
               <Plus aria-hidden="true" />
               {t("channel.members.add")}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content class="channel-member-menu">
-                <For each={available()}>
-                  {(agent) => (
-                    <DropdownMenu.Item
-                      onSelect={() => void commit((draft) => toggleChannelMember(draft, agent.id, true))}
-                    >
-                      <AgentAvatar agent={agent} />
-                      {agent.name}
-                    </DropdownMenu.Item>
-                  )}
-                </For>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content ref={(element) => (pickerPanel = element)} class="ui-action-menu channel-member-menu">
+                <ContentExitMotion panel={() => pickerPanel} />
+                <Popover.Title class="sr-only">{t("channel.members.add")}</Popover.Title>
+                <label class="search-field channel-member-search">
+                  <Search class="channel-search-icon" aria-hidden="true" />
+                  <Input
+                    ref={(element: HTMLInputElement) => (pickerSearch = element)}
+                    type="search"
+                    aria-label={t("channel.create.searchAgents")}
+                    placeholder={t("channel.create.searchAgents")}
+                    value={picker.search}
+                    onValueChange={(search) =>
+                      setPicker((state) => {
+                        state.search = search;
+                      })
+                    }
+                    onKeyDown={(event: KeyboardEvent) => {
+                      if (event.key !== "ArrowDown" || !pickerList) return;
+                      event.preventDefault();
+                      pickerList.focus();
+                    }}
+                  />
+                </label>
+                <Show
+                  when={matching().length}
+                  fallback={
+                    <p class="channel-member-menu-empty" role="status">
+                      {t("channel.create.noMatches")}
+                    </p>
+                  }
+                >
+                  <Listbox.Root
+                    as="div"
+                    ref={(element: HTMLElement) => {
+                      pickerList = element;
+                      pickerFades.bind(element);
+                      element.addEventListener("keydown", typeIntoSearch, { capture: true });
+                    }}
+                    class={["channel-member-options", pickerFades.classes()]}
+                    onScroll={pickerFades.measure}
+                    aria-label={t("channel.members.add")}
+                    options={matching()}
+                    optionValue="id"
+                    optionTextValue="name"
+                    selectionMode="single"
+                    shouldFocusWrap
+                    onChange={(keys) => {
+                      const agentId = keys.values().next().value;
+                      if (!agentId) return;
+                      setPickerOpen(false);
+                      void commit((draft) => toggleChannelMember(draft, agentId, true));
+                    }}
+                    renderItem={(item) => (
+                      <Listbox.Item item={item}>
+                        <AgentAvatar agent={item.rawValue} />
+                        {item.rawValue.name}
+                      </Listbox.Item>
+                    )}
+                  />
+                </Show>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         </ItemGroup>
         <Show when={!members().length}>
           <p class="channel-members-note">{t("channel.members.empty")}</p>

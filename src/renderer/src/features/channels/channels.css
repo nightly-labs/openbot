@@ -130,13 +130,57 @@
    column as the avatars and the plus above it. It is also given room to the right of the longest
    name, which `min-width: 160px` on the shared menu does not leave. */
 .channel-member-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
   min-width: 220px;
+  /* A team can have more agents than the window has rows: the menu stops at the room the window
+     leaves on its side of the trigger, and the list inside it scrolls. */
+  max-height: min(
+    calc(var(--openbot-space-8) * 11),
+    calc(100dvh - var(--openbot-space-4)),
+    var(--kb-popper-content-available-height, 100dvh)
+  );
   margin-inline-start: calc(var(--openbot-space-1) * -1);
 }
-/* Kobalte highlights the first item the moment the menu opens, which painted a row nobody pointed
-   at - and the trigger above it kept its own hover. Only the pointer and the keyboard paint here. */
-.channel-member-menu [role="menuitem"][data-highlighted]:not(:hover, :focus-visible) {
-  background: transparent;
+.channel-member-menu .channel-member-search {
+  flex: none;
+}
+.channel-member-menu .channel-member-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.channel-member-options {
+  min-height: 0;
+  overflow-y: auto;
+  outline: 0;
+  scrollbar-width: thin;
+}
+/* The rows of the shared action menu, for options rather than menu items. Only the pointer and the
+   keyboard paint a row: nothing is highlighted the moment the menu opens. */
+.channel-member-options [role="option"] {
+  display: flex;
+  min-height: var(--openbot-control-md);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-radius: var(--ui-menu-item-radius);
+  outline: 0;
+  padding: var(--openbot-space-1-5) var(--ui-menu-inset);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  white-space: nowrap;
+  cursor: default;
+  transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+.channel-member-options [role="option"]:is(:hover, :focus-visible) {
+  background: var(--ui-menu-item-hover);
+}
+.channel-member-menu-empty {
+  margin: 0;
+  padding: var(--openbot-space-3) var(--ui-menu-inset);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 /* A row action reads as state until it is asked for: the crown stays on the lead, and Remove waits
    for the pointer or the keyboard. Hover is the condition, so a touch screen keeps both visible. */
