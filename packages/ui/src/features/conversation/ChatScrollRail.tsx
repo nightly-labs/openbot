@@ -170,6 +170,7 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   const [held, setHeld] = createSignal(false);
 
   let nav: HTMLElement | undefined;
+  let list: HTMLOListElement | undefined;
   let frame = 0;
   let relayout = true;
   let idle: ReturnType<typeof setTimeout> | undefined;
@@ -297,6 +298,18 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   // New rows and new measurements move the sections.
   createEffect(props.sections, () => schedule(true));
 
+  // A list taller than the rail scrolls itself, not the transcript, to keep the current day in view.
+  createEffect(
+    () => rail.active,
+    (index) => {
+      const item = list?.children[index];
+      if (!list || !(item instanceof HTMLElement) || list.scrollHeight <= list.clientHeight) return;
+      if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop;
+      else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight)
+        list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
+    },
+  );
+
   onSettled(() => () => {
     if (frame) cancelAnimationFrame(frame);
     if (idle) clearTimeout(idle);
@@ -335,7 +348,12 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
               {pad(rail.active + 1)} / {pad(count())}
             </span>
           </p>
-          <ol class="chat-scroll-rail-list">
+          <ol
+            ref={(element) => {
+              list = element;
+            }}
+            class="chat-scroll-rail-list"
+          >
             <For each={props.sections()} keyed={false}>
               {(section, index) => (
                 <li

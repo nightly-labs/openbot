@@ -175,6 +175,11 @@ export const OlderHistoryNotLoaded: Story = {
   },
 };
 
+/** Forty days: more than the rail holds, so its list scrolls and keeps the current day in view. */
+export const ManyDays: Story = {
+  args: { rows: storyRows(Array.from({ length: 40 }, (_, index) => 2 + (index % 4))) },
+};
+
 /** Two days: no rail, because the transcript is short enough to read through. */
 export const TwoDays: Story = {
   args: { rows: storyRows([30, 30]) },

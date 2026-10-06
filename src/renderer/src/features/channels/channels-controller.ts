@@ -3,6 +3,19 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
 import { mergeChannelPage } from "./channel-page-merge";
+
+/**
+ * Takes the older edge of a page: its cursor, and the unloaded length that belongs to that cursor. A
+ * page with no length removes the old one, so the day rail never draws a length for another window.
+ */
+function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
+  target.olderCursor = source.olderCursor;
+  if (source.olderCount === undefined) delete target.olderCount;
+  else target.olderCount = source.olderCount;
+  if (source.oldestAt === undefined) delete target.oldestAt;
+  else target.oldestAt = source.oldestAt;
+}
+
 import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
@@ -133,13 +146,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
-          // The unloaded length belongs to the cursor: the rail would draw the old window's length.
-          if (merged.takeFetchedCursor)
-            Object.assign(state.page, {
-              olderCursor: page.olderCursor,
-              olderCount: page.olderCount,
-              oldestAt: page.oldestAt,
-            });
+          if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else state.page = page;
         state.loading = false;
         if (!failedCommand) state.error = null;
@@ -265,9 +272,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           if (!page || page.olderCursor !== beforeSequence) return;
           const ids = new Set(page.messages.map((item) => item.id));
           reconcile([...older.messages.filter((item) => !ids.has(item.id)), ...page.messages], "id")(page.messages);
-          page.olderCursor = older.olderCursor;
-          page.olderCount = older.olderCount;
-          page.oldestAt = older.oldestAt;
+          takeOlderWindow(page, older);
         });
     } catch (error) {
       if (!disposed && account === env.scopeKey() && state.selectedId === channelId)

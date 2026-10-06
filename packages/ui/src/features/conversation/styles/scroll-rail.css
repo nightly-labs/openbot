@@ -95,6 +95,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Each day keeps room for its title. A chat with more days than the rail holds scrolls the list
+   inside the rail, so every day stays in reach; the list keeps the current day in view. */
 .chat-scroll-rail-list {
   position: relative;
   flex: 1;
@@ -103,6 +105,9 @@
   flex-direction: column;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   list-style: none;
 }
 

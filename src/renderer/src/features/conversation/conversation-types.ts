@@ -98,7 +98,7 @@ export interface ConversationProps {
   loaded: boolean;
   hasOlder?: boolean;
   /** The messages above the loaded page, for the day rail. Absent when the host does not count them. */
-  unloadedHistory?: UnloadedHistory;
+  unloadedHistory?: UnloadedHistory | undefined;
   discontinuous?: boolean;
   loadingOlder?: boolean;
   olderError?: string | null;
