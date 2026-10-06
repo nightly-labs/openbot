@@ -23,6 +23,8 @@ import type {
   QueueDelivery,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
+import { type AttachmentOperationError, attachmentCall, attachmentFailure, attachmentSync } from "./attachment-effects";
 import { sha256File } from "./file-hash";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
@@ -106,20 +108,28 @@ export class AttachmentFiles {
     this.#transfersRoot = join(options.sharedRoot, "Transfers");
   }
 
-  async initialize(): Promise<void> {
-    await Promise.all([
-      mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#transfersRoot, { recursive: true, mode: 0o700 }),
-    ]);
-  }
-
-  async resetDrafts(retainedIds: string[] = []): Promise<void> {
-    const retained = new Set(retainedIds);
-    const entries = await readdir(this.#draftsRoot);
-    await Promise.all(
-      entries.filter((name) => !retained.has(name)).map((name) => this.remove(join(this.#draftsRoot, name))),
+  readonly initialize = Effect.fn("AttachmentFiles.initialize")(function* (
+    this: AttachmentFiles,
+  ): Effect.fn.Return<void, AttachmentOperationError> {
+    yield* Effect.forEach(
+      [this.#draftsRoot, this.#transfersRoot],
+      (root) => attachmentCall(() => mkdir(root, { recursive: true, mode: 0o700 })).pipe(Effect.uninterruptible),
+      { concurrency: "unbounded" },
     );
-  }
+  }).bind(this);
+
+  readonly resetDrafts = Effect.fn("AttachmentFiles.resetDrafts")(function* (
+    this: AttachmentFiles,
+    retainedIds: string[] = [],
+  ): Effect.fn.Return<void, AttachmentOperationError> {
+    const retained = new Set(retainedIds);
+    const entries = yield* attachmentCall(() => readdir(this.#draftsRoot));
+    yield* Effect.forEach(
+      entries.filter((name) => !retained.has(name)),
+      (name) => this.remove(join(this.#draftsRoot, name)),
+      { concurrency: "unbounded" },
+    );
+  }).bind(this);
 
   transferRoot(id: string): string {
     return join(this.#transfersRoot, id);
@@ -137,176 +147,258 @@ export class AttachmentFiles {
    * The real path of a managed transfer file, or null when the file is gone or resolves outside
    * the Transfers folder. A delete from Storage removes only a path this returns.
    */
-  async managedTransferFile(path: string): Promise<string | null> {
-    try {
-      const [root, candidate] = await Promise.all([realpath(this.#transfersRoot), realpath(path)]);
-      if (!isWithin(root, candidate)) return null;
-      return (await lstat(candidate)).isFile() ? candidate : null;
-    } catch {
-      return null;
-    }
+
+  managedTransferFile(path: string): Effect.Effect<string | null, AttachmentOperationError> {
+    return Effect.gen({ self: this }, function* () {
+      try {
+        const [root, candidate] = yield* attachmentCall(() =>
+          Promise.all([realpath(this.#transfersRoot), realpath(path)]),
+        );
+        if (!isWithin(root, candidate)) return null;
+        return (yield* attachmentCall(() => lstat(candidate))).isFile() ? candidate : null;
+      } catch {
+        return null;
+      }
+    }).pipe(
+      Effect.catch(() => Effect.succeed(null)),
+      Effect.withSpan("AttachmentFiles.managedTransferFile"),
+    );
   }
 
-  async remove(path: string): Promise<void> {
-    await rm(path, { recursive: true, force: true });
-  }
+  readonly remove = Effect.fn("AttachmentFiles.remove")(function* (
+    this: AttachmentFiles,
+    path: string,
+  ): Effect.fn.Return<void, AttachmentOperationError> {
+    yield* attachmentCall(() => rm(path, { recursive: true, force: true })).pipe(Effect.uninterruptible);
+  }).bind(this);
 
-  async removeAttachmentDirectories(paths: string[]): Promise<void> {
-    await Promise.all(paths.map((path) => this.remove(dirname(path))));
-  }
+  readonly removeAttachmentDirectories = Effect.fn("AttachmentFiles.removeAttachmentDirectories")(function* (
+    this: AttachmentFiles,
+    paths: string[],
+  ): Effect.fn.Return<void, AttachmentOperationError> {
+    yield* Effect.forEach(paths, (path) => this.remove(dirname(path)), { concurrency: "unbounded" });
+  }).bind(this);
 
-  async discardGenerated(attachments: StoredGeneratedAttachment[]): Promise<void> {
+  readonly discardGenerated = Effect.fn("AttachmentFiles.discardGenerated")(function* (
+    this: AttachmentFiles,
+    attachments: StoredGeneratedAttachment[],
+  ): Effect.fn.Return<void, AttachmentOperationError> {
     const roots = attachments
       .map((attachment) => this.generatedRootForPath(attachment.path))
       .filter((path): path is string => path !== null);
-    await Promise.allSettled(roots.map((path) => this.remove(path)));
+    yield* Effect.forEach(roots, (path) => Effect.result(this.remove(path)), { concurrency: "unbounded" });
+  }).bind(this);
+
+  resolveDraft(attachment: StoredAttachment) {
+    return resolveManagedAttachmentEffect(this.#draftsRoot, attachment);
+  }
+  resolveTransfer(attachment: StoredAttachment) {
+    return resolveManagedAttachmentEffect(this.#transfersRoot, attachment);
   }
 
-  resolveDraft(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
-    return resolveManagedAttachment(this.#draftsRoot, attachment);
-  }
-
-  resolveTransfer(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
-    return resolveManagedAttachment(this.#transfersRoot, attachment);
-  }
-
-  async prepareDrafts(paths: string[], data: AttachmentDataInput[]): Promise<StoredDraft[]> {
+  readonly prepareDrafts = Effect.fn("AttachmentFiles.prepareDrafts")(function* (
+    this: AttachmentFiles,
+    paths: string[],
+    data: AttachmentDataInput[],
+  ): Effect.fn.Return<StoredDraft[], AttachmentOperationError> {
     if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
-      throw new Error("An attachment path is invalid.");
+      return yield* attachmentFailure(new Error("An attachment path is invalid."));
     }
     if (
       data.some(
         (item) => item.name.length > INPUT_LIMITS.attachmentName || item.mimeType.length > INPUT_LIMITS.mimeType,
       )
     ) {
-      throw new Error("Attachment metadata is too long.");
+      return yield* attachmentFailure(new Error("Attachment metadata is too long."));
     }
 
     const prepared: StoredDraft[] = [];
+    const preparedRoots: string[] = [];
     let total = 0;
-    try {
-      for (const sourcePath of paths) {
-        const source = await inspectSource(sourcePath);
-        const id = randomUUID();
-        const targetDirectory = join(this.#draftsRoot, id);
-        const name = sanitizeName(source.path);
-        assertSupportedAttachmentName(name);
-        const targetPath = join(targetDirectory, name);
-        await mkdir(targetDirectory, { recursive: true, mode: 0o700 });
-        await copyFile(source.path, targetPath);
-        const copied = await stat(targetPath);
-        if (copied.size > MAX_FILE_BYTES) {
-          await rm(targetDirectory, { recursive: true, force: true });
-          throw new Error(`${name} exceeds the 100 MB limit.`);
+    let completed = false;
+    return yield* Effect.gen({ self: this }, function* () {
+      try {
+        for (const sourcePath of paths) {
+          const source = yield* inspectSourceEffect(sourcePath);
+          const id = randomUUID();
+          const targetDirectory = join(this.#draftsRoot, id);
+          preparedRoots.push(targetDirectory);
+          const name = sanitizeName(source.path);
+          assertSupportedAttachmentName(name);
+          const targetPath = join(targetDirectory, name);
+          yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
+            Effect.uninterruptible,
+          );
+          yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
+          const copied = yield* attachmentCall(() => stat(targetPath));
+          if (copied.size > MAX_FILE_BYTES) {
+            yield* attachmentCall(() => rm(targetDirectory, { recursive: true, force: true })).pipe(
+              Effect.uninterruptible,
+            );
+            throw new Error(`${name} exceeds the 100 MB limit.`);
+          }
+          total += copied.size;
+          if (total > MAX_TOTAL_BYTES) {
+            yield* attachmentCall(() => rm(targetDirectory, { recursive: true, force: true })).pipe(
+              Effect.uninterruptible,
+            );
+            throw new Error(sourceText("error.attachment.totalTooLarge"));
+          }
+          prepared.push({
+            ...attachmentRecord(
+              id,
+              name,
+              copied.size,
+              targetPath,
+              yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+            ),
+            createdAt: new Date().toISOString(),
+          });
         }
-        total += copied.size;
-        if (total > MAX_TOTAL_BYTES) {
-          await rm(targetDirectory, { recursive: true, force: true });
-          throw new Error(sourceText("error.attachment.totalTooLarge"));
+        for (const item of data) {
+          const bytes = normalizeBytes(item.bytes);
+          if (bytes.byteLength > MAX_FILE_BYTES) {
+            throw new Error(`${item.name} exceeds the 100 MB limit.`);
+          }
+          total += bytes.byteLength;
+          if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
+          const id = randomUUID();
+          const targetDirectory = join(this.#draftsRoot, id);
+          preparedRoots.push(targetDirectory);
+          const name = sanitizeName(item.name || "pasted-image.png");
+          assertSupportedAttachmentName(name);
+          const targetPath = join(targetDirectory, name);
+          yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
+            Effect.uninterruptible,
+          );
+          yield* attachmentCall(() => writeFile(targetPath, bytes, { mode: 0o600 })).pipe(Effect.uninterruptible);
+          prepared.push({
+            ...attachmentRecord(
+              id,
+              name,
+              bytes.byteLength,
+              targetPath,
+              createHash("sha256").update(bytes).digest("hex"),
+              item.mimeType,
+            ),
+            createdAt: new Date().toISOString(),
+          });
         }
-        prepared.push({
-          ...attachmentRecord(id, name, copied.size, targetPath, await sha256File(targetPath)),
-          createdAt: new Date().toISOString(),
-        });
+        completed = true;
+        return prepared;
+      } catch (error) {
+        return yield* attachmentFailure(error);
       }
-      for (const item of data) {
-        const bytes = normalizeBytes(item.bytes);
-        if (bytes.byteLength > MAX_FILE_BYTES) {
-          throw new Error(`${item.name} exceeds the 100 MB limit.`);
-        }
-        total += bytes.byteLength;
-        if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
-        const id = randomUUID();
-        const targetDirectory = join(this.#draftsRoot, id);
-        const name = sanitizeName(item.name || "pasted-image.png");
-        assertSupportedAttachmentName(name);
-        const targetPath = join(targetDirectory, name);
-        await mkdir(targetDirectory, { recursive: true, mode: 0o700 });
-        await writeFile(targetPath, bytes, { mode: 0o600 });
-        prepared.push({
-          ...attachmentRecord(
-            id,
-            name,
-            bytes.byteLength,
-            targetPath,
-            createHash("sha256").update(bytes).digest("hex"),
-            item.mimeType,
-          ),
-          createdAt: new Date().toISOString(),
-        });
-      }
-      return prepared;
-    } catch (error) {
-      await Promise.all(prepared.map((draft) => rm(dirname(draft.path), { recursive: true, force: true })));
-      throw error;
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          if (completed) return;
+          yield* attachmentCall(() =>
+            Promise.all(preparedRoots.map((root) => rm(root, { recursive: true, force: true }))),
+          );
+        }).pipe(Effect.orDie),
+      ),
+    );
+  }).bind(this);
 
-  async commitMessageTransfer(
+  readonly commitMessageTransfer = Effect.fn("AttachmentFiles.commitMessageTransfer")(function* (
+    this: AttachmentFiles,
     transferId: string,
     sender: QueueDelivery["sender"],
     recipientAgentIds: string[],
     messageId: string,
     createdAt: string,
     sourcePaths: string[],
-  ): Promise<StoredAttachment[]> {
+  ): Effect.fn.Return<StoredAttachment[], AttachmentOperationError> {
     if (sourcePaths.length === 0) return [];
-    const inspected = await Promise.all(sourcePaths.map(inspectSource));
+    const inspected = yield* Effect.forEach(sourcePaths, inspectSourceEffect, { concurrency: "unbounded" });
     const temporaryRoot = join(this.#transfersRoot, `.tmp-${transferId}`);
     const finalRoot = join(this.#transfersRoot, transferId);
-    await mkdir(temporaryRoot, { recursive: true, mode: 0o700 });
     const usedNames = new Set<string>();
-    try {
-      const attachments: StoredAttachment[] = [];
-      let total = 0;
-      for (const source of inspected) {
-        const name = uniqueName(sanitizeName(source.path), usedNames);
-        const id = randomUUID();
-        const targetPath = join(temporaryRoot, name);
-        await copyFile(source.path, targetPath);
-        const copied = await stat(targetPath);
-        if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
-        total += copied.size;
-        if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
-        attachments.push(attachmentRecord(id, name, copied.size, join(finalRoot, name), await sha256File(targetPath)));
-      }
-      await writeTransferManifest(temporaryRoot, {
-        version: 2,
-        kind: "message-transfer",
-        transferId,
-        messageId,
-        sender,
-        recipientAgentIds,
-        createdAt,
-        attachments: attachments.map(manifestAttachment),
-      });
-      await rename(temporaryRoot, finalRoot);
-      return attachments;
-    } catch (error) {
-      await rm(temporaryRoot, { recursive: true, force: true });
-      throw error;
-    }
-  }
+    let completed = false;
+    return yield* Effect.gen({ self: this }, function* () {
+      try {
+        yield* attachmentCall(() => mkdir(temporaryRoot, { recursive: true, mode: 0o700 })).pipe(
+          Effect.uninterruptible,
+        );
 
-  async stageGenerated(input: {
-    sources: GeneratedAttachmentSource[];
-    ownerAgentId?: string;
-    ownerThreadId?: string | null;
-  }): Promise<StoredGeneratedAttachment[]> {
+        const attachments: StoredAttachment[] = [];
+        let total = 0;
+        for (const source of inspected) {
+          const name = uniqueName(sanitizeName(source.path), usedNames);
+          const id = randomUUID();
+          const targetPath = join(temporaryRoot, name);
+          yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
+          const copied = yield* attachmentCall(() => stat(targetPath));
+          if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
+          total += copied.size;
+          if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
+          attachments.push(
+            attachmentRecord(
+              id,
+              name,
+              copied.size,
+              join(finalRoot, name),
+              yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+            ),
+          );
+        }
+        yield* writeTransferManifestEffect(temporaryRoot, {
+          version: 2,
+          kind: "message-transfer",
+          transferId,
+          messageId,
+          sender,
+          recipientAgentIds,
+          createdAt,
+          attachments: attachments.map(manifestAttachment),
+        });
+        yield* attachmentCall(() => rename(temporaryRoot, finalRoot)).pipe(Effect.uninterruptible);
+        completed = true;
+        return attachments;
+      } catch (error) {
+        return yield* attachmentFailure(error);
+      }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          if (completed) return;
+          yield* attachmentCall(() => rm(temporaryRoot, { recursive: true, force: true })).pipe(Effect.uninterruptible);
+        }).pipe(Effect.orDie),
+      ),
+    );
+  }).bind(this);
+
+  readonly stageGenerated = Effect.fn("AttachmentFiles.stageGenerated")(function* (
+    this: AttachmentFiles,
+    input: {
+      sources: GeneratedAttachmentSource[];
+      ownerAgentId?: string;
+      ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<StoredGeneratedAttachment[], AttachmentOperationError> {
     if (input.sources.length === 0 || input.sources.length > MAX_ATTACHMENTS) {
-      throw new Error(sourceText("error.backend.attachBetween", { limit: MAX_ATTACHMENTS }));
+      return yield* attachmentFailure(new Error(sourceText("error.backend.attachBetween", { limit: MAX_ATTACHMENTS })));
     }
-    const sources = await Promise.all(
-      input.sources.map(async (source) => {
-        const metadata = await source.handle.stat();
-        if (!metadata.isFile()) throw new Error(sourceText("error.backend.attachmentNotFile", { path: source.path }));
-        if (metadata.size > MAX_FILE_BYTES) throw new Error(`${basename(source.path)} exceeds the 100 MB limit.`);
-        assertSupportedAttachmentName(source.path);
-        return { ...source, size: metadata.size };
-      }),
+    const sources = yield* Effect.forEach(
+      input.sources,
+      (source) =>
+        Effect.gen(function* () {
+          const metadata = yield* attachmentCall(() => source.handle.stat());
+          if (!metadata.isFile())
+            return yield* attachmentFailure(
+              new Error(sourceText("error.backend.attachmentNotFile", { path: source.path })),
+            );
+          if (metadata.size > MAX_FILE_BYTES)
+            return yield* attachmentFailure(new Error(`${basename(source.path)} exceeds the 100 MB limit.`));
+          yield* attachmentSync(() => assertSupportedAttachmentName(source.path));
+          return { ...source, size: metadata.size };
+        }),
+      { concurrency: "unbounded" },
     );
     const total = sources.reduce((sum, source) => sum + source.size, 0);
-    if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
+    if (total > MAX_TOTAL_BYTES)
+      return yield* attachmentFailure(new Error(sourceText("error.attachment.totalTooLarge")));
 
     const usedNames = new Set<string>();
     const entries = sources.map((source) => {
@@ -316,77 +408,124 @@ export class AttachmentFiles {
       return { id, name, source, generatedRoot, targetPath: join(generatedRoot, name) };
     });
 
-    try {
-      const attachments: StoredGeneratedAttachment[] = [];
-      let copiedTotal = 0;
-      for (const entry of entries) {
-        await mkdir(entry.generatedRoot, { recursive: true, mode: 0o700 });
-        await copyOpenedFile(entry.source.handle, entry.targetPath, entry.name, MAX_TOTAL_BYTES - copiedTotal);
-        const copied = await stat(entry.targetPath);
-        if (copied.size > MAX_FILE_BYTES) throw new Error(`${entry.name} exceeds the 100 MB limit.`);
-        copiedTotal += copied.size;
-        if (copiedTotal > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
-        const attachment: StoredGeneratedAttachment = {
-          ...attachmentRecord(entry.id, entry.name, copied.size, entry.targetPath, await sha256File(entry.targetPath)),
-          ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-          ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-        };
-        await writeGeneratedManifest(attachment);
-        attachments.push(attachment);
+    let completed = false;
+    return yield* Effect.gen({ self: this }, function* () {
+      try {
+        const attachments: StoredGeneratedAttachment[] = [];
+        let copiedTotal = 0;
+        for (const entry of entries) {
+          yield* attachmentCall(() => mkdir(entry.generatedRoot, { recursive: true, mode: 0o700 })).pipe(
+            Effect.uninterruptible,
+          );
+          yield* copyOpenedFileEffect(entry.source.handle, entry.targetPath, entry.name, MAX_TOTAL_BYTES - copiedTotal);
+          const copied = yield* attachmentCall(() => stat(entry.targetPath));
+          if (copied.size > MAX_FILE_BYTES) throw new Error(`${entry.name} exceeds the 100 MB limit.`);
+          copiedTotal += copied.size;
+          if (copiedTotal > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
+          const attachment: StoredGeneratedAttachment = {
+            ...attachmentRecord(
+              entry.id,
+              entry.name,
+              copied.size,
+              entry.targetPath,
+              yield* sha256File(entry.targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+            ),
+            ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
+            ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
+          };
+          yield* writeGeneratedManifestEffect(attachment);
+          attachments.push(attachment);
+        }
+        completed = true;
+        return attachments;
+      } catch (error) {
+        return yield* attachmentFailure(error);
       }
-      return attachments;
-    } catch (error) {
-      await Promise.allSettled(entries.map((entry) => rm(entry.generatedRoot, { recursive: true, force: true })));
-      throw error;
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          if (completed) return;
+          yield* attachmentCall(() =>
+            Promise.allSettled(entries.map((entry) => rm(entry.generatedRoot, { recursive: true, force: true }))),
+          );
+        }).pipe(Effect.orDie),
+      ),
+    );
+  }).bind(this);
 
-  async storeGenerated(input: {
-    sourcePath?: string;
-    bytes?: Uint8Array;
-    name?: string;
-    mimeType?: string;
-    ownerAgentId?: string;
-    ownerThreadId?: string | null;
-  }): Promise<StoredGeneratedAttachment> {
+  readonly storeGenerated = Effect.fn("AttachmentFiles.storeGenerated")(function* (
+    this: AttachmentFiles,
+    input: {
+      sourcePath?: string;
+      bytes?: Uint8Array;
+      name?: string;
+      mimeType?: string;
+      ownerAgentId?: string;
+      ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<StoredGeneratedAttachment, AttachmentOperationError> {
     if ((input.sourcePath === undefined) === (input.bytes === undefined)) {
-      throw new Error("Provide exactly one generated image source.");
+      return yield* attachmentFailure(new Error("Provide exactly one generated image source."));
     }
 
     const id = randomUUID();
-    const source = input.sourcePath === undefined ? null : await inspectSource(input.sourcePath);
-    const bytes = input.bytes === undefined ? null : normalizeBytes(input.bytes);
+    const source = input.sourcePath === undefined ? null : yield* inspectSourceEffect(input.sourcePath);
+    const inputBytes = input.bytes;
+    const bytes = inputBytes === undefined ? null : yield* attachmentSync(() => normalizeBytes(inputBytes));
     const size = source?.size ?? bytes?.byteLength ?? 0;
-    if (size > MAX_FILE_BYTES) throw new Error(sourceText("error.backend.generatedImageTooLarge"));
+    if (size > MAX_FILE_BYTES)
+      return yield* attachmentFailure(new Error(sourceText("error.backend.generatedImageTooLarge")));
 
     const name = sanitizeName(input.name ?? (source ? basename(source.path) : "generated-image.png"));
     const generatedRoot = join(this.#transfersRoot, "generated", id);
     const targetPath = join(generatedRoot, name);
-    await mkdir(generatedRoot, { recursive: true, mode: 0o700 });
-    try {
-      if (source) await copyFile(source.path, targetPath);
-      else if (bytes) await writeFile(targetPath, bytes, { mode: 0o600 });
-      else throw new Error("Generated image bytes are missing.");
-      const stored = await stat(targetPath);
-      if (stored.size > MAX_FILE_BYTES) throw new Error(sourceText("error.backend.generatedImageTooLarge"));
-      const generatedAttachment: StoredGeneratedAttachment = {
-        ...attachmentRecord(id, name, stored.size, targetPath, await sha256File(targetPath), input.mimeType),
-        ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
-        ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
-      };
-      await writeGeneratedManifest(generatedAttachment);
-      return generatedAttachment;
-    } catch (error) {
-      await rm(generatedRoot, { recursive: true, force: true });
-      throw error;
-    }
-  }
+    let completed = false;
+    return yield* Effect.gen({ self: this }, function* () {
+      try {
+        yield* attachmentCall(() => mkdir(generatedRoot, { recursive: true, mode: 0o700 })).pipe(
+          Effect.uninterruptible,
+        );
 
-  async exportAttachment(
+        if (source) yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
+        else if (bytes)
+          yield* attachmentCall(() => writeFile(targetPath, bytes, { mode: 0o600 })).pipe(Effect.uninterruptible);
+        else throw new Error("Generated image bytes are missing.");
+        const stored = yield* attachmentCall(() => stat(targetPath));
+        if (stored.size > MAX_FILE_BYTES) throw new Error(sourceText("error.backend.generatedImageTooLarge"));
+        const generatedAttachment: StoredGeneratedAttachment = {
+          ...attachmentRecord(
+            id,
+            name,
+            stored.size,
+            targetPath,
+            yield* sha256File(targetPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause))),
+            input.mimeType,
+          ),
+          ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
+          ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
+        };
+        yield* writeGeneratedManifestEffect(generatedAttachment);
+        completed = true;
+        return generatedAttachment;
+      } catch (error) {
+        return yield* attachmentFailure(error);
+      }
+    }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          if (completed) return;
+          yield* attachmentCall(() => rm(generatedRoot, { recursive: true, force: true })).pipe(Effect.uninterruptible);
+        }).pipe(Effect.orDie),
+      ),
+    );
+  }).bind(this);
+
+  readonly exportAttachment = Effect.fn("AttachmentFiles.exportAttachment")(function* (
+    this: AttachmentFiles,
     attachment: StoredAttachment,
     message?: { id: string; index: number },
-  ): Promise<ExportedAttachmentFile | null> {
-    const resolved = await this.resolveTransfer(attachment);
+  ): Effect.fn.Return<ExportedAttachmentFile | null, AttachmentOperationError> {
+    const resolved = yield* this.resolveTransfer(attachment);
     if (!resolved) return null;
     return {
       sourcePath: resolved.path,
@@ -396,34 +535,50 @@ export class AttachmentFiles {
         `${safeArchiveSegment(attachment.id)}-${safeArchiveSegment(attachment.name)}`,
       ),
     };
-  }
+  }).bind(this);
 }
 
-async function resolveManagedAttachment(
-  root: string,
-  attachment: StoredAttachment,
-): Promise<{ path: string; mimeType: string; name: string } | null> {
-  try {
-    const [canonicalRoot, canonicalPath] = await Promise.all([realpath(root), realpath(attachment.path)]);
-    if (!isWithin(canonicalRoot, canonicalPath)) return null;
-    const metadata = await stat(canonicalPath);
-    if (!metadata.isFile() || metadata.size !== attachment.size) return null;
-    if ((await sha256File(canonicalPath)) !== attachment.sha256) return null;
-    return { path: canonicalPath, mimeType: attachment.mimeType, name: attachment.name };
-  } catch {
-    return null;
-  }
-}
+const resolveManagedAttachmentEffect = Effect.fn("Attachments.resolveManagedAttachment")(
+  function* (
+    root: string,
+    attachment: StoredAttachment,
+  ): Effect.fn.Return<{ path: string; mimeType: string; name: string } | null, AttachmentOperationError> {
+    try {
+      const [canonicalRoot, canonicalPath] = yield* attachmentCall(() =>
+        Promise.all([realpath(root), realpath(attachment.path)]),
+      );
+      if (!isWithin(canonicalRoot, canonicalPath)) return null;
+      const metadata = yield* attachmentCall(() => stat(canonicalPath));
+      if (!metadata.isFile() || metadata.size !== attachment.size) return null;
+      if (
+        (yield* sha256File(canonicalPath).pipe(Effect.mapError((error) => attachmentFailure(error.cause)))) !==
+        attachment.sha256
+      )
+        return null;
+      return { path: canonicalPath, mimeType: attachment.mimeType, name: attachment.name };
+    } catch {
+      return null;
+    }
+  },
+  Effect.catch(() => Effect.succeed(null)),
+);
 
-async function writeTransferManifest(directory: string, manifest: TransferManifest): Promise<void> {
-  await writeFile(join(directory, TRANSFER_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
+const writeTransferManifestEffect = Effect.fn("Attachments.writeTransferManifest")(function* (
+  directory: string,
+  manifest: TransferManifest,
+): Effect.fn.Return<void, AttachmentOperationError> {
+  yield* attachmentCall(() =>
+    writeFile(join(directory, TRANSFER_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    }),
+  ).pipe(Effect.uninterruptible);
+});
 
-async function writeGeneratedManifest(attachment: StoredGeneratedAttachment): Promise<void> {
-  await writeTransferManifest(dirname(attachment.path), {
+const writeGeneratedManifestEffect = Effect.fn("Attachments.writeGeneratedManifest")(function* (
+  attachment: StoredGeneratedAttachment,
+): Effect.fn.Return<void, AttachmentOperationError> {
+  yield* writeTransferManifestEffect(dirname(attachment.path), {
     version: 2,
     kind: "generated-attachment",
     generatedAttachmentId: attachment.id,
@@ -432,7 +587,7 @@ async function writeGeneratedManifest(attachment: StoredGeneratedAttachment): Pr
     createdAt: new Date().toISOString(),
     attachments: [manifestAttachment(attachment)],
   });
-}
+});
 
 function attachmentRecord(
   id: string,
@@ -466,14 +621,19 @@ function manifestAttachment(attachment: StoredAttachment): TransferManifest["att
   };
 }
 
-async function inspectSource(sourcePath: string): Promise<{ path: string; size: number }> {
-  const path = await realpath(sourcePath);
-  const metadata = await stat(path);
+const inspectSourceEffect = Effect.fn("Attachments.inspectSource")(function* (
+  sourcePath: string,
+): Effect.fn.Return<{ path: string; size: number }, AttachmentOperationError> {
+  const path = yield* attachmentCall(() => realpath(sourcePath));
+  const metadata = yield* attachmentCall(() => stat(path));
   if (!metadata.isFile())
-    throw new Error(sourceText("error.backend.attachmentNotRegularFile", { name: basename(path) }));
-  if (metadata.size > MAX_FILE_BYTES) throw new Error(`${basename(path)} exceeds the 100 MB limit.`);
+    return yield* attachmentFailure(
+      new Error(sourceText("error.backend.attachmentNotRegularFile", { name: basename(path) })),
+    );
+  if (metadata.size > MAX_FILE_BYTES)
+    return yield* attachmentFailure(new Error(`${basename(path)} exceeds the 100 MB limit.`));
   return { path, size: metadata.size };
-}
+});
 
 function sanitizeName(path: string): string {
   const value = basename(path)
@@ -575,32 +735,34 @@ function generatedRootForPath(root: string, path: string): string | null {
   return join(root, "generated", segments[1]);
 }
 
-async function copyOpenedFile(
-  source: FileHandle,
-  targetPath: string,
-  name: string,
-  remainingTotalBytes: number,
-): Promise<void> {
-  const target = await open(targetPath, "wx", 0o600);
-  const buffer = Buffer.allocUnsafe(64 * 1024);
-  let position = 0;
-  try {
-    while (true) {
-      const { bytesRead } = await source.read(buffer, 0, buffer.byteLength, position);
-      if (bytesRead === 0) return;
-      const nextPosition = position + bytesRead;
-      if (nextPosition > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
-      if (nextPosition > remainingTotalBytes) throw new Error(sourceText("error.attachment.totalTooLarge"));
-
-      let written = 0;
-      while (written < bytesRead) {
-        const result = await target.write(buffer, written, bytesRead - written, position + written);
-        if (result.bytesWritten === 0) throw new Error(sourceText("error.backend.attachmentCopyFailed", { name }));
-        written += result.bytesWritten;
-      }
-      position = nextPosition;
-    }
-  } finally {
-    await target.close();
-  }
-}
+const copyOpenedFileEffect = Effect.fn("Attachments.copyOpenedFile")(
+  (source: FileHandle, targetPath: string, name: string, remainingTotalBytes: number) =>
+    Effect.acquireUseRelease(
+      attachmentCall(() => open(targetPath, "wx", 0o600)),
+      (target) =>
+        Effect.gen(function* () {
+          const buffer = Buffer.allocUnsafe(64 * 1024);
+          let position = 0;
+          for (;;) {
+            const { bytesRead } = yield* attachmentCall(() => source.read(buffer, 0, buffer.byteLength, position));
+            if (bytesRead === 0) return;
+            const nextPosition = position + bytesRead;
+            if (nextPosition > MAX_FILE_BYTES)
+              return yield* attachmentFailure(new Error(`${name} exceeds the 100 MB limit.`));
+            if (nextPosition > remainingTotalBytes)
+              return yield* attachmentFailure(new Error(sourceText("error.attachment.totalTooLarge")));
+            let written = 0;
+            while (written < bytesRead) {
+              const result = yield* attachmentCall(() =>
+                target.write(buffer, written, bytesRead - written, position + written),
+              );
+              if (result.bytesWritten === 0)
+                return yield* attachmentFailure(new Error(sourceText("error.backend.attachmentCopyFailed", { name })));
+              written += result.bytesWritten;
+            }
+            position = nextPosition;
+          }
+        }),
+      (target) => attachmentCall(() => target.close()).pipe(Effect.orDie),
+    ),
+);

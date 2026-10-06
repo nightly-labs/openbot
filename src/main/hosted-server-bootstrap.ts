@@ -13,7 +13,9 @@
 
 import { parseHostedServerList } from "@openbot/contracts/hosted-servers";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import type { CentralAuthManager } from "./central-auth-manager";
+import { RemoteWorkflowError } from "./remote-service-effects";
 import type { TeamStore } from "./team-store";
 
 const HOST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -44,20 +46,20 @@ export function takeHostedServerEnvironment(
 export interface HostedServerAccountOptions {
   environment: HostedServerEnvironment;
   centralAuth: Pick<CentralAuthManager, "canPersistSession" | "redeemHostedServerClaim" | "requestAuthorized">;
-  centralAuthInitialization: Promise<CentralAuthState>;
+  centralAuthInitialization: Effect.Effect<CentralAuthState, RemoteWorkflowError>;
   teamStore: Pick<
     TeamStore,
     "activateAccount" | "configured" | "configureWithAccount" | "getIdentity" | "setEnabledOnLaunch"
   >;
 }
 
-export async function applyHostedServerAccount({
+export const applyHostedServerAccount = Effect.fn("HostedServer.applyAccount")(function* ({
   environment,
   centralAuth,
   centralAuthInitialization,
   teamStore,
-}: HostedServerAccountOptions): Promise<void> {
-  const state = await centralAuthInitialization;
+}: HostedServerAccountOptions) {
+  const state = yield* centralAuthInitialization;
   let user: CentralAuthUser;
   let serverName: string | null = null;
   if (state.status === "signed_in") {
@@ -65,39 +67,56 @@ export async function applyHostedServerAccount({
   } else {
     // The account server did not answer. A stored session can still exist and the claim can be spent,
     // so the claim waits for an answer. The start retry signs in again.
-    if (state.status === "error") throw new Error("The account server did not answer at the start.");
-    if (!environment.claim) throw new Error("The hosted server is signed out and has no claim.");
+    if (state.status === "error")
+      return yield* new RemoteWorkflowError({ cause: new Error("The account server did not answer at the start.") });
+    if (!environment.claim)
+      return yield* new RemoteWorkflowError({ cause: new Error("The hosted server is signed out and has no claim.") });
     // The claim works one time. With no secret storage the session would end at the next start, and
     // the server could not sign in again. Keep the claim for a start that has a keyring.
-    if (!centralAuth.canPersistSession()) throw new Error("The hosted server has no secret storage for its session.");
-    const redeemed = await centralAuth.redeemHostedServerClaim(environment.claim);
-    if (redeemed.hostId !== environment.hostId) throw new Error("The claim is for a different hosted server.");
+    if (!centralAuth.canPersistSession())
+      return yield* new RemoteWorkflowError({
+        cause: new Error("The hosted server has no secret storage for its session."),
+      });
+    const claim = environment.claim;
+    const redeemed = yield* centralAuth
+      .redeemHostedServerClaim(claim)
+      .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+    if (redeemed.hostId !== environment.hostId)
+      return yield* new RemoteWorkflowError({ cause: new Error("The claim is for a different hosted server.") });
     user = redeemed.user;
     serverName = redeemed.name;
   }
-  await teamStore.activateAccount(user);
+  yield* teamStore.activateAccount(user);
   if (!teamStore.configured) {
     // A start that stopped after the claim and before this point has a session and no name.
-    serverName ??= await hostedServerName(centralAuth, environment.hostId);
-    await teamStore.configureWithAccount(serverName, user, undefined, { serverId: environment.hostId });
+    serverName ??= yield* hostedServerName(centralAuth, environment.hostId);
+    const name = serverName;
+    yield* teamStore.configureWithAccount(name, user, undefined, { serverId: environment.hostId });
   }
   const identity = teamStore.getIdentity();
   if (identity?.serverId !== environment.hostId) {
-    throw new Error("The configured host is not the hosted server that this VM was created for.");
+    return yield* new RemoteWorkflowError({
+      cause: new Error("The configured host is not the hosted server that this VM was created for."),
+    });
   }
-  if (!identity.enabledOnLaunch) await teamStore.setEnabledOnLaunch(identity.serverId, true);
-}
+  if (!identity.enabledOnLaunch) yield* teamStore.setEnabledOnLaunch(identity.serverId, true);
+});
 
-async function hostedServerName(
+const hostedServerName = Effect.fn("HostedServer.name")(function* (
   centralAuth: Pick<CentralAuthManager, "requestAuthorized">,
   hostId: string,
-): Promise<string> {
-  const list = await centralAuth.requestAuthorized("/v2/hosting/servers/", { method: "GET" }, (value) => {
-    const parsed = parseHostedServerList(value);
-    if (!parsed) throw new Error("Invalid hosted server list.");
-    return parsed;
-  });
+) {
+  const list = yield* centralAuth
+    .requestAuthorized("/v2/hosting/servers/", { method: "GET" }, (value) => {
+      const parsed = parseHostedServerList(value);
+      if (!parsed) throw new Error("Invalid hosted server list.");
+      return parsed;
+    })
+    .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
   const server = list.servers.find((entry) => entry.serverId === hostId);
-  if (!server) throw new Error("The account server has no record of this hosted server.");
+  if (!server)
+    return yield* new RemoteWorkflowError({
+      cause: new Error("The account server has no record of this hosted server."),
+    });
   return server.name;
-}
+});

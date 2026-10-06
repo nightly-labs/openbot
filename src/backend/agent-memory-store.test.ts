@@ -7,6 +7,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentMemoryStore } from "./agent-memory-store";
 import { AgentStore } from "./agent-store";
+import { runCauseEffect } from "./effect-boundary";
 import { OpenBotDatabase } from "./openbot-database";
 
 const roots: string[] = [];
@@ -78,12 +79,12 @@ describe("AgentMemoryStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-memory-restart-"));
     roots.push(root);
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await runCauseEffect(database.initialize());
     new AgentMemoryStore(database).createManual("chief", "Use metric units.");
     database.close();
 
     const reopened = new OpenBotDatabase(root);
-    await reopened.initialize();
+    await runCauseEffect(reopened.initialize());
     expect(new AgentMemoryStore(reopened).list("chief").map((memory) => memory.text)).toEqual(["Use metric units."]);
     reopened.close();
   });
@@ -140,12 +141,12 @@ describe("AgentMemoryStore", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-memory-delete-agent-"));
     roots.push(root);
     const agentStore = new AgentStore(join(root, "data"), join(root, "home"));
-    await agentStore.initialize();
-    const agent = await agentStore.getOrCreate("chief");
+    await runCauseEffect(agentStore.initialize());
+    const agent = await runCauseEffect(agentStore.getOrCreate("chief"));
     const memories = new AgentMemoryStore(agentStore.database);
     const created = memories.createManual(agent.id, "Remove this with the agent.");
 
-    await agentStore.deleteAgent(agent.id);
+    await runCauseEffect(agentStore.deleteAgent(agent.id));
 
     expect(memories.list(agent.id)).toEqual([]);
     expect(
@@ -161,6 +162,6 @@ async function setup(): Promise<{ database: OpenBotDatabase; memories: AgentMemo
   const root = await mkdtemp(join(tmpdir(), "openbot-memory-store-"));
   roots.push(root);
   const database = new OpenBotDatabase(root);
-  await database.initialize();
+  await runCauseEffect(database.initialize());
   return { database, memories: new AgentMemoryStore(database) };
 }

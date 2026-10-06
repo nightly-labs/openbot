@@ -1,6 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
 
@@ -11,8 +12,8 @@ describe("loadOrCreateRemoteDesktopCredentials", () => {
       encrypt: (value: string) => Buffer.from(value.split("").reverse().join("")),
       decrypt: (value: Buffer) => value.toString().split("").reverse().join(""),
     };
-    const first = await loadOrCreateRemoteDesktopCredentials(join(root, "runtime.json"), cipher);
-    const second = await loadOrCreateRemoteDesktopCredentials(join(root, "runtime.json"), cipher);
+    const first = await Effect.runPromise(loadOrCreateRemoteDesktopCredentials(join(root, "runtime.json"), cipher));
+    const second = await Effect.runPromise(loadOrCreateRemoteDesktopCredentials(join(root, "runtime.json"), cipher));
     expect(second).toEqual(first);
     expect(first.password).toHaveLength(43);
   });

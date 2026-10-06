@@ -1,10 +1,11 @@
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import { SLACK_EVENTS_PATH } from "@openbot/contracts/signal-protocol/slack-route";
+import type { ManagedRuntime } from "effect";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
-import type { SignalService, SignalSocket, SlackDeliveryResponse } from "./signal-service";
+import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -40,7 +41,11 @@ const authEventSchema = z.discriminatedUnion("type", [
   }),
 ]) satisfies z.ZodType<RemoteAuthEvent>;
 
-export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalService) {
+export function createRemoteApiApp(
+  config: RemoteApiConfig,
+  signal: SignalService,
+  runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
+) {
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live" }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
@@ -104,12 +109,15 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
         const retryNum = Number(request.headers.get("x-slack-retry-num") ?? "");
         const retryReason = request.headers.get("x-slack-retry-reason");
         return slackResponse(
-          await signal.deliverSlack(slack.appId, slack.teamId, {
-            kind,
-            retryNum: Number.isInteger(retryNum) && retryNum >= 0 && retryNum < 100 ? retryNum : null,
-            retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
-            body,
-          }),
+          await runtime.runPromise(
+            signal.deliverSlack(slack.appId, slack.teamId, {
+              kind,
+              retryNum: Number.isInteger(retryNum) && retryNum >= 0 && retryNum < 100 ? retryNum : null,
+              retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
+              body,
+            }),
+            { signal: request.signal },
+          ),
         );
       },
       { parse: "none" },
@@ -132,10 +140,10 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
           : message instanceof Uint8Array
             ? message
             : JSON.stringify(message);
-        await signal.receive(socket, input);
+        await runtime.runPromise(signal.receive(socket, input));
       },
-      close(ws) {
-        signal.disconnect(socketAdapter(ws, config.trustProxy));
+      async close(ws) {
+        await runtime.runPromise(signal.disconnect(socketAdapter(ws, config.trustProxy)));
       },
       error({ error }) {
         console.error("Remote signal WebSocket failed.", error instanceof Error ? error.message : "Unknown error");

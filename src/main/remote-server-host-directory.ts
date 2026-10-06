@@ -22,15 +22,20 @@
 // user has not seen before are appended in directory order. The user drags this list.
 
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
+import { Effect } from "effect";
 import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 import { fingerprint } from "./team-store";
 
 /** Cross-device joins have no local transport event. Only poll while the user can see the app. */
-export function watchRemoteHostDirectory(options: { isActive(): boolean; refresh(): Promise<void> }): () => void {
+export function watchRemoteHostDirectory(options: {
+  isActive(): boolean;
+  refresh(): Effect.Effect<void, RemoteWorkflowError>;
+}): () => void {
   const timer = setInterval(() => {
-    if (options.isActive()) void options.refresh().catch(() => undefined);
+    if (options.isActive()) void Effect.runPromise(options.refresh().pipe(Effect.catch(() => Effect.void)));
   }, REMOTE_ACCOUNT_CHECK_INTERVAL_MS);
   timer.unref();
   return () => clearInterval(timer);

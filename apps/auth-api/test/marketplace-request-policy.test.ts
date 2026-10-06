@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import {
   enforceMarketplaceIngress,
   enforceMarketplaceMutation,
@@ -11,13 +12,15 @@ describe("marketplace request rate limits", () => {
     const limiter: RateLimit = { limit };
     const bindings = { MARKETPLACE_INGRESS_RATE_LIMITER: limiter };
 
-    await enforceMarketplaceIngress(
-      new Request("https://api.openbot.run/v1/skills/?query=test", {
-        headers: { "CF-Connecting-IP": "203.0.113.8" },
-      }),
-      bindings,
+    await runApiEffect(
+      enforceMarketplaceIngress(
+        new Request("https://api.openbot.run/v1/skills/?query=test", {
+          headers: { "CF-Connecting-IP": "203.0.113.8" },
+        }),
+        bindings,
+      ),
     );
-    await enforceMarketplaceIngress(new Request("https://api.openbot.run/v1/me"), bindings);
+    await runApiEffect(enforceMarketplaceIngress(new Request("https://api.openbot.run/v1/me"), bindings));
 
     expect(limit).toHaveBeenCalledOnce();
     expect(limit).toHaveBeenCalledWith({ key: "ip:203.0.113.8" });
@@ -27,15 +30,19 @@ describe("marketplace request rate limits", () => {
     const denied: RateLimit = { limit: async () => ({ success: false }) };
 
     await expect(
-      enforceMarketplaceIngress(new Request("https://api.openbot.run/v1/marketplace/agents/"), {
-        MARKETPLACE_INGRESS_RATE_LIMITER: denied,
-      }),
+      runApiEffect(
+        enforceMarketplaceIngress(new Request("https://api.openbot.run/v1/marketplace/agents/"), {
+          MARKETPLACE_INGRESS_RATE_LIMITER: denied,
+        }),
+      ),
     ).rejects.toBeInstanceOf(MarketplaceRateLimitError);
     await expect(
-      enforceMarketplaceMutation(
-        { MARKETPLACE_MUTATION_RATE_LIMITER: denied, MARKETPLACE_UPLOAD_RATE_LIMITER: denied },
-        "upload",
-        "user-1",
+      runApiEffect(
+        enforceMarketplaceMutation(
+          { MARKETPLACE_MUTATION_RATE_LIMITER: denied, MARKETPLACE_UPLOAD_RATE_LIMITER: denied },
+          "upload",
+          "user-1",
+        ),
       ),
     ).rejects.toMatchObject({ code: "rate_limited", retryAfterSeconds: 60 });
   });

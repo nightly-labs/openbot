@@ -38,6 +38,9 @@ export const messages = {
   "settings.sendShortcut.enter": "Enter で送信",
   "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",
+  "settings.busyMessage.title": "作業中のエージェントの方向を修正",
+  "settings.busyMessage.description":
+    "エージェントの作業中に送ったメッセージは、キューで待たずに、次のステップで現在の作業に加わります。ChatGPT と Claude は方向を修正できます。他のプロバイダーはメッセージをキューに入れます。",
   "settings.autonomy.title": "エージェントの自律動作",
   "settings.turbo.title": "ターボモード",
   "settings.turbo.description":
@@ -249,7 +252,4 @@ export const messages = {
   "settings.hostedSites.loadFailed": "公開サイトを読み込めませんでした。",
   "settings.hostedSites.deleteFailed": "サイトを削除できませんでした。",
   "settings.hostedSites.reloadFailed": "公開サイトを再読み込みできませんでした。",
-  "settings.busyMessage.title": "作業中のエージェントの方向を修正",
-  "settings.busyMessage.description":
-    "エージェントの作業中に送ったメッセージは、キューで待たずに、次のステップで現在の作業に加わります。ChatGPT と Claude は方向を修正できます。他のプロバイダーはメッセージをキューに入れます。",
 } as const satisfies PartialTranslation<typeof source>;

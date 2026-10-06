@@ -2,6 +2,7 @@
 
 import type { ComputerUsePermissionApp, MacPermissionId } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema } from "effect";
 import type { BrowserWindow, NativeImage } from "electron";
 import { applicationBundleName } from "./computer-use-permission-app";
 
@@ -60,30 +61,37 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
     return this.#window !== null && !this.#window.isDestroyed();
   }
 
-  async show(permission: MacPermissionId, sunshineAppPath?: string): Promise<void> {
+  readonly show = Effect.fn("PermissionHelpWindow.show")(function* (
+    this: ComputerUsePermissionHelpWindowController<W>,
+    permission: MacPermissionId,
+    sunshineAppPath?: string,
+  ): Effect.fn.Return<void, PermissionHelpFailed> {
     const generation = ++this.#generation;
     const window = this.#ensureWindow();
     this.#sunshineAppPath = sunshineAppPath ?? null;
-    await this.#options.loadWindow(window, permission, sunshineAppPath !== undefined);
+    yield* helpCall(() => this.#options.loadWindow(window, permission, sunshineAppPath !== undefined));
     if (generation !== this.#generation || window.isDestroyed()) return;
     // `showInactive` would leave it behind System Settings, which is the one window it has to stand
     // in front of. It carries no input the user has to reach, so taking the front costs them nothing.
     window.show();
-  }
+  }).bind(this);
 
   /**
    * What the window draws on the drag card: the name the System Settings list will show, and the
    * icon beside it. The icon is best-effort - a card with no picture still drags.
    */
-  async permissionApp(senderId?: number): Promise<ComputerUsePermissionApp | null> {
+  readonly permissionApp = Effect.fn("PermissionHelpWindow.permissionApp")(function* (
+    this: ComputerUsePermissionHelpWindowController<W>,
+    senderId?: number,
+  ): Effect.fn.Return<ComputerUsePermissionApp | null> {
     const path = this.#bundlePath(senderId);
     if (!path) return null;
-    const icon = await this.#options.bundleIcon(path).catch(() => null);
+    const icon = yield* helpCall(() => this.#options.bundleIcon(path)).pipe(Effect.orElseSucceed(() => null));
     return {
       name: applicationBundleName(path),
       iconDataUrl: typeof icon === "string" ? icon : (icon?.toDataURL() ?? null),
     };
-  }
+  }).bind(this);
 
   /**
    * Hands the bundle to the desktop as a native drag.
@@ -92,17 +100,26 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
    * from the main window: the sender is checked here. A drag started anywhere else would put a file
    * under the pointer of a user who asked for nothing.
    */
-  async startDrag(sender: PermissionAppDragSender): Promise<void> {
-    if (sender.id !== this.#rendererId) throw new Error("The Computer Use drag must start in the help window.");
+  readonly startDrag = Effect.fn("PermissionHelpWindow.startDrag")(function* (
+    this: ComputerUsePermissionHelpWindowController<W>,
+    sender: PermissionAppDragSender,
+  ): Effect.fn.Return<void, PermissionHelpFailed> {
+    if (sender.id !== this.#rendererId)
+      return yield* new PermissionHelpFailed({
+        cause: new Error("The Computer Use drag must start in the help window."),
+      });
     const generation = this.#generation;
     const path = this.#bundlePath(sender.id);
-    if (!path) throw new Error(sourceText("error.computerUse.noAppToDrag"));
-    const icon = await this.#options.bundleIcon(path);
+    if (!path)
+      return yield* new PermissionHelpFailed({ cause: new Error(sourceText("error.computerUse.noAppToDrag")) });
+    const icon = yield* helpCall(() => this.#options.bundleIcon(path));
     if (generation !== this.#generation || sender.id !== this.#rendererId) {
-      throw new Error(sourceText("error.computerUse.helpWindowChanged"));
+      return yield* new PermissionHelpFailed({
+        cause: new Error(sourceText("error.computerUse.helpWindowChanged")),
+      });
     }
     sender.startDrag({ file: path, icon });
-  }
+  }).bind(this);
 
   /** The way past a drag the user cannot make, which is the `+` button in the pane. */
   reveal(senderId?: number): void {
@@ -138,3 +155,10 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
     return window;
   }
 }
+
+export class PermissionHelpFailed extends Schema.TaggedError<PermissionHelpFailed>()("PermissionHelpFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+const helpCall = <A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({ try: operation, catch: (cause) => new PermissionHelpFailed({ cause }) });

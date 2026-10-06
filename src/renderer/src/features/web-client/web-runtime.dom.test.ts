@@ -34,6 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   peer.dispose.mockResolvedValue(undefined);
   peer.cancelUpload.mockResolvedValue(undefined);
+  peer.sendHostStreamData.mockResolvedValue(undefined);
   peer.execute.mockImplementation(async (command) => ({
     ok: true,
     status: 200,

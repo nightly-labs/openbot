@@ -111,6 +111,11 @@ export default defineConfig({
       "tests/visual/**",
       ".openbot-build/**",
       "build/whisper/**",
+      // Agent tools put git worktrees inside the checkout. The renderer project's
+      // `**/*.dom.test.ts` include otherwise runs each nested copy's DOM tests too.
+      "**/.worktrees/**",
+      "**/.claude/worktrees/**",
+      "**/.codex/**",
     ],
   },
 });

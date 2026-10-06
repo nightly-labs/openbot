@@ -1,5 +1,6 @@
 import { HOSTED_SITES_CAPABILITY, HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiHostedSites } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -25,8 +26,8 @@ export async function routeHostedSites(
   // `readJson` has already run the body through the hosted-sites wire codec.
   const body = await readJson(request);
   try {
-    if (list) return json(200, await hostedSites.listServerSites());
-    await hostedSites.deleteServerSite(stringField(body, "siteId"));
+    if (list) return json(200, await runCauseEffect(hostedSites.listServerSites()));
+    await runCauseEffect(hostedSites.deleteServerSite(stringField(body, "siteId")));
     return json(200, {});
   } catch (error) {
     // The account service refuses with a sentence for the person, such as a missing sign-in or a site of

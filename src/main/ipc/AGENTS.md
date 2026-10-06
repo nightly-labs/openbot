@@ -10,9 +10,9 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
    `request<Payload, Result>()("group:wire-name")` or `event<Payload>()("group:wire-name")`. All
    endpoints are typed except `browserInput.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
    and main decodes the different wire `BrowserViewInput`. Do not add another `untypedRequest(...)`.
-2. In a group the preload builds with `bridgeGroup` (the `GroupApi` aliases in
-   `packages/contracts/src/ipc-desktop-apis.ts`), skip this step: the method exists already. In a
-   hand-written group, declare the `OpenBotDesktopApi` method as
+2. In a group the preload builds with `bridgeGroup`, skip this step: the method exists already. A
+   new group needs only its place in `IPC_GROUP_PATHS`, beside `IPC_ENDPOINTS`; `OpenBotDesktopApi`
+   is built from that table. In a hand-written group, declare the `OpenBotDesktopApi` method as
    `Invoke<typeof IPC_ENDPOINTS.group.name>` (or `Subscribe<...>` for an event).
 3. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
    change and the key to add.

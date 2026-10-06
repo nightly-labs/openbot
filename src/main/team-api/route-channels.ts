@@ -8,6 +8,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import {
   parseCreateChannelMemory,
   parseCreateChannelRoutine,
@@ -69,14 +70,17 @@ export async function routeChannels(
       throw new HttpError(400, sourceText("error.team.channelDeleteUnsupported"));
     if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteChannels"));
     const body = await readJson(request);
-    await channels.deleteChannel(channelId(body));
+    await runCauseEffect(channels.deleteChannel(channelId(body)));
     return empty(204);
   }
   if (settings) return routeChannelSettings(context, agents);
   const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
   if (input.type === "archive" && member.role === "member")
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
-  return json(200, await channels.command(input, { id: member.id, name: member.name ?? "Team member" }));
+  return json(
+    200,
+    await runCauseEffect(channels.command(input, { id: member.id, name: member.name ?? "Team member" })),
+  );
 }
 
 async function routeChannelSettings(
@@ -110,7 +114,7 @@ async function routeChannelSettings(
       agents.deleteChannelRoutine(parseDeleteChannelRoutine(body));
       return empty(204);
     case CHANNEL_ROUTES.routineTest:
-      return json(201, await agents.testChannelRoutine(parseTestChannelRoutine(body)));
+      return json(201, await runCauseEffect(agents.testChannelRoutine(parseTestChannelRoutine(body))));
     default:
       return json(200, agents.listChannelRoutineRuns(parseListChannelRoutineRuns(body)));
   }

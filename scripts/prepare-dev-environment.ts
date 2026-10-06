@@ -19,11 +19,13 @@ export const supportedBunVersion = "1.4.0";
 
 // A stamp holds the fingerprint of the inputs of the last command that succeeded. `bun run dev`
 // skips the command while the fingerprint is the same, which saves several seconds on each start.
-// The install stamp is in `node_modules`, so deleting `node_modules` installs again.
+// The install stamp is in `node_modules`, so deleting `node_modules` installs again. The root
+// `postinstall` writes it too, so a plain `bun install` on another branch does not leave it stale.
 const INSTALL_STAMP = join("node_modules", ".openbot-install-stamp");
-const MIGRATION_STAMP = join("apps", "auth-api", ".wrangler", ".openbot-migrate-local-stamp");
 // Wrangler's local D1 state. Without it the local database is empty, whatever the stamp says.
 const LOCAL_D1_STATE = join("apps", "auth-api", ".wrangler", "state", "v3", "d1");
+// Inside the D1 state, so a state directory made again also loses the stamp.
+const MIGRATION_STAMP = join(LOCAL_D1_STATE, ".openbot-migrate-local-stamp");
 const MIGRATIONS_DIRECTORY = join("apps", "auth-api", "migrations");
 
 export interface DevelopmentPreparationInput {
@@ -71,9 +73,17 @@ function runUnlessStamped(stampPath: string, fingerprint: () => string | null, c
   if (before !== null && readStamp(stampPath) === before) return;
   command();
   const after = fingerprint();
-  if (after === null) return;
-  mkdirSync(dirname(stampPath), { recursive: true });
-  writeFileSync(stampPath, `${after}\n`);
+  if (after !== null) writeStamp(stampPath, after);
+}
+
+function writeStamp(path: string, fingerprint: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${fingerprint}\n`);
+}
+
+/** Stamps the inputs of the install that just finished. The root `postinstall` calls it. */
+export function writeInstallStamp(projectRoot = developmentProjectRoot): void {
+  writeStamp(join(projectRoot, INSTALL_STAMP), installFingerprint(projectRoot));
 }
 
 function readStamp(path: string): string | null {

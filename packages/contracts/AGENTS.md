@@ -58,8 +58,12 @@ signature by hand only when the method reshapes its arguments or reads preload s
 A group whose methods all pass straight through is generated whole: `GroupApi<IpcEndpoints["group"]>`
 gives its interface, a request keeps its key, and an event is `on` and the key (`voice.modelStatus`
 is `onModelStatus`). The preload builds it with `bridgeGroup` and the test harness with `stubGroup`,
-so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `app` and `providers` are spread into
-the top level. There are no per-method overrides in `bridgeGroup`. When a method must read or set
+so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `IPC_GROUP_PATHS`, beside
+`IPC_ENDPOINTS`, gives the place of each group on `window.openbot`: its own key, `""` for the top
+level (`app` and `providers`), a shared path (the agent groups are all `agent`), or null for a group
+the page must not reach (`attachmentImports`). `OpenBotDesktopApi` is built from this table, so a new
+group needs no line in `ipc-desktop-apis.ts` either. The built-preload verifier and the test harness
+read the same table. There are no per-method overrides in `bridgeGroup`. When a method must read or set
 preload state, bridge the group into a const outside the API object, spread it, and write only that
 method next to the spread. `agent` and `servers` do this: the server list calls record the selected
 server, and `onPresence`, `onDirectMessage` and `onDirectTyping` narrow the `onScoped*` events to

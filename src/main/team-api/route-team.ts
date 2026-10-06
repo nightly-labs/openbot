@@ -1,3 +1,4 @@
+import type { TeamApiOptions } from "./dependencies";
 // The team itself: who you are, who else is here, and who is allowed to stay.
 //
 // Membership, invitations and sessions all run through `requireAdmin` first. That check is a
@@ -7,10 +8,11 @@
 
 import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CreateTeamInviteInput, InviteSummary, TeamPresenceSnapshot } from "@openbot/contracts/ipc";
+import type { TeamPresenceSnapshot } from "@openbot/contracts/ipc";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamStore } from "../team-store";
 import type { TeamApiRemoteScreen } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -32,8 +34,8 @@ export interface TeamRouteDependencies {
     | "revokeSession"
   >;
   remoteScreen?: Pick<TeamApiRemoteScreen, "revokeTeamSession" | "revokeMember">;
-  createInvite?: (input: CreateTeamInviteInput) => Promise<InviteSummary>;
-  onSessionRevoked?: (sessionId: string) => Promise<void> | void;
+  createInvite?: TeamApiOptions["createInvite"];
+  onSessionRevoked?: TeamApiOptions["onSessionRevoked"];
   getPresence: () => TeamPresenceSnapshot;
   refreshPresence: () => void;
 }
@@ -46,8 +48,8 @@ export async function routeTeam(
 
   /** What removing a member does, whether an admin removes them or they leave. */
   async function removeMember(memberId: string): Promise<void> {
-    await store.removeMember(memberId);
-    await remoteScreen?.revokeMember(memberId);
+    await runCauseEffect(store.removeMember(memberId));
+    await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(memberId)) : undefined);
     refreshPresence();
   }
 
@@ -56,19 +58,21 @@ export async function routeTeam(
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.logout) {
-    await store.logout(token);
-    await remoteScreen?.revokeTeamSession(sessionId);
+    await runCauseEffect(store.logout(token));
+    await (remoteScreen ? runCauseEffect(remoteScreen.revokeTeamSession(sessionId)) : undefined);
     refreshPresence();
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.password) {
     const body = await readJson(request);
-    await store.changePassword(
-      member.id,
-      stringField(body, "currentPassword", false, 256),
-      stringField(body, "newPassword", false, 256),
+    await runCauseEffect(
+      store.changePassword(
+        member.id,
+        stringField(body, "currentPassword", false, 256),
+        stringField(body, "newPassword", false, 256),
+      ),
     );
-    await remoteScreen?.revokeMember(member.id);
+    await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(member.id)) : undefined);
     refreshPresence();
     return empty(204);
   }
@@ -122,11 +126,13 @@ export async function routeTeam(
     if (disabled !== undefined && !isBoolean(disabled)) {
       throw new HttpError(400, "disabled must be a boolean.");
     }
-    const updated = await store.updateMember(pathIdentifier(memberMatch[1], "memberId"), {
-      ...(role ? { role } : {}),
-      ...(disabled === undefined ? {} : { disabled }),
-    });
-    if (updated.disabled) await remoteScreen?.revokeMember(updated.id);
+    const updated = await runCauseEffect(
+      store.updateMember(pathIdentifier(memberMatch[1], "memberId"), {
+        ...(role ? { role } : {}),
+        ...(disabled === undefined ? {} : { disabled }),
+      }),
+    );
+    if (updated.disabled) await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(updated.id)) : undefined);
     refreshPresence();
     return json(200, updated);
   }
@@ -147,7 +153,10 @@ export async function routeTeam(
     const permanent = body.permanent === undefined ? undefined : body.permanent === true;
     if (body.permanent !== undefined && !isBoolean(body.permanent)) throw new HttpError(400, "Invalid invitation.");
     if (!createInvite) throw new HttpError(503, sourceText("error.team.inviteServiceUnavailable"));
-    return json(201, await createInvite({ role, ...(email ? { email } : {}), ...(permanent ? { permanent } : {}) }));
+    return json(
+      201,
+      await runCauseEffect(createInvite({ role, ...(email ? { email } : {}), ...(permanent ? { permanent } : {}) })),
+    );
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.invites) {
     requireAdmin(member);
@@ -156,7 +165,7 @@ export async function routeTeam(
   const inviteMatch = url.pathname.match(/^\/v1\/team\/invites\/([^/]+)$/);
   if (method === "DELETE" && inviteMatch) {
     requireAdmin(member);
-    await store.revokeInvite(pathIdentifier(inviteMatch[1], "inviteId"));
+    await runCauseEffect(store.revokeInvite(pathIdentifier(inviteMatch[1], "inviteId")));
     return empty(204);
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.sessions) {
@@ -167,9 +176,9 @@ export async function routeTeam(
   if (method === "DELETE" && sessionMatch) {
     requireAdmin(member);
     const revokedSessionId = pathIdentifier(sessionMatch[1], "sessionId");
-    await store.revokeSession(revokedSessionId);
-    await onSessionRevoked?.(revokedSessionId);
-    await remoteScreen?.revokeTeamSession(revokedSessionId);
+    await runCauseEffect(store.revokeSession(revokedSessionId));
+    await (onSessionRevoked ? runCauseEffect(onSessionRevoked(revokedSessionId)) : undefined);
+    await (remoteScreen ? runCauseEffect(remoteScreen.revokeTeamSession(revokedSessionId)) : undefined);
     refreshPresence();
     return empty(204);
   }

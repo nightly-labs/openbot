@@ -8,6 +8,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiBrowser, TeamApiBrowserView } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -41,17 +42,19 @@ export async function routeBrowser(
     if (!isBoolean(focus)) throw new HttpError(400, "focus must be a boolean.");
     return json(
       201,
-      await browser.open(
-        stringField(body, "url", false, INPUT_LIMITS.browserUrl),
-        nullableString(body, "ownerThreadId"),
-        nullableString(body, "ownerAgentId"),
-        focus,
+      await runCauseEffect(
+        browser.open(
+          stringField(body, "url", false, INPUT_LIMITS.browserUrl),
+          nullableString(body, "ownerThreadId"),
+          nullableString(body, "ownerAgentId"),
+          focus,
+        ),
       ),
     );
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.activate) {
     const body = await readJson(request);
-    await browser.activate(stringField(body, "tabId"));
+    await runCauseEffect(browser.activate(stringField(body, "tabId")));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.navigate) {
@@ -60,37 +63,41 @@ export async function routeBrowser(
     if (direction !== "back" && direction !== "forward") {
       throw new HttpError(400, "Invalid browser navigation direction.");
     }
-    await browser.navigate(stringField(body, "tabId"), direction);
+    await runCauseEffect(browser.navigate(stringField(body, "tabId"), direction));
     return empty(204);
   }
   // Behind `browser-navigation`: the released navigate route carries a direction only, so a client
   // without it opens a new tab for an address instead of moving the one the user is looking at.
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.load) {
     const body = await readJson(request);
-    await browser.loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl));
+    await runCauseEffect(
+      browser.loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl)),
+    );
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.reload) {
     const body = await readJson(request);
-    await browser.reload(stringField(body, "tabId"));
+    await runCauseEffect(browser.reload(stringField(body, "tabId")));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.close) {
     const body = await readJson(request);
-    await browser.close(stringField(body, "tabId"));
+    await runCauseEffect(browser.close(stringField(body, "tabId")));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.preview) {
     const body = await readJson(request);
-    return json(200, await browser.capturePreview(stringField(body, "tabId")));
+    return json(200, await runCauseEffect(browser.capturePreview(stringField(body, "tabId"))));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.visible) {
     const body = await readJson(request);
     if (!isBoolean(body.visible)) throw new HttpError(400, "visible is required.");
-    await browser.setVisible({
-      visible: body.visible,
-      bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
-    });
+    await runCauseEffect(
+      browser.setVisible({
+        visible: body.visible,
+        bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
+      }),
+    );
     return empty(204);
   }
 
@@ -112,7 +119,11 @@ export async function routeBrowser(
   const viewSessionMatch = /^\/v1\/browser\/view\/sessions\/([^/]+)$/u.exec(url.pathname);
   if (method === "DELETE" && viewSessionMatch) {
     if (!browserView) throw new HttpError(404, sourceText("error.team.browserViewUnavailable"));
-    if (!(await browserView.closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id))) {
+    if (
+      !(await runCauseEffect(
+        browserView.closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id),
+      ))
+    ) {
       throw new HttpError(404, sourceText("error.team.browserSessionNotFound"));
     }
     return empty(204);

@@ -132,7 +132,6 @@ export const messages = {
   "error.backend.mcpServerGone": "Bu MCP sunucusu artık mevcut değil.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
-  "error.backend.mcpConnectionCancelled": "Bağlantı iptal edildi.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
   "error.backend.mcpSignInNotAccepted": "Sunucu bu oturum açmayı kabul etmedi.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -5,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SaveCustomAgentInput } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { CustomAgentStore } from "./custom-agent-store";
 import type { CustomProviderCipher } from "./custom-provider-store";
 
@@ -49,18 +51,18 @@ function input(overrides: Partial<SaveCustomAgentInput> = {}): SaveCustomAgentIn
 }
 
 async function loaded(cipher: CustomProviderCipher = testCipher()): Promise<CustomAgentStore> {
-  const store = new CustomAgentStore({ path, cipher, resolve: async (command) => command });
-  await store.load();
+  const store = new CustomAgentStore({ path, cipher, resolve: (command) => Effect.succeed(command) });
+  await Effect.runPromise(store.load());
   return store;
 }
 
 describe("CustomAgentStore", () => {
   it("gives a fresh instance the agent back, and never lists or writes a value in plaintext", async () => {
     const store = await loaded();
-    await store.save(input());
+    await runCauseEffect(store.save(input()));
 
     const reopened = await loaded();
-    expect(await reopened.list()).toEqual([
+    expect(await Effect.runPromise(reopened.list())).toEqual([
       {
         id: "goose",
         name: "Goose",
@@ -70,7 +72,7 @@ describe("CustomAgentStore", () => {
         resolvedCommand: "/opt/homebrew/bin/goose",
       },
     ]);
-    expect(JSON.stringify(await reopened.list())).not.toContain("sk-agent-secret");
+    expect(JSON.stringify(await Effect.runPromise(reopened.list()))).not.toContain("sk-agent-secret");
     expect(await readFile(path, "utf8")).not.toContain("sk-agent-secret");
     expect(reopened.configs()[0]?.env).toEqual([
       { name: "GOOSE_PROVIDER", value: "ollama" },
@@ -80,7 +82,7 @@ describe("CustomAgentStore", () => {
 
   it("keeps the ciphertext byte for byte when an edit keeps every value", async () => {
     const store = await loaded();
-    await store.save(input());
+    await runCauseEffect(store.save(input()));
     const before = JSON.parse(await readFile(path, "utf8")).agents[0].secret;
 
     // A computer whose keychain is gone must not lose values a later keychain could still open.
@@ -91,14 +93,16 @@ describe("CustomAgentStore", () => {
         },
       }),
     );
-    await locked.save(
-      input({
-        name: "Goose 2",
-        env: [
-          { name: "GOOSE_PROVIDER", value: null },
-          { name: "OPENAI_API_KEY", value: null },
-        ],
-      }),
+    await runCauseEffect(
+      locked.save(
+        input({
+          name: "Goose 2",
+          env: [
+            { name: "GOOSE_PROVIDER", value: null },
+            { name: "OPENAI_API_KEY", value: null },
+          ],
+        }),
+      ),
     );
 
     const after = JSON.parse(await readFile(path, "utf8")).agents[0];
@@ -108,14 +112,16 @@ describe("CustomAgentStore", () => {
 
   it("takes a kept value and a new value together", async () => {
     const store = await loaded();
-    await store.save(input());
-    await store.save(
-      input({
-        env: [
-          { name: "GOOSE_PROVIDER", value: "openai" },
-          { name: "OPENAI_API_KEY", value: null },
-        ],
-      }),
+    await runCauseEffect(store.save(input()));
+    await runCauseEffect(
+      store.save(
+        input({
+          env: [
+            { name: "GOOSE_PROVIDER", value: "openai" },
+            { name: "OPENAI_API_KEY", value: null },
+          ],
+        }),
+      ),
     );
 
     expect((await loaded()).configs()[0]?.env).toEqual([
@@ -126,23 +132,23 @@ describe("CustomAgentStore", () => {
 
   it("refuses a kept value that main does not hold, and writes nothing", async () => {
     const store = await loaded();
-    await expect(store.save(input({ env: [{ name: "OPENAI_API_KEY", value: null }] }))).rejects.toThrow(
+    await expect(runCauseEffect(store.save(input({ env: [{ name: "OPENAI_API_KEY", value: null }] })))).rejects.toThrow(
       "OPENAI_API_KEY",
     );
-    expect(await store.list()).toEqual([]);
+    expect(await Effect.runPromise(store.list())).toEqual([]);
     await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("refuses a value when the keychain cannot store it", async () => {
     const store = await loaded(testCipher({ canPersist: () => false }));
-    await expect(store.save(input())).rejects.toThrow();
-    await store.save(input({ env: [] }));
-    expect((await store.list())[0]?.envNames).toEqual([]);
+    await expect(runCauseEffect(store.save(input()))).rejects.toThrow();
+    await runCauseEffect(store.save(input({ env: [] })));
+    expect((await Effect.runPromise(store.list()))[0]?.envNames).toEqual([]);
   });
 
   it("gives a check the saved value of the agent it names", async () => {
     const store = await loaded();
-    await store.save(input());
+    await runCauseEffect(store.save(input()));
     expect(store.checkEnv([{ name: "OPENAI_API_KEY", value: null }], "goose")).toEqual({
       OPENAI_API_KEY: "sk-agent-secret",
     });
@@ -156,15 +162,15 @@ describe("CustomAgentStore", () => {
     path = join(root, "custom-agents.json");
 
     const store = await loaded();
-    expect(await store.list()).toEqual([]);
-    await expect(store.save(input())).rejects.toThrow();
-    await expect(store.remove("future")).rejects.toThrow();
+    expect(await Effect.runPromise(store.list())).toEqual([]);
+    await expect(runCauseEffect(store.save(input()))).rejects.toThrow();
+    await expect(runCauseEffect(store.remove("future"))).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe(newer);
   });
 
   it("keeps an agent whose values this computer cannot open, without its values", async () => {
     const store = await loaded();
-    await store.save(input());
+    await runCauseEffect(store.save(input()));
 
     const other = await loaded(
       testCipher({
@@ -173,7 +179,7 @@ describe("CustomAgentStore", () => {
         },
       }),
     );
-    expect((await other.list())[0]?.envNames).toEqual(["GOOSE_PROVIDER", "OPENAI_API_KEY"]);
+    expect((await Effect.runPromise(other.list()))[0]?.envNames).toEqual(["GOOSE_PROVIDER", "OPENAI_API_KEY"]);
     expect(other.configs()[0]?.env).toEqual([]);
   });
 });

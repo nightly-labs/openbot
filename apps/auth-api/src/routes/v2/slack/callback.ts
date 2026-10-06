@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../server/effect-runtime";
 import { requestSlackApp } from "../../../server/request-auth";
 import { SlackAppError } from "../../../server/slack-app";
 
@@ -7,30 +9,36 @@ import { SlackAppError } from "../../../server/slack-app";
 export const Route = createFileRoute("/v2/slack/callback")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         const url = new URL(request.url);
         const target = new URL("/slack/connect", url);
-        const code = url.searchParams.get("code");
-        const state = url.searchParams.get("state");
-        if (!code || !state) {
-          target.hash = new URLSearchParams({ error: url.searchParams.get("error") ?? "slack_cancelled" }).toString();
-          return redirect(target);
-        }
-        try {
-          const slack = requestSlackApp();
-          const result = await slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) });
-          // Development only: the dev app's loopback listener takes the grant, not `openbot://`.
-          if (result.returnUrl)
-            return redirect(
-              new URL(`${result.returnUrl}?${new URLSearchParams({ nonce: result.nonce, grant: result.grant })}`),
-            );
-          target.hash = new URLSearchParams({ nonce: result.nonce, grant: result.grant }).toString();
-        } catch (error) {
-          target.hash = new URLSearchParams({
-            error: error instanceof SlackAppError ? error.code : "slack_exchange_failed",
-          }).toString();
-        }
-        return redirect(target);
+        return runApiResponse(
+          Effect.gen(function* () {
+            const code = url.searchParams.get("code");
+            const state = url.searchParams.get("state");
+            if (!code || !state) {
+              target.hash = new URLSearchParams({
+                error: url.searchParams.get("error") ?? "slack_cancelled",
+              }).toString();
+              return redirect(target);
+            }
+            const slack = requestSlackApp();
+            const result = yield* slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) });
+            // Development only: the dev app's loopback listener takes the grant, not `openbot://`.
+            if (result.returnUrl)
+              return redirect(
+                new URL(`${result.returnUrl}?${new URLSearchParams({ nonce: result.nonce, grant: result.grant })}`),
+              );
+            target.hash = new URLSearchParams({ nonce: result.nonce, grant: result.grant }).toString();
+            return redirect(target);
+          }),
+          (error) => {
+            target.hash = new URLSearchParams({
+              error: error instanceof SlackAppError ? error.code : "slack_exchange_failed",
+            }).toString();
+            return redirect(target);
+          },
+        );
       },
     },
   },

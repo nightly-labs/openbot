@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { RemoteFileUpload } from "./file-upload";
 import { type TeamApiRequest, uploadAttachmentDraft } from "./team-api-requests";
@@ -22,10 +23,14 @@ describe("shared Team API requests", () => {
       previewUrl: null,
     };
 
-    await expect(uploadAttachmentDraft(reply(attachment), upload)).resolves.toEqual(attachment);
+    await expect(
+      Effect.runPromise(uploadAttachmentDraft(reply(attachment), upload).pipe(Effect.mapError((error) => error.cause))),
+    ).resolves.toEqual(attachment);
     expect(sent).toEqual([{ method: "POST", path: "/v1/attachments?name=notes+one.txt&mime=text%2Fplain", upload }]);
-    await expect(uploadAttachmentDraft(reply({ id: "draft-1" }), upload)).rejects.toThrow(
-      "The host returned an invalid attachment.",
-    );
+    await expect(
+      Effect.runPromise(
+        uploadAttachmentDraft(reply({ id: "draft-1" }), upload).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    ).rejects.toThrow("The host returned an invalid attachment.");
   });
 });

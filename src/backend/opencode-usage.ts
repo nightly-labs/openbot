@@ -5,7 +5,8 @@
 // anomalyco/opencode; it answers `{ usage: { rolling, weekly, monthly } }`, each with an integer
 // `percent` and an ISO `resetsAt`.
 
-import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { Effect, Option, Schema } from "effect";
 import { type AccountRateLimitsReadResult, type AccountRateLimitWindowResult, getRecord, getString } from "./protocol";
 
 const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
@@ -22,16 +23,40 @@ const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLi
  * No key, a key the console rejects, and a key with no Go subscription all read as no usage, so the
  * dock hides the row instead of showing an error for the free catalog.
  */
-export async function readOpenCodeGoUsage(apiKey: string | null): Promise<AccountRateLimitsReadResult> {
+class OpenCodeUsageFailed extends Schema.TaggedError<OpenCodeUsageFailed>()("OpenCodeUsageFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (apiKey: string | null) {
   if (!apiKey) return NO_USAGE;
-  const response = await fetch(OPENCODE_GO_USAGE_URL, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(OPENCODE_GO_USAGE_TIMEOUT_MS),
-  });
-  if (response.status === 401 || response.status === 403) return NO_USAGE;
-  if (!response.ok) throw new Error(`OpenCode Go usage returned HTTP ${response.status}.`);
-  return openCodeGoRateLimits(await response.json());
-}
+  return yield* Effect.acquireUseRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) =>
+      Effect.gen(function* () {
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            fetch(OPENCODE_GO_USAGE_URL, {
+              headers: { Authorization: `Bearer ${apiKey}` },
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(OPENCODE_GO_USAGE_TIMEOUT_MS)]),
+            }),
+          catch: (cause) => new OpenCodeUsageFailed({ cause }),
+        });
+        if (response.status === 401 || response.status === 403) return NO_USAGE;
+        if (!response.ok)
+          return yield* new OpenCodeUsageFailed({
+            cause: new Error(`OpenCode Go usage returned HTTP ${response.status}.`),
+          });
+        const body = yield* Effect.tryPromise({
+          try: (): Promise<unknown> => response.json(),
+          catch: (cause) => new OpenCodeUsageFailed({ cause }),
+        });
+        return openCodeGoRateLimits(body);
+      }),
+    (controller) => Effect.sync(() => controller.abort()),
+  );
+});
+
+const UsageWindow = Schema.Struct({ percent: Schema.Finite, resetsAt: Schema.NullOr(Schema.String) });
 
 /**
  * The account usage contract holds two windows, so the monthly and weekly readings share the second
@@ -64,10 +89,15 @@ function usageWindow(
   window: DynamicRecord | null,
   windowDurationMins: number,
 ): (AccountRateLimitWindowResult & { usedPercent: number }) | null {
-  if (!window || !isNumber(window.percent) || !Number.isFinite(window.percent)) return null;
-  const resetsAt = Date.parse(getString(window, "resetsAt") ?? "");
+  if (!window) return null;
+  const decoded = Schema.decodeUnknownOption(UsageWindow)({
+    percent: window.percent,
+    resetsAt: getString(window, "resetsAt"),
+  });
+  if (Option.isNone(decoded)) return null;
+  const resetsAt = Date.parse(decoded.value.resetsAt ?? "");
   return {
-    usedPercent: Math.max(0, Math.min(100, window.percent)),
+    usedPercent: Math.max(0, Math.min(100, decoded.value.percent)),
     windowDurationMins,
     resetsAt: Number.isFinite(resetsAt) ? resetsAt / 1_000 : null,
   };
