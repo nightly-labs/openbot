@@ -164,6 +164,8 @@ export const messages = {
   "error.backend.workspaceFileOutside":
     "ワークスペースのファイルはエージェントのワークスペース内にある必要があります。",
   "error.backend.workspacePathNotFile": "ワークスペースのパスがファイルではありません。",
+  "error.backend.workspacePathNotDirectory": "ワークスペースのパスがフォルダではありません。",
+  "error.backend.workspacePathMissing": "エージェントのワークスペース {root} に {path} はありません。",
   "error.backend.useChannelTaskControls": "この割り当てにはチャンネルのタスク操作を使用してください。",
   "error.backend.editFinished": "この編集はすでに終了しています。",
   "error.backend.editCancelled": "この編集はキャンセルされたため、メッセージは元のテキストのままです。",

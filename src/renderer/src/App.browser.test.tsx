@@ -1599,7 +1599,11 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
 
     await fireEvent.click(screen.getByRole("button", { name: "Open file externally" }));
-    expect(window.openbot.agent.openWorkspaceFile).toHaveBeenCalledWith({ agentId: "chief", path: workspacePath });
+    expect(window.openbot.agent.openWorkspaceFile).toHaveBeenCalledWith({
+      agentId: "chief",
+      path: workspacePath,
+      action: "open",
+    });
     await fireEvent.click(screen.getByRole("button", { name: "Close file preview" }));
     expect(screen.queryByRole("complementary", { name: "File preview" })).not.toBeInTheDocument();
 

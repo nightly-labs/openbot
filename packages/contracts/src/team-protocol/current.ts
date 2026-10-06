@@ -24,6 +24,7 @@ import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { TEAM_PROTOCOL_V6_CAPABILITIES } from "./v6";
+import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -70,6 +71,7 @@ export {
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  WORKSPACE_DIRECTORY_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
@@ -113,6 +115,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  WORKSPACE_DIRECTORY_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

@@ -158,6 +158,8 @@ export const messages = {
   "error.backend.sharedPathNotFile": "Paylaşılan yol bir dosya değil.",
   "error.backend.workspaceFileOutside": "Çalışma alanı dosyası ajan çalışma alanının içinde olmalıdır.",
   "error.backend.workspacePathNotFile": "Çalışma alanı yolu bir dosya değil.",
+  "error.backend.workspacePathNotDirectory": "Çalışma alanı yolu bir klasör değil.",
+  "error.backend.workspacePathMissing": "{root} ajan çalışma alanında {path} konumunda hiçbir şey yok.",
   "error.backend.useChannelTaskControls": "Bu atama için kanal görevi kontrollerini kullanın.",
   "error.backend.editFinished": "Bu düzenleme zaten tamamlandı.",
   "error.backend.editCancelled": "Bu düzenleme iptal edildi, bu nedenle mesaj orijinal metnini korur.",

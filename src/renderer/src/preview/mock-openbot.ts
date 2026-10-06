@@ -71,6 +71,7 @@ import {
   type UpdatePreference,
   type UpdateQueuedMessageInput,
   type UpdateStatus,
+  type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
@@ -192,6 +193,24 @@ function mockFilePreview(path: string, fallbackName: string): FilePreview {
       bytes: null,
     }
   );
+}
+
+function mockWorkspaceDirectory(path: string): WorkspaceDirectory {
+  const folder = path.replace(/\/+$/u, "") || ".";
+  const child = (name: string) => (folder === "." ? name : `${folder}/${name}`);
+  const modifiedAt = Date.UTC(2026, 9, 1, 9, 30);
+  return {
+    name: folder.split("/").at(-1) ?? folder,
+    path: folder,
+    root: "/Users/demo/OpenBot/Agents/research",
+    parentPath: folder === "." ? null : folder.split("/").slice(0, -1).join("/") || ".",
+    entries: [
+      { name: "sources", path: child("sources"), kind: "directory", size: 0, modifiedAt },
+      { name: "brief.md", path: child("brief.md"), kind: "file", size: 4_812, modifiedAt },
+      { name: "notes.txt", path: child("notes.txt"), kind: "file", size: 1_204, modifiedAt },
+    ],
+    truncated: false,
+  };
 }
 
 /** What each story server answers with when it is tested, so a story reads the same way twice. */
@@ -1358,6 +1377,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
       previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
+      listWorkspaceDirectory: async (input: OpenWorkspaceFileInput) => mockWorkspaceDirectory(input.path),
       sendMessage: async (input: SendMessageInput) => {
         // As on a host, a repeated client id answers with the first receipt and stores nothing.
         const repeated = input.clientMessageId ? sentReceipts.get(input.clientMessageId) : undefined;

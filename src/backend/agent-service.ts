@@ -164,7 +164,12 @@ import type { RoutineHoldWindow } from "./routine-store";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { TimeoutError, withTimeout } from "./with-timeout";
-import { type ResolvedSharedFile, resolveSharedFile, resolveWorkspaceFile } from "./workspace-paths";
+import {
+  listWorkspaceDirectory,
+  type ResolvedSharedFile,
+  resolveSharedFile,
+  resolveWorkspaceFile,
+} from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
 
@@ -1930,6 +1935,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return yield* resolveWorkspaceFile(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
+      ),
+    );
+  }).bind(this);
+
+  /** A folder a remote member asks for. It must be inside the agent's workspace. */
+  readonly listWorkspaceDirectory = Effect.fn("AgentService.listWorkspaceDirectory")(function* (
+    this: AgentService,
+    agentId: string,
+    inputPath: string,
+  ) {
+    const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
+    return yield* listWorkspaceDirectory(agent, inputPath).pipe(
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "list workspace directory", cause: failure.cause }),
+      ),
+    );
+  }).bind(this);
+
+  /** The local user can list folders outside a workspace when access is unrestricted. */
+  readonly listLocalWorkspaceDirectory = Effect.fn("AgentService.listLocalWorkspaceDirectory")(function* (
+    this: AgentService,
+    agentId: string,
+    inputPath: string,
+  ) {
+    const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
+    return yield* listWorkspaceDirectory(agent, inputPath, { allowOutside: !workspaceAccessEnforced(agent) }).pipe(
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "list local workspace directory", cause: failure.cause }),
       ),
     );
   }).bind(this);

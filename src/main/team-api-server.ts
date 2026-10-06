@@ -129,6 +129,7 @@ import { routeSharedTables } from "./team-api/route-shared-tables";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
+import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { TeamStoreError } from "./team-store";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
@@ -682,6 +683,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if (
         (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>

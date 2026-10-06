@@ -168,6 +168,8 @@ export const messages = {
   "error.backend.sharedPathNotFile": "Le chemin partagé n’est pas un fichier.",
   "error.backend.workspaceFileOutside": "Le fichier doit se trouver dans l’espace de travail de l’agent.",
   "error.backend.workspacePathNotFile": "Le chemin de l’espace de travail n’est pas un fichier.",
+  "error.backend.workspacePathNotDirectory": "Le chemin de l’espace de travail n’est pas un dossier.",
+  "error.backend.workspacePathMissing": "Rien n’existe à {path} dans l’espace de travail de l’agent {root}.",
   "error.backend.useChannelTaskControls": "Utilisez les commandes de tâche du canal pour cette tâche.",
   "error.backend.editFinished": "Cette modification est déjà terminée.",
   "error.backend.editCancelled": "Cette modification a été annulée : le message garde son texte d’origine.",

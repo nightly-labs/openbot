@@ -14,6 +14,8 @@ import {
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type DownloadAttachmentsInput,
+  decodeWorkspaceDirectory,
+  type FileAction,
   type ImportAttachmentsInput,
   LOCAL_SERVER_ID,
   type OpenAttachmentInput,
@@ -23,6 +25,10 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import {
+  WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_DIRECTORY_ROUTES,
+} from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
@@ -57,6 +63,7 @@ export interface AttachmentIpcDependencies {
     | "discardDraftAttachment"
     | "resolveSharedFile"
     | "resolveLocalWorkspaceFile"
+    | "listLocalWorkspaceDirectory"
   >;
   mailbox: Pick<MailboxStore, "resolveAttachment">;
   remoteServers: Pick<
@@ -79,6 +86,41 @@ export function attachmentIpcHandlers({
   getMainWindow,
   translate,
 }: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments" | "attachmentImports"> {
+  // Reveal and save act on the file itself; only "open" depends on where the file is.
+  async function deliverLocalFile(
+    path: string,
+    name: string,
+    action: FileAction | undefined,
+    open: () => Promise<void>,
+  ) {
+    if (action === "reveal") {
+      shell.showItemInFolder(path);
+      return;
+    }
+    if (action === "download") {
+      const filePath = await chooseSavePath(getMainWindow(), translate, basename(name) || basename(path));
+      if (filePath) await copyFile(path, filePath);
+      return;
+    }
+    await open();
+  }
+
+  async function deliverRemoteFile(
+    directory: string,
+    cacheKey: string,
+    downloaded: { name: string; bytes: Uint8Array },
+    action: FileAction | undefined,
+  ) {
+    if (action === "download") {
+      const filePath = await chooseSavePath(getMainWindow(), translate, basename(downloaded.name) || "file");
+      if (filePath) await writeFile(filePath, downloaded.bytes, { mode: 0o600 });
+      return;
+    }
+    const cached = await cacheRemoteFile(directory, cacheKey, downloaded);
+    if (action === "reveal") shell.showItemInFolder(cached);
+    else await openPath(cached);
+  }
+
   return {
     attachmentImports: {
       importAttachments: scopedHandler(parseImportAttachments, {
@@ -156,12 +198,11 @@ export function attachmentIpcHandlers({
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
           const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path));
-          await openPath(sharedFile.path);
+          await deliverLocalFile(sharedFile.path, sharedFile.name, parsed.action, () => openPath(sharedFile.path));
         },
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(remoteServers.downloadSharedFile(parsed.path, serverId));
-          const target = await cacheRemoteFile("remote-shared-files", `${serverId}:${parsed.path}`, downloaded);
-          await openPath(target);
+          await deliverRemoteFile("remote-shared-files", `${serverId}:${parsed.path}`, downloaded, parsed.action);
         },
       }),
       openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
@@ -169,16 +210,30 @@ export function attachmentIpcHandlers({
           const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
           // A file outside the workspace can be anything on the computer, including a program, so it is
           // shown in the file manager rather than run.
-          if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
-          else shell.showItemInFolder(workspaceFile.path);
+          await deliverLocalFile(workspaceFile.path, workspaceFile.name, parsed.action, async () => {
+            if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
+            else shell.showItemInFolder(workspaceFile.path);
+          });
         },
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(
             remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId),
           );
           const key = `${serverId}:${parsed.agentId}:${parsed.path}`;
-          const target = await cacheRemoteFile("remote-workspace-files", key, downloaded);
-          await openPath(target);
+          await deliverRemoteFile("remote-workspace-files", key, downloaded, parsed.action);
+        },
+      }),
+      listWorkspaceDirectory: scopedHandler(parseOpenWorkspaceFile, {
+        local: (parsed) => runCauseEffect(service.listLocalWorkspaceDirectory(parsed.agentId, parsed.path)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKSPACE_DIRECTORY_CAPABILITY))
+            throw new Error(sourceText("error.team.workspaceDirectoryUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, WORKSPACE_DIRECTORY_ROUTES.list, decodeWorkspaceDirectory, {
+              method: "POST",
+              body: { agentId: parsed.agentId, path: parsed.path },
+            }),
+          );
         },
       }),
       previewSharedFile: scopedHandler(parseOpenSharedFile, {

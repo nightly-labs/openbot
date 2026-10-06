@@ -96,6 +96,7 @@ type TeamApiAgentMethods = Pick<
   | "discardDraftAttachment"
   | "resolveSharedFile"
   | "resolveWorkspaceFile"
+  | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
   | "acknowledgeFailedTurn"

@@ -122,6 +122,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     discardDraftAttachment: unimplemented,
     resolveSharedFile: unimplemented,
     resolveWorkspaceFile: unimplemented,
+    listWorkspaceDirectory: unimplemented,
     sendMessage: unimplemented,
     listQueue: unimplemented,
     acknowledgeFailedTurn: unimplemented,

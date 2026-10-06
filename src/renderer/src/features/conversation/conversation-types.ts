@@ -19,6 +19,7 @@ import type {
   ServerSummary,
   TeamPresenceSnapshot,
   UpdateAgentInput,
+  WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
@@ -225,14 +226,18 @@ export interface ComposerDraft {
  */
 type SidebarFilePreviewSource =
   | { kind: "shared"; path: string }
-  | { kind: "workspace"; path: string }
+  /** `folder` is the folder view the file was opened from, so the panel can go back to it. */
+  | { kind: "workspace"; path: string; folder?: string }
   | { kind: "attachment"; attachment: AttachmentSummary };
 
-export interface SidebarFilePreview {
-  ownerAgentId: string;
-  source: SidebarFilePreviewSource;
-  preview: FilePreview;
-}
+export type SidebarFilePreview =
+  | { ownerAgentId: string; source: SidebarFilePreviewSource; preview: FilePreview; directory?: undefined }
+  | {
+      ownerAgentId: string;
+      source: { kind: "workspace-folder"; path: string };
+      preview: null;
+      directory: WorkspaceDirectory;
+    };
 
 export type RightPanelMode =
   | "none"

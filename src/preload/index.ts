@@ -20,6 +20,7 @@ import {
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
   groupApiMethodName,
@@ -722,6 +723,7 @@ const openbotApi: OpenBotDesktopApi = {
       openWorkspaceFile: decodeVoid,
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
+      listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);

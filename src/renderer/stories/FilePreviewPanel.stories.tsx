@@ -106,3 +106,42 @@ export const Spreadsheet: Story = {
 export const Unsupported: Story = {
   args: { preview: UNSUPPORTED_PREVIEW },
 };
+
+/** A folder chip from a chat: the files and subfolders with their size and date. */
+export const Folder: Story = {
+  args: {
+    preview: null,
+    directory: {
+      name: "eyeliner",
+      path: "research/eyeliner",
+      root: "/Users/demo/OpenBot/Agents/research",
+      parentPath: "research",
+      entries: [
+        {
+          name: "sources",
+          path: "research/eyeliner/sources",
+          kind: "directory",
+          size: 0,
+          modifiedAt: 1_790_000_000_000,
+        },
+        {
+          name: "brief.md",
+          path: "research/eyeliner/brief.md",
+          kind: "file",
+          size: 4_812,
+          modifiedAt: 1_790_000_000_000,
+        },
+        {
+          name: "notes.txt",
+          path: "research/eyeliner/notes.txt",
+          kind: "file",
+          size: 1_204,
+          modifiedAt: 1_789_000_000_000,
+        },
+      ],
+      truncated: false,
+    },
+    onOpenWorkspaceFolder: fn(),
+    onBack: fn(),
+  },
+};

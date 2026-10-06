@@ -105,6 +105,7 @@ import type {
   OpenAttachmentInput,
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
+  WorkspaceDirectory,
 } from "./ipc-attachments";
 import type {
   BrowserBounds,
@@ -829,6 +830,9 @@ export const IPC_ENDPOINTS = {
     openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
     previewSharedFile: scopedRequest<OpenSharedFileInput, FilePreview>()("agent:preview-shared-file"),
     previewWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
+    listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
+      "agent:list-workspace-directory",
+    ),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.

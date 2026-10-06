@@ -29,6 +29,7 @@ import type { TeamApiAgents, TeamApiMailbox } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { pathIdentifier, readBinary } from "./request-helpers";
+import { rethrowWorkspacePathError } from "./route-workspace-directory";
 
 // Each upload holds its body, up to 100 MB, until the attachment is on disk. Two at a time keep that
 // below 200 MB on a 4 GB hosted server. A third upload waits for a slot. Node's request timeout
@@ -153,7 +154,9 @@ export async function routeFiles(
     if (!workspacePath || workspacePath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid workspace file path is required.");
     }
-    const workspaceFile = await runCauseEffect(agents.resolveWorkspaceFile(agentId, workspacePath));
+    const workspaceFile = await runCauseEffect(agents.resolveWorkspaceFile(agentId, workspacePath)).catch(
+      rethrowWorkspacePathError,
+    );
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.workspaceFileTooLarge"));
     }

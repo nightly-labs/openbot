@@ -157,6 +157,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sharedPathNotFile": "Shared path is not a file.",
   "error.backend.workspaceFileOutside": "Workspace file must be inside the agent workspace.",
   "error.backend.workspacePathNotFile": "Workspace path is not a file.",
+  "error.backend.workspacePathNotDirectory": "Workspace path is not a folder.",
+  "error.backend.workspacePathMissing": "Nothing exists at {path} in the agent workspace {root}.",
   "error.backend.useChannelTaskControls": "Use the channel task controls for this assignment.",
   "error.backend.editFinished": "This edit has already finished.",
   "error.backend.editCancelled": "This edit was cancelled, so the message keeps its original text.",
