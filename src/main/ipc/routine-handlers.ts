@@ -16,6 +16,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { localRoutineCalendarSource } from "../local-routine-calendar";
 import {
   decodeAgentSummaries,
   decodeRoutine,
@@ -122,7 +123,7 @@ export function routineIpcHandlers({
         },
       }),
       routineCalendar: scopedHandler(parseRoutineCalendar, {
-        local: (input) => calendar(input, localCalendarSource(service)),
+        local: (input) => calendar(input, localRoutineCalendarSource(service)),
         remote: (input, serverId) => calendar(input, remoteCalendarSource(remoteServers, serverId)),
       }),
     },
@@ -133,32 +134,6 @@ function calendar(input: { from: string; to: string }, source: RoutineCalendarSo
   return runCauseEffect(
     buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source),
   );
-}
-
-function localCalendarSource(service: AgentService): RoutineCalendarSource<RemoteWorkflowError> {
-  return {
-    owners: () =>
-      Effect.sync(() => {
-        const archived = service.channels.store.archivedIds();
-        return [
-          ...service.listAgents().map((agent): RoutineCalendarOwner => ({ kind: "agent", agentId: agent.id })),
-          ...service.channels.store
-            .ids()
-            .filter((channelId) => !archived.has(channelId))
-            .map((channelId): RoutineCalendarOwner => ({ kind: "channel", channelId })),
-        ];
-      }),
-    routines: (owner) =>
-      Effect.sync(() =>
-        owner.kind === "agent" ? service.listRoutines(owner.agentId) : service.listChannelRoutines(owner.channelId),
-      ),
-    runs: (owner, routineId, limit) =>
-      Effect.sync(() =>
-        owner.kind === "agent"
-          ? service.listRoutineRuns({ agentId: owner.agentId, routineId, limit })
-          : service.listChannelRoutineRuns({ channelId: owner.channelId, routineId, limit }),
-      ),
-  };
 }
 
 /** A remote host answers through the routes its routine settings already use, so no new route is needed. */

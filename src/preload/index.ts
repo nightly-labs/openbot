@@ -50,6 +50,7 @@ import {
   decodeProviderCodeLoginStart,
   decodeRoutine,
   decodeRoutineCalendar,
+  decodeRoutineFeed,
   decodeRoutineRun,
   decodeRoutineRuns,
   decodeRoutines,
@@ -571,6 +572,11 @@ const openbotApi: OpenBotDesktopApi = {
     cancel: decodeOnePasswordConnectorStatus,
     disconnect: decodeOnePasswordConnectorStatus,
     changed: decodeOnePasswordConnectorStatus,
+  }),
+  routineFeed: bridgeGroup(IPC_ENDPOINTS.routineFeed, {
+    get: decodeRoutineFeed,
+    create: decodeRoutineFeed,
+    remove: decodeRoutineFeed,
   }),
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,

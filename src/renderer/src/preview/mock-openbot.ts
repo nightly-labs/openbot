@@ -109,6 +109,7 @@ import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
+import { createMockRoutineFeed } from "./mock-routine-feed";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
@@ -603,6 +604,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     githubConnector: createMockGitHubConnector(),
     onePasswordConnector: createMockOnePasswordConnector(),
     billing: createMockBilling(),
+    routineFeed: createMockRoutineFeed(),
     hostedServers: createMockHostedServers(),
     customProviders: {
       list: async () => clone(customProviders),

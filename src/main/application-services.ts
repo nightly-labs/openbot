@@ -118,6 +118,7 @@ import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { IdleRestart } from "./idle-restart";
 import { LanguageService } from "./language-service";
+import { localRoutineFeedDocument } from "./local-routine-calendar";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -155,6 +156,7 @@ import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import {
@@ -189,6 +191,7 @@ const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
 const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
 const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
+const ROUTINE_FEED_FILE = "openbot-routine-feed-v1.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const LOGO_COLOR_PREFERENCE_FILE = "openbot-logo-color-preference-v1.json";
@@ -257,6 +260,8 @@ const TEARDOWN_ORDER = {
   slackIngress: 86,
   host: 90,
   teamWebRtcBridge: 100,
+  // Before the agent service, so no calendar read finds it stopping.
+  routineFeed: 104,
   mcpOAuthRedirect: 105,
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
@@ -346,6 +351,7 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
   hostedServers: HostedServerDesktopService;
+  routineFeed: RoutineFeedServer;
   /** The terminal control of a self-hosted server. Null in every other build. */
   serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
@@ -1149,6 +1155,14 @@ export async function createApplicationServices({
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
+  // Listens only after the user turns the feed on in Server Settings > Routines.
+  const routineFeed = new RoutineFeedServer({
+    path: join(app.getPath("userData"), ROUTINE_FEED_FILE),
+    cipher: secretCipher,
+    document: localRoutineFeedDocument(service, language.translate),
+  });
+  await Effect.runPromise(routineFeed.start());
+  teardown.push(TEARDOWN_ORDER.routineFeed, "the routine feed", () => Effect.runPromise(routineFeed.stop()));
   // The host id is read when the Slack socket opens, and the team store is built further down, so
   // it starts as "no name yet".
   let slackIngressHostId: () => string | null = () => null;
@@ -1964,6 +1978,7 @@ export async function createApplicationServices({
     hostedSites,
     billing,
     hostedServers,
+    routineFeed,
     serverMode,
     customProviders,
     customProviderChanges,
