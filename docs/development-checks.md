@@ -139,6 +139,7 @@ renderer bundles it. Then it selects the lanes:
 | Lane | Jobs | Runs when a changed path is |
 | --- | --- | --- |
 | `code` | Check, Tests (desktop) | anything that is left |
+| `docs` | Check, with only `check:doc-links` when `code` is off | any Markdown file, before the removal above, or `scripts/check-doc-links.ts` |
 | `desktop` | Browser smoke | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `remote` and `docker` |
 | `api` | API, Cloudflare preview build | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
 | `sites` | Tests (sites) | in `apps/site-router` |
@@ -158,7 +159,8 @@ renderer preview and web client and imports `apps/site-router/src`, so `api` rea
 `All required checks pass` needs every other check job and fails when one of them failed or was
 cancelled; a skipped lane counts as a pass. Add a new lane to its `needs` list. Branch protection on
 `main` requires only `Check`, not this job. A skipped required check counts as passed, so `Check`
-runs when `detect` did not succeed, and skips only when `detect` found no code change. The list of
+runs when `detect` did not succeed, and skips only when `detect` found no code change and no Markdown
+change. A Markdown-only change runs only its link check. The list of
 changed paths uses `git diff --no-renames`: a moved file then lists its old path as well, so a move
 of a file that a lane reads into `docs/` still runs the lane.
 

@@ -28,7 +28,7 @@ jobs:
     #
     # `code` runs for every change except Markdown that no build or test reads: the desktop tests
     # run the mobile tests and read mobile, API and remote files, and lint and knip cover every
-    # workspace. `desktop` lists what it skips, not what it reads: the other apps, which the
+    # workspace. `docs` runs for any Markdown change, so that `Check` still checks its links. `desktop` lists what it skips, not what it reads: the other apps, which the
     # Electron build does not read. `api` also reads the renderer: the Worker bundles its preview
     # and web client.
     name: Detect changed areas
@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.lanes.outputs.code }}
+      docs: ${{ steps.lanes.outputs.docs }}
       desktop: ${{ steps.lanes.outputs.desktop }}
       api: ${{ steps.lanes.outputs.api }}
       sites: ${{ steps.lanes.outputs.sites }}
@@ -66,6 +67,7 @@ jobs:
           # Markdown that no build or test reads changes no lane. Not every Markdown file: the API
           # bundles CHANGELOG.md, and the renderer bundles Markdown from `resources/`.
           docs='^((docs|plans|changelog\.d)/.+\.md|(.+/)?AGENTS\.md|(ANALYTICS|CODE_OF_CONDUCT|CONTRIBUTING|PRIVACY|README|SECURITY|SUPPORT)\.md)$'
+          all="$changed"
           changed="$(grep -Ev "$docs" <<<"$changed" || true)"
           shared='^(package\.json|bun\.lock|bunfig\.toml|\.nvmrc|biome\.json|tsconfig[^/]*\.json|\.github/|packages/|patches/|tools/|vendor/)'
           lane() {
@@ -85,6 +87,12 @@ jobs:
             fi
           }
           lane code '.'
+          # Every Markdown file, before the filter above removed some of them.
+          if grep -Eq "\.md$|^scripts/check-doc-links\.ts$" <<<"$all" || grep -Eq "$shared" <<<"$changed"; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          fi
           lane_unless desktop '^(apps/(auth-api|mobile|site-router)|docker|remote)/'
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane sites '^apps/site-router/'
@@ -101,12 +109,15 @@ jobs:
     # package.
     #
     # Branch protection requires this job, and a skipped required check counts as passed. So it
-    # runs when `detect` did not succeed, and it skips only when `detect` found no code change.
+    # runs when `detect` did not succeed, and it skips only when `detect` found no code change and
+    # no Markdown change. A Markdown-only change runs only the link check.
     name: Check
     needs: detect
-    if: ${{ !cancelled() && (needs.detect.result != 'success' || needs.detect.outputs.code == 'true') }}
+    if: ${{ !cancelled() && (needs.detect.result != 'success' || needs.detect.outputs.code == 'true' || needs.detect.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CODE: ${{ needs.detect.result != 'success' || needs.detect.outputs.code == 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,21 +126,26 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Check unused files and dependencies
+        if: env.CODE == 'true'
         run: bun run knip:check
 
       - name: Check image asset directories
+        if: env.CODE == 'true'
         run: bun run check:assets
 
       - name: Check Markdown links and anchors
         run: bun run check:doc-links
 
       - name: Check desktop application
+        if: env.CODE == 'true'
         run: bun run check:desktop:static
 
       - name: Check translation catalogs
+        if: env.CODE == 'true'
         run: bun run i18n:check
 
       - name: Check ratcheted TypeScript options
+        if: env.CODE == 'true'
         run: bun run types:ratchet
 
   browser:
