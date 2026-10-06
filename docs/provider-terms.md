@@ -16,10 +16,11 @@ publishes.
   starts the Claude Code CLI (`claude`), and the CLI sends all requests to Anthropic.
 - OpenBot downloads `claude` from Anthropic's npm package for your platform
   (`@anthropic-ai/claude-agent-sdk-<platform>`), checks the npm `dist.integrity` hash, and does not
-  change the executable. It turns off the CLI's own updater for that copy only. If you set
-  `OPENBOT_CLAUDE_PATH`, or installed `claude` yourself, OpenBot runs that executable.
-- Connect on the Claude row runs `claude auth login --claudeai`, which opens Anthropic's sign-in page
-  in your browser. You can also run `claude auth login` in a terminal. The CLI stores the
+  change the executable. It turns off the CLI's own updater for that copy only. With
+  `OPENBOT_CLAUDE_PATH`, OpenBot runs that executable instead. With no downloaded copy, it runs a
+  `claude` that you installed.
+- Connect on the Claude row runs `claude auth login --claudeai`, which opens Anthropic's sign-in
+  page in your browser. You can also run `claude auth login` in a terminal. The CLI stores the
   credentials; OpenBot does not read, copy or store them. OpenBot runs `claude auth status` to show
   whether Claude is ready.
 - On a Linux host with no browser, a host admin can sign in Claude from another computer: the host
@@ -30,8 +31,8 @@ publishes.
 
 ### What Anthropic says
 
-Anthropic's [legal and compliance page](https://code.claude.com/docs/en/legal-and-compliance), read on
-2026-10-06:
+Anthropic's [legal and compliance page](https://code.claude.com/docs/en/legal-and-compliance),
+read on 2026-10-06:
 
 - "OAuth authentication is intended exclusively for purchasers of Claude Free, Pro, Max, Team, and
   Enterprise subscription plans and is designed to support ordinary use of Claude Code and other
