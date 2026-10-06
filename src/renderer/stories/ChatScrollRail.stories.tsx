@@ -1,16 +1,16 @@
 import { Bubble, BubbleContent, Message, MessageContent } from "@openbot/ui";
 import {
   ChatScrollRail,
-  chatScrollSections,
+  createChatScrollRail,
   type UnloadedHistory,
 } from "@openbot/ui/features/conversation/ChatScrollRail";
-import { chatDaySections, dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import {
   calculateChatScrollMargin,
   createChatVirtualizer,
 } from "@openbot/ui/features/conversation/createChatVirtualizer";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 interface StoryRow {
@@ -20,7 +20,9 @@ interface StoryRow {
   createdAt: string;
 }
 
-const NOW = new Date("2026-10-06T16:00:00");
+// The rail labels its days against the real clock, so the fixture days end today.
+const NOW = new Date();
+NOW.setHours(16, 0, 0, 0);
 
 const TOPICS = [
   "the release checklist and who signs off on each step",
@@ -69,17 +71,13 @@ function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory })
     keyVersion: () => `${props.rows[0]?.id ?? ""}:${props.rows.at(-1)?.id ?? ""}`,
     scrollMargin,
   });
-  const days = createMemo(() => chatDaySections(props.rows, { now: NOW, t, format }));
-  const sections = createMemo(() =>
-    chatScrollSections({
-      days: days(),
-      rows: props.rows,
-      itemStart: virtualizer.itemStart,
-      totalSize: virtualizer.getTotalSize(),
-      unloaded: props.unloaded,
-      text: { t, format },
-    }),
-  );
+  const rail = createChatScrollRail({
+    rows: () => props.rows,
+    unloaded: () => props.unloaded,
+    virtualizer,
+    onLoadOlder: () => {},
+    onJump: () => {},
+  });
   const updateMargin = () => setScrollMargin(calculateChatScrollMargin(scrollElement(), virtualRoot()));
 
   return (
@@ -87,6 +85,7 @@ function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory })
       <div
         ref={(element) => {
           setScrollElement(element);
+          rail.ref(element);
           requestAnimationFrame(() => {
             updateMargin();
             element.scrollTop = element.scrollHeight;
@@ -95,11 +94,7 @@ function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory })
         class="conversation-scroll"
         role="log"
       >
-        <ChatScrollRail
-          scrollElement={scrollElement}
-          sections={sections}
-          onJump={(index) => virtualizer.scrollToIndex(sections()[index]?.row ?? 0)}
-        />
+        <ChatScrollRail {...rail.props} />
         <div
           ref={setVirtualRoot}
           class={["virtual-chat-list", { "virtual-chat-list-static": !virtualizer.isVirtualized() }]}

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
+import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
@@ -260,9 +261,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     !Array.isArray(value.tasks) ||
     !value.tasks.every(isChannelTask) ||
     !(value.olderCursor === null || sequence(value.olderCursor)) ||
-    !sequence(value.throughSequence) ||
-    !(value.olderCount === undefined || sequence(value.olderCount)) ||
-    !(value.oldestAt === undefined || isString(value.oldestAt))
+    !sequence(value.throughSequence)
   ) {
     throw new Error("Invalid channel conversation response.");
   }
@@ -272,8 +271,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     tasks: value.tasks,
     olderCursor: value.olderCursor,
     throughSequence: value.throughSequence,
-    ...(value.olderCount === undefined ? {} : { olderCount: value.olderCount }),
-    ...(value.oldestAt === undefined ? {} : { oldestAt: value.oldestAt }),
+    ...optionalHistoryExtent(value),
   };
 }
 

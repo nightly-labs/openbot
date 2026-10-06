@@ -22,8 +22,7 @@ import {
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
-import { ChatScrollRail, chatScrollSections, type UnloadedHistory } from "./ChatScrollRail";
-import { chatDaySections } from "./chat-day-markers";
+import { ChatScrollRail, createChatScrollRail, type UnloadedHistory } from "./ChatScrollRail";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "./send-shortcut";
@@ -103,27 +102,15 @@ export function DirectConversation(props: DirectConversationProps) {
     },
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
-  // The rail reads the scroll container reactively; the handlers below keep it in a plain variable.
-  const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
-  const days = createMemo(() => chatDaySections(props.snapshot?.messages ?? [], { t, format }));
-  const daySections = createMemo(() =>
-    chatScrollSections({
-      days: days(),
-      rows: props.snapshot?.messages ?? [],
-      itemStart: messageVirtualizer.itemStart,
-      totalSize: messageVirtualizer.getTotalSize(),
-      unloaded: props.unloadedHistory,
-      text: { t, format },
-    }),
-  );
-  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
-  const jumpToDay = (index: number) => {
-    const section = daySections()[index];
-    if (!section) return;
-    stickToLatest = false;
-    messageVirtualizer.scrollToIndex(section.row ?? 0);
-    if (section.row === undefined) props.onLoadOlder?.();
-  };
+  const rail = createChatScrollRail({
+    rows: () => props.snapshot?.messages ?? [],
+    unloaded: () => props.unloadedHistory,
+    virtualizer: messageVirtualizer,
+    onLoadOlder: () => props.onLoadOlder?.(),
+    onJump: () => {
+      stickToLatest = false;
+    },
+  });
   const unreadBannerReady = (): boolean => {
     const unreadMessageId = props.snapshot?.readState?.firstUnreadMessageId;
     if (!unreadMessageId) return true;
@@ -314,7 +301,7 @@ export function DirectConversation(props: DirectConversationProps) {
       <div
         ref={(element) => {
           messageList = element;
-          setRailScrollElement(element);
+          rail.ref(element);
           updateVirtualScrollMargin();
         }}
         class="direct-message-list"
@@ -326,7 +313,7 @@ export function DirectConversation(props: DirectConversationProps) {
           updateUnreadDividerVisibility();
         }}
       >
-        <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
+        <ChatScrollRail {...rail.props} />
         <Show when={showScrollToLatest()}>
           <ScrollToLatestButton
             onClick={jumpToLatestMessage}

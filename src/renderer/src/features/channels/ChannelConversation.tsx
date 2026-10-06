@@ -25,7 +25,11 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
-import { ChatScrollRail, chatScrollSections, unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import {
+  ChatScrollRail,
+  createChatScrollRail,
+  unloadedHistory,
+} from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -328,29 +332,17 @@ export function ChannelConversation(props: ChannelConversationProps) {
     scrollMargin: virtualScrollMargin,
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
-  // The rail reads the scroll container reactively; the handlers below keep it in a plain variable.
-  const [railScrollElement, setRailScrollElement] = createSignal<HTMLElement>();
-  const days = createMemo(() =>
-    timeline().flatMap((entry, index) => (entry.dayMarker === null ? [] : [{ index, label: entry.dayMarker }])),
-  );
-  const daySections = createMemo(() =>
-    chatScrollSections({
-      days: days(),
-      rows: timeline().map((entry) => entry.message),
-      itemStart: messageVirtualizer.itemStart,
-      totalSize: messageVirtualizer.getTotalSize(),
-      unloaded: unloadedHistory(channels.state.page),
-      text: { t, format },
-    }),
-  );
-  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
-  const jumpToDay = (index: number) => {
-    const section = daySections()[index];
-    if (!section) return;
-    stickToLatest = false;
-    messageVirtualizer.scrollToIndex(section.row ?? 0);
-    if (section.row === undefined) void channels.loadOlder();
-  };
+  const timelineMessages = createMemo(() => timeline().map((entry) => entry.message));
+  const rail = createChatScrollRail({
+    rows: timelineMessages,
+    storedCount: () => channels.state.page?.messages.length ?? 0,
+    unloaded: () => unloadedHistory(channels.state.page),
+    virtualizer: messageVirtualizer,
+    onLoadOlder: () => void channels.loadOlder(),
+    onJump: () => {
+      stickToLatest = false;
+    },
+  });
   /*
    * A message animates in once, and only after the channel has drawn its first page: everything
    * that was already there when the reader opened the channel arrives at the same moment, and ten
@@ -656,7 +648,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               aria-live="polite"
               ref={(element) => {
                 messageList = element;
-                setRailScrollElement(element);
+                rail.ref(element);
                 updateVirtualScrollMargin();
               }}
               onScroll={(event) => {
@@ -666,7 +658,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                 updateUnreadDividerVisibility();
               }}
             >
-              <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
+              <ChatScrollRail {...rail.props} />
               <Show when={unreadCount() > 0 && !unreadDividerVisible()}>
                 <UnreadMessagesBanner
                   count={unreadCount()}

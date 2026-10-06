@@ -43,13 +43,13 @@
 }
 
 .chat-scroll-rail[data-visible="true"] .chat-scroll-rail-nav,
-.chat-scroll-rail-nav:focus-within {
+.chat-scroll-rail-nav:has(:focus-visible) {
   opacity: 1;
   transform: translate(0, -50%);
 }
 
 .chat-scroll-rail-nav:hover,
-.chat-scroll-rail-nav:focus-within {
+.chat-scroll-rail-nav:has(:focus-visible) {
   pointer-events: auto;
 }
 
@@ -230,18 +230,18 @@
 }
 
 .chat-scroll-rail-nav:hover .chat-scroll-rail-surface,
-.chat-scroll-rail-nav:focus-within .chat-scroll-rail-surface {
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-surface {
   opacity: 1;
   transition: opacity var(--openbot-duration-overlay) ease;
 }
 
 .chat-scroll-rail-nav:hover .chat-scroll-rail-eyebrow,
-.chat-scroll-rail-nav:focus-within .chat-scroll-rail-eyebrow {
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-eyebrow {
   opacity: 1;
 }
 
 .chat-scroll-rail-nav:hover .chat-scroll-rail-label,
-.chat-scroll-rail-nav:focus-within .chat-scroll-rail-label {
+.chat-scroll-rail-nav:has(:focus-visible) .chat-scroll-rail-label {
   opacity: 1;
   filter: blur(0);
   transform: none;

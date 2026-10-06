@@ -522,10 +522,15 @@ export class ConversationQueries {
       excludeRoutineRunEvents,
       excludeHostedSiteEvents,
     );
+    // The count reads only the page-order index when no marker is filtered out. The oldest time is the
+    // first row in that index, not a minimum over every older row.
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT COUNT(*) AS older_count, MIN(created_at) AS oldest_at FROM projection_thread_messages
+          `SELECT COUNT(*) AS older_count,
+             (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
+              ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
+           FROM projection_thread_messages
            WHERE thread_id = ? AND (
              created_at < ? OR
              (created_at = ? AND ordinal < ?) OR
@@ -534,6 +539,7 @@ export class ConversationQueries {
            ${routineFilter}`,
         )
         .get(
+          threadId,
           threadId,
           cursor.createdAt,
           cursor.createdAt,

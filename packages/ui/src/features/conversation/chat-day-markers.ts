@@ -77,18 +77,23 @@ export interface ChatDaySection {
   label: string;
 }
 
+/** A transcript row as the day rule reads it: its stored time, and the time its footer prints. */
+export interface ChatDayRow {
+  createdAt?: string | undefined;
+  time?: string | undefined;
+}
+
 /**
  * The days of a transcript, in the rule of `dayMarkerLabel`. The first row always opens a day, so a
- * transcript with rows has at least one. A first row with no readable time has an empty label.
+ * transcript with rows has at least one. A first row with no stored time takes the label its separator
+ * shows: the time in its footer, or "now".
  */
-export function chatDaySections(
-  rows: readonly { createdAt?: string | undefined }[],
-  options: DayMarkerOptions = {},
-): ChatDaySection[] {
+export function chatDaySections(rows: readonly ChatDayRow[], options: DayMarkerOptions = {}): ChatDaySection[] {
   const sections: ChatDaySection[] = [];
   rows.forEach((row, index) => {
     const label = row.createdAt ? dayMarkerLabel(rows[index - 1]?.createdAt, row.createdAt, options) : null;
-    if (label !== null || index === 0) sections.push({ index, label: label ?? "" });
+    if (label !== null) sections.push({ index, label });
+    else if (index === 0) sections.push({ index, label: row.time ?? (options.t ?? currentText().t)("chat.day.now") });
   });
   return sections;
 }

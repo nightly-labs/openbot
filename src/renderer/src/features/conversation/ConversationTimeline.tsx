@@ -6,10 +6,10 @@ import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCar
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
-import { ChatScrollRail, chatScrollSections } from "@openbot/ui/features/conversation/ChatScrollRail";
+import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
-import { chatDaySections, dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -181,27 +181,14 @@ export function ConversationTimeline() {
   const suggestionMarker = (marker: ChatActionMarkerModel) =>
     marker.kind === "marketplace-suggestion" && marketplaceSuggestionKnown(marker.appId) ? marker : undefined;
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
-  // The rail reads the scroll container reactively; the scope keeps it in a plain variable.
-  const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
-  const days = createMemo(() => chatDaySections(timelineMessages(), { t, format }));
-  const daySections = createMemo(() =>
-    chatScrollSections({
-      days: days(),
-      rows: timelineMessages(),
-      itemStart: messageVirtualizer.itemStart,
-      totalSize: messageVirtualizer.getTotalSize(),
-      unloaded: props.unloadedHistory,
-      text: { t, format },
-    }),
-  );
-  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
-  const jumpToDay = (index: number) => {
-    const section = daySections()[index];
-    if (!section) return;
-    setStickToLatest(false);
-    messageVirtualizer.scrollToIndex(section.row ?? 0);
-    if (section.row === undefined) props.onLoadOlder?.();
-  };
+  const rail = createChatScrollRail({
+    rows: timelineMessages,
+    storedCount: () => props.messages.length,
+    unloaded: () => props.unloadedHistory,
+    virtualizer: messageVirtualizer,
+    onLoadOlder: () => props.onLoadOlder?.(),
+    onJump: () => setStickToLatest(false),
+  });
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
     const prompt = props.prompt;
@@ -247,7 +234,7 @@ export function ConversationTimeline() {
         class={["conversation-scroll", scrollFades.classes()]}
         ref={(element) => {
           setScrollElement(element);
-          setRailScrollElement(element);
+          rail.ref(element);
         }}
         onScroll={(event) => {
           const element = event.currentTarget;
@@ -256,7 +243,7 @@ export function ConversationTimeline() {
           updateUnreadDividerVisibility();
         }}
       >
-        <ChatScrollRail scrollElement={railScrollElement} sections={daySections} onJump={jumpToDay} />
+        <ChatScrollRail {...rail.props} />
         <Show when={showScrollToLatest() || props.discontinuous}>
           <ScrollToLatestButton
             onClick={() => void jumpToLatestMessage()}

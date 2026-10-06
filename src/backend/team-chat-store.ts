@@ -165,15 +165,19 @@ export class TeamChatStore {
     const messages = rows.map((row) => decodeDirectMessage(JSON.parse(requiredStringColumn(row, "message_json"))));
     const firstSequence = rows[0] ? requiredNumberColumn(rows[0], "last_event_sequence") : 0;
     // How much is older than the page, and since when: the day rail draws the unloaded part from it.
+    // Both read the (thread_id, last_event_sequence) index: the count does not read a row, and the time
+    // is from the first row by sequence alone.
     const older =
       firstSequence > 0
         ? databaseRow(
             this.database.connection
               .prepare(
-                `SELECT COUNT(*) AS older_count, MIN(created_at) AS oldest_at FROM projection_direct_messages
-                 WHERE thread_id = ? AND last_event_sequence < ?`,
+                `SELECT COUNT(*) AS older_count,
+                   (SELECT created_at FROM projection_direct_messages WHERE thread_id = ?
+                    ORDER BY last_event_sequence LIMIT 1) AS oldest_at
+                 FROM projection_direct_messages WHERE thread_id = ? AND last_event_sequence < ?`,
               )
-              .get(threadId, firstSequence),
+              .get(threadId, threadId, firstSequence),
           )
         : undefined;
     const olderCount = older ? requiredNumberColumn(older, "older_count") : 0;

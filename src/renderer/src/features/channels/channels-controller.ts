@@ -133,7 +133,13 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
-          if (merged.takeFetchedCursor) state.page.olderCursor = page.olderCursor;
+          // The unloaded length belongs to the cursor: the rail would draw the old window's length.
+          if (merged.takeFetchedCursor)
+            Object.assign(state.page, {
+              olderCursor: page.olderCursor,
+              olderCount: page.olderCount,
+              oldestAt: page.oldestAt,
+            });
         } else state.page = page;
         state.loading = false;
         if (!failedCommand) state.error = null;
