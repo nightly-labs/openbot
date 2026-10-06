@@ -802,6 +802,8 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
+      // Startup marks for `dev:bench`, which reads them over the inspector. They change nothing.
+      performance.mark("openbot:when-ready");
       if (!(await Effect.runPromise(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
@@ -847,6 +849,7 @@ if (!hasSingleInstanceLock) {
         prepareForUpdateInstall,
       });
       services = built;
+      performance.mark("openbot:services-built");
       // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
       // `services`, so every account change announced during construction was dropped.
       // `createApplicationServices` bound the local host to the one state it read and attributed the
@@ -940,6 +943,7 @@ if (!hasSingleInstanceLock) {
         logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
       );
       await windows.loadRenderer(mainWindow);
+      performance.mark("openbot:renderer-loaded");
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       const reconcileDynamicIsland = () =>

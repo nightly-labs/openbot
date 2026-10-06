@@ -36,7 +36,10 @@ const SETTLE = "transform 280ms cubic-bezier(0.23, 1, 0.32, 1), width 280ms cubi
  * image is sized with `width`, not scaled, so the browser draws the SVG sharp at every zoom.
  * This web view does not contain Mermaid, so it opens at once.
  */
-export default function DiagramCanvas({ url, alt, insets, background }: DiagramCanvasProps) {
+// Missing in Expo Go on Android until the props come again; see expo-go-dom.ts.
+const NO_INSETS = { top: 0, bottom: 0 };
+
+export default function DiagramCanvas({ url, alt, insets = NO_INSETS, background }: DiagramCanvasProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
 

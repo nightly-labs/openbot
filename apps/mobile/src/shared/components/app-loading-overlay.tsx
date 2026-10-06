@@ -11,6 +11,7 @@ import {
 } from "react";
 import { BackHandler, View } from "react-native";
 import { BloubLoader } from "@/shared/components/bloub-loader";
+import { isAndroid } from "@/shared/lib/platform";
 
 interface AppLoadingOverlayContextValue {
   setLoadingLabel: (label: string | null) => void;
@@ -72,6 +73,9 @@ export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
         </View>
         <View
           className="absolute inset-0 items-center justify-center"
+          // Android can stop the exit animation before the loader reaches scale 0, and the loader
+          // then stays over the app. Once the overlay is gone, hide it there.
+          style={isAndroid && !present ? { opacity: 0 } : undefined}
           pointerEvents={present ? "auto" : "none"}
           accessibilityElementsHidden={!present}
           importantForAccessibility={present ? "auto" : "no-hide-descendants"}

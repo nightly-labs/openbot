@@ -200,7 +200,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
       return false;
     }
   }
-  async function command(input: ChannelCommand): Promise<boolean> {
+  /**
+   * `onAccepted` runs after the service accepts the command and the channel refreshes. When the
+   * reader leaves the scope during the request, it runs at once and the result is `false`: a sent
+   * message must still leave the composer, or it comes back as a draft.
+   */
+  async function command(input: ChannelCommand, onAccepted?: (accepted: ChannelCommand) => void): Promise<boolean> {
     const account = env.scopeKey();
     // Only the save that creates a channel opens it, and only while the reader has stayed where
     // the save started. The sidebar takes a click through a save of the settings, and settings
@@ -225,7 +230,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
     );
     try {
       await env.port().agent.channelCommand(attempt);
-      if (disposed || account !== env.scopeKey()) return false;
+      if (disposed || account !== env.scopeKey()) {
+        onAccepted?.(attempt);
+        return false;
+      }
       failedCommand = null;
       // Only creation closes the editor. Settings save on every field, so closing on a save
       // would shut the panel under the user between two edits.
@@ -240,6 +248,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         );
       }
       await refreshAfter();
+      onAccepted?.(attempt);
       return true;
     } catch (error) {
       if (!disposed && account === env.scopeKey()) {
@@ -348,9 +357,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
     refresh,
-    retry: async () => {
+    retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;
-      if (previous) return (await command(previous)) ? previous : null;
+      if (previous) return (await command(previous, onAccepted)) ? previous : null;
       await refresh();
       return null;
     },

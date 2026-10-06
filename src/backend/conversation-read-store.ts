@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   type AgentSummary,
   CONTEXT_RESET_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -200,6 +201,7 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') != 'commentary'
       AND COALESCE(item_type, '') != 'plan'
       AND COALESCE(item_type, '') != 'agent_attachment'
+      AND COALESCE(item_type, '') != '${AGENT_EXCHANGE_ITEM_TYPE}'
       AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
@@ -307,6 +309,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         message.itemType !== "commentary" &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
         message.itemType !== "agent_attachment" &&
+        message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
         !message.itemType?.startsWith(SKILL_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) &&

@@ -96,7 +96,9 @@ bun run mobile -- --tunnel
 The native UI does not depend on a native WebRTC module. A hidden Expo DOM component owns the browser
 `RTCPeerConnection` and its authenticated DataChannels, then forwards validated commands and live
 events to React Native. This keeps the production transport identical while remaining testable in
-Expo Go without a development build.
+Expo Go without a development build. Expo Go on Android does not include `@expo/dom-webview`, so there
+the component uses `react-native-webview`. `react-native.config.js` keeps that package out of native
+builds.
 
 Remote connection recovery starts the first attempt immediately, then waits 10 seconds after each failure. After
 five failures it waits two minutes before starting a new series. The agent list shows `Reconnecting`

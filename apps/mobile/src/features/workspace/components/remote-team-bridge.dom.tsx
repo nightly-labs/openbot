@@ -15,7 +15,15 @@ interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
   dom?: import("expo/dom").DOMProps;
 }
 
-export default function RemoteTeamBridge({ commands, active, onCommandResult, ...callbacks }: RemoteTeamBridgeProps) {
+// Missing in Expo Go on Android until the props come again; see expo-go-dom.ts.
+const NO_COMMANDS: RemoteTeamCommand[] = [];
+
+export default function RemoteTeamBridge({
+  commands = NO_COMMANDS,
+  active,
+  onCommandResult,
+  ...callbacks
+}: RemoteTeamBridgeProps) {
   const actions = useRef(callbacks);
   actions.current = callbacks;
   const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);

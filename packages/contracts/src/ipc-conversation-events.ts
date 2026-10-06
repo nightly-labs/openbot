@@ -302,6 +302,12 @@ export function channelRoutingConversationEvent(message: ConversationMessage): C
  */
 export const CONTEXT_RESET_ITEM_TYPE = "context-reset";
 
+/**
+ * The item type of a message that one agent sends to another, in the sender's thread and in the
+ * recipient's thread. It is traffic between agents, not a message to the user.
+ */
+export const AGENT_EXCHANGE_ITEM_TYPE = "agent-exchange";
+
 export function isContextResetMarker(message: ConversationMessage): boolean {
   return (
     message.author === "system" &&

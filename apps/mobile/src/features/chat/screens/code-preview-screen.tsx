@@ -18,6 +18,7 @@ import HtmlPreview from "@/features/chat/components/html-preview.dom";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
@@ -142,7 +143,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
               const url = webLink(href);
               if (url) await Linking.openURL(url);
             }}
-            dom={{ style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
+            dom={{ ...expoGoDomOptions, style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
           />
         ) : (
           <DiagramPreview
@@ -286,7 +287,7 @@ function DiagramPreview({
       alt={title}
       insets={insets}
       background={background}
-      dom={{ style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
+      dom={{ ...expoGoDomOptions, style: { flex: 1 }, containerStyle: { flex: 1 }, scrollEnabled: false }}
     />
   );
 }

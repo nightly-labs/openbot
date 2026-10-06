@@ -159,6 +159,7 @@ export function createMainWindowController({
     });
 
     window.once("ready-to-show", () => {
+      performance.mark("openbot:window-ready");
       if (
         shouldShowDevelopmentWindow({
           remoteRole: developmentRemoteRole,
