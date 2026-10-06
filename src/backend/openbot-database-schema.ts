@@ -305,7 +305,8 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-// Migrations 17, 22, 23, 24 and 26 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// Migrations 17, 22, 23, 24 and 26 widen the provider CHECK and migration 28 removes it, so the fresh schema is no
+// longer the v8 baseline here either.
 // One line rather than the whole table: the substitution then survives any later baseline edit that does
 // not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
 const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
@@ -324,6 +325,11 @@ const V24_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider I
 
 // Migration 26 adds the Cline provider. Frozen with the migration, like V22.
 const V26_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),`;
+
+// Migration 28 removes the provider CHECK, so a new provider no longer needs a table rebuild. The write path
+// validates the provider instead: `ProviderSessions.bindProviderSession` and the thread replay accept only
+// `AGENT_PROVIDERS`. Frozen with the migration.
+const V28_PROVIDER_SESSIONS_COLUMN_SQL = `provider TEXT NOT NULL,`;
 
 // Migration 27 adds what a routine does while the provider plan of its agent is spent. Frozen with the
 // migration. ADD COLUMN appends the declaration at the end of the stored CREATE statement, so the latest
@@ -395,7 +401,7 @@ const LATEST_SCHEMA_SQL =
     substituteOnce(
       substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
       BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-      V26_PROVIDER_SESSIONS_CHECK_SQL,
+      V28_PROVIDER_SESSIONS_COLUMN_SQL,
     ),
     BASELINE_AGENT_ROUTINES_END_SQL,
     withRoutineLimitPolicy(BASELINE_AGENT_ROUTINES_END_SQL),
@@ -545,6 +551,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Adds a column with a constant default to two tables: no rebuild, so no foreign-key pause and no
     // vacuum. Every existing routine keeps waiting, which is what it did before.
     up: addRoutineLimitPolicy,
+  },
+  {
+    version: 28,
+    // The same rebuild as migrations 17, 22, 23, 24 and 26, with foreign keys off for the same reason.
+    disableForeignKeys: true,
+    up: removeProviderSessionsCheck,
   },
 ];
 
@@ -833,6 +845,12 @@ function addRoutineLimitPolicy(db: DatabaseSync): void {
   }
 }
 
+// Migration 28 removes the provider CHECK. It rebuilds the table with no guard: every shipped table has the
+// CHECK, and a rebuild of a table that has none, which a replay over a new database meets, keeps every row.
+function removeProviderSessionsCheck(db: DatabaseSync): void {
+  rebuildProviderSessions(db, V28_PROVIDER_SESSIONS_COLUMN_SQL, "projection_provider_sessions_v28");
+}
+
 // Migrations 17, 22, 23, 24 and 26 share this SQL. Each migration gives its own CHECK line and staging table name, so the
 // SQL that migration 17 runs is the same text as before this function was shared.
 function widenProviderSessionsCheck(
@@ -845,12 +863,16 @@ function widenProviderSessionsCheck(
     .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
     .get();
   if (!isDynamicRecord(row) || !isString(row.sql) || row.sql.includes(providerLiteral)) return;
+  rebuildProviderSessions(db, providerCheckSql, stagingTable);
+}
 
+// The rebuild that migrations 17, 22, 23, 24, 26 and 28 run. `providerColumnSql` is the whole provider column line.
+function rebuildProviderSessions(db: DatabaseSync, providerColumnSql: string, stagingTable: string): void {
   db.exec(`
     CREATE TABLE ${stagingTable} (
       id TEXT PRIMARY KEY,
       thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
-      ${providerCheckSql}
+      ${providerColumnSql}
       external_session_id TEXT NOT NULL,
       model TEXT NOT NULL,
       effort TEXT NOT NULL,

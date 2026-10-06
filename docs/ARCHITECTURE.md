@@ -1333,6 +1333,9 @@ authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
 about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
+Migrations 17, 22, 23, 24 and 26 widen the table's provider `CHECK`. Migration 28 removes it, so a
+new provider needs no table rebuild. `ProviderSessions.bindProviderSession` and the thread replay
+accept only `AGENT_PROVIDERS` and reject other values before they write an event or a row.
 
 ### Gemini
 
