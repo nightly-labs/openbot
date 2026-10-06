@@ -1,11 +1,11 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { Effect } from "effect";
+import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
-import { constantTimeEqual } from "./crypto";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { runApiEffect } from "./effect-runtime";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
@@ -223,27 +223,12 @@ export function skillErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requireSkillsAdmin(request: Request): boolean {
-  const bindings = requireWorkerBindings(env);
-  const expected = bindings.SKILLS_ADMIN_TOKEN;
-  return Boolean(expected && bearerToken(request) === expected);
-}
+export const requireSkillsAdmin = Effect.fn("Auth.requireSkillsAdmin")(function* (request: Request) {
+  return yield* adminTokenMatches(requireWorkerBindings(env).SKILLS_ADMIN_TOKEN, bearerToken(request));
+});
 
 export const requireOperationsAdmin = Effect.fn("Auth.requireOperationsAdmin")(function* (request: Request) {
-  const bindings = requireWorkerBindings(env);
-  const expected = bindings.SITE_OPERATIONS_ADMIN_TOKEN;
-  const provided = bearerToken(request);
-  if (!expected || !provided) return false;
-  const encoder = new TextEncoder();
-  const [expectedHash, providedHash] = yield* Effect.tryPromise({
-    try: () =>
-      Promise.all([
-        crypto.subtle.digest("SHA-256", encoder.encode(expected)),
-        crypto.subtle.digest("SHA-256", encoder.encode(provided)),
-      ]),
-    catch: () => new AuthOperationError({ message: "Account operation failed." }),
-  });
-  return constantTimeEqual(new Uint8Array(expectedHash), new Uint8Array(providedHash));
+  return yield* adminTokenMatches(requireWorkerBindings(env).SITE_OPERATIONS_ADMIN_TOKEN, bearerToken(request));
 });
 
 export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null {

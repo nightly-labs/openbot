@@ -82,6 +82,7 @@ import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-adm
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { Effect, Schema } from "effect";
+import { bytesToBase64 } from "./base64";
 import type { TeamApiRequest } from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
@@ -108,12 +109,6 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
 function decodeAgentStatus(value: unknown): AgentStatus {
   if (!isAgentStatus(value)) throw new Error("The host returned an invalid status.");
   return value;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
 }
 
 function keyValues(rows: McpServerConfig["env"]): TeamProtocolV2Json {

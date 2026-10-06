@@ -15,7 +15,8 @@ export const Route = createFileRoute("/v1/marketplace/agents/admin/submissions")
       GET: ({ request }) =>
         runApiResponse(
           Effect.gen(function* () {
-            if (!requireSkillsAdmin(request)) return apiError(401, "unauthorized", "Admin access is required.");
+            if (!(yield* requireSkillsAdmin(request)))
+              return apiError(401, "unauthorized", "Admin access is required.");
             return json(yield* requestAgentMarketplace().listPending());
           }),
           marketplaceErrorResponse,

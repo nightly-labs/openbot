@@ -30,6 +30,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
+import { base64UrlToBytes, bytesToBase64Url } from "./base64";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 
 class RemotePeerError extends Schema.TaggedError<RemotePeerError>()("RemotePeerError", { message: Schema.String }) {}
@@ -1500,27 +1501,5 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function randomBase64Url(size: number): string {
     return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(size)));
-  }
-
-  function bytesToBase64Url(bytes: Uint8Array): string {
-    return bytesToBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-  }
-
-  function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
-    const padding = "=".repeat((4 - (value.length % 4)) % 4);
-    return base64ToBytes(value.replaceAll("-", "+").replaceAll("_", "/") + padding);
-  }
-
-  function bytesToBase64(bytes: Uint8Array): string {
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return btoa(binary);
-  }
-
-  function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
   }
 }

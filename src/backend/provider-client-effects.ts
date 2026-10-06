@@ -1,5 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
+import { getString } from "./protocol";
 
 /** Preserves provider SDK failures at the existing Promise interfaces. */
 export class ProviderClientOperationError extends Schema.TaggedError<ProviderClientOperationError>()(
@@ -23,4 +24,10 @@ export const providerSync = <A>(operation: () => A) => Effect.try({ try: operati
 export function providerResult<A>(result: Result.Result<A, ProviderClientOperationError>): A {
   if (Result.isFailure(result)) throw result.failure.cause;
   return result.success;
+}
+
+export function requiredString(value: unknown, key: string): string {
+  const result = getString(value, key);
+  if (!result) throw new Error(`${key} is required.`);
+  return result;
 }
