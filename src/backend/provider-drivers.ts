@@ -50,7 +50,7 @@ import type { AccountReadResult } from "./protocol";
 import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
-interface ProviderCliCommand {
+export interface ProviderCliCommand {
   readonly argv: readonly string[];
   readonly env: (cli: AgentCliInfo) => Record<string, string>;
   readonly timeoutMs: number;

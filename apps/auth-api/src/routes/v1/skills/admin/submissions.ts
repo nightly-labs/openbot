@@ -15,7 +15,7 @@ export const Route = createFileRoute("/v1/skills/admin/submissions")({
       GET: ({ request }) =>
         runApiResponse(
           Effect.gen(function* () {
-            return requireSkillsAdmin(request)
+            return (yield* requireSkillsAdmin(request))
               ? json(yield* requestSkillMarketplace().pending())
               : apiError(401, "unauthorized", "An admin token is required.");
           }),
