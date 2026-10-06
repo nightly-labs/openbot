@@ -288,6 +288,27 @@ holds these rules. The run takes about 4 seconds. When an option has no errors l
 `tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
 
+### Plugin cost
+
+Each GritQL plugin walks every file in its scope again. On 2026-10-06 the plugins used about 60 of
+79 CPU-seconds of a full `biome lint .`. To measure one plugin, lint with a temporary config that
+turns off the built-in rules and enables only that plugin, and subtract the time with no plugins.
+
+- Check a cheap condition before a costly one. `no-hardcoded-ui-text` matched its long attribute
+  regex on every JSX attribute: about 16 of its 23 CPU-seconds. It now checks the attribute name
+  first.
+- One snippet with a metavariable can cost less than one snippet per spelling.
+  `Reflect.$method($args)` costs about half as much as two `Reflect.<method>($args)` snippets.
+  `JsCallExpression(callee=...)` was faster still, but it also matched `Reflect.get?.()` and a call
+  with type arguments, so it was rejected.
+- Do not merge rules into one `or { ... }` file. A merged file of the 8 global rules cost 71
+  CPU-seconds, against 24 for the separate files.
+- Scope a plugin only to where its pattern can mean something. `no-collections-in-stores` runs on
+  the SolidJS code only. The type rules stay global, because they apply to scripts and tests too.
+
+Before you change a pattern for speed, show that the old and the new rule report the same
+locations over the whole repository and on a file of edge cases.
+
 ### Removed rules and their limits
 
 - `no-runtime-typeof` could not distinguish valid narrowing of `unknown` at a trust boundary from

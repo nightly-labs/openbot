@@ -21,9 +21,14 @@ const ruleNames = readdirSync(rulesDirectory)
   .map((entry) => entry.replace(/\.grit$/, ""))
   .sort();
 
+interface BiomeOverride {
+  readonly includes?: readonly string[];
+  readonly plugins?: readonly string[];
+}
+
 interface BiomeConfig {
   readonly plugins?: readonly string[];
-  readonly overrides?: readonly { readonly plugins?: readonly string[] }[];
+  readonly overrides?: readonly BiomeOverride[];
 }
 
 const biomeConfig: BiomeConfig = JSON.parse(readFileSync(join(repositoryRoot, "biome.json"), "utf8"));
@@ -32,8 +37,16 @@ function ruleNamesIn(plugins: readonly string[] | undefined): readonly string[] 
   return (plugins ?? []).map((path) => path.replace(/^.*\//, "").replace(/\.grit$/, "")).sort();
 }
 
-const globalRules = ruleNamesIn(biomeConfig.plugins);
-const testOnlyRules = ruleNamesIn(biomeConfig.overrides?.flatMap((override) => override.plugins ?? []));
+const isTestFileOverride = (override: BiomeOverride) =>
+  override.includes?.join() === ["**/*.test.ts", "**/*.test.tsx"].join();
+const overrides = biomeConfig.overrides ?? [];
+// A global rule can run only on the directories where its pattern can occur, such as
+// `no-collections-in-stores` on SolidJS code. It must not move into the test-file override.
+const globalRules = ruleNamesIn([
+  ...(biomeConfig.plugins ?? []),
+  ...overrides.filter((override) => !isTestFileOverride(override)).flatMap((override) => override.plugins ?? []),
+]);
+const testOnlyRules = ruleNamesIn(overrides.filter(isTestFileOverride).flatMap((override) => override.plugins ?? []));
 
 function ruleSource(rule: string): string {
   return readFileSync(join(rulesDirectory, `${rule}.grit`), "utf8");
