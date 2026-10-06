@@ -13,6 +13,7 @@ export const messages = {
   "mobile.app.route.general": "Geral",
   "mobile.app.route.accountSessions": "Sessões da conta",
   "mobile.app.route.about": "Sobre",
+  "mobile.app.route.support": "Suporte",
   "mobile.app.route.hiddenChats": "Chats ocultos",
   "mobile.app.route.deletedChannels": "Canais excluídos",
   "mobile.app.route.cropPhoto": "Mover e redimensionar",

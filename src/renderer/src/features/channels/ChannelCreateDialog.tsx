@@ -17,7 +17,7 @@ import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
 import { useChannels } from "./channels-context";
-import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
+import { emptyChannelDraft, matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
 /**
  * Creation asks for the two things that cannot be guessed - a name and the agents - and leaves the
@@ -32,10 +32,7 @@ export function ChannelCreateDialog() {
   const channelId = crypto.randomUUID();
   const [draft, setDraft] = createStore<ChannelDraft>(emptyChannelDraft());
   const [view, setView] = createStore({ search: "" });
-  const filtered = () =>
-    agentList().filter((agent) =>
-      `${agent.name} ${agent.description}`.toLowerCase().includes(view.search.toLowerCase()),
-    );
+  const filtered = () => agentList().filter((agent) => matchesAgentSearch(agent, view.search));
   // `.t-resize` tweens between two explicit heights, so the list gets its measured content height
   // after every filter change. The stylesheet's `max-height` still caps how tall it can grow.
   let listBody: HTMLDivElement | undefined;

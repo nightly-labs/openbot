@@ -1,5 +1,5 @@
 /**
- * The replies of a host's `providers-v1` routes, as the desktop main process and the browser client
+ * The replies of a host's `providers-v1` to `providers-v4` routes, as the desktop main process and the browser client
  * both read them. The route codec has already checked their fields; these give them their IPC types
  * and fail closed on anything else. They decode what a host sends, so the preload does not use them.
  */
@@ -19,8 +19,8 @@ export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginS
   if (!isDynamicRecord(value)) throw new Error("Invalid code login.");
   if (value.kind === "connected") return { kind: "connected" };
   if (!isHttpsUrl(value.verificationUrl) || !isNumber(value.expiresAt)) throw new Error("Invalid code login.");
-  if (value.kind === "paste")
-    return { kind: "paste", verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
+  if (value.kind === "paste" || value.kind === "link")
+    return { kind: value.kind, verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
   if (
     value.kind !== "code" ||
     !isString(value.userCode) ||
@@ -85,9 +85,15 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
         providers.antigravity === undefined
           ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
           : decodeProviderRuntimeStatus(providers.antigravity),
-      // No Team API protocol carries Cursor or Cline: they stay on the host computer.
-      cursor: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
-      cline: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
+      // Only `providers-v4` carries Cursor and Cline; on an older host this client cannot download them.
+      cursor:
+        providers.cursor === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.cursor),
+      cline:
+        providers.cline === undefined
+          ? { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null }
+          : decodeProviderRuntimeStatus(providers.cline),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

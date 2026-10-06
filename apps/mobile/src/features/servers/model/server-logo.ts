@@ -1,5 +1,5 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { fetch } from "expo/fetch";
+import { fetch } from "@/features/support/model/logged-fetch";
 
 /**
  * Reads the server logo from the account service as a data URI. The route needs the session

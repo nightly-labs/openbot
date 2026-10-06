@@ -75,6 +75,17 @@ export type ProviderCodeLoginState =
       /** Why the last code did not go through, in the user's words. */
       error?: string;
     }
+  /**
+   * The provider's page signs its CLI in by itself once the user logs in there (Cursor on a host
+   * with no visible browser). There is no code to show or to copy back.
+   */
+  | {
+      phase: "link";
+      /** The provider's sign-in page. */
+      verificationUrl: string;
+      /** Epoch milliseconds. When the host stops waiting for the sign-in. */
+      expiresAt: number;
+    }
   /** The code was accepted on the other device; OpenBot is finishing the sign-in. */
   | { phase: "verifying" };
 
@@ -95,6 +106,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
   const { t } = useText();
   const waiting = () => (props.state.phase === "waiting" ? props.state : null);
   const pasting = () => (props.state.phase === "paste" ? props.state : null);
+  const linking = () => (props.state.phase === "link" ? props.state : null);
   // The field keeps what the user pasted until the dialog closes, so a refused code can be fixed.
   const [pastedCode, setPastedCode] = createSignal("");
   // A new sign-in has a new page, and the code of the last one is no use to it.
@@ -106,7 +118,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
   );
   // The clock only runs while a code is on screen, so an open dialog on any other phase does not
   // wake the view once a second for a label nothing shows.
-  const remaining = createCountdown(() => waiting()?.expiresAt ?? pasting()?.expiresAt ?? null);
+  const remaining = createCountdown(() => waiting()?.expiresAt ?? pasting()?.expiresAt ?? linking()?.expiresAt ?? null);
 
   return (
     <Dialog.Root
@@ -120,7 +132,9 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
           <Dialog.Content class="provider-code-login-dialog" as="section">
             <header class="provider-code-login-header">
               <Dialog.Title class="provider-code-login-title">
-                {t("provider.codeLogin.title", { name: props.providerName })}
+                {linking()
+                  ? t("provider.codeLogin.linkTitle", { name: props.providerName })
+                  : t("provider.codeLogin.title", { name: props.providerName })}
               </Dialog.Title>
               <Dialog.Description class="provider-code-login-description">
                 {t("provider.codeLogin.description")}
@@ -247,6 +261,43 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                         {t("provider.codeLogin.pasteSubmit")}
                       </Button>
                     </form>
+
+                    <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
+                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
+                        {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
+                      </Show>
+                    </Text>
+                  </div>
+                )}
+              </Show>
+
+              <Show when={linking()}>
+                {(link) => (
+                  <div class="provider-code-login-code" role="status">
+                    <QrCode
+                      value={link().verificationUrl}
+                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
+                      size={160}
+                    />
+
+                    <ol class="provider-code-login-steps">
+                      <li>
+                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
+                        {/* The whole link carries a long sign-in state, so only its page is shown. */}
+                        <Button
+                          class="provider-code-login-url"
+                          type="button"
+                          variant="link"
+                          onClick={() => props.onOpenVerificationUrl(link().verificationUrl)}
+                        >
+                          {shortUrl(link().verificationUrl)}
+                          <ExternalLink aria-hidden="true" />
+                        </Button>
+                      </li>
+                      <li>
+                        <Text as="span">{t("provider.codeLogin.linkStep", { name: props.providerName })}</Text>
+                      </li>
+                    </ol>
 
                     <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
                       <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>

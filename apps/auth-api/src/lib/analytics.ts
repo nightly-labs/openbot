@@ -47,6 +47,7 @@ type LandingPlacement =
   | "content_index"
   | "content_article"
   | "content_related"
+  | "launch_dialog"
   | "other";
 
 const LANDING_PLACEMENTS = [
@@ -58,6 +59,7 @@ const LANDING_PLACEMENTS = [
   "content_index",
   "content_article",
   "content_related",
+  "launch_dialog",
   "other",
 ] as const satisfies readonly LandingPlacement[];
 /** The platforms the landing page can send a visitor to a download for. */
@@ -77,7 +79,8 @@ type LandingDestination =
   | "architecture"
   | "contributing"
   | "codex"
-  | "claude";
+  | "claude"
+  | "product_hunt";
 
 type CollectionIndexRoute = ContentCollection["indexRoute"];
 type DownloadPagePath = (typeof OPENBOT_DOWNLOAD_PAGE_LINKS)[keyof typeof OPENBOT_DOWNLOAD_PAGE_LINKS];
@@ -181,6 +184,7 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contributing, "contributing"],
   [OPENBOT_LINKS.codex, "codex"],
   [OPENBOT_LINKS.claude, "claude"],
+  [OPENBOT_LINKS.productHunt, "product_hunt"],
 ]);
 
 const EVENT_PROPERTY_ALLOWLIST = {
@@ -523,6 +527,8 @@ export function landingAttribution(document: Document, hostname: string) {
 }
 
 function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
+  // Portaled out of every page container, so it is checked by its own class.
+  if (link.closest(".ph-dialog")) return "launch_dialog";
   if (link.closest(".landing-header")) return "header";
   // Checked before `.post-article`, which wraps it: a card in the related row is a different
   // question from a link inside the article body.

@@ -103,11 +103,11 @@ type ProviderSignIn =
  * A sign-in the user finishes on another device, for a host with no browser the user can see.
  * `codex-device` is the Codex app-server device code. `cli` spawns the provider's CLI and reads its
  * link: `device` prints a code the user confirms, `paste` waits for the code the provider's page
- * shows, which the user copies back.
+ * shows, which the user copies back, and `link` is a page that signs the CLI in by itself.
  */
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
-  | { kind: "cli"; flow: "device" | "paste"; command: ProviderCliCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderCliCommand };
 
 /**
  * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
@@ -418,6 +418,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // `cursor_login` opens the Cursor sign-in page from the server. `CURSOR_API_KEY` in the user's
     // environment signs the CLI in without it.
     signIn: { kind: "acp-authenticate", methodId: "cursor_login", argv: ["acp"], timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    // With `NO_OPEN_BROWSER`, `login` prints the sign-in link and waits until the page signs it in.
+    // The ACP `cursor_login` method gives up instead when it cannot open a browser.
+    codeSignIn: {
+      kind: "cli",
+      flow: "link",
+      command: { argv: ["login"], env: () => ({ NO_OPEN_BROWSER: "1" }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
     resolveCli: resolveCursorCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -455,6 +462,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       argv: CLINE_ARGV,
       env: CLINE_ENV,
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    // `auth -p cline` prints a device code and its page, and waits until the user confirms it.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: { argv: ["auth", "-p", "cline"], env: () => ({ ...CLINE_ENV }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     },
     resolveCli: resolveClineCli,
     createClient: (cli, timeout, context, confinement) =>

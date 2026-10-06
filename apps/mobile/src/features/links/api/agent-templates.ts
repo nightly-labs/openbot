@@ -1,5 +1,5 @@
 import { type AgentTemplateDetail, decodeAgentTemplateDetail } from "@openbot/contracts/ipc";
-import { fetch } from "expo/fetch";
+import { fetch } from "@/features/support/model/logged-fetch";
 import { currentText } from "@/shared/lib/text";
 
 const AGENT_TEMPLATE_REQUEST_TIMEOUT_MS = 10_000;

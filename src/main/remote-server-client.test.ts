@@ -97,7 +97,7 @@ describe("Team API compatibility negotiation", () => {
       fallback: () => {
         attempts += 1;
         if (attempts === 1) {
-          return Response.json({ appVersion: "0.5.0", protocol: { minimum: 6, maximum: 6 }, capabilities: [] });
+          return Response.json({ appVersion: "0.5.0", protocol: { minimum: 7, maximum: 7 }, capabilities: [] });
         }
         throw new DOMException("The operation timed out.", "TimeoutError");
       },
@@ -115,7 +115,7 @@ describe("Team API compatibility negotiation", () => {
   });
 
   it("blocks a host range with no shared protocol", async () => {
-    const protocol = { minimum: 6, maximum: 6 };
+    const protocol = { minimum: 7, maximum: 7 };
     const stub = stubTeamFetch({ compatibility: { appVersion: "0.5.0", protocol } });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("range")], appVersion: "0.4.0" });
 

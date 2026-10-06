@@ -695,7 +695,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     messaging: createMockMessaging(() => agents[0]?.id ?? "preview-agent"),
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
-      // A host signs Claude in with a code its page shows, which the user pastes back.
+      // A host signs Claude in with a code its page shows, which the user pastes back, and Cursor
+      // with a page that signs its CLI in by itself.
       startCodeLogin: async (provider) =>
         provider === "claude"
           ? {
@@ -703,7 +704,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
               verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
               expiresAt: Date.now() + 10 * 60_000,
             }
-          : api.startProviderCodeLogin(provider),
+          : provider === "cursor"
+            ? {
+                kind: "link",
+                verificationUrl: "https://cursor.com/loginDeepControl?mode=login&redirectTarget=cli",
+                expiresAt: Date.now() + 10 * 60_000,
+              }
+            : api.startProviderCodeLogin(provider),
       // As with the code above, the preview has no provider to finish the sign-in.
       submitCodeLogin: async () => clone(agentStatus),
       cancelCodeLogin: (provider) => api.cancelProviderCodeLogin(provider),

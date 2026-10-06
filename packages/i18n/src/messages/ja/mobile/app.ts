@@ -13,6 +13,7 @@ export const messages = {
   "mobile.app.route.general": "一般",
   "mobile.app.route.accountSessions": "アカウントのセッション",
   "mobile.app.route.about": "情報",
+  "mobile.app.route.support": "サポート",
   "mobile.app.route.hiddenChats": "非表示のチャット",
   "mobile.app.route.deletedChannels": "削除したチャンネル",
   "mobile.app.route.cropPhoto": "移動と拡大縮小",

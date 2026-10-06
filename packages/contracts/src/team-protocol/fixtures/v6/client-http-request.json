@@ -1,0 +1,4 @@
+{
+  "provider": "cursor",
+  "model": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]"
+}

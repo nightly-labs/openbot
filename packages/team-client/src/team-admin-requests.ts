@@ -76,6 +76,7 @@ import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
 import { PROVIDERS_SIGN_IN_V3_ROUTES } from "@openbot/contracts/team-protocol/providers-v3";
+import type { PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -356,10 +357,14 @@ export function deleteHostedSite(request: TeamApiRequest, siteId: string): Effec
 }
 
 /**
- * The sign-in routes of a host: `providers-v3` signs in Codex, Claude and Grok, and `providers-v1`
- * Codex only. The caller picks by the host's capabilities.
+ * The sign-in routes of a host: `providers-v4` signs in Codex, Claude, Grok, Cursor and Cline,
+ * `providers-v3` Codex, Claude and Grok, and `providers-v1` Codex only. The caller picks by the
+ * host's capabilities.
  */
-export type ProviderCodeLoginRoutes = typeof PROVIDERS_SIGN_IN_V3_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+export type ProviderCodeLoginRoutes =
+  | typeof PROVIDERS_V4_ROUTES
+  | typeof PROVIDERS_SIGN_IN_V3_ROUTES
+  | typeof PROVIDERS_ADMIN_ROUTES;
 
 /** The verification URL is https, or the reply is refused. */
 export function startProviderCodeLogin(
@@ -378,12 +383,13 @@ const providerChange = Effect.fn("TeamAdmin.providerChange")(function* (
   return yield* adminCall(() => request("GET", TEAM_API_ROUTES.agents.status, decodeAgentStatus));
 });
 
-/** `providers-v3` only. The code is a credential: it goes in the body, and no reply carries it. */
+/** `providers-v3` or `providers-v4`. The code is a credential: it goes in the body, and no reply carries it. */
 export function submitProviderCodeLogin(
   request: TeamApiRequest,
   input: SubmitProviderCodeLoginInput,
+  routes: typeof PROVIDERS_V4_ROUTES | typeof PROVIDERS_SIGN_IN_V3_ROUTES = PROVIDERS_SIGN_IN_V3_ROUTES,
 ): Effect.Effect<AgentStatus, TeamAdminRequestError> {
-  return providerChange(request, PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit, { ...input });
+  return providerChange(request, routes.codeLoginSubmit, { ...input });
 }
 
 export function cancelProviderCodeLogin(
@@ -418,10 +424,13 @@ export function clearProviderApiKey(
 }
 
 /**
- * The runtime routes of a host: `providers-v2` includes Gemini, and `providers-v1` does not. The
- * caller picks by the host's capabilities.
+ * The runtime routes of a host: `providers-v4` includes Cursor and Cline, `providers-v2` Gemini,
+ * and `providers-v1` none of them. The caller picks by the host's capabilities.
  */
-export type ProviderRuntimeRoutes = typeof PROVIDERS_RUNTIMES_V2_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+export type ProviderRuntimeRoutes =
+  | typeof PROVIDERS_V4_ROUTES
+  | typeof PROVIDERS_RUNTIMES_V2_ROUTES
+  | typeof PROVIDERS_ADMIN_ROUTES;
 
 export function getProviderRuntimes(
   request: TeamApiRequest,

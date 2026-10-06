@@ -22,6 +22,7 @@ import { loadDictationLanguage } from "@/features/settings/model/dictation-langu
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadAgentColorMessages } from "@/features/settings/model/message-color";
+import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { SplashBackdrop } from "@/shared/components/splash-backdrop";
@@ -41,6 +42,8 @@ import { useSplashMotion } from "@/shared/lib/use-splash-motion";
 export const unstable_settings = {
   initialRouteName: "index",
 };
+
+installSupportLog();
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 

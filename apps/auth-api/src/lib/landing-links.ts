@@ -42,7 +42,11 @@ export const OPENBOT_LINKS = {
   codex: "https://learn.chatgpt.com/docs/app-server",
   claude: "https://code.claude.com/docs/en/overview",
   anthropicAgents: "https://www.anthropic.com/engineering/building-effective-agents",
+  productHunt: "https://www.producthunt.com/products/openbot-3?launch=openbot-4",
 } as const;
+
+/** The Product Hunt launch pill and dialog. Set to `false` when the launch ends. */
+export const PRODUCT_HUNT_LAUNCH_LIVE = true;
 
 /**
  * One entry in a footer column. An internal entry carries a route, not a string,

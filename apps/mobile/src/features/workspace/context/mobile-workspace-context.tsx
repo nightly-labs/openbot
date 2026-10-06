@@ -42,7 +42,6 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
-import { fetch } from "expo/fetch";
 import * as SecureStore from "expo-secure-store";
 import {
   createContext,
@@ -60,6 +59,8 @@ import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
+import { fetch } from "@/features/support/model/logged-fetch";
+import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
@@ -462,6 +463,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       context.stage = "compatibility";
       const compatibility = await client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
       if (!context.isCurrent()) return;
+      supportLog.add(
+        "info",
+        "connection",
+        `${serverId} host OpenBot ${compatibility.appVersion}, protocol ${compatibility.protocol.minimum}-${compatibility.protocol.maximum}, capabilities: ${compatibility.capabilities.join(" ")}`,
+      );
       if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
         throw new Error(sourceText("error.remote.mobileUpdateRequired"));
       }

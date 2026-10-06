@@ -1,7 +1,8 @@
 // Putting one Team API call on the wire, and reading what came back off it.
 //
-// HTTP uses the adapter for the negotiated protocol: V5 adds Gemini and custom ACP agents, V4 adds
-// OpenCode, V3 adds duplication, and V1 serves older hosts. The WebRTC transport retains its released V2 framing.
+// HTTP uses the adapter for the negotiated protocol: V6 adds Cursor and Cline, V5 adds Gemini and
+// custom ACP agents, V4 adds OpenCode, V3 adds duplication, and V1 serves older hosts. The WebRTC
+// transport retains its released V2 framing.
 //
 // Nothing here knows a server exists. It takes a URL, a token and a protocol number, and it either
 // returns a decoded value or throws one of `remote-server-errors.ts`. Deciding what a throw means for

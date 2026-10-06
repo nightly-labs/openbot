@@ -463,12 +463,18 @@ describe("Team API providers-v1", () => {
                 verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
                 expiresAt: 1_790_000_000_000,
               }
-            : {
-                kind: "code" as const,
-                userCode: "ABCD-1234",
-                verificationUrl: "https://auth.openai.com/codex/device",
-                expiresAt: 1_790_000_000_000,
-              },
+            : provider === "cursor"
+              ? {
+                  kind: "link" as const,
+                  verificationUrl: "https://cursor.com/loginDeepControl?mode=login",
+                  expiresAt: 1_790_000_000_000,
+                }
+              : {
+                  kind: "code" as const,
+                  userCode: "ABCD-1234",
+                  verificationUrl: "https://auth.openai.com/codex/device",
+                  expiresAt: 1_790_000_000_000,
+                },
         ),
       submitProviderCodeLogin: (provider: string, code: string) => {
         // A CLI can quote the code it refused.
@@ -649,6 +655,36 @@ describe("Team API providers-v1", () => {
     expect(gemini.providers.claude.message).toHaveLength(1024);
     expect(downloads).toEqual(["claude", "antigravity"]);
 
+    // providers-v4 adds Cursor and Cline to the runtimes and the sign-in, behind its own capability
+    // and the same admin gate. providers-v3 still refuses them.
+    const v4 = { ...admin, "OpenBot-Capabilities": "providers-v1, providers-v4" };
+    const cursor = { provider: "cursor" };
+    expect((await send("/v1/admin/providers/v4/code-login/start", cursor)).status).toBe(400);
+    expect(
+      (await send("/v1/admin/providers/v4/code-login/start", cursor, { ...v4, Authorization: asMember.Authorization }))
+        .status,
+    ).toBe(403);
+    expect((await send("/v1/admin/providers/v3/code-login/start", cursor, v3)).status).toBe(400);
+    expect(await (await send("/v1/admin/providers/v4/code-login/start", cursor, v4)).json()).toEqual({
+      kind: "link",
+      verificationUrl: "https://cursor.com/loginDeepControl?mode=login",
+      expiresAt: 1_790_000_000_000,
+    });
+    expect(await (await send("/v1/admin/providers/v4/code-login/cancel", cursor, v4)).json()).toEqual({});
+    expect(cancelled).toEqual(["claude", "cursor"]);
+    expect((await send("/v1/admin/providers/v4/code-login/start", { provider: "opencode" }, v4)).status).toBe(400);
+    const cline = await (await send("/v1/admin/providers/v4/runtimes/download", { provider: "cline" }, v4)).json();
+    expect(Object.keys(cline.providers)).toEqual([
+      "codex",
+      "claude",
+      "grok",
+      "opencode",
+      "antigravity",
+      "cursor",
+      "cline",
+    ]);
+    expect(downloads).toEqual(["claude", "antigravity", "cline"]);
+
     const endpoint = {
       id: "studio",
       name: "Studio",
@@ -677,6 +713,7 @@ describe("Team API providers-v1", () => {
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("providers-v1");
     expect(compatibility.capabilities).toContain("providers-v3");
+    expect(compatibility.capabilities).toContain("providers-v4");
   });
 });
 

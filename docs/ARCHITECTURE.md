@@ -1267,6 +1267,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
+| `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 
@@ -1286,6 +1287,15 @@ Windows host keeps `providers-v1`, and its clients offer the Codex code sign-in 
 error quotes them. How a sign-in ends arrives in the host's agent status, as for Codex.
 `codeSignInProviders` in `server-capabilities.ts` picks the providers that the Providers list offers
 for a code sign-in, from the host's capabilities.
+
+`providers-v4` adds Cursor and Cline to the sign-in and to the runtime routes. Every host with
+provider admin advertises it, so a client offers the Claude sign-in only when the host also has
+`providers-v3`. Cursor uses a `link` sign-in: the host runs `cursor-agent login` with
+`NO_OPEN_BROWSER=1`, which prints the sign-in page and waits until the page signs the CLI in, so
+the admin only opens the page. The ACP `cursor_login` method stops when it cannot open a browser,
+so a peer never starts it. Cline uses a device code: the host runs `cline auth -p cline`, which
+prints the code before its page. The parser accepts a link only after its line ends, because a
+chunk can stop inside one.
 
 When the account is an owner or admin of the active remote server, the server serves `providers-v1`,
 and the server has no agent, the workspace shows `ServerOnboarding` before the first-agent form, on
@@ -1402,12 +1412,13 @@ hooks, rules, MCP and permission files there and in the CLI config folder, and t
 `.workspace-trusted` and `mcp-approvals.json` files in each folder in `projects`. Migration 24 adds
 `cursor` to `projection_provider_sessions`.
 
-No Team API protocol knows `cursor`. The host hides Cursor agents, models, status, and sign-in
-state from every peer, and the `providers-v1` and `providers-v2` routes omit it. A route that reads
-an agent ID from the body answers 404 for a hidden agent (`requireVisibleBodyAgent`). A peer cannot
-create an agent, or add one from a template, the marketplace or an import, when the host would start
-it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id `cursor` before the
-provider existed stays visible.
+Team API v1–v5 do not know `cursor`. The host hides Cursor agents, models, status, and sign-in
+state from peers on those versions, and the `providers-v1` to `providers-v3` routes omit it. A route
+that reads an agent ID from the body answers 404 for a hidden agent (`requireVisibleBodyAgent`). A
+peer cannot create an agent, or add one from a template, the marketplace or an import, when the host
+would start it on a hidden provider (`newAgentProvider`). A custom endpoint saved with the id
+`cursor` before the provider existed stays visible. Team API v6 carries Cursor, and `providers-v4`
+lets an owner or admin download the host's Cursor runtime and sign it in from another device.
 
 ### Cline
 
@@ -1428,8 +1439,8 @@ skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. 
 session with the ACP error `-32002`, which `AcpAgentClient` reads as a missing session. Migration 26
 adds `cline` to `projection_provider_sessions`.
 
-No Team API protocol knows `cline`. The host hides Cline agents, models, status, and sign-in state
-from every peer, as for Cursor.
+Team API v1–v5 do not know `cline`. The host hides Cline agents, models, status, and sign-in state
+from peers on those versions, as for Cursor. Team API v6 and `providers-v4` carry it, as for Cursor.
 
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
@@ -1442,6 +1453,12 @@ Team API v5 is the v4 schema with `antigravity` and `acp` added to the providers
 it from the protocol range. A v4 peer still gets the filtered view. A peer counts the host's
 custom agents from the `acp` models; the host never sends an agent's command, arguments or
 environment.
+
+Team API v6 is the v5 schema with `cursor` and `cline` added to the providers and auth kinds, and
+`=` and `,` added to the agent model charset for Cursor model ids (`v6-base.ts`). WebRTC and the
+event stream select it when the peer advertises `local-providers-v2`, and HTTPS negotiates it from
+the protocol range. `GET /v1/agents/models` sends a v1–v5 peer only the ids its charset accepts. A
+v5 peer still gets the filtered view.
 
 ### Custom agents
 

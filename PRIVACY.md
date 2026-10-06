@@ -282,6 +282,14 @@ account identity (name, email and avatar URL), not conversations or workspace co
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
+The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
+system and device model, app state changes, connection steps with server IDs and error text, the
+desktop app version and protocol support of each server, the method, address without query, status
+and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
+does not record message text, files, request bodies or headers, and it masks tokens, keys and email
+addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
+clear it.
+
 Mobile chat uses a local symbol beside links. It does not fetch website icons or Markdown images
 when displaying a conversation. Link destinations are contacted only when you choose to open them.
 
@@ -402,7 +410,10 @@ An owner or admin of a joined server can manage its host from their own computer
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
-No response returns a key, and neither computer writes request bodies to its logs.
+No response returns a key, and neither computer writes request bodies to its logs. For a sign-in on
+another device, the host sends the provider's sign-in link, and for Codex, Grok and Cline its
+one-time code, to that computer or browser, which shows them and opens the link only when the admin
+asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
 ## Other network connections
 
@@ -618,8 +629,8 @@ Cursor's sign-in page in your browser, or the CLI uses `CURSOR_API_KEY` from the
 started OpenBot. OpenBot gives that key only to the local CLI, in its environment, and does
 not store it. The CLI keeps its login and session files
 in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
-upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
-on this computer: OpenBot does not show them to team members.
+upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Team members see
+the host's Cursor agents, as for the other providers, when their app supports Cursor.
 
 ### Cline
 
@@ -631,8 +642,8 @@ Sign in opens Cline's sign-in page in your browser, or the CLI uses `CLINE_API_K
 environment that started OpenBot. OpenBot gives that key only to the local CLI, in its environment,
 and does not store it. The CLI keeps its login and session files in `~/.cline`, or in `$CLINE_DIR`.
 OpenBot does not read, copy, or upload these files. Cline's terms apply:
-<https://cline.bot/tos>. Cline agents stay on this computer: OpenBot does not show them to team
-members.
+<https://cline.bot/tos>. Team members see the host's Cline agents, as
+for the other providers, when their app supports Cline.
 
 ### Local model servers
 

@@ -4,6 +4,7 @@ import { redactText } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
+import { stopProcessTree } from "../windows-process-tree";
 
 export function setProviderStatus(
   statuses: AgentProviderStatus[],
@@ -92,7 +93,8 @@ export const waitForSuccessfulProcess = Effect.fnUntraced(function* (
       duration: timeoutMs,
       orElse: () =>
         Effect.gen(function* () {
-          yield* Effect.sync(() => child.kill("SIGTERM"));
+          // A `.cmd` launcher runs under `cmd.exe`, and a kill of the wrapper leaves the CLI running.
+          yield* stopProcessTree(child).pipe(Effect.ignore);
           return yield* new ProviderProcessFailed({ cause: new Error(`${description} timed out.`) });
         }),
     }),

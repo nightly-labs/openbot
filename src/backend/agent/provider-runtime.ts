@@ -903,6 +903,7 @@ export class ProviderRuntime implements ProviderPort {
     const prompt = yield* code.prompt.pipe(
       Effect.mapError((failure) => new ProviderOperationFailed({ cause: failure.cause })),
     );
+    if (prompt.flow === "link") return { kind: "link", verificationUrl: prompt.verificationUrl, expiresAt };
     return prompt.flow === "paste"
       ? { kind: "paste", verificationUrl: prompt.verificationUrl, expiresAt }
       : {

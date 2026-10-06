@@ -12,10 +12,10 @@ import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV5CurrentEvent,
-  decodeTeamProtocolV5WebRtcHttpResponse,
+  decodeTeamProtocolV6CurrentEvent,
+  decodeTeamProtocolV6WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV5WebRtcHttpRequest,
+  encodeTeamProtocolV6WebRtcHttpRequest,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
@@ -116,6 +116,26 @@ export interface RemoteTeamConnectionUpdate {
   resync?: boolean;
 }
 
+/**
+ * One step of a connection, for the support log on the device. It names no ticket, token, address,
+ * candidate or content: `detail` is a fixed state, a number, or the English error the peer reports.
+ */
+export interface RemoteTeamDiagnostic {
+  hostId: string;
+  step:
+    | "signal-open"
+    | "signal-closed"
+    | "signal-ready"
+    | "signal-retry"
+    | "peer-state"
+    | "route"
+    | "ice-recovery"
+    | "channels-open"
+    | "authenticated"
+    | "failed";
+  detail?: string;
+}
+
 /** How much of one upload command's file has been sent. */
 export interface RemoteUploadProgress {
   commandId: string;
@@ -138,6 +158,8 @@ export interface RemoteTeamPeerActions {
   ) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => Promise<void>;
+  /** Hears connection steps. Optional, and never affects the connection. */
+  onDiagnostic?: (diagnostic: RemoteTeamDiagnostic) => Promise<void>;
   /** The platform reported that the network came back. A consumer that waits to retry can retry now. */
   onNetworkRestored?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
@@ -351,6 +373,28 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
     },
   };
+  function diagnose(state: PeerState, step: RemoteTeamDiagnostic["step"], detail?: string): void {
+    const diagnostic: RemoteTeamDiagnostic = { hostId: state.hostId, step, ...(detail ? { detail } : {}) };
+    void runPeerEffect(peerCall(() => actions.current.onDiagnostic?.(diagnostic))).catch(() => undefined);
+  }
+
+  /** The candidate types of the selected pair, such as `relay/udp -> host/udp`. Never the addresses. */
+  function reportRoute(state: PeerState, connection: RTCPeerConnection) {
+    return Effect.fn("RemotePeer.reportRoute")(function* () {
+      const stats = yield* peerCall(() => connection.getStats());
+      let route: string | null = null;
+      stats.forEach((report) => {
+        if (route || report.type !== "candidate-pair" || report.state !== "succeeded" || !report.nominated) return;
+        route = `${candidateRoute(stats.get(report.localCandidateId))} -> ${candidateRoute(stats.get(report.remoteCandidateId))}`;
+      });
+      if (route) diagnose(state, "route", route);
+    })();
+  }
+
+  function candidateRoute(candidate: { candidateType?: string; protocol?: string } | undefined): string {
+    return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
+  }
+
   function isPeerOnline(state: PeerState): boolean {
     return (
       state.authenticated &&
@@ -377,6 +421,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   function recoverIce(state: PeerState, actions: ActionsRef, delay: number): void {
     scheduleDisconnectedCheck(state, actions);
     if (!active || state.iceRecoveryTimer !== null) return;
+    diagnose(state, "ice-recovery", `in ${delay} ms`);
     // A restart moves the state to `connecting`, so wait for `online`, not for `disconnected`.
     const canContinue = () => active && !state.closed && peer === state && state.authenticated && !isPeerOnline(state);
     state.iceRecoveryTimer = setTimeout(() => {
@@ -586,6 +631,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
       state.reconnectAttempt = 0;
+      diagnose(state, "signal-open");
       const hello: SignalClientMessage = {
         type: "hello",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -624,11 +670,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         });
     };
     socket.onerror = () => socket.close();
-    socket.onclose = () => {
+    // The event is optional: a diagnostic that throws here would stop the reconnect.
+    socket.onclose = (event?: CloseEvent) => {
       if (state.socket !== socket) return;
       state.socket = null;
       state.signalReady = false;
       if (state.closed || peer !== state) return;
+      diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
       scheduleReconnect(state, actions);
     };
   }
@@ -662,6 +710,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           return yield* new RemotePeerError({ message: "Signal returned an incomplete connection." });
         const connectionId = state.connectionId;
         state.signalReady = true;
+        diagnose(state, "signal-ready", `${state.iceServers.length} ICE servers`);
         scheduleTurnRefresh(state);
         if (state.connection) {
           const connection = state.connection;
@@ -742,6 +791,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     connection.onconnectionstatechange = () => {
       if (state.connection !== connection || state.closed || peer !== state) return;
       const connectionState = connection.connectionState;
+      diagnose(state, "peer-state", connectionState);
+      if (connectionState === "connected") void runPeerEffect(reportRoute(state, connection)).catch(() => undefined);
       // ICE can recover a network change without replacing the authenticated session. A failed
       // path waits for nothing: only an ICE restart can recover it.
       if (canRecoverPeer(state)) {
@@ -779,6 +830,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.channelLocks[kind] = lock;
     channel.onopen = () => {
       if (CHANNELS.every((name) => state.channels[name]?.readyState === "open") && !state.binding) {
+        diagnose(state, "channels-open");
         void runPeerEffect(beginAuthentication(state)).catch((error) => failPeer(state, error, actions));
       }
     };
@@ -892,7 +944,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             body: sideRoute
               ? yield* peerDecode(() => sideRoute.response(pending.path, status, body))
               : yield* peerDecode(() =>
-                  decodeTeamProtocolV5WebRtcHttpResponse(pending.method, pending.path, status, body),
+                  decodeTeamProtocolV6WebRtcHttpResponse(pending.method, pending.path, status, body),
                 ),
           });
         }
@@ -928,7 +980,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       const channel = optionalTeamEvent(frame.payload);
       const decoded = channel
         ? { status: "known" as const, event: channel }
-        : yield* peerDecode(() => decodeTeamProtocolV5CurrentEvent(frame));
+        : yield* peerDecode(() => decodeTeamProtocolV6CurrentEvent(frame));
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
@@ -986,6 +1038,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         return yield* new RemotePeerError({ message: "The desktop returned an invalid authentication confirmation." });
       }
       state.authenticated = true;
+      diagnose(state, "authenticated");
       settleConnected(state);
       yield* sendEventAckEffect(state);
       yield* RemotePeerIO.use((io) => io.connectionUpdate({ hostId: state.hostId, state: "online", message: null }));
@@ -1020,7 +1073,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV5WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV6WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),
@@ -1229,6 +1282,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     // for the restart. The recovery owner replaces dead peers.
     const delay =
       isPeerOnline(state) || canRecoverPeer(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000;
+    diagnose(state, "signal-retry", `in ${delay} ms`);
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;
       openSignal(state, actions);
@@ -1269,6 +1323,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   ): void {
     if (state.closed || peer !== state) return;
     const message = error instanceof Error ? error.message : sourceText("error.remote.webRtcConnectionFailed");
+    diagnose(state, "failed", code ? `${code}: ${message}` : message);
     rejectConnection(state, new Error(message));
     void runPeerEffect(
       peerCall(() =>

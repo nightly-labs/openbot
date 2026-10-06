@@ -1,0 +1,12 @@
+{
+  "phase": "ready",
+  "cliVersion": null,
+  "auth": { "kind": "cursor", "email": null },
+  "providers": [
+    { "id": "cursor", "state": "available", "version": "2026.10.01-e373342", "message": null },
+    { "id": "cline", "state": "sign-in-required", "version": "3.0.68", "message": null }
+  ],
+  "capabilities": { "chat": "ready", "browser": "ready", "computerUse": "unavailable" },
+  "message": null,
+  "fullAccess": true
+}

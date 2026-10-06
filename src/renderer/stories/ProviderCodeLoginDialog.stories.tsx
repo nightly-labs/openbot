@@ -106,6 +106,21 @@ export const PasteRefused: Story = {
   },
 };
 
+/**
+ * Cursor on a host with no visible browser: the user signs in on the page, and the host's CLI sees
+ * it by itself. There is no code.
+ */
+export const Link: Story = {
+  args: {
+    providerName: "Cursor",
+    state: {
+      phase: "link",
+      verificationUrl: "https://cursor.com/loginDeepControl?mode=login&redirectTarget=cli",
+      expiresAt: Date.now() + 10 * 60_000,
+    },
+  },
+};
+
 /** The code was accepted elsewhere. OpenBot is trading it for the session. */
 export const Verifying: Story = {
   args: { state: { phase: "verifying" } },
