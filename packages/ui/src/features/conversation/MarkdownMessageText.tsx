@@ -938,16 +938,20 @@ function LocalFileLink(props: {
   onOpen: (path: string) => void;
 }) {
   const { t } = useText();
-  const name = fileReferenceName(props.path);
+  // A workspace path that ends with a separator is a folder chip, such as `research/eyeliner/`.
+  const folder = props.kind === "workspace" && /[/\\]$/u.test(props.path);
+  const name = fileReferenceName(folder ? props.path.replace(/[/\\]+$/u, "") : props.path);
+  const label = () => {
+    if (props.kind === "shared") return t("chat.file.openShared", { name });
+    return folder ? t("chat.file.openWorkspaceFolder", { name }) : t("chat.file.openWorkspace", { name });
+  };
   return (
     <Button
       variant="ghost"
       type="button"
       class="message-file-reference"
       data-file-tone={attachmentReferenceTone(name)}
-      aria-label={
-        props.kind === "shared" ? t("chat.file.openShared", { name }) : t("chat.file.openWorkspace", { name })
-      }
+      aria-label={label()}
       title={props.path}
       data-cuelume-tap="open"
       onClick={() => props.onOpen(props.path)}

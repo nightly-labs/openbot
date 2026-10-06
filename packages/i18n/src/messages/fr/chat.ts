@@ -151,6 +151,7 @@ export const messages = {
   "chat.table.data": "Tableau de données",
   "chat.file.openShared": "Ouvrir le fichier partagé {name}",
   "chat.file.openWorkspace": "Ouvrir le fichier de l’espace de travail {name}",
+  "chat.file.openWorkspaceFolder": "Ouvrir le dossier de l’espace de travail {name}",
   "chat.file.openAttached": "Ouvrir le fichier joint {name}",
   "chat.tag.unavailableAgent": "Agent indisponible",
   "chat.tag.unavailableSkill": "Compétence indisponible",

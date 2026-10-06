@@ -151,6 +151,7 @@ export const messages = {
   "chat.table.data": "Tabela de dados",
   "chat.file.openShared": "Abrir arquivo compartilhado {name}",
   "chat.file.openWorkspace": "Abrir arquivo do espaço de trabalho {name}",
+  "chat.file.openWorkspaceFolder": "Abrir pasta do espaço de trabalho {name}",
   "chat.file.openAttached": "Abrir arquivo anexado {name}",
   "chat.tag.unavailableAgent": "Agente indisponível",
   "chat.tag.unavailableSkill": "Habilidade indisponível",
