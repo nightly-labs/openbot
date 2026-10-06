@@ -218,8 +218,9 @@ and seeds the isolated profile. Set it as the worktree setup command of your age
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
 The command deletes the app and test-client development profiles plus the legacy host profile,
-including `openbot.db` and its WAL files. It does not change the production profile, agent
-workspaces, `~/.codex`, or `~/.claude`.
+including `openbot.db` and its WAL files. It prints each profile before it deletes it, and it
+deletes nothing while a dev app has one of them open. It does not change the production profile,
+agent workspaces, `~/.codex`, or `~/.claude`.
 
 `bun run dev` seeds a development profile it creates, so a first start already shows this data.
 To replace a profile that exists, quit the dev app, then run:
@@ -240,6 +241,8 @@ team chat data. It dates every record backwards from the run, so the transcripts
 Yesterday. It does not add live queue items, open routine runs, or queued channel tasks, so it
 starts no model turn.
 Use `bun run dev:seed --dry-run` to inspect the target and fixture counts without changing files.
+`dev:seed`, `dev:reset`, `dev:verify`, `dev:bench`, and `dev:automation` print their usage for
+`--help` and change nothing. They stop with exit code 2 on an option that they do not know.
 
 ### Marketplace launch catalog
 
@@ -306,7 +309,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dev:slack` | Start the same stack as `bun run dev`, with a `cloudflared` quick tunnel to Signal, so that Slack can send the development Slack app's events to the agents on this computer. It reads `OPENBOT_DEV_SLACK_SIGNING_SECRET` from the ignored `.env.slack-dev`, and needs `SLACK_ROUTE_PRIVATE_JWK` and `SLACK_ROUTE_KEY_ID` in `apps/auth-api/.env.dev`. Takes the same options as `bun run dev`, such as `--isolated`. See [docs/messaging.md](docs/messaging.md#test-slack-locally). |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
 | `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. `--scale=agents:N,messages:M,channels:C,channelMessages:K,attachments:A` adds generated agents, chat history, channel history and large images to the showcase data, for memory and CPU measurements. |
-| `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
+| `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. It refuses while a dev app has one of these profiles open. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
 | `bun run dev:verify` | Print a stable JSON verification plan for this worktree: `ready`/`reasons` for safe checks, setup state, changed files and affected surfaces, nearby tests, runtime state, `qa.required`/`qa.ready`/`qa.reasons`, the renderer QA loop, safe `runnableCommands`, and all suggested `commands`. Add `--run` to execute only the safe non-mutating checks in the plan. Renderer QA follows `snapshot → action with --wait-for → snapshot → screenshot` when appearance matters. |
 | `bun run dev:stop` | Stop this worktree's dev stack, children included, using the pids in the registry rather than a process-name pattern. It signals only a pid whose start time still matches the record, so a recycled pid is never sent SIGTERM; anything it cannot confirm is reported, left running and kept in the registry, and the command exits non-zero. `--pid=<supervisor pid>` stops one other stack, `--all` stops every stack on the machine. |

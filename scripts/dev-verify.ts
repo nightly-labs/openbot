@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { supportedBunVersion } from "./prepare-dev-environment";
+import { readScriptArguments } from "./script-arguments";
 
 export type VerificationSurface = "desktop" | "renderer" | "mobile" | "api" | "remote" | "contracts" | "docs";
 
@@ -381,9 +382,19 @@ function runRecommendedChecks(commandArgs: string[][], projectRoot: string): voi
   for (const args of commandArgs) runBun(projectRoot, args);
 }
 
+const USAGE = [
+  "Usage: bun run dev:verify [--run]",
+  "",
+  "Prints a JSON verification plan for the uncommitted changes in this worktree.",
+  "  --run  Also run the safe checks in the plan that change nothing.",
+].join("\n");
+
 if (import.meta.main) {
-  const projectRoot = process.cwd();
-  const { report, runnableCommandArgs, setupReady } = await createDevVerificationState(projectRoot);
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (process.argv.includes("--run") && setupReady) runRecommendedChecks(runnableCommandArgs, projectRoot);
+  const parsed = readScriptArguments({ usage: USAGE, options: { run: { type: "boolean" } } });
+  if (parsed !== null) {
+    const projectRoot = process.cwd();
+    const { report, runnableCommandArgs, setupReady } = await createDevVerificationState(projectRoot);
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (parsed.values.run && setupReady) runRecommendedChecks(runnableCommandArgs, projectRoot);
+  }
 }

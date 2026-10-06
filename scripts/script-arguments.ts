@@ -1,0 +1,46 @@
+import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+
+// One strict parser for the dev scripts that change or read developer state. A
+// script that ignored a flag it did not know used to run anyway, so a mistyped
+// option or `--help` could seed or reset the shared dev profile. Here an
+// unknown flag is an error and `--help` stops before the script does anything.
+
+const HELP_OPTION = { help: { type: "boolean", short: "h" } } as const satisfies ParseArgsOptionsConfig;
+
+export interface ScriptArgumentsSpec<Options extends ParseArgsOptionsConfig> {
+  usage: string;
+  options: Options;
+  allowPositionals?: boolean;
+}
+
+/**
+ * Parses `process.argv` for a script entry point. Returns
+ * `null` after it prints the usage for `--help`; the caller then returns before
+ * any side effect. An unknown option, a missing value, or an unexpected
+ * positional prints the usage and exits with code 2.
+ */
+export function readScriptArguments<const Options extends ParseArgsOptionsConfig>(spec: ScriptArgumentsSpec<Options>) {
+  let parsed: ReturnType<
+    typeof parseArgs<{ options: Options & typeof HELP_OPTION; strict: true; allowPositionals: true }>
+  >;
+  try {
+    parsed = parseArgs({
+      args: process.argv.slice(2),
+      options: { ...spec.options, ...HELP_OPTION },
+      strict: true,
+      allowPositionals: true,
+    });
+    if (!spec.allowPositionals && parsed.positionals.length > 0) {
+      throw new Error(`Unexpected argument '${parsed.positionals[0]}'.`);
+    }
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${spec.usage}\n`);
+    process.exit(2);
+  }
+  // A boolean option is present in `values` only when it was passed.
+  if ("help" in parsed.values) {
+    process.stdout.write(`${spec.usage}\n`);
+    return null;
+  }
+  return parsed;
+}

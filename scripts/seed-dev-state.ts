@@ -48,6 +48,7 @@ import { ProviderRuntimeManager, providerRuntimeRoot } from "../src/main/provide
 import { writeSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
+import { readScriptArguments } from "./script-arguments";
 import { NO_SCALE, parseSeedScale, type SeedScale, seedScale } from "./seed-dev-scale";
 
 export const DEVELOPMENT_SEED_MANIFEST_FILE = "openbot-dev-seed-v1.json";
@@ -1556,14 +1557,26 @@ function isMainModule(): boolean {
   return entryPath !== undefined && import.meta.url === pathToFileURL(resolve(entryPath)).href;
 }
 
+const USAGE = [
+  "Usage: bun run dev:seed [--dry-run] [--if-missing] [--scale=<spec>]",
+  "",
+  "Replaces the app development profile with showcase data. It refuses while the dev app is open.",
+  "  --dry-run      Print the target and the fixture counts. Change no files.",
+  "  --if-missing   Keep an existing profile.",
+  "  --scale=<spec> Add generated data: agents:N,messages:M,channels:C,channelMessages:K,attachments:A",
+].join("\n");
+
 async function main(): Promise<void> {
-  const dryRun = process.argv.slice(2).includes("--dry-run");
-  const ifMissing = process.argv.slice(2).includes("--if-missing");
-  const scaleFlag = process.argv.slice(2).find((argument) => argument.startsWith("--scale="));
+  const parsed = readScriptArguments({
+    usage: USAGE,
+    options: { "dry-run": { type: "boolean" }, "if-missing": { type: "boolean" }, scale: { type: "string" } },
+  });
+  if (parsed === null) return;
+  const dryRun = parsed.values["dry-run"] ?? false;
   const summary = await seedDevelopmentState({
     dryRun,
-    ifMissing,
-    scale: scaleFlag === undefined ? undefined : parseSeedScale(scaleFlag.slice("--scale=".length)),
+    ifMissing: parsed.values["if-missing"] ?? false,
+    scale: parsed.values.scale === undefined ? undefined : parseSeedScale(parsed.values.scale),
     instanceId: readDevelopmentInstanceId(process.env.OPENBOT_DEV_INSTANCE_ID),
   });
   logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");

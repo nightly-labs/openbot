@@ -21,6 +21,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { developmentInstanceIdForWorktree, developmentUserDataName } from "../../src/main/development-profile";
 import { resolveDevelopmentAppDataRoot } from "../development-state-paths";
+import { readScriptArguments } from "../script-arguments";
 import { cleanupSeedOwnedTransfers, seedDevelopmentState } from "../seed-dev-state";
 import { ensureBenchAuthApi, signInBenchAccount } from "./bench-auth";
 import { type BenchApp, launchBenchApp } from "./bench-launch";
@@ -318,10 +319,23 @@ async function runOnce(
 
 // --- command line ----------------------------------------------------------
 
-function flagValue(name: string): string | null {
-  const passed = process.argv.find((argument) => argument.startsWith(`${name}=`));
-  return passed === undefined ? null : passed.slice(name.length + 1);
-}
+const USAGE = [
+  "Usage: bun run dev:bench --scenario=<id|prefix|all> [--runs=<n>] [--label=<name>] [--compare=<report.json>]",
+  "                         [--cpu-profile] [--frames] [--call-counts]",
+  "",
+  "Scenarios:",
+  ...SCENARIOS.map((one) => `- ${one.id}: ${one.description}`),
+].join("\n");
+
+const OPTIONS = {
+  scenario: { type: "string" },
+  runs: { type: "string" },
+  label: { type: "string" },
+  compare: { type: "string" },
+  "cpu-profile": { type: "boolean" },
+  frames: { type: "boolean" },
+  "call-counts": { type: "boolean" },
+} as const;
 
 function selectScenarios(selector: string): Scenario[] {
   if (selector === "all") return SCENARIOS;
@@ -336,20 +350,20 @@ function selectScenarios(selector: string): Scenario[] {
 }
 
 async function main(): Promise<void> {
-  const selector = flagValue("--scenario");
-  if (selector === null || selector.trim() === "") {
-    throw new Error(
-      `--scenario=<id|prefix|all> is required. Scenarios:\n${SCENARIOS.map((one) => `- ${one.id}: ${one.description}`).join("\n")}`,
-    );
+  const parsed = readScriptArguments({ usage: USAGE, options: OPTIONS });
+  if (parsed === null) return;
+  const selector = parsed.values.scenario;
+  if (selector === undefined || selector.trim() === "") {
+    throw new Error(`--scenario=<id|prefix|all> is required.\n${USAGE}`);
   }
-  const runs = Number(flagValue("--runs") ?? "3");
+  const runs = Number(parsed.values.runs ?? "3");
   if (!Number.isInteger(runs) || runs < 1 || runs > 20) throw new Error("--runs must be an integer from 1 to 20.");
-  const label = flagValue("--label") ?? new Date().toISOString().replaceAll(/[:.]/g, "-");
+  const label = parsed.values.label ?? new Date().toISOString().replaceAll(/[:.]/g, "-");
   if (!/^[\w.-]+$/u.test(label)) throw new Error("--label may hold letters, digits, dot, dash and underscore only.");
-  const comparePath = flagValue("--compare");
-  const cpuProfile = process.argv.includes("--cpu-profile");
-  const frames = process.argv.includes("--frames");
-  const callCounts = process.argv.includes("--call-counts");
+  const comparePath = parsed.values.compare;
+  const cpuProfile = parsed.values["cpu-profile"] ?? false;
+  const frames = parsed.values.frames ?? false;
+  const callCounts = parsed.values["call-counts"] ?? false;
   const baseline = comparePath ? parseBenchReport(JSON.parse(await readFile(comparePath, "utf8"))) : null;
   if (comparePath && !baseline) throw new Error(`${comparePath} is not a dev:bench report.`);
 
