@@ -1,8 +1,11 @@
-// `bun run dev:bench`: repeatable RAM and CPU scenarios on the built app.
+// `bun run dev:bench`: repeatable RAM, CPU and renderer-work scenarios on the
+// built app.
 //
 // Each run seeds the bench's own profile, starts the built app on it, samples
-// the process tree from spawn to exit, drives one scenario over CDP, collects
-// garbage, reads the settled state and stops the app. Several runs reduce to a
+// the process tree from spawn to exit, reads the startup marks, drives one
+// scenario over CDP while it records the app window's work (see
+// `render-metrics.ts`), collects garbage, reads the settled state and stops
+// the app. Several runs reduce to a
 // median with its spread, and `--compare` prints the deltas against an earlier
 // report, which is what a fix PR quotes.
 //
@@ -36,6 +39,7 @@ import {
 import { verifyBrowserOwnership } from "./cdp-client";
 import { InspectorClient } from "./inspector-client";
 import { writeHeapSnapshot } from "./memory-profile";
+import { readStartupMarks, startRenderRecording } from "./render-metrics";
 import { ResourceSampler } from "./resource-sampler";
 
 const logger = createOpenBotLogger("dev-bench", (line) => process.stderr.write(`${line}\n`), "info");
@@ -207,12 +211,14 @@ interface RunOptions {
   label: string;
   authApiUrl: string;
   cpuProfile: boolean;
+  frames: boolean;
+  callCounts: boolean;
 }
 
 async function runOnce(
   scenario: Scenario,
   index: number,
-  { label, authApiUrl, cpuProfile }: RunOptions,
+  { label, authApiUrl, cpuProfile, frames, callCounts }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
   const spawnedAt = Date.now();
@@ -251,7 +257,9 @@ async function runOnce(
       return null;
     });
     const appWindow = page;
+    const startup = await readStartupMarks(appWindow, inspector);
     const recorded: MetricValues = {};
+    const stopRenderRecording = await startRenderRecording(appWindow, { frames, callCounts });
     const actStarted = Date.now();
     await scenario.act({
       app,
@@ -264,6 +272,7 @@ async function runOnce(
       record: (values) => Object.assign(recorded, values),
     });
     const actMs = Date.now() - actStarted;
+    const renderWork = await stopRenderRecording();
     // A click leaves the pointer on its target, and a hovered avatar animates until the pointer leaves.
     // A user who waits does not usually keep the pointer on a row, so the settled numbers must not count it.
     await appWindow.mouse.move(-1, -1);
@@ -271,6 +280,8 @@ async function runOnce(
     const settled: MetricValues = {
       ...(await sampler.settled(scenario.settleMs ?? 10 * SECOND)),
       ...recorded,
+      ...startup,
+      ...renderWork.values,
       "time.readyMs": readyMs,
       "time.actMs": actMs,
       "errors.page": pageErrors.length,
@@ -278,6 +289,11 @@ async function runOnce(
     };
     for (const error of pageErrors.slice(0, 3)) logger.warn(`page error: ${error.split("\n", 1)[0]}`);
     const base = join(BENCH_ROOT, "snapshots", `${label}-${scenario.id}`);
+    if (renderWork.topCalls && index === 0) {
+      await mkdir(dirname(base), { recursive: true });
+      await writeFile(`${base}-call-counts.json`, `${JSON.stringify(renderWork.topCalls, null, 2)}\n`);
+      for (const call of renderWork.topCalls.slice(0, 10)) logger.info(`calls: ${call.calls}× ${call.function}`);
+    }
     if (cpuProfile && index === 0) await writeCpuProfile(connected.browser, appWindow, `${base}-renderer.cpuprofile`);
     if (scenario.snapshots && index === 0) {
       await inspector?.writeHeapSnapshot(`${base}-main.heapsnapshot`);
@@ -332,6 +348,8 @@ async function main(): Promise<void> {
   if (!/^[\w.-]+$/u.test(label)) throw new Error("--label may hold letters, digits, dot, dash and underscore only.");
   const comparePath = flagValue("--compare");
   const cpuProfile = process.argv.includes("--cpu-profile");
+  const frames = process.argv.includes("--frames");
+  const callCounts = process.argv.includes("--call-counts");
   const baseline = comparePath ? parseBenchReport(JSON.parse(await readFile(comparePath, "utf8"))) : null;
   if (comparePath && !baseline) throw new Error(`${comparePath} is not a dev:bench report.`);
 
@@ -353,7 +371,9 @@ async function main(): Promise<void> {
       try {
         for (let index = 0; index < runs; index += 1) {
           logger.info(`${scenario.id}: run ${index + 1} of ${runs}`);
-          results.push(await runOnce(scenario, index, { label, authApiUrl: authApi.url, cpuProfile }));
+          results.push(
+            await runOnce(scenario, index, { label, authApiUrl: authApi.url, cpuProfile, frames, callCounts }),
+          );
         }
       } catch (error) {
         logger.error(`${scenario.id} failed: ${error instanceof Error ? error.message : String(error)}`);
