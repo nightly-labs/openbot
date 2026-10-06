@@ -178,8 +178,7 @@ macOS asks for a permission for it: Screen Recording and Accessibility.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged. Each provider's terms
-apply to your sign-in. See [provider terms](docs/provider-terms.md) for Claude subscriptions and API
-keys.
+apply to your sign-in. See [provider terms](docs/provider-terms.md) for Claude subscriptions.
 
 For setup problems, data reset, and uninstall instructions, see
 [Troubleshooting](docs/TROUBLESHOOTING.md). OpenBot's data and network behavior is documented in
