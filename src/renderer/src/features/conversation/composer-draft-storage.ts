@@ -5,7 +5,7 @@ import { EMPTY_DRAFT } from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
 import type { ComposerDraft } from "./conversation-types";
 
-export const COMPOSER_DRAFTS_STORAGE_KEY = "openbot:composer-drafts";
+const COMPOSER_DRAFTS_STORAGE_KEY = "openbot:composer-drafts";
 const WRITE_DELAY_MS = 300;
 
 type Drafts = Record<string, ComposerDraft>;
