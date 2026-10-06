@@ -4,7 +4,8 @@
 // list one folder in the workspace of an agent that the member can see, as the member can already
 // download any file in it through `/v1/workspace-files`. The host refuses a folder outside the
 // workspace, and leaves out a link whose target is outside it. Each entry has its name, kind, size
-// and modification time, and a path that `/v1/workspace-files` and this route accept again. The
+// and modification time, and a path that `/v1/workspace-files` and this route accept again: inside the
+// workspace it starts with `./` and percent-encodes each segment. The
 // response also names the workspace root, which the agent summary already carries. At most 500
 // entries cross; `truncated` says that there were more. Widening any of it needs a second
 // capability string.

@@ -1,6 +1,7 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
   WORKSPACE_DIRECTORY_LIMIT,
@@ -144,6 +145,9 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
 ) {
   const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
+  // A member reads one sentence for a path that is missing and for a path outside the workspace, so
+  // the answer does not tell whether a path exists on the host.
+  const memberMessage = sourceText("error.backend.workspacePathMissingForMember", { path: inputPath });
   const resolvedPath = yield* realpathWithLegacyRoot(agent, candidatePath).pipe(
     Effect.catch((error) => {
       // The literal path goes first, so a real file named `notes:2` still opens.
@@ -156,7 +160,7 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
         ? refuse(
             "missing",
             sourceText("error.backend.workspacePathMissing", { path: inputPath, root: agent.workspacePath }),
-            sourceText("error.backend.workspacePathMissingForMember", { path: inputPath }),
+            memberMessage,
           )
         : Effect.fail(error),
     ),
@@ -164,7 +168,7 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
   const insideWorkspace =
     isWithin(workspaceRoot, resolvedPath) || (options.allowRoot === true && resolvedPath === workspaceRoot);
   if (!insideWorkspace && !options.allowOutside) {
-    return yield* refuse("outside", sourceText("error.backend.workspaceFileOutside"));
+    return yield* refuse("outside", sourceText("error.backend.workspaceFileOutside"), memberMessage);
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
   return { workspaceRoot, resolvedPath, insideWorkspace, metadata };
@@ -201,8 +205,14 @@ export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirector
   });
   if (!metadata.isDirectory())
     return yield* refuse("not-directory", sourceText("error.backend.workspacePathNotDirectory"));
-  const pathFor = (path: string) =>
-    insideWorkspace ? relative(workspaceRoot, path).split(sep).join("/") || "." : path;
+  // `workspacePathFromInput` trims, decodes `%XX` and expands `~/`. Each segment is encoded and a
+  // relative path starts with `./`, so a name such as ` a%20b` or `~` reads back as the same file.
+  const encode = (path: string) => path.split(sep).map(encodeURIComponent).join("/");
+  const pathFor = (path: string) => {
+    if (!insideWorkspace) return encode(path);
+    const inside = relative(workspaceRoot, path);
+    return inside ? `./${encode(inside)}` : ".";
+  };
   const dirents = yield* attachmentCall(() => readdir(resolvedPath, { withFileTypes: true }));
   const candidates: { name: string; target: string; kind: WorkspaceDirectoryEntry["kind"] }[] = [];
   for (const dirent of dirents) {
@@ -247,7 +257,10 @@ export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirector
     root: agent.workspacePath,
     // A folder outside the workspace is listed only for a caller that may go outside, so its parent is too.
     parentPath: resolvedPath === workspaceRoot || parent === resolvedPath ? null : pathFor(parent),
-    entries: shown.filter((entry) => entry !== null),
+    // An encoded path can pass the limit that the routes accept again; that entry is left out.
+    entries: shown.filter(
+      (entry): entry is WorkspaceDirectoryEntry => entry !== null && entry.path.length <= INPUT_LIMITS.path,
+    ),
     truncated: candidates.length > WORKSPACE_DIRECTORY_LIMIT,
   };
 });

@@ -11,7 +11,8 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, stringField } from "./request-helpers";
 
-const REFUSED_STATUS = { missing: 404, outside: 403, "not-file": 400, "not-directory": 400 } as const;
+// A path outside the workspace answers as a missing one, so a member cannot test which host paths exist.
+const REFUSED_STATUS = { missing: 404, outside: 404, "not-file": 400, "not-directory": 400 } as const;
 
 /**
  * A refused workspace path as the sentence a member reads, with its own status. The sentence does not

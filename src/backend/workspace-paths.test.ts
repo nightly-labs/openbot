@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { listWorkspaceDirectory, rebaseLegacyWorkspacePath, WorkspacePathRefused } from "./workspace-paths";
+import {
+  listWorkspaceDirectory,
+  rebaseLegacyWorkspacePath,
+  resolveWorkspaceFile,
+  WorkspacePathRefused,
+} from "./workspace-paths";
 
 const AGENT_ID = "agent-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
 const LEGACY_ID = "bot-6d3e8b17-9c04-4f21-8a55-1b2c3d4e5f60";
@@ -57,14 +62,18 @@ describe("listWorkspaceDirectory", () => {
     const agent = await fixture();
 
     const listing = await Effect.runPromise(listWorkspaceDirectory(agent, "research/eyeliner/"));
-    expect(listing.path).toBe("research/eyeliner");
-    expect(listing.parentPath).toBe("research");
+    expect(listing.path).toBe("./research/eyeliner");
+    expect(listing.parentPath).toBe("./research");
     expect(listing.entries.map(({ name, path, kind }) => ({ name, path, kind }))).toEqual([
-      { name: "brief.md", path: "research/eyeliner/brief.md", kind: "file" },
+      { name: "brief.md", path: "./research/eyeliner/brief.md", kind: "file" },
     ]);
 
     const outside = await refusal(listWorkspaceDirectory(agent, "../private"));
     expect(outside.reason).toBe("outside");
+    // A member reads the same sentence for a path outside and a missing one, so the answer does not
+    // tell which host paths exist.
+    const missing = await refusal(listWorkspaceDirectory(agent, "../nothing"));
+    expect(outside.memberMessage).toBe(missing.memberMessage.replace("../nothing", "../private"));
     const linked = await refusal(listWorkspaceDirectory(agent, "research/eyeliner/outside"));
     expect(linked.reason).toBe("outside");
   });
@@ -78,5 +87,23 @@ describe("listWorkspaceDirectory", () => {
     expect(missing.message).toContain(agent.workspacePath);
     expect(missing.memberMessage).toContain("research/lipstick/");
     expect(missing.memberMessage).not.toContain(agent.workspacePath);
+  });
+
+  it("gives entry paths that open the same file again", async () => {
+    const agent = await fixture();
+    const odd = join(agent.workspacePath, "odd");
+    await mkdir(join(odd, "~"), { recursive: true });
+    for (const name of ["a%20b.txt", "a b.txt", " lead.txt"]) await writeFile(join(odd, name), name);
+    await writeFile(join(odd, "~", "n.txt"), "tilde");
+
+    const listing = await Effect.runPromise(listWorkspaceDirectory(agent, "odd"));
+    const tilde = listing.entries.find((entry) => entry.name === "~");
+    const nested = tilde && (await Effect.runPromise(listWorkspaceDirectory(agent, tilde.path)));
+    for (const entry of [...listing.entries, ...(nested?.entries ?? [])].filter(({ kind }) => kind === "file")) {
+      const file = await Effect.runPromise(resolveWorkspaceFile(agent, entry.path));
+      expect(file.name).toBe(entry.name);
+      expect(file.insideWorkspace).toBe(true);
+    }
+    expect(nested?.entries.map(({ name }) => name)).toEqual(["n.txt"]);
   });
 });

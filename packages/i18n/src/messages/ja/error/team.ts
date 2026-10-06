@@ -62,8 +62,7 @@ export const messages = {
   "error.team.agentPublishUnsupported": "この接続ではエージェントを公開できません。",
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
-  "error.team.workspaceDirectoryUnsupported":
-    "このサーバーはフォルダを表示できません。サーバーの OpenBot を更新してください。",
+  "error.team.workspaceDirectoryUnsupported": "この接続ではフォルダを表示できません。",
   "error.team.agentImportUnsupported": "この接続ではエージェントをインポートできません。",
   "error.team.liveActivityUnsupported": "このホストはスマートフォンのライブアクティビティを更新できません。",
   "error.team.agentUpdateTargetRequired": "更新するエージェントを指定してください。",
