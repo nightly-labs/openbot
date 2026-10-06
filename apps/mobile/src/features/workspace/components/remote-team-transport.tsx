@@ -9,11 +9,13 @@ import {
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
+  type RemoteTeamDiagnostic,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { supportLog } from "@/features/support/model/support-log-capture";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
@@ -148,6 +150,13 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         onAccountProfileChanged={refreshProfile}
         onAccountServersChanged={onMembershipChanged}
         onConnectionUpdate={async (update) => onConnectionUpdate(update)}
+        onDiagnostic={async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
+          supportLog.add(
+            step === "failed" ? "warn" : "info",
+            "connection",
+            `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
+          )
+        }
         onNetworkRestored={async () => onNetworkRestored?.()}
         onTeamEvent={async (hostId, event) => onTeamEvent(hostId, event)}
       />

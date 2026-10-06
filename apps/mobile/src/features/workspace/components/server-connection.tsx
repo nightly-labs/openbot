@@ -10,6 +10,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { supportLogValue } from "@/features/support/model/support-log";
+import { supportLog } from "@/features/support/model/support-log-capture";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
 export interface ServerConnectionHandle {
@@ -59,6 +61,7 @@ export function ServerConnection({
     if (!client) return;
     let disposed = false;
     let failure: string | null = null;
+    let loggedStatus = "";
     let context: ServerLoadContext = { stage: "connection", isCurrent: () => false };
     const recovery = createRemoteConnectionRecovery(
       () => {
@@ -69,12 +72,20 @@ export function ServerConnection({
         };
         const finish = analytics.attempt();
         const initiatingContext = context;
+        const started = Date.now();
+        supportLog.add("info", "connection", `${hostId} attempt ${attempt} started`);
         return load(hostId, publicKey, client, initiatingContext).then(
           () => {
             if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
+            supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
             if (initiatingContext.isCurrent()) finish("failed", initiatingContext.stage);
+            supportLog.add(
+              "warn",
+              "connection",
+              `${hostId} attempt ${attempt} failed at ${initiatingContext.stage} (${Date.now() - started} ms): ${supportLogValue(error)}`,
+            );
             throw error;
           },
         );
@@ -84,6 +95,16 @@ export function ServerConnection({
       },
       (status) => {
         if (disposed) return;
+        // The status repeats each second for its countdown. Log only a new phase or attempt.
+        const logged = `${status.phase}:${status.attempt}`;
+        if (logged !== loggedStatus) {
+          loggedStatus = logged;
+          supportLog.add(
+            "info",
+            "connection",
+            `${hostId} recovery ${status.phase}, attempt ${status.attempt}${status.remainingSeconds ? `, retry in ${status.remainingSeconds} s` : ""}`,
+          );
+        }
         if (status.phase === "online") failure = null;
         onStatus(hostId, status, failure);
       },
@@ -118,10 +139,18 @@ export function ServerConnection({
       active={active}
       directory={directory}
       onMembershipChanged={onMembershipChanged}
-      onNetworkRestored={() => controller.current?.networkRestored()}
+      onNetworkRestored={() => {
+        supportLog.add("info", "connection", `${hostId} network restored`);
+        controller.current?.networkRestored();
+      }}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (update.hostId !== hostId) return;
+        supportLog.add(
+          update.state === "offline" ? "warn" : "info",
+          "connection",
+          `${hostId} ${update.state}${update.code ? ` (${update.code})` : ""}${update.message ? `: ${update.message}` : ""}${update.resync ? ", resync" : ""}`,
+        );
         if (update.state === "offline") {
           if (activeRef.current) analytics.lost();
           if (update.code === "session_revoked") {

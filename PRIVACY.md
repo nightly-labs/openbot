@@ -282,6 +282,13 @@ account identity (name, email and avatar URL), not conversations or workspace co
 Mobile hidden and pinned chat preferences are stored on the phone, separately per account and server.
 Conversation read/unread changes are stored on the desktop host and shared with your other connected devices.
 
+The mobile app keeps a support log of up to 1,000 events in the phone's system cache: app version,
+system and device model, app state changes, connection steps with server IDs and error text, the
+method, address without query, status and time of its requests, and app warnings and errors. It does
+not record message text, files, request bodies or headers, and it masks tokens, keys and email
+addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
+clear it.
+
 Mobile chat uses a local symbol beside links. It does not fetch website icons or Markdown images
 when displaying a conversation. Link destinations are contacted only when you choose to open them.
 
