@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
-import { recordUsageMessage } from "./agent-usage";
+import { recordUsageMessage, usageMessageRecorder } from "./agent-usage";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
 import {
   databaseRow,
@@ -70,11 +70,23 @@ export class ConversationWriter {
            SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
         ).run(snapshot.activeTurnId, new Date().toISOString(), sequence, snapshot.threadId);
         const messageIds = new Set(snapshot.messages.map((message) => message.id));
-        const staleMessageIds = databaseRows(
-          db.prepare("SELECT message_id FROM projection_thread_messages WHERE thread_id = ?").all(threadId),
-        )
-          .map((row) => requiredStringColumn(row, "message_id"))
-          .filter((messageId) => !messageIds.has(messageId));
+        // Most messages did not change since the last snapshot. A row is written again only when one
+        // of its stored values differs, so a long thread does not rewrite every row for each event.
+        const storedRows = new Map<string, { columns: string; json: string }>();
+        for (const row of databaseRows(
+          db
+            .prepare(
+              `SELECT message_id, turn_id, author, status, item_type, created_at, ordinal, message_json
+               FROM projection_thread_messages WHERE thread_id = ?`,
+            )
+            .all(threadId),
+        )) {
+          storedRows.set(requiredStringColumn(row, "message_id"), {
+            columns: JSON.stringify([row.turn_id, row.author, row.status, row.item_type, row.created_at, row.ordinal]),
+            json: requiredStringColumn(row, "message_json"),
+          });
+        }
+        const staleMessageIds = [...storedRows.keys()].filter((messageId) => !messageIds.has(messageId));
         const deleteMessage = db.prepare(
           "DELETE FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
@@ -100,26 +112,30 @@ export class ConversationWriter {
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
         `);
+        const upsertAttachment = db.prepare(`
+          INSERT OR REPLACE INTO projection_attachments
+            (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
+          VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
+        `);
+        const recordUsage = usageMessageRecorder(db, agent.id, agent.provider, agent.model);
         snapshot.messages.forEach((message, ordinal) => {
-          recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
-          upsert.run(
-            snapshot.threadId,
-            message.id,
+          recordUsage(message);
+          const columns = [
             message.turnId ?? null,
             message.author,
             message.status,
             message.itemType ?? null,
             message.createdAt,
             ordinal,
-            JSON.stringify(message),
-            sequence,
-          );
+          ] as const;
+          const row = { columns: JSON.stringify(columns), json: JSON.stringify(message) };
+          const stored = storedRows.get(message.id);
+          if (stored?.json !== row.json || stored.columns !== row.columns) {
+            upsert.run(snapshot.threadId, message.id, ...columns, row.json, sequence);
+            storedRows.set(message.id, row);
+          }
           for (const attachment of message.attachments ?? []) {
-            db.prepare(`
-              INSERT OR REPLACE INTO projection_attachments
-                (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
-              VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
-            `).run(
+            upsertAttachment.run(
               `${snapshot.threadId}:${message.id}:${attachment.id}`,
               `${snapshot.threadId}:${message.id}`,
               attachment.name,

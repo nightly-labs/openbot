@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import {
   type AgentAnalytics,
   type AgentAnalyticsInput,
@@ -327,22 +327,36 @@ export function recordUsageMessage(
   provider: string,
   model: string,
 ): void {
-  if (message.author !== "user" && message.author !== "assistant") return;
-  if (
-    message.author === "assistant" &&
-    (message.status !== "completed" ||
-      (message.itemType && message.itemType !== "agentMessage" && message.itemType !== "final_answer"))
-  )
-    return;
-  db.prepare(`INSERT OR IGNORE INTO agent_usage_activity
-    SELECT ?, ?, '', ?, ?, ?, ?, ? WHERE ? >= (SELECT applied_at FROM schema_migrations WHERE version = 15)`).run(
-    agentId,
-    `message:${message.id}`,
-    message.turnId ?? "",
-    provider,
-    model,
-    message.author,
-    message.createdAt,
-    message.createdAt,
-  );
+  usageMessageRecorder(db, agentId, provider, model)(message);
+}
+
+/** `recordUsageMessage` for many messages of one agent, with one prepared statement. */
+export function usageMessageRecorder(
+  db: DatabaseSync,
+  agentId: string,
+  provider: string,
+  model: string,
+): (message: ConversationMessage) => void {
+  let insert: StatementSync | undefined;
+  return (message) => {
+    if (message.author !== "user" && message.author !== "assistant") return;
+    if (
+      message.author === "assistant" &&
+      (message.status !== "completed" ||
+        (message.itemType && message.itemType !== "agentMessage" && message.itemType !== "final_answer"))
+    )
+      return;
+    insert ??= db.prepare(`INSERT OR IGNORE INTO agent_usage_activity
+      SELECT ?, ?, '', ?, ?, ?, ?, ? WHERE ? >= (SELECT applied_at FROM schema_migrations WHERE version = 15)`);
+    insert.run(
+      agentId,
+      `message:${message.id}`,
+      message.turnId ?? "",
+      provider,
+      model,
+      message.author,
+      message.createdAt,
+      message.createdAt,
+    );
+  };
 }

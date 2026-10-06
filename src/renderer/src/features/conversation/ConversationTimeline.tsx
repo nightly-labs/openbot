@@ -324,8 +324,9 @@ export function ConversationTimeline() {
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
                   if (!replyToMessageId) return undefined;
+                  const index = timelineIndexById().get(replyToMessageId);
                   return (
-                    timelineMessages().find((candidate) => candidate.id === replyToMessageId) ??
+                    (index === undefined ? undefined : timelineMessages()[index]) ??
                     props.messageReferences?.[replyToMessageId]
                   );
                 });
