@@ -3,7 +3,8 @@
 //   bun scripts/check-release-notes.ts           checks the package.json version on disk
 //   bun scripts/check-release-notes.ts --staged  checks the index, only when the commit changes the version
 //   bun scripts/check-release-notes.ts [--staged] --fragments <path>...  checks changelog.d fragments
-//   --mobile checks the version of apps/mobile/app.json in apps/mobile/CHANGELOG.md instead
+//   --mobile checks the version of apps/mobile/app.json in apps/mobile/CHANGELOG.md instead, and
+//            accepts "In review" as its date
 //   --no-pending also stops when notes wait for a version: in the fragment folder or under Unreleased
 //
 // No package imports: `release.yml` runs this before `bun install`.
@@ -71,6 +72,8 @@ if (staged && version(show(`HEAD:${versionFile}`)) === nextVersion) process.exit
 const problems = releaseNotesProblems(
   (staged ? show(`:${changelogFile}`) : readFileSync(changelogFile, "utf8")) ?? "",
   nextVersion,
+  // A new mobile version waits for store review before `/changelog` shows it.
+  { inReview: mobile },
 );
 if (problems.length > 0) {
   process.stderr.write(

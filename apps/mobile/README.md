@@ -324,6 +324,11 @@ To release a new marketing version, run `bun run mobile:release:patch`, `mobile:
 `mobile:release:major` first. It moves the notes in `apps/mobile/changelog.d` into
 `apps/mobile/CHANGELOG.md`, which the Mobile tab of the public `/changelog` page shows, and sets the
 version in `app.json`, `package.json` and `bun.lock`. Merge that change to `main`, then dispatch the release.
+
+The new section is `## [x.y.z] - In review`, and `/changelog` does not show it. Apple can take days to
+approve a build for external testers. When testers can install the build, run
+`bun run mobile:release:published`. It replaces `In review` with today's date. Merge that change to
+`main`, and the site shows the version. A new `mobile:release:*` stops while a version is in review.
 The signed `.ipa` is saved as a GitHub Actions artifact for seven days before upload. If upload
 fails, download that artifact and retry with Transporter to avoid rebuilding. Re-running the full
 workflow creates a new build number.
