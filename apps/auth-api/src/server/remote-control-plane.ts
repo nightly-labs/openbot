@@ -17,7 +17,7 @@ import {
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { importJWK, type JWK, SignJWT } from "jose";
 import { getServerEntitlement } from "./billing-entitlement";
-import { hmacSha256, randomToken, sha256 } from "./crypto";
+import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -1831,11 +1831,7 @@ export const verifyRemoteServiceSignature = Effect.fn("RemoteControlPlane.verify
   if (!Number.isSafeInteger(timestampSeconds) || Math.abs(now - timestampSeconds * 1_000) > 5 * 60_000) return false;
   const result = yield* Effect.result(
     Effect.gen(function* () {
-      const key = yield* remoteCall(() =>
-        crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-          "verify",
-        ]),
-      );
+      const key = yield* remoteCall(() => importHmacSha256Key(secret, "verify"));
       const signatureBytes = yield* remoteValidate(() => decodeBase64Url(signature));
       return yield* remoteCall(() =>
         crypto.subtle.verify("HMAC", key, signatureBytes, new TextEncoder().encode(`${timestamp}.${body}`)),
@@ -1844,12 +1840,6 @@ export const verifyRemoteServiceSignature = Effect.fn("RemoteControlPlane.verify
   );
   return Result.isSuccess(result) && result.success;
 });
-
-function decodeBase64Url(value: string): ArrayBuffer {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)).buffer;
-}
 
 function parseJwk(value: string): JWK {
   const parsed = JSON.parse(value);

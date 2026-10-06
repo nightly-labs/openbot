@@ -14,6 +14,7 @@ import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contrac
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
+import { bytesToBase64Url } from "./base64";
 import { runTeamEffect } from "./effect-boundary";
 import type { TeamClientFetch } from "./index";
 
@@ -73,10 +74,7 @@ export interface RemoteHostKeyStore {
 
 export function remoteHostFingerprint(publicKey: string): string {
   const digest = sha256(new TextEncoder().encode(publicKey));
-  return btoa(String.fromCharCode(...digest))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/u, "");
+  return bytesToBase64Url(digest);
 }
 
 export class RemoteDirectoryError extends Schema.TaggedError<RemoteDirectoryError>()("RemoteDirectoryError", {

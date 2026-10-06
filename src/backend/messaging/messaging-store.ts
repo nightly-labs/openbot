@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
 import { MESSAGING_PLATFORMS, type MessagingPlatform } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import { deleteAggregateHistory } from "../database/database-core";
 import {
   databaseRow,
   databaseRows,
@@ -298,21 +298,6 @@ export class MessagingStore {
         .all(agentId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
   }
-}
-
-function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, aggregateIds: readonly string[]): void {
-  if (!aggregateIds.length) return;
-  const placeholders = aggregateIds.map(() => "?").join(", ");
-  db.prepare(
-    `DELETE FROM orchestration_command_receipts WHERE command_id IN (
-       SELECT DISTINCT command_id FROM orchestration_events
-       WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})
-     )`,
-  ).run(aggregateType, ...aggregateIds);
-  db.prepare(`DELETE FROM orchestration_events WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})`).run(
-    aggregateType,
-    ...aggregateIds,
-  );
 }
 
 /** A row of a platform this build has no driver for is skipped, not an error: a newer build wrote it. */

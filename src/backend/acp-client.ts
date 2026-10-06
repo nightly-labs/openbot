@@ -66,6 +66,7 @@ import {
   providerFailure,
   providerResult,
   providerSync,
+  requiredString,
 } from "./provider-client-effects";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
@@ -1835,12 +1836,6 @@ function imageMimeType(path: string): "image/jpeg" | "image/webp" | "image/png" 
   if (/\.jpe?g$/i.test(path)) return "image/jpeg";
   if (/\.webp$/i.test(path)) return "image/webp";
   return "image/png";
-}
-
-function requiredString(value: unknown, key: string): string {
-  const result = getString(value, key);
-  if (!result) throw new Error(`${key} is required.`);
-  return result;
 }
 
 function printableInput(value: unknown): string | null {

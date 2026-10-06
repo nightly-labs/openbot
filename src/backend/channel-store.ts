@@ -17,6 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { deleteAggregateHistory } from "./database/database-core";
 import {
   databaseRow,
   databaseRows,
@@ -762,21 +763,6 @@ function channelRoutineIds(db: DatabaseSync, channelId: string): string[] {
     }
   }
   return [...ids];
-}
-
-function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, aggregateIds: readonly string[]): void {
-  if (!aggregateIds.length) return;
-  const placeholders = aggregateIds.map(() => "?").join(", ");
-  db.prepare(
-    `DELETE FROM orchestration_command_receipts WHERE command_id IN (
-       SELECT DISTINCT command_id FROM orchestration_events
-       WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})
-     )`,
-  ).run(aggregateType, ...aggregateIds);
-  db.prepare(`DELETE FROM orchestration_events WHERE aggregate_type = ? AND aggregate_id IN (${placeholders})`).run(
-    aggregateType,
-    ...aggregateIds,
-  );
 }
 
 /**
