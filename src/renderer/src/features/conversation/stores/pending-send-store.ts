@@ -12,7 +12,7 @@ export const PENDING_SEND_ID_PREFIX = "pending:";
  * `waiting` stands behind an earlier send of the same chat that has not finished, or failed: the
  * host stores messages in the order it receives them, so a later one never overtakes.
  */
-export type PendingSendState = "waiting" | "sending" | "failed" | "sent";
+type PendingSendState = "waiting" | "sending" | "failed" | "sent";
 
 export interface PendingSend {
   clientMessageId: string;
