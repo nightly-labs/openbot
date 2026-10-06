@@ -269,6 +269,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       resetRevocation = revocation;
       controller.setComposerErrors({});
       controller.setConversationErrors({});
+      controller.setChannelDrafts({});
       // A queue edit holds its message on its host until Save or Cancel. Keep the edit and its draft
       // after a reload or a host change, so the user can release the hold on that host.
       const editAgentId = untrack(controller.editingAgentId);
