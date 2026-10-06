@@ -40,11 +40,16 @@ function ruleNamesIn(plugins: readonly string[] | undefined): readonly string[] 
 const isTestFileOverride = (override: BiomeOverride) =>
   override.includes?.join() === ["**/*.test.ts", "**/*.test.tsx"].join();
 const overrides = biomeConfig.overrides ?? [];
-// A global rule can run only on the directories where its pattern can occur, such as
-// `no-collections-in-stores` on SolidJS code. It must not move into the test-file override.
+// The `// scope: global` line is the list the skill installer prints for other repositories. This
+// repository runs these global rules only on the code where their pattern can occur, through a
+// non-test override: `no-collections-in-stores` on SolidJS code.
+const scopedGlobalRules: readonly string[] = ["no-collections-in-stores"];
 const globalRules = ruleNamesIn([
   ...(biomeConfig.plugins ?? []),
-  ...overrides.filter((override) => !isTestFileOverride(override)).flatMap((override) => override.plugins ?? []),
+  ...overrides
+    .filter((override) => !isTestFileOverride(override))
+    .flatMap((override) => override.plugins ?? [])
+    .filter((path) => scopedGlobalRules.some((rule) => path.endsWith(`/${rule}.grit`))),
 ]);
 const testOnlyRules = ruleNamesIn(overrides.filter(isTestFileOverride).flatMap((override) => override.plugins ?? []));
 
