@@ -13,6 +13,7 @@ import type {
   Diagram,
   DiagramChatMessage,
   DiagramNode,
+  DiagramRoutineRun,
   DiagramStepRun,
   DiagramSummary,
 } from "@openbot/ui/features/diagrams/diagram-model";
@@ -59,48 +60,99 @@ function at(seconds: number): string {
   return new Date(Date.parse(STARTED) + seconds * 1000).toISOString();
 }
 
+/** The stories show the week from this moment, so the strips do not move with the real date. */
+const NOW = "2026-10-06T10:00:00.000Z";
+const DAY = 24 * 60 * 60;
+
+/** Weekdays at 07:00 Warsaw time, from Wednesday 7 October. */
+const morningUpcoming = [1, 2, 3, 6, 7, 8].map((day) => at(day * DAY));
+/** Every 4 hours from noon UTC today. */
+const sweepUpcoming = Array.from({ length: 6 * 7 }, (_, index) => at(7 * 3600 + index * 4 * 3600));
+
+function pastRuns(prefix: string, everySeconds: number, statuses: DiagramRoutineRun["status"][]): DiagramRoutineRun[] {
+  return statuses.map((status, index) => ({
+    id: `${prefix}-${index}`,
+    kind: index === 3 ? "manual" : "scheduled",
+    status,
+    startedAt: at(-index * everySeconds),
+    finishedAt: at(-index * everySeconds + 60 + index * 7),
+  }));
+}
+
+const morningRoutine: DiagramNode = {
+  kind: "routine",
+  id: "node-routine",
+  position: { x: 0, y: 40 },
+  name: "Morning brief",
+  instruction:
+    "Collect what changed since yesterday in the market and in the sales pipeline, then turn it into today's priorities.",
+  schedule: { kind: "weekdays", time: "07:00" },
+  active: true,
+  upcomingRuns: morningUpcoming,
+  recentRuns: pastRuns("morning", DAY, [
+    "succeeded",
+    "succeeded",
+    "failed",
+    "succeeded",
+    "succeeded",
+    "succeeded",
+    "cancelled",
+    "succeeded",
+  ]),
+};
+
 const nodes: DiagramNode[] = [
+  morningRoutine,
   {
     kind: "routine",
-    id: "node-routine",
-    position: { x: 0, y: 120 },
-    name: "Morning brief",
-    schedule: { kind: "weekdays", time: "07:00" },
+    id: "node-sweep",
+    position: { x: 0, y: 360 },
+    name: "Pipeline sweep",
+    instruction: "Check the CRM for deals that changed stage and flag the ones that stalled.",
+    schedule: { kind: "interval", amount: 4, unit: "hours", anchorAt: "2026-10-01T00:00:00.000Z" },
     active: true,
-    nextRunAt: "2026-10-07T05:00:00.000Z",
+    upcomingRuns: sweepUpcoming,
+    recentRuns: pastRuns("sweep", 4 * 3600, [
+      "succeeded",
+      "succeeded",
+      "succeeded",
+      "succeeded",
+      "failed",
+      "succeeded",
+    ]),
   },
   {
     kind: "agent",
     id: "node-research",
-    position: { x: 336, y: 40 },
+    position: { x: 360, y: 0 },
     agentId: "research",
     task: "Collect the market and product news since yesterday, with a source for each item.",
   },
   {
     kind: "agent",
     id: "node-sales",
-    position: { x: 336, y: 304 },
+    position: { x: 360, y: 280 },
     agentId: "sales",
     task: "List the deals that changed stage since yesterday and the next step for each.",
   },
   {
     kind: "agent",
     id: "node-writer",
-    position: { x: 696, y: 160 },
+    position: { x: 720, y: 140 },
     agentId: "writer",
     task: "Write one brief from the research and the pipeline. Keep it under 200 words.",
   },
   {
     kind: "agent",
     id: "node-chief",
-    position: { x: 1056, y: 160 },
+    position: { x: 1080, y: 140 },
     agentId: "chief",
     task: "Read the brief, decide the three priorities for today and post them to the team.",
   },
   {
     kind: "agent",
     id: "node-reviewer",
-    position: { x: 696, y: 480 },
+    position: { x: 720, y: 460 },
     agentId: "reviewer",
     task: "Check each claim in the brief against its source.",
   },
@@ -112,6 +164,7 @@ const edges = [
   { id: "edge-3", from: "node-research", to: "node-writer" },
   { id: "edge-4", from: "node-sales", to: "node-writer" },
   { id: "edge-5", from: "node-writer", to: "node-chief" },
+  { id: "edge-6", from: "node-sweep", to: "node-sales" },
 ];
 
 const researchOutput = `1. Northwind cut its API prices by 20% (northwind.com/blog, 18:40).
@@ -293,13 +346,31 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
   });
 
   const runNow = (routineNodeId: string) => {
-    const steps = diagramExecutionSteps(snapshot(diagram.nodes), snapshot(diagram.edges));
+    const edgesNow = snapshot(diagram.edges);
+    const reachable = new Set<string>();
+    const queue = [routineNodeId];
+    for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+      for (const edge of edgesNow) {
+        if (edge.from !== next || reachable.has(edge.to)) continue;
+        reachable.add(edge.to);
+        queue.push(edge.to);
+      }
+    }
+    const steps = diagramExecutionSteps(snapshot(diagram.nodes), edgesNow);
     const done = new Map(succeededSteps().map((entry) => [entry.nodeId, entry]));
-    const order = [...steps.entries()].sort((left, right) => left[1] - right[1]);
+    const order = [...steps.entries()]
+      .filter(([nodeId]) => reachable.has(nodeId))
+      .sort((left, right) => left[1] - right[1]);
     const startedAt = new Date().toISOString();
+    const runId = nextId("run");
+    const routineRuns = (state: Diagram) => {
+      const routine = state.nodes.find((node) => node.id === routineNodeId);
+      return routine?.kind === "routine" ? routine.recentRuns : [];
+    };
     setDiagram((state) => {
+      routineRuns(state).unshift({ id: runId, kind: "manual", status: "running", startedAt, finishedAt: null });
       state.lastRun = {
-        id: nextId("run"),
+        id: runId,
         routineNodeId,
         kind: "manual",
         status: "running",
@@ -330,8 +401,14 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
             entry.finishedAt = new Date().toISOString();
           }
           if (index === levels.length - 1 && state.lastRun) {
+            const finishedAt = new Date().toISOString();
             state.lastRun.status = "succeeded";
-            state.lastRun.finishedAt = new Date().toISOString();
+            state.lastRun.finishedAt = finishedAt;
+            const entry = routineRuns(state).find((run) => run.id === runId);
+            if (entry) {
+              entry.status = "succeeded";
+              entry.finishedAt = finishedAt;
+            }
           }
         }),
       );
@@ -356,6 +433,7 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
   return (
     <DiagramView
       diagram={diagram}
+      now={NOW}
       agents={agents}
       editable={props.editable}
       assistant={
@@ -415,9 +493,11 @@ function InteractiveDiagram(props: { diagram: Diagram; assistant?: boolean; edit
             id: nextId("node-routine"),
             position: { x: 0, y: 440 + state.nodes.length * 8 },
             name: "Friday review",
+            instruction: "Review the week and prepare the priorities for next week.",
             schedule: { kind: "weekly", weekday: 5, time: "16:00" },
             active: false,
-            nextRunAt: null,
+            upcomingRuns: [],
+            recentRuns: [],
           });
         })
       }
@@ -443,7 +523,7 @@ const diagramSummaries: DiagramSummary[] = [
     id: "diagram-morning",
     name: "Morning brief",
     agentIds: ["research", "sales", "writer", "chief"],
-    routineNames: ["Morning brief"],
+    routineNames: ["Morning brief", "Pipeline sweep"],
     lastRunStatus: "succeeded",
     lastRunAt: STARTED,
     updatedAt: STARTED,

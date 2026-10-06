@@ -18,9 +18,17 @@ export type DiagramNode =
       id: string;
       position: DiagramPoint;
       name: string;
+      /** What the routine asks for. The agents it starts receive it as their input. */
+      instruction: string;
       schedule: RoutineSchedule;
       active: boolean;
-      nextRunAt: string | null;
+      /**
+       * The times it fires next, soonest first. The host expands the schedule, so the canvas never
+       * reads a cron expression. Empty while the routine is paused.
+       */
+      upcomingRuns: string[];
+      /** Its last runs, newest first. */
+      recentRuns: DiagramRoutineRun[];
     }
   | {
       kind: "agent";
@@ -60,6 +68,15 @@ export interface DiagramRun {
   startedAt: string;
   finishedAt: string | null;
   steps: DiagramStepRun[];
+}
+
+/** One past run of a routine, for its history. Only the last run of the diagram has step details. */
+export interface DiagramRoutineRun {
+  id: string;
+  kind: "scheduled" | "manual";
+  status: DiagramRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
 }
 
 export interface Diagram {

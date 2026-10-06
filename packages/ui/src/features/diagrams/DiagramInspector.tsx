@@ -1,7 +1,7 @@
 /**
  * The last run of a diagram, beside the canvas. With no node selected it lists the steps in the
  * order they ran; a selected agent shows exactly what it received and what it returned, and a
- * selected routine shows its schedule.
+ * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
 import { Badge, Button, ChevronLeft, CopyButton, Play, X } from "@openbot/ui";
@@ -12,7 +12,8 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
 import { DiagramStepIcon } from "./DiagramNodeCard";
-import { diagramExecutionSteps } from "./diagram-graph";
+import { DiagramRoutineWeek, diagramRunStepStatus } from "./DiagramRoutineVisuals";
+import { diagramExecutionSteps, diagramRoutineReach } from "./diagram-graph";
 import type { Diagram, DiagramNode, DiagramStepRun } from "./diagram-model";
 import { DIAGRAM_RUN_STATUS_KEY, DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
 
@@ -20,6 +21,8 @@ export interface DiagramInspectorProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
+  /** The day the routine week strip starts on. */
+  now: Date;
   onSelectNode: (nodeId: string | null) => void;
   onClose: () => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
@@ -170,31 +173,14 @@ export function DiagramInspector(props: DiagramInspectorProps) {
               fallback={<AgentStepDetail node={node()} stepRun={stepRuns().get(node().id)} />}
             >
               {(routine) => (
-                <>
-                  <section class="diagram-inspector-section">
-                    <h3 class="diagram-inspector-section-title">{t("diagram.inspector.schedule")}</h3>
-                    <p>{routineScheduleSummary(routine().schedule, true)}</p>
-                  </section>
-                  <Show when={routine().active && routine().nextRunAt}>
-                    {(at) => (
-                      <section class="diagram-inspector-section">
-                        <h3 class="diagram-inspector-section-title">{t("diagram.inspector.nextRun")}</h3>
-                        <p>{format.date(new Date(at()), { dateStyle: "medium", timeStyle: "short" })}</p>
-                      </section>
-                    )}
-                  </Show>
-                  <Show when={props.onRunRoutine}>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => props.onRunRoutine?.(routine().id)}
-                    >
-                      <Play aria-hidden="true" />
-                      {t("diagram.node.runNow")}
-                    </Button>
-                  </Show>
-                </>
+                <RoutineDetail
+                  routine={routine()}
+                  diagram={props.diagram}
+                  agents={props.agents}
+                  now={props.now}
+                  onSelectNode={props.onSelectNode}
+                  onRunRoutine={props.onRunRoutine}
+                />
               )}
             </Show>
           )}
@@ -263,5 +249,146 @@ function TextBlock(props: { title: string; text: string | null; empty: string; t
         )}
       </Show>
     </section>
+  );
+}
+
+type RoutineNode = Extract<DiagramNode, { kind: "routine" }>;
+
+const UPCOMING_LIMIT = 5;
+const HISTORY_LIMIT = 10;
+
+function RoutineDetail(props: {
+  routine: RoutineNode;
+  diagram: Diagram;
+  agents: AgentProfile[];
+  now: Date;
+  onSelectNode: (nodeId: string | null) => void;
+  onRunRoutine?: ((nodeId: string) => void) | undefined;
+}) {
+  const { t, format } = useText();
+  const reach = createMemo(() => diagramRoutineReach(props.diagram.edges, props.routine.id));
+  const started = () =>
+    reach().direct.flatMap((id) => {
+      const node = props.diagram.nodes.find((candidate) => candidate.id === id);
+      return node?.kind === "agent" ? [node] : [];
+    });
+  const agentFor = (agentId: string) => props.agents.find((agent) => agent.id === agentId);
+  /** The runs the week strip shows, so the list under it matches the picture. */
+  const thisWeek = () => {
+    const start = new Date(props.now);
+    start.setHours(0, 0, 0, 0);
+    const end = start.getTime() + 7 * 24 * 60 * 60 * 1000;
+    return props.routine.upcomingRuns.filter((value) => Date.parse(value) < end);
+  };
+  const when = (value: string) =>
+    format.date(new Date(value), {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  return (
+    <>
+      <div class="diagram-inspector-run">
+        <Badge size="sm" shape="pill" tone={props.routine.active ? "success" : "neutral"}>
+          {props.routine.active ? t("diagram.routine.active") : t("diagram.node.paused")}
+        </Badge>
+        <span>{routineScheduleSummary(props.routine.schedule, true)}</span>
+      </div>
+
+      <TextBlock title={t("diagram.routine.does")} text={props.routine.instruction} empty="" />
+
+      <section class="diagram-inspector-section">
+        <h3 class="diagram-inspector-section-title">{t("diagram.routine.starts")}</h3>
+        <Show
+          when={started().length > 0}
+          fallback={<p class="diagram-inspector-empty">{t("diagram.routine.startsNothing")}</p>}
+        >
+          <ul class="diagram-inspector-steps">
+            <For each={started()}>
+              {(node) => (
+                <li>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    class="diagram-inspector-step"
+                    onClick={() => props.onSelectNode(node.id)}
+                  >
+                    <Show when={agentFor(node.agentId)}>
+                      {(agent) => <AgentAvatar agent={agent()} class="diagram-inspector-avatar" motion="idle" />}
+                    </Show>
+                    <span class="diagram-inspector-step-name">{agentFor(node.agentId)?.name ?? node.agentId}</span>
+                  </Button>
+                </li>
+              )}
+            </For>
+          </ul>
+          <p class="diagram-inspector-muted">
+            {t("diagram.routine.reach", { count: reach().nodes, steps: reach().steps })}
+          </p>
+        </Show>
+      </section>
+
+      <section class="diagram-inspector-section">
+        <h3 class="diagram-inspector-section-title">{t("diagram.routine.week")}</h3>
+        <DiagramRoutineWeek upcomingRuns={props.routine.upcomingRuns} now={props.now} size="panel" />
+        <Show
+          when={thisWeek().length > 0}
+          fallback={<p class="diagram-inspector-empty">{t("diagram.routine.noUpcoming")}</p>}
+        >
+          <ol class="diagram-inspector-times">
+            <For each={thisWeek().slice(0, UPCOMING_LIMIT)}>{(at) => <li>{when(at)}</li>}</For>
+          </ol>
+        </Show>
+      </section>
+
+      <section class="diagram-inspector-section">
+        <h3 class="diagram-inspector-section-title">{t("diagram.routine.history")}</h3>
+        <Show
+          when={props.routine.recentRuns.length > 0}
+          fallback={<p class="diagram-inspector-empty">{t("diagram.routine.noHistory")}</p>}
+        >
+          <ol class="diagram-inspector-history">
+            <For each={props.routine.recentRuns.slice(0, HISTORY_LIMIT)}>
+              {(run) => {
+                const seconds = () =>
+                  run.finishedAt
+                    ? Math.max(0, Math.round((Date.parse(run.finishedAt) - Date.parse(run.startedAt)) / 1000))
+                    : null;
+                return (
+                  <li>
+                    <span class="diagram-inspector-step-status" data-status={run.status}>
+                      <DiagramStepIcon status={diagramRunStepStatus(run.status)} />
+                      {t(DIAGRAM_RUN_STATUS_KEY[run.status])}
+                    </span>
+                    <span class="diagram-inspector-history-time">
+                      {when(run.startedAt)}
+                      <Show when={run.kind === "manual"}>
+                        <span class="diagram-inspector-history-kind">{t("diagram.routine.manual")}</span>
+                      </Show>
+                    </span>
+                    <Show when={seconds()}>
+                      {(value) => (
+                        <span class="diagram-inspector-muted">
+                          {t("diagram.inspector.seconds", { seconds: format.number(value()) })}
+                        </span>
+                      )}
+                    </Show>
+                  </li>
+                );
+              }}
+            </For>
+          </ol>
+        </Show>
+      </section>
+
+      <Show when={props.onRunRoutine}>
+        <Button type="button" variant="secondary" size="sm" onClick={() => props.onRunRoutine?.(props.routine.id)}>
+          <Play aria-hidden="true" />
+          {t("diagram.node.runNow")}
+        </Button>
+      </Show>
+    </>
   );
 }

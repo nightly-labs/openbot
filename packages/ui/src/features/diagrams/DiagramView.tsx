@@ -18,6 +18,8 @@ import { DIAGRAM_RUN_STATUS_KEY } from "./diagram-text";
 export interface DiagramViewProps {
   diagram: Diagram;
   agents: AgentProfile[];
+  /** The day the routine week strips start on. Defaults to the time the view opens. */
+  now?: string | undefined;
   editable?: boolean;
   /** The agent that edits the diagram from the chat panel. Without it, the panel is hidden. */
   assistant?:
@@ -41,6 +43,7 @@ export function DiagramView(props: DiagramViewProps) {
   const { t, format } = useText();
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
   const [panels, setPanels] = createStore({ inspector: true, chat: true });
+  const now = () => (props.now ? new Date(props.now) : new Date());
   const firstRoutineId = () => props.diagram.nodes.find((node) => node.kind === "routine")?.id;
   const select = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
@@ -103,6 +106,7 @@ export function DiagramView(props: DiagramViewProps) {
           diagram={props.diagram}
           agents={props.agents}
           selectedNodeId={selectedNodeId()}
+          now={now()}
           editable={props.editable}
           onSelectNode={select}
           onMoveNode={props.onMoveNode}
@@ -141,6 +145,7 @@ export function DiagramView(props: DiagramViewProps) {
             diagram={props.diagram}
             agents={props.agents}
             selectedNodeId={selectedNodeId()}
+            now={now()}
             onSelectNode={select}
             onClose={() =>
               setPanels((state) => {

@@ -68,6 +68,8 @@ export interface DiagramBoardProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
+  /** The day the routine week strips start on. */
+  now: Date;
   editable?: boolean;
   onSelectNode: (nodeId: string | null) => void;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
@@ -484,6 +486,8 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 editable={editable()}
                 connecting={interaction.source === node.id}
                 inputTarget={inputTarget(node.id)}
+                now={props.now}
+                firing={props.diagram.lastRun?.status === "running" && props.diagram.lastRun.routineNodeId === node.id}
                 onSelect={() => {
                   if (suppressClick) return;
                   setInteraction((state) => {

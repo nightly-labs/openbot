@@ -6,9 +6,9 @@
 
 import type { DiagramEdge, DiagramNode, DiagramPoint } from "./diagram-model";
 
-export const DIAGRAM_NODE_WIDTH = { routine: 232, agent: 264 } as const;
+export const DIAGRAM_NODE_WIDTH = { routine: 264, agent: 264 } as const;
 /** The height the fit and the bounds use. A card can be taller; its ports stay at the top. */
-export const DIAGRAM_NODE_HEIGHT = { routine: 132, agent: 196 } as const;
+export const DIAGRAM_NODE_HEIGHT = { routine: 248, agent: 196 } as const;
 /** The distance from a card's top edge to the centre of its ports. */
 export const DIAGRAM_PORT_OFFSET_Y = 26;
 
@@ -40,6 +40,28 @@ function reaches(edges: readonly DiagramEdge[], start: string, target: string): 
     for (const edge of edges) if (edge.from === next) queue.push(edge.to);
   }
   return false;
+}
+
+/**
+ * What one routine sets in motion: the agents it starts itself, and how many agents and steps the
+ * whole run behind it takes. A node after two routines counts for each of them.
+ */
+export function diagramRoutineReach(
+  edges: readonly DiagramEdge[],
+  routineId: string,
+): { direct: string[]; nodes: number; steps: number } {
+  const direct = edges.filter((edge) => edge.from === routineId).map((edge) => edge.to);
+  const depth = new Map<string, number>(direct.map((id) => [id, 1]));
+  const queue = [...direct];
+  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+    const current = depth.get(next) ?? 1;
+    for (const edge of edges) {
+      if (edge.from !== next || (depth.get(edge.to) ?? 0) >= current + 1) continue;
+      depth.set(edge.to, current + 1);
+      queue.push(edge.to);
+    }
+  }
+  return { direct, nodes: depth.size, steps: Math.max(0, ...depth.values()) };
 }
 
 /**

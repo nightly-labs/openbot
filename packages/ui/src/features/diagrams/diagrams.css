@@ -575,6 +575,134 @@
   cursor: default;
 }
 
+/* Routine: what it asks, when it fires, how it went */
+
+/* The routine glows while the run it started is in progress. */
+.diagram-node[data-kind="routine"][data-firing] {
+  box-shadow:
+    0 0 0 1px var(--openbot-accent),
+    0 0 0 5px var(--openbot-accent-soft);
+}
+
+.diagram-node[data-kind="routine"][data-firing] .diagram-node-icon {
+  animation: diagram-routine-fire 1.2s var(--openbot-ease-in-out) infinite;
+}
+
+.diagram-routine-instruction {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  border-left: 2px solid var(--openbot-accent);
+  padding-left: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.diagram-routine-week {
+  --diagram-week-height: 40px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--openbot-space-1);
+}
+
+.diagram-routine-week[data-size="panel"] {
+  --diagram-week-height: 72px;
+}
+
+.diagram-routine-day {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-1);
+}
+
+/* One day, midnight at the top: a tick sits at the time the routine fires. */
+.diagram-routine-day-track {
+  position: relative;
+  width: 100%;
+  height: var(--diagram-week-height);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+}
+
+.diagram-routine-day[data-weekend] .diagram-routine-day-track {
+  background: var(--openbot-bg-control-hover);
+}
+
+.diagram-routine-day[data-today] .diagram-routine-day-track {
+  box-shadow: inset 0 0 0 1px var(--openbot-accent);
+}
+
+/* Noon, so a morning run reads as morning. */
+.diagram-routine-day-track::after {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  left: 3px;
+  height: 1px;
+  background: var(--openbot-border);
+  content: "";
+}
+
+.diagram-routine-tick {
+  position: absolute;
+  top: var(--diagram-tick-at);
+  right: 3px;
+  left: 3px;
+  z-index: 1;
+  height: 3px;
+  translate: 0 -50%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+}
+
+.diagram-routine-day-name {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+}
+
+.diagram-routine-day[data-today] .diagram-routine-day-name {
+  color: var(--openbot-accent-text);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.diagram-routine-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagram-routine-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border-strong);
+}
+
+.diagram-routine-dot[data-status="succeeded"] {
+  background: var(--openbot-success);
+}
+
+.diagram-routine-dot[data-status="failed"] {
+  background: var(--openbot-danger);
+}
+
+.diagram-routine-dot[data-status="running"] {
+  background: var(--openbot-accent);
+}
+
+@keyframes diagram-routine-fire {
+  50% {
+    scale: 1.15;
+  }
+}
+
 /* Run panel */
 
 .diagram-inspector {
@@ -729,6 +857,42 @@
   font-variant-numeric: tabular-nums;
 }
 
+.diagram-inspector-times,
+.diagram-inspector-history {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--openbot-text-md);
+  list-style: none;
+}
+
+.diagram-inspector-times li {
+  color: var(--openbot-text-secondary);
+}
+
+.diagram-inspector-history li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.diagram-inspector-history-time {
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-inspector-history-kind {
+  color: var(--openbot-text-muted);
+}
+
+.diagram-inspector-history-kind::before {
+  content: " · ";
+}
+
 .diagram-inspector-step-status svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
@@ -861,6 +1025,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .diagram-edge[data-state="running"] .diagram-edge-line {
+    animation: none;
+  }
+
+  .diagram-node[data-kind="routine"][data-firing] .diagram-node-icon {
     animation: none;
   }
 

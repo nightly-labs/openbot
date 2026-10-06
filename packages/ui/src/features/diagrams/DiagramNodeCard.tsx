@@ -12,7 +12,7 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
-import { sidebarMessageTime } from "../sidebar/sidebar-filtering";
+import { DiagramRoutineRunDots, DiagramRoutineWeek } from "./DiagramRoutineVisuals";
 import { DIAGRAM_NODE_WIDTH } from "./diagram-graph";
 import type { DiagramNode, DiagramStepRun, DiagramStepStatus } from "./diagram-model";
 import { DIAGRAM_STEP_STATUS_KEY, diagramStepSeconds } from "./diagram-text";
@@ -32,6 +32,10 @@ export interface DiagramNodeCardProps {
   /** True while this node's output is the source of a connection in progress. */
   connecting: boolean;
   inputTarget: DiagramPortTarget;
+  /** The day the week strip of a routine starts on. */
+  now: Date;
+  /** True while the run this routine started is in progress. */
+  firing?: boolean;
   onSelect: () => void;
   onRemove: () => void;
   onOutputPort: () => void;
@@ -46,6 +50,15 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
   const mood = (): AvatarMood => {
     if (status() === "running") return "working";
     return status() === "failed" ? "failed" : "idle";
+  };
+  /** A routine's kicker says when it fires next, or that it is paused. */
+  const routineKicker = (node: Extract<DiagramNode, { kind: "routine" }>) => {
+    if (!node.active) return t("diagram.node.paused");
+    const next = node.upcomingRuns[0];
+    if (!next) return t("diagram.node.routine");
+    return t("diagram.node.nextRun", {
+      time: format.date(new Date(next), { weekday: "short", hour: "numeric", minute: "2-digit" }),
+    });
   };
   const label = () => {
     const node = routine();
@@ -66,6 +79,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
       data-diagram-node={props.node.id}
       data-kind={props.node.kind}
       data-status={status()}
+      data-firing={props.firing ? "" : undefined}
       data-selected={props.selected ? "" : undefined}
       data-unreachable={props.node.kind === "agent" && props.step === undefined ? "" : undefined}
     >
@@ -119,7 +133,7 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
           <span class="diagram-node-heading">
             <span class="diagram-node-kicker">
               <Show when={routine()} fallback={props.agent?.title || props.agent?.model}>
-                {t("diagram.node.routine")}
+                {(node) => <>{routineKicker(node())}</>}
               </Show>
             </span>
             <strong class="diagram-node-name">{props.name}</strong>
@@ -197,16 +211,10 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
         {(node) => (
           <div class="diagram-node-body">
             <p class="diagram-node-schedule">{routineScheduleSummary(node().schedule)}</p>
+            <p class="diagram-routine-instruction">{node().instruction}</p>
+            <DiagramRoutineWeek upcomingRuns={node().upcomingRuns} now={props.now} size="card" />
             <div class="diagram-node-footer">
-              <Show when={node().active} fallback={<span class="diagram-node-status">{t("diagram.node.paused")}</span>}>
-                <Show when={node().nextRunAt}>
-                  {(at) => (
-                    <span class="diagram-node-status">
-                      {t("diagram.node.nextRun", { time: sidebarMessageTime(at(), format) })}
-                    </span>
-                  )}
-                </Show>
-              </Show>
+              <DiagramRoutineRunDots runs={node().recentRuns} limit={8} />
               <Show when={props.onRunRoutine}>
                 {(run) => (
                   <Button
