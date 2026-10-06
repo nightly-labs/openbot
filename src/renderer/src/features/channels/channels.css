@@ -157,7 +157,7 @@
 }
 /* The rows of the shared action menu, for options rather than menu items. Only the pointer and the
    keyboard paint a row: nothing is highlighted the moment the menu opens. */
-.channel-member-options [role="option"] {
+.channel-member-option {
   display: flex;
   min-height: var(--openbot-control-md);
   align-items: center;
@@ -172,8 +172,13 @@
   cursor: default;
   transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
-.channel-member-options [role="option"]:is(:hover, :focus-visible) {
+.channel-member-option:is(:hover, :focus-visible) {
   background: var(--ui-menu-item-hover);
+}
+/* The pointer does not move the keyboard focus here, so while a row has it, that row is the only
+   one painted: Enter picks it, not the row under a resting pointer. */
+.channel-member-options:has(:focus-visible) .channel-member-option:hover:not(:focus-visible) {
+  background: transparent;
 }
 .channel-member-menu-empty {
   margin: 0;

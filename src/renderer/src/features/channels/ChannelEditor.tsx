@@ -22,7 +22,7 @@ import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, For, onSettled, Show } from "solid-js";
 import { useChannels } from "./channels-context";
-import { toggleChannelMember } from "./channels-draft";
+import { matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
 interface ChannelEditorProps {
   memoryCount: number;
@@ -112,12 +112,8 @@ export function ChannelEditor(props: ChannelEditorProps) {
     search: "",
     placement: "bottom-start",
   });
-  const matching = () => {
-    const search = picker.search.toLowerCase();
-    return available().filter((agent) => `${agent.name} ${agent.description}`.toLowerCase().includes(search));
-  };
+  const matching = () => available().filter((agent) => matchesAgentSearch(agent, picker.search));
   let pickerPanel: HTMLElement | undefined;
-  let pickerList: HTMLElement | undefined;
   const pickerFades = createScrollFades();
   onSettled(() => pickerFades.stop);
   // A filter changes what overflows without always changing the list's own height.
@@ -133,13 +129,30 @@ export function ChannelEditor(props: ChannelEditorProps) {
    * typeahead sees it, so typing "Scale 9" would add whichever agent "Scale" had reached.
    */
   function typeIntoSearch(event: KeyboardEvent) {
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
+    const erase = event.key === "Backspace";
+    if ((event.key.length !== 1 && !erase) || event.ctrlKey || event.metaKey || event.altKey) return;
     event.preventDefault();
     event.stopPropagation();
     setPicker((state) => {
-      state.search += event.key;
+      state.search = erase ? state.search.slice(0, -1) : state.search + event.key;
     });
     pickerSearch?.focus();
+  }
+  /**
+   * ArrowDown from the search field focuses the first option itself. Focusing the list would let
+   * Kobalte go back to the option it last focused, which a search may have taken off the list.
+   */
+  function focusFirstOption(): boolean {
+    const option = pickerPanel?.querySelector<HTMLElement>(".channel-member-option");
+    option?.focus();
+    return option !== null && option !== undefined;
+  }
+  function addMember(agentId: string) {
+    setPickerOpen(false);
+    // Kobalte gives focus back only when it closes the popover itself. The focus waits a frame: the
+    // Enter that picked would otherwise press the trigger too and open the popover again.
+    requestAnimationFrame(() => pickerTrigger?.focus());
+    void commit((draft) => toggleChannelMember(draft, agentId, true));
   }
   function setPickerOpen(open: boolean) {
     // The side is chosen once, where the window has more room. The menu stops at the room it has,
@@ -155,6 +168,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
     // A popover that is not modal does not move focus, so the search field takes it once it is on
     // the page.
     if (open) requestAnimationFrame(() => pickerSearch?.focus({ preventScroll: true }));
+    else pickerFades.stop();
   }
 
   /**
@@ -417,9 +431,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
                       })
                     }
                     onKeyDown={(event: KeyboardEvent) => {
-                      if (event.key !== "ArrowDown" || !pickerList) return;
-                      event.preventDefault();
-                      pickerList.focus();
+                      if (event.key === "ArrowDown" && focusFirstOption()) event.preventDefault();
                     }}
                   />
                 </label>
@@ -434,7 +446,6 @@ export function ChannelEditor(props: ChannelEditorProps) {
                   <Listbox.Root
                     as="div"
                     ref={(element: HTMLElement) => {
-                      pickerList = element;
                       pickerFades.bind(element);
                       element.addEventListener("keydown", typeIntoSearch, { capture: true });
                     }}
@@ -446,14 +457,15 @@ export function ChannelEditor(props: ChannelEditorProps) {
                     optionTextValue="name"
                     selectionMode="single"
                     shouldFocusWrap
+                    // A pick on pointerdown would close the popover under the pointer, and the click
+                    // would land on whatever was below it, such as a member's Remove button.
+                    shouldSelectOnPressUp
                     onChange={(keys) => {
                       const agentId = keys.values().next().value;
-                      if (!agentId) return;
-                      setPickerOpen(false);
-                      void commit((draft) => toggleChannelMember(draft, agentId, true));
+                      if (agentId) addMember(agentId);
                     }}
                     renderItem={(item) => (
-                      <Listbox.Item item={item}>
+                      <Listbox.Item item={item} class="channel-member-option">
                         <AgentAvatar agent={item.rawValue} />
                         {item.rawValue.name}
                       </Listbox.Item>
