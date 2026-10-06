@@ -16,6 +16,7 @@ on:
       - "scripts/cua-driver-lock.ts"
       - "scripts/install-cua-driver.ts"
       - "scripts/pin-cua-driver.ts"
+      - "scripts/runtime-install.ts"
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:

@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { z } from "zod";
 import type { NativeRuntimeLock } from "./native-runtime-lock";
-import { safeArchivePathParts } from "./runtime-install";
 
 export const remoteDesktopTargets = ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"] as const;
 export type RemoteDesktopTarget = (typeof remoteDesktopTargets)[number];
@@ -131,7 +130,13 @@ export function listArchiveEntries(archive: string): string[] {
 }
 
 export function validateArchivePath(name: string): void {
-  if (safeArchivePathParts(name, "runtime")[0] !== "remote-desktop-runtime") {
+  if (name.includes("\0") || name.includes("\\")) throw new Error(`Unsafe runtime archive path: ${name}`);
+  const normalized = name.replace(/\/+$/u, "");
+  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:/u.test(normalized)) {
+    throw new Error(`Unsafe runtime archive path: ${name}`);
+  }
+  const parts = normalized.split("/");
+  if (parts[0] !== "remote-desktop-runtime" || parts.some((part) => !part || part === "." || part === "..")) {
     throw new Error(`Unsafe runtime archive path: ${name}`);
   }
 }
