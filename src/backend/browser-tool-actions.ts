@@ -1,11 +1,13 @@
 import type { BrowserTarget } from "@openbot/contracts/ipc";
+import { Effect, type Fiber } from "effect";
 import type { BrowserCdpEngine } from "./browser-cdp";
+import { type BrowserOperationError, browserSync } from "./browser-effects";
 import type { BrowserToolCall } from "./browser-tools";
 
 export interface BrowserDynamicToolHooks {
   onUploadTargetResolved?: (inputId: string, documentId: string) => void;
   onUploadAssigned?: (inputId: string, documentId: string) => void;
-  onUploadOperationStarted?: (completion: Promise<void>) => void;
+  onUploadOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void;
 }
 
 export type BrowserInputCall = Extract<
@@ -18,7 +20,11 @@ export type BrowserInputCall = Extract<
 interface BrowserInputAction {
   name: string;
   target: BrowserTarget | undefined;
-  run(engine: BrowserCdpEngine, deadline: number, markDispatched: () => void): Promise<void>;
+  run(
+    engine: BrowserCdpEngine,
+    deadline: number,
+    markDispatched: () => void,
+  ): Effect.Effect<void, BrowserOperationError>;
 }
 
 /** Owns typed input dispatch. The host owns tab authorization, queues, focus, and deadlines. */
@@ -122,16 +128,17 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
       return {
         name: "upload-files",
         target: args.target,
-        run: async (engine, deadline, markDispatched) => {
-          const assignment = await engine.uploadFiles(
-            args.target,
-            args.paths,
-            (resolved) => hooks.onUploadTargetResolved?.(resolved.inputId, resolved.documentId),
-            deadline,
-            markDispatched,
-          );
-          hooks.onUploadAssigned?.(assignment.inputId, assignment.documentId);
-        },
+        run: (engine, deadline, markDispatched) =>
+          Effect.gen(function* () {
+            const assignment = yield* engine.uploadFiles(
+              args.target,
+              args.paths,
+              (resolved) => hooks.onUploadTargetResolved?.(resolved.inputId, resolved.documentId),
+              deadline,
+              markDispatched,
+            );
+            yield* browserSync(() => hooks.onUploadAssigned?.(assignment.inputId, assignment.documentId));
+          }),
       };
     }
   }

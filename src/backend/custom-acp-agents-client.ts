@@ -21,6 +21,7 @@ import { CUSTOM_AGENT_DEFAULT_MODEL, customAgentIdOfModel } from "@openbot/contr
 import { isAgentModel } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AgentClient, DiagnosticOrigin } from "./agent-client";
 import {
@@ -36,7 +37,7 @@ import {
   type ResponseDecoder,
   type RpcError,
 } from "./protocol";
-import { withTimeout } from "./with-timeout";
+import { ProviderClientOperationError } from "./provider-client-effects";
 
 export interface CustomAgentConfig {
   readonly id: string;
@@ -122,7 +123,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
-  readonly #children = new Map<string, Promise<AgentClient>>();
+  readonly #children = new Map<string, Deferred.Deferred<AgentClient, ProviderClientOperationError>>();
   /** The process that opened or loaded each session, by the routed id that the caller knows. */
   readonly #sessions = new Map<string, HeldSession>();
   /**
@@ -149,121 +150,156 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this.#running = true;
   }
 
-  async stop(): Promise<void> {
+  readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
     this.#running = false;
     const children = [...this.#children.values()];
     this.#children.clear();
     this.#sessions.clear();
     this.#requests.clear();
-    await Promise.all(children.map((child) => child.then((client) => client.stop()).catch(() => undefined)));
-  }
+    yield* Effect.forEach(
+      children,
+      (pending) =>
+        Deferred.await(pending).pipe(
+          Effect.flatMap((client) => client.stop()),
+          Effect.catch(() => Effect.void),
+        ),
+      { concurrency: "unbounded", discard: true },
+    );
+  });
 
-  async releaseThread(externalThreadId: string): Promise<void> {
+  readonly releaseThread = Effect.fn("CustomAcp.releaseThread")(function* (
+    this: CustomAcpAgentsClient,
+    externalThreadId: string,
+  ) {
     const held = this.#sessions.get(externalThreadId);
-    await held?.child.releaseThread?.(held.sessionId);
-  }
+    const release = held?.child.releaseThread?.bind(held.child);
+    if (held && release)
+      yield* release(held.sessionId).pipe(
+        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+      );
+  });
 
-  async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
-    if (!this.#running) throw new Error("ACP client is not running.");
-    try {
-      return await this.#request(method, params, decoder, timeoutMs);
-    } catch (error) {
-      throw this.#redactError(error);
-    }
-  }
-
-  async #request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
-    switch (method) {
-      case "initialize":
-        return decoder({});
-      case "account/read":
-        return decoder(
-          this.#source().length > 0
-            ? { account: { type: "acp", email: null, planType: null }, requiresOpenaiAuth: false }
-            : { account: null, requiresOpenaiAuth: false },
-        );
-      case "account/rateLimits/read":
-        return decoder({ rateLimits: null, rateLimitsByLimitId: null });
-      case "plugin/list":
-        return decoder({ marketplaces: [] });
-      case "model/list":
-        return decoder({ data: await this.#listModels(params, timeoutMs ?? MODEL_LIST_TIMEOUT_MS) });
-      case "thread/start": {
-        const agentId = this.#modelAgent(params);
-        const cwd = requiredCwd(params);
-        const child = await this.#child(agentId, cwd);
-        const response = await child.request(method, forChild(params, null), decodeRecordResponse, timeoutMs);
-        return decoder(
-          withThreadId(response, (sessionId) => {
-            const threadId = `${agentId}:${folderTag(cwd)}:${sessionId}`;
-            this.#sessions.set(threadId, { child, sessionId });
-            return threadId;
-          }),
-        );
-      }
-      case "thread/resume": {
-        const threadId = getString(params, "threadId") ?? "";
-        const agentId = this.#routedAgent(params);
-        const cwd = requiredCwd(params);
-        const child = await this.#child(agentId, cwd);
-        const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
-        // Held before the agent answers, so what it sends while it loads the session reaches the
-        // caller under the id the caller knows, a saved id with no folder tag included.
-        this.#sessions.set(threadId, held);
-        try {
-          const response = await child.request(
-            method,
-            forChild(params, held.sessionId),
-            decodeRecordResponse,
-            timeoutMs,
+  readonly request = Effect.fn("CustomAcp.request")(
+    function* <T>(
+      this: CustomAcpAgentsClient,
+      method: string,
+      params: unknown,
+      decoder: ResponseDecoder<T>,
+      timeoutMs?: number,
+    ): Effect.fn.Return<T, ProviderClientOperationError> {
+      if (!this.#running)
+        return yield* new ProviderClientOperationError({ cause: new Error("ACP client is not running.") });
+      switch (method) {
+        case "initialize":
+        case "thread/compact/start":
+          return yield* customStep(() => decoder({}));
+        case "account/read":
+          return yield* customStep(() =>
+            decoder(
+              this.#source().length > 0
+                ? { account: { type: "acp", email: null, planType: null }, requiresOpenaiAuth: false }
+                : { account: null, requiresOpenaiAuth: false },
+            ),
           );
-          return decoder(withThreadId(response, () => threadId));
-        } catch (error) {
-          if (this.#sessions.get(threadId) === held) this.#sessions.delete(threadId);
-          throw error;
+        case "account/rateLimits/read":
+          return yield* customStep(() => decoder({ rateLimits: null, rateLimitsByLimitId: null }));
+        case "plugin/list":
+          return yield* customStep(() => decoder({ marketplaces: [] }));
+        case "model/list": {
+          const data = yield* this.#listModels(params, timeoutMs ?? MODEL_LIST_TIMEOUT_MS);
+          return yield* customStep(() => decoder({ data }));
         }
-      }
-      case "thread/read": {
-        const threadId = getString(params, "threadId") ?? "";
-        const agentId = sessionAgent(threadId);
-        // A read has nothing to recover: a session of an agent that is gone has no turns to show.
-        if (!agentId || !this.#source().some((config) => config.id === agentId)) {
-          return decoder({ thread: { id: threadId, turns: [] } });
+        case "thread/start": {
+          const agentId = yield* customStep(() => this.#modelAgent(params));
+          const cwd = yield* customStep(() => requiredCwd(params));
+          const child = yield* this.#child(agentId, cwd).pipe(
+            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+          );
+          const response = yield* child
+            .request(method, forChild(params, null), decodeRecordResponse, timeoutMs)
+            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+          return yield* customStep(() =>
+            decoder(
+              withThreadId(response, (sessionId) => {
+                const threadId = `${agentId}:${folderTag(cwd)}:${sessionId}`;
+                this.#sessions.set(threadId, { child, sessionId });
+                return threadId;
+              }),
+            ),
+          );
         }
-        const cwd = getString(params, "cwd");
-        // Only the process of the session's folder can load it. With no folder, nothing can.
-        const held =
-          this.#sessions.get(threadId) ??
-          (cwd ? { child: await this.#child(agentId, cwd), sessionId: ownSessionId(threadId, agentId, cwd) } : null);
-        if (!held) return decoder({ thread: { id: threadId, turns: [] } });
-        const response = await held.child.request(
-          method,
-          forChild(params, held.sessionId),
-          decodeRecordResponse,
-          timeoutMs,
-        );
-        return decoder(withThreadId(response, () => threadId));
+        case "thread/resume": {
+          const threadId = getString(params, "threadId") ?? "";
+          const agentId = yield* customStep(() => this.#routedAgent(params));
+          const cwd = yield* customStep(() => requiredCwd(params));
+          const child = yield* this.#child(agentId, cwd).pipe(
+            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+          );
+          const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
+          // Held before the agent answers, so what it sends while it loads the session reaches the
+          // caller under the id the caller knows, a saved id with no folder tag included.
+          this.#sessions.set(threadId, held);
+          return yield* child.request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs).pipe(
+            Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+            Effect.flatMap((response) => customStep(() => decoder(withThreadId(response, () => threadId)))),
+            Effect.onError(() =>
+              Effect.sync(() => {
+                if (this.#sessions.get(threadId) === held) this.#sessions.delete(threadId);
+              }),
+            ),
+          );
+        }
+        case "thread/read": {
+          const threadId = getString(params, "threadId") ?? "";
+          const agentId = sessionAgent(threadId);
+          // A read has nothing to recover: a session of an agent that is gone has no turns to show.
+          if (!agentId || !this.#source().some((config) => config.id === agentId)) {
+            return yield* customStep(() => decoder({ thread: { id: threadId, turns: [] } }));
+          }
+          const cwd = getString(params, "cwd");
+          // Only the process of the session's folder can load it. With no folder, nothing can.
+          const held =
+            this.#sessions.get(threadId) ??
+            (cwd
+              ? {
+                  child: yield* this.#child(agentId, cwd).pipe(
+                    Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+                  ),
+                  sessionId: ownSessionId(threadId, agentId, cwd),
+                }
+              : null);
+          if (!held) return yield* customStep(() => decoder({ thread: { id: threadId, turns: [] } }));
+          const response = yield* held.child
+            .request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs)
+            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+          return yield* customStep(() => decoder(withThreadId(response, () => threadId)));
+        }
+        case "turn/start":
+        case "turn/steer": {
+          const threadId = getString(params, "threadId") ?? "";
+          yield* customStep(() => this.#routedAgent(params));
+          // A session that no process holds is missing, and the caller resumes it in its folder.
+          const held = this.#sessions.get(threadId);
+          if (!held) return yield* new ProviderClientOperationError({ cause: unknownSession(threadId) });
+          return yield* held.child
+            .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
+            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+        }
+        case "turn/interrupt": {
+          const held = this.#sessions.get(getString(params, "threadId") ?? "");
+          if (!held) return yield* customStep(() => decoder({}));
+          return yield* held.child
+            .request(method, forChild(params, held.sessionId), decoder, timeoutMs)
+            .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })));
+        }
+        default:
+          return yield* new ProviderClientOperationError({
+            cause: new Error(`ACP adapter does not implement ${method}.`),
+          });
       }
-      case "turn/start":
-      case "turn/steer": {
-        const threadId = getString(params, "threadId") ?? "";
-        this.#routedAgent(params);
-        // A session that no process holds is missing, and the caller resumes it in its folder.
-        const held = this.#sessions.get(threadId);
-        if (!held) throw unknownSession(threadId);
-        return held.child.request(method, forChild(params, held.sessionId), decoder, timeoutMs);
-      }
-      case "turn/interrupt": {
-        const held = this.#sessions.get(getString(params, "threadId") ?? "");
-        if (!held) return decoder({});
-        return held.child.request(method, forChild(params, held.sessionId), decoder, timeoutMs);
-      }
-      case "thread/compact/start":
-        return decoder({});
-      default:
-        throw new Error(`ACP adapter does not implement ${method}.`);
-    }
-  }
+    },
+    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#redactError(error.cause) })),
+  );
 
   notify(): void {
     // The processes are initialized when they start. There is nothing to send to all of them.
@@ -317,48 +353,61 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
    * One started, initialized process for each agent and folder, however many callers ask for it at
    * once. The folder `null` is the process that lists the agent's models.
    */
-  #child(agentId: string, folder: string | null): Promise<AgentClient> {
+  readonly #child = Effect.fn("CustomAcp.child")(function* (
+    this: CustomAcpAgentsClient,
+    agentId: string,
+    folder: string | null,
+  ) {
     const key = childKey(agentId, folder);
     const existing = this.#children.get(key);
-    if (existing) return existing;
-    const starting = this.#startChild(agentId, folder, key);
+    if (existing) return yield* Deferred.await(existing);
+    const starting = Deferred.makeUnsafe<AgentClient, ProviderClientOperationError>();
     this.#children.set(key, starting);
-    starting.catch(() => {
-      if (this.#children.get(key) === starting) this.#children.delete(key);
-    });
-    return starting;
-  }
+    const exit = yield* Effect.exit(this.#startChild(agentId, folder, key));
+    yield* Deferred.done(starting, exit);
+    if (Exit.isFailure(exit) && this.#children.get(key) === starting) this.#children.delete(key);
+    return yield* exit;
+  }, Effect.uninterruptible);
 
-  async #startChild(agentId: string, folder: string | null, key: string): Promise<AgentClient> {
-    const config = this.#source().find((candidate) => candidate.id === agentId);
-    if (!config) throw new Error(sourceText("error.provider.customAgentMissing"));
-    assertAgentArgs(config.args);
-    const executable = await this.#resolve(config.command);
-    if (!executable) throw new Error(sourceText("error.provider.customAgentNotFound", { command: config.command }));
-    assertWindowsScriptArgs(executable, config.args);
-    const child = this.#createChild(config, executable, folder);
-    const prefix = folder === null ? agentId : `${agentId}:${folderTag(folder)}`;
-    const route = (sessionId: string) => this.#routedSessionId(child, prefix, sessionId);
-    child.on("notification", (notification) => {
-      this.emit("notification", withRoutedThreadId(notification, route));
-    });
-    child.on("request", (request) => {
-      this.#nextRequestId += 1;
-      const id = `${agentId}:${this.#nextRequestId}`;
-      this.#requests.set(id, { child, id: request.id });
-      this.emit("request", withRoutedThreadId({ ...request, id }, route));
-    });
-    child.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
-    child.once("exit", (error) => this.#childExited(key, folder, child, this.#redactError(error)));
-    child.start();
-    try {
-      await child.request("initialize", {}, decodeRecordResponse);
-    } catch (error) {
-      await child.stop().catch(() => undefined);
-      throw error;
-    }
-    return child;
-  }
+  readonly #startChild = Effect.fn("CustomAcp.startChild")(
+    function* (this: CustomAcpAgentsClient, agentId: string, folder: string | null, key: string) {
+      const config = this.#source().find((candidate) => candidate.id === agentId);
+      if (!config)
+        return yield* new ProviderClientOperationError({
+          cause: new Error(sourceText("error.provider.customAgentMissing")),
+        });
+      yield* customStep(() => assertAgentArgs(config.args));
+      const executable = yield* this.#resolve(config.command).pipe(
+        Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })),
+      );
+      if (!executable)
+        return yield* new ProviderClientOperationError({
+          cause: new Error(sourceText("error.provider.customAgentNotFound", { command: config.command })),
+        });
+      yield* customStep(() => assertWindowsScriptArgs(executable, config.args));
+      const child = yield* customStep(() => this.#createChild(config, executable, folder));
+      const prefix = folder === null ? agentId : `${agentId}:${folderTag(folder)}`;
+      const route = (sessionId: string) => this.#routedSessionId(child, prefix, sessionId);
+      child.on("notification", (notification) => {
+        this.emit("notification", withRoutedThreadId(notification, route));
+      });
+      child.on("request", (request) => {
+        this.#nextRequestId += 1;
+        const id = `${agentId}:${this.#nextRequestId}`;
+        this.#requests.set(id, { child, id: request.id });
+        this.emit("request", withRoutedThreadId({ ...request, id }, route));
+      });
+      child.on("diagnostic", (message, origin) => this.emit("diagnostic", this.#redact(message), origin));
+      child.once("exit", (error) => this.#childExited(key, folder, child, this.#redactError(error)));
+      yield* customStep(() => child.start());
+      yield* child
+        .request("initialize", {}, decodeRecordResponse)
+        .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+        .pipe(Effect.onError(() => child.stop().pipe(Effect.catch(() => Effect.void))));
+      return child;
+    },
+    Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#redactError(error.cause) })),
+  );
 
   /**
    * One agent's process ended on its own. The runtime replaces the whole router, which is how the
@@ -366,18 +415,24 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
    * that only lists models holds no thread, so it is forgotten, and the next list starts another.
    */
   #childExited(key: string, folder: string | null, child: AgentClient, error: Error): void {
-    const entry = this.#children.get(key);
-    void entry
-      ?.then((current) => {
-        if (current !== child || !this.#running) return;
-        if (folder === null) {
-          if (this.#children.get(key) === entry) this.#children.delete(key);
-          return;
-        }
-        this.#running = false;
-        this.emit("exit", error);
-      })
-      .catch(() => undefined);
+    const pending = this.#children.get(key);
+    if (!pending) return;
+    Effect.runFork(
+      Deferred.await(pending).pipe(
+        Effect.tap((current) =>
+          Effect.sync(() => {
+            if (current !== child || !this.#running) return;
+            if (folder === null) {
+              if (this.#children.get(key) === pending) this.#children.delete(key);
+              return;
+            }
+            this.#running = false;
+            this.emit("exit", error);
+          }),
+        ),
+        Effect.ignore,
+      ),
+    );
   }
 
   /**
@@ -401,29 +456,53 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return message === error.message ? error : new Error(message);
   }
 
-  async #listModels(params: unknown, timeoutMs: number): Promise<ModelEntry[]> {
+  readonly #listModels = Effect.fn("CustomAcp.listModels")(function* (
+    this: CustomAcpAgentsClient,
+    params: unknown,
+    timeoutMs: number,
+  ) {
     const configs = this.#source();
-    const lists = await Promise.all(
-      configs.map(async (config) => {
-        try {
-          const response = await withTimeout(
-            this.#child(config.id, null).then((child) =>
-              child.request("model/list", params, decodeModelListResponse, timeoutMs),
+    const lists = yield* Effect.forEach(
+      configs,
+      (config) =>
+        this.#child(config.id, null)
+          .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause })))
+          .pipe(
+            Effect.flatMap((child) =>
+              child
+                .request("model/list", params, decodeModelListResponse, timeoutMs)
+                .pipe(Effect.mapError((failure) => new ProviderClientOperationError({ cause: failure.cause }))),
             ),
-            timeoutMs,
-            `${config.name} request timed out: model/list`,
-          );
-          const models = routedModels(config, response.data);
-          this.#lastModels.set(config.id, models);
-          return models;
-        } catch (error) {
-          this.emit("diagnostic", this.#redact(`Custom agent ${config.id} did not list its models: ${String(error)}`));
-          return this.#lastModels.get(config.id) ?? [];
-        }
-      }),
+            Effect.timeoutOrElse({
+              duration: timeoutMs,
+              orElse: () =>
+                Effect.fail(
+                  new ProviderClientOperationError({
+                    cause: new Error(`${config.name} request timed out: model/list`),
+                  }),
+                ),
+            }),
+            Effect.flatMap((response) =>
+              customStep(() => {
+                const models = routedModels(config, response.data);
+                this.#lastModels.set(config.id, models);
+                return models;
+              }),
+            ),
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                this.emit(
+                  "diagnostic",
+                  this.#redact(`Custom agent ${config.id} did not list its models: ${String(error.cause)}`),
+                );
+                return this.#lastModels.get(config.id) ?? [];
+              }),
+            ),
+          ),
+      { concurrency: "unbounded" },
     );
     return lists.flat();
-  }
+  });
 }
 
 /**
@@ -468,4 +547,8 @@ function withThreadId(response: DynamicRecord, route: (sessionId: string) => str
   const id = getString(thread, "id");
   if (!thread || id === null) return response;
   return { ...response, thread: { ...thread, id: route(id) } };
+}
+
+function customStep<A>(run: () => A): Effect.Effect<A, ProviderClientOperationError> {
+  return Effect.try({ try: run, catch: (cause) => new ProviderClientOperationError({ cause }) });
 }

@@ -5,12 +5,14 @@ import type {
   HostedSiteStatus,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
 import { hmacSha256, sha256 } from "./crypto";
 import {
   type HostedSiteFileManifest,
   HostedSiteInputError,
   type HostedSiteUploadRequest,
 } from "./hosted-site-contract";
+import { siteCall, siteDecode, siteFailure } from "./hosted-site-effects";
 
 /**
  * The stored rows of hosted sites and deployments, and the pure helpers that read, map and name them.
@@ -62,8 +64,8 @@ export interface HostedSiteSummary extends Omit<HostedSiteClientSummary, "status
   status: SiteRow["status"];
 }
 
-export async function uploadRequestHash(request: HostedSiteUploadRequest): Promise<string> {
-  return sha256(
+export const uploadRequestHash = Effect.fn("HostedSites.uploadRequestHash")((request: HostedSiteUploadRequest) =>
+  sha256(
     JSON.stringify({
       siteId: request.siteId,
       title: request.title,
@@ -75,8 +77,8 @@ export async function uploadRequestHash(request: HostedSiteUploadRequest): Promi
         return left.path < right.path ? -1 : 1;
       }),
     }),
-  );
-}
+  ).pipe(Effect.mapError(siteFailure)),
+);
 
 export function parseManifest(value: string): HostedSiteFileManifest[] {
   const parsed = JSON.parse(value);
@@ -86,31 +88,42 @@ export function parseManifest(value: string): HostedSiteFileManifest[] {
   return parsed.map((file) => ({ path: file.path, size: file.size, mimeType: file.mimeType }));
 }
 
-export async function readUploadBody(body: ReadableStream<Uint8Array>, expectedSize: number): Promise<Uint8Array> {
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalSize = 0;
-  while (true) {
-    const result = await reader.read();
-    if (result.done) break;
-    totalSize += result.value.byteLength;
-    if (totalSize > expectedSize) {
-      await reader.cancel().catch(() => undefined);
-      throw new HostedSiteInputError(400, "size_mismatch", "The file size does not match the manifest.");
-    }
-    chunks.push(result.value);
-  }
-  if (totalSize !== expectedSize) {
-    throw new HostedSiteInputError(400, "size_mismatch", "The file size does not match the manifest.");
-  }
-  const combined = new Uint8Array(totalSize);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return combined;
-}
+export const readUploadBody = Effect.fn("HostedSites.readUploadBody")(
+  (body: ReadableStream<Uint8Array>, expectedSize: number) =>
+    Effect.acquireUseRelease(
+      siteDecode(() => body.getReader()),
+      (reader) =>
+        Effect.gen(function* () {
+          const chunks: Uint8Array[] = [];
+          let totalSize = 0;
+          while (true) {
+            const result = yield* siteCall(() => reader.read());
+            if (result.done) break;
+            totalSize += result.value.byteLength;
+            if (totalSize > expectedSize) {
+              yield* siteCall(() => reader.cancel()).pipe(Effect.catch(() => Effect.void));
+              return yield* new HostedSiteInputError(
+                400,
+                "size_mismatch",
+                "The file size does not match the manifest.",
+              );
+            }
+            chunks.push(result.value);
+          }
+          if (totalSize !== expectedSize) {
+            return yield* new HostedSiteInputError(400, "size_mismatch", "The file size does not match the manifest.");
+          }
+          const combined = new Uint8Array(totalSize);
+          let offset = 0;
+          for (const chunk of chunks) {
+            combined.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          return combined;
+        }),
+      (reader) => Effect.sync(() => reader.releaseLock()),
+    ),
+);
 
 function isStoredManifestFile(value: unknown): value is HostedSiteFileManifest {
   return isDynamicRecord(value) && isString(value.path) && isNumber(value.size) && isString(value.mimeType);
@@ -273,6 +286,7 @@ export function randomBase32(length: number): string {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
-export async function sourceIpHash(secret: string, value: string, deduplicationWindow: number): Promise<string> {
-  return hmacSha256(secret, `${deduplicationWindow}\0${value}`);
-}
+export const sourceIpHash = Effect.fn("HostedSites.sourceIpHash")(
+  (secret: string, value: string, deduplicationWindow: number) =>
+    hmacSha256(secret, `${deduplicationWindow}\0${value}`).pipe(Effect.mapError(siteFailure)),
+);

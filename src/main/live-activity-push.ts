@@ -20,6 +20,7 @@ import {
   liveActivityKeys,
   sealLiveActivity,
 } from "@openbot/team-client/live-activity-seal";
+import { Effect, Exit, Schema, Scope } from "effect";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import type { markerExclusionsForCapabilities } from "./team-api/request-helpers";
 
@@ -42,7 +43,7 @@ export type LiveActivityPushAgents = Pick<TeamApiAgents, "on" | "off" | "getRunt
 export interface LiveActivityPushOptions {
   agents: LiveActivityPushAgents;
   /** Sends one update through the account service. `gone` means Apple refused the token. */
-  send(push: LiveActivityRelayPush): Promise<"sent" | "gone">;
+  send(push: LiveActivityRelayPush): Effect.Effect<"sent" | "gone", LiveActivitySendFailure>;
   now?: () => number;
   randomBytes(size: number): Uint8Array;
   /** Whether the member is still a member and not disabled. A removed member gets no more updates. */
@@ -93,6 +94,7 @@ export class LiveActivityPushService {
   readonly #listener = () => {
     for (const registration of this.#registrations.values()) this.#schedule(registration, EVENT_DELAY_MS);
   };
+  #scope = Scope.makeUnsafe();
   #listening = false;
 
   constructor(options: LiveActivityPushOptions) {
@@ -146,13 +148,15 @@ export class LiveActivityPushService {
     if (registration) this.#stop(registration);
   }
 
-  dispose(): void {
+  readonly dispose = Effect.fn("LiveActivityPush.dispose")(function* (this: LiveActivityPushService) {
     for (const registration of [...this.#registrations.values()]) this.#stop(registration);
-  }
+    yield* Scope.close(this.#scope, Exit.void);
+    this.#scope = Scope.makeUnsafe();
+  }, Effect.uninterruptible);
 
   /** Runs an update after `delay`, or keeps an earlier one that is already planned. */
   #schedule(registration: Registration, delay: number): void {
-    if (!away(registration)) return;
+    if (this.#registrations.get(registration.sessionId) !== registration || !away(registration)) return;
     const at = Math.max(this.#now() + delay, registration.retryAt);
     if (registration.timer && registration.timer.at <= at) return;
     this.#clearTimer(registration);
@@ -160,12 +164,17 @@ export class LiveActivityPushService {
       at,
       handle: setTimeout(() => {
         registration.timer = null;
-        void this.#update(registration);
+        Effect.runFork(
+          this.#update(registration).pipe(
+            Effect.uninterruptible,
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+          ),
+        );
       }, at - this.#now()),
     };
   }
 
-  async #update(registration: Registration): Promise<void> {
+  #update = Effect.fn("LiveActivityPush.update")(function* (this: LiveActivityPushService, registration: Registration) {
     if (this.#registrations.get(registration.sessionId) !== registration || !away(registration)) return;
     const now = this.#now();
     // Access can end while the phone is away: a removed or disabled member gets no more content.
@@ -205,25 +214,33 @@ export class LiveActivityPushService {
     };
     registration.sending = true;
     registration.sent = { key, mode, at: now };
-    try {
-      const result = await this.#options.send(push);
-      registration.failures = 0;
-      registration.retryAt = 0;
-      // Apple refused the token: the activity ended, or the app was removed.
-      if (result === "gone" || !props) this.#stop(registration);
-      else this.#schedule(registration, KEEPALIVE_MS);
-    } catch (error) {
-      // The network or Apple can fail for a time. Try again, less often each time. Without updates,
-      // iOS marks the content out of date.
-      registration.sent = sent;
-      registration.failures += 1;
-      registration.retryAt = this.#now() + Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS);
-      this.#options.logger?.warn("Live Activity update was not sent:", toLogValue(error));
-      this.#schedule(registration, 0);
-    } finally {
-      registration.sending = false;
-    }
-  }
+    yield* this.#options.send(push).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          registration.failures = 0;
+          registration.retryAt = 0;
+          // Apple refused the token: the activity ended, or the app was removed.
+          if (result === "gone" || !props) this.#stop(registration);
+          else this.#schedule(registration, KEEPALIVE_MS);
+        }),
+      ),
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          // Preserve the existing backoff policy after an operational failure.
+          registration.sent = sent;
+          registration.failures += 1;
+          registration.retryAt = this.#now() + Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS);
+          this.#options.logger?.warn("Live Activity update was not sent:", toLogValue(error.cause));
+          this.#schedule(registration, 0);
+        }),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          registration.sending = false;
+        }),
+      ),
+    );
+  });
 
   /** Apple takes 4 KB for each update, so the lists and then the buttons go when the seal is too long. */
   #sealToFit(props: AgentLiveActivityProps, keys: LiveActivityKeys): string {
@@ -310,3 +327,7 @@ function visibleSnapshot(snapshot: AgentRuntimeSnapshot, hidden: ReadonlySet<str
 function phoneText(locale: string) {
   return mobileTranslateFor(resolveLocale("system", locale));
 }
+
+export class LiveActivitySendFailure extends Schema.TaggedError<LiveActivitySendFailure>()("LiveActivitySendFailure", {
+  cause: Schema.Defect(),
+}) {}

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 // The fixtures the `remote-server-*` tests share: a temporary `servers.json`, a manager built over it,
@@ -27,6 +29,7 @@ import { join } from "node:path";
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { expect, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { RemoteHostSummary } from "./central-auth-records";
 import { RemoteServerManager } from "./remote-server-manager";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
@@ -143,45 +146,51 @@ export function storedHttpsServer(id: string, overrides: Partial<StoredRemoteSer
  */
 export function fakeWebRtcTransport(hosts: readonly RemoteHostSummary[] = []): TeamWebRtcClientTransport {
   const bridge = new TeamWebRtcBridge();
-  vi.spyOn(bridge, "connect").mockRejectedValue(new Error("The fake bridge never connects."));
-  vi.spyOn(bridge, "send").mockResolvedValue();
-  vi.spyOn(bridge, "disconnect").mockResolvedValue();
+  vi.spyOn(bridge, "connect").mockReturnValue(
+    Effect.fail(new RemoteWorkflowError({ cause: new Error("The fake bridge never connects.") })),
+  );
+  vi.spyOn(bridge, "send").mockReturnValue(Effect.void);
+  vi.spyOn(bridge, "disconnect").mockReturnValue(Effect.void);
   return new TeamWebRtcClientTransport({
     bridge,
-    listHosts: async () => [...hosts],
-    startSession: async () => ({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 }),
-    issueTicket: async () => ({
-      ticket: "ticket",
-      expiresAt: Date.now() + 180_000,
-      signalUrl: "wss://signal.example.test/v1/signal",
-    }),
-    endSession: async () => undefined,
-    createInvite: async () => ({
-      inviteId: "invite",
-      token: "token",
-      expiresAt: Date.now() + 60_000,
-      permanent: false,
-      useCount: 0,
-    }),
-    listInvites: async () => [],
-    previewInvite: async () => ({
-      inviteId: "invite",
-      hostId: "host-1",
-      hostName: "Host",
-      role: "member",
-      expiresAt: Date.now() + 60_000,
-      emailBound: false,
-      permanent: false,
-      devicePublicKey: null,
-    }),
-    acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),
-    revokeInvite: async () => undefined,
-    listMembers: async () => [],
-    updateMember: async () => undefined,
-    removeMember: async () => undefined,
+    listHosts: () => Effect.sync(() => [...hosts]),
+    startSession: () =>
+      Effect.sync(() => ({ sessionId: "session-1", hostId: "host-1", expiresAt: Date.now() + 86_400_000 })),
+    issueTicket: () =>
+      Effect.sync(() => ({
+        ticket: "ticket",
+        expiresAt: Date.now() + 180_000,
+        signalUrl: "wss://signal.example.test/v1/signal",
+      })),
+    endSession: () => Effect.sync(() => undefined),
+    createInvite: () =>
+      Effect.sync(() => ({
+        inviteId: "invite",
+        token: "token",
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      })),
+    listInvites: () => Effect.sync(() => []),
+    previewInvite: () =>
+      Effect.sync(() => ({
+        inviteId: "invite",
+        hostId: "host-1",
+        hostName: "Host",
+        role: "member",
+        expiresAt: Date.now() + 60_000,
+        emailBound: false,
+        permanent: false,
+        devicePublicKey: null,
+      })),
+    acceptInvite: () => Effect.sync(() => ({ hostId: "host-1", membershipId: "member-1", role: "member" })),
+    revokeInvite: () => Effect.sync(() => undefined),
+    listMembers: () => Effect.sync(() => []),
+    updateMember: () => Effect.sync(() => undefined),
+    removeMember: () => Effect.sync(() => undefined),
     getPrincipalId: () => "user-1",
     controlPlaneUrl: "https://api.example.test",
-    downloadHostLogo: async () => ({ bytes: new Uint8Array(), mimeType: "image/png" }),
+    downloadHostLogo: () => Effect.sync(() => ({ bytes: new Uint8Array(), mimeType: "image/png" })),
     transferDirectory: join(tmpdir(), "openbot-remote-harness-transfers"),
   });
 }
@@ -223,7 +232,11 @@ export async function createRemoteManager(options: RemoteManagerOptions = {}): P
   const manager = new RemoteServerManager(
     statePath,
     { encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() },
-    { createTeamAuthTicket: async () => "ticket", getEmail: () => "person@example.com", ...options.account },
+    {
+      createTeamAuthTicket: () => Effect.sync(() => "ticket"),
+      getEmail: () => "person@example.com",
+      ...options.account,
+    },
     { appVersion: options.appVersion, ...options.managerOptions },
   );
   const fixture: RemoteManagerFixture = {
@@ -233,7 +246,7 @@ export async function createRemoteManager(options: RemoteManagerOptions = {}): P
     server: (serverId = servers[0]?.id ?? "") => manager.list().find((server) => server.id === serverId),
   };
   openFixtures.push(fixture);
-  await manager.initialize();
+  await runCauseEffect(manager.initialize());
   return fixture;
 }
 
@@ -241,7 +254,7 @@ export async function createRemoteManager(options: RemoteManagerOptions = {}): P
 export async function stopRemoteFixtures(): Promise<void> {
   const fixtures = openFixtures.splice(0, openFixtures.length);
   for (const fixture of fixtures) {
-    await fixture.manager.stop().catch(() => undefined);
+    await Effect.runPromise(fixture.manager.stop()).catch(() => undefined);
     await rm(fixture.directory, { recursive: true, force: true });
   }
 }

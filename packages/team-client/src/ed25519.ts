@@ -1,5 +1,12 @@
 import { getPublicKeyAsync, hashes, signAsync, verifyAsync } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
+import { Effect, Schema } from "effect";
+
+class Ed25519Error extends Schema.TaggedError<Ed25519Error>()("Ed25519Error", { message: Schema.String }) {}
+
+function cryptoError(error: unknown): Ed25519Error {
+  return new Ed25519Error({ message: error instanceof Error ? error.message : String(error) });
+}
 
 hashes.sha512 = sha512;
 hashes.sha512Async = async (message) => sha512(message);
@@ -15,27 +22,34 @@ export interface Ed25519Identity {
   publicKeyPem: string;
 }
 
-export async function createEd25519Identity(randomBytes: (size: number) => Uint8Array): Promise<Ed25519Identity> {
-  const generated = randomBytes(ED25519_SECRET_KEY_BYTES);
+export const createEd25519Identity = Effect.fn("Ed25519.createIdentity")(function* (
+  randomBytes: (size: number) => Uint8Array,
+) {
+  const generated = yield* Effect.try({ try: () => randomBytes(ED25519_SECRET_KEY_BYTES), catch: cryptoError });
   if (generated.length !== ED25519_SECRET_KEY_BYTES) {
-    throw new Error("The random source returned an invalid Ed25519 secret key.");
+    return yield* new Ed25519Error({ message: "The random source returned an invalid Ed25519 secret key." });
   }
   const secretKey = Uint8Array.from(generated);
-  const publicKey = await getPublicKeyAsync(secretKey);
-  return { secretKey, publicKeyPem: encodePublicKeyPem(publicKey) };
-}
+  const publicKey = yield* Effect.tryPromise({ try: () => getPublicKeyAsync(secretKey), catch: cryptoError });
+  const publicKeyPem = yield* Effect.try({ try: () => encodePublicKeyPem(publicKey), catch: cryptoError });
+  return { secretKey, publicKeyPem };
+});
 
-export async function signEd25519(message: Uint8Array, secretKey: Uint8Array): Promise<Uint8Array> {
-  return signAsync(message, secretKey);
-}
+export const signEd25519 = Effect.fn("Ed25519.sign")(function* (message: Uint8Array, secretKey: Uint8Array) {
+  return yield* Effect.tryPromise({ try: () => signAsync(message, secretKey), catch: cryptoError });
+});
 
-export async function verifyEd25519Pem(
+export const verifyEd25519Pem = Effect.fn("Ed25519.verify")(function* (
   signature: Uint8Array,
   message: Uint8Array,
   publicKeyPem: string,
-): Promise<boolean> {
-  return verifyAsync(signature, message, decodePublicKeyPem(publicKeyPem), { zip215: false });
-}
+) {
+  const key = yield* Effect.try({ try: () => decodePublicKeyPem(publicKeyPem), catch: cryptoError });
+  return yield* Effect.tryPromise({
+    try: () => verifyAsync(signature, message, key, { zip215: false }),
+    catch: cryptoError,
+  });
+});
 
 function encodePublicKeyPem(publicKey: Uint8Array): string {
   if (publicKey.length !== ED25519_PUBLIC_KEY_BYTES) throw new Error("The Ed25519 public key is invalid.");

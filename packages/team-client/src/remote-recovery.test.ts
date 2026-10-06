@@ -1,5 +1,7 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runTeamEffect } from "./effect-boundary";
 import {
   createRemoteConnectionRecovery,
   createRemoteReadRefresh,
@@ -177,17 +179,21 @@ describe("remote connection recovery", () => {
       unread = mergeRemoteUnreadIds(unread, reads);
     };
     const initial = deferredReads();
-    const loading = refresh.refresh(
-      "host",
-      () => initial.promise,
-      apply,
-      () => true,
+    const loading = runTeamEffect(
+      refresh.refresh(
+        "host",
+        () => Effect.tryPromise(() => initial.promise),
+        apply,
+        () => true,
+      ),
     );
-    await refresh.refresh(
-      "host",
-      async () => ({ agent: { unreadCount: 0 } }),
-      apply,
-      () => true,
+    await runTeamEffect(
+      refresh.refresh(
+        "host",
+        () => Effect.tryPromise(async () => ({ agent: { unreadCount: 0 } })),
+        apply,
+        () => true,
+      ),
     );
     initial.resolve({ agent: { unreadCount: 1 } });
     await loading;
@@ -202,17 +208,21 @@ describe("remote connection recovery", () => {
     };
     const initial = deferredReads();
     const other = deferredReads();
-    const loading = refresh.refresh(
-      "host",
-      () => initial.promise,
-      apply,
-      () => true,
+    const loading = runTeamEffect(
+      refresh.refresh(
+        "host",
+        () => Effect.tryPromise(() => initial.promise),
+        apply,
+        () => true,
+      ),
     );
-    const loadingOther = refresh.refresh(
-      "other",
-      () => other.promise,
-      apply,
-      () => true,
+    const loadingOther = runTeamEffect(
+      refresh.refresh(
+        "other",
+        () => Effect.tryPromise(() => other.promise),
+        apply,
+        () => true,
+      ),
     );
     refresh.invalidate("host");
     apply({ agent: { unreadCount: 0 } });
@@ -531,18 +541,21 @@ describe("conversation recovery after an event reset", () => {
       other: snapshot("other", "untouched", 1),
     };
     const loaded: string[] = [];
-    await resyncRemoteConversations({
-      agentIds: ["local", "unopened"],
-      cached,
-      load: async (id) => {
-        loaded.push(id);
-        return snapshot(id, "missed response", 2);
-      },
-      apply: (value) => {
-        cached[value.agentId] = value;
-      },
-      isCurrent: () => true,
-    });
+    await runTeamEffect(
+      resyncRemoteConversations({
+        agentIds: ["local", "unopened"],
+        cached,
+        load: (id) =>
+          Effect.sync(() => {
+            loaded.push(id);
+            return snapshot(id, "missed response", 2);
+          }),
+        apply: (value) => {
+          cached[value.agentId] = value;
+        },
+        isCurrent: () => true,
+      }),
+    );
     expect(cached.local?.messages[0]?.text).toBe("missed response");
     expect(cached.other?.messages[0]?.text).toBe("untouched");
     expect(loaded).toEqual(["local"]);
@@ -557,18 +570,21 @@ describe("conversation recovery after an event reset", () => {
       messages: [],
     };
     let displayed = old;
-    await resyncRemoteConversations({
-      agentIds: ["agent"],
-      cached: { agent: old },
-      load: async () => {
-        current = false;
-        return { ...old, revision: 2 };
-      },
-      apply: (value) => {
-        displayed = value;
-      },
-      isCurrent: () => current,
-    });
+    await runTeamEffect(
+      resyncRemoteConversations({
+        agentIds: ["agent"],
+        cached: { agent: old },
+        load: () =>
+          Effect.sync(() => {
+            current = false;
+            return { ...old, revision: 2 };
+          }),
+        apply: (value) => {
+          displayed = value;
+        },
+        isCurrent: () => current,
+      }),
+    );
     expect(displayed.revision).toBe(1);
   });
 });

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isPlanLimitDiagnostic, isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { USAGE_LIMIT_RECHECK_MS } from "./agent/usage-limit-gate";
@@ -13,7 +14,9 @@ import {
   stopAgentTestFixture,
   waitFor,
 } from "./agent-service-test-harness";
+import { runCauseEffect } from "./effect-boundary";
 import { getRecord, getString, type ResponseDecoder } from "./protocol";
+import type { ProviderClientOperationError } from "./provider-client-effects";
 
 const SESSION_LIMIT = "You've hit your session limit · resets 8:40pm (Europe/Budapest)";
 
@@ -27,9 +30,18 @@ class PlanClient extends FakeAgentClient {
     super(provider, "", false);
   }
 
-  override async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>): Promise<T> {
-    const result = await super.request(method, params, decoder);
-    if (method !== "turn/start") return result;
+  override request<T>(
+    method: string,
+    params: unknown,
+    decoder: ResponseDecoder<T>,
+  ): Effect.Effect<T, ProviderClientOperationError> {
+    return super
+      .request(method, params, decoder)
+      .pipe(Effect.tap((result) => Effect.sync(() => this.#answer(method, params, result))));
+  }
+
+  #answer(method: string, params: unknown, result: unknown): void {
+    if (method !== "turn/start") return;
     this.turnStarts += 1;
     const threadId = getString(params, "threadId");
     const turnId = getString(getRecord(result, "turn"), "id");
@@ -47,7 +59,6 @@ class PlanClient extends FakeAgentClient {
       const status = limit ? "failed" : "completed";
       this.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
     }, 0);
-    return result;
   }
 }
 
@@ -75,10 +86,10 @@ describe.sequential("AgentService: usage limit", () => {
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
 
-    const first = await service.sendMessage({ agentId: "chief", text: "Write the morning plan." });
+    const first = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Write the morning plan." }));
     await waitFor(() => events.some((event) => event.type === "usage-limit-reached"));
     // The gate is closed now, and `scheduleDrain` reads it before it starts anything.
-    const second = await service.sendMessage({ agentId: "chief", text: "Build ended with code 1." });
+    const second = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Build ended with code 1." }));
 
     // The refused message is back in the queue, and the next one does not start into the same refusal.
     expect(client.turnStarts).toBe(1);
@@ -108,11 +119,13 @@ describe.sequential("AgentService: usage limit", () => {
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
 
-    const receipt = await service.sendMessage({ agentId: "chief", text: "Write the morning plan." });
+    const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Write the morning plan." }));
     await waitFor(() => events.some((event) => event.type === "usage-limit-reached"));
     client.limit = null;
     const current = started.store.list().find((agent) => agent.id === "chief")?.model;
-    await service.updateAgent({ agentId: "chief", model: current === "gpt-5.4" ? "gpt-5.5" : "gpt-5.4" });
+    await runCauseEffect(
+      service.updateAgent({ agentId: "chief", model: current === "gpt-5.4" ? "gpt-5.5" : "gpt-5.4" }),
+    );
 
     const delivery = () => started.mailbox.getDelivery(receipt.deliveries[0]?.id ?? "")?.delivery;
     await waitFor(() => delivery()?.status === "completed");
@@ -125,7 +138,7 @@ describe.sequential("AgentService: usage limit", () => {
     const started = await startService(root, { provider: "codex", client: () => client });
     service = started.service;
 
-    const receipt = await service.sendMessage({ agentId: "chief", text: "Clean the build folder." });
+    const receipt = await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Clean the build folder." }));
     const delivery = () => started.mailbox.getDelivery(receipt.deliveries[0]?.id ?? "")?.delivery;
     await waitFor(() => delivery()?.status === "failed");
 
@@ -137,7 +150,7 @@ describe.sequential("AgentService: usage limit", () => {
     const client = new PlanClient("codex");
     const started = await startService(root, { provider: "codex", client: () => client });
     service = started.service;
-    await started.store.getOrCreate("chief");
+    await runCauseEffect(started.store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: "chief",
       name: "Morning plan",
@@ -148,7 +161,7 @@ describe.sequential("AgentService: usage limit", () => {
       limitPolicy: "skip",
     });
 
-    const run = await service.testRoutine({ agentId: "chief", routineId: routine.id });
+    const run = await runCauseEffect(service.testRoutine({ agentId: "chief", routineId: routine.id }));
     const status = () =>
       service?.listRoutineRuns({ agentId: "chief", routineId: routine.id }).find((item) => item.id === run.id)?.status;
     await waitFor(() => status() === "cancelled");
@@ -157,7 +170,7 @@ describe.sequential("AgentService: usage limit", () => {
     expect(started.mailbox.getDelivery(run.deliveryId ?? "")?.delivery.status).toBe("cancelled");
 
     // A run that arrives during the hold is dropped at once. A local script run takes the same path.
-    const late = await service.testRoutine({ agentId: "chief", routineId: routine.id });
+    const late = await runCauseEffect(service.testRoutine({ agentId: "chief", routineId: routine.id }));
     expect(late).toMatchObject({ status: "cancelled", deliveryId: null });
     expect(client.turnStarts).toBe(1);
   });

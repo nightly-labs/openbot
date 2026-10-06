@@ -132,8 +132,8 @@ the shared file panel's width, and for each account and host the pinned item ids
 ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
 desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
-Host switches discard the prior host's chat state. Temporary connection loss keeps drafts;
-uncertain sends require an explicit user check before another send. BroadcastChannel, account
+Host switches discard the prior host's chat state. Temporary connection loss keeps drafts; a
+failed send stays in the chat and is never sent again on its own. BroadcastChannel, account
 checks on focus, and signed session invalidation clear access when a session ends.
 
 MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import
@@ -583,6 +583,46 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
 | Make a teammate whose description owns Notion, then ask a general agent about a Notion page. | The general agent delegates to the Notion teammate. Its answer starts with the teammate's name. |
 | Ask the same question with no Notion plugin installed. | The Notion teammate opens Notion in the browser and requests a takeover for sign-in. When sign-in fails, the answer says what was tried and to install the Notion plugin. |
 
+## Effect service execution
+
+Service workflows use the catalog-pinned `effect` 4.0.0 package. Read the source and
+reference material in the installed package when changing these workflows. The Electron
+main process, account Worker, site-router Worker, Signal service, and shared team client
+use the same version. Framework routing, IPC validation, UI rendering, and event delivery
+keep their native interfaces.
+
+Effects compose domain operations and typed failures. Promise interfaces remain at
+framework and SDK boundaries. These interfaces unwrap expected failures with
+`Effect.result`; defects and interruption can still reject. Existing public error
+mapping and secret redaction remain the responsibility of each boundary.
+
+Long-lived service graphs own their managed runtime and dispose it at shutdown. Provider
+discovery registers disposal in the desktop teardown registry. Each remote peer owns its
+runtime until peer disposal. Signal owns a process runtime. Worker service dependencies
+belong to a request or invocation; they must not retain request bindings in a global
+runtime. Response streams and `waitUntil` tasks retain their framework lifetimes.
+
+Constructor-injected services expose one Effect operation per async method. Service ports
+accept Effects, and callers compose them directly. There are no paired Promise facades.
+Deferred values share pending results; semaphores preserve operation order; owned scopes
+retain background fibers until cleanup. Synchronous SQLite transactions stay synchronous.
+A mutation that must finish before rollback or shutdown uses an explicit interruption boundary.
+
+The renderer and mobile application workflows remain outside this migration. Their native
+callbacks execute shared client Effects and keep existing UI and event behavior. Electron window management,
+HTTP routing, IPC handlers, SDK callback registration, and startup/teardown hooks remain
+framework code. They call Effect service boundaries and await resource disposal.
+
+The isolated agent database host imports Effect from the installed package. It keeps
+its separate process, SQL authorizer, and frozen line protocol. The supervisor can still
+terminate a process blocked in synchronous SQLite work. Desktop packages unpack Effect
+with the host, and package verification checks that the dependency exists there.
+
+Resources belong to the operation that acquires them. Use finalizers for file handles,
+streams, temporary files, permits, and pending callbacks. Forward cancellation only to
+adapters that support it. Cancellation does not make a database write or a remote mutation
+safe to replay. Keep domain retry and recovery rules at their existing owners.
+
 ## Change rules
 
 1. Put a type in `packages/contracts` only when it crosses a process or application boundary.
@@ -799,7 +839,7 @@ check; a device holding no Signal socket finds the change at its next 15-minute 
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
 A foreground return checks absolute freshness: successful account and directory responses stay fresh
 for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
-one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+one minute while foregrounded. Concurrent requests share one Effect result through a Deferred; invalidations received during
 a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
 Stored mobile sessions become available before startup validation completes; network failures retain
 them, and validation results apply only to the initiating login.
@@ -872,7 +912,7 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 ## Required verification
 
 Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:ui` and
-`bun run typecheck`, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
+the typecheck of each project that a staged file affects, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
 for the local rules, and [check design notes](development-checks.md#check-coverage) for what each CI
 job covers.
 
@@ -1333,6 +1373,9 @@ authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
 about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
+Migrations 17, 22, 23, 24 and 26 widen the table's provider `CHECK`. Migration 28 removes it, so a
+new provider needs no table rebuild. `ProviderSessions.bindProviderSession` and the thread replay
+accept only `AGENT_PROVIDERS` and reject other values before they write an event or a row.
 
 ### Gemini
 
@@ -1424,6 +1467,12 @@ Team API v6 is the v5 schema with `cursor` and `cline` added to the providers an
 event stream select it when the peer advertises `local-providers-v2`, and HTTPS negotiates it from
 the protocol range. `GET /v1/agents/models` sends a v1–v5 peer only the ids its charset accepts. A
 v5 peer still gets the filtered view.
+
+The v4, v5 and v6 base schemas are one codec, `provider-aware-codec.ts`. Each `v<N>-base.ts` passes
+`createProviderAwareCodec` a frozen profile: the providers, the signed-in auth kinds and the agent
+model charset. Nothing else differs between these versions. `provider-aware-codec.test.ts` holds
+what each released profile accepts. Do not edit a released profile; a new provider needs a new
+protocol version.
 
 ### Custom agents
 

@@ -15,12 +15,14 @@
 // The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
 // and one page each, which is expensive, so it runs once per connection rather than per event.
 
-import type { AgentEvent, ConversationPage, QueueSnapshot } from "@openbot/contracts/ipc";
+import type { AgentEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { addRemotePreviewUrls, pageQuery } from "./remote-server-urls";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 
 // One in-flight conversation refetch, and the newest revision asked for while it was running.
 // `sequence` counts announcements that did not move the revision: a read on another device changes
@@ -53,7 +55,7 @@ export class RemoteEventRefresh {
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
-  readonly #rosterLoads = new Map<string, Promise<void>>();
+  readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
@@ -66,62 +68,81 @@ export class RemoteEventRefresh {
    * goes straight out. `bufferedLive` marks an event that arrived while the fallback was loading,
    * so the renderer can tell it apart from the snapshot it is patching.
    */
-  forward(serverId: string, event: AgentEvent, bufferedLive = false): void {
+  readonly forward = Effect.fn("RemoteEvents.forward")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+    event: AgentEvent,
+    bufferedLive = false,
+  ) {
     this.#advance(serverId);
     if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
-      void this.#refreshConversationPage(serverId, event.agentId, event.revision);
+      yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
-      void this.#refreshQueue(serverId, event.agentId);
+      yield* this.#refreshQueue(serverId, event.agentId);
     } else {
       const remoteEvent = addRemotePreviewUrls(event, serverId);
       if (bufferedLive) this.#emit(serverId, remoteEvent, true);
       else this.#emit(serverId, remoteEvent);
     }
-  }
+  }).bind(this);
 
   /**
    * Builds the current state from scratch, for a host that cannot replay what was missed. One agent
    * failing is not the server failing, so each is caught on its own.
    */
-  async refreshAgentState(serverId: string): Promise<void> {
+
+  readonly refreshAgentState = Effect.fn("RemoteEvents.refreshAgentState")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
     const generation = this.#advance(serverId);
-    const agents = await this.#request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
+    const request = { request: this.#request };
+    const agents = yield* request.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
     if (this.#generations.get(serverId) !== generation) return;
     this.#emit(serverId, { type: "agents-changed", agents });
-    await Promise.all(
-      agents.map(async (agent) => {
-        try {
-          const [page, queue] = await Promise.all([
-            this.#conversationPage(serverId, agent.id, FALLBACK_CONVERSATION_LIMIT),
-            this.#request(serverId, TEAM_API_ROUTES.agent.queue(agent.id), decodeQueueSnapshot),
-          ]);
+    yield* Effect.forEach(
+      agents,
+      (agent) =>
+        Effect.gen({ self: this }, function* () {
+          const [page, queue] = yield* Effect.all(
+            [
+              this.#conversationPageEffect(serverId, agent.id, FALLBACK_CONVERSATION_LIMIT),
+              request.request(serverId, TEAM_API_ROUTES.agent.queue(agent.id), decodeQueueSnapshot),
+            ],
+            { concurrency: "unbounded" },
+          );
           if (this.#generations.get(serverId) !== generation) return;
           const { pageInfo: _, references: __, readState: ___, ...snapshot } = page;
           this.#emit(serverId, { type: "conversation", snapshot });
           this.#emit(serverId, { type: "queue-changed", snapshot: queue });
-        } catch {
-          // A failed agent refresh must not discard the server or other agents.
-        }
-      }),
+        }).pipe(Effect.catch(() => Effect.void)),
+      { concurrency: "unbounded", discard: true },
     );
-  }
+  }).bind(this);
 
-  /** Runtime snapshots omit the roster. Reload it once when a WebRTC connection recovers. */
-  refreshAgentRoster(serverId: string): Promise<void> {
+  /** Shared admission keeps a roster response bound to its generation. */
+  readonly refreshAgentRoster = Effect.fn("RemoteEvents.refreshAgentRoster")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
     const pending = this.#rosterLoads.get(serverId);
-    if (pending) return pending;
-    const operation = this.#request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)
-      .then((agents) => {
-        if (this.#rosterLoads.get(serverId) !== operation || !this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "agents-changed", agents });
-      })
-      .finally(() => {
-        if (this.#rosterLoads.get(serverId) === operation) this.#rosterLoads.delete(serverId);
-      });
+    if (pending) return yield* Deferred.await(pending);
+    const operation = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     this.#rosterLoads.set(serverId, operation);
-    return operation;
-  }
+    yield* Effect.gen({ self: this }, function* () {
+      const agents = yield* this.#request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
+      if (this.#rosterLoads.get(serverId) !== operation || !this.#hasServer(serverId)) return;
+      this.#emit(serverId, { type: "agents-changed", agents });
+    }).pipe(
+      Effect.onExit((exit) => Deferred.done(operation, exit)),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#rosterLoads.get(serverId) === operation) this.#rosterLoads.delete(serverId);
+        }),
+      ),
+    );
+  }).bind(this);
 
   forget(serverId: string): void {
     this.#rosterLoads.delete(serverId);
@@ -141,7 +162,12 @@ export class RemoteEventRefresh {
     this.#queues.clear();
   }
 
-  async #refreshConversationPage(serverId: string, agentId: string, revision: number): Promise<void> {
+  readonly #refreshConversationPage = Effect.fn("RemoteEvents.refreshConversationPage")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+    agentId: string,
+    revision: number,
+  ) {
     const key = `${serverId}\0${agentId}`;
     const pending = this.#conversations.get(key);
     if (pending) {
@@ -151,35 +177,39 @@ export class RemoteEventRefresh {
     }
     const request = { revision, sequence: 0 };
     this.#conversations.set(key, request);
-    try {
+    yield* Effect.gen({ self: this }, function* () {
       while (this.#hasServer(serverId)) {
         const requestedRevision = request.revision;
         const requestedSequence = request.sequence;
-        let page: ConversationPage;
-        try {
-          page = await this.#conversationPage(serverId, agentId, INVALIDATED_CONVERSATION_LIMIT);
-        } catch {
-          // Something arrived while this failed, so the retry is for that one, not this one.
+        const result = yield* this.#conversationPageEffect(serverId, agentId, INVALIDATED_CONVERSATION_LIMIT).pipe(
+          Effect.result,
+        );
+        if (Result.isFailure(result)) {
           if (request.sequence !== requestedSequence || request.revision !== requestedRevision) continue;
           return;
         }
-        // A read cursor can change without changing the conversation's revision, so the page in hand
-        // is already stale even though its revision is current.
+        const page = result.success;
         if (request.sequence !== requestedSequence) continue;
-        // The host can answer with a page older than the revision it announced. Loop only if
-        // something asked again in the meantime; otherwise the announcement was the stale one.
         if (page.revision >= request.revision) {
           this.#emit(serverId, { type: "conversation-page", page });
           return;
         }
         if (request.revision === requestedRevision) return;
       }
-    } finally {
-      if (this.#conversations.get(key) === request) this.#conversations.delete(key);
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#conversations.get(key) === request) this.#conversations.delete(key);
+        }),
+      ),
+    );
+  });
 
-  async #refreshQueue(serverId: string, agentId: string): Promise<void> {
+  readonly #refreshQueue = Effect.fn("RemoteEvents.refreshQueue")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+    agentId: string,
+  ) {
     const key = `${serverId}\0${agentId}`;
     const pending = this.#queues.get(key);
     if (pending) {
@@ -188,31 +218,36 @@ export class RemoteEventRefresh {
     }
     const request = { dirty: false };
     this.#queues.set(key, request);
-    try {
+    yield* Effect.gen({ self: this }, function* () {
       do {
         request.dirty = false;
-        let snapshot: QueueSnapshot;
-        try {
-          snapshot = await this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot);
-        } catch {
+        const result = yield* this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
+          Effect.result,
+        );
+        if (Result.isFailure(result)) {
           if (request.dirty) continue;
           return;
         }
         if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "queue-changed", snapshot });
+        this.#emit(serverId, { type: "queue-changed", snapshot: result.success });
       } while (request.dirty);
-    } finally {
-      if (this.#queues.get(key) === request) this.#queues.delete(key);
-    }
-  }
-
-  #conversationPage(serverId: string, agentId: string, limit: number): Promise<ConversationPage> {
-    return this.#request(
-      serverId,
-      `${TEAM_API_ROUTES.agent.conversationPage(agentId)}${pageQuery({ type: "latest" }, limit)}`,
-      decodeConversationPageFromHost,
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#queues.get(key) === request) this.#queues.delete(key);
+        }),
+      ),
     );
-  }
+  });
+
+  readonly #conversationPageEffect = Effect.fn("RemoteEvents.conversationPage")(
+    (serverId: string, agentId: string, limit: number) =>
+      this.#request(
+        serverId,
+        `${TEAM_API_ROUTES.agent.conversationPage(agentId)}${pageQuery({ type: "latest" }, limit)}`,
+        decodeConversationPageFromHost,
+      ),
+  );
 
   /**
    * Marks everything in flight as belonging to a previous session. A response that started before

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Who may import agents into the host from a joined server. The authority is deliberate and frozen by
@@ -42,32 +43,35 @@ function createAgentImport(): NonNullable<TeamApiOptions["agentImport"]> & {
   return {
     staged,
     applied,
-    stageUpload: async (read, owner) => {
-      staged.push({ bytes: [...(await read())], owner });
-      return preview;
-    },
-    apply: async (_input, caller): Promise<AgentImportResult> => {
-      if (caller) applied.push(caller);
-      const agent: AgentSummary = {
-        id: "agent-1",
-        name: "Research",
-        title: "Analyst",
-        description: "You are research.",
-        provider: "codex",
-        notifications: true,
-        model: "gpt-5.6-luna",
-        reasoningEffort: "medium",
-        threadId: null,
-        workspacePath: "/Users/host/OpenBot/agent-1",
-        preview: "",
-        updatedAt: null,
-        avatarSeed: "research",
-        avatarHue: null,
-        avatarUrl: null,
-      };
-      return { agents: [agent], skipped: [], channels: [], skippedChannels: [], warnings: [] };
-    },
-    discard: () => undefined,
+    stageUpload: (read, owner) =>
+      Effect.gen(function* () {
+        const bytes = yield* Effect.promise(read);
+        staged.push({ bytes: [...bytes], owner });
+        return preview;
+      }),
+    apply: (_input, caller): Effect.Effect<AgentImportResult> =>
+      Effect.sync(() => {
+        if (caller) applied.push(caller);
+        const agent: AgentSummary = {
+          id: "agent-1",
+          name: "Research",
+          title: "Analyst",
+          description: "You are research.",
+          provider: "codex",
+          notifications: true,
+          model: "gpt-5.6-luna",
+          reasoningEffort: "medium",
+          threadId: null,
+          workspacePath: "/Users/host/OpenBot/agent-1",
+          preview: "",
+          updatedAt: null,
+          avatarSeed: "research",
+          avatarHue: null,
+          avatarUrl: null,
+        };
+        return { agents: [agent], skipped: [], channels: [], skippedChannels: [], warnings: [] };
+      }),
+    discard: () => Effect.void,
   };
 }
 
@@ -76,8 +80,8 @@ describe("Team API agent import", () => {
     const agentImport = createAgentImport();
     const fixture = await createTeamApiFixture("agent-import", { configure: true });
     const { base } = await fixture.start({ agentImport });
-    const invite = await fixture.store.createInvite("member");
-    const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+    const invite = await Effect.runPromise(fixture.store.createInvite("member"));
+    const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
     const headers = {
       Authorization: `Bearer ${member.sessionToken}`,
       "OpenBot-Protocol-Version": "3",

@@ -17,8 +17,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve("src/main/index.ts"),
-          // The database host is its own process. Its runtime imports are `node:*` only, so it
-          // emits a standalone chunk that `utilityProcess.fork` can load by path.
+          // The database host is its own process. Only node:* and the installed Effect package
+          // are runtime imports; the unpacked host must not load the main process bundle.
           "agent-database-host": resolve("src/backend/agent-data/agent-database-host.ts"),
         },
       },

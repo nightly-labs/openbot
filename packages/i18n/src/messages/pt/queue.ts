@@ -14,6 +14,10 @@ export const messages = {
   "queue.item.steerTooltip": "Redirecionar com a mensagem",
   "queue.item.steering": "Redirecionando",
   "queue.item.steer": "Redirecionar",
+  "queue.item.notSteered": "Não redirecionada",
+  "queue.item.steerFallback.providerUnsupported":
+    "Este provedor não pode redirecionar um turno em andamento, então a mensagem espera na fila.",
+  "queue.item.steerFallback.steerFailed": "O redirecionamento falhou, então a mensagem espera na fila.",
   "queue.item.deleteLabel": "Excluir mensagem na fila {position}",
   "queue.item.deleteTooltip": "Excluir mensagem",
   "queue.item.editLabel": "Editar mensagem na fila {position}",
@@ -21,8 +25,4 @@ export const messages = {
   "queue.deleteHeld.title": "Excluir mensagem na fila?",
   "queue.deleteHeld.body": "Outro dispositivo está editando esta mensagem. O agente não vai recebê-la.",
   "queue.deleteHeld.keep": "Manter",
-  "queue.item.notSteered": "Não redirecionada",
-  "queue.item.steerFallback.providerUnsupported":
-    "Este provedor não pode redirecionar um turno em andamento, então a mensagem espera na fila.",
-  "queue.item.steerFallback.steerFailed": "O redirecionamento falhou, então a mensagem espera na fila.",
 } as const satisfies PartialTranslation<typeof source>;

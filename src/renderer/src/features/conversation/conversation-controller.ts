@@ -21,6 +21,7 @@ import {
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
 import type { ComposerDraft, ConversationProps, RightPanelMode, SidebarFilePreview } from "./conversation-types";
+import { createPendingSendStore } from "./stores/pending-send-store";
 
 const SETTINGS_PANEL_DEFAULT = 296;
 const BROWSER_PANEL_DEFAULT = 380;
@@ -121,6 +122,8 @@ export function createStableConversationState(
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
+  // A send in flight belongs to the server it was sent to, so it outlives a server switch.
+  const pendingSends = createPendingSendStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   createEffect(
     () => {
@@ -178,7 +181,14 @@ export function createStableConversationState(
     },
   );
   if (storedDrafts)
-    writeComposerDraftsOnChange({ drafts, channelDrafts, editingAgentId, editingServerId, editingDraftBackup });
+    writeComposerDraftsOnChange({
+      drafts,
+      channelDrafts,
+      editingAgentId,
+      editingServerId,
+      editingDraftBackup,
+      unsentTexts: pendingSends.unsentTexts,
+    });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
@@ -274,6 +284,7 @@ export function createStableConversationState(
     setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
+    pendingSends,
     conversationErrors,
     setConversationErrors,
     composerErrors,
@@ -304,7 +315,7 @@ export function createStableConversationState(
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy`, `submitting` and `selectionSending` are
+ * `attachmentBusy` and `submitting` are
  * here for the same reason by a different route: they carry no key at all. Each
  * describes the composer on screen right now - "a send is in flight" - so a
  * shared owner would disable the arriving server's composer for the length of
@@ -320,7 +331,6 @@ export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
-  const [selectionSending, setSelectionSending] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
@@ -350,8 +360,6 @@ export function createServerConversationState() {
     setAttachmentBusy,
     submitting,
     setSubmitting,
-    selectionSending,
-    setSelectionSending,
     markingRead,
     setMarkingRead,
     dropActive,

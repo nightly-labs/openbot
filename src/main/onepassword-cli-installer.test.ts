@@ -2,7 +2,9 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { installedManagedCli, installOnePasswordCli } from "./onepassword-cli-installer";
 
 let directory: string;
@@ -21,15 +23,10 @@ describe("installOnePasswordCli", () => {
     const tampered = new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]));
 
     await expect(
-      installOnePasswordCli({
-        directory,
-        target: "darwin-arm64",
-        signal: new AbortController().signal,
-        fetch: async () => tampered,
-      }),
+      runCauseEffect(installOnePasswordCli({ directory, target: "darwin-arm64", fetch: async () => tampered })),
     ).rejects.toThrow("OpenBot could not install the 1Password CLI");
 
-    expect(await installedManagedCli(directory, "darwin-arm64")).toBeNull();
+    expect(await Effect.runPromise(installedManagedCli(directory, "darwin-arm64"))).toBeNull();
     expect(await readdir(directory)).toEqual([]);
   });
 });

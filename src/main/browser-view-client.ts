@@ -15,7 +15,9 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Fiber } from "effect";
 import type { RemoteServerManager } from "./remote-server-manager";
+import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 
 export interface BrowserViewClientOptions {
   servers: Pick<
@@ -36,28 +38,30 @@ export class BrowserViewClient {
   readonly #options: BrowserViewClientOptions;
   #view: ActiveView | null = null;
   /** Start and stop both replace the view, so they run one after another rather than at once. */
-  #chain: Promise<void> = Promise.resolve();
+  #chain: Deferred.Deferred<void> | null = null;
+  readonly #events = new Set<Fiber.Fiber<void>>();
 
   constructor(options: BrowserViewClientOptions) {
     this.#options = options;
   }
 
-  async start(tabId: string): Promise<void> {
-    return this.#queue(async () => {
+  readonly start = Effect.fn("BrowserViewClient.start")(
+    function* (this: BrowserViewClient, tabId: string) {
       const serverId = this.#options.servers.activeServerId;
-      if (!serverId) throw new Error(sourceText("error.backend.browserViewRemoteOnly"));
+      if (!serverId)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.backend.browserViewRemoteOnly")) });
       if (!this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY)) {
-        throw new Error(sourceText("error.backend.browserViewUnsupported"));
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.backend.browserViewUnsupported")) });
       }
-      await this.#closeView();
-      const stream = await this.#options.servers.openBrowserViewStream(serverId, tabId);
+      yield* this.#closeViewEffect();
+      const stream = yield* this.#options.servers.openBrowserViewStream(serverId, tabId);
       const url = new URL(stream.url);
       // The host keeps a frame's size only for a client that will say when that frame is on screen.
       // An older client never does, and the host must not retain every frame for the whole session.
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
       }
-      const socket = new WebSocket(url, stream.protocols);
+      const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
       const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, socket };
       this.#view = view;
@@ -70,14 +74,25 @@ export class BrowserViewClient {
           socket.close(1000, "Invalid browser view frame");
         }
       });
-      socket.addEventListener("close", () => this.#viewEnded(view, sourceText("error.backend.browserViewEnded")));
-      socket.addEventListener("error", () => this.#viewEnded(view, sourceText("error.backend.browserViewFailed")));
-    });
-  }
+      const ended = (reason: string) => {
+        const fiber = Effect.runFork(this.#viewEnded(view, reason));
+        this.#events.add(fiber);
+        fiber.addObserver(() => this.#events.delete(fiber));
+      };
+      socket.addEventListener("close", () => ended(sourceText("error.backend.browserViewEnded")));
+      socket.addEventListener("error", () => ended(sourceText("error.backend.browserViewFailed")));
+    },
+    (operation) => this.#queue(operation),
+  ).bind(this);
 
-  async stop(): Promise<void> {
-    return this.#queue(() => this.#closeView());
-  }
+  readonly stop = Effect.fn("BrowserViewClient.stop")(() =>
+    this.#queue(
+      Effect.gen({ self: this }, function* () {
+        yield* this.#closeViewEffect();
+        yield* Fiber.awaitAll([...this.#events]);
+      }),
+    ),
+  );
 
   /**
    * Input is dropped rather than queued when no view is open: a click belongs to the frame the user
@@ -96,27 +111,45 @@ export class BrowserViewClient {
     view.socket.send(encodeBrowserViewInput(wire));
   }
 
-  #queue<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.#chain.then(operation);
-    this.#chain = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+  #queue<T>(operation: Effect.Effect<T, RemoteWorkflowError>): Effect.Effect<T, RemoteWorkflowError> {
+    return Effect.gen({ self: this }, function* () {
+      const previous = this.#chain;
+      const pending = Deferred.makeUnsafe<void>();
+      this.#chain = pending;
+      return yield* Effect.gen(function* () {
+        if (previous) yield* Deferred.await(previous);
+        return yield* operation;
+      }).pipe(
+        Effect.ensuring(
+          Effect.gen({ self: this }, function* () {
+            if (this.#chain === pending) this.#chain = null;
+            yield* Deferred.succeed(pending, undefined);
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 
-  #viewEnded(view: ActiveView, reason: string): void {
+  readonly #viewEnded = Effect.fn("BrowserViewClient.viewEnded")(function* (
+    this: BrowserViewClient,
+    view: ActiveView,
+    reason: string,
+  ) {
     if (this.#view !== view) return;
     this.#view = null;
-    void this.#options.servers.closeBrowserViewSession(view.serverId, view.sessionId).catch(() => undefined);
     this.#options.onEvent({ type: "stopped", tabId: view.tabId, reason });
-  }
+    yield* this.#releaseEffect(view);
+  });
 
-  async #closeView(): Promise<void> {
+  readonly #closeViewEffect = Effect.fn("BrowserViewClient.closeView")(function* (this: BrowserViewClient) {
     const view = this.#view;
     if (!view) return;
     this.#view = null;
     view.socket.close(1000, "The live view was closed");
-    await this.#options.servers.closeBrowserViewSession(view.serverId, view.sessionId).catch(() => undefined);
-  }
+    yield* this.#releaseEffect(view);
+  });
+
+  readonly #releaseEffect = Effect.fn("BrowserViewClient.release")((view: ActiveView) =>
+    this.#options.servers.closeBrowserViewSession(view.serverId, view.sessionId).pipe(Effect.catch(() => Effect.void)),
+  );
 }

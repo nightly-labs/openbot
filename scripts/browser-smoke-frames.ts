@@ -15,10 +15,16 @@ export async function waitForPresentedFrame(contents: WebContents, timeoutMs = 6
   let last = "no capture";
   while (Date.now() < deadline) {
     try {
-      const viewport = String(await contents.executeJavaScript("innerWidth + 'x' + innerHeight"));
+      // The capture is in device pixels and `innerWidth` in CSS pixels, so on a 2x display a
+      // 800x600 viewport presents a 1600x1200 frame. A fractional ratio can round either way.
+      const [width = 0, height = 0, ratio = 1] = String(
+        await contents.executeJavaScript("[innerWidth, innerHeight, devicePixelRatio].join(' ')"),
+      )
+        .split(" ")
+        .map(Number);
       const size = (await contents.capturePage()).getSize();
-      last = `${size.width}x${size.height} for a ${viewport} viewport`;
-      if (`${size.width}x${size.height}` === viewport) return;
+      last = `${size.width}x${size.height} for a ${width}x${height} viewport at ${ratio}x`;
+      if (Math.abs(size.width - width * ratio) <= 1 && Math.abs(size.height - height * ratio) <= 1) return;
     } catch (error) {
       // A view with no frame yet has no surface to copy.
       last = String(error);

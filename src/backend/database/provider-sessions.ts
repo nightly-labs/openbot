@@ -114,6 +114,9 @@ export class ProviderSessions {
     effort: string;
     resumeCursor?: string | null;
   }): ProviderSession {
+    // The table has no provider CHECK since migration 28, so this is the guard. It throws before the
+    // dispatch, so an unknown provider writes no event and no row, as the CHECK did.
+    if (!isAgentProvider(input.provider)) throw new Error("Unknown provider for a provider session.");
     const now = new Date().toISOString();
     const session: ProviderSession = {
       id: randomUUID(),

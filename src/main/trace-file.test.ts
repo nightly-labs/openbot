@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { TraceFile } from "./trace-file";
 
@@ -32,7 +33,7 @@ describe("TraceFile", () => {
       turnId: "turn-1",
       status: "failed /Users/alice/private.txt token=sk-live-abcdefgh1234",
     });
-    await trace.flush();
+    await Effect.runPromise(trace.flush());
 
     const path = join(directory, "trace.ndjson");
     const text = await readFile(path, "utf8");
@@ -46,7 +47,7 @@ describe("TraceFile", () => {
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(["at", "durationMs", "kind", "name", "outcome"]);
 
     await writeFile(path, `${text}{"kind":"ipc","name":"agent:se`);
-    const summary = await trace.summarize();
+    const summary = await Effect.runPromise(trace.summarize());
     expect(summary.map(({ kind, name, count, outcomes, maxMs }) => ({ kind, name, count, outcomes, maxMs }))).toEqual([
       { kind: "ipc", name: "agent:send", count: 2, outcomes: { ok: 1, error: 1 }, maxMs: 30 },
       { kind: "turn", name: "user", count: 1, outcomes: { other: 1 }, maxMs: lines[2].durationMs },

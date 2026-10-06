@@ -7,6 +7,7 @@ import {
   parseDeleteHostedServerInput,
 } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedServerDesktopService } from "../hosted-server-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { requireString } from "./validation";
@@ -20,17 +21,17 @@ export function hostedServerIpcHandlers({
 }: HostedServerIpcDependencies): Pick<IpcGroupHandlers, "hostedServers"> {
   return {
     hostedServers: {
-      list: handler(() => hostedServers.list()),
-      plans: handler(() => hostedServers.plans()),
-      create: payloadHandler(parseCreate, (input) => hostedServers.create(input)),
+      list: handler(() => runCauseEffect(hostedServers.list())),
+      plans: handler(() => runCauseEffect(hostedServers.plans())),
+      create: payloadHandler(parseCreate, (input) => runCauseEffect(hostedServers.create(input))),
       openCheckout: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) => hostedServers.openCheckout(serverId),
+        (serverId) => runCauseEffect(hostedServers.openCheckout(serverId)),
       ),
-      delete: payloadHandler(parseDelete, (input) => hostedServers.delete(input)),
+      delete: payloadHandler(parseDelete, (input) => runCauseEffect(hostedServers.delete(input))),
       wake: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
-        (serverId) => hostedServers.wake(serverId),
+        (serverId) => runCauseEffect(hostedServers.wake(serverId)),
       ),
     },
   };

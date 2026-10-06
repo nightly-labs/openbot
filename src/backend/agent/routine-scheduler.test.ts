@@ -15,6 +15,7 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
+import { runCauseEffect } from "../effect-boundary";
 
 let root: string;
 let service: AgentService | null = null;
@@ -42,12 +43,10 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("design", "Design Studio", "Product design");
-    const receipt = await service.sendMessage(
-      { agentId: "chief", text: "Manage our routines." },
-      undefined,
-      "Pacific/Auckland",
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("design", "Design Studio", "Product design"));
+    const receipt = await runCauseEffect(
+      service.sendMessage({ agentId: "chief", text: "Manage our routines." }, undefined, "Pacific/Auckland"),
     );
     const turnId = () => mailbox.getDelivery(receipt.deliveries[0]?.id ?? "")?.delivery.turnId ?? undefined;
     await waitFor(() => Boolean(store.activeProviderSession("chief") && turnId()));
@@ -121,7 +120,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     });
     expect(service.listRoutines("chief")).toEqual([]);
     expect(service.listRoutines("design")).toEqual([expect.objectContaining({ id: otherRoutine.id, active: true })]);
-    const ownEvents = (await service.readConversation("chief")).messages.flatMap((message) => {
+    const ownEvents = (await runCauseEffect(service.readConversation("chief"))).messages.flatMap((message) => {
       const event = routineConversationEvent(message);
       return event ? [{ ...event, turnId: message.turnId }] : [];
     });
@@ -129,7 +128,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       expect.objectContaining({ action: "created", routineId: ownRoutine.id, turnId: expect.any(String) }),
       expect.objectContaining({ action: "deleted", routineId: ownRoutine.id, turnId: expect.any(String) }),
     ]);
-    const otherEvents = (await service.readConversation("design")).messages.flatMap((message) => {
+    const otherEvents = (await runCauseEffect(service.readConversation("design"))).messages.flatMap((message) => {
       const event = routineConversationEvent(message);
       return event ? [{ ...event, turnId: message.turnId }] : [];
     });
@@ -150,8 +149,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         return client;
       },
     });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Active routine",
@@ -160,7 +159,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    const run = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const run = await runCauseEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() =>
       service
         ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
@@ -169,7 +168,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     const runningDelivery = service.listQueue(agent.id).deliveries.find((delivery) => delivery.status === "running");
     if (!runningDelivery?.turnId || !client) throw new Error("The active routine turn did not start.");
 
-    await service.deleteRoutine({ agentId: agent.id, routineId: routine.id });
+    await runCauseEffect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id }));
 
     expect(client.requests).toContainEqual(
       expect.objectContaining({
@@ -177,7 +176,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         params: expect.objectContaining({ turnId: runningDelivery.turnId }),
       }),
     );
-    const events = (await service.readConversation(agent.id)).messages.flatMap(
+    const events = (await runCauseEffect(service.readConversation(agent.id))).messages.flatMap(
       (message) => routineRunConversationEvent(message) ?? [],
     );
     expect(events).toContainEqual(
@@ -194,8 +193,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         clientFactory: (provider) => new FakeAgentClient(provider, "", false),
       });
     service = createService();
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Atomic run",
@@ -204,13 +203,13 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    const runningRun = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const runningRun = await runCauseEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() =>
       service
         ?.listQueue(agent.id)
         .deliveries.some((delivery) => delivery.id === runningRun.deliveryId && delivery.status === "running"),
     );
-    const queuedRun = await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    const queuedRun = await runCauseEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     const queued = service.listQueue(agent.id).deliveries.find((delivery) => delivery.id === queuedRun.deliveryId);
     if (queued?.status !== "queued") throw new Error("The queued routine delivery is missing.");
     const appendConversationMessage = store.database.appendConversationMessage.bind(store.database);
@@ -223,7 +222,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       return appendConversationMessage(input);
     });
 
-    await expect(service.cancelQueuedMessage(agent.id, queued.id)).rejects.toThrow(
+    await expect(runCauseEffect(service.cancelQueuedMessage(agent.id, queued.id))).rejects.toThrow(
       "transition marker persistence failed",
     );
     expect(
@@ -232,14 +231,14 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         .find((run) => run.deliveryId === queued.id),
     ).toMatchObject({ status: "queued" });
     const cancelledMarkers = async () =>
-      (await service?.readConversation(agent.id))?.messages.filter((message) => {
+      (await (service ? runCauseEffect(service.readConversation(agent.id)) : undefined))?.messages.filter((message) => {
         const event = routineRunConversationEvent(message);
         return event?.runId === queuedRun.id && event.status === "cancelled";
       }) ?? [];
 
-    await service.stop();
+    await runCauseEffect(service.stop());
     service = createService();
-    await service.initialize();
+    await runCauseEffect(service.initialize());
 
     // The restarted service reconciles the cancelled delivery while it starts, so the marker is
     // waited for. It arrives with the run transition, in one transaction. The count stays a plain
@@ -265,13 +264,13 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         return client;
       },
     });
-    await service.initialize();
+    await runCauseEffect(service.initialize());
     const errors: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => {
       if (event.type === "error") errors.push(event);
     });
-    await store.getOrCreate("design", "Design Studio", "Product design");
-    await service.sendMessage({ agentId: "chief", text: "Validate routine requests." });
+    await runCauseEffect(store.getOrCreate("design", "Design Studio", "Product design"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Validate routine requests." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
 
     const client = clients.get("codex");
@@ -379,8 +378,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
         return client;
       },
     });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Watch the inbox folder." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Watch the inbox folder." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
 
     const client = clients.get("codex");
@@ -432,8 +431,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("rolls back a routine mutation when its transcript marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
     const initialAgent = store.list().find((candidate) => candidate.id === agent.id);
     vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
       throw new Error("conversation persistence failed");
@@ -450,7 +449,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       }),
     ).toThrow("conversation persistence failed");
     expect(service.listRoutines(agent.id)).toEqual([]);
-    expect((await service.readConversation(agent.id)).messages).toEqual([]);
+    expect((await runCauseEffect(service.readConversation(agent.id))).messages).toEqual([]);
     expect(store.list().find((candidate) => candidate.id === agent.id)).toMatchObject({
       threadId: initialAgent?.threadId ?? null,
       updatedAt: initialAgent?.updatedAt ?? null,
@@ -459,8 +458,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("restores queued routine work when a delete marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    const agent = await runCauseEffect(store.getOrCreate("chief"));
     const routine = service.createRoutine({
       agentId: agent.id,
       name: "Queued routine",
@@ -469,8 +468,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await runCauseEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
+    await runCauseEffect(service.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "queued"));
     const queuedDelivery = service.listQueue(agent.id).deliveries.find((delivery) => delivery.status === "queued");
     if (!queuedDelivery) throw new Error("The queued routine delivery is missing.");
@@ -484,7 +483,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       return persistConversation(...args);
     });
 
-    await expect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id })).rejects.toThrow(
+    await expect(runCauseEffect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id }))).rejects.toThrow(
       "delete marker persistence failed",
     );
     expect(service.listRoutines(agent.id)).toEqual([expect.objectContaining({ id: routine.id })]);

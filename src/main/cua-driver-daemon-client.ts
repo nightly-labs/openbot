@@ -14,6 +14,8 @@
 
 import { connect, type Socket } from "node:net";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
+import { CuaDriverFailure } from "./cua-driver-effects";
 
 /** How long one read may take before the connection is given up and the tick keeps the last answer. */
 const REQUEST_TIMEOUT_MS = 2_000;
@@ -55,7 +57,6 @@ interface DaemonReadRequest {
 interface PendingRequest {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
 }
 
 /** The reads the rim needs, over one connection that outlives them. */
@@ -75,15 +76,14 @@ export class CuaDriverDaemonClient {
    * The result is the tool's own structured payload, which is what the driver's command line
    * prints, so the readers above it see exactly what they saw before.
    */
-  async listWindows(): Promise<unknown> {
-    const result = await this.#request({
+  listWindows(): Effect.Effect<unknown, CuaDriverFailure> {
+    return this.#request({
       method: "call",
       name: "list_windows",
       args: {},
       session_id: SESSION_ID,
       client_kind: "cli",
-    });
-    return isDynamicRecord(result) ? result.structuredContent : null;
+    }).pipe(Effect.map((result) => (isDynamicRecord(result) ? result.structuredContent : null)));
   }
 
   /**
@@ -93,64 +93,77 @@ export class CuaDriverDaemonClient {
    * through the tools, so the agent's lease - which is what the rim is about - is visible on this
    * method and on no other.
    */
-  sessions(): Promise<unknown> {
+  sessions(): Effect.Effect<unknown, CuaDriverFailure> {
     return this.#request({ method: "sessions_list", client_kind: "cli" });
   }
 
   /** Ends the lease and drops the connection. Safe to call when nothing is connected. */
-  async close(): Promise<void> {
-    const socket = this.#socket;
-    if (socket) {
-      // Best effort: the daemon drops the lease by itself when a connection ends, and a daemon that
-      // has already stopped is the ordinary way this runs at teardown.
-      await this.#request({ method: "session_end", session_id: SESSION_ID, client_kind: "cli" }).catch(() => undefined);
-    }
-    this.#drop(new Error("The Computer Use driver connection was closed."));
+  close(): Effect.Effect<void, CuaDriverFailure> {
+    return Effect.gen({ self: this }, function* () {
+      if (this.#socket)
+        yield* this.#request({ method: "session_end", session_id: SESSION_ID, client_kind: "cli" }).pipe(
+          Effect.catch(() => Effect.void),
+        );
+    }).pipe(
+      Effect.ensuring(Effect.sync(() => this.#drop(new Error("The Computer Use driver connection was closed.")))),
+    );
   }
 
-  async #request(payload: DaemonReadRequest): Promise<unknown> {
-    const socket = await this.#connection();
-    return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        // A late answer would be handed to the next request, because the protocol carries no
-        // request id and answers are matched in order. So a read that times out ends the
-        // connection rather than leaving it one answer out of step.
-        this.#drop(new Error("The Computer Use driver did not answer in time."));
-      }, REQUEST_TIMEOUT_MS);
-      this.#pending.push({ resolve, reject, timer });
+  #request = Effect.fn("CuaDriverDaemon.request")(function* (this: CuaDriverDaemonClient, payload: DaemonReadRequest) {
+    const socket = yield* this.#connection();
+    return yield* Effect.callback<unknown, CuaDriverFailure>((resume) => {
+      const pending: PendingRequest = {
+        resolve: (result) => resume(Effect.succeed(result)),
+        reject: (cause) => resume(Effect.fail(new CuaDriverFailure({ cause }))),
+      };
+      this.#pending.push(pending);
       try {
         socket.write(`${JSON.stringify(payload)}\n`);
       } catch (error) {
-        // A daemon that stopped between two reads fails the write before anything says the
-        // connection is gone. That read is lost and the connection with it; the next one opens a
-        // new connection, which is a single tick of the rim rather than a rim that stays down.
         this.#drop(error instanceof Error ? error : new Error(String(error)));
       }
-    });
-  }
+      // Replies have no id. An interrupted read must close the socket before another read.
+      return Effect.sync(() => {
+        if (this.#pending.includes(pending)) this.#drop(new Error("The Computer Use driver did not answer in time."));
+      });
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: REQUEST_TIMEOUT_MS,
+        orElse: () =>
+          Effect.fail(new CuaDriverFailure({ cause: new Error("The Computer Use driver did not answer in time.") })),
+      }),
+    );
+  });
 
-  async #connection(): Promise<Socket> {
+  #connection = Effect.fn("CuaDriverDaemon.connect")(function* (this: CuaDriverDaemonClient) {
     const existing = this.#socket;
     if (existing && !existing.destroyed) return existing;
     const path = this.#socketPath();
-    if (!path) throw new Error("The Computer Use driver is not running.");
-    const socket = await new Promise<Socket>((resolve, reject) => {
+    if (!path) return yield* new CuaDriverFailure({ cause: new Error("The Computer Use driver is not running.") });
+    return yield* Effect.callback<Socket, CuaDriverFailure>((resume) => {
       const opening = connect(path);
-      const fail = (error: Error) => reject(error);
-      opening.once("error", fail);
-      opening.once("connect", () => {
+      let connected = false;
+      const fail = (cause: Error) => resume(Effect.fail(new CuaDriverFailure({ cause })));
+      const ready = () => {
+        connected = true;
         opening.removeListener("error", fail);
-        resolve(opening);
+        this.#socket = opening;
+        this.#buffer = "";
+        opening.setEncoding("utf8");
+        opening.on("data", (chunk: string) => this.#read(chunk));
+        opening.on("error", (error) => this.#drop(error));
+        opening.on("close", () => this.#drop(new Error("The Computer Use driver closed the connection.")));
+        resume(Effect.succeed(opening));
+      };
+      opening.once("error", fail);
+      opening.once("connect", ready);
+      return Effect.sync(() => {
+        opening.removeListener("connect", ready);
+        opening.removeListener("error", fail);
+        if (!connected) opening.destroy();
       });
     });
-    this.#socket = socket;
-    this.#buffer = "";
-    socket.setEncoding("utf8");
-    socket.on("data", (chunk: string) => this.#read(chunk));
-    socket.on("error", (error) => this.#drop(error));
-    socket.on("close", () => this.#drop(new Error("The Computer Use driver closed the connection.")));
-    return socket;
-  }
+  });
 
   #read(chunk: string): void {
     this.#buffer += chunk;
@@ -169,7 +182,6 @@ export class CuaDriverDaemonClient {
   #answer(line: string): void {
     const pending = this.#pending.shift();
     if (!pending) return;
-    clearTimeout(pending.timer);
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
@@ -194,7 +206,6 @@ export class CuaDriverDaemonClient {
     const pending = this.#pending;
     this.#pending = [];
     for (const request of pending) {
-      clearTimeout(request.timer);
       request.reject(error);
     }
     if (socket) {

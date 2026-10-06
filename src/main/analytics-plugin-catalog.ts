@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect } from "effect";
+import { analyticsIO, analyticsSync } from "./analytics-effects";
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
@@ -19,26 +21,29 @@ export interface CatalogPluginServer {
  * Reads the plugin catalog that ships in the app resources. A missing or damaged catalog gives no
  * servers, so every configured server reports as `custom`: analytics must never stop startup.
  */
-export async function loadCatalogPluginServers(root: string): Promise<CatalogPluginServer[]> {
-  try {
-    const catalog = JSON.parse(await readFile(join(root, "catalog.json"), "utf8"));
+export const loadCatalogPluginServers = Effect.fn("Analytics.loadPluginCatalog")(
+  function* (root: string) {
+    const contents = yield* analyticsIO(() => readFile(join(root, "catalog.json"), "utf8"));
+    const catalog = yield* analyticsSync(() => JSON.parse(contents));
     if (!isDynamicRecord(catalog) || !Array.isArray(catalog.plugins)) return [];
-    const servers = await Promise.all(
-      catalog.plugins.map(async (entry: unknown) => {
+    const servers = yield* Effect.forEach(
+      catalog.plugins,
+      Effect.fn("Analytics.loadPluginDetail")(function* (entry: unknown) {
         if (!isDynamicRecord(entry) || !isString(entry.slug) || !isString(entry.version)) return [];
         const { slug, version } = entry;
         if (!SLUG_PATTERN.test(slug) || !/^[\w.-]+$/u.test(version)) return [];
-        const detail = JSON.parse(await readFile(join(root, slug, `${version}.json`), "utf8"));
+        const contents = yield* analyticsIO(() => readFile(join(root, slug, `${version}.json`), "utf8"));
+        const detail = yield* analyticsSync(() => JSON.parse(contents));
         return isDynamicRecord(detail) && Array.isArray(detail.apps)
           ? detail.apps.flatMap((app: unknown) => catalogServer(slug, app))
           : [];
       }),
+      { concurrency: "unbounded" },
     );
     return servers.flat();
-  } catch {
-    return [];
-  }
-}
+  },
+  Effect.catch(() => Effect.succeed([])),
+);
 
 function catalogServer(slug: string, app: unknown): CatalogPluginServer[] {
   if (!isDynamicRecord(app) || !isDynamicRecord(app.server)) return [];

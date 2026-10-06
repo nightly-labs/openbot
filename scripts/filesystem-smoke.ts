@@ -8,6 +8,7 @@ import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
 import { resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "../src/backend/cli";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { GrokAgentClient } from "../src/backend/grok-client";
 import {
   confineSpawnTarget,
@@ -78,87 +79,93 @@ async function runFilesystemSmoke(provider: AgentProvider, completedProviders: A
   client.start();
   try {
     await initialize(client);
-    const started = await client.request(
-      "thread/start",
-      {
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "on-request",
-        sandbox: "danger-full-access",
-        ephemeral: provider === "codex",
-        persistSession: false,
-        serviceName: "openbot_filesystem_smoke",
-        developerInstructions: [
-          "This is an isolated local filesystem smoke test.",
-          `Your persistent workspace is ${workspaceRoot}.`,
-          `The persistent shared directory is ${sharedRoot}.`,
-          "You have full filesystem and command access. Do not use the network or modify files outside those directories.",
-        ].join("\n"),
-      },
-      decodeThreadResponse,
+    const started = await runCauseEffect(
+      client.request(
+        "thread/start",
+        {
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "on-request",
+          sandbox: "danger-full-access",
+          ephemeral: provider === "codex",
+          persistSession: false,
+          serviceName: "openbot_filesystem_smoke",
+          developerInstructions: [
+            "This is an isolated local filesystem smoke test.",
+            `Your persistent workspace is ${workspaceRoot}.`,
+            `The persistent shared directory is ${sharedRoot}.`,
+            "You have full filesystem and command access. Do not use the network or modify files outside those directories.",
+          ].join("\n"),
+        },
+        decodeThreadResponse,
+      ),
     );
 
     const completion = waitForTurn(client, 180_000);
-    await client.request(
-      "turn/start",
-      {
-        threadId: started.thread.id,
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "on-request",
-        sandboxPolicy: { type: "dangerFullAccess" },
-        input: [
-          {
-            type: "text",
-            text: [
-              "Use local system commands for every step.",
-              `Run pwd and verify it prints ${workspaceRoot}.`,
-              `Run ls and grep to verify ${workspaceSeedPath} contains OPENBOT_${provider.toUpperCase()}_WORKSPACE_SEED.`,
-              `Run grep to verify ${join(sharedRoot, "shared-seed.txt")} contains OPENBOT_SHARED_SEED.`,
-              ...completedProviders.map(
-                (completedProvider) =>
-                  `Run grep to verify ${join(sharedRoot, `${completedProvider}-shared-result.txt`)} contains OPENBOT_${completedProvider.toUpperCase()}_SHARED_OK.`,
-              ),
-              `Replace ${temporaryPath} with ${workspaceResultPath} using mv, then write exactly OPENBOT_${provider.toUpperCase()}_WORKSPACE_OK followed by one newline to it.`,
-              `Delete ${deletePath} using rm.`,
-              `Write exactly OPENBOT_${provider.toUpperCase()}_SHARED_OK followed by one newline to ${sharedResultPath}.`,
-              "Verify the results with local commands, then finish with a short confirmation.",
-            ].join("\n"),
-          },
-        ],
-      },
-      decodeTurnResponse,
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: started.thread.id,
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "on-request",
+          sandboxPolicy: { type: "dangerFullAccess" },
+          input: [
+            {
+              type: "text",
+              text: [
+                "Use local system commands for every step.",
+                `Run pwd and verify it prints ${workspaceRoot}.`,
+                `Run ls and grep to verify ${workspaceSeedPath} contains OPENBOT_${provider.toUpperCase()}_WORKSPACE_SEED.`,
+                `Run grep to verify ${join(sharedRoot, "shared-seed.txt")} contains OPENBOT_SHARED_SEED.`,
+                ...completedProviders.map(
+                  (completedProvider) =>
+                    `Run grep to verify ${join(sharedRoot, `${completedProvider}-shared-result.txt`)} contains OPENBOT_${completedProvider.toUpperCase()}_SHARED_OK.`,
+                ),
+                `Replace ${temporaryPath} with ${workspaceResultPath} using mv, then write exactly OPENBOT_${provider.toUpperCase()}_WORKSPACE_OK followed by one newline to it.`,
+                `Delete ${deletePath} using rm.`,
+                `Write exactly OPENBOT_${provider.toUpperCase()}_SHARED_OK followed by one newline to ${sharedResultPath}.`,
+                "Verify the results with local commands, then finish with a short confirmation.",
+              ].join("\n"),
+            },
+          ],
+        },
+        decodeTurnResponse,
+      ),
     );
     await completion;
 
     const persistenceCompletion = waitForTurn(client, 180_000);
-    await client.request(
-      "turn/start",
-      {
-        threadId: started.thread.id,
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "on-request",
-        sandboxPolicy: { type: "dangerFullAccess" },
-        input: [
-          {
-            type: "text",
-            text: [
-              `In this new turn, run grep to confirm ${workspaceResultPath} still contains OPENBOT_${provider.toUpperCase()}_WORKSPACE_OK.`,
-              `Run grep to confirm ${sharedResultPath} still contains OPENBOT_${provider.toUpperCase()}_SHARED_OK.`,
-              `Write exactly OPENBOT_${provider.toUpperCase()}_PERSISTENCE_OK followed by one newline to ${persistenceResultPath}.`,
-              "Finish with a short confirmation.",
-            ].join("\n"),
-          },
-        ],
-      },
-      decodeTurnResponse,
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: started.thread.id,
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "on-request",
+          sandboxPolicy: { type: "dangerFullAccess" },
+          input: [
+            {
+              type: "text",
+              text: [
+                `In this new turn, run grep to confirm ${workspaceResultPath} still contains OPENBOT_${provider.toUpperCase()}_WORKSPACE_OK.`,
+                `Run grep to confirm ${sharedResultPath} still contains OPENBOT_${provider.toUpperCase()}_SHARED_OK.`,
+                `Write exactly OPENBOT_${provider.toUpperCase()}_PERSISTENCE_OK followed by one newline to ${persistenceResultPath}.`,
+                "Finish with a short confirmation.",
+              ].join("\n"),
+            },
+          ],
+        },
+        decodeTurnResponse,
+      ),
     );
     await persistenceCompletion;
 
@@ -194,7 +201,7 @@ async function runFilesystemSmoke(provider: AgentProvider, completedProviders: A
       )}\n`,
     );
   } finally {
-    await client.stop();
+    await runCauseEffect(client.stop());
   }
 }
 
@@ -275,55 +282,59 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     await initialize(client);
     const model = created.model ?? (await defaultModel(client));
     const codexConfig = provider === "codex" ? codexSandboxConfig(agent, sharedRoot) : {};
-    const started = await client.request(
-      "thread/start",
-      {
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "on-request",
-        sandbox: codexSandboxMode(agent),
-        ...(Object.keys(codexConfig).length > 0 ? { config: codexConfig } : {}),
-        ephemeral: provider === "codex",
-        persistSession: false,
-        serviceName: "openbot_filesystem_smoke",
-        developerInstructions: [
-          "This is an isolated sandbox smoke test. The user wants every step tried, also the ones that fail.",
-          `Your workspace is ${workspaceRoot}. The shared directory is ${sharedRoot}.`,
-          "You may write only in those two directories. Report each failure and continue with the next step.",
-        ].join("\n"),
-      },
-      decodeThreadResponse,
+    const started = await runCauseEffect(
+      client.request(
+        "thread/start",
+        {
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "on-request",
+          sandbox: codexSandboxMode(agent),
+          ...(Object.keys(codexConfig).length > 0 ? { config: codexConfig } : {}),
+          ephemeral: provider === "codex",
+          persistSession: false,
+          serviceName: "openbot_filesystem_smoke",
+          developerInstructions: [
+            "This is an isolated sandbox smoke test. The user wants every step tried, also the ones that fail.",
+            `Your workspace is ${workspaceRoot}. The shared directory is ${sharedRoot}.`,
+            "You may write only in those two directories. Report each failure and continue with the next step.",
+          ].join("\n"),
+        },
+        decodeThreadResponse,
+      ),
     );
 
     const completion = waitForTurn(client, 240_000);
-    await client.request(
-      "turn/start",
-      {
-        threadId: started.thread.id,
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "on-request",
-        sandboxPolicy: codexSandboxPolicy(agent, sharedRoot),
-        input: [
-          {
-            type: "text",
-            text: [
-              "Do these steps in order. Do each step once, and do not retry a step that fails.",
-              `1. Run a shell command that writes exactly OPENBOT_${token}_INSIDE_OK followed by one newline to ${paths.workspace}.`,
-              `2. Run a shell command that writes exactly OPENBOT_${token}_SHARED_OK followed by one newline to ${paths.shared}.`,
-              `3. Run: curl -sS -o /dev/null -w '%{http_code}' https://example.com > ${paths.network}`,
-              `4. Run exactly this one shell command, which is expected to fail and records its exit status: printf 'OUTSIDE\\n' > ${paths.commandOutside}; echo $? > ${paths.commandStatus}`,
-              `5. Use your file edit or file write tool, not a shell command, to create ${paths.editOutside} with the text OUTSIDE. This step is expected to fail.`,
-              "Finish with one line per step: the step number and whether it worked.",
-            ].join("\n"),
-          },
-        ],
-      },
-      decodeTurnResponse,
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: started.thread.id,
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "on-request",
+          sandboxPolicy: codexSandboxPolicy(agent, sharedRoot),
+          input: [
+            {
+              type: "text",
+              text: [
+                "Do these steps in order. Do each step once, and do not retry a step that fails.",
+                `1. Run a shell command that writes exactly OPENBOT_${token}_INSIDE_OK followed by one newline to ${paths.workspace}.`,
+                `2. Run a shell command that writes exactly OPENBOT_${token}_SHARED_OK followed by one newline to ${paths.shared}.`,
+                `3. Run: curl -sS -o /dev/null -w '%{http_code}' https://example.com > ${paths.network}`,
+                `4. Run exactly this one shell command, which is expected to fail and records its exit status: printf 'OUTSIDE\\n' > ${paths.commandOutside}; echo $? > ${paths.commandStatus}`,
+                `5. Use your file edit or file write tool, not a shell command, to create ${paths.editOutside} with the text OUTSIDE. This step is expected to fail.`,
+                "Finish with one line per step: the step number and whether it worked.",
+              ].join("\n"),
+            },
+          ],
+        },
+        decodeTurnResponse,
+      ),
     );
     await completion;
 
@@ -381,7 +392,7 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     );
     if (failures.length > 0) throw new Error(`${provider} Workspace only smoke failed: ${failures.join(" ")}`);
   } finally {
-    await client.stop();
+    await runCauseEffect(client.stop());
     await rm(outsideRoot, { recursive: true, force: true });
   }
 }
@@ -395,50 +406,54 @@ async function runImagegenSmoke(): Promise<void> {
   client.start();
   try {
     await initialize(client);
-    const started = await client.request(
-      "thread/start",
-      {
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "never",
-        sandbox: "danger-full-access",
-        ephemeral: true,
-        serviceName: "openbot_filesystem_smoke",
-        developerInstructions: [
-          "This is an isolated local image-generation smoke test.",
-          `Only create files inside ${workspaceRoot}.`,
-          "Use the installed imagegen skill and its image generation tool. Do not modify any other files.",
-        ].join("\n"),
-      },
-      decodeThreadResponse,
+    const started = await runCauseEffect(
+      client.request(
+        "thread/start",
+        {
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "never",
+          sandbox: "danger-full-access",
+          ephemeral: true,
+          serviceName: "openbot_filesystem_smoke",
+          developerInstructions: [
+            "This is an isolated local image-generation smoke test.",
+            `Only create files inside ${workspaceRoot}.`,
+            "Use the installed imagegen skill and its image generation tool. Do not modify any other files.",
+          ].join("\n"),
+        },
+        decodeThreadResponse,
+      ),
     );
 
     const completion = waitForTurn(client, 300_000);
-    await client.request(
-      "turn/start",
-      {
-        threadId: started.thread.id,
-        model,
-        effort: "medium",
-        cwd: workspaceRoot,
-        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
-        approvalPolicy: "never",
-        sandboxPolicy: { type: "dangerFullAccess" },
-        input: [
-          {
-            type: "text",
-            text: [
-              "Use $imagegen and the real image generation tool, not drawing code, SVG, Canvas, or a hand-written PNG.",
-              "Generate a polished square illustration of a small red robot passing a file to a yellow robot on a dark background.",
-              `Save or copy the final generated PNG to ${imagePath}.`,
-              "Verify the PNG exists, then finish with a short confirmation.",
-            ].join("\n"),
-          },
-        ],
-      },
-      decodeTurnResponse,
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: started.thread.id,
+          model,
+          effort: "medium",
+          cwd: workspaceRoot,
+          runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+          approvalPolicy: "never",
+          sandboxPolicy: { type: "dangerFullAccess" },
+          input: [
+            {
+              type: "text",
+              text: [
+                "Use $imagegen and the real image generation tool, not drawing code, SVG, Canvas, or a hand-written PNG.",
+                "Generate a polished square illustration of a small red robot passing a file to a yellow robot on a dark background.",
+                `Save or copy the final generated PNG to ${imagePath}.`,
+                "Verify the PNG exists, then finish with a short confirmation.",
+              ].join("\n"),
+            },
+          ],
+        },
+        decodeTurnResponse,
+      ),
     );
     await completion;
 
@@ -465,7 +480,7 @@ async function runImagegenSmoke(): Promise<void> {
       )}\n`,
     );
   } finally {
-    await client.stop();
+    await runCauseEffect(client.stop());
   }
 }
 
@@ -484,11 +499,11 @@ async function createClient(
     if (!confinement) throw new Error(`The filesystem smoke runs ${provider} only with --workspace-only.`);
     const model = modelArgument();
     if (provider === "grok") {
-      const cli = await resolveGrokCli();
+      const cli = await runCauseEffect(resolveGrokCli());
       const client = new GrokAgentClient(cli, 60_000, false, undefined, undefined, undefined, undefined, confinement);
       return { client, model, version: cli.version };
     }
-    const cli = await resolveOpencodeCli();
+    const cli = await runCauseEffect(resolveOpencodeCli());
     const client = new AcpAgentClient(cli, 60_000, {
       provider: "opencode",
       argv: ["acp"],
@@ -499,7 +514,7 @@ async function createClient(
     return { client, model, version: cli.version };
   }
   if (provider === "claude") {
-    const cli = await resolveClaudeCli();
+    const cli = await runCauseEffect(resolveClaudeCli());
     const client = new ClaudeAgentClient(
       cli,
       undefined,
@@ -513,22 +528,24 @@ async function createClient(
     );
     return { client, model: "claude-sonnet-5", version: cli.version };
   }
-  const cli = await resolveCodexCli();
+  const cli = await runCauseEffect(resolveCodexCli());
   return { client: new CodexAppServerClient(cli.executable, 60_000), model: "gpt-5.6-luna", version: cli.version };
 }
 
 async function initialize(client: AgentClient): Promise<void> {
-  await client.request(
-    "initialize",
-    {
-      clientInfo: {
-        name: "openbot_filesystem_smoke",
-        title: "OpenBot Filesystem Smoke",
-        version: "0.1.0",
+  await runCauseEffect(
+    client.request(
+      "initialize",
+      {
+        clientInfo: {
+          name: "openbot_filesystem_smoke",
+          title: "OpenBot Filesystem Smoke",
+          version: "0.1.0",
+        },
+        capabilities: { experimentalApi: true },
       },
-      capabilities: { experimentalApi: true },
-    },
-    decodeRecordResponse,
+      decodeRecordResponse,
+    ),
   );
   client.notify("initialized");
 }
@@ -549,7 +566,7 @@ function modelArgument(): string | null {
 }
 
 async function defaultModel(client: AgentClient): Promise<string> {
-  const models = await client.request("model/list", {}, decodeModelListResponse);
+  const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
   const model = models.data[0]?.model;
   if (!model) throw new Error(`${client.provider} listed no model. Pass --model.`);
   return model;

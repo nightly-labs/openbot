@@ -102,7 +102,6 @@ export const messages = {
   "error.remote.desktopRestarted":
     "Masaüstü yeniden başlatıldı. Yeni bir kimliği doğrulanmış oturumla yeniden bağlanılıyor.",
   "error.remote.dataBeforeAuth": "Ana makine kimlik doğrulamasından önce veri gönderdi.",
-  "error.remote.attachmentDownloadFailed": "Ek indirme başarısız oldu.",
   "error.remote.eventStreamGap": "Ana makine etkinlik akışında bir boşluk var.",
   "error.remote.malformedEvent": "Ana makine bozuk biçimli bir etkinlik döndürdü.",
   "error.remote.desktopIdentityNotVerified": "Masaüstü kimliği doğrulanamadı.",

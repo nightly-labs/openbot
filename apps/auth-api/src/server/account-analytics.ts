@@ -14,6 +14,7 @@ import {
   type HostedServerSize,
 } from "@openbot/contracts/hosted-servers";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { Effect, Schema } from "effect";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -88,19 +89,23 @@ export interface AccountAnalyticsOptions {
   clientSecret: string | undefined;
   fetch: (input: string, init: RequestInit) => Promise<Response>;
   /** Keeps the Worker alive until the send ends (`waitUntil`). */
-  schedule: (send: Promise<void>) => void;
+  schedule: (send: Effect.Effect<void>) => void;
 }
+
+class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
 
 export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
   if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  return {
-    track(accountId, event) {
-      const properties = accountEventProperties(event);
-      if (!properties || !ACCOUNT_ID_PATTERN.test(accountId)) return;
-      const send = options
-        .fetch(`${OPENPANEL_API_URL}/track`, {
+  const send = Effect.fn("AccountAnalytics.send")(function* (
+    accountId: string,
+    event: AccountAnalyticsEvent,
+    properties: Record<string, string | number>,
+  ) {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        options.fetch(`${OPENPANEL_API_URL}/track`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -108,15 +113,21 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
             "openpanel-client-secret": clientSecret,
           },
           body: JSON.stringify({ type: "track", payload: { name: event.name, profileId: accountId, properties } }),
-          signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-        })
-        .then(
-          (response) => {
-            if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
-          },
-          () => console.warn("Account analytics send failed."),
-        );
-      options.schedule(send);
+          signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
+        }),
+      catch: () => new AnalyticsDeliveryError({}),
+    });
+    if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
+  });
+  return {
+    track(accountId, event) {
+      const properties = accountEventProperties(event);
+      if (!properties || !ACCOUNT_ID_PATTERN.test(accountId)) return;
+      options.schedule(
+        send(accountId, event, properties).pipe(
+          Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))),
+        ),
+      );
     },
   };
 }
