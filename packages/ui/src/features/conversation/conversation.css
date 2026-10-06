@@ -14,6 +14,7 @@
 @import "./styles/awaiting-replies.css";
 @import "./styles/header-controls.css";
 @import "./styles/timeline.css";
+@import "./styles/scroll-rail.css";
 @import "./styles/messages.css";
 @import "./styles/message-content.css";
 @import "./styles/math.css";

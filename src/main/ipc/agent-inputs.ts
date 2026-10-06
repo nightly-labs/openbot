@@ -22,6 +22,7 @@ import {
   isAgentProvider,
   isAvatarHue,
   isAvatarSeed,
+  isBusyMessageMode,
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
@@ -537,6 +538,12 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.allowAutomation !== undefined) {
     if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
     result.allowAutomation = value.allowAutomation;
+  }
+  if (value.busyMessageMode !== undefined) {
+    if (value.busyMessageMode !== null && !isBusyMessageMode(value.busyMessageMode)) {
+      throw new Error("Invalid busy message mode.");
+    }
+    result.busyMessageMode = value.busyMessageMode;
   }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");

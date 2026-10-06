@@ -62,3 +62,38 @@ export function dayMarkerLabel(
   if (age === 1) return t("chat.day.yesterday", { time });
   return t("chat.day.date", { date: dateOf(current, options), time });
 }
+
+/** How many calendar days lie from one time to a later one, in local time: 0 for the same day. */
+export function calendarDaysBetween(fromIso: string, toIso: string): number {
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.max(0, dayDifference(from, to));
+}
+
+/** Where a day starts in a transcript: the row that carries its separator, and the separator's text. */
+export interface ChatDaySection {
+  index: number;
+  label: string;
+}
+
+/** A transcript row as the day rule reads it: its stored time, and the time its footer prints. */
+export interface ChatDayRow {
+  createdAt?: string | undefined;
+  time?: string | undefined;
+}
+
+/**
+ * The days of a transcript, in the rule of `dayMarkerLabel`. The first row always opens a day, so a
+ * transcript with rows has at least one. A first row with no stored time takes the label its separator
+ * shows: the time in its footer, or "now".
+ */
+export function chatDaySections(rows: readonly ChatDayRow[], options: DayMarkerOptions = {}): ChatDaySection[] {
+  const sections: ChatDaySection[] = [];
+  rows.forEach((row, index) => {
+    const label = row.createdAt ? dayMarkerLabel(rows[index - 1]?.createdAt, row.createdAt, options) : null;
+    if (label !== null) sections.push({ index, label });
+    else if (index === 0) sections.push({ index, label: row.time ?? (options.t ?? currentText().t)("chat.day.now") });
+  });
+  return sections;
+}

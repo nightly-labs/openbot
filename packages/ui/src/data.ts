@@ -180,6 +180,8 @@ export interface AgentProfile {
   computerUse?: boolean;
   /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
   allowAutomation?: boolean;
+  /** Absent means the app default. Absent for an agent on a remote host too, which does not share it. */
+  busyMessageMode?: AgentSummary["busyMessageMode"];
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
+import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
@@ -85,6 +86,9 @@ export interface ChannelPage {
   tasks: ChannelTask[];
   olderCursor: number | null;
   throughSequence: number;
+  /** As in `ConversationPageInfo`: the unloaded length, for the day rail. Absent from a remote host. */
+  olderCount?: number;
+  oldestAt?: string;
 }
 
 export type ChannelCommand =
@@ -267,6 +271,7 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     tasks: value.tasks,
     olderCursor: value.olderCursor,
     throughSequence: value.throughSequence,
+    ...optionalHistoryExtent(value),
   };
 }
 

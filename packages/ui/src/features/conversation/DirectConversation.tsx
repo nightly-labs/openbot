@@ -22,6 +22,7 @@ import {
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { ChatScrollRail, createChatScrollRail, type UnloadedHistory } from "./ChatScrollRail";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
 import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "./send-shortcut";
@@ -33,6 +34,8 @@ interface DirectConversationProps {
   loading: boolean;
   loadError: string | null;
   hasOlder?: boolean;
+  /** The messages above the loaded page, for the day rail. Absent when the host does not count them. */
+  unloadedHistory?: UnloadedHistory | undefined;
   loadingOlder?: boolean;
   olderError?: string | null;
   typing: boolean;
@@ -99,6 +102,15 @@ export function DirectConversation(props: DirectConversationProps) {
     },
   });
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
+  const rail = createChatScrollRail({
+    rows: () => props.snapshot?.messages ?? [],
+    unloaded: () => props.unloadedHistory,
+    virtualizer: messageVirtualizer,
+    onLoadOlder: () => props.onLoadOlder?.(),
+    onJump: () => {
+      stickToLatest = false;
+    },
+  });
   const unreadBannerReady = (): boolean => {
     const unreadMessageId = props.snapshot?.readState?.firstUnreadMessageId;
     if (!unreadMessageId) return true;
@@ -289,6 +301,7 @@ export function DirectConversation(props: DirectConversationProps) {
       <div
         ref={(element) => {
           messageList = element;
+          rail.ref(element);
           updateVirtualScrollMargin();
         }}
         class="direct-message-list"
@@ -300,6 +313,7 @@ export function DirectConversation(props: DirectConversationProps) {
           updateUnreadDividerVisibility();
         }}
       >
+        <ChatScrollRail {...rail.props} />
         <Show when={showScrollToLatest()}>
           <ScrollToLatestButton
             onClick={jumpToLatestMessage}

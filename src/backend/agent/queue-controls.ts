@@ -239,40 +239,47 @@ export class QueueControls {
       .markSteering(input.deliveryId, turnId)
       .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
     this.#mailboxSync.emitQueue(agent.id);
-    yield* Effect.gen({ self: this }, function* () {
-      yield* client
-        .request(
-          "turn/steer",
-          {
-            threadId: session.externalSessionId,
-            expectedTurnId: turnId,
-            clientUserMessageId: input.deliveryId,
-            input: deliveryPromptInput(context, {
-              agentNames: agentNamesById(this.#store.list()),
-              snapshot,
-              routineRun:
-                context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
-            }),
-          },
-          decodeRecordResponse,
-        )
-        .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
-      yield* this.#mailbox
-        .markRunning(input.deliveryId, turnId)
-        .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
-      yield* queueStep(() => {
-        this.#mailboxSync.syncMailboxMessages(snapshot);
-        this.#mailboxSync.emitQueue(agent.id);
-        this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
-      });
-    }).pipe(
-      Effect.tapError(() =>
-        this.#mailbox
-          .restoreQueued(input.deliveryId)
-          .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })))
-          .pipe(Effect.tap(() => Effect.sync(() => this.#mailboxSync.emitQueue(agent.id)))),
-      ),
-    );
+    yield* client
+      .request(
+        "turn/steer",
+        {
+          threadId: session.externalSessionId,
+          expectedTurnId: turnId,
+          clientUserMessageId: input.deliveryId,
+          input: deliveryPromptInput(context, {
+            agentNames: agentNamesById(this.#store.list()),
+            snapshot,
+            routineRun:
+              context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+          }),
+        },
+        decodeRecordResponse,
+      )
+      .pipe(
+        Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })),
+        // The turn may have ended while the request was in flight, and found nothing else to start
+        // with this message out of the queue, so the drain is asked again.
+        Effect.tapError(() =>
+          this.#mailbox.restoreUnsteered(input.deliveryId, turnId).pipe(
+            Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })),
+            Effect.andThen(
+              queueStep(() => {
+                this.#mailboxSync.syncMailboxMessages(snapshot);
+                this.#mailboxSync.emitQueue(agent.id);
+                this.#drain.scheduleDrain(agent.id);
+              }),
+            ),
+          ),
+        ),
+      );
+    yield* this.#mailbox
+      .markRunning(input.deliveryId, turnId)
+      .pipe(Effect.mapError((failure) => new QueueOperationFailed({ cause: failure.cause })));
+    yield* queueStep(() => {
+      this.#mailboxSync.syncMailboxMessages(snapshot);
+      this.#mailboxSync.emitQueue(agent.id);
+      this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
+    });
   }, Effect.uninterruptible);
 }
 

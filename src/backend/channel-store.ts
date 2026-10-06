@@ -17,7 +17,13 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
+import {
+  databaseRow,
+  databaseRows,
+  optionalStringColumn,
+  requiredNumberColumn,
+  requiredStringColumn,
+} from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 
 export interface ChannelAssignment {
@@ -289,13 +295,34 @@ export class ChannelStore {
     const messages = this.messages(channelId, before, 101);
     const hasOlder = messages.length > 100;
     if (hasOlder) messages.shift();
+    const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
     return {
       channel: this.get(channelId),
       tasks: this.tasks(channelId),
       messages,
-      olderCursor: hasOlder ? (messages[0]?.sequence ?? null) : null,
+      olderCursor,
       throughSequence: this.messages(channelId, undefined, 1)[0]?.sequence ?? 0,
+      ...(olderCursor === null ? {} : this.olderExtent(channelId, olderCursor)),
     };
+  }
+
+  /**
+   * How many messages are older than a page, and when the first one was written: the day rail draws
+   * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
+   */
+  private olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          `SELECT COUNT(*) AS older_count,
+             (SELECT json_extract(message_json, '$.message.createdAt') FROM projection_channel_messages
+              WHERE channel_id = ? ORDER BY sequence LIMIT 1) AS oldest_at
+           FROM projection_channel_messages WHERE channel_id = ? AND sequence < ?`,
+        )
+        .get(channelId, channelId, before),
+    );
+    const oldestAt = row ? optionalStringColumn(row, "oldest_at") : null;
+    return { olderCount: row ? requiredNumberColumn(row, "older_count") : 0, ...(oldestAt ? { oldestAt } : {}) };
   }
 
   commit(operationId: string, change: ChannelChange): Channel {

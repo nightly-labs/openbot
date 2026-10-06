@@ -312,4 +312,7 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para uma equipe pequena com rotinas diárias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muitos agentes e uso intenso do navegador.",
+  "settings.busyMessage.title": "Redirecionar agentes enquanto trabalham",
+  "settings.busyMessage.description":
+    "Uma mensagem enviada enquanto um agente trabalha entra no trabalho atual na próxima etapa, em vez de esperar na fila. ChatGPT e Claude podem redirecionar; os outros provedores colocam a mensagem na fila.",
 } as const satisfies PartialTranslation<typeof source>;

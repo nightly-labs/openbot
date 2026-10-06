@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -77,8 +78,11 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentAutomationAllowed,
+  type BusyMessageMode,
   CONTEXT_RESET_ITEM_TYPE,
+  DEFAULT_BUSY_MESSAGE_MODE,
   isContextResetMarker,
+  type QueueSteerFallback,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -205,6 +209,11 @@ export interface AgentServiceOptions {
    * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
    */
   approvalAutomation?: ApprovalAutomationPolicy;
+  /**
+   * The app default for a message sent while its agent works. The main process owns the preference.
+   * Omitted, such a message waits in the queue, as every one did before the setting existed.
+   */
+  busyMessageMode?: () => BusyMessageMode;
   deleteWithRevokedApproval?: (
     agentId: string,
     remove: () => Effect.Effect<void, AgentRemovalFailed>,
@@ -282,6 +291,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
   readonly #developmentDefaults: boolean;
+  readonly #busyMessageMode: () => BusyMessageMode;
+  /** The last turn of each agent's chat that the user stopped. One per agent, so it needs no clean-up. */
+  readonly #stoppedTurns = new Map<string, string>();
   #initialized = false;
   #stopping = false;
 
@@ -305,8 +317,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer = () => null,
       githubConnector = null,
       hostMemory = null,
+      busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
     } = options;
     this.#developmentDefaults = developmentDefaults;
+    this.#busyMessageMode = busyMessageMode;
     this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
@@ -2583,12 +2597,67 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "update message preview", cause: failure.cause }),
         ),
       );
+    // A turn the user stopped is ending, and a message steered into it would end with it.
+    const steerTurnId =
+      snapshot.activeTurnId &&
+      snapshot.activeTurnId !== this.#stoppedTurns.get(agent.id) &&
+      (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer"
+        ? snapshot.activeTurnId
+        : null;
+    const steers = steerTurnId !== null && agentProviderDescriptor(providerForAgent(agent)).steer === "native";
+    if (steerTurnId && !steers) yield* this.#markSteerFallback(agent.id, delivery.delivery.id, "provider-unsupported");
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     this.#conversation.emitConversation(snapshot);
     this.#mailboxSync.emitQueue(agent.id);
+    // Not awaited: the message is already queued, and the sender is answered without the wait for
+    // the provider.
+    if (steerTurnId && steers)
+      yield* this.#steerSentMessage(agent, delivery.delivery.id, steerTurnId).pipe(Effect.forkIn(this.#scope));
     this.#drain.scheduleDrain(agent.id);
     return receipt;
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Takes a message the user sent while the agent works into the running turn. The message is
+   * queued before this runs, so a refusal leaves it there: it says why on its row and starts when
+   * the turn ends. Only a provider that reads a message at its next step is asked; the ACP ones can
+   * hold a second prompt until the turn ends, which is a queue the user cannot see.
+   */
+  readonly #steerSentMessage = Effect.fn("AgentService.steerSentMessage")(function* (
+    this: AgentService,
+    agent: AgentSummary,
+    deliveryId: string,
+    turnId: string,
+  ) {
+    yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }).pipe(
+      Effect.catch((failure) =>
+        Effect.gen({ self: this }, function* () {
+          logger.warn("A message sent to steer the running turn waits in the queue.", {
+            agentId: agent.id,
+            error: failure.cause,
+          });
+          // When the turn ended in between, the message starts as the next turn or waits behind it
+          // like any other, which is no fallback worth naming.
+          if (this.#conversation.ensureSnapshot(agent.id, agent.threadId).activeTurnId !== turnId) return;
+          yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
+          this.#mailboxSync.emitQueue(agent.id);
+        }),
+      ),
+    );
+  });
+
+  /** The reason is a label on the queue row, so a failed write leaves the message queued without it. */
+  #markSteerFallback(agentId: string, deliveryId: string, reason: QueueSteerFallback): Effect.Effect<void> {
+    return this.#mailbox
+      .markSteerFallback(deliveryId, reason)
+      .pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() =>
+            logger.warn("Could not record why a message waits in the queue.", { agentId, error: failure.cause }),
+          ),
+        ),
+      );
+  }
 
   readonly setMessageReaction = Effect.fn("AgentService.setMessageReaction")(function* (
     this: AgentService,
@@ -2628,7 +2697,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }, Effect.uninterruptible).bind(this);
 
   interrupt(agentId: string, turnId: string, executionThreadId?: string): Effect.Effect<void, AgentLifecycleFailed> {
-    return this.#interruptTurn(agentId, turnId, executionThreadId).pipe(Effect.asVoid);
+    return Effect.suspend(() => {
+      if (!executionThreadId) this.#stoppedTurns.set(agentId, turnId);
+      return this.#interruptTurn(agentId, turnId, executionThreadId);
+    }).pipe(Effect.asVoid);
   }
 
   /**

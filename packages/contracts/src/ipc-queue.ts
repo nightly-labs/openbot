@@ -15,6 +15,27 @@ export const QUEUE_DELIVERY_STATUSES = [
 ] as const;
 export type QueueDeliveryStatus = (typeof QUEUE_DELIVERY_STATUSES)[number];
 
+/**
+ * What a message sent to a busy agent does. `queue` waits behind the running turn; `steer` joins
+ * that turn at the provider's next step. Idle agents start every message the same way.
+ */
+export const BUSY_MESSAGE_MODES = ["queue", "steer"] as const;
+export type BusyMessageMode = (typeof BUSY_MESSAGE_MODES)[number];
+export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "queue";
+
+export function isBusyMessageMode(value: unknown): value is BusyMessageMode {
+  return isOneOf(BUSY_MESSAGE_MODES, value);
+}
+
+/** The app default, as it is stored and as it crosses IPC. An agent's own setting comes first. */
+export interface BusyMessageModePreference {
+  mode: BusyMessageMode;
+}
+
+/** Why a message sent in `steer` mode waits in the queue instead. */
+export const QUEUE_STEER_FALLBACKS = ["provider-unsupported", "steer-failed"] as const;
+export type QueueSteerFallback = (typeof QUEUE_STEER_FALLBACKS)[number];
+
 export interface QueueDelivery {
   id: string;
   messageId: string;
@@ -47,6 +68,11 @@ export interface QueueDelivery {
    * and what a remote server too old to send it reports.
    */
   expectsReply?: boolean;
+  /**
+   * The message was sent to steer the running turn and waits in the queue instead. Absent on a
+   * released Team API response: the shipped adapters project a fixed key list.
+   */
+  steerFallback?: QueueSteerFallback;
 }
 
 /**
@@ -84,7 +110,8 @@ function isQueueDelivery(value: unknown): value is QueueDelivery {
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
     isBoundedString(value.createdAt, 160) &&
     (value.editing === undefined || isBoolean(value.editing)) &&
-    (value.expectsReply === undefined || isBoolean(value.expectsReply))
+    (value.expectsReply === undefined || isBoolean(value.expectsReply)) &&
+    (value.steerFallback === undefined || isOneOf(QUEUE_STEER_FALLBACKS, value.steerFallback))
   );
 }
 

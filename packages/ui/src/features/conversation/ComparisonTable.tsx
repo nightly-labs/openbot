@@ -18,11 +18,7 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
         <thead>
           <tr>
             <For each={props.table.headers}>
-              {(header) => (
-                <th scope="col">
-                  <span class="message-data-table-cell-text">{props.renderCell?.(header) ?? header}</span>
-                </th>
-              )}
+              {(header) => <th scope="col">{props.renderCell?.(header) ?? header}</th>}
             </For>
           </tr>
         </thead>
@@ -33,17 +29,13 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
                 <For each={row}>
                   {(cell, index) => (
                     <td>
-                      <span
-                        class={
-                          index() === 0
-                            ? "message-data-table-cell-text"
-                            : cell === "✓"
-                              ? "message-comparison-table-yes"
-                              : "message-comparison-table-no"
-                        }
-                      >
-                        {index() === 0 ? (props.renderCell?.(cell) ?? cell) : cell}
-                      </span>
+                      {index() === 0 ? (
+                        (props.renderCell?.(cell) ?? cell)
+                      ) : (
+                        <span class={cell === "✓" ? "message-comparison-table-yes" : "message-comparison-table-no"}>
+                          {cell}
+                        </span>
+                      )}
                     </td>
                   )}
                 </For>

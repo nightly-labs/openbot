@@ -8,6 +8,7 @@ import type {
   AvatarImageInput,
   BrowserControlState,
   BrowserTab,
+  BusyMessageMode,
   CustomAgentSummary,
   CustomProviderSummary,
   DraftAttachment,
@@ -21,6 +22,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import type { AccountProfilePanelProps } from "@openbot/ui/features/settings/AccountProfilePanel";
 import type { JSX } from "@solidjs/web";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -96,6 +98,8 @@ export interface ConversationProps {
   firstUnreadMessageId: string | null;
   loaded: boolean;
   hasOlder?: boolean;
+  /** The messages above the loaded page, for the day rail. Absent when the host does not count them. */
+  unloadedHistory?: UnloadedHistory | undefined;
   discontinuous?: boolean;
   loadingOlder?: boolean;
   olderError?: string | null;
@@ -177,6 +181,8 @@ export interface ConversationProps {
   agentAutoApproves?: boolean;
   /** Turbo mode covers every agent, so the per-agent switch is read-only while it is on. */
   agentAutoApproveLocked?: boolean;
+  /** The app default an agent without its own busy-message setting follows. Local agents only. */
+  defaultBusyMessageMode?: BusyMessageMode;
   /** Absent for a remote agent: its own computer holds that choice. */
   onSetAgentAutoApprove?: (autoApprove: boolean) => Promise<void>;
   /** Starts a new chat with the agent. Absent when its host does not serve `context-reset-v1`. */

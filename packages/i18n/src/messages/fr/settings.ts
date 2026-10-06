@@ -255,4 +255,7 @@ export const messages = {
   "settings.hostedSites.loadFailed": "Impossible de charger les sites hébergés.",
   "settings.hostedSites.deleteFailed": "Impossible de supprimer le site.",
   "settings.hostedSites.reloadFailed": "Impossible de recharger les sites hébergés.",
+  "settings.busyMessage.title": "Orienter les agents pendant leur travail",
+  "settings.busyMessage.description":
+    "Un message envoyé pendant le travail d’un agent rejoint son travail en cours à l’étape suivante, au lieu d’attendre dans la file. ChatGPT et Claude peuvent orienter ; les autres fournisseurs mettent le message en attente.",
 } as const satisfies PartialTranslation<typeof source>;

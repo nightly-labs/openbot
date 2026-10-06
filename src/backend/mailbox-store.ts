@@ -18,6 +18,7 @@ import type {
   QueueDeliveryStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
+  QueueSteerFallback,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
@@ -25,8 +26,9 @@ import {
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   isConversationMessageSender,
   isMessageReaction,
+  QUEUE_STEER_FALLBACKS,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -108,6 +110,8 @@ interface StoredDelivery {
   turnId: string | null;
   error: string | null;
   createdAt: string;
+  /** Sent to steer the running turn, and waiting in the queue instead. Shown only while queued. */
+  steerFallback?: QueueSteerFallback;
 }
 
 interface StoredState {
@@ -1136,6 +1140,7 @@ export class MailboxStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       this.#assertQueueNotEditing(deliveryId);
+      this.#clearSteerFallback(deliveryId);
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -1542,6 +1547,7 @@ export class MailboxStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       this.#assertQueueNotEditing(deliveryId);
+      this.#clearSteerFallback(deliveryId);
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
         status: "starting",
         turnId,
@@ -1550,6 +1556,37 @@ export class MailboxStore {
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * A steer the provider did not take, back at its place in the queue. The turn it was sent to can
+   * end while the request is in flight, and its end stamps every delivery of that turn, this one
+   * too, so a terminal state from that turn is undone as well: the agent never read the message.
+   */
+  restoreUnsteered = Effect.fn("MailboxStore.restoreUnsteered")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      if (!delivery || delivery.turnId !== turnId || delivery.status === "queued" || delivery.status === "cancelled") {
+        return;
+      }
+      Object.assign(delivery, { status: "queued", turnId: null, error: null });
+      this.#persist("delivery.updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /** Says why a message sent to steer waits in the queue. A message that has left the queue keeps its state. */
+  markSteerFallback = Effect.fn("MailboxStore.markSteerFallback")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    steerFallback: QueueSteerFallback,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { steerFallback });
   }, Effect.uninterruptible).bind(this);
 
   restoreQueued = Effect.fn("MailboxStore.restoreQueued")(function* (
@@ -1913,9 +1950,10 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
-    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, ...publicDelivery } = delivery;
+    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, steerFallback, ...publicDelivery } = delivery;
     return {
       ...publicDelivery,
+      ...(steerFallback && delivery.status === "queued" ? { steerFallback } : {}),
       sender: structuredClone(message.sender),
       text: message.text,
       attachments: message.attachments.map(toAttachmentSummary),
@@ -1974,6 +2012,12 @@ export class MailboxStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible);
+
+  /** The reason a steer waits is shown only while queued, so it goes when the delivery leaves the queue. */
+  #clearSteerFallback(deliveryId: string): void {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (delivery?.status === "queued") delete delivery.steerFallback;
+  }
 
   #requireMessage(id: string): StoredMessage {
     const message = this.#state.messages.find((candidate) => candidate.id === id);
@@ -2240,7 +2284,8 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
       value.status === "cancelled") &&
     (isString(value.turnId) || value.turnId === null) &&
     (isString(value.error) || value.error === null) &&
-    isString(value.createdAt)
+    isString(value.createdAt) &&
+    (value.steerFallback === undefined || isOneOf(QUEUE_STEER_FALLBACKS, value.steerFallback))
   );
 }
 

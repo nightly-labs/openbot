@@ -7,7 +7,7 @@ import { Badge, Blocks, Bot, File, Folder, Listbox, Plug, Puzzle, ShieldCheck, S
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { Dynamic, Portal } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, onSettled, Show } from "solid-js";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { AgentProfile } from "../../data";
@@ -15,6 +15,7 @@ import { currentText, type TextValue, useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
+import { shouldRestoreComposerFocus } from "./composer-focus";
 import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
@@ -301,6 +302,28 @@ export function ComposerEditor(props: ComposerEditorProps) {
       }
     },
   );
+
+  // Coming back to the window puts the caret back here, so the first keys are not lost. A touch
+  // device would open its keyboard instead, and focus leaving an embedded frame (an HTML preview)
+  // also fires `focus` here without the window having been away.
+  onSettled(() => {
+    const view = editor?.ownerDocument.defaultView;
+    if (!view) return;
+    let focusInFrame = false;
+    const noteFrameFocus = () => {
+      focusInFrame = view.document.activeElement instanceof view.HTMLIFrameElement;
+    };
+    const restoreFocus = () => {
+      if (focusInFrame || usesTouchLayout()) return;
+      if (editor && shouldRestoreComposerFocus(editor)) editor.focus();
+    };
+    view.addEventListener("blur", noteFrameFocus);
+    view.addEventListener("focus", restoreFocus);
+    return () => {
+      view.removeEventListener("blur", noteFrameFocus);
+      view.removeEventListener("focus", restoreFocus);
+    };
+  });
 
   function emitValue() {
     if (!editor) return;

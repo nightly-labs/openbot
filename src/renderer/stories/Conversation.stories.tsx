@@ -1192,6 +1192,28 @@ export const ScrollToLatest: Story = {
   },
 };
 
+/** Five days of history, 120 messages: scroll to bring in the day rail on the right edge. */
+export const LongHistory: Story = {
+  args: {
+    messages: Array.from({ length: 120 }, (_, index): RendererAgentMessage => {
+      const createdAt = new Date(2026, 8, 1 + Math.floor(index / 24), 9, (index % 24) * 2);
+      return {
+        id: `long-history-${index + 1}`,
+        author: index % 3 === 0 ? "you" : "agent",
+        body:
+          index % 3 === 0
+            ? `Can you check step ${index + 1} of the release plan?`
+            : `I checked step ${index + 1}. The owner, the date and the open risk are in the plan now.`,
+        time: `${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`,
+        createdAt: createdAt.toISOString(),
+        kind: "text",
+      };
+    }),
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+};
+
 /** One agent chat on a team: two other people write, their runs group, and a reply quotes one. */
 export const SeveralPeople: Story = {
   name: "Several people",
@@ -1429,6 +1451,29 @@ export const PlanInProgress: Story = {
 
 export const ThreeQueuedMessages: Story = {
   args: { queue: queueWithItems(3), activeTurnId: "turn-active" },
+};
+
+/** Messages sent to steer that wait in the queue instead, each with the reason on its row. */
+export const QueuedAfterSteerFallback: Story = {
+  args: {
+    activeTurnId: "turn-active",
+    queue: {
+      ...queue,
+      deliveries: [
+        { ...queuedDelivery, text: "Use the staging database, not production.", steerFallback: "provider-unsupported" },
+        {
+          ...queuedDelivery,
+          id: "queued-2",
+          messageId: "queued-message-2",
+          text: "Skip the flaky browser tests.",
+          position: 2,
+          createdAt: "2026-08-19T10:01:00.000Z",
+          steerFallback: "steer-failed",
+        },
+        runningDelivery,
+      ],
+    },
+  },
 };
 
 export const SevenQueuedMessages: Story = {

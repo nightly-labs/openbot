@@ -210,3 +210,75 @@ describe("ComposerEditor", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 });
+
+describe("ComposerEditor window focus", () => {
+  const fixtures: HTMLElement[] = [];
+
+  afterEach(() => {
+    document.getSelection()?.removeAllRanges();
+    for (const element of fixtures.splice(0)) element.remove();
+  });
+
+  function fixture(html: string) {
+    const element = document.createElement("div");
+    element.innerHTML = html;
+    document.body.append(element);
+    fixtures.push(element);
+    return element;
+  }
+
+  it("takes focus back when the window returns with nothing focused", () => {
+    const { editor } = renderComposer();
+    expect(editor).not.toHaveFocus();
+
+    fireEvent(window, new Event("focus"));
+
+    expect(editor).toHaveFocus();
+  });
+
+  it("leaves focus in an open dialog", () => {
+    const { editor } = renderComposer();
+    fixture('<div role="dialog" aria-label="Settings"><button type="button">Close</button></div>');
+    const close = screen.getByRole("button", { name: "Close" });
+    close.focus();
+
+    fireEvent(window, new Event("focus"));
+
+    expect(close).toHaveFocus();
+    expect(editor).not.toHaveFocus();
+  });
+
+  it("keeps a text selection outside the composer", () => {
+    const { editor } = renderComposer();
+    const transcript = fixture("<p>Copy this answer</p>");
+    const range = document.createRange();
+    range.selectNodeContents(transcript);
+    document.getSelection()?.addRange(range);
+
+    fireEvent(window, new Event("focus"));
+
+    expect(editor).not.toHaveFocus();
+    expect(document.getSelection()?.toString()).toBe("Copy this answer");
+  });
+
+  it("leaves a disabled composer alone", () => {
+    render(() => (
+      <ComposerEditor
+        agentId="chief"
+        agents={[]}
+        attachments={[]}
+        value=""
+        placeholder="Message Chief"
+        ariaLabel="Message Chief"
+        disabled
+        sendShortcut="enter"
+        onValueChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />
+    ));
+
+    fireEvent(window, new Event("focus"));
+
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).not.toHaveFocus();
+  });
+});
