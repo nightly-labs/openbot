@@ -9,6 +9,8 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/pr
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Effect } from "effect";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type CustomProviderCipher, CustomProviderStore } from "../src/main/custom-provider-store";
 import { probeModels } from "../src/main/model-server-probe";
 import { createProviderDetection } from "../src/main/provider-detection";
@@ -85,6 +87,7 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-detection-e2e-"));
 const report: Report = { passed: false };
 const servers: FakeServer[] = [];
 
+const detections: Effect.Success<ReturnType<typeof createProviderDetection>>[] = [];
 try {
   const primary = await fakeServer(["llama-3.1-8b", "qwen2.5-coder"]);
   const other = await fakeServer(["other-model"]);
@@ -92,15 +95,18 @@ try {
   servers.push(primary, other, redirecting);
 
   const settings = new ProviderDetectionSettingsStore(join(root, "openbot-provider-detection-v1.json"));
-  await settings.load();
+  await runCauseEffect(settings.load());
   const endpoints = new CustomProviderStore({ path: join(root, "custom-providers.json"), cipher });
-  await endpoints.load();
-  const detection = createProviderDetection({
-    settings,
-    customProviders: endpoints,
-    customAgents: { configs: () => [] },
-    probe: probeModels,
-  });
+  await runCauseEffect(endpoints.load());
+  const detection = await Effect.runPromise(
+    createProviderDetection({
+      settings,
+      customProviders: endpoints,
+      customAgents: { configs: () => [] },
+      probe: probeModels,
+    }),
+  );
+  detections.push(detection);
 
   // 1. A listed address is found with its models, with no key; a redirect is not followed.
   const agentFolder = join(root, "tools");
@@ -108,13 +114,15 @@ try {
   await mkdir(agentFolder);
   await writeFile(join(agentFolder, "goose"), `#!/bin/sh\ntouch "${marker}"\n`);
   await chmod(join(agentFolder, "goose"), 0o755);
-  await settings.set({
-    enabled: true,
-    addresses: [primary.baseUrl, redirecting.baseUrl],
-    folders: [agentFolder],
-    hiddenIds: [],
-  });
-  const found = await detection.scanModelServers();
+  await runCauseEffect(
+    settings.set({
+      enabled: true,
+      addresses: [primary.baseUrl, redirecting.baseUrl],
+      folders: [agentFolder],
+      hiddenIds: [],
+    }),
+  );
+  const found = await Effect.runPromise(detection.scanModelServers());
   const row = found.find((server) => server.baseUrl === primary.baseUrl);
   assert.ok(row, "The listed address is found.");
   assert.deepEqual(
@@ -124,7 +132,7 @@ try {
   assert.ok(!found.some((server) => server.baseUrl === redirecting.baseUrl), "A redirect is not a server.");
   assert.equal(primary.seen.length, 1, "The redirect target gets only the direct request.");
   assert.equal(primary.seen[0]?.authorization, null, "A scan sends no key.");
-  const agents = await detection.scanAgents();
+  const agents = await Effect.runPromise(detection.scanAgents());
   const goose = agents.find((agent) => agent.command === join(agentFolder, "goose"));
   assert.ok(goose, "The agent in the listed folder is found.");
   await assert.rejects(stat(marker), { code: "ENOENT" }, "The scan does not start the agent.");
@@ -137,28 +145,32 @@ try {
   };
 
   // 2. Add the found server with a key and a header.
-  await endpoints.save({
-    id: row.id,
-    name: "Local server",
-    baseUrl: row.baseUrl,
-    apiKey: KEY,
-    headers: [HEADER],
-    models: [{ id: "llama-3.1-8b", name: "llama-3.1-8b" }],
-  });
+  await runCauseEffect(
+    endpoints.save({
+      id: row.id,
+      name: "Local server",
+      baseUrl: row.baseUrl,
+      apiKey: KEY,
+      headers: [HEADER],
+      models: [{ id: "llama-3.1-8b", name: "llama-3.1-8b" }],
+    }),
+  );
   const envelope = await readFile(join(root, "custom-providers.json"), "utf8");
   assert.ok(!envelope.includes(KEY) && !envelope.includes(HEADER.value), "The file holds no plain key or header.");
   const cipherBefore = JSON.parse(envelope).providers[0].secret;
 
   // 3. Edit with an empty key field: the models change, the stored key and header stay.
-  await endpoints.update({
-    id: row.id,
-    name: "Local server",
-    baseUrl: row.baseUrl,
-    models: [
-      { id: "llama-3.1-8b", name: "llama-3.1-8b" },
-      { id: "qwen2.5-coder", name: "qwen2.5-coder" },
-    ],
-  });
+  await runCauseEffect(
+    endpoints.update({
+      id: row.id,
+      name: "Local server",
+      baseUrl: row.baseUrl,
+      models: [
+        { id: "llama-3.1-8b", name: "llama-3.1-8b" },
+        { id: "qwen2.5-coder", name: "qwen2.5-coder" },
+      ],
+    }),
+  );
   const edited = endpoints.list().find((summary) => summary.id === row.id);
   assert.equal(edited?.models.length, 2);
   assert.equal(edited?.hasApiKey, true);
@@ -166,17 +178,21 @@ try {
   assert.deepEqual(cipherAfter, cipherBefore, "A kept key keeps its ciphertext.");
 
   // 4. Load models for the saved endpoint with an empty key field: the server gets the stored key.
-  await detection.discoverModels({ baseUrl: row.baseUrl, apiKey: null, headers: [], savedProviderId: row.id });
+  await Effect.runPromise(
+    detection.discoverModels({ baseUrl: row.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
+  );
   const loaded = primary.seen.at(-1);
   assert.equal(loaded?.authorization, `Bearer ${KEY}`);
   assert.equal(loaded?.team, HEADER.value);
 
   // 5. The stored key never goes to another origin.
-  await detection.discoverModels({ baseUrl: other.baseUrl, apiKey: null, headers: [], savedProviderId: row.id });
+  await Effect.runPromise(
+    detection.discoverModels({ baseUrl: other.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
+  );
   assert.equal(other.seen.at(-1)?.authorization, null, "Another origin gets no stored key.");
   assert.equal(other.seen.at(-1)?.team, null, "Another origin gets no stored header.");
   await assert.rejects(
-    endpoints.update({ id: row.id, name: "Local server", baseUrl: other.baseUrl, models: [] }),
+    runCauseEffect(endpoints.update({ id: row.id, name: "Local server", baseUrl: other.baseUrl, models: [] })),
     "A new address with a kept key is refused.",
   );
   report.edit = {
@@ -189,17 +205,18 @@ try {
 
   // 6. Detection off: nothing is probed.
   const before = primary.seen.length;
-  await settings.set({ ...settings.get(), enabled: false });
-  assert.deepEqual(await detection.scanModelServers(), []);
-  assert.deepEqual(await detection.scanAgents(), []);
+  await runCauseEffect(settings.set({ ...settings.get(), enabled: false }));
+  assert.deepEqual(await Effect.runPromise(detection.scanModelServers()), []);
+  assert.deepEqual(await Effect.runPromise(detection.scanAgents()), []);
   assert.equal(primary.seen.length, before, "A disabled scan sends nothing.");
   const reloaded = new ProviderDetectionSettingsStore(join(root, "openbot-provider-detection-v1.json"));
-  await reloaded.load();
+  await runCauseEffect(reloaded.load());
   assert.equal(reloaded.get().enabled, false, "The switch survives a restart.");
   report.disabled = { requestsSent: 0, savedAcrossRestart: true };
 
   report.passed = true;
 } finally {
+  for (const detection of detections) await Effect.runPromise(detection.close());
   await Promise.all(servers.map((server) => server.close()));
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });

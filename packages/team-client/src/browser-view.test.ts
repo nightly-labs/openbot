@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/team-protocol/remote-stream-v1";
 import { assert, describe, expect, it, vi } from "vitest";
 import { createRemoteBrowserView } from "./browser-view";
+import { runTeamEffect } from "./effect-boundary";
 
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const tabId = "22222222-2222-4222-8222-222222222222";
@@ -20,7 +21,7 @@ describe("remote browser view", () => {
     const client = createRemoteBrowserView(send, request, () => false);
     const frame = vi.fn();
     const ended = vi.fn();
-    const view = await client.open(tabId, frame, ended);
+    const view = await runTeamEffect(client.open(tabId, frame, ended));
     const [openCall] = send.mock.calls;
     assert(openCall);
     const control = decodeRemoteDesktopSignalControl(openCall[0]);
@@ -32,11 +33,11 @@ describe("remote browser view", () => {
     expect(frame).not.toHaveBeenCalled();
     client.receive(encodeRemoteDesktopSignalBinary(control.streamId, bytes));
     expect(frame).toHaveBeenCalledWith({ sequence: 1, width: 10, height: 20, image: new Uint8Array([1, 2, 3]) });
-    await view.close();
+    await runTeamEffect(view.close());
     expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
     expect(ended).toHaveBeenCalledOnce();
     await expect(
-      view.input({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 }),
+      runTeamEffect(view.input({ type: "key", action: "down", key: "a", code: "KeyA", text: "", modifiers: 0 })),
     ).rejects.toThrow("not connected");
   });
   it("does not attach a view that finishes opening after disconnect", async () => {
@@ -52,7 +53,7 @@ describe("remote browser view", () => {
       .mockResolvedValue(undefined);
     const send = vi.fn().mockResolvedValue(undefined);
     const client = createRemoteBrowserView(send, request, () => false);
-    const opening = client.open(tabId, vi.fn(), vi.fn());
+    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
     const rejected = expect(opening).rejects.toThrow("view changed");
     await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
     client.disconnect();
@@ -74,12 +75,12 @@ describe("remote browser view", () => {
       .mockResolvedValue(undefined);
     const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
     const client = createRemoteBrowserView(send, request, () => false);
-    const opening = client.open(tabId, vi.fn(), vi.fn());
+    const opening = runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
     await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
     client.disconnect();
     opened?.();
     const view = await opening;
-    await view.close();
+    await runTeamEffect(view.close());
     const [openCall] = send.mock.calls;
     assert(openCall);
     const streamId = decodeRemoteDesktopSignalControl(openCall[0]).streamId;
@@ -91,24 +92,26 @@ describe("remote browser view", () => {
       const send = vi.fn().mockResolvedValue(undefined);
       const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
       const client = createRemoteBrowserView(send, request, () => namesFrames);
-      const view = await client.open(tabId, vi.fn(), vi.fn());
+      const view = await runTeamEffect(client.open(tabId, vi.fn(), vi.fn()));
       const [openCall] = send.mock.calls;
       assert(openCall);
       const control = decodeRemoteDesktopSignalControl(openCall[0]);
       client.receive(encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }));
-      await view.input({ type: "ack", sequence: 3 });
-      await view.input({
-        type: "pointer",
-        action: "down",
-        x: 0.5,
-        y: 0.5,
-        sequence: 3,
-        button: "left",
-        clickCount: 1,
-        deltaX: 0,
-        deltaY: 0,
-        modifiers: 0,
-      });
+      await runTeamEffect(view.input({ type: "ack", sequence: 3 }));
+      await runTeamEffect(
+        view.input({
+          type: "pointer",
+          action: "down",
+          x: 0.5,
+          y: 0.5,
+          sequence: 3,
+          button: "left",
+          clickCount: 1,
+          deltaX: 0,
+          deltaY: 0,
+          modifiers: 0,
+        }),
+      );
       const inputs = send.mock.calls.slice(1).map(([data]) => {
         const text = decodeRemoteDesktopSignalControl(data);
         return text.type === "text" ? decodeBrowserViewInput(text.data) : undefined;

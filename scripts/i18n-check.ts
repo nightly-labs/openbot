@@ -15,8 +15,10 @@ import { createOpenBotLogger } from "@openbot/logging";
 // - a source template that more than one source key can match, so the reverse lookup is ambiguous;
 // - an English key no code names. Write keys as literals, so this check and a search find them.
 //
-// Reports, and does not fail on, keys that are not translated yet. `--json` writes the report to
-// .openbot-build/i18n-report.json.
+// Reports, and does not fail on, keys that are not translated yet and translated modules whose keys
+// are not in the English order. `--fix` puts those keys in the English order; it moves each
+// key with the comments and blank lines above it and does not change the text. `--json` writes the
+// report to .openbot-build/i18n-report.json.
 
 const ROOT = resolve(import.meta.dirname, "..");
 const MESSAGES = resolve(ROOT, "packages/i18n/src/messages");
@@ -29,6 +31,9 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".e
 
 const logger = createOpenBotLogger("i18n-check");
 const failures: string[] = [];
+const OBJECT_START = "export const messages = {";
+/** The quoted key of a catalog entry, after the comments and blank lines above it. */
+const LEADING_KEY = /^(?:\s|\/\/[^\n]*)*"([^"\\]+)"\s*:/;
 
 function files(directory: string, match: RegExp): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -73,6 +78,85 @@ function placeholders(message: Message): Set<string> {
   return new Set(forms(message).flatMap((form) => [...form.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? "")));
 }
 
+/** The index after the string literal that starts at `start`. */
+function stringEnd(text: string, start: number): number {
+  const quote = text[start];
+  for (let index = start + 1; index < text.length; index += 1) {
+    if (text[index] === "\\") index += 1;
+    else if (quote === "`" && text.startsWith("${", index))
+      throw new Error("a template literal with a placeholder is not supported.");
+    else if (text[index] === quote) return index + 1;
+  }
+  throw new Error("a string literal does not end.");
+}
+
+/**
+ * Splits the `messages` object at its top-level commas. Each entry keeps the comments and blank
+ * lines above its key, so they move with it.
+ */
+function catalogEntries(text: string): { head: string; entries: string[]; tail: string } {
+  const open = text.indexOf(OBJECT_START);
+  if (open < 0 || text.indexOf(OBJECT_START, open + 1) >= 0) throw new Error(`expected one \`${OBJECT_START}\`.`);
+  const bodyStart = open + OBJECT_START.length;
+  const entries: string[] = [];
+  let depth = 0;
+  let entryStart = bodyStart;
+  for (let index = bodyStart; index < text.length; index += 1) {
+    const char = text[index];
+    if (text.startsWith("//", index)) {
+      const lineEnd = text.indexOf("\n", index);
+      index = (lineEnd < 0 ? text.length : lineEnd) - 1;
+    } else if (text.startsWith("/*", index)) {
+      throw new Error("a block comment is not supported; use a line comment above the key.");
+    } else if (char === '"' || char === "'" || char === "`") {
+      index = stringEnd(text, index) - 1;
+    } else if (char === "{" || char === "[" || char === "(") {
+      depth += 1;
+    } else if (char === "}" || char === "]" || char === ")") {
+      if (depth > 0) {
+        depth -= 1;
+        continue;
+      }
+      const last = text.slice(entryStart, index);
+      const lastEntry = last.trimEnd();
+      if (lastEntry.trim() === "") return { head: text.slice(0, bodyStart), entries, tail: text.slice(entryStart) };
+      entries.push(lastEntry);
+      return { head: text.slice(0, bodyStart), entries, tail: text.slice(entryStart + lastEntry.length) };
+    } else if (char === "," && depth === 0) {
+      entries.push(text.slice(entryStart, index));
+      entryStart = index + 1;
+    }
+  }
+  throw new Error("the `messages` object does not end.");
+}
+
+function entryKey(entry: string): string {
+  if (!entry.startsWith("\n")) throw new Error("text follows a comma on the same line; put each key on its own line.");
+  const key = LEADING_KEY.exec(entry)?.[1];
+  if (key === undefined) throw new Error(`an entry does not start with a quoted key: ${entry.trim().slice(0, 60)}`);
+  return key;
+}
+
+/** Puts the keys of a translated module in `order`. Keys that English does not have go last. */
+function sortCatalog(text: string, order: readonly string[]): string {
+  const { head, entries, tail } = catalogEntries(text);
+  const rank = new Map(order.map((key, index) => [key, index]));
+  const sorted = entries
+    .map((entry, index) => ({ entry, rank: rank.get(entryKey(entry)) ?? order.length + index }))
+    .sort((left, right) => left.rank - right.rank)
+    .map(({ entry }) => entry);
+  // A blank line separates groups; the first key in the object has none above it.
+  const [first, ...rest] = sorted;
+  if (first === undefined) return text;
+  return `${head}${[first.replace(/^\n(?:[ \t]*\n)+/, "\n"), ...rest].join(",")},${tail}`;
+}
+
+function isInOrder(keys: readonly string[], order: readonly string[]): boolean {
+  const known = new Set(keys);
+  const expected = order.filter((key) => known.has(key));
+  return expected.every((key, index) => keys[index] === key);
+}
+
 function modulePaths(locale: string): Map<string, string> {
   return new Map(
     files(resolve(MESSAGES, locale), /\.ts$/)
@@ -101,6 +185,8 @@ interface Coverage {
 }
 const coverage: Record<string, Record<string, Coverage>> = {};
 const untranslated: Record<string, string[]> = {};
+const outOfOrder: string[] = [];
+const fix = process.argv.includes("--fix");
 
 for (const locale of TRANSLATED_LOCALES.filter((locale) => locale !== "en")) {
   const paths = modulePaths(locale);
@@ -113,6 +199,18 @@ for (const locale of TRANSLATED_LOCALES.filter((locale) => locale !== "en")) {
     const path = paths.get(name);
     if (!path) failures.push(`${locale}/${name}.ts is missing. Create it, even when it is empty.`);
     const translation = path ? await loadModule(path) : {};
+    if (path && !isInOrder(Object.keys(translation), Object.keys(source))) {
+      outOfOrder.push(`${locale}/${name}.ts`);
+      if (fix) {
+        try {
+          writeFileSync(path, sortCatalog(readFileSync(path, "utf8"), Object.keys(source)));
+        } catch (error) {
+          failures.push(
+            `${locale}/${name}.ts: --fix cannot sort it: ${error instanceof Error ? error.message : error}`,
+          );
+        }
+      }
+    }
     let translated = 0;
     for (const [key, message] of Object.entries(translation)) {
       const sourceMessage = source[key];
@@ -175,6 +273,7 @@ const report = {
   keys: owner.size,
   coverage,
   untranslated,
+  outOfOrder,
   failures,
 };
 
@@ -191,6 +290,13 @@ const summary = Object.entries(coverage).map(([locale, areas]) => {
   return `${locale}: ${translated} of ${total} keys translated`;
 });
 logger.info([`${owner.size} English keys.`, ...summary].join("\n"));
+if (outOfOrder.length > 0) {
+  logger.info(
+    fix
+      ? `Put the keys of ${outOfOrder.length} modules in the English order.`
+      : `${outOfOrder.length} modules do not have their keys in the English order. Run \`bun run i18n:check --fix\`.`,
+  );
+}
 
 if (failures.length > 0) {
   logger.error(["The catalogs have problems:", ...failures.map((line) => `  ${line}`)].join("\n"));

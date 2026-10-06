@@ -3,20 +3,24 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { z } from "zod";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { resolveRemoteDesktopRuntime } from "../src/main/remote-desktop-runtime-artifact";
 import { RemoteScreenGateway } from "../src/main/remote-screen-gateway";
 
 const logger = createOpenBotLogger("remote-desktop-browser-harness");
 
 const platform = process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux";
-const runtimePaths = await resolveRemoteDesktopRuntime({
-  isPackaged: false,
-  resourcesPath: process.cwd(),
-  sourceRoot: resolve("."),
-  platform,
-  architecture: process.arch,
-});
+const runtimePaths = await Effect.runPromise(
+  resolveRemoteDesktopRuntime({
+    isPackaged: false,
+    resourcesPath: process.cwd(),
+    sourceRoot: resolve("."),
+    platform,
+    architecture: process.arch,
+  }),
+);
 if (!runtimePaths) throw new Error("Build the remote desktop runtime before the browser E2E test.");
 
 const clientCount = z.coerce
@@ -31,9 +35,9 @@ const gateway = new RemoteScreenGateway({
   unattended: false,
   runtimePaths,
   runtimeStateDirectory: stateDirectory,
-  getRuntimeCredentials: async () => ({ username: "openbot-e2e", password: "openbot-local-e2e-only" }),
+  getRuntimeCredentials: () => Effect.succeed({ username: "openbot-e2e", password: "openbot-local-e2e-only" }),
   getDisplays: () => [{ id: "1", label: "Primary display", width: 1920, height: 1080, primary: true }],
-  getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+  getIceServers: () => Effect.succeed([{ urls: "stun:127.0.0.1:3478" }]),
   audit: (event) => {
     // Machine-readable: the E2E runner parses OPENBOT_REMOTE_E2E_AUDIT lines.
     process.stdout.write(`OPENBOT_REMOTE_E2E_AUDIT=${JSON.stringify(event)}\n`);
@@ -48,7 +52,7 @@ const server = createServer((request, response) => {
     response.end("Not found");
     return;
   }
-  void gateway.handleHttp(request, response, url);
+  void runCauseEffect(gateway.handleHttp(request, response, url));
 });
 server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -63,13 +67,15 @@ await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolve
 const { port } = z.object({ port: z.number().int() }).parse(server.address());
 const origin = `http://127.0.0.1:${port}`;
 for (let index = 0; index < clientCount; index += 1) {
-  const session = await gateway.createSession({
-    serverId: "local-e2e-server",
-    memberId: `local-e2e-member-${index + 1}`,
-    teamSessionId: `local-e2e-team-session-${index + 1}`,
-    teamSessionExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
-    publicHttpBaseUrl: origin,
-  });
+  const session = await runCauseEffect(
+    gateway.createSession({
+      serverId: "local-e2e-server",
+      memberId: `local-e2e-member-${index + 1}`,
+      teamSessionId: `local-e2e-team-session-${index + 1}`,
+      teamSessionExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      publicHttpBaseUrl: origin,
+    }),
+  );
   const viewerUrl = `${session.viewerUrl}#${session.viewerGrant}`;
   // Machine-readable: the E2E runner parses OPENBOT_REMOTE_E2E_URL lines.
   if (index === 0) process.stdout.write(`OPENBOT_REMOTE_E2E_URL=${viewerUrl}\n`);
@@ -80,7 +86,7 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
-  await gateway.stop();
+  await runCauseEffect(gateway.stop());
   await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
   await rm(stateDirectory, { force: true, recursive: true });
 }

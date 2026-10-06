@@ -1,3 +1,4 @@
+import { Effect, Schema } from "effect";
 import {
   RATE_LIMITED_DELIVERY_ERROR,
   type SmtpEmailConfig,
@@ -5,6 +6,10 @@ import {
   sendPrivateTeamInvite,
 } from "./smtp-email-delivery";
 import type { EmailCodeDelivery, TeamInviteEmailDelivery, WorkerBindings } from "./types";
+
+export class EmailDeliveryError extends Schema.TaggedError<EmailDeliveryError>()("EmailDeliveryError", {
+  message: Schema.String,
+}) {}
 
 type EmailDeliveryBindings = Pick<
   WorkerBindings,
@@ -32,23 +37,21 @@ export function createEmailCodeDelivery(bindings: EmailDeliveryBindings): EmailC
     throw new Error("EMAIL_DELIVERY_WEBHOOK_URL must use HTTPS.");
   }
   const secret = bindings.EMAIL_DELIVERY_WEBHOOK_SECRET?.trim();
-  return {
-    async send(message) {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
-        },
-        body: JSON.stringify(message),
-        signal: AbortSignal.timeout(10_000),
-      }).catch(() => {
-        throw new Error("email_delivery_unknown");
-      });
-      if (response.status === 429) throw new Error(RATE_LIMITED_DELIVERY_ERROR);
-      if (!response.ok) throw new Error("email_delivery_webhook_failed");
-    },
-  };
+  const send = Effect.fn("EmailDelivery.sendCode")(function* (message: Parameters<EmailCodeDelivery["send"]>[0]) {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(secret ? { Authorization: `Bearer ${secret}` } : {}) },
+          body: JSON.stringify(message),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+        }),
+      catch: () => new EmailDeliveryError({ message: "email_delivery_unknown" }),
+    });
+    if (response.status === 429) return yield* new EmailDeliveryError({ message: RATE_LIMITED_DELIVERY_ERROR });
+    if (!response.ok) return yield* new EmailDeliveryError({ message: "email_delivery_webhook_failed" });
+  });
+  return { send };
 }
 
 export function createTeamInviteEmailDelivery(bindings: EmailDeliveryBindings): TeamInviteEmailDelivery | null {

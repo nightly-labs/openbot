@@ -6,10 +6,12 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import type { AgentSummary, ExportResult } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
+import { Effect } from "effect";
 import { app, type BrowserWindow, dialog } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import type { MailboxStore } from "../backend/mailbox-store";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { TraceFile } from "./trace-file";
 import type { UpdateService } from "./update-service";
 
@@ -24,85 +26,110 @@ interface MaintenanceContext {
   parentWindow: BrowserWindow | null;
   translate: AppTranslate;
 }
-
-export async function exportOpenBotData(
+export const exportOpenBotData = Effect.fn("Archive.exportOpenBotData")(function* (
   context: Pick<MaintenanceContext, "service" | "mailbox" | "parentWindow" | "translate">,
-): Promise<ExportResult> {
-  const destination = await chooseExportDestination(
+): Effect.fn.Return<ExportResult, ArchiveOperationError> {
+  const destination = yield* chooseExportDestinationEffect(
     context.parentWindow,
     `OpenBot-backup-${new Date().toISOString().slice(0, 10)}.zip`,
     [{ name: context.translate("dialog.filter.zipArchive"), extensions: ["zip"] }],
   );
   if (!destination) return { saved: false };
 
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-export-"));
-  const exportRoot = join(temporaryRoot, "OpenBot Backup");
   const archiveCandidate = `${destination}.${randomUUID()}.tmp.zip`;
-  try {
-    await mkdir(exportRoot, { recursive: true, mode: 0o700 });
-    const agents = context.service.listAgents();
-    const [conversations, queues, attachments] = await Promise.all([
-      Promise.all(agents.map((agent) => context.service.readConversation(agent.id))),
-      Promise.resolve(agents.map((agent) => context.service.listQueue(agent.id))),
-      context.mailbox.listExportAttachments(),
-    ]);
-    const manifest = {
-      // 4, not 3: a schema 3 archive a released build wrote spells the roster `bots`, and this one spells
-      // it `agents`. Anything reading the manifest picks its parser by this number, so leaving it at 3
-      // hands a reader the wrong shape under a version that promised the old one.
-      schemaVersion: 4,
-      exportedAt: new Date().toISOString(),
-      application: { name: "OpenBot", version: app.getVersion() },
-      scope: {
-        includes: ["agent profiles", "agent memories", "conversation snapshots", "queues", "attachments"],
-        excludes: [
-          "Codex credentials",
-          "OpenCode Go key",
-          "custom provider API keys",
-          "custom agent environment values",
-          "browser cookies",
-          "agent workspace files",
-        ],
-      },
-      agents: agents.map(toBackupAgent),
-      memories: agents.flatMap((agent) => context.service.listMemories(agent.id)),
-      conversations,
-      queues,
-    };
-    await writeFile(join(exportRoot, "openbot-data.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    for (const attachment of attachments) {
-      const target = join(exportRoot, attachment.relativePath);
-      await mkdir(dirname(target), { recursive: true, mode: 0o700 });
-      await copyFile(attachment.sourcePath, target);
-    }
-    if (process.platform === "win32") {
-      await execFileAsync("powershell.exe", [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        `Compress-Archive -LiteralPath '${powerShellLiteral(exportRoot)}' -DestinationPath '${powerShellLiteral(archiveCandidate)}' -Force`,
-      ]);
-    } else {
-      await execFileAsync("/usr/bin/ditto", ["-c", "-k", "--keepParent", exportRoot, archiveCandidate]);
-    }
-    await rename(archiveCandidate, destination);
-    return { saved: true };
-  } finally {
-    await Promise.all([rm(temporaryRoot, { recursive: true, force: true }), rm(archiveCandidate, { force: true })]);
-  }
-}
+  return yield* Effect.acquireUseRelease(
+    archiveCall(() => mkdtemp(join(tmpdir(), "openbot-export-"))),
+    (temporaryRoot) =>
+      Effect.gen(function* () {
+        const exportRoot = join(temporaryRoot, "OpenBot Backup");
+        yield* archiveCall(() => mkdir(exportRoot, { recursive: true, mode: 0o700 })).pipe(Effect.uninterruptible);
+        const agents = context.service.listAgents();
+        const [conversations, queues, attachments] = yield* Effect.all(
+          [
+            Effect.forEach(
+              agents,
+              (agent) =>
+                context.service
+                  .readConversation(agent.id)
+                  .pipe(Effect.mapError((error) => archiveFailure(error.cause))),
+              {
+                concurrency: "unbounded",
+              },
+            ),
+            archiveSync(() => agents.map((agent) => context.service.listQueue(agent.id))),
+            context.mailbox.listExportAttachments().pipe(Effect.mapError((error) => archiveFailure(error.cause))),
+          ],
+          { concurrency: "unbounded" },
+        );
+        const manifest = {
+          // 4, not 3: a schema 3 archive a released build wrote spells the roster `bots`, and this one spells
+          // it `agents`. Anything reading the manifest picks its parser by this number, so leaving it at 3
+          // hands a reader the wrong shape under a version that promised the old one.
+          schemaVersion: 4,
+          exportedAt: new Date().toISOString(),
+          application: { name: "OpenBot", version: app.getVersion() },
+          scope: {
+            includes: ["agent profiles", "agent memories", "conversation snapshots", "queues", "attachments"],
+            excludes: [
+              "Codex credentials",
+              "OpenCode Go key",
+              "custom provider API keys",
+              "custom agent environment values",
+              "browser cookies",
+              "agent workspace files",
+            ],
+          },
+          agents: agents.map(toBackupAgent),
+          memories: agents.flatMap((agent) => context.service.listMemories(agent.id)),
+          conversations,
+          queues,
+        };
+        yield* archiveCall(() =>
+          writeFile(join(exportRoot, "openbot-data.json"), `${JSON.stringify(manifest, null, 2)}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+          }),
+        ).pipe(Effect.uninterruptible);
+        for (const attachment of attachments) {
+          const target = join(exportRoot, attachment.relativePath);
+          yield* archiveCall(() => mkdir(dirname(target), { recursive: true, mode: 0o700 })).pipe(
+            Effect.uninterruptible,
+          );
+          yield* archiveCall(() => copyFile(attachment.sourcePath, target)).pipe(Effect.uninterruptible);
+        }
+        if (process.platform === "win32") {
+          yield* archiveCall(() =>
+            execFileAsync("powershell.exe", [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command",
+              `Compress-Archive -LiteralPath '${powerShellLiteral(exportRoot)}' -DestinationPath '${powerShellLiteral(archiveCandidate)}' -Force`,
+            ]),
+          ).pipe(Effect.uninterruptible);
+        } else {
+          yield* archiveCall(() =>
+            execFileAsync("/usr/bin/ditto", ["-c", "-k", "--keepParent", exportRoot, archiveCandidate]),
+          ).pipe(Effect.uninterruptible);
+        }
+        yield* archiveCall(() => rename(archiveCandidate, destination)).pipe(Effect.uninterruptible);
+        return { saved: true };
+      }),
+    (temporaryRoot) =>
+      Effect.gen(function* () {
+        yield* archiveCall(() =>
+          Promise.all([rm(temporaryRoot, { recursive: true, force: true }), rm(archiveCandidate, { force: true })]),
+        );
+      }),
+  );
+});
 
 function powerShellLiteral(value: string): string {
   return value.replaceAll("'", "''");
 }
-
-export async function exportDiagnostics(
+export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function* (
   context: Pick<MaintenanceContext, "service" | "browser" | "updater" | "trace" | "parentWindow" | "translate">,
-): Promise<ExportResult> {
-  const destination = await chooseExportDestination(
+): Effect.fn.Return<ExportResult, ArchiveOperationError> {
+  const destination = yield* chooseExportDestinationEffect(
     context.parentWindow,
     `OpenBot-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
     [{ name: context.translate("dialog.filter.jsonDocument"), extensions: ["json"] }],
@@ -174,16 +201,18 @@ export async function exportDiagnostics(
       history: context.updater.getDiagnostics(),
     },
     // IPC channels and turn origins with counts, outcomes and durations, from the local trace file.
-    trace: await context.trace.summarize(),
+    trace: yield* context.trace.summarize(),
     privacy:
       "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
   };
-  await writeFile(destination, `${JSON.stringify(diagnostics, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
+  yield* archiveCall(() =>
+    writeFile(destination, `${JSON.stringify(diagnostics, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    }),
+  ).pipe(Effect.uninterruptible);
   return { saved: true };
-}
+});
 
 const KB_PER_MB = 1_024;
 const BYTES_PER_MB = 1_024 * 1_024;
@@ -209,21 +238,21 @@ function readMemoryDiagnostics() {
   };
 }
 
-async function chooseExportDestination(
+const chooseExportDestinationEffect = Effect.fn("Archive.chooseExportDestination")(function* (
   parentWindow: BrowserWindow | null,
   defaultName: string,
   filters: Electron.FileFilter[],
-): Promise<string | null> {
+): Effect.fn.Return<string | null, ArchiveOperationError> {
   const options: Electron.SaveDialogOptions = {
     defaultPath: join(app.getPath("documents"), defaultName),
     filters,
     showsTagField: false,
   };
   const result = parentWindow
-    ? await dialog.showSaveDialog(parentWindow, options)
-    : await dialog.showSaveDialog(options);
+    ? yield* archiveCall(() => dialog.showSaveDialog(parentWindow, options))
+    : yield* archiveCall(() => dialog.showSaveDialog(options));
   return result.canceled || !result.filePath ? null : result.filePath;
-}
+});
 
 function toBackupAgent(agent: AgentSummary): Omit<AgentSummary, "workspacePath"> {
   return {

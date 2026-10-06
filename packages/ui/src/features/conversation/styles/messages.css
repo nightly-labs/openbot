@@ -1339,3 +1339,25 @@ button.chat-action-target:active,
     background-position: 0% 0;
   }
 }
+
+/* A message the host has not stored yet. It reads as the user's own, a step quieter, until it is. */
+.message-entry-pending .message-shell {
+  opacity: 0.7;
+}
+
+.pending-send-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+}
+
+.pending-send-status[data-state="failed"] .pending-send-label {
+  color: var(--openbot-danger-text);
+}
+
+.pending-send-error {
+  margin-inline-start: var(--openbot-space-2);
+  overflow-wrap: anywhere;
+}

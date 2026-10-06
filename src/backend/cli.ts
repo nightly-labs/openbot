@@ -7,6 +7,8 @@ import { promisify } from "node:util";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result } from "effect";
+import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 144, 1] as const;
@@ -84,25 +86,35 @@ export class CodexCliError extends Error {
  */
 export type BundledProviderExecutables = Partial<Record<AgentProviderId, string | null>>;
 
-export async function resolveCodexCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<CodexCliInfo> {
-  const bundledExecutable = input.bundledExecutable === undefined ? bundledCodexExecutable() : input.bundledExecutable;
-  const candidates = await cliCandidates("codex", input.systemCandidates, bundledExecutable);
-  const failures: CodexCliError[] = [];
+export const resolveCodexCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<CodexCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveCodexCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<CodexCliInfo, ProviderClientOperationError> {
+    const bundledExecutable =
+      input.bundledExecutable === undefined ? bundledCodexExecutable() : input.bundledExecutable;
+    const candidates = yield* cliCandidates("codex", input.systemCandidates, bundledExecutable);
+    const failures: CodexCliError[] = [];
 
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
 
-    try {
-      const stdout = await readCliVersion(candidate.executable, "codex");
-      const version = parseCodexVersion(stdout);
-      if (!isMinimumVersion(version, MINIMUM_CODEX_VERSION)) {
-        throw new CodexCliError(sourceText("error.provider.codexOutdated", { version }), "outdated");
-      }
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const stdout = yield* readCliVersion(candidate.executable, "codex");
+          const version = parseCodexVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_CODEX_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.codexOutdated", { version }), "outdated");
+          }
 
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
@@ -110,16 +122,17 @@ export async function resolveCodexCli(
           : new CodexCliError(sourceText("error.provider.codexNotStarted"), "invalid"),
       );
     }
-  }
 
-  const outdated = failures.find((failure) => failure.code === "outdated");
-  if (outdated) throw outdated;
-  if (failures.length > 0) {
-    throw new CodexCliError(sourceText("error.provider.codexNotStartedHint"), "invalid");
-  }
+    const outdated = failures.find((failure) => failure.code === "outdated");
+    if (outdated) throw outdated;
+    if (failures.length > 0) {
+      throw new CodexCliError(sourceText("error.provider.codexNotStartedHint"), "invalid");
+    }
 
-  throw new CodexCliError(sourceText("error.provider.codexMissing"), "missing");
-}
+    throw new CodexCliError(sourceText("error.provider.codexMissing"), "missing");
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 export function bundledCodexExecutable(
   platform = process.platform,
@@ -129,24 +142,34 @@ export function bundledCodexExecutable(
   return bundledProviderExecutable("codex", platform, architecture, resourcesPath);
 }
 
-export async function resolveClaudeCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<ClaudeCliInfo> {
-  const bundledExecutable = input.bundledExecutable === undefined ? bundledClaudeExecutable() : input.bundledExecutable;
-  const candidates = await cliCandidates("claude", input.systemCandidates, bundledExecutable);
-  const failures: CodexCliError[] = [];
+export const resolveClaudeCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<ClaudeCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveClaudeCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<ClaudeCliInfo, ProviderClientOperationError> {
+    const bundledExecutable =
+      input.bundledExecutable === undefined ? bundledClaudeExecutable() : input.bundledExecutable;
+    const candidates = yield* cliCandidates("claude", input.systemCandidates, bundledExecutable);
+    const failures: CodexCliError[] = [];
 
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
 
-    try {
-      const stdout = await readCliVersion(candidate.executable, "claude");
-      const version = parseClaudeVersion(stdout);
-      if (!isMinimumVersion(version, MINIMUM_CLAUDE_VERSION)) {
-        throw new CodexCliError(sourceText("error.provider.claudeOutdated", { version }), "outdated");
-      }
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const stdout = yield* readCliVersion(candidate.executable, "claude");
+          const version = parseClaudeVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_CLAUDE_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.claudeOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
@@ -154,16 +177,17 @@ export async function resolveClaudeCli(
           : new CodexCliError(sourceText("error.provider.claudeNotStarted"), "invalid"),
       );
     }
-  }
 
-  const outdated = failures.find((failure) => failure.code === "outdated");
-  if (outdated) throw outdated;
-  if (failures.length > 0) {
-    throw new CodexCliError(sourceText("error.provider.claudeNotStartedHint"), "invalid");
-  }
+    const outdated = failures.find((failure) => failure.code === "outdated");
+    if (outdated) throw outdated;
+    if (failures.length > 0) {
+      throw new CodexCliError(sourceText("error.provider.claudeNotStartedHint"), "invalid");
+    }
 
-  throw new CodexCliError(sourceText("error.provider.claudeMissing"), "missing");
-}
+    throw new CodexCliError(sourceText("error.provider.claudeMissing"), "missing");
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 export function bundledClaudeExecutable(
   platform = process.platform,
@@ -173,24 +197,33 @@ export function bundledClaudeExecutable(
   return bundledProviderExecutable("claude", platform, architecture, resourcesPath);
 }
 
-export async function resolveGrokCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<GrokCliInfo> {
-  const bundledExecutable = input.bundledExecutable === undefined ? bundledGrokExecutable() : input.bundledExecutable;
-  const candidates = await cliCandidates("grok", input.systemCandidates, bundledExecutable);
-  const failures: CodexCliError[] = [];
+export const resolveGrokCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<GrokCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveGrokCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<GrokCliInfo, ProviderClientOperationError> {
+    const bundledExecutable = input.bundledExecutable === undefined ? bundledGrokExecutable() : input.bundledExecutable;
+    const candidates = yield* cliCandidates("grok", input.systemCandidates, bundledExecutable);
+    const failures: CodexCliError[] = [];
 
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
 
-    try {
-      const stdout = await readCliVersion(candidate.executable, "grok");
-      const version = parseGrokVersion(stdout);
-      if (!isMinimumVersion(version, MINIMUM_GROK_VERSION)) {
-        throw new CodexCliError(sourceText("error.provider.grokOutdated", { version }), "outdated");
-      }
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const stdout = yield* readCliVersion(candidate.executable, "grok");
+          const version = parseGrokVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_GROK_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.grokOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
@@ -198,47 +231,58 @@ export async function resolveGrokCli(
           : new CodexCliError(sourceText("error.provider.grokNotStarted"), "invalid"),
       );
     }
-  }
 
-  const outdated = failures.find((failure) => failure.code === "outdated");
-  if (outdated) throw outdated;
-  if (failures.length > 0) {
-    throw new CodexCliError(sourceText("error.provider.grokNotStartedHint"), "invalid");
-  }
+    const outdated = failures.find((failure) => failure.code === "outdated");
+    if (outdated) throw outdated;
+    if (failures.length > 0) {
+      throw new CodexCliError(sourceText("error.provider.grokNotStartedHint"), "invalid");
+    }
 
-  throw new CodexCliError(sourceText("error.provider.grokMissing"), "missing");
-}
+    throw new CodexCliError(sourceText("error.provider.grokMissing"), "missing");
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 /**
  * There is deliberately no minimum version here. OpenBot downloads and pins OpenCode now, but a
  * user who already has the CLI keeps it, and a floor would newly lock out an install that works.
  */
-export async function resolveOpencodeCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<OpencodeCliInfo> {
-  const bundledExecutable =
-    input.bundledExecutable === undefined ? bundledOpencodeExecutable() : input.bundledExecutable;
-  const candidates = await cliCandidates("opencode", input.systemCandidates, bundledExecutable);
-  let found = false;
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
-    found = true;
-    try {
-      const version = parseOpencodeVersion(await readCliVersion(candidate.executable, "opencode"));
-      // `source` has to be the candidate's own: hardcoding "system" made `updateProviderCli` refuse
-      // to activate the managed copy, and made `trackSystemCliVersions` report the managed version
-      // as the user's, which suppressed every later update offer.
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+export const resolveOpencodeCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<OpencodeCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveOpencodeCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<OpencodeCliInfo, ProviderClientOperationError> {
+    const bundledExecutable =
+      input.bundledExecutable === undefined ? bundledOpencodeExecutable() : input.bundledExecutable;
+    const candidates = yield* cliCandidates("opencode", input.systemCandidates, bundledExecutable);
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const version = parseOpencodeVersion(yield* readCliVersion(candidate.executable, "opencode"));
+          // `source` has to be the candidate's own: hardcoding "system" made `updateProviderCli` refuse
+          // to activate the managed copy, and made `trackSystemCliVersions` report the managed version
+          // as the user's, which suppressed every later update offer.
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       /* Try the remaining installed candidates. */
     }
-  }
-  throw new CodexCliError(
-    found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
-    found ? "invalid" : "missing",
-  );
-}
+    throw new CodexCliError(
+      found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 /** The file beside `bin/` that names the version of an Antigravity install. */
 export const ANTIGRAVITY_MANIFEST = "antigravity-package.json";
@@ -256,33 +300,42 @@ export function antigravityHarnessName(target: string): "localharness_external" 
  * A path the user set is the only candidate: when it cannot start, the error says so, and the
  * managed copy does not run in its place without a message.
  */
-export async function resolveAntigravityCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<AntigravityCliInfo> {
-  const override = input.systemCandidates ?? [configuredCliPath("antigravity")].filter((path) => path !== null);
-  const candidates =
-    override.length > 0
-      ? override.map((executable) => ({ executable, source: "system" as const }))
-      : input.bundledExecutable
-        ? [{ executable: input.bundledExecutable, source: "managed" as const }]
-        : [];
-  let found = false;
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
-    found = true;
-    try {
-      const manifest = join(dirname(dirname(candidate.executable)), ANTIGRAVITY_MANIFEST);
-      const version = parseAntigravityVersion(await readFile(manifest, "utf8"));
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch {
+export const resolveAntigravityCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<AntigravityCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveAntigravityCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<AntigravityCliInfo, ProviderClientOperationError> {
+    const override = input.systemCandidates ?? [configuredCliPath("antigravity")].filter((path) => path !== null);
+    const candidates =
+      override.length > 0
+        ? override.map((executable) => ({ executable, source: "system" as const }))
+        : input.bundledExecutable
+          ? [{ executable: input.bundledExecutable, source: "managed" as const }]
+          : [];
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const manifest = join(dirname(dirname(candidate.executable)), ANTIGRAVITY_MANIFEST);
+          const version = parseAntigravityVersion(yield* providerCall(() => readFile(manifest, "utf8")));
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+
       /* Try the remaining candidates. */
     }
-  }
-  throw new CodexCliError(
-    found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
-    found ? "invalid" : "missing",
-  );
-}
+    throw new CodexCliError(
+      found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 export function parseAntigravityVersion(manifest: string): string {
   let version: unknown = null;
@@ -306,27 +359,37 @@ export const CURSOR_MANIFEST = "cursor-package.json";
  * CLI, so it is never used. There is no minimum version, as for OpenCode: a user who already has
  * the CLI keeps it.
  */
-export async function resolveCursorCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<CursorCliInfo> {
-  const candidates = await cliCandidates("cursor", input.systemCandidates, input.bundledExecutable ?? null);
-  let found = false;
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
-    found = true;
-    try {
-      const version = parseCursorVersion(await readCliVersion(candidate.executable, "cursor"));
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+export const resolveCursorCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<CursorCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveCursorCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<CursorCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("cursor", input.systemCandidates, input.bundledExecutable ?? null);
+    let found = false;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const version = parseCursorVersion(yield* readCliVersion(candidate.executable, "cursor"));
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       /* Try the remaining installed candidates. */
     }
-  }
-  throw new CodexCliError(
-    found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
-    found ? "invalid" : "missing",
-  );
-}
+    throw new CodexCliError(
+      found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 /**
  * Cursor prints its build as a date and a commit, such as `2026.09.28-64d2043`. The newer form that
@@ -360,20 +423,29 @@ export function parseCursorManifestVersion(manifest: string): string {
  * `MINIMUM_CLINE_VERSION` is skipped, so a managed one after it is still used. With no newer CLI,
  * the outdated one is the error the user sees.
  */
-export async function resolveClineCli(
-  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
-): Promise<ClineCliInfo> {
-  const candidates = await cliCandidates("cline", input.systemCandidates, input.bundledExecutable ?? null);
-  const failures: CodexCliError[] = [];
-  for (const candidate of candidates) {
-    if (!(await isExecutable(candidate.executable))) continue;
-    try {
-      const version = parseClineVersion(await readCliVersion(candidate.executable, "cline"));
-      if (!isMinimumVersion(version, MINIMUM_CLINE_VERSION)) {
-        throw new CodexCliError(sourceText("error.provider.clineOutdated", { version }), "outdated");
-      }
-      return { executable: candidate.executable, version, source: candidate.source };
-    } catch (error) {
+export const resolveClineCli: (input?: {
+  systemCandidates?: string[];
+  bundledExecutable?: string | null;
+}) => Effect.Effect<ClineCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveClineCli")(
+  function* (
+    input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+  ): Effect.fn.Return<ClineCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("cline", input.systemCandidates, input.bundledExecutable ?? null);
+    const failures: CodexCliError[] = [];
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const version = parseClineVersion(yield* readCliVersion(candidate.executable, "cline"));
+          if (!isMinimumVersion(version, MINIMUM_CLINE_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.clineOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: candidate.source };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+
       if (isCliTimeout(error)) throw error;
       failures.push(
         error instanceof CodexCliError
@@ -381,13 +453,14 @@ export async function resolveClineCli(
           : new CodexCliError(sourceText("error.provider.clineNotStarted"), "invalid"),
       );
     }
-  }
-  throw (
-    failures.find((failure) => failure.code === "outdated") ??
-    failures[0] ??
-    new CodexCliError(sourceText("error.provider.clineMissing"), "missing")
-  );
-}
+    throw (
+      failures.find((failure) => failure.code === "outdated") ??
+      failures[0] ??
+      new CodexCliError(sourceText("error.provider.clineMissing"), "missing")
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
 
 export function bundledOpencodeExecutable(
   platform = process.platform,
@@ -501,61 +574,56 @@ export function configuredCliPath(provider: AgentProviderId): string | null {
   return process.env[`OPENBOT_${provider.toUpperCase()}_PATH`]?.trim() || null;
 }
 
-async function cliCandidates(
+const cliCandidates = Effect.fn("Cli.candidates")(function* (
   provider: AgentProviderId,
   systemCandidates: string[] | undefined,
   bundledExecutable: string | null,
-): Promise<Array<{ executable: string; source: "system" | "managed" }>> {
+) {
   const override = systemCandidates === undefined ? configuredCliPath(provider) : null;
-  const system = (systemCandidates ?? (await collectCandidates(provider, override ?? undefined))).map((executable) => ({
-    executable,
-    source: "system" as const,
-  }));
+  const system = (systemCandidates ?? (yield* collectCandidates(provider, override ?? undefined))).map(
+    (executable) => ({
+      executable,
+      source: "system" as const,
+    }),
+  );
   const managed = bundledExecutable ? [{ executable: bundledExecutable, source: "managed" as const }] : [];
   return (override ? [...system, ...managed] : [...managed, ...system]).filter(
     (candidate, index, all) => all.findIndex((other) => other.executable === candidate.executable) === index,
   );
-}
+});
 
 /**
  * `command` goes into a login shell as `command -v <command>`, so it takes a fixed provider id and
  * nothing else. A command the user typed, as for a custom agent, is resolved by
  * `resolveAgentCommand` in `acp-agent-command.ts`, which never gives it to a shell.
  */
-async function collectCandidates(provider: AgentProviderId, configuredPath: string | undefined): Promise<string[]> {
+const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
+  provider: AgentProviderId,
+  configuredPath: string | undefined,
+) {
   const candidates: string[] = [];
   const override = configuredPath?.trim();
   if (override) return [override];
   const command = cliCommandName(provider);
-
   if (process.platform === "win32") {
-    try {
-      const { stdout } = await execFileAsync("where.exe", [command], {
-        timeout: 5_000,
-        maxBuffer: 64 * 1024,
-      });
-      candidates.push(
-        ...stdout
-          .split(/\r?\n/u)
-          .map((path) => path.trim())
-          .filter(Boolean),
-      );
-    } catch {
-      // Known Windows install locations are checked next.
-    }
+    const output = yield* providerCall(() =>
+      execFileAsync("where.exe", [command], { timeout: 5_000, maxBuffer: 64 * 1024 }),
+    ).pipe(Effect.catch(() => Effect.succeed({ stdout: "" })));
+    candidates.push(
+      ...output.stdout
+        .split(/\r?\n/u)
+        .map((path) => path.trim())
+        .filter(Boolean),
+    );
     candidates.push(...windowsFallbackPaths(provider));
   } else {
-    try {
-      const path = commandPathFromShellOutput(await runInLoginShell(`command -v ${command}`));
-      if (path) candidates.push(path);
-    } catch {
-      // Packaged apps often start with a restricted PATH; known locations are checked next.
-    }
+    const output = yield* runInLoginShell(`command -v ${command}`).pipe(Effect.catch(() => Effect.succeed("")));
+    const path = commandPathFromShellOutput(output);
+    if (path) candidates.push(path);
     candidates.push(...posixFallbackPaths(provider));
   }
-
   return [...new Set(candidates)];
-}
+});
 
 export function windowsFallbackPaths(
   provider: AgentProviderId,
@@ -638,8 +706,14 @@ const LOGIN_SHELL_MAX_OUTPUT_BYTES = 64 * 1024;
  * A failed start, a non-zero exit, a signal, the timeout and too much output all reject, as
  * `execFile` did, so each caller keeps its fallback.
  */
-export function runInLoginShell(script: string, shell = loginShellCommand()): Promise<string> {
-  return new Promise((resolve, reject) => {
+export function runInLoginShell(
+  script: string,
+  shell = loginShellCommand(),
+): Effect.Effect<string, ProviderClientOperationError> {
+  return Effect.callback<string, ProviderClientOperationError>((resume) => {
+    const resolve = (value: string) => resume(Effect.succeed(value));
+    const reject = (cause: unknown) => resume(Effect.fail(providerFailure(cause)));
+    let finished = false;
     const child = spawn(shell.command, [...shell.args, script], {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -673,14 +747,20 @@ export function runInLoginShell(script: string, shell = loginShellCommand()): Pr
     // Drained and dropped: an interactive shell with no terminal reports that job control is off.
     child.stderr.resume();
     child.once("error", (error) => {
+      finished = true;
       clearTimeout(timer);
       reject(error);
     });
     child.once("close", (code, signal) => {
+      finished = true;
       clearTimeout(timer);
       if (failure) reject(failure);
       else if (code !== 0) reject(new Error(`The login shell exited with ${signal ?? `code ${code}`}.`));
       else resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    return Effect.sync(() => {
+      clearTimeout(timer);
+      if (!finished) stop(new Error("Login shell interrupted."));
     });
   });
 }
@@ -757,47 +837,42 @@ function isCliTimeout(error: unknown): error is CodexCliError {
   return error instanceof CodexCliError && error.code === "timeout";
 }
 
-async function readCliVersion(candidate: string, provider: AgentProviderId): Promise<string> {
-  try {
-    if (process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase())) {
-      const commandProcessor = process.env.ComSpec?.trim() || "cmd.exe";
-      const escapedCandidate = candidate.replaceAll("%", "%%");
-      const { stdout } = await execFileAsync(
-        commandProcessor,
-        ["/d", "/s", "/c", `""${escapedCandidate}" --version"`],
-        {
+const readCliVersion = Effect.fn("Cli.readVersion")(function* (candidate: string, provider: AgentProviderId) {
+  const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const output = yield* providerCall(() =>
+    target
+      ? execFileAsync(
+          process.env.ComSpec?.trim() || "cmd.exe",
+          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
+          {
+            timeout: CLI_VERSION_TIMEOUT_MS,
+            maxBuffer: 64 * 1024,
+            windowsHide: true,
+            windowsVerbatimArguments: true,
+          },
+        )
+      : execFileAsync(candidate, ["--version"], {
           timeout: CLI_VERSION_TIMEOUT_MS,
           maxBuffer: 64 * 1024,
-          windowsHide: true,
-          windowsVerbatimArguments: true,
-        },
-      );
-      return stdout;
-    }
+          windowsHide: process.platform === "win32",
+        }),
+  ).pipe(
+    Effect.mapError((failure) =>
+      isDynamicRecord(failure.cause) && failure.cause.killed === true
+        ? providerFailure(
+            new CodexCliError(
+              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+              "timeout",
+            ),
+          )
+        : failure,
+    ),
+  );
+  return output.stdout;
+});
 
-    const { stdout } = await execFileAsync(candidate, ["--version"], {
-      timeout: CLI_VERSION_TIMEOUT_MS,
-      maxBuffer: 64 * 1024,
-      windowsHide: process.platform === "win32",
-    });
-    return stdout;
-  } catch (error) {
-    // `execFile` kills the child when its timer ends and marks the rejection with `killed`.
-    if (isDynamicRecord(error) && error.killed === true) {
-      throw new CodexCliError(
-        sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-        "timeout",
-      );
-    }
-    throw error;
-  }
-}
-
-async function isExecutable(path: string): Promise<boolean> {
-  try {
-    await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
+const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
+  providerCall(() => access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK)).pipe(
+    Effect.match({ onSuccess: () => true, onFailure: () => false }),
+  ),
+);

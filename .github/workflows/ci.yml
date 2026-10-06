@@ -59,7 +59,9 @@ jobs:
           if [[ "$EVENT_NAME" != "pull_request" ]]; then
             changed="package.json"
           else
-            changed="$(git diff --name-only HEAD^1 HEAD)"
+            # Without `--no-renames`, a moved file lists only its new path, and a move to `docs/`
+            # would hide the path that a lane reads.
+            changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
           fi
           # Markdown that no build or test reads changes no lane. Not every Markdown file: the API
           # bundles CHANGELOG.md, and the renderer bundles Markdown from `resources/`.
@@ -97,9 +99,12 @@ jobs:
     # Ubuntu runner, so the two run side by side. The install here is the full
     # one: this job builds with electron-vite, which resolves the `electron`
     # package.
+    #
+    # Branch protection requires this job, and a skipped required check counts as passed. So it
+    # runs when `detect` did not succeed, and it skips only when `detect` found no code change.
     name: Check
     needs: detect
-    if: needs.detect.outputs.code == 'true'
+    if: ${{ !cancelled() && (needs.detect.result != 'success' || needs.detect.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -338,8 +343,9 @@ jobs:
           OPENBOT_STORYBOOK_CHECK: "true"
 
   all-checks-pass:
-    # The one check branch protection requires. A lane that `detect` skipped counts as passed; a
-    # failed or cancelled job, including `detect` itself, fails this one.
+    # A summary of every job. Branch protection requires `Check`, not this job. A lane that
+    # `detect` skipped counts as passed; a failed or cancelled job, including `detect` itself,
+    # fails this one.
     name: All required checks pass
     if: always()
     needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook]

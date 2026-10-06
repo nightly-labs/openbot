@@ -2,6 +2,7 @@ import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/inpu
 import { PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { RemoteTeamMember } from "@openbot/team-client";
+import { runTeamEffect } from "@openbot/team-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams } from "expo-router";
@@ -50,14 +51,14 @@ export function ServerMembersScreen() {
     enabled: Boolean(server),
     retry: false,
     gcTime: 0,
-    queryFn: () => teamDirectory.listMembers(serverId),
+    queryFn: () => runTeamEffect(teamDirectory.listMembers(serverId)),
   });
   const invites = useQuery({
     queryKey: ["server-invites", session?.apiUrl, session?.user.id, sessionScope, serverId],
     enabled: canInvite,
     retry: false,
     gcTime: 0,
-    queryFn: () => teamDirectory.listInvites(serverId),
+    queryFn: () => runTeamEffect(teamDirectory.listInvites(serverId)),
   });
   const inviteUsed = Boolean(
     created &&
@@ -103,10 +104,12 @@ export function ServerMembersScreen() {
                 member.role === "admin" ? t("mobile.server.members.makeMember") : t("mobile.server.members.makeAdmin"),
               onPress: () =>
                 perform(() =>
-                  teamDirectory.updateMember(
-                    serverId,
-                    member.membershipId,
-                    memberRole === "admin" ? "member" : "admin",
+                  runTeamEffect(
+                    teamDirectory.updateMember(
+                      serverId,
+                      member.membershipId,
+                      memberRole === "admin" ? "member" : "admin",
+                    ),
                   ),
                 ),
             },
@@ -115,7 +118,7 @@ export function ServerMembersScreen() {
       {
         text: t("mobile.server.members.remove"),
         style: "destructive",
-        onPress: () => perform(() => teamDirectory.leaveHost(serverId, member.membershipId)),
+        onPress: () => perform(() => runTeamEffect(teamDirectory.leaveHost(serverId, member.membershipId))),
       },
     ];
     Alert.alert(member.name || member.email, t("mobile.server.members.manage"), [
@@ -204,14 +207,18 @@ export function ServerMembersScreen() {
                   if (inviteMode === "email") {
                     const normalized = normalizeEmailAddress(email);
                     if (!normalized) throw new Error(t("mobile.server.members.invalidEmail"));
-                    const invite = await teamDirectory.sendInviteEmail(host, { role, email: normalized });
+                    const invite = await runTeamEffect(
+                      teamDirectory.sendInviteEmail(host, { role, email: normalized }),
+                    );
                     setCreated({ ...invite, email: normalized });
                   } else {
                     setCreated(
-                      await teamDirectory.createInvite(host, {
-                        role,
-                        ...(inviteMode === "permanent" ? { permanent: true } : {}),
-                      }),
+                      await runTeamEffect(
+                        teamDirectory.createInvite(host, {
+                          role,
+                          ...(inviteMode === "permanent" ? { permanent: true } : {}),
+                        }),
+                      ),
                     );
                   }
                   setCopied(false);
@@ -388,7 +395,7 @@ export function ServerMembersScreen() {
                     style: "destructive",
                     onPress: () =>
                       perform(async () => {
-                        await teamDirectory.revokeInvite(invite.inviteId);
+                        await runTeamEffect(teamDirectory.revokeInvite(invite.inviteId));
                         if (created?.inviteId === invite.inviteId) setCreated(null);
                       }),
                   },

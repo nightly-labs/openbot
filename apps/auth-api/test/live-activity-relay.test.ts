@@ -1,5 +1,6 @@
 import { exportPKCS8, generateKeyPair } from "jose";
 import { describe, expect, it, vi } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { ApnsLiveActivitySender, readLiveActivityRelayPush } from "../src/server/live-activity-relay";
 
 const token = "ab".repeat(32);
@@ -35,7 +36,7 @@ describe("Live Activity relay", () => {
     const push = readLiveActivityRelayPush({ ...body, alert: { title: "Pay now" } });
     if (!push) throw new Error("The update was not read.");
 
-    expect(await apns.send(push)).toBe("sent");
+    expect(await runApiEffect(apns.send(push))).toBe("sent");
     const [url, init] = fetch.mock.calls[0] ?? [];
     expect(url).toBe(`https://api.push.apple.com/3/device/${token}`);
     expect(init?.headers).toMatchObject({
@@ -66,11 +67,11 @@ describe("Live Activity relay", () => {
     if (!push) throw new Error("The update was not read.");
 
     const gone = await sender(() => new Response(null, { status: 410 }));
-    expect(await gone.apns.send(push)).toBe("gone");
+    expect(await runApiEffect(gone.apns.send(push))).toBe("gone");
     expect(gone.fetch.mock.calls[0]?.[0]).toContain("api.sandbox.push.apple.com");
     const refused = await sender(() => Response.json({ reason: "BadDeviceToken" }, { status: 400 }));
-    expect(await refused.apns.send(push)).toBe("gone");
+    expect(await runApiEffect(refused.apns.send(push))).toBe("gone");
     const busy = await sender(() => new Response(null, { status: 503 }));
-    expect(await busy.apns.send(push)).toBe("unavailable");
+    expect(await runApiEffect(busy.apns.send(push))).toBe("unavailable");
   });
 });

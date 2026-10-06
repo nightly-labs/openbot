@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+
+import type { McpAuthorizationSource } from "./mcp-provider-shapes";
 // @vitest-environment node
 
 /*
@@ -23,6 +26,7 @@ import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
+import { runCauseEffect } from "./effect-boundary";
 import type { CustomProviderConfig } from "./opencode-config";
 import {
   decodeAccountReadResult,
@@ -35,7 +39,7 @@ import { requireProviderDriver } from "./provider-drivers";
 const started: AgentClient[] = [];
 
 afterEach(async () => {
-  await Promise.all(started.splice(0).map((client) => client.stop().catch(() => undefined)));
+  await Promise.all(started.splice(0).map((client) => runCauseEffect(client.stop()).catch(() => undefined)));
   // The fake agent reads its behaviour from the environment, so a stub left in place would decide
   // the next test as well.
   vi.unstubAllEnvs();
@@ -314,7 +318,7 @@ function startOpencode(
     /** Read at every session, the same way the real source is. */
     mcpServers?: () => McpServerConfig[];
     /** The bearer token a signed-in http server is given, minted at the hand-off and never stored. */
-    mcpAuthorization?: (config: McpServerConfig) => Promise<string | null>;
+    mcpAuthorization?: McpAuthorizationSource;
     /** How long one request may take, which is also the deadline model discovery works inside. */
     requestTimeoutMs?: number;
   } = {},
@@ -353,15 +357,17 @@ describe("OpenCode ACP environment", () => {
     const fake = await createFakeOpencodeAgent("system");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     // An empty `OPENCODE_API_KEY` is not the same as an absent one: the CLI reads it as an account
     // and lists nothing. A user with no account has to see the variable missing.
     const [environment] = await fake.readSpawnEnvironments();
     expect(environment).toEqual({ argv: ["acp"], apiKey: null, disableAutoupdate: null, configContent: null });
-    const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
+    const account = await runCauseEffect(
+      client.request("account/read", { refreshToken: false }, decodeAccountReadResult),
+    );
     expect(account.account).not.toBeNull();
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(models.data.map((model) => model.model)).toEqual(["opencode/big-pickle"]);
   });
 
@@ -370,7 +376,7 @@ describe("OpenCode ACP environment", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_FAIL_MODEL_REFRESH", "1");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
 
     // Initialization discovered this model successfully. The next `model/list` refresh fails, but
     // that temporary failure must not erase the catalogue users can already select.
@@ -383,16 +389,16 @@ describe("OpenCode ACP environment", () => {
     // One client across both spawns, which is what makes this about the spawn and not the client:
     // the key is read while the process is created, so the same client picks up a later save.
     const client = startOpencode(fake.cli, () => key, fake.envLog);
-    await client.request("initialize", {}, decodeRecordResponse);
-    await client.stop();
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    await runCauseEffect(client.stop());
 
     key = "go-key-value";
     client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     const environments = await fake.readSpawnEnvironments();
     expect(environments.map((environment) => environment.apiKey)).toEqual([null, "go-key-value"]);
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
     expect(models.data.map((model) => model.model)).toEqual([
       "opencode-go/go-one",
       "opencode-go/go-two",
@@ -403,7 +409,7 @@ describe("OpenCode ACP environment", () => {
   it("stops a managed install from updating itself past the pin", async () => {
     const managed = await createFakeOpencodeAgent("managed");
     const client = startOpencode(managed.cli, () => null, managed.envLog);
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     // `verifyInstalledRuntime` compares the reported version with the pin for exact equality, so a
     // CLI that self-updates would leave OpenBot re-downloading a runtime it already has.
@@ -413,7 +419,7 @@ describe("OpenCode ACP environment", () => {
   it("leaves the CLI a user installed free to update itself", async () => {
     const system = await createFakeOpencodeAgent("system");
     const client = startOpencode(system.cli, () => null, system.envLog);
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     expect((await system.readSpawnEnvironments())[0]?.disableAutoupdate).toBeNull();
   });
@@ -423,11 +429,13 @@ describe("OpenCode ACP environment", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_REJECT_KEY", "1");
     const client = startOpencode(fake.cli, () => "not-a-key", fake.envLog);
 
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     // A rejected key has to read as "sign in again", not as a broken CLI: this null account is what
     // `provider-runtime` turns into `sign-in-required` with the provider's own message.
-    const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
+    const account = await runCauseEffect(
+      client.request("account/read", { refreshToken: false }, decodeAccountReadResult),
+    );
     expect(account.account).toBeNull();
   });
 
@@ -435,7 +443,7 @@ describe("OpenCode ACP environment", () => {
     const fake = await createFakeOpencodeAgent("system");
     const client = startOpencode(fake.cli, () => null, fake.envLog, { customProviders: () => [customProvider()] });
 
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     const [environment] = await fake.readSpawnEnvironments();
     expect(JSON.parse(environment?.configContent ?? "")).toEqual({
@@ -456,12 +464,12 @@ describe("OpenCode ACP environment", () => {
     // One `opencode acp` process serves the whole app, so a saved endpoint can only reach it through
     // a respawn of a client that was built long before the save.
     const client = startOpencode(fake.cli, () => null, fake.envLog, { customProviders: () => providers });
-    await client.request("initialize", {}, decodeRecordResponse);
-    await client.stop();
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    await runCauseEffect(client.stop());
 
     providers.push(customProvider());
     client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     const environments = await fake.readSpawnEnvironments();
     // No endpoint means no config layer at all: an empty layer is not the same as no layer.
@@ -479,7 +487,7 @@ describe("OpenCode ACP environment", () => {
       profile: true,
     });
 
-    await client.request("initialize", {}, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
 
     const config = JSON.parse((await fake.readSpawnEnvironments())[0]?.configContent ?? "");
     expect(config.permission).toEqual({ "*": "deny" });
@@ -494,7 +502,7 @@ describe("OpenCode ACP environment", () => {
     // Not an authentication failure, so it is not softened into "sign in": an empty catalog is a CLI
     // OpenBot cannot drive, and guessing a model id here would send every prompt to a model the CLI
     // rejects. The provider row reports it as a failed connection.
-    await expect(client.request("initialize", {}, decodeRecordResponse)).rejects.toThrow(
+    await expect(runCauseEffect(client.request("initialize", {}, decodeRecordResponse))).rejects.toThrow(
       "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
     );
   });
@@ -506,7 +514,7 @@ describe("OpenCode ACP environment", () => {
 
     // The SDK rejects with "ACP connection closed" as soon as stdout ends. That phrase was all a user
     // saw when an update's CLI failed to start, so the exit and the CLI's own reason replace it.
-    const failure = client.request("initialize", {}, decodeRecordResponse);
+    const failure = runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
     await expect(failure).rejects.toBeInstanceOf(AgentProcessExitError);
     await expect(failure).rejects.toThrow("OpenCode stopped before it answered (exit code 3).");
     const error = await failure.catch((reason: unknown) => reason);
@@ -522,21 +530,21 @@ describe("OpenCode ACP environment", () => {
     // The endpoint is still saved while the thread is opened, and gone when the prompt would leave.
     let served = true;
     const client = startOpencode(fake.cli, () => null, fake.envLog, { servesModel: () => served });
-    await client.request("initialize", {}, decodeRecordResponse);
-    const thread = await client.request(
-      "thread/start",
-      { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] },
-      decodeRecordResponse,
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    const thread = await runCauseEffect(
+      client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse),
     );
     const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
     if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
 
     served = false;
     await expect(
-      client.request(
-        "turn/start",
-        { threadId, clientUserMessageId: "delivery-1", input: [{ type: "inputText", text: "Keep working" }] },
-        decodeRecordResponse,
+      runCauseEffect(
+        client.request(
+          "turn/start",
+          { threadId, clientUserMessageId: "delivery-1", input: [{ type: "inputText", text: "Keep working" }] },
+          decodeRecordResponse,
+        ),
       ),
     ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
 
@@ -552,7 +560,7 @@ describe("OpenCode ACP reasoning efforts", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
 
     // `thought_level` describes the model the session is on, and a new session is on one model. Read
     // without a probe per model, the whole catalog carried that one answer: the Effort menu offered
@@ -584,7 +592,7 @@ describe("OpenCode ACP reasoning efforts", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_FAIL", "agent/broken");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
 
     // A model an agent will not answer for keeps the efforts the session published, and costs the
     // models after it nothing: a catalog is what the user picks from, so one refusal must not empty it.
@@ -608,7 +616,7 @@ describe("OpenCode ACP reasoning efforts", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_HANG", "agent/silent");
     const client = startOpencode(fake.cli, () => null, fake.envLog, { requestTimeoutMs: 4_000 });
 
-    const models = await client.request("model/list", {}, decodeModelListResponse);
+    const models = await runCauseEffect(client.request("model/list", {}, decodeModelListResponse));
 
     // The sweep runs inside the caller's own timeout, so a probe that never answers has to end
     // before that timeout does. A sweep that waited for it would time `model/list` out, and the
@@ -633,10 +641,12 @@ describe("OpenCode ACP reasoning efforts", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    await client.request(
-      "thread/start",
-      { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()], model: "agent/thinker", effort: "low" },
-      decodeRecordResponse,
+    await runCauseEffect(
+      client.request(
+        "thread/start",
+        { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()], model: "agent/thinker", effort: "low" },
+        decodeRecordResponse,
+      ),
     );
 
     // `minimal` also reads as low effort and comes first in the agent's list, so a first-match
@@ -695,8 +705,10 @@ describe("OpenCode ACP MCP servers", () => {
       },
     ];
     const client = startOpencode(fake.cli, () => null, fake.envLog, { mcpServers: () => configs });
-    await client.request("initialize", {}, decodeRecordResponse);
-    await client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    await runCauseEffect(
+      client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse),
+    );
 
     const logged = (await readFile(sessionLog, "utf8")).split("\n").filter((line) => line.trim());
     // The first session is the model probe the client opens in its own directory; the thread is the
@@ -738,10 +750,12 @@ describe("OpenCode MCP sign-in", () => {
     };
     const client = startOpencode(fake.cli, () => null, fake.envLog, {
       mcpServers: () => [config],
-      mcpAuthorization: async () => "minted-access-token",
+      mcpAuthorization: () => Effect.succeed("minted-access-token"),
     });
-    await client.request("initialize", {}, decodeRecordResponse);
-    await client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    await runCauseEffect(
+      client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse),
+    );
 
     // The row holds no credential: a native sign-in keeps the token in OpenBot's own store, so the
     // only way OpenCode can reach the server is the header written here, at the hand-off.
@@ -767,10 +781,12 @@ describe("OpenCode ACP session loading", () => {
 
     // What boot recovery sends after a restart: a session id from the database that no turn has
     // resumed yet. Before the session is loaded the client holds nothing under that id.
-    const response = await client.request(
-      "thread/read",
-      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
-      decodeThreadResponse,
+    const response = await runCauseEffect(
+      client.request(
+        "thread/read",
+        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+        decodeThreadResponse,
+      ),
     );
 
     expect(response.thread.id).toBe("ses_stored");
@@ -785,12 +801,16 @@ describe("OpenCode ACP session loading", () => {
     // The startup race: the history read and the first drain reach the same stored session id in
     // the same tick. Two loads would leave two threads and two MCP bridge sessions under one id.
     await Promise.all([
-      client.request(
-        "thread/read",
-        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
-        decodeThreadResponse,
+      runCauseEffect(
+        client.request(
+          "thread/read",
+          { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+          decodeThreadResponse,
+        ),
       ),
-      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+      runCauseEffect(
+        client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+      ),
     ]);
 
     expect(await fake.readLoadedSessions()).toHaveLength(1);
@@ -816,30 +836,32 @@ describe("OpenCode ACP session loading", () => {
         .filter((sessionId) => threadIds.includes(sessionId));
     const input = [{ type: "inputText", text: "Keep working" }];
     for (let index = 0; index <= ACP_IDLE_SESSION_LIMIT; index += 1) {
-      const thread = await client.request(
-        "thread/start",
-        { cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
-        decodeRecordResponse,
+      const thread = await runCauseEffect(
+        client.request(
+          "thread/start",
+          { cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+          decodeRecordResponse,
+        ),
       );
       const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
       if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
       threadIds.push(threadId);
     }
     for (const [index, threadId] of threadIds.entries()) {
-      await client.request(
-        "turn/start",
-        { threadId, clientUserMessageId: `turn-${index}`, input },
-        decodeRecordResponse,
+      await runCauseEffect(
+        client.request("turn/start", { threadId, clientUserMessageId: `turn-${index}`, input }, decodeRecordResponse),
       );
       await vi.waitFor(() => expect(completed).toBe(index + 1));
     }
 
     // Each open session holds its own set of the user's MCP servers until the agent closes it.
     await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
-    await client.request(
-      "turn/start",
-      { threadId: threadIds[0], clientUserMessageId: "turn-again", input },
-      decodeRecordResponse,
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        { threadId: threadIds[0], clientUserMessageId: "turn-again", input },
+        decodeRecordResponse,
+      ),
     );
     expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: threadIds[0], cwd: fake.directory }]);
   });
@@ -860,7 +882,9 @@ describe("OpenCode ACP session loading", () => {
 
     // What boot recovery does after a restart: it reads every stored session, and each read loads one.
     for (const threadId of threadIds) {
-      await client.request("thread/read", { threadId, cwd: fake.directory, includeTurns: true }, decodeThreadResponse);
+      await runCauseEffect(
+        client.request("thread/read", { threadId, cwd: fake.directory, includeTurns: true }, decodeThreadResponse),
+      );
     }
 
     // Each open session holds its own set of the user's MCP servers until the agent closes it.
@@ -875,14 +899,18 @@ describe("OpenCode ACP session loading", () => {
     // An agent that does not advertise `loadSession` cannot give the session back. The read answers
     // an empty thread, so a restart reports no failure to the user, and the resume fails as a
     // missing session, which is what starts the replacement.
-    const read = await client.request(
-      "thread/read",
-      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
-      decodeThreadResponse,
+    const read = await runCauseEffect(
+      client.request(
+        "thread/read",
+        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+        decodeThreadResponse,
+      ),
     );
     expect(read.thread.turns).toEqual([]);
     await expect(
-      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+      runCauseEffect(
+        client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+      ),
     ).rejects.toThrow(/unknown acp session/i);
     expect(await fake.readLoadedSessions()).toEqual([]);
   });
@@ -900,15 +928,17 @@ describe("OpenCode ACP session loading", () => {
 
     // The boot read shows nothing to the user, and the resume fails as a missing session, which is
     // what starts the replacement.
-    const read = await client.request(
-      "thread/read",
-      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
-      decodeThreadResponse,
+    const read = await runCauseEffect(
+      client.request(
+        "thread/read",
+        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+        decodeThreadResponse,
+      ),
     );
     expect(read.thread.turns).toEqual([]);
-    const error = await client
-      .request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse)
-      .catch((reason: unknown) => reason);
+    const error = await runCauseEffect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).catch((reason: unknown) => reason);
     expect(isMissingProviderSessionError(error, "opencode")).toBe(true);
     expect(diagnostics).toEqual([]);
     expect(await fake.readLoadedSessions()).toHaveLength(2);
@@ -921,7 +951,9 @@ describe("OpenCode ACP session loading", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "1");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    await client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse);
+    await runCauseEffect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    );
 
     expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored" }, { sessionId: "ses_stored" }]);
   });
@@ -938,9 +970,9 @@ describe("OpenCode ACP session loading", () => {
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
-    const error = await client
-      .request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse)
-      .catch((reason: unknown) => reason);
+    const error = await runCauseEffect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).catch((reason: unknown) => reason);
 
     expect(isMissingProviderSessionError(error, "opencode")).toBe(false);
     expect(error).toHaveProperty("message", sourceText("error.provider.opencodeServiceFailure"));

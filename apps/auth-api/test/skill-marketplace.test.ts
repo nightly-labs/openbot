@@ -1,5 +1,6 @@
 import { zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import {
   enforceSubmissionLimits,
   inspectSkillArchive,
@@ -173,7 +174,10 @@ describe("skill detail examples", () => {
       const marketplace = detailMarketplace(
         archive({ "SKILL.md": `---\nname: Notes\ndescription: Write notes.\n${metadata}---\nExplain changes.` }),
       );
-      for (const detail of [await marketplace.get("notes"), await marketplace.getVersion("notes", "v1")]) {
+      for (const detail of [
+        await runApiEffect(marketplace.get("notes")),
+        await runApiEffect(marketplace.getVersion("notes", "v1")),
+      ]) {
         expect(detail.instructions).toBe("Explain changes.");
         expect(detail.examplePrompt).toBe(withExample ? "Summarize commits." : undefined);
       }
@@ -235,7 +239,7 @@ async function walkCatalog(marketplace: SkillMarketplace, legacy: boolean): Prom
   const seen: string[] = [];
   let cursor: string | undefined;
   for (let request = 0; request < 10; request += 1) {
-    const result = await marketplace.list({ limit: 2, ...(cursor ? { cursor } : {}) });
+    const result = await runApiEffect(marketplace.list({ limit: 2, ...(cursor ? { cursor } : {}) }));
     seen.push(...result.skills.map((skill) => skill.id));
     const last = result.skills.at(-1);
     if (!result.nextCursor || !last) return seen;

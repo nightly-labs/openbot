@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../../server/effect-runtime";
 import {
   apiError,
   json,
@@ -10,14 +12,14 @@ import {
 export const Route = createFileRoute("/v1/marketplace/agents/admin/submissions")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        if (!requireSkillsAdmin(request)) return apiError(401, "unauthorized", "Admin access is required.");
-        try {
-          return json(await requestAgentMarketplace().listPending());
-        } catch (error) {
-          return marketplaceErrorResponse(error);
-        }
-      },
+      GET: ({ request }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            if (!requireSkillsAdmin(request)) return apiError(401, "unauthorized", "Admin access is required.");
+            return json(yield* requestAgentMarketplace().listPending());
+          }),
+          marketplaceErrorResponse,
+        ),
     },
   },
 });

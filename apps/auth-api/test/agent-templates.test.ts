@@ -5,6 +5,7 @@ import type { AgentTemplateSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentMarketplace } from "../src/server/agent-marketplace";
 import { AgentTemplates } from "../src/server/agent-templates";
+import { runApiEffect } from "../src/server/effect-runtime";
 
 const databases: DatabaseSync[] = [];
 
@@ -46,94 +47,121 @@ function snapshot(overrides: Partial<AgentTemplateSnapshot> = {}): AgentTemplate
 describe("agent templates", () => {
   it("publishes a template that anyone can read, and updates it in place", async () => {
     const { templates, bucket } = setup();
-    const published = await templates.publish({
-      user: owner,
-      sourceAgentId: "local-agent",
-      snapshot: { ...snapshot(), extra: "dropped" },
-      avatar: { bytes: png, mimeType: "image/png" },
-    });
+    const published = await runApiEffect(
+      templates.publish({
+        user: owner,
+        sourceAgentId: "local-agent",
+        snapshot: { ...snapshot(), extra: "dropped" },
+        avatar: { bytes: png, mimeType: "image/png" },
+      }),
+    );
     expect(isAgentTemplateId(published.id)).toBe(true);
 
-    const detail = await templates.get(published.id);
+    const detail = await runApiEffect(templates.get(published.id));
     expect(detail).toMatchObject({ id: published.id, name: "Writer", creatorName: "Owner" });
     expect(detail).not.toHaveProperty("extra");
     expect(JSON.stringify(detail)).not.toContain("owner@example.com");
     expect(detail.avatarUrl).toMatch(new RegExp(`^/v1/agent-templates/${published.id}/avatar\\?v=`));
     expect(bucket.size).toBe(1);
 
-    const republished = await templates.publish({
-      user: owner,
-      sourceAgentId: "local-agent",
-      snapshot: snapshot({ name: "Writer 2", routines: [] }),
-      avatar: null,
-    });
+    const republished = await runApiEffect(
+      templates.publish({
+        user: owner,
+        sourceAgentId: "local-agent",
+        snapshot: snapshot({ name: "Writer 2", routines: [] }),
+        avatar: null,
+      }),
+    );
     expect(republished.id).toBe(published.id);
-    expect(await templates.get(published.id)).toMatchObject({ name: "Writer 2", routines: [], avatarUrl: null });
+    expect(await runApiEffect(templates.get(published.id))).toMatchObject({
+      name: "Writer 2",
+      routines: [],
+      avatarUrl: null,
+    });
     expect(bucket.size).toBe(0);
-    expect(await templates.listMine(owner.id)).toEqual([
+    expect(await runApiEffect(templates.listMine(owner.id))).toEqual([
       { id: published.id, sourceAgentId: "local-agent", updatedAt: republished.updatedAt },
     ]);
   });
 
   it("lets only the owner unpublish, and a removed template is not found", async () => {
     const { templates } = setup();
-    const { id } = await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });
+    const { id } = await runApiEffect(
+      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null }),
+    );
 
-    await expect(templates.unpublish(intruder.id, id)).rejects.toMatchObject({ status: 404 });
+    await expect(runApiEffect(templates.unpublish(intruder.id, id))).rejects.toMatchObject({ status: 404 });
     await expect(
-      templates.publish({ user: intruder, sourceAgentId: "a", snapshot: snapshot({ name: "Taken" }), avatar: null }),
+      runApiEffect(
+        templates.publish({ user: intruder, sourceAgentId: "a", snapshot: snapshot({ name: "Taken" }), avatar: null }),
+      ),
     ).resolves.not.toMatchObject({ id });
-    expect((await templates.get(id)).name).toBe("Writer");
+    expect((await runApiEffect(templates.get(id))).name).toBe("Writer");
 
-    await templates.unpublish(owner.id, id);
-    await expect(templates.get(id)).rejects.toMatchObject({ status: 404 });
-    expect(await templates.listMine(owner.id)).toEqual([]);
-    await expect(templates.unpublish(owner.id, id)).rejects.toMatchObject({ status: 404 });
+    await runApiEffect(templates.unpublish(owner.id, id));
+    await expect(runApiEffect(templates.get(id))).rejects.toMatchObject({ status: 404 });
+    expect(await runApiEffect(templates.listMine(owner.id))).toEqual([]);
+    await expect(runApiEffect(templates.unpublish(owner.id, id))).rejects.toMatchObject({ status: 404 });
   });
 
   it("stops a 6th published agent in the write itself, and counts only published ones", async () => {
     const { templates, bucket } = setup();
     for (let index = 0; index < 5; index++)
-      await templates.publish({ user: owner, sourceAgentId: `agent-${index}`, snapshot: snapshot(), avatar: null });
+      await runApiEffect(
+        templates.publish({ user: owner, sourceAgentId: `agent-${index}`, snapshot: snapshot(), avatar: null }),
+      );
 
     await expect(
-      templates.publish({
-        user: owner,
-        sourceAgentId: "agent-5",
-        snapshot: snapshot(),
-        avatar: { bytes: png, mimeType: "image/png" },
-      }),
+      runApiEffect(
+        templates.publish({
+          user: owner,
+          sourceAgentId: "agent-5",
+          snapshot: snapshot(),
+          avatar: { bytes: png, mimeType: "image/png" },
+        }),
+      ),
     ).rejects.toMatchObject({ status: 409, code: "template_limit" });
     expect(bucket.size).toBe(0);
     await expect(
-      templates.publish({ user: owner, sourceAgentId: "agent-0", snapshot: snapshot({ name: "Again" }), avatar: null }),
+      runApiEffect(
+        templates.publish({
+          user: owner,
+          sourceAgentId: "agent-0",
+          snapshot: snapshot({ name: "Again" }),
+          avatar: null,
+        }),
+      ),
     ).resolves.toMatchObject({ sourceAgentId: "agent-0" });
 
     // Another account has its own limit, and an unpublish frees a place.
     await expect(
-      templates.publish({ user: intruder, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null }),
+      runApiEffect(templates.publish({ user: intruder, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null })),
     ).resolves.toMatchObject({ sourceAgentId: "agent-5" });
-    const [first] = await templates.listMine(owner.id);
+    const [first] = await runApiEffect(templates.listMine(owner.id));
     if (!first) throw new Error("The owner has published agents.");
-    await templates.unpublish(owner.id, first.id);
+    await runApiEffect(templates.unpublish(owner.id, first.id));
     await expect(
-      templates.publish({ user: owner, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null }),
+      runApiEffect(templates.publish({ user: owner, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null })),
     ).resolves.toMatchObject({ sourceAgentId: "agent-5" });
   });
 
   it("gives an agent published again after an unpublish the same link", async () => {
     const { templates } = setup();
-    const first = await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });
-    await templates.unpublish(owner.id, first.id);
+    const first = await runApiEffect(
+      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null }),
+    );
+    await runApiEffect(templates.unpublish(owner.id, first.id));
 
-    const again = await templates.publish({
-      user: owner,
-      sourceAgentId: "a",
-      snapshot: snapshot({ name: "Writer again" }),
-      avatar: null,
-    });
+    const again = await runApiEffect(
+      templates.publish({
+        user: owner,
+        sourceAgentId: "a",
+        snapshot: snapshot({ name: "Writer again" }),
+        avatar: null,
+      }),
+    );
     expect(again.id).toBe(first.id);
-    expect((await templates.get(first.id)).name).toBe("Writer again");
+    expect((await runApiEffect(templates.get(first.id))).name).toBe("Writer again");
   });
 
   it.each<[string, Partial<AgentTemplateSnapshot>]>([
@@ -150,28 +178,32 @@ describe("agent templates", () => {
   ])("refuses %s", async (_reason, overrides) => {
     const { templates } = setup();
     await expect(
-      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(overrides), avatar: null }),
+      runApiEffect(templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(overrides), avatar: null })),
     ).rejects.toMatchObject({ status: 400 });
   });
 
   it("serves the share card, replaces it on republish, and removes it on unpublish", async () => {
     const { templates, bucket } = setup();
-    const { id } = await templates.publish({
-      user: owner,
-      sourceAgentId: "a",
-      snapshot: snapshot(),
-      avatar: null,
-      card: cardPng(),
-    });
-    expect((await templates.get(id)).cardUrl).toMatch(new RegExp(`^/v1/agent-templates/${id}/card\\?v=`));
-    expect((await templates.card(id)).httpMetadata?.contentType).toBe("image/png");
+    const { id } = await runApiEffect(
+      templates.publish({
+        user: owner,
+        sourceAgentId: "a",
+        snapshot: snapshot(),
+        avatar: null,
+        card: cardPng(),
+      }),
+    );
+    expect((await runApiEffect(templates.get(id))).cardUrl).toMatch(new RegExp(`^/v1/agent-templates/${id}/card\\?v=`));
+    expect((await runApiEffect(templates.card(id))).httpMetadata?.contentType).toBe("image/png");
     expect(bucket.size).toBe(1);
 
-    await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card: cardPng() });
+    await runApiEffect(
+      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card: cardPng() }),
+    );
     expect(bucket.size).toBe(1);
 
-    await templates.unpublish(owner.id, id);
-    await expect(templates.card(id)).rejects.toMatchObject({ status: 404 });
+    await runApiEffect(templates.unpublish(owner.id, id));
+    await expect(runApiEffect(templates.card(id))).rejects.toMatchObject({ status: 404 });
     expect(bucket.size).toBe(0);
   });
 
@@ -181,16 +213,16 @@ describe("agent templates", () => {
   ])("refuses %s as the share card", async (_reason, card) => {
     const { templates, bucket } = setup();
     await expect(
-      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card }),
+      runApiEffect(templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card })),
     ).rejects.toMatchObject({ status: 400, code: "invalid_card" });
     expect(bucket.size).toBe(0);
   });
 
   it("is not listed in the agent marketplace", async () => {
     const { templates, database } = setup();
-    await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });
+    await runApiEffect(templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null }));
     const marketplace = new AgentMarketplace({ DB: d1(database), SKILLS: memoryBucket() });
-    expect((await marketplace.list()).agents).toEqual([]);
+    expect((await runApiEffect(marketplace.list())).agents).toEqual([]);
   });
 });
 
