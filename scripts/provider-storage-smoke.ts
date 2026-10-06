@@ -7,6 +7,7 @@ import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
 import { type GrokCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli } from "../src/backend/cli";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { GrokAgentClient } from "../src/backend/grok-client";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import {
@@ -24,11 +25,11 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-storage-smoke-"));
 
 try {
   const database = new OpenBotDatabase(join(root, "user-data"));
-  await database.initialize();
+  await runCauseEffect(database.initialize());
   const grokOnly = process.argv.includes("--grok-only");
   if (!grokOnly) {
-    const codex = await resolveCodexCli();
-    const claude = await resolveClaudeCli();
+    const codex = await runCauseEffect(resolveCodexCli());
+    const claude = await runCauseEffect(resolveClaudeCli());
     await runProvider(database, "codex", new CodexAppServerClient(codex.executable, 60_000), "gpt-5.6-luna");
     await runProvider(database, "claude", new ClaudeAgentClient(claude), "claude-opus-5");
   }
@@ -46,7 +47,7 @@ try {
 async function runOptionalGrok(database: OpenBotDatabase): Promise<boolean> {
   let cli: GrokCliInfo;
   try {
-    cli = await resolveGrokCli();
+    cli = await runCauseEffect(resolveGrokCli());
   } catch {
     process.stdout.write("Skipping optional Grok live smoke: Grok CLI is not installed.\n");
     return false;
@@ -55,15 +56,17 @@ async function runOptionalGrok(database: OpenBotDatabase): Promise<boolean> {
   client.start();
   let model: string | null = null;
   try {
-    await client.request("initialize", {}, decodeRecordResponse);
-    const account = await client.request("account/read", {}, decodeAccountReadResult);
-    const models = await client.request("model/list", { limit: 100, includeHidden: true }, decodeModelListResponse);
+    await runCauseEffect(client.request("initialize", {}, decodeRecordResponse));
+    const account = await runCauseEffect(client.request("account/read", {}, decodeAccountReadResult));
+    const models = await runCauseEffect(
+      client.request("model/list", { limit: 100, includeHidden: true }, decodeModelListResponse),
+    );
     model = account.account ? (models.data.find((candidate) => candidate.model)?.model ?? null) : null;
   } catch {
     // This is an optional smoke and an unauthenticated local Grok installation is a valid skip.
   }
   if (!model) {
-    await client.stop();
+    await runCauseEffect(client.stop());
     process.stdout.write("Skipping optional Grok live smoke: Grok CLI is not authenticated or advertised no models.\n");
     return false;
   }
@@ -145,30 +148,34 @@ async function runProvider(
   client.once("exit", (error) => rejectCompleted?.(error));
   client.start();
   try {
-    await client.request(
-      "initialize",
-      {
-        clientInfo: { name: "openbot-storage-smoke", version: "1.0.0" },
-        capabilities: { experimentalApi: true },
-      },
-      decodeRecordResponse,
+    await runCauseEffect(
+      client.request(
+        "initialize",
+        {
+          clientInfo: { name: "openbot-storage-smoke", version: "1.0.0" },
+          capabilities: { experimentalApi: true },
+        },
+        decodeRecordResponse,
+      ),
     );
     client.notify("initialized", {});
-    const started = await client.request(
-      "thread/start",
-      {
-        model,
-        effort: "low",
-        cwd: workspace,
-        runtimeWorkspaceRoots: [workspace],
-        approvalPolicy: "never",
-        sandbox: "danger-full-access",
-        developerInstructions: "Return only the exact text requested by the user.",
-        ephemeral: provider === "codex",
-        persistSession: provider !== "claude",
-        dynamicTools: [],
-      },
-      decodeThreadResponse,
+    const started = await runCauseEffect(
+      client.request(
+        "thread/start",
+        {
+          model,
+          effort: "low",
+          cwd: workspace,
+          runtimeWorkspaceRoots: [workspace],
+          approvalPolicy: "never",
+          sandbox: "danger-full-access",
+          developerInstructions: "Return only the exact text requested by the user.",
+          ephemeral: provider === "codex",
+          persistSession: provider !== "claude",
+          dynamicTools: [],
+        },
+        decodeThreadResponse,
+      ),
     );
     database.bindProviderSession({
       threadId,
@@ -177,20 +184,22 @@ async function runProvider(
       model,
       effort: "low",
     });
-    const turn = await client.request(
-      "turn/start",
-      {
-        threadId: started.thread.id,
-        model,
-        effort: "low",
-        clientUserMessageId: userMessage.id,
-        input: [{ type: "text", text: userMessage.text }],
-        cwd: workspace,
-        runtimeWorkspaceRoots: [workspace],
-        approvalPolicy: "never",
-        sandboxPolicy: { type: "dangerFullAccess" },
-      },
-      decodeTurnResponse,
+    const turn = await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: started.thread.id,
+          model,
+          effort: "low",
+          clientUserMessageId: userMessage.id,
+          input: [{ type: "text", text: userMessage.text }],
+          cwd: workspace,
+          runtimeWorkspaceRoots: [workspace],
+          approvalPolicy: "never",
+          sandboxPolicy: { type: "dangerFullAccess" },
+        },
+        decodeTurnResponse,
+      ),
     );
     turnId = turn.turn.id;
     assistantMessage.turnId = turnId;
@@ -240,6 +249,6 @@ async function runProvider(
     }
   } finally {
     clearTimeout(timeout);
-    await client.stop();
+    await runCauseEffect(client.stop());
   }
 }

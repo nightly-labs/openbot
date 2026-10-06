@@ -1,6 +1,8 @@
 import { type AppLanguagePreference, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
 import { type AppTranslate, resolveLocale, type TranslatedLocale, translateFor } from "@openbot/i18n";
+import { Effect, Semaphore } from "effect";
 import { readLanguagePreference, writeLanguagePreference } from "./language-preference-store";
+import type { PreferenceFileFailure } from "./preference-file";
 
 /**
  * The language every native surface draws in: the application menu, desktop notifications, the file
@@ -20,7 +22,7 @@ export class LanguageService {
   readonly #listeners = new Set<(preference: AppLanguagePreference) => void>();
   #preference: AppLanguagePreference = { language: DEFAULT_APP_LANGUAGE };
   #translate: AppTranslate;
-  #pending: Promise<unknown> = Promise.resolve();
+  #writes = Semaphore.makeUnsafe(1);
 
   constructor(input: { path: string; systemLocale: string }) {
     this.#path = input.path;
@@ -44,9 +46,11 @@ export class LanguageService {
   }
 
   /** Read the saved preference. Called once at startup, before the first window opens. */
-  async load(): Promise<AppLanguagePreference> {
-    this.#apply(await readLanguagePreference(this.#path));
-    return this.preference;
+  load(): Effect.Effect<AppLanguagePreference, PreferenceFileFailure> {
+    return Effect.gen({ self: this }, function* () {
+      this.#apply(yield* readLanguagePreference(this.#path));
+      return this.preference;
+    });
   }
 
   /**
@@ -57,20 +61,17 @@ export class LanguageService {
    * made rather than in the order the disk happened to finish. `update-preference-store.ts` queues
    * its writes for the same reason.
    */
-  async set(preference: AppLanguagePreference): Promise<AppLanguagePreference> {
-    const applied = this.#pending.then(
-      () => this.#write(preference),
-      () => this.#write(preference),
-    );
-    this.#pending = applied.catch(() => undefined);
-    return applied;
+  set(preference: AppLanguagePreference): Effect.Effect<AppLanguagePreference, PreferenceFileFailure> {
+    return this.#writes.withPermit(this.#write(preference));
   }
 
-  async #write(preference: AppLanguagePreference): Promise<AppLanguagePreference> {
-    const saved = await writeLanguagePreference(this.#path, preference);
-    this.#apply(saved);
-    for (const listener of this.#listeners) listener(this.preference);
-    return this.preference;
+  #write(preference: AppLanguagePreference): Effect.Effect<AppLanguagePreference, PreferenceFileFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const saved = yield* writeLanguagePreference(this.#path, preference);
+      this.#apply(saved);
+      for (const listener of this.#listeners) listener(this.preference);
+      return this.preference;
+    }).pipe(Effect.uninterruptible);
   }
 
   subscribe(listener: (preference: AppLanguagePreference) => void): () => void {

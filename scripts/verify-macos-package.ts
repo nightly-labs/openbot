@@ -48,6 +48,8 @@ const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agen
 
 await Promise.all([
   access(executablePath),
+  access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
+  access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
   access(resolve(resourcesPath, "app.asar")),
   access(packagedIconPath),
   access(sourceIconPath),

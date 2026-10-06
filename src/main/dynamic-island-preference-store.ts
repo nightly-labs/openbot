@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
@@ -6,12 +5,12 @@ import {
   isDynamicIslandSizePercent,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { Effect } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
+import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
+export const readDynamicIslandPreference = Effect.fn("readDynamicIslandPreference")((path: string) =>
+  readPreferenceFile(path, (parsed): DynamicIslandPreference => {
     if (!isDynamicRecord(parsed) || !isBoolean(parsed.enabled)) {
       return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
     }
@@ -46,16 +45,22 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
         ? parsed.heightPercent
         : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent,
     };
-  } catch (error) {
-    if (isMissingFileError(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
-    throw error;
-  }
-}
+  }).pipe(
+    Effect.catch((failure) => {
+      const error = failure.cause;
+      if (isMissingFileError(error) || error instanceof SyntaxError)
+        return Effect.succeed({ ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE });
+      return Effect.fail(failure);
+    }),
+  ),
+);
 
-export async function writeDynamicIslandPreference(
+export function writeDynamicIslandPreference(
   path: string,
   preference: DynamicIslandPreference,
-): Promise<DynamicIslandPreference> {
-  await writeJsonFileAtomically(path, { version: 3, ...preference });
-  return { ...preference };
+): Effect.Effect<DynamicIslandPreference, PreferenceFileFailure> {
+  return Effect.gen(function* () {
+    yield* writePreferenceFile(path, { version: 3, ...preference });
+    return { ...preference };
+  });
 }

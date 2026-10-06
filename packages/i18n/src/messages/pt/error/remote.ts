@@ -113,7 +113,6 @@ export const messages = {
   "error.remote.desktopDidNotConnect": "O computador não se conectou.",
   "error.remote.desktopRestarted": "O computador reiniciou. Reconectando com uma nova sessão autenticada.",
   "error.remote.dataBeforeAuth": "O computador anfitrião enviou dados antes da autenticação.",
-  "error.remote.attachmentDownloadFailed": "O download do anexo falhou.",
   "error.remote.eventStreamGap": "Há uma lacuna no fluxo de eventos do computador anfitrião.",
   "error.remote.malformedEvent": "O computador anfitrião retornou um evento malformado.",
   "error.remote.desktopIdentityNotVerified": "Não foi possível verificar a identidade do computador.",

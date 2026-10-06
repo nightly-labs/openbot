@@ -12,6 +12,7 @@ import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/Conversat
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
@@ -26,6 +27,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
+import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -77,7 +79,11 @@ export function ConversationTimeline() {
     chatSearchTotal,
     clearNewMessages,
     closeChatSearch,
+    composerHasContent,
     copiedMessageId,
+    dismissPendingSend,
+    editingDeliveryId,
+    editPendingSend,
     copyMessage,
     expandedEmojiMessageId,
     installedSkills,
@@ -101,12 +107,14 @@ export function ConversationTimeline() {
     openSkillSettings,
     openSharedFile,
     openWorkspaceFile,
+    pendingSendFor,
     previewAttachment,
     props,
     reactToMessage,
     renderedAgentActivity,
     respondToBrowserTakeover,
     replyToMessage,
+    retryPendingSend,
     scheduleUnreadDividerVisibilityUpdate,
     setChatSearchQuery,
     setExpandedEmojiMessageId,
@@ -333,6 +341,23 @@ export function ConversationTimeline() {
                 const referencedAuthorName = () => {
                   const sender = otherSender(referencedMessage());
                   return sender ? memberAuthor(sender).name : undefined;
+                };
+                // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
+                // host's, even after the host answered.
+                const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
+                const pendingSend = createMemo(() => {
+                  const send = pendingSendFor(message()?.id);
+                  return send && send.state !== "sent" ? send : undefined;
+                });
+                // The status line stays one element while its state changes, so its live region speaks.
+                const pending = createMemo(() => pendingSend() !== undefined);
+                const pendingState = () => {
+                  const state = pendingSend()?.state;
+                  return state === "failed" || state === "waiting" ? state : "sending";
+                };
+                const pendingRetrySafe = () => {
+                  const send = pendingSend();
+                  return send ? pendingSendRetrySafe(send) : false;
                 };
                 const markerOnly = untrack(() => markerOnlyMessage(initialMessage));
                 // Consecutive markers keep the tighter marker gap so they read as one group.
@@ -571,45 +596,70 @@ export function ConversationTimeline() {
                             onOpenWorkspaceFile={openWorkspaceFile}
                             onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
+                            class={pending() ? "message-entry-pending" : undefined}
+                            footer={
+                              pending() ? (
+                                <PendingSendStatus
+                                  state={pendingState()}
+                                  error={pendingSend()?.error ?? null}
+                                  retrySafe={pendingRetrySafe()}
+                                  canEdit={!composerHasContent() && !editingDeliveryId()}
+                                  onRetry={() => {
+                                    const send = pendingSend();
+                                    if (send) retryPendingSend(send.clientMessageId);
+                                  }}
+                                  onEdit={() => {
+                                    const send = pendingSend();
+                                    if (send) editPendingSend(send.clientMessageId);
+                                  }}
+                                  onDismiss={() => {
+                                    const send = pendingSend();
+                                    if (send) dismissPendingSend(send.clientMessageId);
+                                  }}
+                                />
+                              ) : undefined
+                            }
                             actions={
-                              <MessageActions
-                                message={message() ?? initialMessage}
-                                pickerOpen={openReactionMessageId() === message()?.id}
-                                moreOpen={openMoreMessageId() === message()?.id}
-                                expandedEmoji={expandedEmojiMessageId() === message()?.id}
-                                copied={copiedMessageId() === message()?.id}
-                                onTogglePicker={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
-                                  setOpenMoreMessageId(null);
-                                  setExpandedEmojiMessageId(null);
-                                }}
-                                onToggleMore={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
-                                  setOpenReactionMessageId(null);
-                                  setExpandedEmojiMessageId(null);
-                                }}
-                                onExpandEmoji={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
-                                }}
-                                onReact={(emoji) => {
-                                  const currentMessage = message();
-                                  if (currentMessage) void reactToMessage(currentMessage, emoji);
-                                }}
-                                onReply={() => {
-                                  const currentMessage = message();
-                                  if (currentMessage) replyToMessage(currentMessage);
-                                }}
-                                onCopy={() => {
-                                  const currentMessage = message();
-                                  if (currentMessage) void copyMessage(currentMessage);
-                                }}
-                              />
+                              <Show when={!hostless()}>
+                                <MessageActions
+                                  message={message() ?? initialMessage}
+                                  pickerOpen={openReactionMessageId() === message()?.id}
+                                  moreOpen={openMoreMessageId() === message()?.id}
+                                  expandedEmoji={expandedEmojiMessageId() === message()?.id}
+                                  copied={copiedMessageId() === message()?.id}
+                                  onTogglePicker={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
+                                    setOpenMoreMessageId(null);
+                                    setExpandedEmojiMessageId(null);
+                                  }}
+                                  onToggleMore={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
+                                    setOpenReactionMessageId(null);
+                                    setExpandedEmojiMessageId(null);
+                                  }}
+                                  onExpandEmoji={() => {
+                                    const messageId = message()?.id;
+                                    if (!messageId) return;
+                                    setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
+                                  }}
+                                  onReact={(emoji) => {
+                                    const currentMessage = message();
+                                    if (currentMessage) void reactToMessage(currentMessage, emoji);
+                                  }}
+                                  onReply={() => {
+                                    const currentMessage = message();
+                                    if (currentMessage) replyToMessage(currentMessage);
+                                  }}
+                                  onCopy={() => {
+                                    const currentMessage = message();
+                                    if (currentMessage) void copyMessage(currentMessage);
+                                  }}
+                                />
+                              </Show>
                             }
                           />
                         }

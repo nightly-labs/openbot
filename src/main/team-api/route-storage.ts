@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { StorageNotFoundError } from "../../backend/storage-usage";
 import type { TeamApiStorage } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -35,9 +36,9 @@ export async function routeStorage(
   // `readJson` has already run the body through the storage wire codec.
   const body = await readJson(request);
   try {
-    if (usage) return json(200, await storage.usage(parseGetStorageUsageInput(body)));
-    if (deleteFile) await storage.deleteFile(parseDeleteStoredFileInput(body).fileId);
-    else await storage.clear(parseClearStorageInput(body).category);
+    if (usage) return json(200, await runCauseEffect(storage.usage(parseGetStorageUsageInput(body))));
+    if (deleteFile) await runCauseEffect(storage.deleteFile(parseDeleteStoredFileInput(body).fileId));
+    else await runCauseEffect(storage.clear(parseClearStorageInput(body).category));
   } catch (error) {
     if (error instanceof StorageNotFoundError) throw new HttpError(404, error.message);
     throw error;

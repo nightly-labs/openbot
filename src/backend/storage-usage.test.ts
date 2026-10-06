@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
@@ -5,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StorageUsage } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "./effect-boundary";
 import type { MailboxStoredFile } from "./mailbox-store";
 import { OpenBotDatabase } from "./openbot-database";
 import { type StorageRoots, StorageUsageScanner, StorageUsageService, type StorageUsageSources } from "./storage-usage";
@@ -12,7 +15,9 @@ import { type StorageRoots, StorageUsageScanner, StorageUsageService, type Stora
 const roots: string[] = [];
 const databases: OpenBotDatabase[] = [];
 
+const services: StorageUsageService[] = [];
 afterEach(async () => {
+  for (const service of services.splice(0)) await runCauseEffect(service.dispose());
   for (const database of databases.splice(0)) database.close();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -47,7 +52,7 @@ async function host() {
   const root = await mkdtemp(join(tmpdir(), "openbot-storage-usage-"));
   roots.push(root);
   const database = new OpenBotDatabase(join(root, "userData"));
-  await database.initialize();
+  await runCauseEffect(database.initialize());
   databases.push(database);
   const db = database.connection;
   const thread = db.prepare(
@@ -106,7 +111,7 @@ async function host() {
   const sources: StorageUsageSources = {
     roots: storageRoots,
     database: () => db,
-    mailbox: { listStoredFiles: () => files, deleteStoredFile: vi.fn(async () => undefined) },
+    mailbox: { listStoredFiles: () => files, deleteStoredFile: vi.fn(() => Effect.void) },
     agents: () => [
       { id: "chief", workspacePath: join(root, "workspaces", "chief") },
       { id: "writer", workspacePath: join(root, "workspaces", "writer") },
@@ -120,7 +125,7 @@ const bytesOf = (usage: StorageUsage) => Object.fromEntries(usage.breakdown.map(
 describe("StorageUsageScanner", () => {
   it("measures every location, places a sent file in its chat, and does not follow a link", async () => {
     const { sources } = await host();
-    const usage = await new StorageUsageScanner(sources).scan({ scope: "host" });
+    const usage = await runCauseEffect(new StorageUsageScanner(sources).scan({ scope: "host" }));
 
     expect(bytesOf(usage)).toMatchObject({
       workspaces: 24,
@@ -157,18 +162,20 @@ describe("StorageUsageScanner", () => {
     const { sources } = await host();
     const scanner = new StorageUsageScanner(sources);
 
-    const writer = await scanner.scan({ scope: "agent", agentId: "writer" });
+    const writer = await runCauseEffect(scanner.scan({ scope: "agent", agentId: "writer" }));
     expect(writer).toMatchObject({ scope: "agent", agentId: "writer", conversationId: null });
     expect(bytesOf(writer)).toMatchObject({ workspaces: 13, attachments: 0 });
     expect(writer.files.map((row) => row.id)).toEqual(["drawn"]);
     expect(writer.conversations.map((row) => row.id)).toEqual(["thread-writer"]);
 
-    const chat = await scanner.scan({ scope: "conversation", conversationId: "thread-chief" });
+    const chat = await runCauseEffect(scanner.scan({ scope: "conversation", conversationId: "thread-chief" }));
     expect(chat.files.map((row) => row.id)).toEqual(["sent"]);
     expect(chat.conversations).toEqual([expect.objectContaining({ id: "thread-chief", fileCount: 1 })]);
     expect(bytesOf(chat).workspaces).toBeUndefined();
 
-    await expect(scanner.scan({ scope: "agent", agentId: "gone" })).rejects.toThrow("The agent does not exist.");
+    await expect(runCauseEffect(scanner.scan({ scope: "agent", agentId: "gone" }))).rejects.toThrow(
+      "The agent does not exist.",
+    );
   });
 
   it("counts a file shown in two agents' chats for both agents, as the agent scope does", async () => {
@@ -184,8 +191,8 @@ describe("StorageUsageScanner", () => {
       .run();
     const scanner = new StorageUsageScanner(sources);
 
-    const usage = await scanner.scan({ scope: "host" });
-    const writer = await scanner.scan({ scope: "agent", agentId: "writer" });
+    const usage = await runCauseEffect(scanner.scan({ scope: "host" }));
+    const writer = await runCauseEffect(scanner.scan({ scope: "agent", agentId: "writer" }));
     const writerRow = usage.agents.find((row) => row.agentId === "writer");
     expect(usage.agents.find((row) => row.agentId === "chief")).toMatchObject({ fileCount: 1 });
     expect(writerRow).toMatchObject({ fileCount: 2 });
@@ -196,10 +203,12 @@ describe("StorageUsageScanner", () => {
   it("sends the largest files and marks the answer truncated past the limit", async () => {
     const { sources, root } = await host();
     const many = Array.from({ length: 2_001 }, (_, index) => stored(`file-${index}`, join(root, "none", `${index}`)));
-    const usage = await new StorageUsageScanner({
-      ...sources,
-      mailbox: { ...sources.mailbox, listStoredFiles: () => many },
-    }).scan({ scope: "host" });
+    const usage = await runCauseEffect(
+      new StorageUsageScanner({
+        ...sources,
+        mailbox: { ...sources.mailbox, listStoredFiles: () => many },
+      }).scan({ scope: "host" }),
+    );
 
     expect(usage.files).toHaveLength(2_000);
     expect(usage.truncated).toBe(true);
@@ -212,28 +221,33 @@ describe("StorageUsageService", () => {
     const scanner = new StorageUsageScanner(sources);
     const scan = vi.spyOn(scanner, "scan");
     const service = new StorageUsageService(scanner, sources);
+    services.push(service);
 
-    const [first, second] = await Promise.all([service.usage({ scope: "host" }), service.usage({ scope: "host" })]);
+    const [first, second] = await Promise.all([
+      runCauseEffect(service.usage({ scope: "host" })),
+      runCauseEffect(service.usage({ scope: "host" })),
+    ]);
     expect(second).toBe(first);
-    expect(await service.usage({ scope: "host" })).toBe(first);
+    expect(await runCauseEffect(service.usage({ scope: "host" }))).toBe(first);
     expect(scan).toHaveBeenCalledTimes(1);
 
-    await service.deleteFile("sent");
+    await runCauseEffect(service.deleteFile("sent"));
     expect(sources.mailbox.deleteStoredFile).toHaveBeenCalledWith("sent");
-    await service.usage({ scope: "host" });
-    await service.usage({ scope: "host", force: true });
+    await runCauseEffect(service.usage({ scope: "host" }));
+    await runCauseEffect(service.usage({ scope: "host", force: true }));
     expect(scan).toHaveBeenCalledTimes(3);
   });
 
   it("clears the rotated logs and the caches but keeps the transfer journal", async () => {
     const { sources, root } = await host();
     const service = new StorageUsageService(new StorageUsageScanner(sources), sources);
+    services.push(service);
 
-    await service.clear("logs");
+    await runCauseEffect(service.clear("logs"));
     expect(await readdir(join(root, "logs", "remote"))).toEqual(["transfers"]);
     expect(await readdir(join(root, "logs", "remote", "transfers"))).toEqual(["journal.json"]);
 
-    await service.clear("caches");
+    await runCauseEffect(service.clear("caches"));
     expect(await readdir(join(root, "remote-attachments"))).toEqual([]);
     expect(await readdir(join(root, "downloads"))).toEqual(["page.html"]);
   });

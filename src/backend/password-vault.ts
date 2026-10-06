@@ -1,6 +1,7 @@
 // The password vault that the browser fills logins from. The main process implements it with the
 // 1Password connection; the agent service only reads it.
 
+import { type Effect, Schema } from "effect";
 import { getDomain } from "tldts";
 
 /**
@@ -24,16 +25,25 @@ export interface VaultLogin {
   hasOneTimePassword: boolean;
 }
 
+/** Keeps the original vault failure private; callers log it and give the agent a fixed message. */
+export class PasswordVaultError extends Schema.TaggedError<PasswordVaultError>()("PasswordVaultError", {
+  cause: Schema.Defect(),
+}) {}
+
 export interface PasswordVault {
   /** Whether a vault is connected now. Agents are told about the vault only while it is. */
   connected(): boolean;
   /** The logins saved for `origin`, or null while no vault is connected. */
-  loginsFor(origin: string): Promise<VaultLogin[] | null>;
+  loginsFor(origin: string): Effect.Effect<VaultLogin[] | null, PasswordVaultError>;
   /**
    * The password or the current one-time code of `loginId`, or null when that login is not saved for
    * `origin` or has no such value. The answer goes to the browser only, never to an agent.
    */
-  secretFor(loginId: string, origin: string, kind: "password" | "totp"): Promise<string | null>;
+  secretFor(
+    loginId: string,
+    origin: string,
+    kind: "password" | "totp",
+  ): Effect.Effect<string | null, PasswordVaultError>;
 }
 
 function websiteUrl(value: string): URL | null {

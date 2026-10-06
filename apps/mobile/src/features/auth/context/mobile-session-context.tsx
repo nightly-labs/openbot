@@ -1,4 +1,5 @@
-import { createRemoteAccountRefresh } from "@openbot/team-client";
+import { createRemoteAccountRefresh, runTeamEffect } from "@openbot/team-client";
+import { Effect } from "effect";
 import {
   createContext,
   type PropsWithChildren,
@@ -93,19 +94,21 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!credentialToken || !credentialApiUrl) return;
     let active = true;
-    const controller = createRemoteAccountRefresh(async () => {
-      const current = sessionRef.current;
-      if (!current) return;
-      await validateMobileSession(current, (validated) => {
-        if (!active) return;
-        const next = resolveSessionValidation(sessionRef.current, current, validated);
-        if (next !== sessionRef.current) setCurrentSession(next);
-      });
-    });
+    const controller = createRemoteAccountRefresh(() =>
+      Effect.tryPromise(async () => {
+        const current = sessionRef.current;
+        if (!current) return;
+        await validateMobileSession(current, (validated) => {
+          if (!active) return;
+          const next = resolveSessionValidation(sessionRef.current, current, validated);
+          if (next !== sessionRef.current) setCurrentSession(next);
+        });
+      }),
+    );
     validation.current = controller;
     refreshProfileRef.current = () => {
       controller.invalidate();
-      return controller.refresh().catch(() => undefined);
+      return runTeamEffect(controller.refresh()).catch(() => undefined);
     };
     controller.setActive(foregroundRef.current);
     return () => {

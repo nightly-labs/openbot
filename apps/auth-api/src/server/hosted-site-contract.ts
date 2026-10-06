@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/hosted-sites";
 import type { HostedSiteFramework } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { Schema } from "effect";
 
 export const HOSTED_SITE_LIMITS = {
   concurrentUploads: 2,
@@ -41,13 +42,13 @@ const PATH_PROBLEM_MESSAGES = {
   archive: "Archives and source maps are not allowed.",
 } as const satisfies Record<HostedSitePathProblem, string>;
 
-export class HostedSiteInputError extends Error {
-  constructor(
-    readonly status: 400 | 401 | 404 | 409 | 413 | 429,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
+export class HostedSiteInputError extends Schema.TaggedError<HostedSiteInputError>()("HostedSiteInputError", {
+  status: Schema.Literals([400, 401, 404, 409, 413, 429]),
+  code: Schema.String,
+  message: Schema.String,
+}) {
+  constructor(status: 400 | 401 | 404 | 409 | 413 | 429, code: string, message: string) {
+    super({ status, code, message });
   }
 }
 

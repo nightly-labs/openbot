@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../server/effect-runtime";
 import {
   apiError,
   json,
@@ -10,15 +12,15 @@ import {
 export const Route = createFileRoute("/v1/skills/admin/submissions")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        try {
-          return requireSkillsAdmin(request)
-            ? json(await requestSkillMarketplace().pending())
-            : apiError(401, "unauthorized", "An admin token is required.");
-        } catch (error) {
-          return skillErrorResponse(error);
-        }
-      },
+      GET: ({ request }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            return requireSkillsAdmin(request)
+              ? json(yield* requestSkillMarketplace().pending())
+              : apiError(401, "unauthorized", "An admin token is required.");
+          }),
+          skillErrorResponse,
+        ),
     },
   },
 });

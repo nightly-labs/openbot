@@ -1,5 +1,6 @@
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
@@ -41,7 +42,7 @@ export interface DrainHooks {
    */
   redactMcp(text: string): string;
   /** Gives a channel task back to its channel after a spent plan refused it; false when it cannot go back. */
-  requeueChannelDelivery(deliveryId: string): boolean;
+  requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
 }
 
 export interface DrainSchedulerOptions {
@@ -108,7 +109,7 @@ export class DrainScheduler {
    */
   readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
-  readonly #drainTasks = new Map<string, Promise<void>>();
+  readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
 
   constructor(options: DrainSchedulerOptions) {
     this.#store = options.store;
@@ -187,27 +188,28 @@ export class DrainScheduler {
       return;
     }
     this.#scheduledDrains.add(agentId);
-    const task = Promise.resolve()
-      .then(() => {
-        this.#scheduledDrains.delete(agentId);
-        if (this.#hooks.isStopping()) return;
-        return this.drainAgent(agentId);
-      })
-      .finally(() => {
-        if (this.#drainTasks.get(agentId) === task) this.#drainTasks.delete(agentId);
-      });
-    // Track the microtask as soon as it is scheduled. A channel can be deleted in the same
-    // turn that queues its delivery, before the microtask has entered drainAgent. Deletion must
-    // still wait for that start attempt so a provider turn cannot outlive the channel records.
-    this.#drainTasks.set(agentId, task);
+    const completion = Deferred.makeUnsafe<void, DeliveryStartFailed>();
+    // Publish the scheduled work before its microtask, so deletion must wait for the attempt.
+    this.#drainTasks.set(agentId, completion);
+    queueMicrotask(() => {
+      Effect.runFork(
+        Effect.gen({ self: this }, function* () {
+          this.#scheduledDrains.delete(agentId);
+          const exit = yield* Effect.exit(this.#hooks.isStopping() ? Effect.void : this.drainAgent(agentId));
+          yield* Deferred.done(completion, exit);
+          if (this.#drainTasks.get(agentId) === completion) this.#drainTasks.delete(agentId);
+        }),
+      );
+    });
   }
 
-  pendingTasks(): Promise<void>[] {
-    return [...this.#drainTasks.values()];
+  pendingTasks(): Effect.Effect<void, DeliveryStartFailed>[] {
+    return [...this.#drainTasks.values()].map(Deferred.await);
   }
 
-  taskFor(agentId: string): Promise<void> | undefined {
-    return this.#drainTasks.get(agentId);
+  taskFor(agentId: string): Effect.Effect<void, DeliveryStartFailed> | undefined {
+    const completion = this.#drainTasks.get(agentId);
+    return completion ? Deferred.await(completion) : undefined;
   }
 
   forgetAgent(agentId: string): void {
@@ -248,7 +250,11 @@ export class DrainScheduler {
     );
   }
 
-  async drainAgent(agentId: string): Promise<void> {
+  drainAgent(agentId: string) {
+    return this.#drainAgent(agentId);
+  }
+
+  readonly #drainAgent = Effect.fn("DrainScheduler.drainAgent")(function* (this: DrainScheduler, agentId: string) {
     if (
       this.#hooks.isStopping() ||
       this.#drainingAgents.has(agentId) ||
@@ -263,7 +269,7 @@ export class DrainScheduler {
     )
       return;
     this.#drainingAgents.add(agentId);
-    try {
+    yield* Effect.gen({ self: this }, function* () {
       const snapshot = this.#conversation.workingSnapshot(agentId);
       if (snapshot?.activeTurnId) return;
       const context = this.#mailbox.nextQueued(agentId);
@@ -276,18 +282,25 @@ export class DrainScheduler {
       const session =
         agent && publicThreadId ? this.#store.database.activeProviderSession(publicThreadId, agent.provider) : null;
       if (session && this.#compaction.reserve(agentId, session.externalSessionId)) {
-        await this.#compaction.request(agentId, session.externalSessionId);
+        yield* this.#compaction.request(agentId, session.externalSessionId);
         return;
       }
-      await this.startDelivery(context);
-    } finally {
-      this.#drainingAgents.delete(agentId);
-      if (this.#mailbox.nextQueued(agentId)) this.#scheduleDrain(agentId);
-      this.retrySlotWaiters();
-    }
-  }
+      yield* this.startDelivery(context);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#drainingAgents.delete(agentId);
+          if (this.#mailbox.nextQueued(agentId)) this.#scheduleDrain(agentId);
+          this.retrySlotWaiters();
+        }),
+      ),
+    );
+  }, Effect.uninterruptible);
 
-  async startDelivery(context: DeliveryContext): Promise<void> {
+  readonly startDelivery = Effect.fn("DrainScheduler.startDelivery")(function* (
+    this: DrainScheduler,
+    context: DeliveryContext,
+  ) {
     const { delivery } = context;
     const channelDelivery = this.#channels ? this.#channels.store.assignmentForDelivery(delivery.id) !== null : false;
     const messagingDelivery = this.#messaging?.ownsDelivery(delivery.id) ?? false;
@@ -315,18 +328,29 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
-    try {
-      for (const item of batch) await this.#mailbox.markStarting(item.delivery.id);
+    yield* Effect.gen({ self: this }, function* () {
+      for (const item of batch)
+        yield* this.#mailbox
+          .markStarting(item.delivery.id)
+          .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      await this.#mailbox.verifyDeliveryAttachments(delivery.id);
+      yield* this.#mailbox
+        .verifyDeliveryAttachments(delivery.id)
+        .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       // An answer whose attachment changed fails alone. The message that starts the turn still runs.
       const failedCompanions = new Set<string>();
       for (const { delivery: companion } of companions) {
-        try {
-          await this.#mailbox.verifyDeliveryAttachments(companion.id);
-        } catch (error) {
+        const verified = yield* Effect.result(
+          this.#mailbox
+            .verifyDeliveryAttachments(companion.id)
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause }))),
+        );
+        if (Result.isFailure(verified)) {
+          const error = verified.failure.cause;
           const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
-          await this.#mailbox.markTerminal(companion.id, "failed", reason);
+          yield* this.#mailbox
+            .markTerminal(companion.id, "failed", reason)
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
           failedCompanions.add(companion.id);
         }
       }
@@ -334,7 +358,9 @@ export class DrainScheduler {
         batch = batch.filter((item) => !failedCompanions.has(item.delivery.id));
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
-      const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
+      const agent = yield* this.#store
+        .getOrCreate(delivery.recipientAgentId)
+        .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       requestedModel = agent.model;
       // The endpoint was removed while this agent was busy, so no other model could be given to it
       // then. The old process would still answer on the removed endpoint, with the credentials it
@@ -343,35 +369,52 @@ export class DrainScheduler {
       const requireServedModel = () => {
         if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
       };
-      requireServedModel();
-      this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
+      yield* drainStep(requireServedModel);
+      yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id);
-      const client = await this.#providers.ensureAgentClient(agent);
+      const client = yield* this.#providers
+        .ensureAgentClient(agent)
+        .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+      const messaging = this.#messaging;
+      const channels = this.#channels;
       const execution = messagingDelivery
-        ? await this.#messaging?.prepare(context)
-        : this.#channels
-          ? await this.#channels.prepare(context)
+        ? messaging
+          ? yield* messaging
+              .prepare(context)
+              .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })))
+          : undefined
+        : channels
+          ? yield* channels
+              .prepare(context)
+              .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })))
           : null;
       if ((channelDelivery || messagingDelivery) && !execution) {
         const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
         if (current?.status === "starting")
-          await this.#mailbox.markTerminal(
-            delivery.id,
-            "interrupted",
-            channelDelivery
-              ? "The channel was deleted before starting."
-              : "The messaging thread was removed before starting.",
-          );
+          yield* this.#mailbox
+            .markTerminal(
+              delivery.id,
+              "interrupted",
+              channelDelivery
+                ? "The channel was deleted before starting."
+                : "The messaging thread was removed before starting.",
+            )
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
         return;
       }
-      let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
+      let threadId = yield* this.#threads
+        .ensureThread(agent, client, execution?.threadId)
+        .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       // A turn started on this thread while the provider and the thread were prepared. The user
       // cannot see that race, so the delivery goes back to the head of the queue rather than
       // failing: a message to a busy agent always waits. `drainAgent` reschedules it in its
       // `finally`, and `mayDrain` holds it there until the turn ends.
       if (snapshot.activeTurnId) {
-        for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
+        for (const item of batch)
+          yield* this.#mailbox
+            .restoreQueued(item.delivery.id)
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
         this.#mailboxSync.emitQueue(agent.id);
         return;
       }
@@ -422,52 +465,63 @@ export class DrainScheduler {
       }
       this.#conversation.emitConversation(snapshot);
 
-      const startTurn = (providerThreadId: string) => {
-        // Read again here, not only above: the provider, the thread and the channel are prepared in
-        // between, and an endpoint removed during that wait finds the process still running. The
-        // retry below calls this as well, so the recovered thread is checked too.
-        requireServedModel();
-        return this.#threads.requestWithArchivedThreadRecovery(
-          agent,
-          client,
-          "turn/start",
-          {
-            threadId: providerThreadId,
-            model: agent.model,
-            effort: agent.reasoningEffort,
-            clientUserMessageId: delivery.id,
-            // A teammate message that wants no answer tells the model to write nothing, so an empty
-            // turn is the expected result and not a provider that swallowed its error.
-            answerOptional:
-              delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
-            input: inputForThread(providerThreadId),
-            cwd: agent.workspacePath,
-            runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
-            approvalPolicy: "on-request",
-            sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
-          },
-          decodeTurnResponse,
-        );
-      };
-      let response: Awaited<ReturnType<typeof startTurn>>;
-      try {
-        response = await startTurn(threadId);
-      } catch (error) {
-        if (!isMissingProviderSessionError(error, client.provider)) throw error;
+      const startTurn = (providerThreadId: string) =>
+        Effect.gen({ self: this }, function* () {
+          // Read again here, not only above: the provider, the thread and the channel are prepared in
+          // between, and an endpoint removed during that wait finds the process still running. The
+          // retry below calls this as well, so the recovered thread is checked too.
+          yield* drainStep(requireServedModel);
+          return yield* this.#threads
+            .requestWithArchivedThreadRecovery(
+              agent,
+              client,
+              "turn/start",
+              {
+                threadId: providerThreadId,
+                model: agent.model,
+                effort: agent.reasoningEffort,
+                clientUserMessageId: delivery.id,
+                // A teammate message that wants no answer tells the model to write nothing, so an empty
+                // turn is the expected result and not a provider that swallowed its error.
+                answerOptional:
+                  delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
+                input: inputForThread(providerThreadId),
+                cwd: agent.workspacePath,
+                runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
+                approvalPolicy: "on-request",
+                sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
+              },
+              decodeTurnResponse,
+            )
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+        });
+      const firstStart = yield* Effect.result(startTurn(threadId));
+      let response: Effect.Success<ReturnType<typeof startTurn>>;
+      if (Result.isSuccess(firstStart)) response = firstStart.success;
+      else {
+        if (!isMissingProviderSessionError(firstStart.failure.cause, client.provider)) return yield* firstStart.failure;
         const unavailableThreadId = threadId;
         if (this.#conversation.loadedClientFor(unavailableThreadId) === client) {
           this.#conversation.unloadThread(unavailableThreadId);
         }
-        threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
-        response = await startTurn(threadId);
+        threadId = yield* this.#threads
+          .ensureThread(agent, client, execution?.threadId)
+          .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+        response = yield* startTurn(threadId);
         if (threadId === unavailableThreadId) {
           this.#threads.logRecovery(agent.id, client.provider, "resumed");
         }
       }
-      for (const item of batch) await this.#mailbox.markRunning(item.delivery.id, response.turn.id);
+      for (const item of batch)
+        yield* this.#mailbox
+          .markRunning(item.delivery.id, response.turn.id)
+          .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       confirmedTurnId = response.turn.id;
       this.#turnModels.set(agent.id, { turnId: response.turn.id, model: agent.model });
-      this.#channels?.accepted(delivery.id, threadId, response.turn.id);
+      if (this.#channels)
+        yield* this.#channels
+          .accepted(delivery.id, threadId, response.turn.id)
+          .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
       const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
       if (currentDelivery?.status === "running" && currentDelivery.turnId === response.turn.id) {
         snapshot.activeTurnId = response.turn.id;
@@ -475,63 +529,90 @@ export class DrainScheduler {
         this.#mailboxSync.emitQueue(agent.id);
         this.#conversation.emitConversation(snapshot);
       }
-      await this.#threads.deletePendingHandoff(threadId).catch((error) => {
-        this.#hooks.emitError("history_handoff_cleanup_failed", error, agent.id);
-      });
-    } catch (error) {
-      const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
-      if (confirmedTurnId && currentDelivery?.status === "running" && currentDelivery.turnId === confirmedTurnId) {
-        this.#hooks.emitError("delivery_reconciliation_pending", error, delivery.recipientAgentId);
-        this.#mailboxSync.retryDeliveryReconciliation(delivery.recipientAgentId);
-        return;
-      }
-      if (isRequestTimeout(error, "turn/start")) {
-        turnMayRun = true;
-        this.#channels?.deliveryUncertain(delivery.id);
-        this.#hooks.emitError(
-          "delivery_start_unconfirmed",
-          `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
-          delivery.recipientAgentId,
-        );
-        return;
-      }
-      const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
-      // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
-      // a channel task goes back to its channel, so that its assignment does not reserve the host.
-      if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
-        if (!channelDelivery) {
-          for (const item of batch) await this.#mailbox.restoreQueued(item.delivery.id);
+      yield* this.#threads.deletePendingHandoff(threadId).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            this.#hooks.emitError("history_handoff_cleanup_failed", failure.cause, agent.id);
+          }),
+        ),
+      );
+    }).pipe(
+      // Synchronous store/event failures used the same reconciliation path before migration.
+      Effect.catchDefect((cause) => Effect.fail(new DeliveryStartFailed({ cause }))),
+      Effect.catch((failure) =>
+        Effect.gen({ self: this }, function* () {
+          const error = failure.cause;
+          const currentDelivery = this.#mailbox.getDelivery(delivery.id)?.delivery;
+          if (confirmedTurnId && currentDelivery?.status === "running" && currentDelivery.turnId === confirmedTurnId) {
+            this.#hooks.emitError("delivery_reconciliation_pending", error, delivery.recipientAgentId);
+            this.#mailboxSync.retryDeliveryReconciliation(delivery.recipientAgentId);
+            return;
+          }
+          if (isRequestTimeout(error, "turn/start")) {
+            turnMayRun = true;
+            this.#channels?.deliveryUncertain(delivery.id);
+            this.#hooks.emitError(
+              "delivery_start_unconfirmed",
+              `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
+              delivery.recipientAgentId,
+            );
+            return;
+          }
+          const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+          // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
+          // a channel task goes back to its channel, so that its assignment does not reserve the host.
+          if (!messagingDelivery && isPlanLimitDiagnostic(reason)) {
+            if (!channelDelivery) {
+              for (const item of batch)
+                yield* this.#mailbox
+                  .restoreQueued(item.delivery.id)
+                  .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+              this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+              // After the restore, so a routine set to skip finds its run back in the queue.
+              yield* this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
+              return;
+            }
+            // Before the requeue, so the channel does not assign the task to this agent again at once.
+            yield* this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
+            if (yield* this.#hooks.requeueChannelDelivery(delivery.id)) {
+              yield* this.#mailbox
+                .markTerminal(delivery.id, "interrupted", null)
+                .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+              this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+              return;
+            }
+          }
+          yield* this.#mailbox
+            .markTerminal(delivery.id, "failed", reason)
+            .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+          // The provider did not read the answers that were to start with it, so they wait for the next turn.
+          for (const { delivery: companion } of batch) {
+            if (companion.id !== delivery.id)
+              yield* this.#mailbox
+                .restoreQueued(companion.id)
+                .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+          }
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-          // After the restore, so a routine set to skip finds its run back in the queue.
-          this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
-          return;
-        }
-        // Before the requeue, so the channel does not assign the task to this agent again at once.
-        this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
-        if (this.#hooks.requeueChannelDelivery(delivery.id)) {
-          await this.#mailbox.markTerminal(delivery.id, "interrupted", null);
-          this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-          return;
-        }
-      }
-      await this.#mailbox.markTerminal(delivery.id, "failed", reason);
-      // The provider did not read the answers that were to start with it, so they wait for the next turn.
-      for (const { delivery: companion } of batch) {
-        if (companion.id !== delivery.id) await this.#mailbox.restoreQueued(companion.id);
-      }
-      this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
-      this.#messaging?.deliveryFailed(delivery.id);
-      this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
-      this.scheduleDrain(delivery.recipientAgentId);
-      // The requester may hold the other answers until this request ends.
-      if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);
-    } finally {
-      releaseRuntimeRefresh();
-      if (!confirmedTurnId && !turnMayRun) releaseReservation();
-      for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
-    }
-  }
+          if (this.#channels)
+            yield* this.#channels
+              .deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.")
+              .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));
+          this.#messaging?.deliveryFailed(delivery.id);
+          this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
+          this.scheduleDrain(delivery.recipientAgentId);
+          // The requester may hold the other answers until this request ends.
+          if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);
+        }),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          releaseRuntimeRefresh();
+          if (!confirmedTurnId && !turnMayRun) releaseReservation();
+          for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
+        }),
+      ),
+    );
+  }, Effect.uninterruptible);
 
   /** The model this turn runs on, or `null` when this agent's running turn is not the one asked for. */
   modelForTurn(agentId: string, turnId: string): string | null {
@@ -556,4 +637,12 @@ export class DrainScheduler {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     return agent ? [providerForAgent(agent)] : [...AGENT_PROVIDERS];
   }
+}
+
+export class DeliveryStartFailed extends Schema.TaggedError<DeliveryStartFailed>()("DeliveryStartFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+function drainStep<A>(run: () => A): Effect.Effect<A, DeliveryStartFailed> {
+  return Effect.try({ try: run, catch: (cause) => new DeliveryStartFailed({ cause }) });
 }

@@ -7,9 +7,11 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Effect } from "effect";
 import { checkAcpAgent } from "../src/backend/acp-agent-check";
 import { isMissingProviderSessionError } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getString, isRecord } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { CustomAgentStore } from "../src/main/custom-agent-store";
@@ -131,32 +133,36 @@ try {
 
   // 1. Save two agents. The secret is encrypted on disk and is in no summary.
   const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher });
-  await store.load();
-  await store.save({
-    id: "alpha",
-    name: "Alpha",
-    command: executable,
-    args: ["--acp"],
-    env: [
-      { name: "FAKE_LOG", value: alphaLog },
-      { name: "FAKE_TITLE", value: "Alpha" },
-      { name: "FAKE_MODELS", value: "1" },
-      { name: "FAKE_TOKEN", value: SECRET },
-    ],
-  });
-  await store.save({
-    id: "beta",
-    name: "Beta",
-    command: executable,
-    args: [],
-    env: [
-      { name: "FAKE_LOG", value: betaLog },
-      { name: "FAKE_TITLE", value: "Beta" },
-    ],
-  });
+  await runCauseEffect(store.load());
+  await runCauseEffect(
+    store.save({
+      id: "alpha",
+      name: "Alpha",
+      command: executable,
+      args: ["--acp"],
+      env: [
+        { name: "FAKE_LOG", value: alphaLog },
+        { name: "FAKE_TITLE", value: "Alpha" },
+        { name: "FAKE_MODELS", value: "1" },
+        { name: "FAKE_TOKEN", value: SECRET },
+      ],
+    }),
+  );
+  await runCauseEffect(
+    store.save({
+      id: "beta",
+      name: "Beta",
+      command: executable,
+      args: [],
+      env: [
+        { name: "FAKE_LOG", value: betaLog },
+        { name: "FAKE_TITLE", value: "Beta" },
+      ],
+    }),
+  );
   const file = await readFile(join(root, "custom-agents.json"), "utf8");
   assert.ok(!file.includes(SECRET), "The agent file holds no plain env value.");
-  const summaries = await store.list();
+  const summaries = await Effect.runPromise(store.list());
   assert.ok(!JSON.stringify(summaries).includes(SECRET), "A summary holds no env value.");
   assert.deepEqual(summaries.find((agent) => agent.id === "alpha")?.envNames, [
     "FAKE_LOG",
@@ -168,11 +174,13 @@ try {
 
   // 2. Check agent: `initialize` only, then the process is gone.
   const checkLog = join(root, "check.jsonl");
-  const check = await checkAcpAgent({
-    executable,
-    args: ["--acp"],
-    env: { FAKE_LOG: checkLog, FAKE_TITLE: "Alpha", FAKE_TOKEN: SECRET },
-  });
+  const check = await runCauseEffect(
+    checkAcpAgent({
+      executable,
+      args: ["--acp"],
+      env: { FAKE_LOG: checkLog, FAKE_TITLE: "Alpha", FAKE_TOKEN: SECRET },
+    }),
+  );
   assert.equal(check.agentName, "Alpha");
   assert.equal(check.version, "1.2.3");
   const checkEntries = await readLog(checkLog);
@@ -182,12 +190,14 @@ try {
   );
   const checkPid = checkEntries[0]?.pid ?? 0;
   assert.equal(isRunning(checkPid), false, "Check agent stops the process.");
-  const crash = await checkAcpAgent({
-    executable,
-    args: [],
-    env: { FAKE_LOG: checkLog, FAKE_CRASH: "1", FAKE_TOKEN: SECRET },
-    timeoutMs: 5_000,
-  }).catch((error: unknown) => error);
+  const crash = await runCauseEffect(
+    checkAcpAgent({
+      executable,
+      args: [],
+      env: { FAKE_LOG: checkLog, FAKE_CRASH: "1", FAKE_TOKEN: SECRET },
+      timeoutMs: 5_000,
+    }),
+  ).catch((error: unknown) => error);
   assert.ok(crash instanceof Error, "A crashing agent fails the check.");
   assert.ok(!crash.message.includes(SECRET), "The check error masks the agent's env value.");
   report.check = { agentName: check.agentName, version: check.version, requests: ["initialize"], stopped: true };
@@ -201,7 +211,7 @@ try {
     mcpServers: () => [],
     customAgents: () => store.configs(),
   };
-  const cli = await driver.resolveCli();
+  const cli = await runCauseEffect(driver.resolveCli());
   const open = () => {
     const client = driver.createClient(cli, 20_000, context, undefined);
     clients.push(client);
@@ -209,7 +219,7 @@ try {
     return client;
   };
   let client = open();
-  const models = await client.request("model/list", {}, (value) => value);
+  const models = await runCauseEffect(client.request("model/list", {}, (value) => value));
   const modelIds = JSON.stringify(models);
   for (const id of ["alpha/fast", "alpha/deep", "beta/default"]) assert.ok(modelIds.includes(`"${id}"`), id);
 
@@ -239,13 +249,15 @@ try {
 
   // 4. Restart: a new router loads the saved session on a new process and runs a turn on it.
   const pidsBefore = [...new Set([...alphaEntries, ...(await readLog(betaLog))].map((entry) => entry.pid))];
-  await client.stop();
+  await runCauseEffect(client.stop());
   assert.ok(
     pidsBefore.every((pid) => !isRunning(pid)),
     "Stopping the router stops every agent process.",
   );
   client = open();
-  await client.request("thread/resume", { threadId: alphaThread, model: "alpha/deep", cwd: workspace }, (v) => v);
+  await runCauseEffect(
+    client.request("thread/resume", { threadId: alphaThread, model: "alpha/deep", cwd: workspace }, (v) => v),
+  );
   const loaded = (await readLog(alphaLog)).filter((entry) => entry.method === "session/load");
   assert.equal(loaded.at(-1)?.sessionId, alphaThread.split(":")[1], "The agent loads its own session id.");
   const resumedReply = await runTurn(client, alphaThread, "alpha/deep", "after restart");
@@ -253,14 +265,14 @@ try {
   report.restart = { processesStopped: pidsBefore.length, loadedSession: loaded.at(-1)?.sessionId, resumedReply };
 
   // 5. Switch: a turn on another agent's model reads as a missing session, so the runtime hands over.
-  const switched = await client
-    .request("turn/start", { threadId: alphaThread, model: "beta/default", input: [] }, (v) => v)
-    .catch((error: unknown) => error);
+  const switched = await runCauseEffect(
+    client.request("turn/start", { threadId: alphaThread, model: "beta/default", input: [] }, (v) => v),
+  ).catch((error: unknown) => error);
   assert.equal(isMissingProviderSessionError(switched, "acp"), true);
   report.switch = { missingSession: true };
 
   // 6. Delete: the agent's models are refused, and the other agent still works.
-  await store.remove("beta");
+  await runCauseEffect(store.remove("beta"));
   const deleted = await threadId(client, { model: "beta/default", cwd: workspace }).catch((error: unknown) => error);
   assert.ok(deleted instanceof Error && /not saved now/.test(deleted.message), String(deleted));
   assert.match(await runTurn(client, alphaThread, "alpha/deep", "still here"), /still here$/);
@@ -268,7 +280,7 @@ try {
 
   report.passed = true;
 } finally {
-  await Promise.all(clients.map((client) => client.stop().catch(() => undefined)));
+  await Promise.all(clients.map((client) => runCauseEffect(client.stop()).catch(() => undefined)));
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
@@ -276,7 +288,7 @@ try {
 }
 
 async function threadId(client: AgentClient, params: { model: string; cwd: string }): Promise<string> {
-  const response = await client.request("thread/start", params, (value) => value);
+  const response = await runCauseEffect(client.request("thread/start", params, (value) => value));
   const id = JSON.stringify(response).match(/"id":"([^"]+)"/)?.[1];
   assert.ok(id, "thread/start answers a thread id.");
   return id;
@@ -300,10 +312,12 @@ async function runTurn(client: AgentClient, thread: string, model: string, text:
       }
     });
   });
-  await client.request(
-    "turn/start",
-    { threadId: thread, model, input: [{ type: "text", text, text_elements: [] }] },
-    (v) => v,
+  await runCauseEffect(
+    client.request(
+      "turn/start",
+      { threadId: thread, model, input: [{ type: "text", text, text_elements: [] }] },
+      (v) => v,
+    ),
   );
   await done;
   return reply;

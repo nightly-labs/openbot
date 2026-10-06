@@ -1,5 +1,6 @@
 import type { MacPermissionId } from "@openbot/contracts/ipc";
 import { assert, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
 
 let nextWebContentsId = 1;
@@ -51,8 +52,8 @@ describe("ComputerUsePermissionHelpWindowController", () => {
       loaded.push(permission);
     });
 
-    await help.show("screen-recording");
-    await help.show("accessibility");
+    await runCauseEffect(help.show("screen-recording"));
+    await runCauseEffect(help.show("accessibility"));
 
     expect(windows).toHaveLength(1);
     expect(loaded).toEqual(["screen-recording", "accessibility"]);
@@ -70,8 +71,8 @@ describe("ComputerUsePermissionHelpWindowController", () => {
         }),
     );
 
-    const first = help.show("screen-recording");
-    const second = help.show("accessibility");
+    const first = runCauseEffect(help.show("screen-recording"));
+    const second = runCauseEffect(help.show("accessibility"));
     const [releaseFirst, releaseSecond] = releases;
     assert(releaseFirst && releaseSecond);
     releaseSecond();
@@ -93,7 +94,7 @@ describe("ComputerUsePermissionHelpWindowController", () => {
         }),
     );
 
-    const pending = help.show("accessibility");
+    const pending = runCauseEffect(help.show("accessibility"));
     help.close();
     const [release] = releases;
     assert(release);
@@ -109,7 +110,7 @@ describe("ComputerUsePermissionHelpWindowController", () => {
   it("names the bundle the system holds responsible", async () => {
     const { controller: help } = controller(undefined, () => "/path/to/Electron.app");
 
-    await expect(help.permissionApp()).resolves.toEqual({
+    await expect(runCauseEffect(help.permissionApp())).resolves.toEqual({
       name: "Electron",
       iconDataUrl: "data:image/png;base64,icon",
     });
@@ -118,20 +119,20 @@ describe("ComputerUsePermissionHelpWindowController", () => {
   it("offers no card where there is no bundle to drag", async () => {
     const { controller: help } = controller(undefined, () => null);
 
-    await expect(help.permissionApp()).resolves.toBeNull();
+    await expect(runCauseEffect(help.permissionApp())).resolves.toBeNull();
   });
 
   // Every window of the app shares one origin, so this check is the only thing that keeps a drag
   // from starting in a window the user is not dragging from.
   it("drags the bundle for the help window, and for no other sender", async () => {
     const { controller: help, windows } = controller();
-    await help.show("accessibility");
+    await runCauseEffect(help.show("accessibility"));
     const startDrag = vi.fn();
     const [helpWindow] = windows;
     assert(helpWindow);
 
-    await help.startDrag({ id: helpWindow.webContents.id, startDrag });
-    await expect(help.startDrag({ id: helpWindow.webContents.id + 1000, startDrag })).rejects.toThrow(
+    await runCauseEffect(help.startDrag({ id: helpWindow.webContents.id, startDrag }));
+    await expect(runCauseEffect(help.startDrag({ id: helpWindow.webContents.id + 1000, startDrag }))).rejects.toThrow(
       /must start in the help window/u,
     );
 
@@ -151,22 +152,22 @@ describe("ComputerUsePermissionHelpWindowController", () => {
   });
   it("uses Sunshine only in its helper and restores the Computer Use bundle when reopened", async () => {
     const { controller: help, windows, revealed } = controller();
-    await help.show("accessibility", "/runtime/Sunshine.app");
+    await runCauseEffect(help.show("accessibility", "/runtime/Sunshine.app"));
     const [helpWindow] = windows;
     assert(helpWindow);
     const senderId = helpWindow.webContents.id;
-    expect(await help.permissionApp(senderId)).toMatchObject({ name: "Sunshine" });
-    expect(await help.permissionApp(senderId + 1000)).toMatchObject({ name: "OpenBot" });
+    expect(await runCauseEffect(help.permissionApp(senderId))).toMatchObject({ name: "Sunshine" });
+    expect(await runCauseEffect(help.permissionApp(senderId + 1000))).toMatchObject({ name: "OpenBot" });
     const startDrag = vi.fn();
-    await help.startDrag({ id: senderId, startDrag });
+    await runCauseEffect(help.startDrag({ id: senderId, startDrag }));
     expect(startDrag).toHaveBeenCalledWith({ file: "/runtime/Sunshine.app", icon: "data:image/png;base64,icon" });
     help.reveal(senderId);
     expect(revealed).toEqual(["/runtime/Sunshine.app"]);
-    await help.show("screen-recording");
-    expect(await help.permissionApp(senderId)).toMatchObject({ name: "OpenBot" });
-    await help.show("accessibility", "/runtime/Sunshine.app");
+    await runCauseEffect(help.show("screen-recording"));
+    expect(await runCauseEffect(help.permissionApp(senderId))).toMatchObject({ name: "OpenBot" });
+    await runCauseEffect(help.show("accessibility", "/runtime/Sunshine.app"));
     help.close();
-    expect(await help.permissionApp(senderId)).toMatchObject({ name: "OpenBot" });
+    expect(await runCauseEffect(help.permissionApp(senderId))).toMatchObject({ name: "OpenBot" });
   });
 
   it("does not drag a stale bundle after the helper changes", async () => {
@@ -176,12 +177,12 @@ describe("ComputerUsePermissionHelpWindowController", () => {
       undefined,
       () => new Promise((resolve) => releases.push(resolve)),
     );
-    await help.show("accessibility", "/runtime/Sunshine.app");
+    await runCauseEffect(help.show("accessibility", "/runtime/Sunshine.app"));
     const startDrag = vi.fn();
     const [helpWindow] = windows;
     assert(helpWindow);
-    const pending = help.startDrag({ id: helpWindow.webContents.id, startDrag });
-    await help.show("screen-recording");
+    const pending = runCauseEffect(help.startDrag({ id: helpWindow.webContents.id, startDrag }));
+    await runCauseEffect(help.show("screen-recording"));
     const [release] = releases;
     assert(release);
     release("icon");

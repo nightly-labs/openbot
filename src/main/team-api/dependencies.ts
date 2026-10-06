@@ -1,10 +1,13 @@
+import type { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { HostService } from "../host-service";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
@@ -18,11 +21,8 @@ import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type {
   AgentEvent,
   CentralAuthUser,
-  CreateTeamInviteInput,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
-  InstalledSkill,
-  InviteSummary,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
@@ -162,7 +162,7 @@ export interface TeamApiAdmin {
 }
 
 interface TeamApiHostIdentity {
-  updateIdentity(input: UpdateHostIdentityInput): Promise<unknown>;
+  updateIdentity(input: UpdateHostIdentityInput): Effect.Effect<void, RemoteWorkflowError>;
 }
 
 interface TeamApiProviders {
@@ -238,19 +238,22 @@ export interface TeamApiOptions {
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
-  skills?: { listInstalledForChatTags: (agentId: string) => Promise<InstalledSkill[]> };
+  skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags">;
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView;
   remoteScreen?: TeamApiRemoteScreen;
-  redeemCentralTicket?: (ticket: string, serverId: string) => Promise<CentralAuthUser | null>;
+  redeemCentralTicket?: (
+    ticket: string,
+    serverId: string,
+  ) => Effect.Effect<CentralAuthUser | null, RemoteWorkflowError>;
   onPresence?: (snapshot: TeamPresenceSnapshot) => void;
   chat?: TeamChatStore;
   onDirectMessage?: (event: DirectMessageRealtimeEvent) => void;
   onDirectTyping?: (event: DirectTypingRealtimeEvent) => void;
-  createInvite?: (input: CreateTeamInviteInput) => Promise<InviteSummary>;
-  onSessionRevoked?: (sessionId: string) => Promise<void> | void;
+  createInvite?: OmitThisParameter<HostService["createInvite"]>;
+  onSessionRevoked?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   /** Sends Live Activity updates to members' phones. Absent when this host has no account credential. */
   liveActivityPush?: LiveActivityPushService;
   rateLimitCapacity?: number;

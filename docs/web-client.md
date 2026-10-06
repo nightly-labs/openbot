@@ -135,9 +135,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   An open edit stays in local storage after a reload or a host change, so the user can release the
   hold on its host. Sign-out cancels the hold and removes the edit. When the host does not confirm, the
   edit stays for the same account. Another account and a revoked session remove it.
-- Reconnect reads authoritative state. It never resends uncertain messages. A user must check
-  the conversation and acknowledge the uncertain result. New-agent requests with an unknown
-  result require closing the form and refreshing before another attempt.
+- Reconnect reads authoritative state. It never resends a message. A sent message shows in the
+  chat as pending, and the composer stays free. A failed send stays in the chat with its reason and
+  Edit and Dismiss; Retry is offered only when the host has `message-client-id-v1`, which answers a
+  repeated `clientMessageId` with the first receipt. New-agent requests with an unknown result
+  require closing the form and refreshing before another attempt.
 - The browser-view transport uses the existing host stream and input protocol. The shared
   panel is available only when the host advertises browser control and browser view.
   Tabs, back, forward, reload, and the address bar use the same Team API routes as a desktop
@@ -223,7 +225,7 @@ Before enabling the deployed flag:
   single-host tab lock. The Chrome, Edge, Firefox and Safari matrix is deferred by the user.
 - Check invitation expiry, revocation, prior use and wrong-account errors; no-host guidance;
   offline and incompatible hosts; host key mismatch; host switching; and reconnection.
-- Check history pagination, live output, uncertain sends, stop, approvals, answered/expired
+- Check history pagination, live output, pending and failed sends, stop, approvals, answered/expired
   prompts and subscription cleanup against the host.
 - Check file bytes, previews, limits, cancellation during transfer, interrupted downloads,
   creation/settings permissions, older-host capability gates and takeover ownership/release.

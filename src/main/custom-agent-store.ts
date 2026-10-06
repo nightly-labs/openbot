@@ -12,12 +12,22 @@ import type { CustomAgentEnvInput, CustomAgentSummary, SaveCustomAgentInput } fr
 import { CUSTOM_AGENT_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
+import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import { resolveAgentCommand } from "../backend/acp-agent-command";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CustomAgentConfig } from "../backend/custom-acp-agents-client";
 import type { CustomProviderCipher } from "./custom-provider-store";
 
+export class CustomAgentFailure extends Schema.TaggedError<CustomAgentFailure>()("CustomAgentFailure", {
+  cause: Schema.Defect(),
+}) {}
+function agentIO<A>(operation: () => Promise<A>): Effect.Effect<A, CustomAgentFailure> {
+  return Effect.tryPromise({ try: operation, catch: (cause) => new CustomAgentFailure({ cause }) });
+}
+function agentSync<A>(operation: () => A): Effect.Effect<A, CustomAgentFailure> {
+  return Effect.try({ try: operation, catch: (cause) => new CustomAgentFailure({ cause }) });
+}
 export const CUSTOM_AGENTS_FILE = "custom-agents.json";
 
 /**
@@ -52,20 +62,23 @@ const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.customAgentNoSecure
 export class CustomAgentStore {
   readonly #path: string;
   readonly #cipher: CustomProviderCipher;
-  readonly #resolve: (command: string) => Promise<string | null>;
+  readonly #resolve: (command: string) => Effect.Effect<string | null, CustomAgentFailure>;
   #entries: Entry[] = [];
   /** Set when the file exists and this build cannot read it. See `load`. */
   #readOnly = false;
-  #writeChain = Promise.resolve();
+  #writes = Semaphore.makeUnsafe(1);
 
   constructor(options: {
     path: string;
     cipher: CustomProviderCipher;
-    resolve?: (command: string) => Promise<string | null>;
+    resolve?: (command: string) => Effect.Effect<string | null, CustomAgentFailure>;
   }) {
     this.#path = options.path;
     this.#cipher = options.cipher;
-    this.#resolve = options.resolve ?? resolveAgentCommand;
+    this.#resolve =
+      options.resolve ??
+      ((command) =>
+        resolveAgentCommand(command).pipe(Effect.mapError((error) => new CustomAgentFailure({ cause: error.cause }))));
   }
 
   /**
@@ -73,35 +86,48 @@ export class CustomAgentStore {
    * overwritten, because a newer build's agents would be lost with it: the app starts with no custom
    * agents, and every write is refused until the file is readable again.
    */
-  async load(): Promise<void> {
-    let contents: string | null = null;
-    try {
-      contents = await readFile(this.#path, "utf8");
-    } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-    }
-    if (contents === null) return;
-    const file = parseAgentFile(contents);
-    if (!file) {
-      this.#readOnly = true;
-      this.#entries = [];
-      return;
-    }
-    this.#readOnly = false;
-    this.#entries = file.agents.map((stored) => ({ stored, values: this.#openSecret(stored.secret) }));
+  load(): Effect.Effect<void, CustomAgentFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const contents = yield* agentIO(() => readFile(this.#path, "utf8")).pipe(
+        Effect.catch(({ cause }) =>
+          cause instanceof Error && "code" in cause && cause.code === "ENOENT"
+            ? Effect.succeed(null)
+            : Effect.fail(new CustomAgentFailure({ cause })),
+        ),
+      );
+      if (contents === null) return;
+      const file = parseAgentFile(contents);
+      if (!file) {
+        this.#readOnly = true;
+        this.#entries = [];
+        return;
+      }
+      this.#readOnly = false;
+      this.#entries = yield* Effect.forEach(file.agents, (stored) =>
+        this.#openSecret(stored.secret).pipe(Effect.map((values) => ({ stored, values }))),
+      );
+    });
   }
 
   /** What the renderer may know: the variable names, and never a value. */
-  async list(): Promise<CustomAgentSummary[]> {
-    return Promise.all(
-      this.#entries.map(async ({ stored }) => ({
-        id: stored.id,
-        name: stored.name,
-        command: stored.command,
-        args: [...stored.args],
-        envNames: [...stored.envNames],
-        resolvedCommand: await this.#resolve(stored.command).catch(() => null),
-      })),
+  list(): Effect.Effect<CustomAgentSummary[]> {
+    return Effect.suspend(() =>
+      Effect.forEach(
+        this.#entries,
+        ({ stored }) =>
+          this.#resolve(stored.command).pipe(
+            Effect.catch(() => Effect.succeed(null)),
+            Effect.map((resolvedCommand) => ({
+              id: stored.id,
+              name: stored.name,
+              command: stored.command,
+              args: [...stored.args],
+              envNames: [...stored.envNames],
+              resolvedCommand,
+            })),
+          ),
+        { concurrency: "unbounded" },
+      ),
     );
   }
 
@@ -135,8 +161,8 @@ export class CustomAgentStore {
    * an edit on a computer whose keychain is gone does not lose values that a later keychain could
    * still open.
    */
-  async save(input: SaveCustomAgentInput): Promise<void> {
-    await this.#mutate(() => {
+  save(input: SaveCustomAgentInput): Effect.Effect<void, CustomAgentFailure> {
+    return this.#mutate(() => {
       const index = this.#entries.findIndex((entry) => entry.stored.id === input.id);
       const current = this.#entries[index];
       if (!current && this.#entries.length >= CUSTOM_AGENT_LIMITS.agents) {
@@ -174,8 +200,8 @@ export class CustomAgentStore {
   }
 
   /** Removes one agent and its values. An id that is not saved writes nothing. */
-  async remove(id: string): Promise<void> {
-    await this.#mutate(() => {
+  remove(id: string): Effect.Effect<void, CustomAgentFailure> {
+    return this.#mutate(() => {
       const remaining = this.#entries.filter((entry) => entry.stored.id !== id);
       return remaining.length === this.#entries.length ? null : remaining;
     });
@@ -190,37 +216,40 @@ export class CustomAgentStore {
    * One change, start to end, with no other change between its read and its write. The list is
    * published only after the durable write, so a failed write leaves what the file still holds.
    */
-  async #mutate(build: () => Entry[] | null): Promise<void> {
-    this.assertWritable();
-    const operation = this.#writeChain.then(async () => {
-      this.assertWritable();
-      const entries = build();
-      if (!entries) return;
-      await writeJsonFileAtomically(
-        this.#path,
-        { version: 1, agents: entries.map((entry) => entry.stored) },
-        { createDirectory: true },
-      );
-      this.#entries = entries;
-    });
-    this.#writeChain = operation.catch(() => undefined);
-    await operation;
+  #mutate(build: () => Entry[] | null): Effect.Effect<void, CustomAgentFailure> {
+    return this.#writes.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const entries = yield* agentSync(() => {
+          this.assertWritable();
+          return build();
+        });
+        if (!entries) return;
+        const content = yield* agentSync(
+          () => `${JSON.stringify({ version: 1, agents: entries.map((entry) => entry.stored) })}\n`,
+        );
+        yield* writeFileAtomically(this.#path, content, { createDirectory: true }).pipe(
+          Effect.mapError(({ cause }) => new CustomAgentFailure({ cause })),
+        );
+        this.#entries = entries;
+      }).pipe(Effect.uninterruptible),
+    );
   }
 
   /**
    * A ciphertext this computer cannot read leaves the agent in the list with no values, and throws
    * nothing: the user can still see the agent, and enter the values again.
    */
-  #openSecret(sealed: string | null | undefined): Record<string, string> | null {
+  #openSecret = Effect.fn("CustomAgentStore.openSecret")(function* (
+    this: CustomAgentStore,
+    sealed: string | null | undefined,
+  ) {
     if (!sealed) return null;
-    try {
+    return yield* agentSync(() => {
       const { values } = secretSchema.parse(JSON.parse(this.#cipher.decrypt(Buffer.from(sealed, "base64"))));
       for (const value of Object.values(values)) registerSecretValue(value);
       return values;
-    } catch {
-      return null;
-    }
-  }
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
+  });
 }
 
 /** Each variable with its value: a new one, or the saved one for `null`. */

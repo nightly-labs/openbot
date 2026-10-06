@@ -10,6 +10,7 @@ import { isMessageReaction } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -45,16 +46,18 @@ export async function routeAgentConversation(
   const { method, url, request, member, protocol, capabilities, json, empty } = context;
 
   if (method === "GET" && action === "conversation") {
-    const conversation = await agents.readConversationFor(agentId, member.id);
+    const conversation = await runCauseEffect(agents.readConversationFor(agentId, member.id));
     return json(200, conversationForCapabilities(conversation, capabilities));
   }
   if (method === "GET" && action === "conversation-page") {
-    const page = await agents.readConversationPageFor(
-      agentId,
-      member.id,
-      pageAnchor(url),
-      pageLimit(url),
-      markerExclusionsForCapabilities(capabilities),
+    const page = await runCauseEffect(
+      agents.readConversationPageFor(
+        agentId,
+        member.id,
+        pageAnchor(url),
+        pageLimit(url),
+        markerExclusionsForCapabilities(capabilities),
+      ),
     );
     return json(200, page);
   }
@@ -66,17 +69,19 @@ export async function routeAgentConversation(
       throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
-    return json(200, await agents.markConversationUnread(agentId, member.id));
+    return json(200, await runCauseEffect(agents.markConversationUnread(agentId, member.id)));
   }
   if (method === "POST" && action === "conversation/read") {
     const body = await readJson(request);
     return json(
       200,
-      await agents.markConversationRead(
-        agentId,
-        member.id,
-        nullableString(body, "throughMessageId"),
-        markerExclusionsForCapabilities(capabilities),
+      await runCauseEffect(
+        agents.markConversationRead(
+          agentId,
+          member.id,
+          nullableString(body, "throughMessageId"),
+          markerExclusionsForCapabilities(capabilities),
+        ),
       ),
     );
   }
@@ -84,16 +89,20 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     return json(
       202,
-      await agents.sendMessage(
-        {
-          agentId,
-          text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-          attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-          replyToMessageId: nullableString(body, "replyToMessageId"),
-        },
-        memberSender(member),
-        // A V5 request carries it only after the codec checked it names a zone.
-        isString(body.timezone) ? body.timezone : undefined,
+      await runCauseEffect(
+        agents.sendMessage(
+          {
+            agentId,
+            text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+            attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+            replyToMessageId: nullableString(body, "replyToMessageId"),
+            // Like the zone, a V5 request carries it only after the codec checked it is an identifier.
+            ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
+          },
+          memberSender(member),
+          // A V5 request carries it only after the codec checked it names a zone.
+          isString(body.timezone) ? body.timezone : undefined,
+        ),
       ),
     );
   }
@@ -102,11 +111,13 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     const emoji = body.emoji;
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
-    await agents.setMessageReaction({
-      agentId,
-      messageId: stringField(body, "messageId"),
-      emoji,
-    });
+    await runCauseEffect(
+      agents.setMessageReaction({
+        agentId,
+        messageId: stringField(body, "messageId"),
+        emoji,
+      }),
+    );
     return empty(204);
   }
   return "unmatched";

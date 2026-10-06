@@ -3,8 +3,10 @@ import {
   decodeTeamProtocolV2FileControlFrame,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
-import { createRemoteFileSender } from "./file-upload";
+import { runTeamEffect } from "./effect-boundary";
+import { createRemoteFileSender, type FileTransferError, fileTransferError } from "./file-upload";
 
 const transferId = "b6396068-3405-4e51-9b42-d97bfd1e2f33";
 const input = { name: "note.txt", mimeType: "text/plain", base64: btoa("hello") };
@@ -12,35 +14,46 @@ const input = { name: "note.txt", mimeType: "text/plain", base64: btoa("hello") 
 describe("mobile file upload", () => {
   it("cancels an upload before acknowledgement and lets the next upload finish", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
-    const sender = createRemoteFileSender(send, () => transferId);
-    const uploading = sender.upload(input);
+    const sender = createRemoteFileSender(
+      (data: string | ArrayBuffer): Effect.Effect<void, FileTransferError> =>
+        Effect.tryPromise({ try: () => send(data), catch: fileTransferError }),
+      () => transferId,
+    );
+    const uploading = runTeamEffect(sender.upload(input));
     const rejected = expect(uploading).rejects.toThrow("cancelled");
     await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
-    await sender.cancelUpload();
+    await runTeamEffect(sender.cancelUpload());
     await rejected;
     expect(decodeTeamProtocolV2FileControlFrame(send.mock.calls[1]?.[0])).toMatchObject({
       type: "file-cancel",
       transferId,
     });
-    send.mockImplementation(async (data) => {
+    send.mockImplementation(async (data: string | ArrayBuffer) => {
       if (typeof data === "string" && decodeTeamProtocolV2FileControlFrame(data).type === "file-open")
         sender.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId, receivedThrough: 0 }));
     });
-    await expect(sender.upload(input)).resolves.toBe(transferId);
+    await expect(runTeamEffect(sender.upload(input))).resolves.toBe(transferId);
   });
   it("sends the existing file protocol with the exact bytes and digest before completing", async () => {
     const received: Array<string | ArrayBuffer> = [];
     const sender = createRemoteFileSender(
-      async (data) => {
-        received.push(data);
-        if (typeof data === "string" && decodeTeamProtocolV2FileControlFrame(data).type === "file-open") {
-          sender.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId, receivedThrough: 0 }));
-        }
-      },
+      (data: string | ArrayBuffer): Effect.Effect<void, FileTransferError> =>
+        Effect.tryPromise({
+          try: () =>
+            (async (data: string | ArrayBuffer) => {
+              received.push(data);
+              if (typeof data === "string" && decodeTeamProtocolV2FileControlFrame(data).type === "file-open") {
+                sender.receive(
+                  encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId, receivedThrough: 0 }),
+                );
+              }
+            })(data),
+          catch: fileTransferError,
+        }),
       () => transferId,
     );
     const progress: [number, number][] = [];
-    await sender.upload(input, (sent, total) => progress.push([sent, total]));
+    await runTeamEffect(sender.upload(input, (sent, total) => progress.push([sent, total])));
     // Reported after the bytes left, so a person never sees more sent than the channel took.
     expect(progress).toEqual([[5, 5]]);
     expect(
@@ -64,20 +77,28 @@ describe("mobile file upload", () => {
   it("stops before sending bytes when the host rejects the file", async () => {
     let frames = 0;
     const sender = createRemoteFileSender(
-      async () => {
-        frames++;
-        sender.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-cancel", transferId, reason: "rejected" }));
-      },
+      (_data: string | ArrayBuffer): Effect.Effect<void, FileTransferError> =>
+        Effect.tryPromise({
+          try: () =>
+            (async () => {
+              frames++;
+              sender.receive(
+                encodeTeamProtocolV2Frame({ version: 2, type: "file-cancel", transferId, reason: "rejected" }),
+              );
+            })(),
+          catch: fileTransferError,
+        }),
       () => transferId,
     );
-    await expect(sender.upload(input)).rejects.toThrow("The host rejected the attachment.");
+    await expect(runTeamEffect(sender.upload(input))).rejects.toThrow("The host rejected the attachment.");
     expect(frames).toBe(1);
   });
   it("rejects a pending upload when its connection is replaced", async () => {
     const sender = createRemoteFileSender(
-      async () => sender.cancel(),
+      (_data: string | ArrayBuffer): Effect.Effect<void, FileTransferError> =>
+        Effect.tryPromise({ try: () => (async () => sender.cancel())(), catch: fileTransferError }),
       () => transferId,
     );
-    await expect(sender.upload(input)).rejects.toThrow("The attachment connection closed.");
+    await expect(runTeamEffect(sender.upload(input))).rejects.toThrow("The attachment connection closed.");
   });
 });

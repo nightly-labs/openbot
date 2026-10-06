@@ -1,5 +1,7 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
+import { Effect } from "effect";
+import { desktopCall } from "./remote-desktop-effects";
 
 export interface RemoteDesktopRuntimePaths {
   sunshine: string;
@@ -7,14 +9,17 @@ export interface RemoteDesktopRuntimePaths {
   moonlightStreamer: string;
 }
 
-export async function resolveRemoteDesktopRuntime(input: {
+interface ResolveRuntimeInput {
   isPackaged: boolean;
   resourcesPath: string;
   sourceRoot: string;
   platform: "darwin" | "win32" | "linux";
   architecture: string;
   overrideRoot?: string;
-}): Promise<RemoteDesktopRuntimePaths | null> {
+}
+export const resolveRemoteDesktopRuntime = Effect.fn("RemoteDesktop.resolveRuntime")(function* (
+  input: ResolveRuntimeInput,
+) {
   const platformDirectory = input.platform;
   const architecture = input.architecture;
   // Releases ship x64 only on Windows and Linux. A Linux arm64 build is for local development.
@@ -34,10 +39,10 @@ export async function resolveRemoteDesktopRuntime(input: {
     moonlightWebServer: join(root, `web-server${suffix}`),
     moonlightStreamer: join(root, `streamer${suffix}`),
   };
-  try {
-    await Promise.all(Object.values(paths).map((path) => access(path)));
-    return paths;
-  } catch {
-    return null;
-  }
-}
+  return yield* Effect.forEach(Object.values(paths), (path) => desktopCall(() => access(path)), {
+    concurrency: "unbounded",
+  }).pipe(
+    Effect.map(() => paths),
+    Effect.catch(() => Effect.succeed(null)),
+  );
+});

@@ -1,3 +1,4 @@
+import { remoteCall } from "./remote-service-effects";
 // @vitest-environment node
 
 // The live event channel: which subprotocol is offered, what the client says once the socket opens,
@@ -9,6 +10,7 @@
 // timers, and only where a reconnect delay is the thing under test.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import {
   createRemoteManager,
   deferredRoute,
@@ -46,10 +48,10 @@ describe("remote event connections", () => {
       appVersion: "0.4.0",
     });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await removed.arrived;
     await kept.arrived;
-    await fixture.manager.remove("removed-host");
+    await runCauseEffect(fixture.manager.remove("removed-host"));
     // Answering the removed host first puts its connection attempt ahead of the surviving one, so a
     // socket for the survivor is proof the removed host already reached its own decision.
     removed.resolve(handshake());
@@ -66,12 +68,12 @@ describe("remote event connections", () => {
       servers: [storedHttpsServer("server-1"), storedHttpsServer("server-2")],
     });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await vi.waitFor(() => expect(sockets).toHaveLength(2));
     await vi.waitFor(() => expect(sockets[0]?.sent).toContainEqual(agentScope(true)));
     expect(sockets[1]?.sent).toContainEqual(agentScope(false));
 
-    await fixture.manager.select("server-2");
+    await runCauseEffect(fixture.manager.select("server-2"));
 
     expect(sockets).toHaveLength(2);
     expect(sockets.every((socket) => socket.close.mock.calls.length === 0)).toBe(true);
@@ -80,7 +82,7 @@ describe("remote event connections", () => {
   });
 
   it("reconnects one host without disturbing the other", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     stubTeamFetch({});
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({
@@ -89,7 +91,7 @@ describe("remote event connections", () => {
     const agentEvent = vi.fn();
     fixture.manager.on("agent", agentEvent);
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await vi.waitFor(() => expect(sockets).toHaveLength(2));
 
     sockets[0]?.close();
@@ -119,7 +121,7 @@ describe("remote event connections", () => {
       await vi.waitFor(() => expect(agentEvent).toHaveBeenCalledWith("server-1", event));
     }
 
-    fixture.manager.refreshRuntimeSnapshots();
+    void runCauseEffect(fixture.manager.refreshRuntimeSnapshots());
     expect(sockets).toHaveLength(3);
     expect(sockets[1]?.sent).toContainEqual({ type: "runtime-snapshot-request" });
     expect(sockets[2]?.sent).toContainEqual({ type: "runtime-snapshot-request" });
@@ -131,7 +133,7 @@ describe("remote event connections", () => {
   });
 
   it("backs off short-lived event connections", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     stubTeamFetch({});
     const { sockets } = stubEventSockets({
@@ -146,11 +148,11 @@ describe("remote event connections", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("backoff")] });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     await waitForServer(fixture, { state: "offline" });
     // A snapshot request never revives a connection that is waiting out its backoff.
-    fixture.manager.refreshRuntimeSnapshots();
+    void runCauseEffect(fixture.manager.refreshRuntimeSnapshots());
     expect(sockets).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(3_000);
@@ -160,7 +162,7 @@ describe("remote event connections", () => {
   });
 
   it("pauses event reconnects after credentials are rejected", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     stubTeamFetch({
       fallback: () =>
         new Response(JSON.stringify({ error: "Authentication required." }), {
@@ -173,17 +175,17 @@ describe("remote event connections", () => {
     });
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("auth-paused")] });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "error" });
     await vi.advanceTimersByTimeAsync(5 * 60_000);
-    fixture.manager.refreshRuntimeSnapshots();
+    void runCauseEffect(fixture.manager.refreshRuntimeSnapshots());
     await vi.advanceTimersByTimeAsync(60_000);
 
     expect(sockets).toHaveLength(1);
   });
 
   it("retries a WebRTC host that Signal reports offline each 5 minutes with focus, and each 15 without it", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const hostId = "00000000-0000-4000-8000-0000000000fa";
     const transport = fakeWebRtcTransport([
@@ -197,16 +199,18 @@ describe("remote event connections", () => {
         role: "member",
       },
     ]);
-    const connect = vi.spyOn(transport, "connect").mockImplementation(async (failedHostId) => {
-      transport.emit("error", failedHostId, "host_unavailable", "The host is offline.");
-      throw new Error("The host is offline.");
-    });
+    const connect = vi.spyOn(transport, "connect").mockImplementation((failedHostId) =>
+      remoteCall(async () => {
+        transport.emit("error", failedHostId, "host_unavailable", "The host is offline.");
+        throw new Error("The host is offline.");
+      }),
+    );
     const fixture = await createRemoteManager({
       servers: [storedHttpsServer(hostId, { transport: "webrtc-v2", apiUrl: `webrtc://${hostId}` })],
       managerOptions: { webrtcTransport: transport },
     });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
     // Each retry costs a Worker request and a Signal ticket, and a host that went away for good stays
     // listed, so an open window does not retry each minute.
@@ -216,7 +220,7 @@ describe("remote event connections", () => {
     expect(connect).toHaveBeenCalledTimes(2);
 
     // Without focus, the retry waits longer. The retry set with focus still runs first.
-    fixture.manager.setAppFocused(false);
+    void runCauseEffect(fixture.manager.setAppFocused(false));
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     const unfocusedCalls = connect.mock.calls.length;
     expect(unfocusedCalls).toBe(3);
@@ -226,11 +230,11 @@ describe("remote event connections", () => {
     expect(connect).toHaveBeenCalledTimes(unfocusedCalls + 1);
 
     await vi.advanceTimersByTimeAsync(60_000);
-    fixture.manager.setAppFocused(true);
+    void runCauseEffect(fixture.manager.setAppFocused(true));
     expect(connect).toHaveBeenCalledTimes(unfocusedCalls + 2);
     // A focus right after Signal answered does not send another request.
-    fixture.manager.setAppFocused(false);
-    fixture.manager.setAppFocused(true);
+    void runCauseEffect(fixture.manager.setAppFocused(false));
+    void runCauseEffect(fixture.manager.setAppFocused(true));
     expect(connect).toHaveBeenCalledTimes(unfocusedCalls + 2);
   });
 
@@ -287,7 +291,7 @@ describe("remote event connections", () => {
     const agentEvent = vi.fn();
     fixture.manager.on("agent", agentEvent);
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await initialConversation.arrived;
     sockets[0]?.emit({
       type: "conversation",
@@ -323,7 +327,7 @@ describe("remote event connections", () => {
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("scope")], appVersion: "0.4.0" });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await vi.waitFor(() => expect(sockets[0]?.sent).not.toHaveLength(0));
 
     expect(sockets[0]?.protocols).toContain("openbot-team-v1");
@@ -336,12 +340,12 @@ describe("remote event connections", () => {
   });
 
   it("ignores an unknown event and stops reconnecting after a malformed known one", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     stubTeamFetch({ compatibility: { appVersion: "0.3.0", capabilities: ["agent-runtime-snapshots"] } });
     const { sockets } = stubEventSockets();
     const fixture = await createRemoteManager({ servers: [storedHttpsServer("known-events")], appVersion: "0.4.0" });
 
-    fixture.manager.startEventConnections();
+    void runCauseEffect(fixture.manager.startEventConnections());
     await waitForServer(fixture, { state: "online", connectionSequence: 1 });
 
     // An event this build has never heard of is a newer host, not a broken one.

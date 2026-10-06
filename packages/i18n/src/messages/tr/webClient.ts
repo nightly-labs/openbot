@@ -31,11 +31,6 @@ export const messages = {
   "webClient.notice.join": "Davet ile katıl",
   "webClient.notice.reconnect": "Yeniden bağlan",
   "webClient.notice.refreshHosts": "Ana makineleri yenile",
-  "webClient.uncertain.title": "Mesajınızın ulaşıp ulaşmadığını kontrol edin",
-  "webClient.uncertain.description":
-    "Teslimat onaylanmadan önce bağlantı kesildi. Tekrar göndermeden önce yenileyin ve konuşmayı kontrol edin. Mesajınız otomatik olarak tekrar gönderilmeyecektir.",
-  "webClient.uncertain.refresh": "Konuşmayı yenile",
-  "webClient.uncertain.checked": "Konuşmayı kontrol ettim",
   "webClient.agent.modelsFailed": "Ana makine modelleri yüklenemedi.",
   "webClient.agent.refreshFailed":
     "Ajan oluşturuldu, ancak çalışma alanı yenilenemedi. Tekrar denemeden önce sayfayı yeniden yükleyin.",

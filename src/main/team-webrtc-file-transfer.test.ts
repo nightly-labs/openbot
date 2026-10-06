@@ -10,7 +10,9 @@ import {
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { restartActivityGeneration } from "../backend/restart-activity";
+import { remoteCall } from "./remote-service-effects";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
@@ -24,13 +26,15 @@ class FakeBridge extends TeamWebRtcBridge {
   readonly sent: Array<{ peerId: string; channel: string; data: string | ArrayBuffer }> = [];
   readonly disconnectedPeers: string[] = [];
 
-  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
-    this.sent.push({ peerId, channel, data });
-  }
+  override readonly send = (peerId: string, channel: string, data: string | ArrayBuffer) =>
+    remoteCall(async () => {
+      this.sent.push({ peerId, channel, data });
+    });
 
-  override async disconnectPeer(peerId: string): Promise<void> {
-    this.disconnectedPeers.push(peerId);
-  }
+  override readonly disconnectPeer = (peerId: string) =>
+    remoteCall(async () => {
+      this.disconnectedPeers.push(peerId);
+    });
 }
 
 describe("TeamWebRtcFileTransfer", () => {
@@ -57,8 +61,8 @@ describe("TeamWebRtcFileTransfer", () => {
       fileOpen("transfer-1", 4, createHash("sha256").update("test").digest("hex")),
     );
     await vi.waitFor(() => expect(bridge.sent).toHaveLength(1));
-    await first.stop();
-    await second.stop();
+    await runCauseEffect(first.stop());
+    await runCauseEffect(second.stop());
   });
 
   it("resumes at the last exact offset and verifies SHA-256", async () => {
@@ -68,7 +72,7 @@ describe("TeamWebRtcFileTransfer", () => {
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new TextEncoder().encode("hello-world");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const complete = transfers.receive("host-1", "transfer-1");
+    const complete = runCauseEffect(transfers.receive("host-1", "transfer-1"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
     bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes.slice(0, 5)));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
@@ -81,18 +85,18 @@ describe("TeamWebRtcFileTransfer", () => {
     );
 
     await expect(complete).resolves.toMatchObject({ transferId: "transfer-1", size: bytes.byteLength });
-    await expect(transfers.consume("host-1", "transfer-1")).resolves.toMatchObject({ bytes });
+    await expect(runCauseEffect(transfers.consume("host-1", "transfer-1"))).resolves.toMatchObject({ bytes });
     expect(bridge.sent.some((message) => isString(message.data) && message.data.includes('"receivedThrough":5'))).toBe(
       true,
     );
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("rejects a non-contiguous offset", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
-    const waiting = transfers.receive("host-1", "transfer-2");
+    const waiting = runCauseEffect(transfers.receive("host-1", "transfer-2"));
     bridge.emit(
       "data",
       "host-1",
@@ -101,7 +105,7 @@ describe("TeamWebRtcFileTransfer", () => {
     );
     bridge.emit("data", "host-1", "files", chunk("transfer-2", 2, new Uint8Array([1, 2])));
     await expect(waiting).rejects.toThrow("offset");
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("reports a moving transfer and goes quiet after pickup", async () => {
@@ -112,7 +116,7 @@ describe("TeamWebRtcFileTransfer", () => {
     const bytes = new TextEncoder().encode("hello-world");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const before = restartActivityGeneration();
-    const complete = transfers.receive("host-1", "transfer-1");
+    const complete = runCauseEffect(transfers.receive("host-1", "transfer-1"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
     await vi.waitFor(() => expect(transfers.hasActiveTransfers()).toBe(true));
     bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes));
@@ -123,10 +127,10 @@ describe("TeamWebRtcFileTransfer", () => {
       encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-1" }),
     );
     await expect(complete).resolves.toMatchObject({ transferId: "transfer-1" });
-    await transfers.consume("host-1", "transfer-1");
+    await runCauseEffect(transfers.consume("host-1", "transfer-1"));
     expect(transfers.hasActiveTransfers()).toBe(false);
     expect(restartActivityGeneration()).toBeGreaterThan(before);
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("disconnects an authenticated peer after an unidentifiable file frame", async () => {
@@ -136,14 +140,14 @@ describe("TeamWebRtcFileTransfer", () => {
     bridge.emit("data", "host-1", "files", "not-a-file-frame");
 
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toEqual(["host-1"]));
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("rejects a completed file with the wrong hash", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
-    const waiting = transfers.receive("host-1", "transfer-3");
+    const waiting = runCauseEffect(transfers.receive("host-1", "transfer-3"));
     bridge.emit("data", "host-1", "files", fileOpen("transfer-3", 4, "0".repeat(64)));
     bridge.emit("data", "host-1", "files", chunk("transfer-3", 0, new TextEncoder().encode("test")));
     bridge.emit(
@@ -153,7 +157,7 @@ describe("TeamWebRtcFileTransfer", () => {
       encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-3" }),
     );
     await expect(waiting).rejects.toThrow("hash");
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("keeps a malformed peer frame isolated from other hosts", async () => {
@@ -161,8 +165,8 @@ describe("TeamWebRtcFileTransfer", () => {
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
     transfers.setPeerAuthenticated("host-1", true);
     transfers.setPeerAuthenticated("host-2", true);
-    const first = transfers.receive("host-1", "transfer-1");
-    const second = transfers.receive("host-2", "transfer-2");
+    const first = runCauseEffect(transfers.receive("host-1", "transfer-1"));
+    const second = runCauseEffect(transfers.receive("host-2", "transfer-2"));
     bridge.emit(
       "data",
       "host-1",
@@ -186,7 +190,7 @@ describe("TeamWebRtcFileTransfer", () => {
 
     await expect(first).rejects.toThrow("offset");
     await expect(second).resolves.toMatchObject({ peerId: "host-2", transferId: "transfer-2" });
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("settles a pending receive when the transfer service stops", async () => {
@@ -197,10 +201,10 @@ describe("TeamWebRtcFileTransfer", () => {
       const bridge = new FakeBridge();
       const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
       transfers.setPeerAuthenticated("host-1", true);
-      const waiting = transfers.receive("host-1", "transfer-1");
+      const waiting = runCauseEffect(transfers.receive("host-1", "transfer-1"));
       expect(vi.getTimerCount()).toBe(1);
 
-      await transfers.stop();
+      await runCauseEffect(transfers.stop());
 
       expect(vi.getTimerCount()).toBe(0);
       await expect(waiting).rejects.toThrow("The WebRTC file transport stopped.");
@@ -215,14 +219,16 @@ describe("TeamWebRtcFileTransfer", () => {
     bridge.onReconnect = () => transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 1024 * 1024);
     bytes.fill(7);
-    const sending = transfers.send("host-1", { name: "large.bin", mimeType: "application/octet-stream", bytes });
+    const sending = runCauseEffect(
+      transfers.send("host-1", { name: "large.bin", mimeType: "application/octet-stream", bytes }),
+    );
     transfers.setPeerAuthenticated("host-1", true);
     const transferId = await sending;
 
     expect(bridge.openTransferIds).toEqual([transferId, transferId]);
     expect(bridge.firstOffsetAfterReconnect).toBe(bridge.resumeAcknowledged);
     expect(bridge.acknowledged).toBe(bytes.byteLength);
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("uses the last acknowledged progress instead of a fixed whole-transfer deadline", async () => {
@@ -238,13 +244,15 @@ describe("TeamWebRtcFileTransfer", () => {
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 60 * 1024 + 1);
 
-    const transferId = await transfers.send("host-1", {
-      name: "slow.bin",
-      mimeType: "application/octet-stream",
-      bytes,
-    });
+    const transferId = await runCauseEffect(
+      transfers.send("host-1", {
+        name: "slow.bin",
+        mimeType: "application/octet-stream",
+        bytes,
+      }),
+    );
     expect(transferId).toBe(bridge.transferId);
-    await transfers.stop();
+    await runCauseEffect(transfers.stop());
   });
 
   it("releases quota for file declarations that make no progress", async () => {
@@ -273,7 +281,7 @@ describe("TeamWebRtcFileTransfer", () => {
         receivedThrough: 0,
       });
     } finally {
-      await transfers.stop();
+      await runCauseEffect(transfers.stop());
     }
   });
 });
@@ -287,72 +295,73 @@ class ResumingBridge extends TeamWebRtcBridge {
   #transferId = "";
   #disconnected = false;
 
-  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
-    if (channel !== "files") return;
-    if (isString(data)) {
-      const frame = decodeTeamProtocolV2FileControlFrame(data);
-      if (frame.type === "file-open") {
-        this.#transferId = frame.transferId;
-        this.openTransferIds.push(frame.transferId);
-        setTimeout(
-          () =>
-            this.emit(
-              "data",
-              peerId,
-              "files",
-              encodeTeamProtocolV2Frame({
-                version: 2,
-                type: "file-ack",
-                transferId: frame.transferId,
-                receivedThrough: this.acknowledged,
-              }),
-            ),
-          0,
+  override readonly send = (peerId: string, channel: string, data: string | ArrayBuffer) =>
+    remoteCall(async () => {
+      if (channel !== "files") return;
+      if (isString(data)) {
+        const frame = decodeTeamProtocolV2FileControlFrame(data);
+        if (frame.type === "file-open") {
+          this.#transferId = frame.transferId;
+          this.openTransferIds.push(frame.transferId);
+          setTimeout(
+            () =>
+              this.emit(
+                "data",
+                peerId,
+                "files",
+                encodeTeamProtocolV2Frame({
+                  version: 2,
+                  type: "file-ack",
+                  transferId: frame.transferId,
+                  receivedThrough: this.acknowledged,
+                }),
+              ),
+            0,
+          );
+        }
+        return;
+      }
+      const chunk = decodeTeamProtocolV2FileChunk(data);
+      if (this.#disconnected && this.firstOffsetAfterReconnect === null) this.firstOffsetAfterReconnect = chunk.offset;
+      if (!this.#disconnected && this.acknowledged >= 1024 * 1024) {
+        this.#disconnected = true;
+        this.resumeAcknowledged = this.acknowledged;
+        this.emit("disconnected", peerId);
+        setTimeout(() => {
+          this.emit("connected", peerId);
+          this.onReconnect();
+        }, 5);
+        throw new Error("simulated network change");
+      }
+      this.acknowledged = Math.max(this.acknowledged, chunk.offset + chunk.bytes.byteLength);
+      if (this.#disconnected && chunk.bytes.byteLength < 60 * 1024) {
+        this.emit(
+          "data",
+          peerId,
+          "files",
+          encodeTeamProtocolV2Frame({
+            version: 2,
+            type: "file-ack",
+            transferId: this.#transferId,
+            receivedThrough: this.acknowledged,
+          }),
         );
       }
-      return;
-    }
-    const chunk = decodeTeamProtocolV2FileChunk(data);
-    if (this.#disconnected && this.firstOffsetAfterReconnect === null) this.firstOffsetAfterReconnect = chunk.offset;
-    if (!this.#disconnected && this.acknowledged >= 1024 * 1024) {
-      this.#disconnected = true;
-      this.resumeAcknowledged = this.acknowledged;
-      this.emit("disconnected", peerId);
-      setTimeout(() => {
-        this.emit("connected", peerId);
-        this.onReconnect();
-      }, 5);
-      throw new Error("simulated network change");
-    }
-    this.acknowledged = Math.max(this.acknowledged, chunk.offset + chunk.bytes.byteLength);
-    if (this.#disconnected && chunk.bytes.byteLength < 60 * 1024) {
-      this.emit(
-        "data",
-        peerId,
-        "files",
-        encodeTeamProtocolV2Frame({
-          version: 2,
-          type: "file-ack",
-          transferId: this.#transferId,
-          receivedThrough: this.acknowledged,
-        }),
-      );
-    }
-    if (!this.#disconnected && this.acknowledged >= 1024 * 1024) {
-      this.emit(
-        "data",
-        peerId,
-        "files",
-        encodeTeamProtocolV2Frame({
-          version: 2,
-          type: "file-ack",
-          transferId: this.#transferId,
-          receivedThrough: this.acknowledged,
-        }),
-      );
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-  }
+      if (!this.#disconnected && this.acknowledged >= 1024 * 1024) {
+        this.emit(
+          "data",
+          peerId,
+          "files",
+          encodeTeamProtocolV2Frame({
+            version: 2,
+            type: "file-ack",
+            transferId: this.#transferId,
+            receivedThrough: this.acknowledged,
+          }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    });
 }
 
 const CHUNK_ACK_DELAY_MS = 100;
@@ -362,61 +371,62 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
   transferId = "";
   #received = 0;
 
-  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
-    if (channel !== "files") return;
-    if (isString(data)) {
-      const frame = decodeTeamProtocolV2FileControlFrame(data);
-      if (frame.type === "file-open") {
-        this.transferId = frame.transferId;
-        queueMicrotask(() =>
-          this.emit(
-            "data",
-            peerId,
-            "files",
-            encodeTeamProtocolV2Frame({
-              version: 2,
-              type: "file-ack",
-              transferId: frame.transferId,
-              receivedThrough: this.#received,
-            }),
-          ),
+  override readonly send = (peerId: string, channel: string, data: string | ArrayBuffer) =>
+    remoteCall(async () => {
+      if (channel !== "files") return;
+      if (isString(data)) {
+        const frame = decodeTeamProtocolV2FileControlFrame(data);
+        if (frame.type === "file-open") {
+          this.transferId = frame.transferId;
+          queueMicrotask(() =>
+            this.emit(
+              "data",
+              peerId,
+              "files",
+              encodeTeamProtocolV2Frame({
+                version: 2,
+                type: "file-ack",
+                transferId: frame.transferId,
+                receivedThrough: this.#received,
+              }),
+            ),
+          );
+        }
+        return;
+      }
+      const chunk = decodeTeamProtocolV2FileChunk(data);
+      this.#received = chunk.offset + chunk.bytes.byteLength;
+      await new Promise((resolve) => setTimeout(resolve, CHUNK_ACK_DELAY_MS));
+      if (chunk.bytes.byteLength === 60 * 1024) {
+        this.emit(
+          "data",
+          peerId,
+          "files",
+          encodeTeamProtocolV2Frame({
+            version: 2,
+            type: "file-ack",
+            transferId: this.transferId,
+            receivedThrough: this.#received,
+          }),
+        );
+      } else {
+        setTimeout(
+          () =>
+            this.emit(
+              "data",
+              peerId,
+              "files",
+              encodeTeamProtocolV2Frame({
+                version: 2,
+                type: "file-ack",
+                transferId: this.transferId,
+                receivedThrough: this.#received,
+              }),
+            ),
+          FINAL_ACK_DELAY_MS,
         );
       }
-      return;
-    }
-    const chunk = decodeTeamProtocolV2FileChunk(data);
-    this.#received = chunk.offset + chunk.bytes.byteLength;
-    await new Promise((resolve) => setTimeout(resolve, CHUNK_ACK_DELAY_MS));
-    if (chunk.bytes.byteLength === 60 * 1024) {
-      this.emit(
-        "data",
-        peerId,
-        "files",
-        encodeTeamProtocolV2Frame({
-          version: 2,
-          type: "file-ack",
-          transferId: this.transferId,
-          receivedThrough: this.#received,
-        }),
-      );
-    } else {
-      setTimeout(
-        () =>
-          this.emit(
-            "data",
-            peerId,
-            "files",
-            encodeTeamProtocolV2Frame({
-              version: 2,
-              type: "file-ack",
-              transferId: this.transferId,
-              receivedThrough: this.#received,
-            }),
-          ),
-        FINAL_ACK_DELAY_MS,
-      );
-    }
-  }
+    });
 }
 
 function fileOpen(transferId: string, size: number, sha256: string): string {

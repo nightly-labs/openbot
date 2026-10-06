@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { Notification } from "electron";
 import type { NotificationPreferenceStore } from "./notification-preference-store";
 
@@ -37,15 +38,15 @@ export interface NotificationPermissionRequest {
  * The request is recorded before the notification is shown: a failed write then skips the welcome,
  * where the other order would show it again on every start.
  */
-export async function requestNotificationPermission({
+export const requestNotificationPermission = Effect.fn("requestNotificationPermission")(function* ({
   platform,
   preference,
   showWelcome,
-}: NotificationPermissionRequest): Promise<void> {
+}: NotificationPermissionRequest) {
   if (platform !== "darwin" || preference.permissionRequested() || !preference.get().desktopNotifications) return;
-  await preference.markPermissionRequested();
+  yield* preference.markPermissionRequested();
   showWelcome();
-}
+});
 
 const NOTIFICATION_SETTINGS_URLS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "x-apple.systempreferences:com.apple.Notifications-Settings.extension",

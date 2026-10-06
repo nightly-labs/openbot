@@ -6,6 +6,7 @@ import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/br
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import type { BrowserHost } from "../../backend/browser-host";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import type { BrowserViewClient } from "../browser-view-client";
 import {
@@ -57,73 +58,88 @@ export function browserIpcHandlers({
       open: payloadHandler(parseBrowserOpen, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>
-            browser.open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus),
+            runCauseEffect(
+              browser.open(parsed.url, parsed.ownerThreadId ?? null, parsed.ownerAgentId ?? null, parsed.focus),
+            ),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
-              method: "POST",
-              body: parsed,
-            }),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.open, decodeBrowserTab, {
+                method: "POST",
+                body: parsed,
+              }),
+            ),
         }),
       ),
       activate: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.activate(tabId),
+          local: () => runCauseEffect(browser.activate(tabId)),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.activate, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
+            ),
         }),
       ),
       navigate: payloadHandler(parseBrowserNavigate, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
           local: () =>
             "url" in parsed
-              ? browser.loadUrl(parsed.tabId, parsed.url)
-              : browser.navigate(parsed.tabId, parsed.direction),
+              ? runCauseEffect(browser.loadUrl(parsed.tabId, parsed.url))
+              : runCauseEffect(browser.navigate(parsed.tabId, parsed.direction)),
           remote: (serverId) => {
             if (!("url" in parsed)) {
-              return remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
-                method: "POST",
-                body: parsed,
-              });
+              return runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
+                  method: "POST",
+                  body: parsed,
+                }),
+              );
             }
             // An older host has no route that moves an existing tab to an address. The renderer
             // opens a new tab for it instead, so this stays the error that tells it to.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
-            return remoteServers.request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
-              method: "POST",
-              body: parsed,
-            });
+            return runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
+                method: "POST",
+                body: parsed,
+              }),
+            );
           },
         }),
       ),
       reload: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.reload(tabId),
+          local: () => runCauseEffect(browser.reload(tabId)),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.reload, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
+            ),
         }),
       ),
       close: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.close(tabId),
+          local: () => runCauseEffect(browser.close(tabId)),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
-              method: "POST",
-              body: { tabId },
-            }),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.close, decodeVoid, {
+                method: "POST",
+                body: { tabId },
+              }),
+            ),
         }),
       ),
       listTabs: handler(() =>
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.listTabs(),
-          remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
+          remote: (serverId) =>
+            runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs)),
         }),
       ),
       getDisplayState: handler(() =>
@@ -133,10 +149,14 @@ export function browserIpcHandlers({
             // Without the capability the host can only list tabs, and nothing on that list says
             // which one is in front. The first tab is the guess this route exists to replace.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
-              const tabs = await remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs);
+              const tabs = await runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
+              );
               return { tabs, activeTabId: tabs[0]?.id ?? null };
             }
-            return remoteServers.request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState);
+            return runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.display, decodeBrowserDisplayState),
+            );
           },
         }),
       ),
@@ -144,17 +164,19 @@ export function browserIpcHandlers({
         routeToServer(remoteServers.activeServerId, {
           local: () => browser.getControlState(),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState),
+            runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.browser.control, decodeBrowserControlState)),
         }),
       ),
       capturePreview: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.capturePreview(tabId),
+          local: () => runCauseEffect(browser.capturePreview(tabId)),
           remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
-              method: "POST",
-              body: { tabId },
-            }),
+            runCauseEffect(
+              remoteServers.request(serverId, TEAM_API_ROUTES.browser.preview, decodeBrowserPreviewFromHost, {
+                method: "POST",
+                body: { tabId },
+              }),
+            ),
         }),
       ),
       // Visibility is a local placement, not a remote operation, so a host's tab is left alone. The
@@ -163,13 +185,13 @@ export function browserIpcHandlers({
       // at coordinates that mean nothing there, and still showed the remote user nothing.
       // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
-        if (remoteServers.activeServerId === LOCAL_SERVER_ID) await browser.setVisible(parsed);
+        if (remoteServers.activeServerId === LOCAL_SERVER_ID) await runCauseEffect(browser.setVisible(parsed));
       }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => browserView.start(tabId)),
-      stopLiveView: handler(() => browserView.stop()),
+      startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => runCauseEffect(browserView.start(tabId))),
+      stopLiveView: handler(() => runCauseEffect(browserView.stop())),
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        browserPictureInPicture.open(bounds),
+        runCauseEffect(browserPictureInPicture.open(bounds)),
       ),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
