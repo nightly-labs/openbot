@@ -872,7 +872,7 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 ## Required verification
 
 Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:ui` and
-`bun run typecheck`, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
+the typecheck of each project that a staged file affects, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
 for the local rules, and [check design notes](development-checks.md#check-coverage) for what each CI
 job covers.
 
