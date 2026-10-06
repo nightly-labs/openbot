@@ -1425,6 +1425,12 @@ event stream select it when the peer advertises `local-providers-v2`, and HTTPS 
 the protocol range. `GET /v1/agents/models` sends a v1–v5 peer only the ids its charset accepts. A
 v5 peer still gets the filtered view.
 
+The v4, v5 and v6 base schemas are one codec, `provider-aware-codec.ts`. Each `v<N>-base.ts` passes
+`createProviderAwareCodec` a frozen profile: the providers, the signed-in auth kinds and the agent
+model charset. Nothing else differs between these versions. `provider-aware-codec.test.ts` holds
+what each released profile accepts. Do not edit a released profile; a new provider needs a new
+protocol version.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:
