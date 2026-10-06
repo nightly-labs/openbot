@@ -326,11 +326,10 @@ async function measureMemory(flags: Flags, target: AutomationTarget): Promise<vo
 }
 
 async function main(): Promise<void> {
-  const parsed = readScriptArguments({ usage: USAGE, options: OPTIONS, allowPositionals: true });
+  const parsed = readScriptArguments({ usage: USAGE, options: OPTIONS, maxPositionals: 1 });
   if (parsed === null) return;
   const flags = parsed.values;
-  const [command, ...extra] = parsed.positionals;
-  if (extra.length > 0) throw new Error(`Unexpected argument '${extra[0]}'.\n${USAGE}`);
+  const [command] = parsed.positionals;
   if (command === "instances") {
     // Every diagnostic on stderr goes through the logger, which redacts. This
     // is the one place a registry field reaches stdout raw, and `projectRoot`
