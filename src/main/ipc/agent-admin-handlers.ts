@@ -23,7 +23,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
-import type { ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import { parseInstallAgentTemplate } from "./agent-template-handlers";
@@ -60,9 +60,6 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
   if (!skill) throw new Error("Invalid installed skill.");
   return skill;
 }
-
-// The skills-admin-v1 codec has already checked that the body is an empty record.
-const acceptEmpty = (): undefined => undefined;
 
 export function agentAdminIpcHandlers({
   settings,

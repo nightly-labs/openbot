@@ -31,6 +31,7 @@ import { Effect, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
@@ -817,9 +818,6 @@ const pathExists = Effect.fn("SkillMarketplace.pathExists")((path: string) =>
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
-}
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return Uint8Array.from(bytes).buffer;
 }
 
 function decodeSubmissions(value: unknown): SkillSubmission[] {
