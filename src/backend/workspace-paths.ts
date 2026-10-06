@@ -159,7 +159,10 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
       isMissing(error)
         ? refuse(
             "missing",
-            sourceText("error.backend.workspacePathMissing", { path: inputPath, root: agent.workspacePath }),
+            sourceText("error.backend.workspacePathMissing", {
+              path: homeRelative(inputPath),
+              root: homeRelative(agent.workspacePath),
+            }),
             memberMessage,
           )
         : Effect.fail(error),
@@ -173,6 +176,15 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
   return { workspaceRoot, resolvedPath, insideWorkspace, metadata };
 });
+
+/**
+ * A path in the home folder as `~/…`. The error display hides a message with a `/Users/` path as runtime
+ * output, and the short form is also easier to read.
+ */
+function homeRelative(path: string): string {
+  const home = homedir();
+  return path === home || path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;
+}
 
 function isMissing(error: AttachmentOperationError): boolean {
   return isRecord(error.cause) && error.cause.code === "ENOENT";
