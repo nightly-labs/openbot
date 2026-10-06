@@ -93,7 +93,7 @@ describe("listWorkspaceDirectory", () => {
     const agent = await fixture();
     const odd = join(agent.workspacePath, "odd");
     await mkdir(join(odd, "~"), { recursive: true });
-    for (const name of ["a%20b.txt", "a b.txt", " lead.txt"]) await writeFile(join(odd, name), name);
+    for (const name of ["a%20b.txt", "a b.txt", " lead.txt", "a\\b.txt"]) await writeFile(join(odd, name), name);
     await writeFile(join(odd, "~", "n.txt"), "tilde");
 
     const listing = await Effect.runPromise(listWorkspaceDirectory(agent, "odd"));

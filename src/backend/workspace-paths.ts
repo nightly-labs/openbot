@@ -228,6 +228,8 @@ export const listWorkspaceDirectory = Effect.fn("Workspace.listWorkspaceDirector
   const dirents = yield* attachmentCall(() => readdir(resolvedPath, { withFileTypes: true }));
   const candidates: { name: string; target: string; kind: WorkspaceDirectoryEntry["kind"] }[] = [];
   for (const dirent of dirents) {
+    // `workspacePathFromInput` reads `\` as a separator, so such a name would open a different file.
+    if (dirent.name.includes("\\")) continue;
     const entryPath = join(resolvedPath, dirent.name);
     if (dirent.isDirectory() || dirent.isFile()) {
       candidates.push({ name: dirent.name, target: entryPath, kind: dirent.isDirectory() ? "directory" : "file" });

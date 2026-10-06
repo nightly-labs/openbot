@@ -1376,7 +1376,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
-      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
+      previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => {
+        // A path with no extension is a folder here, so a folder chip reaches the listing as on desktop.
+        if (!/\.[^/]+$/u.test(input.path)) throw new Error("Workspace path is not a file.");
+        return mockFilePreview(input.path, "workspace-file");
+      },
       listWorkspaceDirectory: async (input: OpenWorkspaceFileInput) => mockWorkspaceDirectory(input.path),
       sendMessage: async (input: SendMessageInput) => {
         // As on a host, a repeated client id answers with the first receipt and stores nothing.
