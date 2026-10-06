@@ -551,8 +551,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
     const mention = chatTagReferences(expanded).find(
       (reference) => reference.kind === "agent" && !expanded.slice(0, reference.start).trim(),
     );
-    void channels
-      .command({
+    void channels.command(
+      {
         type: "send",
         operationId: crypto.randomUUID(),
         channelId,
@@ -560,10 +560,9 @@ export function ChannelConversation(props: ChannelConversationProps) {
         recipientAgentId: mention?.id ?? null,
         replyToMessageId,
         attachmentDraftIds: attachments.map((attachment) => attachment.id),
-      })
-      .then((sent) => {
-        if (sent) clearSent(channelId, text);
-      });
+      },
+      () => clearSent(channelId, text),
+    );
   };
   return (
     <main
@@ -597,8 +596,8 @@ export function ChannelConversation(props: ChannelConversationProps) {
           <Button
             variant="ghost"
             onClick={() =>
-              void channels.retry().then((sent) => {
-                if (sent?.type === "send") clearSent(sent.channelId, sent.text);
+              void channels.retry((sent) => {
+                if (sent.type === "send") clearSent(sent.channelId, sent.text);
               })
             }
           >
