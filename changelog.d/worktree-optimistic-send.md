@@ -5,4 +5,4 @@
 
 ### Added
 
-- A message that could not be sent stays in the chat with Retry, Edit and Dismiss. Retry does not send the message two times, also when the first attempt reached the server and only its answer was lost. A server on an older version cannot detect a repeated message, so for it the chat offers only Edit and Dismiss.
+- A message that could not be sent stays in the chat with Retry, Edit and Dismiss. Retry does not send the message two times, also when the first attempt reached the server and only its answer was lost. A server on an older version cannot detect a repeated message, so for it the chat offers only Edit and Dismiss. If you quit or restart before such a message is sent, its text is back in the composer when you return; nothing sends it again on its own.

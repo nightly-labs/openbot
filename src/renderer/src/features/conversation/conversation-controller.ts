@@ -181,7 +181,14 @@ export function createStableConversationState(
     },
   );
   if (storedDrafts)
-    writeComposerDraftsOnChange({ drafts, channelDrafts, editingAgentId, editingServerId, editingDraftBackup });
+    writeComposerDraftsOnChange({
+      drafts,
+      channelDrafts,
+      editingAgentId,
+      editingServerId,
+      editingDraftBackup,
+      unsentTexts: pendingSends.unsentTexts,
+    });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",

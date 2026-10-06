@@ -76,6 +76,28 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
+  it("puts a failed message back in the composer after a restart and sends nothing on its own", async () => {
+    vi.mocked(window.openbot.agent.sendMessage).mockRejectedValueOnce(new Error("Mailbox unavailable"));
+    const first = render(() => <App />);
+    await confirmOnboardingModel();
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Run this Monday";
+    await fireEvent.input(composer);
+    await fireEvent.keyDown(composer, { key: "Enter" });
+    expect(await screen.findByText("Mailbox unavailable")).toBeInTheDocument();
+    composer.textContent = "Later draft";
+    await fireEvent.input(composer);
+
+    // Unmounting the app writes the drafts at once, the way a quit inside the write delay does.
+    first.unmount();
+    const restarted = render(() => <App />);
+    expect(await screen.findByRole("textbox", { name: "Message Chief" })).toHaveTextContent(
+      /Run this Monday\s*Later draft/,
+    );
+    expect(window.openbot.agent.sendMessage).toHaveBeenCalledOnce();
+    restarted.unmount();
+  });
+
   it("does not read an earlier agent reply again after sending a message", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

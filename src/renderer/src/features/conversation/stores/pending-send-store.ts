@@ -160,9 +160,20 @@ export function createPendingSendStore() {
     publish(key);
   }
 
+  /** The composer text of each send the host has not confirmed, per chat, oldest first. */
+  function unsentTexts(): Record<string, string[]> {
+    return Object.fromEntries(
+      Object.entries(sends).flatMap(([key, queue]) => {
+        const texts = queue.filter((send) => send.state !== "sent").map((send) => send.draft.text);
+        return texts.length ? [[key, texts]] : [];
+      }),
+    );
+  }
+
   return {
     list: (target: ConversationTarget | undefined): readonly PendingSend[] =>
       target ? (sends[composerDraftKey(target)] ?? []) : [],
+    unsentTexts,
     add,
     retry,
     remove,
