@@ -67,6 +67,8 @@ export type InlineSegment =
   | { kind: "link"; text: string; href: string };
 
 const RELEASE_HEADING = /^## \[([^\]]+)\](?:\s+-\s+(\d{4}-\d{2}-\d{2}))?/;
+/** A mobile version that the store has not approved yet. `scripts/release-notes.ts` writes it. */
+const IN_REVIEW_HEADING = /^## \[[^\]]+\]\s+-\s+In review\s*$/;
 const GROUP_HEADING = /^### (.+)$/;
 const BULLET = /^- (.*)$/;
 const CONTINUATION = /^ {2,}(\S.*)$/;
@@ -91,7 +93,8 @@ function groupType(heading: string): ChangelogGroupType {
 }
 
 /**
- * Every released version, newest first as the file lists them. Unreleased notes are left out.
+ * Every released version, newest first as the file lists them. Unreleased notes and a version
+ * that is still in store review are left out.
  * `anchorPrefix` keeps the anchors of two files apart when both have the same version.
  */
 export function parseChangelog(markdown: string, anchorPrefix = ""): ChangelogRelease[] {
@@ -121,7 +124,7 @@ export function parseChangelog(markdown: string, anchorPrefix = ""): ChangelogRe
       const date = Number.isNaN(Date.parse(`${written}T00:00:00Z`)) ? "" : written;
       group = undefined;
       release =
-        version.toLowerCase() === "unreleased"
+        version.toLowerCase() === "unreleased" || IN_REVIEW_HEADING.test(line)
           ? undefined
           : { version, date, anchor: `${anchorPrefix}${releaseAnchor(version)}`, intro: [], notices: [], groups: [] };
       if (release) releases.push(release);

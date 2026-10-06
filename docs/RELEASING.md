@@ -314,7 +314,8 @@ A change to the desktop app or the web client and the iPhone app gets one file i
 `bun run mobile:release:patch`, `mobile:release:minor` and `mobile:release:major` move these files
 into `apps/mobile/CHANGELOG.md` and set the version in `apps/mobile/app.json`,
 `apps/mobile/package.json` and the copy of it in `bun.lock`. The pre-commit hook checks the new section when a commit changes the
-`app.json` version.
+`app.json` version. The new section is `## [x.y.z] - In review`, and `/changelog` does not show it
+until the store makes the build available. Then `bun run mobile:release:published` writes the date.
 
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a

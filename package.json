@@ -121,6 +121,7 @@
     "mobile:release:patch": "bun scripts/prepare-release.ts patch --mobile",
     "mobile:release:minor": "bun scripts/prepare-release.ts minor --mobile",
     "mobile:release:major": "bun scripts/prepare-release.ts major --mobile",
+    "mobile:release:published": "bun scripts/publish-mobile-release.ts",
     "mobile:lint": "bun run --cwd apps/mobile lint",
     "mobile:typecheck": "bun run typecheck:mobile",
     "mobile:doctor": "bun run --cwd apps/mobile doctor",

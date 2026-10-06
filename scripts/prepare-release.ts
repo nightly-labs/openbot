@@ -6,6 +6,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import {
   assembleSection,
   FRAGMENT_DIR,
+  IN_REVIEW,
   MOBILE_CHANGELOG,
   MOBILE_FRAGMENT_DIR,
   MOBILE_VERSION_FILES,
@@ -28,6 +29,8 @@ interface ReleaseTarget {
   versionFiles: readonly string[];
   /** The workspace whose copy of the version `bun.lock` keeps. Bun does not update that copy. */
   lockWorkspace?: string;
+  /** The new section is `In review` until the store approves the build, so `/changelog` hides it. */
+  inReview: boolean;
   next: string;
 }
 
@@ -36,6 +39,7 @@ const DESKTOP: ReleaseTarget = {
   changelog: "CHANGELOG.md",
   fragmentDir: FRAGMENT_DIR,
   versionFiles: ["package.json"],
+  inReview: false,
   next: "commit package.json, CHANGELOG.md and changelog.d, push, run preflight, then tag it",
 };
 
@@ -45,7 +49,8 @@ const MOBILE: ReleaseTarget = {
   fragmentDir: MOBILE_FRAGMENT_DIR,
   versionFiles: MOBILE_VERSION_FILES,
   lockWorkspace: "apps/mobile",
-  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight",
+  inReview: true,
+  next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight. When the store makes the build available, run bun run mobile:release:published",
 };
 
 /** The first `"version"` in the file, which is the top-level one in each file that this script changes. */
@@ -66,9 +71,16 @@ if (versions.some((version) => version !== currentVersion)) {
 }
 const changelog = await readFile(target.changelog, "utf8");
 const nextVersion = bumpVersion(currentVersion, increment);
-const releaseHeading = `## [${nextVersion}] - ${new Date().toISOString().slice(0, 10)}`;
+const releaseHeading = `## [${nextVersion}] - ${target.inReview ? IN_REVIEW : new Date().toISOString().slice(0, 10)}`;
 if (changelog.includes(`## [${nextVersion}]`)) {
   throw new Error(`${target.changelog} already contains ${nextVersion}`);
+}
+// The publish step dates only the current version, so an older one would stay hidden.
+const waiting = changelog.split("\n").find((line) => line.startsWith("## [") && line.endsWith(`] - ${IN_REVIEW}`));
+if (target.inReview && waiting !== undefined) {
+  throw new Error(
+    `"${waiting}" in ${target.changelog} is still in review. Run bun run mobile:release:published when the store makes it available, then prepare the next release.`,
+  );
 }
 
 // The release is the items still written under Unreleased, then each fragment in the order that
@@ -93,7 +105,7 @@ const nextChangelog = [
   ...lines.slice(unreleasedEnd),
 ].join("\n");
 
-const problems = releaseNotesProblems(nextChangelog, nextVersion);
+const problems = releaseNotesProblems(nextChangelog, nextVersion, { inReview: target.inReview });
 if (problems.length > 0) {
   throw new Error(
     [
