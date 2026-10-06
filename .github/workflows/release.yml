@@ -6,7 +6,8 @@ on:
       - "v*.*.*"
   # A manual run publishes nothing. `host-signing` exercises the Host signing keychain on its own,
   # so a credential or keychain problem is found without pushing a tag; it builds nothing, and it
-  # must run on a tag ref because the `release` environment admits only tags. `dry-run` runs the
+  # must run on a tag ref because the `release` environment admits only tags. `windows-signing`
+  # does the same for Azure Artifact Signing, also on a tag ref. `dry-run` runs the
   # release path on any ref, without the macOS job and the publish job: they need the tag-only
   # `release` secrets. It also makes no provenance attestation, because an attestation of a public
   # repository is a public Sigstore record.
@@ -17,6 +18,7 @@ on:
         type: choice
         options:
           - host-signing
+          - windows-signing
           - dry-run
         default: host-signing
 
@@ -163,6 +165,70 @@ jobs:
             exit 1
           fi
           echo "This runner records no AppleDouble metadata entries."
+
+  windows-signing:
+    name: Check Windows Artifact Signing
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'windows-signing'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      # The same login and token cache as the `windows` job.
+      - name: Log in to Azure Artifact Signing
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: d6b8edfc-2bac-4da5-969a-64101dd2ec02
+          tenant-id: 286de395-f5c5-499b-9999-5cff1631ef5a
+          subscription-id: 3004c497-bc0d-40ca-b79d-be9ff034692f
+
+      - name: Cache Azure Artifact Signing token
+        run: az account get-access-token --resource https://codesigning.azure.net --output none
+
+      # Runs the commands that electron-builder runs for `azureSignOptions`, with the values of
+      # `electron-builder.windows-signing.yml`, on a throwaway executable that is never uploaded.
+      # The first signature checks the role, the profile and the module. The second one comes after
+      # the delay between login and signing in a release build, so it checks the token cache.
+      - name: Sign a throwaway executable now and after a release build's delay
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          $options = bun -e 'const { parse } = require("yaml"); const config = parse(require("fs").readFileSync("electron-builder.windows-signing.yml", "utf8")); console.log(JSON.stringify(config.win.azureSignOptions))' | ConvertFrom-Json
+          Install-Module -Name TrustedSigning -MinimumVersion 0.5.0 -Force -Repository PSGallery -Scope CurrentUser
+          $probe = Join-Path $env:RUNNER_TEMP "openbot-signing-probe"
+          New-Item -ItemType Directory -Force -Path $probe | Out-Null
+          Set-Content -LiteralPath "$probe/probe.cs" -Value "class Probe { static void Main() {} }"
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo "/out:$probe\probe.exe" "$probe\probe.cs"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          function Test-ProbeSigning([string] $label) {
+            $file = Join-Path $probe "$label.exe"
+            Copy-Item -LiteralPath "$probe/probe.exe" -Destination $file
+            Invoke-TrustedSigning -Endpoint $options.endpoint -CodeSigningAccountName $options.codeSigningAccountName `
+              -CertificateProfileName $options.certificateProfileName -FileDigest SHA256 `
+              -TimestampRfc3161 http://timestamp.acs.microsoft.com -TimestampDigest SHA256 -Files $file
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne "Valid" -or -not $signature.SignerCertificate.Subject.StartsWith("CN=$($options.publisherName),")) {
+              Write-Error "The $label signature is not valid for $($options.publisherName): $($signature.Status) $($signature.SignerCertificate.Subject)."
+            }
+            Write-Output "Signed the $label probe: $($signature.SignerCertificate.Subject)"
+          }
+          Test-ProbeSigning "immediate"
+          # The delay is the condition under test: a release build signs about 15 minutes after login.
+          Start-Sleep -Seconds 1200
+          Test-ProbeSigning "delayed"
 
   # Each architecture builds on a runner of its own kind. The install scripts run every provider
   # runtime they download, and Whisper and the remote desktop runtime are built or verified for the
@@ -454,11 +520,12 @@ jobs:
           retention-days: 7
 
   windows:
-    name: Build unsigned Windows x64 release
+    name: Build ${{ github.event_name == 'push' && 'signed' || 'unsigned' }} Windows x64 release
     needs: validate
     runs-on: windows-2025
     timeout-minutes: 35
-    # These jobs read no secrets. The environment limits a tag build to tags; a dry run has none.
+    # This job reads no secrets. The environment limits a tag build to tags, and the Azure federated
+    # credential trusts only this environment, so a dry run has no environment and stays unsigned.
     environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
       attestations: write
@@ -467,6 +534,7 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      WINDOWS_SIGNED: ${{ github.event_name == 'push' }}
     steps:
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -492,11 +560,41 @@ jobs:
           bun scripts/install-claude-runtime.ts win32 x64
           bun scripts/install-grok-runtime.ts win32 x64
 
-      - name: Build unsigned NSIS installer
-        run: bun run dist:win
+      # Azure Artifact Signing: the `openbot-release-signing` app registration in the Synthetify
+      # tenant holds the Signer role on the SYNTHETIFY certificate profile only. These IDs are not
+      # secrets; the federated credential admits only this repository's `release` environment.
+      - name: Log in to Azure Artifact Signing
+        if: env.WINDOWS_SIGNED == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: d6b8edfc-2bac-4da5-969a-64101dd2ec02
+          tenant-id: 286de395-f5c5-499b-9999-5cff1631ef5a
+          subscription-id: 3004c497-bc0d-40ca-b79d-be9ff034692f
+
+      # The GitHub token that the login exchanged can expire before electron-builder signs, about
+      # 15 minutes later. Azure CLI caches this token for the signing service for about an hour,
+      # and the TrustedSigning module gets it from Azure CLI.
+      - name: Cache Azure Artifact Signing token
+        if: env.WINDOWS_SIGNED == 'true'
+        run: az account get-access-token --resource https://codesigning.azure.net --output none
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          if ($env:WINDOWS_SIGNED -eq "true") {
+            bun run dist:win --config electron-builder.windows-signing.yml
+          } else {
+            bun run dist:win
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify packaged application metadata and launch
-        run: bun run verify:package:win --require-update-metadata
+        shell: pwsh
+        run: |
+          $signatureArguments = @()
+          if ($env:WINDOWS_SIGNED -eq "true") { $signatureArguments = @("--require-signature") }
+          bun run verify:package:win --require-update-metadata @signatureArguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify installer and updater metadata
         shell: pwsh
@@ -506,27 +604,23 @@ jobs:
           if ($installers.Count -ne 1 -or -not (Test-Path dist/latest.yml)) {
             Write-Error "Expected one EXE installer and latest.yml."
           }
-          $applicationSignature = Get-AuthenticodeSignature -LiteralPath dist/win-unpacked/OpenBot.exe
-          if ($applicationSignature.Status -ne "NotSigned") {
-            Write-Error "The unsigned application contract changed: $($applicationSignature.Status)."
+          # The package verifier ties the signer of OpenBot.exe to the publisher in app-update.yml.
+          # A signed install verifies the next update's installer against that publisher.
+          $signature = Get-AuthenticodeSignature -LiteralPath $installers[0].FullName
+          if ($env:WINDOWS_SIGNED -eq "true") {
+            $applicationSigner = (Get-AuthenticodeSignature -LiteralPath dist/win-unpacked/OpenBot.exe).SignerCertificate.Subject
+            if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -ne $applicationSigner) {
+              Write-Error "The installer signer differs from the application signer: $($signature.Status) $($signature.SignerCertificate.Subject)."
+            }
+          } elseif ($signature.Status -ne "NotSigned") {
+            Write-Error "The unsigned installer contract changed: $($signature.Status)."
           }
-          $sourceBuiltRuntimeExecutables = @(
-            "dist/win-unpacked/resources/remote-desktop-runtime/win32/x64/sunshine.exe",
-            "dist/win-unpacked/resources/remote-desktop-runtime/win32/x64/web-server.exe",
-            "dist/win-unpacked/resources/remote-desktop-runtime/win32/x64/streamer.exe"
-          )
           $vendorRuntimeExecutables = @(
             "build/codex/win/x64/bin/codex.exe",
             "build/codex/win/x64/bin/codex-code-mode-host.exe",
             "build/claude/win/x64/bin/claude.exe",
             "build/grok/win/x64/bin/grok.exe"
           )
-          foreach ($runtimeExecutable in $sourceBuiltRuntimeExecutables) {
-            $runtimeSignature = Get-AuthenticodeSignature -LiteralPath $runtimeExecutable
-            if ($runtimeSignature.Status -ne "NotSigned") {
-              Write-Error "The source-built runtime signature contract changed for ${runtimeExecutable}: $($runtimeSignature.Status)."
-            }
-          }
           foreach ($runtimeExecutable in $vendorRuntimeExecutables) {
             $runtimeSignature = Get-AuthenticodeSignature -LiteralPath $runtimeExecutable
             if ($runtimeSignature.Status -ne "Valid") {
@@ -544,10 +638,6 @@ jobs:
             if ($runtimeSignature.SignerCertificate.Subject -notmatch $providerVendorPatterns[$runtimeExecutable]) {
               Write-Error "The provider runtime has an unexpected signer: ${runtimeExecutable}."
             }
-          }
-          $signature = Get-AuthenticodeSignature -LiteralPath $installers[0].FullName
-          if ($signature.Status -ne "NotSigned") {
-            Write-Error "The unsigned installer contract changed: $($signature.Status)."
           }
           Select-String -Path dist/latest.yml -SimpleMatch "version: $env:RELEASE_VERSION"
           Select-String -Path dist/latest.yml -SimpleMatch ".exe"
