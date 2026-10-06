@@ -6722,7 +6722,9 @@ a {
   width: min(420px, calc(100vw - 32px));
   margin: auto;
   padding: 0;
-  overflow: hidden;
+  /* Scrolls when the panel is taller than the dialog's maximum height, such as on a landscape
+     phone; the page under it does not scroll. */
+  overflow: hidden auto;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-lg);
   background: radial-gradient(120% 70% at 50% 0%, rgba(255, 97, 84, 0.22), transparent 62%), var(--openbot-bg-sidebar);
