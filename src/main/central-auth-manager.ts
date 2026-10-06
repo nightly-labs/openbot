@@ -904,10 +904,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   ): Promise<T> {
     const deadline = Date.now() + this.#options.startupRetryWindowMs;
     let retryIndex = 0;
-    let blocked: NetworkBlockedError | null = null;
     while (true) {
       const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) throw blocked ?? new Error(sourceText("error.auth.serviceUnavailable"));
+      if (remainingMs <= 0) throw new Error(sourceText("error.auth.serviceUnavailable"));
       try {
         return await this.#request(
           path,
@@ -920,7 +919,6 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         );
       } catch (error) {
         if (!isTransientStartupError(error)) throw error;
-        if (error instanceof NetworkBlockedError) blocked = error;
         const delayMs = Math.min(
           this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)] ?? 0,
           Math.max(0, deadline - Date.now()),
@@ -1124,7 +1122,7 @@ function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetche
       throw error;
     }
     if (isFilterPage(response)) {
-      await response.body?.cancel();
+      void response.body?.cancel().catch(() => undefined);
       throw blocked();
     }
     return response;
@@ -1132,10 +1130,13 @@ function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetche
 }
 
 // The account service answers with JSON or an image, never with HTML. Cloudflare's own error pages
-// are HTML too, but they carry `cf-ray`, and a 5xx page is an outage that startup retries.
+// are HTML too, but they carry `cf-ray`. A self-hosted service behind nginx can send an HTML 404 or
+// 413, so only the statuses that a filter uses for its block page count.
+const FILTER_PAGE_STATUSES = new Set([200, 401, 403, 407, 451]);
+
 function isFilterPage(response: Response): boolean {
   return (
-    response.status < 500 &&
+    FILTER_PAGE_STATUSES.has(response.status) &&
     !response.headers.has("cf-ray") &&
     Boolean(response.headers.get("content-type")?.toLowerCase().startsWith("text/html"))
   );
@@ -1147,6 +1148,7 @@ function isInterceptedTlsError(error: unknown): boolean {
 }
 
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {
+  if (error instanceof NetworkBlockedError) return { code: "network_blocked", message: error.message };
   if (error instanceof AuthApiError) {
     return {
       code: error.code,
@@ -1158,8 +1160,7 @@ function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage:
 }
 
 function emailCodeRequestIssue(error: unknown): CentralAuthIssue {
-  if (error instanceof NetworkBlockedError) return { code: "network_blocked", message: error.message };
-  if (error instanceof AuthApiError) {
+  if (error instanceof AuthApiError || error instanceof NetworkBlockedError) {
     return centralAuthIssue(error, "email_sign_in_start_failed", sourceText("error.auth.codeNotSent"));
   }
   if (error instanceof DOMException && error.name === "TimeoutError") {
@@ -1202,7 +1203,9 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+// A block page gives the same answer on each attempt, so it is not transient.
 function isTransientStartupError(error: unknown): boolean {
+  if (error instanceof NetworkBlockedError) return false;
   return !(error instanceof AuthApiError) || error.status >= 500;
 }
 

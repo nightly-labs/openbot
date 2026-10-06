@@ -170,7 +170,8 @@ filter shows a block page, or when it inspects TLS with a root certificate that 
 not trust.
 
 OpenBot trusts the root certificates in the operating system store, as a browser does. If the
-company installs its inspection certificate on the computer, OpenBot accepts it. Do not turn off
+company installs its inspection certificate on the computer, OpenBot accepts it. Agent CLIs that
+OpenBot starts, such as Codex and Claude, check certificates by their own rules. Do not turn off
 certificate checks to work around a block.
 
 Ask the network administrator to allow these hosts over HTTPS (TCP 443) and WebSocket:
@@ -179,12 +180,13 @@ Ask the network administrator to allow these hosts over HTTPS (TCP 443) and WebS
 | --- | --- |
 | `api.openbot.run` | Accounts, sign-in, teams, and hosted servers |
 | `signal.openbot.run` | Connection setup for teams and remote servers |
-| `*.openbot.run` | Hosted servers and sites, `openbot.run`, and `analytics.openbot.run` |
+| `openbot.run` | Public site and images in invitation emails |
+| `*.openbot.run` | Hosted servers and sites, and `analytics.openbot.run` |
 | `github.com`, `*.githubusercontent.com` | App updates |
 
 Teams and remote servers also send WebRTC traffic to the other device or to the TURN relay that
-Signal names, on the UDP and TCP ports that it names. A filter that blocks WebRTC makes these connections slow or
-stops them. Conversations stay on the computer; the [privacy policy](../PRIVACY.md) lists what each
+Signal names, on the UDP and TCP ports that it names. A filter that blocks WebRTC makes these
+connections slow or stops them. Conversations stay on the computer; the [privacy policy](../PRIVACY.md) lists what each
 host receives.
 
 If the filter puts `openbot.run` in a blocked category, the administrator can ask the vendor to
