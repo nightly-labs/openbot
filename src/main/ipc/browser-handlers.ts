@@ -191,7 +191,7 @@ export function browserIpcHandlers({
       startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => runCauseEffect(browserView.start(tabId))),
       stopLiveView: handler(() => runCauseEffect(browserView.stop())),
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        browserPictureInPicture.open(bounds),
+        runCauseEffect(browserPictureInPicture.open(bounds)),
       ),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
