@@ -263,6 +263,12 @@ export class MailboxStore {
     return this.#deliveryGate.prepare(agentIds);
   }
 
+  /** The receipt of the message an idempotency key already stored, or null. */
+  receiptForKey(key: string): QueuedMessageReceipt | null {
+    const messageId = this.#state.idempotency[key];
+    return messageId ? this.#receipt(messageId) : null;
+  }
+
   deliveryForKey(key: string): DeliveryContext | null {
     const messageId = this.#state.idempotency[key];
     const delivery = this.#state.deliveries.find((item) => item.messageId === messageId);

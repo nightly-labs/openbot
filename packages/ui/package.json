@@ -107,6 +107,7 @@
     "./features/conversation/MarkdownMessageText": "./src/features/conversation/MarkdownMessageText.tsx",
     "./features/conversation/MessageNavigation": "./src/features/conversation/MessageNavigation.tsx",
     "./features/conversation/MessageRendering": "./src/features/conversation/MessageRendering.tsx",
+    "./features/conversation/PendingSendStatus": "./src/features/conversation/PendingSendStatus.tsx",
     "./features/conversation/QueuePanel": "./src/features/conversation/QueuePanel.tsx",
     "./features/conversation/RichMessageText": "./src/features/conversation/RichMessageText.tsx",
     "./features/conversation/RoutineRunHistory": "./src/features/conversation/RoutineRunHistory.tsx",

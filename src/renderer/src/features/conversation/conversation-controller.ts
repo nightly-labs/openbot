@@ -20,6 +20,7 @@ import {
 } from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
 import type { ComposerDraft, ConversationProps, RightPanelMode, SidebarFilePreview } from "./conversation-types";
+import { createPendingSendStore } from "./stores/pending-send-store";
 
 const SETTINGS_PANEL_DEFAULT = 296;
 const BROWSER_PANEL_DEFAULT = 380;
@@ -111,6 +112,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
+  // A send in flight belongs to the server it was sent to, so it outlives a server switch.
+  const pendingSends = createPendingSendStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   createEffect(
     () => {
@@ -260,6 +263,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
+    pendingSends,
     conversationErrors,
     setConversationErrors,
     composerErrors,

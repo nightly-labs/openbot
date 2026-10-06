@@ -23,6 +23,7 @@ import { createComposerStore, currentConversationTarget } from "./stores/compose
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
+import { PENDING_SEND_ID_PREFIX, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
 import { createScrollStore } from "./stores/scroll-store";
 import { createSearchStore } from "./stores/search-store";
@@ -56,6 +57,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
+    pendingSends,
     showComposerActions,
     setShowComposerActions,
     attachmentBusy,
@@ -285,11 +287,42 @@ export function createConversationViewScope(props: ConversationProps) {
   const viewIsMounted = createScopeGuard();
   let imageAttachmentPicker: HTMLInputElement | undefined;
   let contextAttachmentPicker: HTMLInputElement | undefined;
+  const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
+  // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
+  const drawnHostIds = createMemo(
+    () =>
+      new Set([
+        ...props.messages.map((message) => message.id),
+        ...presentedQueueDeliveries().map((delivery) => delivery.id),
+      ]),
+  );
+  // Filtered here as well as settled below, so the two rows never stand together for a frame.
+  const pendingMessages = createMemo(() =>
+    currentPendingSends()
+      .filter((send) => !(send.messageId && drawnHostIds().has(send.messageId)))
+      .map(pendingSendMessage),
+  );
+  /** The pending send a timeline row draws, by the row's message id. */
+  const pendingSendFor = (messageId: string | undefined) =>
+    messageId?.startsWith(PENDING_SEND_ID_PREFIX)
+      ? currentPendingSends().find((send) => `${PENDING_SEND_ID_PREFIX}${send.clientMessageId}` === messageId)
+      : undefined;
+  createEffect(
+    () => ({
+      target: currentTarget(),
+      sent: currentPendingSends().some((send) => send.state === "sent"),
+      drawnIds: drawnHostIds(),
+    }),
+    ({ target, sent, drawnIds }) => {
+      if (target && sent) pendingSends.settle(target, drawnIds);
+    },
+  );
   const scroll = createScrollStore({
     props,
     markingRead,
     setMarkingRead,
     setComposerError: setScopedComposerError,
+    pendingMessages,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -439,6 +472,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest: (value: boolean) => {
       stickToLatest = value;
     },
+    pendingSends,
     imageAttachmentPicker: () => imageAttachmentPicker,
     contextAttachmentPicker: () => contextAttachmentPicker,
   });
@@ -452,6 +486,9 @@ export function createConversationViewScope(props: ConversationProps) {
     reorderPresentedQueue,
     submitComposer,
     sendSelectionInstruction,
+    retryPendingSend,
+    editPendingSend,
+    dismissPendingSend,
   } = actions;
   createEffect(
     () => {
@@ -1140,6 +1177,10 @@ export function createConversationViewScope(props: ConversationProps) {
     revealSidebarFile,
     openWorkspaceFile,
     awaitingReplies,
+    pendingSendFor,
+    retryPendingSend,
+    editPendingSend,
+    dismissPendingSend,
     presentedQueueDeliveries,
     previewAttachment,
     props,

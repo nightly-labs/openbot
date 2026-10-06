@@ -25,7 +25,7 @@ describe("OpenBot connected desktop shell", () => {
     installOpenbotStub();
   });
 
-  it("keeps a failed send in the composer and clears it only after a successful retry", async () => {
+  it("keeps a failed send in the chat and retries it with the same client id", async () => {
     vi.mocked(window.openbot.agent.sendMessage).mockRejectedValueOnce(new Error("Mailbox unavailable"));
     render(() => <App />);
     await confirmOnboardingModel();
@@ -39,16 +39,20 @@ describe("OpenBot connected desktop shell", () => {
       }),
     );
     await fireEvent.keyDown(composer, { key: "Enter" });
+    // The composer is free at once; the message stays in the chat with why it failed.
     expect(await screen.findByText("Mailbox unavailable")).toBeInTheDocument();
-    expect(composer).toHaveTextContent("Run this Monday");
+    expect(screen.getByText("Not sent")).toBeInTheDocument();
+    expect(composer).toHaveTextContent("");
 
-    await fireEvent.keyDown(composer, { key: "Enter" });
-    await waitFor(() =>
-      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
-        { agentId: "chief", text: "Run this Monday", attachmentDraftIds: [] },
-        "local",
-      ),
-    );
+    await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(window.openbot.agent.sendMessage).toHaveBeenCalledTimes(2));
+    const [first, retried] = vi.mocked(window.openbot.agent.sendMessage).mock.calls;
+    // The same client id lets the host answer a retry of a stored message with its first receipt.
+    expect(retried).toEqual(first);
+    expect(first).toEqual([
+      { agentId: "chief", text: "Run this Monday", attachmentDraftIds: [], clientMessageId: expect.any(String) },
+      "local",
+    ]);
     await waitFor(() =>
       expect(window.openbot.agent.markConversationRead).toHaveBeenCalledWith(
         {
@@ -58,7 +62,7 @@ describe("OpenBot connected desktop shell", () => {
         "local",
       ),
     );
-    await waitFor(() => expect(composer).toHaveTextContent(""));
+    await waitFor(() => expect(screen.queryByText("Mailbox unavailable")).not.toBeInTheDocument());
     expect(trackAnalytics).toHaveBeenCalledWith("message_send", {
       provider: "codex",
       model: "gpt-5.6-luna",
@@ -316,6 +320,7 @@ describe("OpenBot connected desktop shell", () => {
           text: "Yes, today please",
           attachmentDraftIds: [],
           replyToMessageId: "assistant-1",
+          clientMessageId: expect.any(String),
         },
         "local",
       ),
@@ -704,7 +709,12 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.keyDown(composer, { key: "Enter" });
     await waitFor(() =>
       expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
-        { agentId: "chief", text: "Queue this while you wait", attachmentDraftIds: [] },
+        {
+          agentId: "chief",
+          text: "Queue this while you wait",
+          attachmentDraftIds: [],
+          clientMessageId: expect.any(String),
+        },
         "local",
       ),
     );

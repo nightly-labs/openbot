@@ -176,6 +176,25 @@ describe.sequential("AgentService: queue", () => {
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, "device-b-edit", "Edited on B", [], [])).toBe(true);
   });
 
+  it("stores a retried user message once, and keeps the same id from another sender apart", async () => {
+    const { store, mailbox } = stores(root);
+    // The active turn never completes, so every later message waits queued behind it.
+    const client = new FakeAgentClient("codex", "CODEX_DONE", false);
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.sendMessage({ agentId: "chief", text: "Active task" });
+    const input = { agentId: "chief", text: "Send once", clientMessageId: "client-1" };
+    // A retry while the first call still waits joins it; a retry after the answer gets its receipt.
+    const [first, concurrent] = await Promise.all([service.sendMessage(input), service.sendMessage(input)]);
+    const later = await service.sendMessage(input);
+    expect(concurrent).toEqual(first);
+    expect(later.messageId).toBe(first.messageId);
+    const other = await service.sendMessage(input, { id: "member-1", name: "Ada" });
+    expect(other.messageId).not.toBe(first.messageId);
+    expect(service.listQueue("chief").deliveries.filter((item) => item.text === "Send once")).toHaveLength(2);
+  });
+
   it("rejects a save that repeats a finished cancellation and keeps the original message", async () => {
     const { service: agentService, client, store, mailbox } = await startService(root, { provider: "codex" });
     service = agentService;

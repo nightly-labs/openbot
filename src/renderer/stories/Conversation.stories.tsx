@@ -1044,7 +1044,9 @@ const args: Parameters<typeof Conversation>[0] = {
   onSelectAgent: fn(),
   onUpdateAgent: async (_agentId: string, _updates: Omit<UpdateAgentInput, "agentId">) => undefined,
   onSetAgentAvatar: async (_agentId: string, _image: AvatarImageInput | null) => undefined,
-  onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => true,
+  onSendMessage: async (_body: string, _attachmentDraftIds: string[], _replyToMessageId: string | null) => ({
+    messageId: `storybook-sent-${Date.now()}`,
+  }),
   onMarkRead: async () => undefined,
   onTypingChange: fn(),
   onAnswerPrompt: async (_answers: Record<string, string[]>) => true,
@@ -1491,7 +1493,7 @@ export const SevenQueuedMessages: Story = {
     };
     const sendMessage = async (body: string, attachmentDraftIds: string[], replyToMessageId: string | null) => {
       const sent = await storyArgs.onSendMessage(body, attachmentDraftIds, replyToMessageId);
-      if (!sent || !storyArgs.activeTurnId) return sent;
+      if ("error" in sent || !storyArgs.activeTurnId) return sent;
       const id = `storybook-queued-${nextStoryDeliveryId++}`;
       setQueueState((current) => ({
         ...current,
@@ -1513,7 +1515,7 @@ export const SevenQueuedMessages: Story = {
           },
         ],
       }));
-      return true;
+      return { messageId: id };
     };
 
     return (

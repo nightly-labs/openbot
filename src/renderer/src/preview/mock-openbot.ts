@@ -47,6 +47,7 @@ import {
   type OpenWorkspaceFileInput,
   type ProviderDetectionSettings,
   type QueueDelivery,
+  type QueuedMessageReceipt,
   type QueueSnapshot,
   type RemoteDesktopSession,
   type ReorderQueueInput,
@@ -264,6 +265,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
   const agentTemplatePublications = new Map<string, AgentTemplatePublication>();
   let messageCounter = 10;
+  const sentReceipts = new Map<string, QueuedMessageReceipt>();
 
   /** Which providers have a key saved. The preview holds the flag only, like the real boundary. */
   const providerApiKeys = new Set<AgentProviderId>();
@@ -1346,12 +1348,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
       previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => mockFilePreview(input.path, "workspace-file"),
       sendMessage: async (input: SendMessageInput) => {
+        // As on a host, a repeated client id answers with the first receipt and stores nothing.
+        const repeated = input.clientMessageId ? sentReceipts.get(input.clientMessageId) : undefined;
+        if (repeated) return repeated;
         const messageId = `mock-message-${messageCounter++}`;
         const deliveryId = `mock-delivery-${messageCounter++}`;
         const turnId = `mock-turn-${messageCounter++}`;
         const createdAt = new Date().toISOString();
+        // The host names a user message by its delivery, which the receipt returns.
         const userMessage: ConversationMessage = {
-          id: messageId,
+          id: deliveryId,
           turnId,
           author: "user",
           source: "user",
@@ -1428,10 +1434,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           });
         }, 80);
 
-        return {
+        const receipt: QueuedMessageReceipt = {
           messageId,
           deliveries: [{ id: deliveryId, recipientAgentId: input.agentId, status: "running", position: null }],
         };
+        if (input.clientMessageId) sentReceipts.set(input.clientMessageId, receipt);
+        return receipt;
       },
       setMessageReaction: async (input: SetMessageReactionInput) => {
         updateSnapshot(input.agentId, (snapshot) => {

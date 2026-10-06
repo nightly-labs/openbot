@@ -155,7 +155,14 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
-  send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
+  /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
+  send(
+    agentId: string,
+    text: string,
+    attachmentDraftIds: string[],
+    replyToMessageId?: string | null,
+    clientMessageId?: string,
+  ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
   /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
@@ -704,16 +711,19 @@ export function createWebWorkspaceRuntime(
         { name: "avatar", mimeType: image.mimeType, base64: btoa(binary) },
       );
     },
-    async send(id, text, attachmentDraftIds, replyToMessageId = null) {
+    async send(id, text, attachmentDraftIds, replyToMessageId = null, clientMessageId) {
       const result = await request("POST", TEAM_API_ROUTES.agent.messages(id), {
         text,
         attachmentDraftIds,
         replyToMessageId,
         // The host uses this browser's zone for a routine the agent creates from the message.
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        // A host with `message-client-id-v1` answers a retry with the first receipt.
+        ...(clientMessageId ? { clientMessageId } : {}),
       });
       if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
       removeCompletedDrafts(attachmentDraftIds);
+      return result.deliveries[0]?.id ?? result.messageId;
     },
     stop: (id, turnId) => interruptAgentTurn(teamApi, id, turnId),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),

@@ -90,6 +90,8 @@ export async function routeAgentConversation(
           text: stringField(body, "text", true, INPUT_LIMITS.messageText),
           attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
           replyToMessageId: nullableString(body, "replyToMessageId"),
+          // Like the zone, a V5 request carries it only after the codec checked it is an identifier.
+          ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
         },
         memberSender(member),
         // A V5 request carries it only after the codec checked it names a zone.

@@ -1,5 +1,4 @@
 import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
-import { currentText } from "@openbot/ui/text";
 import { render, waitFor } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,7 +63,7 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     conversation: vi.fn().mockResolvedValue(page),
     markRead: vi.fn().mockResolvedValue({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     conversationReads: vi.fn().mockResolvedValue({}),
-    send: vi.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue("delivery-1"),
     stop: vi.fn(),
     setTyping: vi.fn(),
     queue: vi.fn(async (agentId: string) => ({ agentId, deliveries: [] })),
@@ -338,11 +337,8 @@ describe("web workspace state", () => {
     const workspace = await connected(app);
     expect(workspace.state.host?.hostId).toBe("host");
     expect(app.runtime.connect).toHaveBeenCalledOnce();
-    workspace.setDraft("Hello teammate");
-    await waitFor(() => expect(workspace.conversation()?.draft).toBe("Hello teammate"));
-    expect(await workspace.send()).toBe(true);
-    expect(app.runtime.send).toHaveBeenCalledWith("chief", "Hello teammate", [], null);
-    expect(workspace.conversation()?.draft).toBe("");
+    expect(await workspace.send("chief", "Hello teammate", [], null, "client-1")).toEqual({ messageId: "delivery-1" });
+    expect(app.runtime.send).toHaveBeenCalledWith("chief", "Hello teammate", [], null, "client-1");
     app.unmount();
     expect(app.runtime.dispose).toHaveBeenCalledOnce();
   });
@@ -675,21 +671,17 @@ describe("web workspace state", () => {
     expect(app.runtime.respondToTakeover).toHaveBeenCalledWith({ requestId: "takeover-one", decision: "complete" });
     expect(workspace.state.takeovers).toEqual([]);
   });
-  it("retains uncertain messages and never automatically resends", async () => {
+  it("answers a failed send with its reason and never resends it", async () => {
     const app = harness();
     const workspace = await connected(app);
     vi.mocked(app.runtime.send).mockRejectedValue(new Error("Disconnected"));
-    workspace.setDraft("Keep this draft");
-    await waitFor(() => expect(workspace.conversation()?.draft).toBe("Keep this draft"));
-    expect(await workspace.send()).toBe(false);
-    expect(workspace.conversation()?.uncertain).toBe(true);
-    // The composer shows the failure; a workspace error would show it again as a toast.
-    expect(workspace.conversation()?.sendError).toBe(currentText().t("webClient.error.deliveryUnconfirmed"));
+    // The pending message shows the failure; a workspace error would show it again as a toast.
+    expect(await workspace.send("chief", "Keep this message", [], null, "client-1")).toEqual({
+      error: "Disconnected",
+    });
     expect(workspace.state.error).toBeNull();
-    expect(workspace.conversation()?.draft).toBe("Keep this draft");
     app.events().connection({ hostId: "host", state: "online", message: null, resync: true });
     await waitFor(() => expect(app.runtime.conversation).toHaveBeenCalledTimes(2));
-    await workspace.send();
     expect(app.runtime.send).toHaveBeenCalledOnce();
   });
   it("streams deltas in place and applies the ones newer than a read in flight", async () => {
@@ -807,17 +799,15 @@ describe("web workspace state", () => {
     app.events().event("host", { type: "turn-completed", ...turn, status: "completed" });
     await waitFor(() => expect(workspace.state.progress.chief).toBeUndefined());
   });
-  it("keeps a sent draft confirmed when the history refresh fails", async () => {
+  it("keeps a sent message confirmed when the history refresh fails", async () => {
     const app = harness();
     const workspace = await connected(app);
-    workspace.setDraft("Keep this confirmed message");
     expect(workspace.state.status).toBe("online");
-    await waitFor(() => expect(workspace.conversation()?.draft).toBe("Keep this confirmed message"));
     vi.mocked(app.runtime.conversation).mockRejectedValueOnce(new Error("History is unavailable."));
 
-    await expect(workspace.send()).resolves.toBe(true);
-    expect(workspace.conversation()?.draft).toBe("");
-    expect(workspace.conversation()?.uncertain).toBe(false);
+    await expect(workspace.send("chief", "Keep this confirmed message", [], null)).resolves.toEqual({
+      messageId: "delivery-1",
+    });
     expect(app.runtime.send).toHaveBeenCalledOnce();
   });
   it("ignores an old host history response after a host switch", async () => {
