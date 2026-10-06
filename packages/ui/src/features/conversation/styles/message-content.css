@@ -834,7 +834,7 @@
 
 .message-data-table {
   width: 100%;
-  min-width: max(100%, calc(var(--message-data-table-columns) * 112px));
+  min-width: calc(var(--message-data-table-columns) * 112px);
   overflow: hidden;
   border: 1px solid var(--openbot-data-table-outer-border);
   border-radius: var(--openbot-radius-lg);
@@ -880,7 +880,8 @@
 }
 
 /* Links and code can be one long token. Break them inside the column, so they do not make the
-   table wider than the message. Plain words keep whole, so a short column does not split a word. */
+   table wider than the message. Auto table layout sizes a column to its longest plain word, so a
+   short column does not split a word. */
 :is(.message-data-table, .message-markdown-table) :is(th, td) :is(a, code) {
   overflow-wrap: anywhere;
 }

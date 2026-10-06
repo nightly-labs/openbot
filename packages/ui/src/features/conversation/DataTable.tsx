@@ -41,7 +41,7 @@ export function DataTable(props: { table: DataTableBlock; renderCell?: (text: st
             <For each={props.table.headers}>
               {(header, index) => (
                 <th scope="col" data-align={props.table.alignments[index()]}>
-                  <span class="message-data-table-cell-text">{props.renderCell?.(header) ?? header}</span>
+                  {props.renderCell?.(header) ?? header}
                 </th>
               )}
             </For>
@@ -53,9 +53,7 @@ export function DataTable(props: { table: DataTableBlock; renderCell?: (text: st
               <tr>
                 <For each={row}>
                   {(cell, index) => (
-                    <td data-align={props.table.alignments[index()]}>
-                      <span class="message-data-table-cell-text">{props.renderCell?.(cell) ?? cell}</span>
-                    </td>
+                    <td data-align={props.table.alignments[index()]}>{props.renderCell?.(cell) ?? cell}</td>
                   )}
                 </For>
               </tr>
