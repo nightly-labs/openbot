@@ -136,7 +136,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
-      fetch: options.fetch ?? fetch,
+      fetch: detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl),
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
       startupRetryDelaysMs: options.startupRetryDelaysMs ?? STARTUP_RETRY_DELAYS_MS,
@@ -904,9 +904,10 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   ): Promise<T> {
     const deadline = Date.now() + this.#options.startupRetryWindowMs;
     let retryIndex = 0;
+    let blocked: NetworkBlockedError | null = null;
     while (true) {
       const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) throw new Error(sourceText("error.auth.serviceUnavailable"));
+      if (remainingMs <= 0) throw blocked ?? new Error(sourceText("error.auth.serviceUnavailable"));
       try {
         return await this.#request(
           path,
@@ -919,6 +920,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         );
       } catch (error) {
         if (!isTransientStartupError(error)) throw error;
+        if (error instanceof NetworkBlockedError) blocked = error;
         const delayMs = Math.min(
           this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)] ?? 0,
           Math.max(0, deadline - Date.now()),
@@ -1032,6 +1034,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   #setInitializationError(error: unknown): CentralAuthState {
+    if (error instanceof NetworkBlockedError) {
+      return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
+    }
     const apiError = error instanceof AuthApiError ? error : null;
     const unavailable = !apiError || apiError.status >= 500;
     return this.#setState({
@@ -1092,6 +1097,55 @@ class AuthApiError extends Error {
   }
 }
 
+// A company firewall or proxy answers in place of the account service: with an HTML block page, or
+// by re-signing TLS with a root that this computer does not trust. Neither is the API's answer, so
+// its status must not reach a handler, such as the 401 that clears the stored session.
+class NetworkBlockedError extends Error {}
+
+const INTERCEPTED_TLS_CODES = new Set([
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_UNTRUSTED",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
+  const blocked = () =>
+    new NetworkBlockedError(sourceText("error.auth.networkBlocked", { host: new URL(apiUrl).host }));
+  return async (input, init) => {
+    let response: Response;
+    try {
+      response = await fetcher(input, init);
+    } catch (error) {
+      if (isInterceptedTlsError(error)) throw blocked();
+      throw error;
+    }
+    if (isFilterPage(response)) {
+      await response.body?.cancel();
+      throw blocked();
+    }
+    return response;
+  };
+}
+
+// The account service answers with JSON or an image, never with HTML. Cloudflare's own error pages
+// are HTML too, but they carry `cf-ray`, and a 5xx page is an outage that startup retries.
+function isFilterPage(response: Response): boolean {
+  return (
+    response.status < 500 &&
+    !response.headers.has("cf-ray") &&
+    Boolean(response.headers.get("content-type")?.toLowerCase().startsWith("text/html"))
+  );
+}
+
+function isInterceptedTlsError(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : undefined;
+  return isDynamicRecord(cause) && isString(cause.code) && INTERCEPTED_TLS_CODES.has(cause.code);
+}
+
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {
   if (error instanceof AuthApiError) {
     return {
@@ -1104,6 +1158,7 @@ function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage:
 }
 
 function emailCodeRequestIssue(error: unknown): CentralAuthIssue {
+  if (error instanceof NetworkBlockedError) return { code: "network_blocked", message: error.message };
   if (error instanceof AuthApiError) {
     return centralAuthIssue(error, "email_sign_in_start_failed", sourceText("error.auth.codeNotSent"));
   }

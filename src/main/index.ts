@@ -84,6 +84,7 @@ import { sendToRenderer } from "./renderer-ipc";
 import { RoutineWake } from "./routine-wake";
 import { takeServerModeEnvironment } from "./server-mode";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
+import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
@@ -102,6 +103,13 @@ function reportMainProcessFailure(origin: "uncaughtException" | "unhandledReject
   if (!crashTrace) return;
   crashTrace.record({ kind: "crash", name: origin, durationMs: 0, outcome: "reported" });
   void crashTrace.flush();
+}
+
+// Before any network call: a TLS-inspecting company network needs the roots that IT installed.
+try {
+  trustSystemCertificates();
+} catch (error) {
+  logger.warn("Could not read the system certificate store; Node uses its bundled roots only:", toLogValue(error));
 }
 
 const commandLineUserDataDirectory = app.commandLine.getSwitchValue("user-data-dir").trim();
