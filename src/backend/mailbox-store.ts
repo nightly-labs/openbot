@@ -20,6 +20,7 @@ import type {
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
@@ -619,7 +620,7 @@ export class MailboxStore {
           },
           createdAt: message.createdAt,
           status: "completed",
-          itemType: "agent-exchange",
+          itemType: AGENT_EXCHANGE_ITEM_TYPE,
         });
       }
 
@@ -675,7 +676,7 @@ export class MailboxStore {
           status: delivery.status === "failed" ? "failed" : "completed",
           itemType:
             message.sender.kind === "agent"
-              ? "agent-exchange"
+              ? AGENT_EXCHANGE_ITEM_TYPE
               : message.sender.kind === "routine"
                 ? "routine"
                 : undefined,
