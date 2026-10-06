@@ -1,6 +1,11 @@
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { combinedPromptInput, deliveryPromptInput } from "./agent/delivery-content";
+import {
+  CURRENT_MESSAGE_SEPARATOR,
+  combinedPromptInput,
+  type DeliveryInputItem,
+  deliveryPromptInput,
+} from "./agent/delivery-content";
 import { isMailboxMessageCopy, mergeProviderHistory, snapshotFromThread } from "./conversation-snapshots";
 import type { DeliveryContext } from "./mailbox-store";
 
@@ -307,7 +312,7 @@ describe("teammate messages in provider history", () => {
       ["planner"],
       agentNames,
     );
-    const handoff = `Continue this OpenBot conversation.\n\n--- current message ---\n${combined?.type === "text" ? combined.text : ""}`;
+    const handoff = `Continue this OpenBot conversation.${CURRENT_MESSAGE_SEPARATOR}${combined?.type === "text" ? combined.text : ""}`;
     const rebuilt = snapshotFromThread(
       "chief",
       providerThread(handoff),
@@ -339,11 +344,39 @@ describe("teammate messages in provider history", () => {
 
   it("finds a stored user copy of a teammate message that the mailbox holds", () => {
     const copy = message("provider-1", "user", promptText(reply));
-    expect(isMailboxMessageCopy(copy, new Set(["message-1"]))).toBe(true);
-    expect(isMailboxMessageCopy(copy, new Set())).toBe(false);
-    expect(isMailboxMessageCopy(message("user-1", "user", reply.delivery.text), new Set(["message-1"]))).toBe(false);
+    const mailbox = new Map([["message-1", message("delivery-1", "agent", reply.delivery.text)]]);
+    expect(isMailboxMessageCopy(copy, mailbox)).toBe(true);
+    expect(isMailboxMessageCopy(copy, new Map())).toBe(false);
+    expect(isMailboxMessageCopy(message("user-1", "user", reply.delivery.text), mailbox)).toBe(false);
+  });
+
+  it("keeps the user's own words that share a turn or a message with a teammate prompt", () => {
+    const mailbox = new Map([["message-1", message("delivery-1", "agent", reply.delivery.text)]]);
+    const pasted = message("user-1", "user", `${promptText(reply)}\n\nWhy is this shown as mine?`);
+    expect(isMailboxMessageCopy(pasted, mailbox)).toBe(false);
+    const quoted = message("user-2", "user", `Look at this:\n${promptText(reply)}`);
+    expect(isMailboxMessageCopy(quoted, mailbox)).toBe(false);
+
+    const [combined] = combinedPromptInput(
+      [deliveryPromptInput(reply, { agentNames, snapshot: snapshot([]), routineRun: null }), userText("Deploy now.")],
+      [],
+      agentNames,
+    );
+    const text = combined?.type === "text" ? combined.text : "";
+    const imported = snapshotFromThread(
+      "chief",
+      providerThread(text),
+      () => null,
+      () => null,
+    );
+    expect(imported.messages).toEqual([expect.objectContaining({ id: "provider-1", author: "user", text })]);
+    expect(isMailboxMessageCopy(message("provider-1", "user", text), mailbox)).toBe(false);
   });
 });
+
+function userText(text: string): DeliveryInputItem[] {
+  return [{ type: "text", text }];
+}
 
 function teammateDelivery(
   id: string,

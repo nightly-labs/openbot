@@ -2,7 +2,7 @@ import { sortConversationMessages } from "@openbot/contracts/conversation-order"
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
+import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem, ThreadResponse } from "./protocol";
 
@@ -150,13 +150,27 @@ function teammateMessage(
  * A copy of a teammate message that the mailbox holds too. An import that did not find the delivery
  * kept the message under the provider's ID: as one the user wrote, in builds before this check, or
  * rebuilt from its prompt. The mailbox row carries the same message, so the copy only repeats it.
+ * A row the user wrote is a copy only when its text is the mailbox text, so no words of theirs go.
  */
-export function isMailboxMessageCopy(message: ConversationMessage, mailboxMessageIds: ReadonlySet<string>): boolean {
+export function isMailboxMessageCopy(
+  message: ConversationMessage,
+  mailboxMessages: ReadonlyMap<string, ConversationMessage>,
+): boolean {
   if (message.delivery) return false;
-  if (message.exchange?.direction === "incoming") return mailboxMessageIds.has(message.exchange.messageId);
+  if (message.exchange?.direction === "incoming") return mailboxMessages.has(message.exchange.messageId);
   if (message.author !== "user") return false;
   const teammates = teammatePrompts(message.text);
-  return teammates.length > 0 && teammates.every((teammate) => mailboxMessageIds.has(teammate.messageId));
+  return (
+    teammates.length > 0 &&
+    teammates.every((teammate) => {
+      const original = mailboxMessages.get(teammate.messageId);
+      // A chat tag keeps its name, so the prompt text comes back without the agent list.
+      return (
+        original !== undefined &&
+        displayMessageReferences(original.text, original.attachments ?? [], new Map()).trimEnd() === teammate.text
+      );
+    })
+  );
 }
 
 export function mergeConversationSnapshots(

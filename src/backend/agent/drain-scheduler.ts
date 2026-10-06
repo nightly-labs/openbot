@@ -9,7 +9,12 @@ import type { MessagingThreads } from "../messaging/messaging-threads";
 import { decodeTurnResponse } from "../protocol";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { agentNamesById, combinedPromptInput, deliveryPromptInput } from "./delivery-content";
+import {
+  agentNamesById,
+  CURRENT_MESSAGE_SEPARATOR,
+  combinedPromptInput,
+  deliveryPromptInput,
+} from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
@@ -443,7 +448,7 @@ export class DrainScheduler {
         if (!handoff) return input;
         return input.map((item, index) =>
           index === 0 && item.type === "text"
-            ? { ...item, text: `${handoff}\n\n--- current message ---\n${item.text}` }
+            ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
             : item,
         );
       };

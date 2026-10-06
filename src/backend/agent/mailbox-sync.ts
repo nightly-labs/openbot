@@ -61,14 +61,14 @@ export class MailboxSync {
   syncMailboxMessages(snapshot: ConversationSnapshot): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
     const mailboxMessages = this.#mailbox.conversationMessages(snapshot.agentId);
-    const incomingMessageIds = new Set(
+    const incomingMessages = new Map(
       mailboxMessages.flatMap((message) =>
-        message.exchange?.direction === "incoming" ? [message.exchange.messageId] : [],
+        message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
       ),
     );
     for (let index = snapshot.messages.length - 1; index >= 0; index--) {
       const message = snapshot.messages[index];
-      if (message && isMailboxMessageCopy(message, incomingMessageIds)) snapshot.messages.splice(index, 1);
+      if (message && isMailboxMessageCopy(message, incomingMessages)) snapshot.messages.splice(index, 1);
     }
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
     for (const mailboxMessage of mailboxMessages) {

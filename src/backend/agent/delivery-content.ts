@@ -56,11 +56,16 @@ const TEAMMATE_HEADER = "Message from OpenBot teammate";
 const NO_ANSWER_LINE = "The sender does not want an answer. This message passes information to you.";
 const COLLABORATOR_SEPARATOR = "--- collaborator message ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
-const NO_ANSWER_FROM = "\n\nNo answer comes from ";
+const NO_ANSWER_FROM = "No answer comes from ";
+const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
+/** Between a provider handoff and the prompt of the turn that takes it. */
+export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
 const TEAMMATE_PROMPT = new RegExp(
   `^${TEAMMATE_HEADER} [^\\n]* \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)\\n(?:This replies to message: (\\S+)\\n)?`,
   "gm",
 );
+const COMBINED_HEADER = /^This turn starts with (\d+) messages\. Read all of them before you answer\.\n\n/;
+const UNANSWERED_TAIL = new RegExp(`\\n\\n${NO_ANSWER_FROM}[^\\n]*${escapeRegExp(NO_ANSWER_REASON)}$`);
 
 /** A teammate message as `deliveryPromptInput` wrote it into the provider prompt. */
 export interface TeammatePrompt {
@@ -75,32 +80,54 @@ export interface TeammatePrompt {
  * The teammate messages in a prompt that `deliveryPromptInput` wrote, alone, after a provider
  * handoff, or several in one turn. Provider history keeps only the prompt, so this is how an
  * imported turn finds its sender when its delivery ID is not known.
+ *
+ * Only a prompt that has this shape from start to end gives messages. Other text, such as a
+ * person's own message in the same turn or a pasted prompt, gives none, so it stays the person's.
  */
 export function teammatePrompts(prompt: string): TeammatePrompt[] {
-  const matches = [...prompt.matchAll(TEAMMATE_PROMPT)];
-  return matches.flatMap((match, index) => {
+  const handoff = prompt.lastIndexOf(CURRENT_MESSAGE_SEPARATOR);
+  return (
+    currentTeammatePrompts(prompt) ??
+    (handoff < 0 ? null : currentTeammatePrompts(prompt.slice(handoff + CURRENT_MESSAGE_SEPARATOR.length))) ??
+    []
+  );
+}
+
+function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
+  const combined = COMBINED_HEADER.exec(prompt);
+  const count = combined ? Number(combined[1]) : 1;
+  let current = combined ? prompt.slice(combined[0].length) : prompt;
+  const unanswered = UNANSWERED_TAIL.exec(current);
+  if (unanswered) current = current.slice(0, unanswered.index);
+  // Several messages are joined by blank lines. A single message can quote a prompt in its text.
+  const starts = [...current.matchAll(TEAMMATE_PROMPT)].filter(
+    (match) => match.index === 0 || (count > 1 && current.startsWith("\n\n", match.index - 2)),
+  );
+  if (starts[0]?.index !== 0 || (count > 1 && starts.length !== count)) return null;
+  const messages: TeammatePrompt[] = [];
+  for (const [index, match] of starts.slice(0, count).entries()) {
     const [header, senderAgentId, messageId, replyToMessageId] = match;
-    if (!senderAgentId || !messageId) return [];
-    const end = matches[index + 1]?.index ?? prompt.length;
-    const segment = prompt.slice(match.index + header.length, end);
+    if (!senderAgentId || !messageId) return null;
+    const segment = current.slice(match.index + header.length, starts[index + 1]?.index ?? current.length);
     const separator = segment.indexOf(`\n${COLLABORATOR_SEPARATOR}\n`);
-    if (separator < 0) return [];
+    if (separator < 0) return null;
     const preamble = segment.slice(0, separator);
     let text = segment.slice(separator + COLLABORATOR_SEPARATOR.length + 2);
     const attachedFiles = text.lastIndexOf(ATTACHED_FILES_HEADER);
     if (attachedFiles >= 0) text = text.slice(0, attachedFiles);
-    const noAnswerFrom = index === matches.length - 1 ? text.lastIndexOf(NO_ANSWER_FROM) : -1;
-    if (noAnswerFrom >= 0) text = text.slice(0, noAnswerFrom);
-    return [
-      {
-        senderAgentId,
-        messageId,
-        replyToMessageId: replyToMessageId ?? null,
-        expectsReply: !preamble.split("\n").includes(NO_ANSWER_LINE),
-        text: text.trimEnd(),
-      },
-    ];
-  });
+    messages.push({
+      senderAgentId,
+      messageId,
+      replyToMessageId: replyToMessageId ?? null,
+      expectsReply: !preamble.split("\n").includes(NO_ANSWER_LINE),
+      text: text.trimEnd(),
+    });
+  }
+  return messages;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -207,9 +234,7 @@ export function combinedPromptInput(
   const text = [
     inputs.length > 1 ? `This turn starts with ${inputs.length} messages. Read all of them before you answer.` : null,
     ...texts,
-    names.length
-      ? `${NO_ANSWER_FROM.trimStart()}${names.join(", ")}: the request to them ended before they answered. Do not wait for them.`
-      : null,
+    names.length ? `${NO_ANSWER_FROM}${names.join(", ")}${NO_ANSWER_REASON}` : null,
   ]
     .filter(Boolean)
     .join("\n\n");
