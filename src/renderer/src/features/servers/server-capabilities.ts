@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
+import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
 
 /**
  * Whether a server can be asked for a capability-gated feature. A local server
@@ -35,6 +36,7 @@ export function serverSupportsCapability(
       capability === "providers-v1" ||
       capability === "providers-v2" ||
       capability === "providers-v3" ||
+      capability === "providers-v4" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "context-reset-v1" ||
@@ -66,11 +68,17 @@ export function serverCanAdminister(
 }
 
 /**
- * The providers that a code sign-in reaches on `server`. A host with `providers-v3` signs in Codex,
- * Claude and Grok. This computer, and an older host, sign in with a code only the providers whose
- * descriptor says so: this computer has a browser for the others.
+ * The providers that a code sign-in reaches on `server`. A host with `providers-v4` signs in Codex,
+ * Grok, Cursor and Cline, and Claude when it also has `providers-v3`, which only a host that can run
+ * the Claude pasted code advertises. A host with `providers-v3` alone signs in Codex, Claude and Grok.
+ * This computer, and an older host, sign in with a code only the providers whose descriptor says so:
+ * this computer has a browser for the others.
  */
 export function codeSignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
+  if (server?.kind === "remote" && serverSupportsCapability(server, "providers-v4")) {
+    const paste = serverSupportsCapability(server, "providers-v3");
+    return PROVIDERS_V4_SIGN_IN_PROVIDERS.filter((provider) => paste || provider !== "claude");
+  }
   if (server?.kind === "remote" && serverSupportsCapability(server, "providers-v3"))
     return PROVIDERS_SIGN_IN_V3_PROVIDERS;
   return AGENT_PROVIDERS.filter((provider) => agentProviderDescriptor(provider).codeSignIn);

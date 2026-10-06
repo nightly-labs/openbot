@@ -220,4 +220,12 @@ export type ProviderCodeLoginStart =
       /** Epoch milliseconds, as for `code`. */
       expiresAt: number;
     }
+  | {
+      /** The user signs in on the page, and the provider's CLI sees it by itself. No code is shown or copied. */
+      kind: "link";
+      /** The provider's sign-in page. Always https. */
+      verificationUrl: string;
+      /** Epoch milliseconds, as for `code`. */
+      expiresAt: number;
+    }
   | { kind: "connected" };

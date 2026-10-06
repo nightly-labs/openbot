@@ -78,6 +78,7 @@
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",
     "./team-protocol/providers-v3": "./src/team-protocol/providers-v3.ts",
+    "./team-protocol/providers-v4": "./src/team-protocol/providers-v4.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
     "./team-protocol/hosted-sites-v1": "./src/team-protocol/hosted-sites-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",

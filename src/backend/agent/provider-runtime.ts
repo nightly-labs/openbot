@@ -831,6 +831,7 @@ export class ProviderRuntime implements ProviderPort {
       const expiresAt = Date.now() + command.timeoutMs;
       // A CLI that exits or prints no link rejects here; its `done` then records the failure.
       const prompt = await pending.code.prompt;
+      if (prompt.flow === "link") return { kind: "link", verificationUrl: prompt.verificationUrl, expiresAt };
       return prompt.flow === "paste"
         ? { kind: "paste", verificationUrl: prompt.verificationUrl, expiresAt }
         : {

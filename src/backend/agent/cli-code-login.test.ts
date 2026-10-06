@@ -26,6 +26,13 @@ const GROK_OUTPUT = [
 ].join("\n");
 const CLAUDE_URL = "https://claude.com/cai/oauth/authorize?code=true&code_challenge=feIha1bB&state=wKR2LafO";
 const CLAUDE_OUTPUT = `Opening browser to sign in…\r\nIf the browser didn't open, visit: \u001b]8;;${CLAUDE_URL}\u0007${CLAUDE_URL}\u001b]8;;\u0007\r\nPaste code here if prompted > `;
+// Cursor 2026.10.01 `login` with `NO_OPEN_BROWSER=1`, on stdout, and Cline 3.0.68 `auth -p cline`,
+// both on macOS. The challenge and the code are shortened.
+const CURSOR_URL =
+  "https://cursor.com/loginDeepControl?challenge=km32Nwn&uuid=69f1edda-7ada&mode=login&redirectTarget=cli&supportsSelectedTeamLogin=true";
+const CURSOR_OUTPUT = `Starting login process...\nAuthenticating with Cursor...\nWaiting for browser authentication...\nOpen a browser and navigate to this link: ${CURSOR_URL}\n`;
+const CLINE_OUTPUT =
+  "\u001b[2m[auth] Enter this code in your browser: QVFH-LKDN\u001b[0m\n\u001b[2m[auth] https://authkit.cline.bot/device?user_code=QVFH-LKDN\u001b[0m\n";
 
 describe("parseCliCodePrompt", () => {
   it("reads the Grok device code only once its line is printed", () => {
@@ -42,6 +49,22 @@ describe("parseCliCodePrompt", () => {
   it("reads the Claude link out of its hyperlink only once the paste prompt shows", () => {
     expect(parseCliCodePrompt("paste", CLAUDE_OUTPUT)).toEqual({ flow: "paste", verificationUrl: CLAUDE_URL });
     expect(parseCliCodePrompt("paste", CLAUDE_OUTPUT.slice(0, CLAUDE_OUTPUT.indexOf("Paste")))).toBeNull();
+  });
+
+  it("reads the Cursor link only once its line has ended", () => {
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT)).toEqual({ flow: "link", verificationUrl: CURSOR_URL });
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT.slice(0, CURSOR_OUTPUT.indexOf("&mode")))).toBeNull();
+    expect(parseCliCodePrompt("link", CURSOR_OUTPUT.trimEnd())).toBeNull();
+  });
+
+  it("reads the Cline device code that comes before its link", () => {
+    expect(parseCliCodePrompt("device", CLINE_OUTPUT)).toEqual({
+      flow: "device",
+      userCode: "QVFH-LKDN",
+      verificationUrl: "https://authkit.cline.bot/device",
+      verificationUrlComplete: "https://authkit.cline.bot/device?user_code=QVFH-LKDN",
+    });
+    expect(parseCliCodePrompt("device", CLINE_OUTPUT.slice(0, CLINE_OUTPUT.indexOf("user_code")))).toBeNull();
   });
 });
 

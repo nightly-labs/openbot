@@ -70,6 +70,8 @@ export const messages = {
   "provider.codeLogin.pasteSubmit": "Devam et",
   "provider.codeLogin.pasteExpired": "Bu giriş işlemi durduruldu.",
   "provider.codeLogin.pasteExpiresIn": "Sizi bekliyor. Bu giriş işlemi {time} içinde sona erecek.",
+  "provider.codeLogin.linkTitle": "{name} hesabına başka bir cihazda giriş yapın",
+  "provider.codeLogin.linkStep": "{name} hesabına giriş yapın. OpenBot kendiliğinden devam eder.",
 
   "provider.picker.noEndpoints": "Henüz uç nokta yok",
   "provider.picker.customCounts": "{endpoints} · {agents}",

@@ -14,6 +14,7 @@ import {
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v3";
+import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import {
   cancelProviderCodeLogin,
   cancelProviderRuntime,
@@ -74,7 +75,14 @@ function webProviderAdmin(
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider, signInRoutes()),
-    submitCodeLogin: async (input, serverId) => submitProviderCodeLogin(request(serverId), input),
+    submitCodeLogin: async (input, serverId) => {
+      const routes = signInRoutes();
+      return submitProviderCodeLogin(
+        request(serverId),
+        input,
+        routes === PROVIDERS_V4_ROUTES ? routes : PROVIDERS_SIGN_IN_V3_ROUTES,
+      );
+    },
     cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider, signInRoutes()),
     getApiKeyState: async (provider, serverId) => getProviderApiKeyState(request(serverId), provider),
     setApiKey: async (input, serverId) => setProviderApiKey(request(serverId), input),
@@ -108,14 +116,18 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
   const admin = webProviderAdmin(
     options.request,
     () =>
-      serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
-        ? PROVIDERS_RUNTIMES_V2_ROUTES
-        : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), PROVIDERS_V4_CAPABILITY)
+        ? PROVIDERS_V4_ROUTES
+        : serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
+          ? PROVIDERS_RUNTIMES_V2_ROUTES
+          : PROVIDERS_ADMIN_ROUTES,
     // `providers-v1` signs in Codex only; the picker offers no other provider on such a host.
     () =>
-      serverSupportsCapability(options.server(), PROVIDERS_SIGN_IN_V3_CAPABILITY)
-        ? PROVIDERS_SIGN_IN_V3_ROUTES
-        : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), PROVIDERS_V4_CAPABILITY)
+        ? PROVIDERS_V4_ROUTES
+        : serverSupportsCapability(options.server(), PROVIDERS_SIGN_IN_V3_CAPABILITY)
+          ? PROVIDERS_SIGN_IN_V3_ROUTES
+          : PROVIDERS_ADMIN_ROUTES,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(

@@ -25,6 +25,7 @@ import {
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v3";
+import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { sourceText } from "@openbot/i18n/source";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import type { AgentService } from "../../backend/agent-service";
@@ -78,19 +79,24 @@ export function providerAdminIpcHandlers({
     return remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost);
   }
 
-  /** The runtime routes of the host: `providers-v2` includes Gemini, and `providers-v1` does not. */
+  /**
+   * The runtime routes of the host: `providers-v4` includes Cursor and Cline, `providers-v2` Gemini,
+   * and `providers-v1` none of them.
+   */
   function runtimeRoutes(serverId: string) {
+    if (remoteServers.supportsCapability(serverId, PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_ROUTES;
     return remoteServers.supportsCapability(serverId, PROVIDERS_RUNTIMES_V2_CAPABILITY)
       ? PROVIDERS_RUNTIMES_V2_ROUTES
       : PROVIDERS_ADMIN_ROUTES;
   }
 
   /**
-   * The sign-in routes of the host: `providers-v3` signs in Codex, Claude and Grok. An older host
-   * has `providers-v1` only, which signs in Codex, so another provider is refused here and not by
-   * the host.
+   * The sign-in routes of the host: `providers-v4` signs in Codex, Claude, Grok, Cursor and Cline,
+   * and `providers-v3` Codex, Claude and Grok. An older host has `providers-v1` only, which signs in
+   * Codex, so another provider is refused here and not by the host.
    */
   function signInRoutes(serverId: string, provider: AgentProviderId) {
+    if (remoteServers.supportsCapability(serverId, PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_ROUTES;
     if (remoteServers.supportsCapability(serverId, PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_ROUTES;
     if (provider !== "codex") throw new Error(sourceText("error.provider.localOnly"));
     return PROVIDERS_ADMIN_ROUTES;
@@ -109,6 +115,8 @@ export function providerAdminIpcHandlers({
       submitCodeLogin: scopedHandler(parseSubmitCodeLoginInput, {
         local: ({ provider, code }) => service.submitProviderCodeLogin(provider, code),
         remote: (input, serverId) => {
+          if (remoteServers.supportsCapability(serverId, PROVIDERS_V4_CAPABILITY))
+            return remoteChange(serverId, PROVIDERS_V4_ROUTES.codeLoginSubmit, input);
           if (!remoteServers.supportsCapability(serverId, PROVIDERS_SIGN_IN_V3_CAPABILITY))
             throw new Error(sourceText("error.provider.localOnly"));
           return remoteChange(serverId, PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit, input);

@@ -78,6 +78,8 @@ export const messages = {
   "provider.codeLogin.pasteSubmit": "Continuer",
   "provider.codeLogin.pasteExpired": "Cette connexion s’est arrêtée.",
   "provider.codeLogin.pasteExpiresIn": "En attente. Cette connexion s’arrête dans {time}.",
+  "provider.codeLogin.linkTitle": "Connectez-vous à {name} sur un autre appareil",
+  "provider.codeLogin.linkStep": "Connectez-vous à {name}. OpenBot continue tout seul.",
 
   "provider.picker.noEndpoints": "Aucun point de terminaison pour l’instant",
   "provider.picker.customCounts": "{endpoints} · {agents}",

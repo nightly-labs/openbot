@@ -1,18 +1,21 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
+import { cliSpawnTarget } from "../cli";
 import { waitForSuccessfulProcess } from "./provider-status";
 
 /**
  * What a provider CLI prints for a sign-in the user finishes on another device.
  *
  * `device` is a device code: the user opens the page, confirms the code, and the CLI sees the
- * approval by itself (Grok). `paste` is an authorization code the provider's page shows after the
- * sign-in, which the user copies back and OpenBot types into the CLI's prompt (Claude).
+ * approval by itself (Grok, Cline). `paste` is an authorization code the provider's page shows after
+ * the sign-in, which the user copies back and OpenBot types into the CLI's prompt (Claude). `link` is
+ * a page that signs the CLI in by itself, with no code to confirm or copy (Cursor).
  */
 export type CliCodePrompt =
   | { flow: "device"; userCode: string; verificationUrl: string; verificationUrlComplete: string | null }
-  | { flow: "paste"; verificationUrl: string };
+  | { flow: "paste"; verificationUrl: string }
+  | { flow: "link"; verificationUrl: string };
 
 export interface CliCodeLogin {
   child: ChildProcess;
@@ -51,9 +54,14 @@ export function startCliCodeLogin(options: {
 }): CliCodeLogin {
   const platform = options.platform ?? process.platform;
   const command = options.flow === "paste" ? terminalCommand(platform, options.argv) : null;
-  const child = spawn(command?.file ?? options.executable, command?.args ?? [...options.argv], {
+  // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
+  const target = command
+    ? { command: command.file, args: command.args, windowsVerbatimArguments: false }
+    : cliSpawnTarget(options.executable, options.argv, platform);
+  const child = spawn(target.command, target.args, {
     cwd: process.cwd(),
     env: { ...process.env, ...options.env, ...(command ? { OPENBOT_LOGIN_EXECUTABLE: options.executable } : {}) },
+    windowsVerbatimArguments: target.windowsVerbatimArguments,
     stdio: ["pipe", "pipe", "pipe"],
     shell: false,
     windowsHide: platform === "win32",
@@ -145,12 +153,13 @@ function shellQuote(value: string): string {
 
 /**
  * Reads the link, and the code for a device sign-in, from what the CLI has printed so far. Returns
- * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263);
- * the tests hold samples of both.
+ * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263,
+ * Cursor 2026.10.01, Cline 3.0.68); the tests hold samples of each.
  */
 export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
-  const url = text.match(/https:\/\/[^\s"'<>]+/)?.[0];
+  // Only a link the line has ended after: a chunk can stop in the middle of one.
+  const url = text.match(/https:\/\/[^\s"'<>]+(?=\s)/)?.[0];
   if (!url) return null;
   let parsed: URL;
   try {
@@ -162,8 +171,8 @@ export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string):
     // The CLI reads stdin only once it shows the prompt, so a code typed before then is lost.
     return /paste code/i.test(text) ? { flow, verificationUrl: parsed.href } : null;
   }
-  // The code line comes after the link, so once it is there the link is not cut off mid-chunk.
-  const userCode = codeAfterConfirmLine(text);
+  if (flow === "link") return { flow, verificationUrl: parsed.href };
+  const userCode = codeAfterConfirmLine(text) ?? codeOnEnterLine(text);
   if (!userCode) return null;
   const base = new URL(parsed.href);
   base.search = "";
@@ -185,6 +194,11 @@ function codeAfterConfirmLine(text: string): string | null {
   if (confirm < 0) return null;
   const code = lines.slice(confirm + 1, -1).find(Boolean);
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
+}
+
+/** The code at the end of an "Enter this code in your browser: CODE" line that has ended (Cline). */
+function codeOnEnterLine(text: string): string | null {
+  return text.match(/enter this code[^:\n]*:[ \t]*([A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*)[ \t]*\n/i)?.[1] ?? null;
 }
 
 const ESC = 0x1b;

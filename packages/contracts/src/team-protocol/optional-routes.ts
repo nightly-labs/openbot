@@ -15,6 +15,7 @@ import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
 import { PROVIDERS_ADMIN_CODECS } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CODECS } from "./providers-v2";
 import { PROVIDERS_SIGN_IN_V3_CODECS } from "./providers-v3";
+import { PROVIDERS_V4_CODECS } from "./providers-v4";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 
@@ -29,6 +30,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_ADMIN_CODECS,
   ...PROVIDERS_RUNTIMES_V2_CODECS,
   ...PROVIDERS_SIGN_IN_V3_CODECS,
+  ...PROVIDERS_V4_CODECS,
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,

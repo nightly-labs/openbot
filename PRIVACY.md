@@ -402,7 +402,10 @@ An owner or admin of a joined server can manage its host from their own computer
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
 provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
-No response returns a key, and neither computer writes request bodies to its logs.
+No response returns a key, and neither computer writes request bodies to its logs. For a sign-in on
+another device, the host sends the provider's sign-in link, and for Codex, Grok and Cline its
+one-time code, to that computer or browser, which shows them and opens the link only when the admin
+asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
 ## Other network connections
 
@@ -618,8 +621,8 @@ Cursor's sign-in page in your browser, or the CLI uses `CURSOR_API_KEY` from the
 started OpenBot. OpenBot gives that key only to the local CLI, in its environment, and does
 not store it. The CLI keeps its login and session files
 in `~/.cursor` (on Linux, the login is in `~/.config/cursor`). OpenBot does not read, copy, or
-upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Cursor agents stay
-on this computer: OpenBot does not show them to team members.
+upload these files. Cursor's terms apply: <https://cursor.com/terms-of-service>. Team members see
+the host's Cursor agents, as for the other providers, when their app supports Cursor.
 
 ### Cline
 
@@ -631,8 +634,8 @@ Sign in opens Cline's sign-in page in your browser, or the CLI uses `CLINE_API_K
 environment that started OpenBot. OpenBot gives that key only to the local CLI, in its environment,
 and does not store it. The CLI keeps its login and session files in `~/.cline`, or in `$CLINE_DIR`.
 OpenBot does not read, copy, or upload these files. Cline's terms apply:
-<https://cline.bot/tos>. Cline agents stay on this computer: OpenBot does not show them to team
-members.
+<https://cline.bot/tos>. Team members see the host's Cline agents, as
+for the other providers, when their app supports Cline.
 
 ### Local model servers
 
