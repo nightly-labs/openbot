@@ -44,6 +44,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { sourceText } from "@openbot/i18n/source";
+import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
 
 export const JSON_LIMIT = 1024 * 1024;
@@ -190,16 +191,10 @@ export function parseBrowserBounds(value: unknown): {
 }
 
 export async function readJson(request: IncomingMessage): Promise<DynamicRecord> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > JSON_LIMIT) throw new HttpError(413, sourceText("error.team.requestTooLarge"));
-    chunks.push(bytes);
-  }
+  const body = await readBodyWithin(request, JSON_LIMIT);
+  if (body === null) throw new HttpError(413, sourceText("error.team.requestTooLarge"));
   try {
-    const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    const value = JSON.parse(body.toString("utf8"));
     const path = request.url ?? "/";
     const sideRoute = teamSideRouteCodec(path);
     if (sideRoute) {
