@@ -21,7 +21,7 @@ export interface CursorPoint {
 }
 
 /** One planned position, `t` milliseconds after the move starts. */
-export interface CursorSample extends CursorPoint {
+interface CursorSample extends CursorPoint {
   t: number;
 }
 
