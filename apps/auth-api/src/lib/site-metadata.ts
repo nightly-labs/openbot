@@ -15,6 +15,13 @@ export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
 export const OPENBOT_X_HANDLE = "@OpenBot_";
 const OPENBOT_X_URL = "https://x.com/OpenBot_";
 const OPENBOT_REPOSITORY_URL = "https://github.com/nightly-labs/openbot";
+const OPENBOT_PRODUCT_HUNT_URL = "https://www.producthunt.com/products/openbot-3";
+const OPENBOT_LICENSE_URL = "https://polyformproject.org/licenses/noncommercial/1.0.0/";
+// One id for each entity, so that every page describes the same organization,
+// site and app, and an assistant can join what the pages say about each.
+const OPENBOT_ORGANIZATION_ID = `${OPENBOT_SITE_URL}#organization`;
+const OPENBOT_WEBSITE_ID = `${OPENBOT_SITE_URL}#website`;
+const OPENBOT_APPLICATION_ID = `${OPENBOT_SITE_URL}#app`;
 /** Square, as schema.org wants for a publisher logo. */
 export const OPENBOT_LOGO_URL = `${OPENBOT_SITE_URL}icon-512x512.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
@@ -43,58 +50,82 @@ export function siteUrlForPage(pageUrl: URL): string {
   return OPENBOT_PRODUCTION_HOSTS.has(pageUrl.hostname) ? OPENBOT_SITE_URL : `${pageUrl.origin}/`;
 }
 
-export const OPENBOT_SOFTWARE_APPLICATION = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "OpenBot",
-  url: OPENBOT_SITE_URL,
-  image: OPENBOT_SOCIAL_IMAGE_URL,
-  description: OPENBOT_SITE_DESCRIPTION,
-  applicationCategory: "DeveloperApplication",
-  applicationSubCategory: "AI agent app",
-  operatingSystem: ["macOS 13 or later (Apple silicon or Intel)", "Windows 10 or later (x64)", "Linux (x64 or arm64)"],
-  // The installers themselves: schema.org's `downloadUrl` is the file, not a page about it.
-  downloadUrl: [
-    OPENBOT_DOWNLOAD_LINKS.macos,
-    OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
-    OPENBOT_DOWNLOAD_LINKS.windows,
-    OPENBOT_DOWNLOAD_LINKS.linux,
-    OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux,
-  ].map((path) => new URL(path, OPENBOT_SITE_URL).toString()),
-  // What people ask an assistant for. Keep it to what the released app does.
-  featureList: [
-    "Runs Codex, Claude Code, Gemini (Antigravity), Grok and OpenCode agents",
-    "Uses your ChatGPT, Claude, Google AI Pro or Ultra, or Grok plan",
-    "Any OpenAI-compatible model server, also one on your own computer",
-    "Agents that work as a team and keep their workspace and history",
-    "Chats, files and workspaces stay on your computer",
-    "iPhone and Android apps that connect to your own computer",
-    "Free for noncommercial use, with no account needed",
-  ],
-  isAccessibleForFree: true,
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
-  sameAs: [OPENBOT_REPOSITORY_URL],
-} as const;
+/** What the app's structured data names and that this file can not import: see the note at the top. */
+export interface OpenBotApplicationFacts {
+  /** The newest dated release. */
+  release: { version: string; date: string } | undefined;
+  /** An absolute URL of a picture of the app. */
+  screenshot: string;
+}
+
+export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "@id": OPENBOT_APPLICATION_ID,
+    name: "OpenBot",
+    url: OPENBOT_SITE_URL,
+    image: OPENBOT_SOCIAL_IMAGE_URL,
+    description: OPENBOT_SITE_DESCRIPTION,
+    applicationCategory: "DeveloperApplication",
+    applicationSubCategory: "AI agent app",
+    operatingSystem: [
+      "macOS 13 or later (Apple silicon or Intel)",
+      "Windows 10 or later (x64)",
+      "Linux (x64 or arm64)",
+    ],
+    // The installers themselves: schema.org's `downloadUrl` is the file, not a page about it.
+    downloadUrl: [
+      OPENBOT_DOWNLOAD_LINKS.macos,
+      OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
+      OPENBOT_DOWNLOAD_LINKS.windows,
+      OPENBOT_DOWNLOAD_LINKS.linux,
+      OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux,
+    ].map((path) => new URL(path, OPENBOT_SITE_URL).toString()),
+    // What people ask an assistant for. Keep it to what the released app does.
+    featureList: [
+      "Runs Codex, Claude Code, Gemini (Antigravity), Grok and OpenCode agents",
+      "Uses your ChatGPT, Claude, Google AI Pro or Ultra, or Grok plan",
+      "Any OpenAI-compatible model server, also one on your own computer",
+      "Agents that work as a team and keep their workspace and history",
+      "Chats, files and workspaces stay on your computer",
+      "iPhone and Android apps that connect to your own computer",
+      "Free for noncommercial use, with no account needed",
+    ],
+    isAccessibleForFree: true,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    ...(facts.release ? { softwareVersion: facts.release.version, dateModified: facts.release.date } : {}),
+    screenshot: facts.screenshot,
+    license: OPENBOT_LICENSE_URL,
+    publisher: { "@id": OPENBOT_ORGANIZATION_ID },
+    sameAs: [OPENBOT_REPOSITORY_URL, OPENBOT_PRODUCT_HUNT_URL],
+  } as const;
+}
+
+export type OpenBotSoftwareApplication = ReturnType<typeof openBotSoftwareApplication>;
 
 // Search engines read these two for the site name and the logo next to a result.
 const OPENBOT_ORGANIZATION = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": OPENBOT_ORGANIZATION_ID,
   name: "OpenBot",
   url: OPENBOT_SITE_URL,
   logo: OPENBOT_LOGO_URL,
-  sameAs: [OPENBOT_REPOSITORY_URL, OPENBOT_X_URL],
+  sameAs: [OPENBOT_REPOSITORY_URL, OPENBOT_X_URL, OPENBOT_PRODUCT_HUNT_URL],
 } as const;
 
 const OPENBOT_WEBSITE = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": OPENBOT_WEBSITE_ID,
   name: "OpenBot",
   url: OPENBOT_SITE_URL,
+  publisher: { "@id": OPENBOT_ORGANIZATION_ID },
 } as const;
 
 export const OPENBOT_SECURITY_HEADERS = {
@@ -140,10 +171,10 @@ export function openBotRootHead(interLatinFont: string) {
   };
 }
 
-export function openBotHomeHead() {
+export function openBotHomeHead(application: OpenBotSoftwareApplication) {
   return {
     meta: [
-      { "script:ld+json": OPENBOT_SOFTWARE_APPLICATION },
+      { "script:ld+json": application },
       { "script:ld+json": OPENBOT_ORGANIZATION },
       { "script:ld+json": OPENBOT_WEBSITE },
       { property: "og:type", content: "website" },
