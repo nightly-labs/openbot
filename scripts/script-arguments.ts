@@ -1,4 +1,5 @@
 import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { redactText } from "@openbot/logging";
 
 // One strict parser for the dev scripts that change or read developer state. A
 // script that ignored a flag it did not know used to run anyway, so a mistyped
@@ -34,7 +35,8 @@ export function readScriptArguments<const Options extends ParseArgsOptionsConfig
       throw new Error(`Unexpected argument '${parsed.positionals[0]}'.`);
     }
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${spec.usage}\n`);
+    // The message repeats what was typed, which can be a token pasted in the wrong place.
+    process.stderr.write(`${redactText(error instanceof Error ? error.message : String(error))}\n\n${spec.usage}\n`);
     process.exit(2);
   }
   // A boolean option is present in `values` only when it was passed.

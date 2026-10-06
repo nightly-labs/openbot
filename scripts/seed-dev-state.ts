@@ -341,7 +341,19 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   return summary;
 }
 
-export async function isDevelopmentProfileActive(profilePath: string): Promise<boolean> {
+export async function isDevelopmentProfileActive(
+  profilePath: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<boolean> {
+  // Chromium on Windows has no `SingletonLock`. It holds `lockfile` open while it runs.
+  if (platform === "win32") {
+    try {
+      await lstat(join(profilePath, "lockfile"));
+      return true;
+    } catch (error) {
+      if (!isMissingFileError(error)) throw error;
+    }
+  }
   const lockPath = join(profilePath, "SingletonLock");
   try {
     const lock = await lstat(lockPath);
