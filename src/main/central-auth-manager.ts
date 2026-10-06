@@ -139,12 +139,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   constructor(options: CentralAuthManagerOptions) {
     super();
-    this.#transport = CentralAuthTransport.layer(options.fetch ?? fetch);
+    const fetcher = detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl);
+    this.#transport = CentralAuthTransport.layer(fetcher);
     this.#options = {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
-      fetch: detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl),
+      fetch: fetcher,
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
       startupRetryDelaysMs: options.startupRetryDelaysMs ?? STARTUP_RETRY_DELAYS_MS,

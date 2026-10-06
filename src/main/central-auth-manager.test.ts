@@ -863,7 +863,7 @@ describe("CentralAuthManager", () => {
       startupRetryDelaysMs: [5, 10],
     });
 
-    await expect(manager.initialize()).resolves.toEqual({
+    await expect(runCauseEffect(manager.initialize())).resolves.toEqual({
       status: "error",
       issue: {
         code: "auth_api_unavailable",
@@ -875,7 +875,7 @@ describe("CentralAuthManager", () => {
 
     const certificateError = new TypeError("fetch failed", { cause: { code: "SELF_SIGNED_CERT_IN_CHAIN" } });
     fetchMock.mockReset().mockRejectedValue(certificateError);
-    await expect(manager.retry()).resolves.toMatchObject({
+    await expect(runCauseEffect(manager.retry())).resolves.toMatchObject({
       status: "error",
       issue: { message: expect.stringContaining("blocked OpenBot from reaching api.openbot.run") },
     });
