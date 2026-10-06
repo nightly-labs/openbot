@@ -10,8 +10,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { supportLogValue } from "@/features/support/model/support-log";
-import { supportLog } from "@/features/support/model/support-log-capture";
+import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { RemoteTeamTransport, type RemoteTeamTransportRef } from "./remote-team-transport";
 
 export interface ServerConnectionHandle {

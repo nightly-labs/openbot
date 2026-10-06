@@ -9,8 +9,8 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
-import { formatSupportLogEntry, type SupportLogLevel } from "@/features/support/model/support-log";
-import { clearSupportLog, supportLog, supportLogFileText } from "@/features/support/model/support-log-capture";
+import { formatSupportLogEntry, type SupportLogLevel, supportLog } from "@/features/support/model/support-log";
+import { clearSupportLog, supportLogFileText } from "@/features/support/model/support-log-capture";
 import { useText } from "@/shared/lib/text";
 
 /** The OpenBot account, the same contact as the website. */

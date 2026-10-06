@@ -3,19 +3,13 @@ import * as Device from "expo-device";
 import { File, Paths } from "expo-file-system";
 import { AppState } from "react-native";
 import {
-  createSupportLog,
   formatSupportLogEntry,
   parseSupportLog,
   type SupportLogLevel,
-  supportLogUrl,
+  supportLog,
   supportLogValue,
+  withRequestLog,
 } from "./support-log";
-
-/**
- * The support log of this phone. It stays in memory and in the app cache, which the system does not
- * back up. Only the user moves it off the phone, from Settings > Support.
- */
-export const supportLog = createSupportLog();
 
 const CACHE_FILE = "support-log-v1.json";
 const PERSIST_DELAY_MS = 2_000;
@@ -97,32 +91,10 @@ function captureErrors(): void {
   });
 }
 
-/** Method, origin, path, status and time of each request. Never a query, a header or a body. */
+/** Libraries and other code call the global `fetch`. */
 function captureFetch(): void {
   const original = globalThis.fetch;
-  const fetchWithLog = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const request = typeof input === "object" && "method" in input ? input : null;
-    const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
-    const url = supportLogUrl(typeof input === "string" ? input : "href" in input ? input.href : input.url);
-    const started = Date.now();
-    try {
-      const response = await original(input, init);
-      supportLog.add(
-        response.ok ? "info" : "warn",
-        "network",
-        `${method} ${url} -> ${response.status} (${Date.now() - started} ms)`,
-      );
-      return response;
-    } catch (error) {
-      const canceled = error instanceof Error && error.name === "AbortError";
-      supportLog.add(
-        canceled ? "info" : "warn",
-        "network",
-        `${method} ${url} -> ${canceled ? "canceled" : `failed: ${supportLogValue(error)}`} (${Date.now() - started} ms)`,
-      );
-      throw error;
-    }
-  };
+  const fetchWithLog = withRequestLog((input: RequestInfo | URL, init?: RequestInit) => original(input, init));
   // The type declares `fetch` as a function, so it cannot be assigned. React Native defines the
   // global as a configurable property.
   Object.defineProperty(globalThis, "fetch", {

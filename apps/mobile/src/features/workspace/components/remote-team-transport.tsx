@@ -15,8 +15,7 @@ import {
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { supportLogUrl } from "@/features/support/model/support-log";
-import { supportLog } from "@/features/support/model/support-log-capture";
+import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";

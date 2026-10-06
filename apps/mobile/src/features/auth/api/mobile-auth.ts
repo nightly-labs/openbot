@@ -10,14 +10,14 @@ import {
 } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { validateProfileName } from "@openbot/contracts/validation";
-import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { z } from "zod";
-
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText } from "@/shared/lib/text";
+// Relative: the Node test project resolves no `@/` path that the test does not mock.
+import { fetch } from "../../support/model/logged-fetch";
 
 const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
 const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";

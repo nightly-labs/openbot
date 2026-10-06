@@ -22,7 +22,7 @@ const SOURCES: readonly SupportLogSource[] = ["app", "network", "connection", "c
  * Every message goes through the shared log redaction before it is kept. The screen, the cache file
  * and the saved file then mask tokens, keys and email addresses as the desktop logs do.
  */
-export function supportLogMessage(text: string): string {
+function supportLogMessage(text: string): string {
   // Redaction reads the whole text. Only the start of a large payload can reach the kept length.
   const line = redactText(text.slice(0, MAX_MESSAGE_LENGTH * 8))
     .replace(/[\r\n]+\s*/gu, " | ")
@@ -115,4 +115,43 @@ export function createSupportLog(
   };
 }
 
-export type SupportLog = ReturnType<typeof createSupportLog>;
+/**
+ * The support log of this phone. It stays in memory and in the app cache, which the system does not
+ * back up. Only the user moves it off the phone, from Settings > Support.
+ */
+export const supportLog = createSupportLog();
+
+type RequestInput = string | URL | { readonly url: string; readonly method: string };
+
+/** Method, origin, path, status and time of each request. Never a query, a header or a body. */
+export function withRequestLog<
+  I extends RequestInput,
+  N extends { method?: string },
+  R extends { ok: boolean; status: number },
+>(original: (input: I, init?: N) => Promise<R>): (input: I, init?: N) => Promise<R> {
+  return async (input, init) => {
+    // TypeScript does not narrow a generic parameter, so read the value as its constraint.
+    const target: RequestInput = input;
+    const request = typeof target === "object" && "method" in target ? target : null;
+    const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
+    const url = supportLogUrl(typeof target === "string" ? target : "href" in target ? target.href : target.url);
+    const started = Date.now();
+    try {
+      const response = await original(input, init);
+      supportLog.add(
+        response.ok ? "info" : "warn",
+        "network",
+        `${method} ${url} -> ${response.status} (${Date.now() - started} ms)`,
+      );
+      return response;
+    } catch (error) {
+      const canceled = error instanceof Error && error.name === "AbortError";
+      supportLog.add(
+        canceled ? "info" : "warn",
+        "network",
+        `${method} ${url} -> ${canceled ? "canceled" : `failed: ${supportLogValue(error)}`} (${Date.now() - started} ms)`,
+      );
+      throw error;
+    }
+  };
+}
