@@ -156,6 +156,15 @@ function lexStreamingTokens(body: string, previous: StreamedTokens | undefined):
   let kept = previous.tokens.length - 1;
   while (kept > 0 && previous.tokens[kept]?.type === "space") kept -= 1;
   while (kept > 0 && previous.tokens[kept]?.type !== "space") kept -= 1;
+  // Display math can span blank lines. Until its closing delimiter arrives, it reads as paragraphs.
+  const openMath = previous.tokens.findIndex(
+    (token, index) =>
+      index < kept &&
+      token.type !== "blockMath" &&
+      token.type !== "code" &&
+      chatMathBlockStart(token.raw) !== undefined,
+  );
+  if (openMath !== -1) kept = openMath;
   const settled = previous.tokens.slice(0, kept);
   const settledLength = settled.reduce((length, token) => length + token.raw.length, 0);
   // The lexer normalizes line endings, and then the sources no longer add up to the body.
