@@ -147,6 +147,28 @@ break a destructured export.
 deliberately not cached: `install-electron` takes 2.6s on a runner, and a measured cache hit
 restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no cache at all.
 
+## Focused tests
+
+`bun run test:changed` is `vitest run --changed origin/main --maxWorkers=1`. Vitest takes the files
+in `git diff origin/main...HEAD`, the staged files, and the unstaged and untracked files. Then it
+runs each test file whose import graph contains one of them. It uses the root `vitest.config.ts`,
+so each file goes to its usual project (`node`, `renderer` or `mobile-ui`) and environment. When
+no test imports a changed file, it finds no test files and exits with code 0. Fetch `origin/main`
+first if it is old: an old base selects tests for changes that are already on `main`.
+
+`bun run test:related -- <source>...` is `vitest related --run --maxWorkers=1`. It runs the test
+files that import the named source files, with no Git query.
+
+Vitest 4.1.10 does not select tests for a change to `vitest.config.ts`, a setup file or
+`package.json`. Its default `forceRerunTriggers` (`**/package.json/**`,
+`**/{vitest,vite}.config.*/**`) do not match these files, and a setup file is not in a test's
+import graph. After such a change, run the test files that it can affect with
+`bun run test:desktop -- <path>`.
+
+A shared module can have many dependents. For example, `packages/ui/src/digit-roll.ts` selects 16
+files, including the `App.*.test.tsx` files. Do a list first to see the set without a run:
+`bun x vitest list --filesOnly --changed origin/main`.
+
 ## Test environment guard
 
 `tools/vitest/hermetic-setup.ts` is the first setup file of the `node` and `renderer` projects, so it
