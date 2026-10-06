@@ -1,4 +1,5 @@
 import { createHmac, generateKeyPairSync } from "node:crypto";
+import { Effect } from "effect";
 import { exportJWK, SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import { RESUME_TTL_SECONDS, RemoteTokenService, verifyWebhookSignature } from "../src/tokens";
@@ -25,11 +26,13 @@ describe("remote tokens", () => {
         undefined,
         { fetch: async () => response },
       );
-    await expect(createService(Response.json({ keys: [jwk] })).initialize()).resolves.toBeUndefined();
-    await expect(createService(new Response("unavailable", { status: 503 })).initialize()).rejects.toThrow(
-      "Expected 200 OK",
-    );
-    await expect(createService(Response.json({ keys: [] })).initialize()).rejects.toThrow();
+    await expect(
+      Effect.runPromise(createService(Response.json({ keys: [jwk] })).initialize()),
+    ).resolves.toBeUndefined();
+    await expect(
+      Effect.runPromise(createService(new Response("unavailable", { status: 503 })).initialize()),
+    ).rejects.toThrow("Expected 200 OK");
+    await expect(Effect.runPromise(createService(Response.json({ keys: [] })).initialize())).rejects.toThrow();
   });
 
   it("verifies ES256 tickets and creates coturn credentials", async () => {
@@ -66,21 +69,23 @@ describe("remote tokens", () => {
         turnPort: 3478,
         turnTlsPort: 5349,
       },
-      async () => {
-        remoteValidations += 1;
-        return true;
-      },
+      () =>
+        Effect.sync(() => {
+          remoteValidations += 1;
+          return true;
+        }),
     );
-    const claims = await service.verifyTicket(token);
+    const claims = await Effect.runPromise(service.verifyTicket(token));
     const servers = service.iceServers(claims, now);
     expect(claims.sessionId).toBe("session-1");
     expect(servers[1]).toMatchObject({ username: `${now + 3_600}:session-1` });
     expect(() => service.iceServers({ ...claims, sessionExpiresAt: now }, now)).toThrow("expired");
-    const resume = await service.issueResumeToken(claims, now);
-    expect((await service.verifyResumeToken(resume)).hostId).toBe("host-1");
-    expect((await service.verifyResumeToken(resume, new Date((now + RESUME_TTL_SECONDS - 1) * 1_000))).sessionId).toBe(
-      "session-1",
-    );
+    const resume = await Effect.runPromise(service.issueResumeToken(claims, now));
+    expect((await Effect.runPromise(service.verifyResumeToken(resume))).hostId).toBe("host-1");
+    expect(
+      (await Effect.runPromise(service.verifyResumeToken(resume, new Date((now + RESUME_TTL_SECONDS - 1) * 1_000))))
+        .sessionId,
+    ).toBe("session-1");
     expect(remoteValidations).toBe(0);
     const restartedService = new RemoteTokenService(
       {
@@ -92,20 +97,22 @@ describe("remote tokens", () => {
         turnPort: 3478,
         turnTlsPort: 5349,
       },
-      async () => {
-        remoteValidations += 1;
-        return true;
-      },
+      () =>
+        Effect.sync(() => {
+          remoteValidations += 1;
+          return true;
+        }),
     );
-    expect((await restartedService.verifyResumeToken(resume, new Date((now + 60) * 1_000))).sessionId).toBe(
-      "session-1",
-    );
+    expect(
+      (await Effect.runPromise(restartedService.verifyResumeToken(resume, new Date((now + 60) * 1_000)))).sessionId,
+    ).toBe("session-1");
     expect(remoteValidations).toBe(1);
-    await restartedService.verifyResumeToken(resume, new Date((now + 61) * 1_000));
+    await Effect.runPromise(restartedService.verifyResumeToken(resume, new Date((now + 61) * 1_000)));
     expect(remoteValidations).toBe(1);
-    expect((await service.verifyResumeToken(resume, new Date((now + RESUME_TTL_SECONDS + 1) * 1_000))).sessionId).toBe(
-      "session-1",
-    );
+    expect(
+      (await Effect.runPromise(service.verifyResumeToken(resume, new Date((now + RESUME_TTL_SECONDS + 1) * 1_000))))
+        .sessionId,
+    ).toBe("session-1");
     expect(remoteValidations).toBe(2);
   });
 
@@ -151,7 +158,11 @@ describe("remote tokens", () => {
         .setExpirationTime(now + 300)
         .sign(privateKey);
 
-    await expect(service.verifyTicket(await issue(now - 1), new Date(now * 1_000))).rejects.toThrow("expired");
-    await expect(service.verifyTicket(await issue(now + 300, 3, 3), new Date(now * 1_000))).rejects.toThrow("protocol");
+    await expect(Effect.runPromise(service.verifyTicket(await issue(now - 1), new Date(now * 1_000)))).rejects.toThrow(
+      "expired",
+    );
+    await expect(
+      Effect.runPromise(service.verifyTicket(await issue(now + 300, 3, 3), new Date(now * 1_000))),
+    ).rejects.toThrow("protocol");
   });
 });

@@ -2,7 +2,7 @@
 // agree on.
 //
 // This file carries no runtime import at all, which is what lets `agent-database-host.ts` reference
-// every shape through `import type` and keep its own runtime imports to `node:*`. See that file for
+// every shape through `import type` and limit runtime imports to `node:*` and Effect. See that file for
 // why that restriction exists.
 
 /** A value a caller can bind. A blob has no JSON form, so no statement can take one as input. */

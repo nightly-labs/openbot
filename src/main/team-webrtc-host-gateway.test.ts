@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
 import { generateKeyPairSync, sign } from "node:crypto";
@@ -21,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import opencodeAgents from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 import { createRemoteFileReceiver } from "../../packages/team-client/src/file-download";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
@@ -38,30 +41,28 @@ class FakeBridge extends TeamWebRtcBridge {
   readonly disconnectedPeers: string[] = [];
   readonly sent: Array<{ peerId: string; channel: string; data: string | ArrayBuffer }> = [];
 
-  override async connect(input: {
-    peerId: string;
-    signalUrl: string;
-    token: string;
-    peer: "host" | "client";
-  }): Promise<void> {
-    this.connections.push(input);
-    // A local Signal may be ready before the connect command acknowledges.
-    this.emit("signalReady", input.peerId);
-  }
+  override readonly connect = (input: { peerId: string; signalUrl: string; token: string; peer: "host" | "client" }) =>
+    Effect.sync(() => {
+      this.connections.push(input);
+      // A local Signal may be ready before the connect command acknowledges.
+      this.emit("signalReady", input.peerId);
+    });
 
-  override async disconnect(): Promise<void> {}
+  override readonly disconnect = () => Effect.sync(() => {});
 
-  override async disconnectPeer(peerId: string): Promise<void> {
-    this.disconnectedPeers.push(peerId);
-  }
+  override readonly disconnectPeer = (peerId: string) =>
+    Effect.sync(() => {
+      this.disconnectedPeers.push(peerId);
+    });
 
-  override async send(
+  override readonly send = (
     peerId: string,
     channel: "rpc" | "events" | "files" | "desktop",
     data: string | ArrayBuffer,
-  ): Promise<void> {
-    this.sent.push({ peerId, channel, data });
-  }
+  ): Effect.Effect<void, RemoteWorkflowError> =>
+    Effect.sync(() => {
+      this.sent.push({ peerId, channel, data });
+    });
 }
 
 describe("TeamWebRtcHostGateway", () => {
@@ -70,19 +71,21 @@ describe("TeamWebRtcHostGateway", () => {
     directories.push(directory);
     const bridge = new FakeBridge();
     const store = new TeamStore(join(directory, "team.json"));
-    await store.initialize();
-    await store.configureWithAccount("Test Host", {
-      id: "owner-account",
-      email: "owner@example.com",
-      name: "Owner",
-      avatarUrl: null,
-    });
+    await runCauseEffect(store.initialize());
+    await runCauseEffect(
+      store.configureWithAccount("Test Host", {
+        id: "owner-account",
+        email: "owner@example.com",
+        name: "Owner",
+        avatarUrl: null,
+      }),
+    );
     const closeLocalSession = vi.spyOn(store, "closeRemoteSession");
     const renewSignal = vi
       .fn()
-      .mockResolvedValue({ signalUrl: "wss://signal.example.test/v1/signal", ticket: "fresh" });
+      .mockReturnValue(Effect.succeed({ signalUrl: "wss://signal.example.test/v1/signal", ticket: "fresh" }));
     const recoveryFailure = vi.fn();
-    const closeSession = vi.fn().mockResolvedValue(undefined);
+    const closeSession = vi.fn(() => Effect.void);
     const clientKeys = generateKeyPairSync("ed25519", {
       publicKeyEncoding: { type: "spki", format: "pem" },
       privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -155,24 +158,27 @@ describe("TeamWebRtcHostGateway", () => {
       renewSignal,
       onSignalRecoveryFailure: recoveryFailure,
       closeSession,
-      verifyClientTicket: async (ticket) => ({
-        sessionId: ticket === "second-ticket" ? "session-2" : "session-1",
-        hostId: "host-1",
-        userId: "member-account",
-        membershipId: "membership-1",
-        role: "member",
-        authEpoch: 1,
-        sessionExpiresAt,
-        clientPublicKey: clientKeys.publicKey,
-      }),
+      verifyClientTicket: (ticket) =>
+        Effect.succeed({
+          sessionId: ticket === "second-ticket" ? "session-2" : "session-1",
+          hostId: "host-1",
+          userId: "member-account",
+          membershipId: "membership-1",
+          role: "member",
+          authEpoch: 1,
+          sessionExpiresAt,
+          clientPublicKey: clientKeys.publicKey,
+        }),
     });
 
-    const starting = gateway.start({
-      hostId: "host-1",
-      signalUrl: "wss://signal.example.test/v1/signal",
-      ticket: "initial",
-      localApiPort: address.port,
-    });
+    const starting = runCauseEffect(
+      gateway.start({
+        hostId: "host-1",
+        signalUrl: "wss://signal.example.test/v1/signal",
+        ticket: "initial",
+        localApiPort: address.port,
+      }),
+    );
     await vi.waitFor(() => expect(bridge.connections).toHaveLength(1));
     await starting;
 
@@ -315,14 +321,19 @@ describe("TeamWebRtcHostGateway", () => {
       const frame = decodeTeamProtocolV2RpcFrame(response.data);
       expect(frame).toMatchObject({ type: "response", result: { status: 200, body: scopedUsage } });
     });
-    const receiver = createRemoteFileReceiver(async (data) => {
-      bridge.emit("data", "peer-1", "files", data);
-    });
+    const receiver = createRemoteFileReceiver((data) =>
+      Effect.sync(() => {
+        bridge.emit("data", "peer-1", "files", data);
+      }),
+    );
     const originalSend = bridge.send.bind(bridge);
-    const fileSend = vi.spyOn(bridge, "send").mockImplementation(async (peerId, channel, data) => {
-      await originalSend(peerId, channel, data);
-      if (channel === "files") await receiver.receive(data);
-    });
+    const fileSend = vi.spyOn(bridge, "send").mockImplementation((peerId, channel, data) =>
+      Effect.gen(function* () {
+        yield* originalSend(peerId, channel, data);
+        if (channel === "files")
+          yield* receiver.receive(data).pipe(Effect.mapError((cause) => new RemoteWorkflowError({ cause })));
+      }),
+    );
     bridge.emit(
       "data",
       "peer-1",
@@ -354,7 +365,7 @@ describe("TeamWebRtcHostGateway", () => {
       }
       expect(downloadedId).not.toBe("");
     });
-    expect(await receiver.take(downloadedId)).toEqual({
+    expect(await Effect.runPromise(receiver.take(downloadedId))).toEqual({
       name: "data.json",
       mimeType: "application/json",
       base64: btoa('{"file":true}'),
@@ -549,7 +560,7 @@ describe("TeamWebRtcHostGateway", () => {
         payload: event,
       });
     }
-    await gateway.revokeSession("session-2");
+    await runCauseEffect(gateway.revokeSession("session-2"));
     expect(closeLocalSession).toHaveBeenCalledExactlyOnceWith("session-2");
     expect(bridge.disconnectedPeers).toEqual(["peer-2"]);
     const beforeCachedReply = bridge.sent.length;
@@ -575,8 +586,8 @@ describe("TeamWebRtcHostGateway", () => {
     expect(closeSession).not.toHaveBeenCalled();
     bridge.emit("data", "peer-1", "rpc", duplicateRequest);
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toContain("peer-1"));
-    await gateway.stop();
-    gateway.dispose();
+    await runCauseEffect(gateway.stop());
+    await runCauseEffect(gateway.dispose());
   });
 
   it("drops only the active WebRTC peer after a malformed known frame", async () => {
@@ -584,7 +595,7 @@ describe("TeamWebRtcHostGateway", () => {
     directories.push(directory);
     const bridge = new FakeBridge();
     const store = new TeamStore(join(directory, "team.json"));
-    await store.initialize();
+    await runCauseEffect(store.initialize());
     const gateway = new TeamWebRtcHostGateway({
       bridge,
       store,
@@ -592,12 +603,14 @@ describe("TeamWebRtcHostGateway", () => {
       transferDirectory: join(directory, "transfers"),
     });
 
-    const starting = gateway.start({
-      hostId: "host-1",
-      signalUrl: "wss://signal.example.test/v1/signal",
-      ticket: "initial",
-      localApiPort: 0,
-    });
+    const starting = runCauseEffect(
+      gateway.start({
+        hostId: "host-1",
+        signalUrl: "wss://signal.example.test/v1/signal",
+        ticket: "initial",
+        localApiPort: 0,
+      }),
+    );
     await vi.waitFor(() => expect(bridge.connections).toHaveLength(1));
     await starting;
     bridge.emit("incoming", "peer-1", {
@@ -613,8 +626,8 @@ describe("TeamWebRtcHostGateway", () => {
 
     await vi.waitFor(() => expect(bridge.disconnectedPeers).toEqual(["peer-1"]));
     expect(bridge.connections).toHaveLength(1);
-    await gateway.stop();
-    gateway.dispose();
+    await runCauseEffect(gateway.stop());
+    await runCauseEffect(gateway.dispose());
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
+import { runApiEffect } from "../src/server/effect-runtime";
 
 const FIFTEEN_MINUTES_MS = 15 * 60_000;
 
@@ -21,7 +22,7 @@ describe("D1 auth sessions", () => {
     const calls: PreparedCall[] = [];
     const repository = new D1AuthRepository(emailChallengeDatabase(calls));
 
-    await expect(repository.latestEmailChallengeAt("person@example.com")).resolves.toBe(1_000);
+    await expect(runApiEffect(repository.latestEmailChallengeAt("person@example.com"))).resolves.toBe(1_000);
 
     expect(calls[0]?.query).toContain("delivery_state IN ('pending', 'sent')");
     expect(calls[0]?.query).not.toContain("consumed_at IS NULL");
@@ -32,7 +33,7 @@ describe("D1 auth sessions", () => {
     const calls: PreparedCall[] = [];
     const repository = new D1AuthRepository(desktopAuthenticationDatabase(calls));
 
-    await expect(repository.authenticateDesktopSession("desktop-token", 1_000)).resolves.toMatchObject({
+    await expect(runApiEffect(repository.authenticateDesktopSession("desktop-token", 1_000))).resolves.toMatchObject({
       id: "user-1",
     });
 
@@ -45,21 +46,26 @@ describe("D1 auth sessions", () => {
     const calls: PreparedCall[] = [];
     const repository = new D1AuthRepository(mobileRevocationDatabase(calls));
 
-    await expect(repository.revokeMobileSession("mobile-token", 2_000)).resolves.toBe(true);
+    await expect(runApiEffect(repository.revokeMobileSession("mobile-token", 2_000))).resolves.toBe(true);
 
     expect(calls[0]?.query).toContain("id IN (SELECT session_id FROM mobile_auth_sessions)");
     expect(calls[0]?.values).toEqual([2_000, expect.any(String)]);
   });
 
   it.each([
-    ["generic", (repository: D1AuthRepository, now: number) => repository.authenticate("session-token", now)],
+    [
+      "generic",
+      (repository: D1AuthRepository, now: number) => runApiEffect(repository.authenticate("session-token", now)),
+    ],
     [
       "desktop",
-      (repository: D1AuthRepository, now: number) => repository.authenticateDesktopSession("desktop-token", now),
+      (repository: D1AuthRepository, now: number) =>
+        runApiEffect(repository.authenticateDesktopSession("desktop-token", now)),
     ],
     [
       "mobile",
-      (repository: D1AuthRepository, now: number) => repository.authenticateMobileSession("mobile-token", now),
+      (repository: D1AuthRepository, now: number) =>
+        runApiEffect(repository.authenticateMobileSession("mobile-token", now)),
     ],
   ])("updates %s session activity only after the coarse activity window", async (_kind, authenticate) => {
     const updates: unknown[][] = [];
@@ -80,13 +86,15 @@ describe("D1 auth sessions", () => {
     const batches: PreparedCall[][] = [];
     const repository = new D1AuthRepository(ticketDatabase(batches));
 
-    await repository.replaceMobileAuthTicket({
-      ticketHash: "new-ticket-hash",
-      userId: "user-1",
-      serverId: "00000000-0000-4000-8000-000000000001",
-      createdAt: 1_000,
-      expiresAt: 121_000,
-    });
+    await runApiEffect(
+      repository.replaceMobileAuthTicket({
+        ticketHash: "new-ticket-hash",
+        userId: "user-1",
+        serverId: "00000000-0000-4000-8000-000000000001",
+        createdAt: 1_000,
+        expiresAt: 121_000,
+      }),
+    );
 
     expect(batches).toHaveLength(1);
     expect(batches[0]).toHaveLength(2);

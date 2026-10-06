@@ -1,17 +1,19 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
+import { Effect } from "effect";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
-import { AuthService, AuthServiceError } from "./auth-service";
+import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { D1AuthRepository } from "./d1-auth-repository";
+import { runApiEffect } from "./effect-runtime";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
-import { type HostedSiteScope, resolveHostedSiteScope } from "./hosted-site-server";
+import { resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
 import { type ApnsLiveActivitySender, sharedApnsSender } from "./live-activity-relay";
@@ -40,10 +42,8 @@ export function requestAuthService(): AuthService {
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings),
     exposeDevelopmentCode,
     // The revocation is already written and the cron redelivers it, so the answer does not wait.
-    flushSessionRevocations: async () => {
-      waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now()));
-    },
-    profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, waitUntil),
+    flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
+    profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
   });
 }
 
@@ -66,7 +66,7 @@ export function requestAgentTemplates(): AgentTemplates {
 }
 
 /** The sites that a signed-in `/v1/sites` request can see and change. See `resolveHostedSiteScope`. */
-export function requestHostedSiteScope(request: Request, userId: string): Promise<HostedSiteScope> {
+export function requestHostedSiteScope(request: Request, userId: string) {
   return resolveHostedSiteScope(requireWorkerBindings(env).DB, userId, request);
 }
 
@@ -133,12 +133,20 @@ export function requestGitHubInstallationTokens(): GitHubInstallationTokens {
   return githubInstallationTokens.service;
 }
 
-export async function enforceGitHubTokenRateLimit(sourceIp: string): Promise<void> {
-  const result = await requireWorkerBindings(env).GITHUB_TOKEN_RATE_LIMITER.limit({ key: `ip:${sourceIp}` });
+export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLimit")(function* (sourceIp: string) {
+  const result = yield* Effect.tryPromise({
+    try: () => requireWorkerBindings(env).GITHUB_TOKEN_RATE_LIMITER.limit({ key: `ip:${sourceIp}` }),
+    catch: () =>
+      new GitHubInstallationTokensError(503, "github_app_unavailable", "The OpenBot GitHub App is unavailable."),
+  });
   if (!result.success) {
-    throw new GitHubInstallationTokensError(429, "rate_limited", "Too many GitHub token requests. Try again later.");
+    return yield* new GitHubInstallationTokensError(
+      429,
+      "rate_limited",
+      "Too many GitHub token requests. Try again later.",
+    );
   }
-}
+});
 
 export function githubInstallationTokensErrorResponse(error: unknown): Response {
   if (error instanceof GitHubInstallationTokensError) {
@@ -156,7 +164,7 @@ export function githubInstallationTokensErrorResponse(error: unknown): Response 
 export function requestLiveActivityRelay(): {
   sender: ApnsLiveActivitySender;
   /** A host sends a few updates a minute for each phone. More is a fault or misuse. */
-  allow(hostId: string): Promise<boolean>;
+  allow(hostId: string): Effect.Effect<boolean, AuthOperationError>;
 } | null {
   const bindings = requireWorkerBindings(env);
   const { APNS_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_ORIGIN, LIVE_ACTIVITY_RATE_LIMITER } = bindings;
@@ -171,7 +179,11 @@ export function requestLiveActivityRelay(): {
       topic: APNS_TOPIC,
       ...(origin ? { origin } : {}),
     }),
-    allow: async (hostId) => (await LIVE_ACTIVITY_RATE_LIMITER.limit({ key: `host:${hostId}` })).success,
+    allow: (hostId) =>
+      Effect.tryPromise({
+        try: () => LIVE_ACTIVITY_RATE_LIMITER.limit({ key: `host:${hostId}` }),
+        catch: () => new AuthOperationError({ message: "Account operation failed." }),
+      }).pipe(Effect.map((result) => result.success)),
   };
 }
 
@@ -180,11 +192,11 @@ function developmentApnsOrigin(value: string | undefined): string | undefined {
   return value && /^http:\/\/127\.0\.0\.1:\d+\/__dev\/apns$/u.test(value) ? value : undefined;
 }
 
-export function enforceMarketplaceMutationRateLimit(kind: MarketplaceMutationKind, principal: string): Promise<void> {
+export function enforceMarketplaceMutationRateLimit(kind: MarketplaceMutationKind, principal: string) {
   return enforceMarketplaceMutation(requireWorkerBindings(env), kind, principal);
 }
 
-export function enforceHostedSiteReportRateLimit(sourceIp: string): Promise<void> {
+export function enforceHostedSiteReportRateLimit(sourceIp: string) {
   return enforceReportRateLimit(requireWorkerBindings(env), sourceIp);
 }
 
@@ -193,9 +205,9 @@ export function marketplaceErrorResponse(error: unknown): Response {
   return skillErrorResponse(error);
 }
 
-export async function requestUser(request: Request) {
+export function requestUser(request: Request) {
   const token = bearerToken(request);
-  if (!token) return null;
+  if (!token) return Effect.succeed(null);
   return requestAuthService().authenticate(token);
 }
 
@@ -216,18 +228,22 @@ export function requireSkillsAdmin(request: Request): boolean {
   return Boolean(expected && bearerToken(request) === expected);
 }
 
-export async function requireOperationsAdmin(request: Request): Promise<boolean> {
+export const requireOperationsAdmin = Effect.fn("Auth.requireOperationsAdmin")(function* (request: Request) {
   const bindings = requireWorkerBindings(env);
   const expected = bindings.SITE_OPERATIONS_ADMIN_TOKEN;
   const provided = bearerToken(request);
   if (!expected || !provided) return false;
   const encoder = new TextEncoder();
-  const [expectedHash, providedHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
-    crypto.subtle.digest("SHA-256", encoder.encode(provided)),
-  ]);
+  const [expectedHash, providedHash] = yield* Effect.tryPromise({
+    try: () =>
+      Promise.all([
+        crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+        crypto.subtle.digest("SHA-256", encoder.encode(provided)),
+      ]),
+    catch: () => new AuthOperationError({ message: "Account operation failed." }),
+  });
   return constantTimeEqual(new Uint8Array(expectedHash), new Uint8Array(providedHash));
-}
+});
 
 export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null {
   const bindings = requireWorkerBindings(env);
@@ -235,7 +251,7 @@ export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null
 }
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
-  return new RemoteControlPlane(requireWorkerBindings(env), { schedule: waitUntil });
+  return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
 }
 
 /** Pass the request when the call checks who can create servers, so its developer key counts. */
@@ -245,12 +261,12 @@ export function requestHostedServerService(request?: Request): HostedServerServi
 
 function requestHostedBilling(developerKey: string | null = null) {
   const bindings = requireWorkerBindings(env);
-  const remote = new RemoteControlPlane(bindings, { schedule: waitUntil });
+  const remote = new RemoteControlPlane(bindings, { schedule });
   return createHostedBilling(bindings, {
     removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
     developerKey,
     planChanged: (hostId) => remote.planChanged(hostId),
-    schedule: waitUntil,
+    schedule,
   });
 }
 
@@ -261,9 +277,9 @@ export function hostedServerErrorResponse(error: unknown): Response {
   return remoteControlPlaneErrorResponse(error);
 }
 
-export function verifyRemoteServiceRequest(request: Request, body: string): Promise<boolean> {
+export function verifyRemoteServiceRequest(request: Request, body: string) {
   const secret = requireWorkerBindings(env).REMOTE_AUTH_WEBHOOK_SECRET;
-  if (!secret) return Promise.resolve(false);
+  if (!secret) return Effect.succeed(false);
   return verifyRemoteServiceSignature(
     secret,
     body,
@@ -281,7 +297,7 @@ export function requestSlackApp(): SlackAppService {
   const bindings = requireWorkerBindings(env);
   // The events are already in D1 and the cron redelivers them, so the answer does not wait.
   return new SlackAppService(bindings, {
-    flushAuthEvents: async () => waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now())),
+    flushAuthEvents: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
   });
 }
 
@@ -352,4 +368,9 @@ export function authErrorResponse(error: unknown): Response {
     return response;
   }
   return apiError(500, "internal_error", "The account service could not complete the request.");
+}
+
+/** Starts background work in the active Worker invocation. */
+function schedule<E>(work: Effect.Effect<void, E>): void {
+  waitUntil(runApiEffect(work));
 }

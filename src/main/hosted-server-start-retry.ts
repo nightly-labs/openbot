@@ -1,3 +1,5 @@
+import { Deferred, Effect } from "effect";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 /**
  * A hosted server has nobody to press Retry, so it publishes the host again after a failed start. A
  * start that could not sign in leaves the host idle or unconfigured, so those phases also start again.
@@ -5,6 +7,7 @@
  */
 
 import type { HostPhase } from "@openbot/contracts/ipc";
+import { runCauseEffect } from "../backend/effect-boundary";
 
 const CHECK_INTERVAL_MS = 60_000;
 const START_RETRY_DELAYS_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000];
@@ -13,7 +16,7 @@ const RETRY_PHASES: ReadonlySet<HostPhase> = new Set(["error", "idle", "unconfig
 export interface HostedServerStartRetryOptions {
   hostPhase: () => HostPhase;
   /** Signs in again when the first start could not, then publishes the host. */
-  startHost: () => Promise<unknown>;
+  startHost: () => Effect.Effect<unknown, RemoteWorkflowError>;
   onError: (message: string, error: unknown) => void;
   now?: () => number;
 }
@@ -22,7 +25,7 @@ export class HostedServerStartRetry {
   readonly #options: HostedServerStartRetryOptions;
   readonly #now: () => number;
   #timer: ReturnType<typeof setInterval> | null = null;
-  #pending: Promise<void> | null = null;
+  #pending: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   #startFailures = 0;
   #nextStartAt = 0;
 
@@ -34,24 +37,38 @@ export class HostedServerStartRetry {
   start(): void {
     if (this.#timer) return;
     this.#timer = setInterval(() => {
-      void this.tick().catch((error) => this.#options.onError("The hosted server start retry failed.", error));
+      void runCauseEffect(this.tick()).catch((error) =>
+        this.#options.onError("The hosted server start retry failed.", error),
+      );
     }, CHECK_INTERVAL_MS);
     this.#timer.unref();
   }
 
-  stop(): void {
-    if (this.#timer) clearInterval(this.#timer);
-    this.#timer = null;
-  }
-
-  tick(): Promise<void> {
-    this.#pending ??= this.#tick().finally(() => {
-      this.#pending = null;
+  stop(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#timer) clearInterval(this.#timer);
+      this.#timer = null;
+      return this.#pending ? Deferred.await(this.#pending).pipe(Effect.catch(() => Effect.void)) : Effect.void;
     });
-    return this.#pending;
   }
 
-  async #tick(): Promise<void> {
+  tick(): Effect.Effect<void, RemoteWorkflowError> {
+    return Effect.suspend(() => {
+      if (this.#pending) return Deferred.await(this.#pending);
+      const pending = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+      this.#pending = pending;
+      return this.#tickEffect().pipe(
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            this.#pending = null;
+            yield* Deferred.done(pending, exit);
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
+  }
+
+  readonly #tickEffect = Effect.fn("HostedServerStartRetry.tick")(function* (this: HostedServerStartRetry) {
     const now = this.#now();
     const phase = this.#options.hostPhase();
     if (phase === "online") {
@@ -63,6 +80,6 @@ export class HostedServerStartRetry {
     const delay = START_RETRY_DELAYS_MS[Math.min(this.#startFailures, START_RETRY_DELAYS_MS.length - 1)] ?? 0;
     this.#startFailures += 1;
     this.#nextStartAt = now + delay;
-    await this.#options.startHost();
-  }
+    yield* this.#options.startHost();
+  });
 }

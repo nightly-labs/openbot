@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -12,6 +13,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { runCauseEffect } from "./effect-boundary";
 import { getString } from "./protocol";
 
 let root: string;
@@ -40,9 +42,9 @@ describe.sequential("AgentService: channel tools without assignment", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: "chief", text: "Create agents in sections A and B." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Create agents in sections A and B." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
 
     const client = clients.get("codex");
@@ -73,9 +75,9 @@ describe.sequential("AgentService: channel tools without assignment", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.sendMessage({ agentId: "chief", text: "Normal chat work." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Normal chat work." }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
 
     const client = clients.get("codex");
@@ -84,7 +86,7 @@ describe.sequential("AgentService: channel tools without assignment", () => {
 
     const routed = { items: [] };
     const channelForThread = vi.spyOn(service.channels.store, "channelForThread").mockReturnValue("channel-1");
-    const tool = vi.spyOn(service.channels, "tool").mockResolvedValue(routed);
+    const tool = vi.spyOn(service.channels, "tool").mockReturnValue(Effect.succeed(routed));
     try {
       const turnId = service.listQueue("chief").deliveries[0]?.turnId ?? "test-turn";
       const { result, error } = await callOpenBotTool(client, threadId, "channel_history", {}, turnId);

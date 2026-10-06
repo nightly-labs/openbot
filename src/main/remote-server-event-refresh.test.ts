@@ -1,8 +1,11 @@
 // @vitest-environment node
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
+import { remoteCall } from "./remote-service-effects";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -50,13 +53,14 @@ function harness() {
   };
   // The real decoder runs, so a reply that is not a shape the host could send fails here rather
   // than sailing through to an assertion about coordination.
-  const request: RemoteRequestFn = (_serverId, path, decoder) => {
-    paths.push(path);
-    const pending = deferred<unknown>();
-    replies.push(pending);
-    wake(requestWaiters);
-    return pending.promise.then(decoder);
-  };
+  const request: RemoteRequestFn = (_serverId, path, decoder) =>
+    Effect.suspend(() => {
+      paths.push(path);
+      const pending = deferred<unknown>();
+      replies.push(pending);
+      wake(requestWaiters);
+      return remoteCall(() => pending.promise.then(decoder));
+    });
   const refresh = new RemoteEventRefresh({
     request,
     hasServer: () => true,
@@ -78,9 +82,9 @@ function harness() {
 describe("RemoteEventRefresh", () => {
   it("reloads the roster once after reconnect despite unrelated activity events", async () => {
     const { refresh, paths, replies, emitted } = harness();
-    const first = refresh.refreshAgentRoster("server");
-    const second = refresh.refreshAgentRoster("server");
-    refresh.forward("server", { type: "usage-changed", usage: { limits: [] } });
+    const first = runCauseEffect(refresh.refreshAgentRoster("server"));
+    const second = runCauseEffect(refresh.refreshAgentRoster("server"));
+    void runCauseEffect(refresh.forward("server", { type: "usage-changed", usage: { limits: [] } }));
     replies[0]?.resolve([]);
     await Promise.all([first, second]);
     expect({ paths, events: emitted.map((entry) => entry.event) }).toEqual({
@@ -94,8 +98,8 @@ describe("RemoteEventRefresh", () => {
 
   it.each(["event", "forget", "clear"] as const)("discards a roster load superseded by %s", async (action) => {
     const { refresh, replies, emitted } = harness();
-    const pending = refresh.refreshAgentRoster("server");
-    if (action === "event") refresh.forward("server", { type: "agents-changed", agents: [] });
+    const pending = runCauseEffect(refresh.refreshAgentRoster("server"));
+    if (action === "event") void runCauseEffect(refresh.forward("server", { type: "agents-changed", agents: [] }));
     else if (action === "forget") refresh.forget("server");
     else refresh.clear();
     replies[0]?.resolve([]);
@@ -106,9 +110,9 @@ describe("RemoteEventRefresh", () => {
   it("holds a burst to one fetch in flight, then refetches once for what arrived during it", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    refresh.forward("server", invalidated("research", 7));
-    refresh.forward("server", invalidated("research", 7));
-    refresh.forward("server", invalidated("research", 7));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 7)));
     expect(paths).toHaveLength(1);
 
     // Repeating a revision is not repeating an announcement. A read on another device moves the
@@ -132,8 +136,8 @@ describe("RemoteEventRefresh", () => {
   it("fetches again when a newer revision is announced while the first fetch is in flight", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    refresh.forward("server", invalidated("research", 7));
-    refresh.forward("server", invalidated("research", 9));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 9)));
     const refetched = nextRequest();
     replies[0]?.resolve(conversationPage(7));
     await refetched;
@@ -153,8 +157,8 @@ describe("RemoteEventRefresh", () => {
   it("retries a failed refetch for the revision announced while it was away", async () => {
     const { refresh, paths, replies, emitted, nextRequest, nextEmit } = harness();
 
-    refresh.forward("server", invalidated("research", 7));
-    refresh.forward("server", invalidated("research", 9));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 7)));
+    void runCauseEffect(refresh.forward("server", invalidated("research", 9)));
     const retried = nextRequest();
     replies[0]?.reject(new Error("Refresh failed"));
     await retried;
@@ -177,8 +181,8 @@ describe("RemoteEventRefresh", () => {
 
     // The queue carries no revision, so "changed again" is the only thing a second event can say --
     // which makes coalescing and retrying the same question here, unlike a conversation page.
-    refresh.forward("server", queueInvalidated("research"));
-    refresh.forward("server", queueInvalidated("research"));
+    void runCauseEffect(refresh.forward("server", queueInvalidated("research")));
+    void runCauseEffect(refresh.forward("server", queueInvalidated("research")));
     expect(paths).toHaveLength(1);
 
     const retried = nextRequest();
@@ -196,8 +200,8 @@ describe("RemoteEventRefresh", () => {
   it("drops a fallback load that a later one has already replaced", async () => {
     const { refresh, replies, emitted, nextEmit } = harness();
 
-    void refresh.refreshAgentState("server");
-    void refresh.refreshAgentState("server");
+    void runCauseEffect(refresh.refreshAgentState("server"));
+    void runCauseEffect(refresh.refreshAgentState("server"));
     const shown = nextEmit();
     replies[0]?.resolve([]);
     replies[1]?.resolve([]);

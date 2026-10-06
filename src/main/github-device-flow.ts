@@ -5,7 +5,9 @@
 // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token
 
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Schema } from "effect";
 import { z } from "zod";
+import { GitHubOperationError, githubCall, githubDecode } from "./github-effects";
 
 const GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
 export const GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -71,13 +73,20 @@ export type GitHubDeviceFlowFailure =
   | "unreachable"
   | "unexpected";
 
-export class GitHubDeviceFlowError extends Error {
-  readonly failure: GitHubDeviceFlowFailure;
-
+export class GitHubDeviceFlowError extends Schema.TaggedError<GitHubDeviceFlowError>()("GitHubDeviceFlowError", {
+  failure: Schema.Literals([
+    "denied",
+    "expired",
+    "device_flow_disabled",
+    "client_unknown",
+    "refresh_rejected",
+    "unreachable",
+    "unexpected",
+  ]),
+  message: Schema.String,
+}) {
   constructor(failure: GitHubDeviceFlowFailure, message: string) {
-    super(message);
-    this.name = "GitHubDeviceFlowError";
-    this.failure = failure;
+    super({ failure, message });
   }
 }
 
@@ -93,19 +102,26 @@ export interface PollGitHubDeviceTokenOptions extends GitHubDeviceFlowOptions {
 }
 
 /** Asks GitHub for a user code. The user types it at `verificationUri`. An abort rejects with the signal's reason. */
-export async function requestGitHubDeviceCode(
+
+export const requestGitHubDeviceCode = Effect.fn("GitHub.requestDeviceCode")(function* (
   options: GitHubDeviceFlowOptions & { signal: AbortSignal },
-): Promise<GitHubDeviceCode> {
+): Effect.fn.Return<GitHubDeviceCode, GitHubOperationError> {
   const now = options.now ?? Date.now;
-  const body = await postForm(options.fetch, GITHUB_DEVICE_CODE_URL, { client_id: options.clientId }, options.signal);
-  const error = body.error;
-  if (error) throw flowError(error, body);
-  const deviceCode = body.device_code;
-  const userCode = body.user_code;
-  const verificationUri = body.verification_uri;
-  const expiresIn = body.expires_in;
+  const body = yield* postFormEffect(
+    options.fetch,
+    GITHUB_DEVICE_CODE_URL,
+    { client_id: options.clientId },
+    options.signal,
+  );
+  if (body.error) return yield* new GitHubOperationError({ cause: flowError(body.error, body) });
+  const {
+    device_code: deviceCode,
+    user_code: userCode,
+    verification_uri: verificationUri,
+    expires_in: expiresIn,
+  } = body;
   if (!deviceCode || !userCode || !verificationUri?.startsWith("https://") || expiresIn === undefined) {
-    throw unexpected("device code");
+    return yield* new GitHubOperationError({ cause: unexpected("device code") });
   }
   return {
     deviceCode,
@@ -114,58 +130,54 @@ export async function requestGitHubDeviceCode(
     expiresAt: now() + expiresIn * 1_000,
     intervalMs: Math.max(1, body.interval ?? 5) * 1_000,
   };
-}
+});
 
-/**
- * Asks GitHub for the token at the interval it named, until the user answers, the code expires, or
- * `signal` aborts. An abort rejects with the signal's reason. A network failure is not an answer:
- * the next interval asks again.
- */
-export async function pollGitHubDeviceToken(options: PollGitHubDeviceTokenOptions): Promise<GitHubTokenSet> {
+/** Keep GitHub's polling interval and retry only unreachable requests. */
+
+export const pollGitHubDeviceToken = Effect.fn("GitHub.pollDeviceToken")(function* (
+  options: PollGitHubDeviceTokenOptions,
+): Effect.fn.Return<GitHubTokenSet, GitHubOperationError> {
   const now = options.now ?? Date.now;
   let intervalMs = options.device.intervalMs;
   for (;;) {
-    await waitFor(intervalMs, options.signal);
-    if (now() >= options.device.expiresAt) throw flowError("expired_token", null);
-    let body: OAuthAnswer;
-    try {
-      body = await postForm(
-        options.fetch,
-        GITHUB_ACCESS_TOKEN_URL,
-        { client_id: options.clientId, device_code: options.device.deviceCode, grant_type: DEVICE_GRANT },
-        options.signal,
-      );
-    } catch (error) {
+    yield* waitForEffect(intervalMs, options.signal);
+    if (now() >= options.device.expiresAt)
+      return yield* new GitHubOperationError({ cause: flowError("expired_token", null) });
+    const result = yield* postFormEffect(
+      options.fetch,
+      GITHUB_ACCESS_TOKEN_URL,
+      { client_id: options.clientId, device_code: options.device.deviceCode, grant_type: DEVICE_GRANT },
+      options.signal,
+    ).pipe(Effect.result);
+    if (Result.isFailure(result)) {
+      const error = result.failure.cause;
       if (error instanceof GitHubDeviceFlowError && error.failure === "unreachable") continue;
-      throw error;
+      return yield* result.failure;
     }
-    const error = body.error;
-    if (error === "authorization_pending") continue;
-    if (error === "slow_down") {
-      // GitHub names the new interval; without one, the documented five seconds are added.
-      const named = body.interval;
-      intervalMs = named === undefined ? intervalMs + SLOW_DOWN_MS : Math.max(named * 1_000, intervalMs);
+    const body = result.success;
+    if (body.error === "authorization_pending") continue;
+    if (body.error === "slow_down") {
+      intervalMs =
+        body.interval === undefined ? intervalMs + SLOW_DOWN_MS : Math.max(body.interval * 1_000, intervalMs);
       continue;
     }
-    if (error) throw flowError(error, body);
-    return tokenSet(body, now());
+    if (body.error) return yield* new GitHubOperationError({ cause: flowError(body.error, body) });
+    return yield* githubDecode(() => tokenSet(body, now()));
   }
-}
+});
 
-/** Trades a refresh token for a new token set. No client secret: the device flow issued it. */
-export async function refreshGitHubToken(
+export const refreshGitHubToken = Effect.fn("GitHub.refreshToken")(function* (
   options: GitHubDeviceFlowOptions & { refreshToken: string },
-): Promise<GitHubTokenSet> {
+): Effect.fn.Return<GitHubTokenSet, GitHubOperationError> {
   const now = options.now ?? Date.now;
-  const body = await postForm(options.fetch, GITHUB_ACCESS_TOKEN_URL, {
+  const body = yield* postFormEffect(options.fetch, GITHUB_ACCESS_TOKEN_URL, {
     client_id: options.clientId,
     grant_type: "refresh_token",
     refresh_token: options.refreshToken,
   });
-  const error = body.error;
-  if (error) throw flowError(error, body);
-  return tokenSet(body, now());
-}
+  if (body.error) return yield* new GitHubOperationError({ cause: flowError(body.error, body) });
+  return yield* githubDecode(() => tokenSet(body, now()));
+});
 
 function tokenSet(body: OAuthAnswer, now: number): GitHubTokenSet {
   const accessToken = body.access_token;
@@ -180,37 +192,40 @@ function tokenSet(body: OAuthAnswer, now: number): GitHubTokenSet {
   };
 }
 
-async function postForm(
+const postFormEffect = Effect.fn("GitHub.postForm")(function* (
   fetch: GitHubFetch,
   url: string,
   fields: Record<string, string>,
   signal?: AbortSignal,
-): Promise<OAuthAnswer> {
+): Effect.fn.Return<OAuthAnswer, GitHubOperationError> {
   const timeout = AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS);
-  let response: Response;
-  try {
-    response = await fetch(url, {
+  const response = yield* githubCall((fiberSignal) =>
+    fetch(url, {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(fields).toString(),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-    });
-  } catch (cause) {
-    // Only the caller's abort is rethrown. The timeout is a network fault like any other.
-    if (signal?.aborted) throw signal.reason;
-    throw new GitHubDeviceFlowError(
-      "unreachable",
-      sourceText("error.connector.githubUnreachable", {
-        detail: cause instanceof Error ? cause.message : String(cause),
-      }),
-    );
-  }
-  // GitHub answers an OAuth error with 200 and an `error` field, and some errors with 4xx and the
-  // same field. Both are read the same way; a body that is not an object is the unexpected case.
-  const answer = oauthAnswerSchema.safeParse(await response.json().catch(() => null));
-  if (!answer.success) throw unexpected(`HTTP ${response.status}`);
+      signal: AbortSignal.any(signal ? [signal, timeout, fiberSignal] : [timeout, fiberSignal]),
+    }),
+  ).pipe(
+    Effect.mapError(
+      ({ cause }) =>
+        new GitHubOperationError({
+          cause: signal?.aborted
+            ? signal.reason
+            : new GitHubDeviceFlowError(
+                "unreachable",
+                sourceText("error.connector.githubUnreachable", {
+                  detail: cause instanceof Error ? cause.message : String(cause),
+                }),
+              ),
+        }),
+    ),
+  );
+  const json = yield* githubCall(() => response.json()).pipe(Effect.catch(() => Effect.succeed(null)));
+  const answer = oauthAnswerSchema.safeParse(json);
+  if (!answer.success) return yield* new GitHubOperationError({ cause: unexpected(`HTTP ${response.status}`) });
   return answer.data;
-}
+});
 
 function flowError(code: string, body: OAuthAnswer | null): GitHubDeviceFlowError {
   switch (code) {
@@ -236,17 +251,17 @@ function unexpected(detail: string): GitHubDeviceFlowError {
   return new GitHubDeviceFlowError("unexpected", sourceText("error.connector.githubUnexpected", { detail }));
 }
 
-function waitFor(ms: number, signal: AbortSignal): Promise<void> {
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", abort);
-      resolve();
-    }, ms);
-    const abort = () => {
-      clearTimeout(timer);
-      reject(signal.reason);
-    };
+const waitForEffect = (ms: number, signal: AbortSignal): Effect.Effect<void, GitHubOperationError> =>
+  Effect.callback<void, GitHubOperationError>((resume) => {
+    if (signal.aborted) {
+      resume(Effect.fail(new GitHubOperationError({ cause: signal.reason })));
+      return;
+    }
+    const timer = setTimeout(() => resume(Effect.void), ms);
+    const abort = () => resume(Effect.fail(new GitHubOperationError({ cause: signal.reason })));
     signal.addEventListener("abort", abort, { once: true });
+    return Effect.sync(() => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+    });
   });
-}

@@ -1,5 +1,20 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Schema } from "effect";
+import { runTeamEffect } from "./effect-boundary";
+
+class RemoteRecoveryError extends Schema.TaggedError<RemoteRecoveryError>()("RemoteRecoveryError", {
+  message: Schema.String,
+}) {}
+
+const recoveryCall = <A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: operation,
+    catch: (error) =>
+      new RemoteRecoveryError({
+        message: error instanceof Error ? error.message : sourceText("error.remote.operationFailed"),
+      }),
+  });
 
 /** The wait after the first failed attempt. Each next failed attempt doubles it: 2, 4, 8 and 16 seconds. */
 export const REMOTE_RETRY_INTERVAL_MS = 2_000;
@@ -138,7 +153,12 @@ export function createRemoteConnectionRecovery(
     timer = null;
   }
 
-  function scheduleRetry() {
+  function startRun() {
+    void runTeamEffect(run());
+  }
+
+  /** `start` begins the attempt that is due now: a new run, or the next pass of the run that is ending. */
+  function scheduleRetry(start: () => void = startRun) {
     if (disposed || suspended) return;
     retryAt ??= Date.now() + remoteRetryDelay(attempt);
     if (!active) return;
@@ -146,7 +166,7 @@ export function createRemoteConnectionRecovery(
     if (remaining === 0 && !running) {
       retryAt = null;
       if (attempt >= REMOTE_RETRY_LIMIT) attempt = 0;
-      void run();
+      start();
       return;
     }
     onStatus({
@@ -167,8 +187,14 @@ export function createRemoteConnectionRecovery(
     );
   }
 
-  async function run() {
-    if (!active || disposed || running || suspended) return;
+  // An attempt that ends with a refresh or a due retry starts the next pass in the same run.
+  const run = Effect.fn("RemoteRecovery.run")(function* () {
+    while (yield* attemptOnce()) {}
+  });
+
+  const attemptOnce = Effect.fn("RemoteRecovery.attempt")(function* () {
+    if (!active || disposed || running || suspended) return false;
+    let again = false;
     cancelTimer();
     running = true;
     const checkingConnection = online;
@@ -179,44 +205,54 @@ export function createRemoteConnectionRecovery(
     // A foreground read is not a lost connection. Keep the workspace usable
     // until the transport reports a failure or the read fails.
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: 0 });
-    try {
-      await connect();
-    } catch (error) {
-      if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
-        interrupted = true;
-        retryRequested = false;
-        retryAt = null;
-        return;
-      }
-      if (active) {
-        online = false;
-        if (!disposed) onError(error);
-      }
-      retryRequested = true;
-      // A read on a previously usable peer detected a dead connection. Its first
-      // replacement starts now; only a failed replacement earns a retry delay.
-      if (checkingConnection) {
-        attempt = 0;
-        retryAt = Date.now();
-      }
-      scheduleRetry();
-    } finally {
-      running = false;
-      if (!disposed && !suspended && active) {
-        if (refreshRequested) {
+    yield* Effect.gen(function* () {
+      const result = yield* recoveryCall(connect).pipe(Effect.result);
+      if (Result.isFailure(result)) {
+        const error = result.failure;
+        if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
+          interrupted = true;
+          retryRequested = false;
           retryAt = null;
-          void run();
-        } else if (retryRequested) scheduleRetry();
-        else if (interrupted) void run();
-        else {
-          online = true;
-          attempt = 0;
-          retryAt = null;
-          onStatus({ phase: "online", attempt: 0, remainingSeconds: 0 });
+          return;
         }
+        if (active) {
+          online = false;
+          if (!disposed) onError(error);
+        }
+        retryRequested = true;
+        // A read on a previously usable peer detected a dead connection. Its first
+        // replacement starts now; only a failed replacement earns a retry delay.
+        if (checkingConnection) {
+          attempt = 0;
+          retryAt = Date.now();
+        }
+        scheduleRetry();
       }
-    }
-  }
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          running = false;
+          if (!disposed && !suspended && active) {
+            if (refreshRequested) {
+              retryAt = null;
+              again = true;
+            } else if (retryRequested)
+              scheduleRetry(() => {
+                again = true;
+              });
+            else if (interrupted) again = true;
+            else {
+              online = true;
+              attempt = 0;
+              retryAt = null;
+              onStatus({ phase: "online", attempt: 0, remainingSeconds: 0 });
+            }
+          }
+        }),
+      ),
+    );
+    return again;
+  });
 
   return {
     setActive(value: boolean) {
@@ -235,7 +271,7 @@ export function createRemoteConnectionRecovery(
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
-        else void run();
+        else startRun();
       }
     },
     offline(error?: unknown) {
@@ -257,7 +293,7 @@ export function createRemoteConnectionRecovery(
       retryAt = null;
       attempt = 0;
       cancelTimer();
-      if (active) void run();
+      if (active) startRun();
     },
     /**
      * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
@@ -282,7 +318,7 @@ export function createRemoteConnectionRecovery(
       attempt = 0;
       cancelTimer();
       if (running || !active) refreshRequested = true;
-      else void run();
+      else startRun();
     },
     dispose() {
       disposed = true;
@@ -301,17 +337,19 @@ export function createRemoteReadRefresh() {
       cursors.set(serverId, cursor);
       return () => cursors.get(serverId) === cursor;
     },
-    async refresh<T>(
+    refresh<T, E>(
       serverId: string,
-      load: () => Promise<T>,
+      load: () => Effect.Effect<T, E>,
       apply: (value: T) => void,
       isCurrent: () => boolean,
-    ): Promise<void> {
-      const request = (requests.get(serverId) ?? 0) + 1;
-      requests.set(serverId, request);
-      const cursor = cursors.get(serverId);
-      const value = await load();
-      if (requests.get(serverId) === request && cursors.get(serverId) === cursor && isCurrent()) apply(value);
+    ): Effect.Effect<void, E> {
+      return Effect.gen(function* () {
+        const request = (requests.get(serverId) ?? 0) + 1;
+        requests.set(serverId, request);
+        const cursor = cursors.get(serverId);
+        const value = yield* load();
+        if (requests.get(serverId) === request && cursors.get(serverId) === cursor && isCurrent()) apply(value);
+      });
     },
   };
 }
@@ -332,18 +370,18 @@ export function mergeRemoteUnreadIds(current: string[], reads: Record<string, { 
 }
 
 /** Only conversations cached for agents in this server need recovery. */
-export async function resyncRemoteConversations(input: {
+export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConversations")(function* <E>(input: {
   agentIds: string[];
   cached: Record<string, ConversationSnapshot>;
-  load: (agentId: string) => Promise<ConversationSnapshot>;
+  load: (agentId: string) => Effect.Effect<ConversationSnapshot, E>;
   apply: (snapshot: ConversationSnapshot) => void;
   isCurrent: () => boolean;
-}): Promise<void> {
+}) {
   for (const agentId of input.agentIds) {
     if (!input.isCurrent()) return;
     if (!input.cached[agentId]) continue;
-    const snapshot = await input.load(agentId);
+    const snapshot = yield* input.load(agentId);
     if (!input.isCurrent()) return;
     input.apply(snapshot);
   }
-}
+});

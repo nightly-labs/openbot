@@ -1,5 +1,11 @@
 import { execFile } from "node:child_process";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema } from "effect";
+
+/** The process scan failed. The cause is the message the install refusal shows. */
+export class SiblingScanFailed extends Schema.TaggedError<SiblingScanFailed>()("SiblingScanFailed", {
+  cause: Schema.Defect(),
+}) {}
 
 /**
  * Another OpenBot process running from the same application bundle. On a Mac shared by several
@@ -15,7 +21,7 @@ interface SiblingScanInput {
   executablePath: string;
   currentPid: number;
   platform?: NodeJS.Platform;
-  listProcesses?: () => Promise<string>;
+  listProcesses?: () => Effect.Effect<string, SiblingScanFailed>;
 }
 
 /**
@@ -29,11 +35,16 @@ interface SiblingScanInput {
  * with `--type=` arguments, so a scan there always finds this session's own children. An AppImage
  * also mounts at a new path for each launch, so no other session can share the executable path.
  */
-export async function listSiblingOpenBotInstances(input: SiblingScanInput): Promise<OpenBotSiblingInstance[]> {
-  const platform = input.platform ?? process.platform;
-  if (platform !== "darwin") return [];
-  const output = await (input.listProcesses ?? listProcessesWithPs)();
-  return parseSiblingInstances(output, input);
+export function listSiblingOpenBotInstances(
+  input: SiblingScanInput,
+): Effect.Effect<OpenBotSiblingInstance[], SiblingScanFailed> {
+  return Effect.suspend(() => {
+    const platform = input.platform ?? process.platform;
+    if (platform !== "darwin") return Effect.succeed([]);
+    return (input.listProcesses ?? listProcessesWithPs)().pipe(
+      Effect.map((output) => parseSiblingInstances(output, input)),
+    );
+  });
 }
 
 export function parseSiblingInstances(
@@ -55,12 +66,13 @@ export function parseSiblingInstances(
   return siblings;
 }
 
-function listProcessesWithPs(): Promise<string> {
-  return new Promise((resolve, reject) => {
+function listProcessesWithPs(): Effect.Effect<string, SiblingScanFailed> {
+  return Effect.callback<string, SiblingScanFailed>((resume) => {
     // macOS comm is the executable path.
     execFile("/bin/ps", ["-ax", "-o", "pid=,uid=,comm="], (error, stdout) => {
-      if (error) reject(new Error(sourceText("error.update.siblingCheckFailed")));
-      else resolve(stdout);
+      if (error) {
+        resume(Effect.fail(new SiblingScanFailed({ cause: new Error(sourceText("error.update.siblingCheckFailed")) })));
+      } else resume(Effect.succeed(stdout));
     });
   });
 }

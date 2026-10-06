@@ -1,3 +1,7 @@
+import { Effect, Result, Schema } from "effect";
+
+class PluginIconError extends Schema.TaggedError<PluginIconError>()("PluginIconError", {}) {}
+
 // A listing's own icon, served from openbot.run rather than from the developer who published it.
 //
 // The catalog carries an `iconUrl` on each listing and each of its apps, and those addresses are
@@ -41,7 +45,7 @@ function iconSource(slug: string, appId: string | null): string | null {
   return plugin.iconUrl;
 }
 
-export async function pluginIconResponse(slug: string, appId: string | null): Promise<Response> {
+export const pluginIconResponse = Effect.fn("PluginIcon.response")(function* (slug: string, appId: string | null) {
   const source = iconSource(slug, appId);
   if (!source) return notFound();
 
@@ -53,17 +57,19 @@ export async function pluginIconResponse(slug: string, appId: string | null): Pr
   }
   if (url.protocol !== "https:") return notFound();
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(url, {
-      headers: { Accept: "image/*" },
-      redirect: "follow",
-      // The developer's server is not this origin's to wait on.
-      signal: AbortSignal.timeout(5_000),
-    });
-  } catch {
-    return notFound();
-  }
+  const result = yield* Effect.result(
+    Effect.tryPromise({
+      try: (signal) =>
+        fetch(url, {
+          headers: { Accept: "image/*" },
+          redirect: "follow",
+          signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+        }),
+      catch: () => new PluginIconError({}),
+    }),
+  );
+  if (Result.isFailure(result)) return notFound();
+  const upstream = result.success;
   const contentType = upstream.headers.get("Content-Type") ?? "";
   if (!upstream.ok || !isServableImage(contentType)) return notFound();
 
@@ -77,4 +83,4 @@ export async function pluginIconResponse(slug: string, appId: string | null): Pr
       "Content-Security-Policy": "default-src 'none'; sandbox",
     },
   });
-}
+});

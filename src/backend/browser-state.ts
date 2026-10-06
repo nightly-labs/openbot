@@ -3,6 +3,8 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { BrowserBounds, BrowserEnvironment } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { legacyAgentId } from "@openbot/contracts/validation";
+import { Effect } from "effect";
+import { browserCall, browserSync } from "./browser-effects";
 import type { BrowserToolArguments } from "./browser-tools";
 import { isMissingFileError } from "./file-errors";
 import { isRecord } from "./protocol";
@@ -225,37 +227,40 @@ export interface StoredBrowserStateV2 {
   activeTabId: string | null;
   tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
-
-export async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
-    if (!isRecord(parsed) || (parsed.version !== 1 && parsed.version !== 2)) {
-      return { version: 2, activeTabId: null, tabs: [] };
-    }
-    const tabs = Array.isArray(parsed.tabs)
-      ? parsed.tabs
-          .map(storedBrowserTab)
-          .filter((tab) => tab !== null)
-          .map((tab) => ({
-            ...tab,
-            url: persistentBrowserUrl(tab.url),
-            // A v1 file never wrote an environment, so anything sitting under that key in one is not
-            // ours to trust -- the tab starts from the default instead.
-            environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
-          }))
-      : [];
-    return {
-      version: 2,
-      activeTabId: isString(parsed.activeTabId) ? parsed.activeTabId : null,
-      tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
-    };
-  } catch (error) {
-    if (isMissingFileError(error) || error instanceof SyntaxError) {
-      return { version: 2, activeTabId: null, tabs: [] };
-    }
-    throw error;
-  }
-}
+export const readBrowserState = Effect.fn("Browser.readState")((path: string) =>
+  Effect.gen(function* () {
+    const content = yield* browserCall((signal) => readFile(path, { encoding: "utf8", signal }));
+    return yield* browserSync((): StoredBrowserStateV2 => {
+      const parsed = JSON.parse(content);
+      if (!isRecord(parsed) || (parsed.version !== 1 && parsed.version !== 2)) {
+        return { version: 2, activeTabId: null, tabs: [] };
+      }
+      const tabs = Array.isArray(parsed.tabs)
+        ? parsed.tabs
+            .map(storedBrowserTab)
+            .filter((tab) => tab !== null)
+            .map((tab) => ({
+              ...tab,
+              url: persistentBrowserUrl(tab.url),
+              // A v1 file never wrote an environment, so anything sitting under that key in one is not
+              // ours to trust -- the tab starts from the default instead.
+              environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
+            }))
+        : [];
+      return {
+        version: 2,
+        activeTabId: isString(parsed.activeTabId) ? parsed.activeTabId : null,
+        tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
+      };
+    });
+  }).pipe(
+    Effect.catch((error) =>
+      isMissingFileError(error.cause) || error.cause instanceof SyntaxError
+        ? Effect.succeed<StoredBrowserStateV2>({ version: 2, activeTabId: null, tabs: [] })
+        : Effect.fail(error),
+    ),
+  ),
+);
 
 export function resolveEnvironment(
   value: BrowserToolArguments<"set_environment">,

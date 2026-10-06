@@ -22,6 +22,9 @@ import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect } from "effect";
+import { runCauseEffect } from "../../backend/effect-boundary";
+import { remoteCall } from "../remote-service-effects";
 import type { TeamApiAgents, TeamApiMailbox } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -32,25 +35,42 @@ import { pathIdentifier, readBinary } from "./request-helpers";
 // (300 s) still counts while it waits, so a very slow pair of uploads can make it fail with 408.
 const ATTACHMENT_UPLOAD_SLOTS = 2;
 
+/**
+ * A released slot goes directly to the oldest waiting upload, so a new upload cannot take it first.
+ * `Semaphore` wakes its waiters on a later task, which lets a new upload take the slot in between.
+ */
 class UploadSlots {
-  readonly #waiting: Array<() => void> = [];
+  readonly #waiting: Deferred.Deferred<void>[] = [];
   #free: number;
 
   constructor(count: number) {
     this.#free = count;
   }
 
-  async use<T>(run: () => Promise<T>): Promise<T> {
-    if (this.#free > 0) this.#free -= 1;
-    else await new Promise<void>((resolve) => this.#waiting.push(resolve));
-    try {
-      return await run();
-    } finally {
-      // The slot goes directly to the next upload, so a new upload cannot take it first.
-      const next = this.#waiting.shift();
-      if (next) next();
-      else this.#free += 1;
-    }
+  use<A, E>(run: Effect.Effect<A, E>): Effect.Effect<A, E> {
+    return Effect.acquireUseRelease(
+      this.#take(),
+      () => run,
+      () => Effect.sync(() => this.#release()),
+    );
+  }
+
+  #take(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#free > 0) {
+        this.#free -= 1;
+        return Effect.void;
+      }
+      const slot = Deferred.makeUnsafe<void>();
+      this.#waiting.push(slot);
+      return Deferred.await(slot);
+    });
+  }
+
+  #release(): void {
+    const next = this.#waiting.shift();
+    if (next) Deferred.doneUnsafe(next, Effect.void);
+    else this.#free += 1;
   }
 }
 
@@ -79,10 +99,14 @@ export async function routeFiles(
     if (mimeType.length > INPUT_LIMITS.mimeType) {
       throw new HttpError(400, "The attachment MIME type is too long.");
     }
-    const [attachment] = await attachmentUploads.use(async () => {
-      const bytes = await readBinary(request, ATTACHMENT_LIMITS.fileBytes);
-      return agents.prepareImportedAttachments([], [{ name, mimeType, bytes }]);
-    });
+    const [attachment] = await runCauseEffect(
+      attachmentUploads.use(
+        Effect.gen(function* () {
+          const bytes = yield* remoteCall(() => readBinary(request, ATTACHMENT_LIMITS.fileBytes));
+          return yield* agents.prepareImportedAttachments([], [{ name, mimeType, bytes }]);
+        }),
+      ),
+    );
     if (!attachment) throw new Error("The attachment was not prepared.");
     return json(201, attachment);
   }
@@ -90,11 +114,11 @@ export async function routeFiles(
   if (attachmentMatch) {
     const attachmentId = pathIdentifier(attachmentMatch[1], "attachmentId");
     if (method === "DELETE") {
-      await agents.discardDraftAttachment(attachmentId);
+      await runCauseEffect(agents.discardDraftAttachment(attachmentId));
       return empty(204);
     }
     if (method === "GET") {
-      const attachment = await mailbox.resolveAttachment(attachmentId);
+      const attachment = await runCauseEffect(mailbox.resolveAttachment(attachmentId));
       if (!attachment) throw new HttpError(404, sourceText("error.team.attachmentNotFound"));
       return sendFile(response, attachment.path, null, (size) => ({
         "Content-Type": attachment.mimeType || "application/octet-stream",
@@ -108,7 +132,7 @@ export async function routeFiles(
     if (!sharedPath || sharedPath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid shared file path is required.");
     }
-    const sharedFile = await agents.resolveSharedFile(sharedPath);
+    const sharedFile = await runCauseEffect(agents.resolveSharedFile(sharedPath));
     if (sharedFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.sharedFileTooLarge"));
     }
@@ -129,7 +153,7 @@ export async function routeFiles(
     if (!workspacePath || workspacePath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid workspace file path is required.");
     }
-    const workspaceFile = await agents.resolveWorkspaceFile(agentId, workspacePath);
+    const workspaceFile = await runCauseEffect(agents.resolveWorkspaceFile(agentId, workspacePath));
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {
       throw new HttpError(413, sourceText("error.team.workspaceFileTooLarge"));
     }

@@ -5,6 +5,7 @@ import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../../effect-boundary";
 import { SlackWebApi } from "./slack-web-api";
 
 const TOKEN = "xoxb-1111-2222-downloadtoken";
@@ -41,8 +42,12 @@ describe("SlackWebApi.download", () => {
     roots.push(root);
     const api = new SlackWebApi({ token: TOKEN, origin: slack });
 
-    await expect(api.download(`${foreign}/file`, join(root, "direct"), 1024)).rejects.toThrow("untrusted_file_url");
-    await expect(api.download(`${slack}/file`, join(root, "redirected"), 1024)).rejects.toThrow("untrusted_file_url");
+    await expect(runCauseEffect(api.download(`${foreign}/file`, join(root, "direct"), 1024))).rejects.toThrow(
+      "untrusted_file_url",
+    );
+    await expect(runCauseEffect(api.download(`${slack}/file`, join(root, "redirected"), 1024))).rejects.toThrow(
+      "untrusted_file_url",
+    );
     expect(seen).toEqual([]);
   });
 
@@ -53,10 +58,10 @@ describe("SlackWebApi.download", () => {
     const api = new SlackWebApi({ token: TOKEN, origin: slack });
     const destination = join(root, "big");
 
-    await expect(api.download(`${slack}/file`, destination, 1024)).rejects.toThrow("too_large");
+    await expect(runCauseEffect(api.download(`${slack}/file`, destination, 1024))).rejects.toThrow("too_large");
     await expect(stat(destination)).rejects.toThrow();
 
-    await api.download(`${slack}/file`, destination, 8192);
+    await runCauseEffect(api.download(`${slack}/file`, destination, 8192));
     expect((await readFile(destination)).byteLength).toBe(4096);
   });
 });

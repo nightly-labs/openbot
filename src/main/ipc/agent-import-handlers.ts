@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // Agent import into the local host, or into a joined server with `agent-import-v1`. The file dialog
 // opens here, so the renderer never names a path. For a joined server, main reads the file and sends it.
 
@@ -19,6 +20,7 @@ import {
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentImportService } from "../agent-import-service";
 import { decodeAgentSummaries } from "../remote-agent-decoding";
 import { AGENT_IMPORT_UPLOAD_TIMEOUT_MS, type RemoteServerManager } from "../remote-server-manager";
@@ -65,19 +67,21 @@ export function agentImportIpcHandlers({
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(sourceText("error.import.remoteZipTooLarge"));
-    return remoteServers.stageAgentImport(serverId, new Uint8Array(await readFile(path)));
+    return runCauseEffect(remoteServers.stageAgentImport(serverId, new Uint8Array(await readFile(path))));
   };
 
   const applyRemote = async (input: ApplyAgentImportInput, serverId: string) => {
     requireRemoteImport(serverId);
-    const result = await remoteServers.request(serverId, AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, {
-      method: "POST",
-      body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
-    });
+    const result = await runCauseEffect(
+      remoteServers.request(serverId, AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, {
+        method: "POST",
+        body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+        timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+      }),
+    );
     return resolveRemoteAgentImportResult(
       result,
-      await remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+      await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)),
     );
   };
 
@@ -86,22 +90,24 @@ export function agentImportIpcHandlers({
       choose: scopedQueryHandler({
         local: async () => {
           const path = await chooseExport();
-          return path ? agentImport.stage(path) : null;
+          return path ? runCauseEffect(agentImport.stage(path)) : null;
         },
         remote: stageRemote,
       }),
       apply: scopedHandler(parseApplyAgentImportInput, {
-        local: (input) => agentImport.apply(input),
+        local: (input) => runCauseEffect(agentImport.apply(input)),
         remote: applyRemote,
       }),
       discard: scopedHandler(stringPayload("token"), {
-        local: (token) => agentImport.discard(token),
+        local: (token) => Effect.runPromise(agentImport.discard(token)),
         remote: async (token, serverId) => {
           requireRemoteImport(serverId);
-          await remoteServers.request(serverId, AGENT_IMPORT_ROUTES.discard, () => undefined, {
-            method: "POST",
-            body: { token },
-          });
+          await runCauseEffect(
+            remoteServers.request(serverId, AGENT_IMPORT_ROUTES.discard, () => undefined, {
+              method: "POST",
+              body: { token },
+            }),
+          );
         },
       }),
       readSkill: handler(() => readFile(exportSkillPath, "utf8")),

@@ -2,13 +2,16 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import {
   type OnePasswordClient,
   type OnePasswordCliRunner,
   OnePasswordConnectorService,
 } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
+import type { OnePasswordOperationError } from "./onepassword-effects";
 
 const TOKEN = "ops_service-account-token-for-tests";
 const PASSWORD = "vault-only-hunter2";
@@ -67,8 +70,8 @@ function service(
   runCli: OnePasswordCliRunner,
   options: {
     createClient?: (token: string) => Promise<OnePasswordClient>;
-    findCli?: () => Promise<string[]>;
-    installCli?: (signal: AbortSignal) => Promise<unknown>;
+    findCli?: () => Effect.Effect<string[]>;
+    installCli?: (signal: AbortSignal) => Effect.Effect<string, OnePasswordOperationError>;
     store?: (path: string) => OnePasswordConnectorStore;
   } = {},
 ) {
@@ -81,7 +84,7 @@ function service(
       appVersion: "1.0.0",
       cliInstall: null,
       openExternal: async () => undefined,
-      findCli: options.findCli ?? (async () => ["/usr/local/bin/op"]),
+      findCli: options.findCli ?? (() => Effect.succeed(["/usr/local/bin/op"])),
       runCli,
       installCli: options.installCli,
       createClient: options.createClient ?? (async () => fakeClient()),
@@ -94,7 +97,7 @@ describe("OnePasswordConnectorService", () => {
     const cli = fakeCli([{ account_uuid: "account-1", email: "ada@example.com", url: "my.1password.com" }]);
     const { connector, path } = service(cli);
 
-    const status = await connector.connect({ accountId: null });
+    const status = await runCauseEffect(connector.connect({ accountId: null }));
 
     expect(status).toMatchObject({ state: "connected", vaultNames: ["Shared with OpenBot"], loginCount: 1 });
     expect(JSON.stringify(status)).not.toContain(TOKEN);
@@ -110,7 +113,7 @@ describe("OnePasswordConnectorService", () => {
     ]);
     const { connector } = service(cli);
 
-    const status = await connector.connect({ accountId: null });
+    const status = await runCauseEffect(connector.connect({ accountId: null }));
 
     expect(status.state).toBe("choose-account");
     expect(status.accounts.map((account) => account.id)).toEqual(["account-1", "account-2"]);
@@ -119,11 +122,11 @@ describe("OnePasswordConnectorService", () => {
 
   it("gives a password only for a site that the login is saved for", async () => {
     const { connector } = service(fakeCli([]));
-    await connector.connectWithToken(TOKEN);
+    await runCauseEffect(connector.connectWithToken(TOKEN));
 
-    expect(await connector.secretFor("login-1", "https://evilgithub.com", "password")).toBeNull();
-    expect(await connector.secretFor("login-1", "https://github.com", "password")).toBe(PASSWORD);
-    expect(await connector.loginsFor("https://github.com")).toEqual([
+    expect(await runCauseEffect(connector.secretFor("login-1", "https://evilgithub.com", "password"))).toBeNull();
+    expect(await runCauseEffect(connector.secretFor("login-1", "https://github.com", "password"))).toBe(PASSWORD);
+    expect(await runCauseEffect(connector.loginsFor("https://github.com"))).toEqual([
       { id: "login-1", title: "GitHub", username: "ada", hasOneTimePassword: false },
     ]);
   });
@@ -132,13 +135,13 @@ describe("OnePasswordConnectorService", () => {
     let websites: Websites = [{ url: "https://github.com", autofillBehavior: "AnywhereOnWebsite" }];
     const client = fakeClient({ websites: () => websites });
     const { connector } = service(fakeCli([]), { createClient: async () => client });
-    await connector.connectWithToken(TOKEN);
+    await runCauseEffect(connector.connectWithToken(TOKEN));
 
     // The index is still fresh and lists github.com; the user has since set the login to Never.
     websites = [{ url: "https://github.com", autofillBehavior: "Never" }];
 
-    expect(await connector.secretFor("login-1", "https://github.com", "password")).toBeNull();
-    expect(await connector.loginsFor("https://github.com")).toEqual([]);
+    expect(await runCauseEffect(connector.secretFor("login-1", "https://github.com", "password"))).toBeNull();
+    expect(await runCauseEffect(connector.loginsFor("https://github.com"))).toEqual([]);
   });
 
   it("drops a password that 1Password sends after Disconnect", async () => {
@@ -153,12 +156,12 @@ describe("OnePasswordConnectorService", () => {
       },
     });
     const { connector } = service(fakeCli([]), { createClient: async () => client });
-    await connector.connectWithToken(TOKEN);
+    await runCauseEffect(connector.connectWithToken(TOKEN));
     pending = true;
 
-    const secret = connector.secretFor("login-1", "https://github.com", "password");
+    const secret = runCauseEffect(connector.secretFor("login-1", "https://github.com", "password"));
     await vi.waitFor(() => expect(release).toBeDefined());
-    await connector.disconnect();
+    await runCauseEffect(connector.disconnect());
     release?.();
 
     expect(await secret).toBeNull();
@@ -166,10 +169,10 @@ describe("OnePasswordConnectorService", () => {
 
   it("gives no password to a read that starts while Disconnect removes the file", async () => {
     const { connector } = service(fakeCli([]));
-    await connector.connectWithToken(TOKEN);
+    await runCauseEffect(connector.connectWithToken(TOKEN));
 
-    const disconnecting = connector.disconnect();
-    expect(await connector.secretFor("login-1", "https://github.com", "password")).toBeNull();
+    const disconnecting = runCauseEffect(connector.disconnect());
+    expect(await runCauseEffect(connector.secretFor("login-1", "https://github.com", "password"))).toBeNull();
     await disconnecting;
   });
 
@@ -180,21 +183,22 @@ describe("OnePasswordConnectorService", () => {
     });
     let writing = false;
     class SlowStore extends OnePasswordConnectorStore {
-      override async write(...args: Parameters<OnePasswordConnectorStore["write"]>): Promise<boolean> {
-        writing = true;
-        await gate;
-        return super.write(...args);
+      override write(...args: Parameters<OnePasswordConnectorStore["write"]>) {
+        const write = super.write(...args);
+        return Effect.sync(() => {
+          writing = true;
+        }).pipe(Effect.andThen(Effect.promise(() => gate)), Effect.andThen(write));
       }
     }
     const { connector, path } = service(fakeCli([]), { store: (file) => new SlowStore(file, cipher) });
 
-    const connecting = connector.connectWithToken(TOKEN);
+    const connecting = runCauseEffect(connector.connectWithToken(TOKEN));
     await vi.waitFor(() => expect(writing).toBe(true));
     connector.cancel();
     unblock?.();
 
     expect((await connecting).state).toBe("disconnected");
-    expect(await connector.loginsFor("https://github.com")).toBeNull();
+    expect(await runCauseEffect(connector.loginsFor("https://github.com"))).toBeNull();
     await expect(readFile(path, "utf8")).rejects.toThrow();
   });
 
@@ -207,9 +211,9 @@ describe("OnePasswordConnectorService", () => {
         }),
     });
 
-    const connecting = connector.connectWithToken(TOKEN);
+    const connecting = runCauseEffect(connector.connectWithToken(TOKEN));
     await vi.waitFor(() => expect(accept).toBeDefined());
-    await connector.disconnect();
+    await runCauseEffect(connector.disconnect());
     accept?.();
 
     expect((await connecting).state).toBe("disconnected");
@@ -223,11 +227,11 @@ describe("OnePasswordConnectorService", () => {
       },
     });
 
-    const status = await connector.connectWithToken(TOKEN);
+    const status = await runCauseEffect(connector.connectWithToken(TOKEN));
 
     expect(status.state).toBe("disconnected");
     expect(status.error).toBe("1Password did not accept the service account token.");
-    expect(await connector.loginsFor("https://github.com")).toBeNull();
+    expect(await runCauseEffect(connector.loginsFor("https://github.com"))).toBeNull();
     await expect(readFile(path, "utf8")).rejects.toThrow();
   });
 
@@ -244,12 +248,12 @@ describe("OnePasswordConnectorService", () => {
       appVersion: "1.0.0",
       cliInstall: null,
       openExternal: async () => undefined,
-      findCli: async () => [],
+      findCli: () => Effect.succeed([]),
       runCli: fakeCli([]),
       createClient: async () => client,
       now: () => now,
     });
-    await connector.connectWithToken(TOKEN);
+    await runCauseEffect(connector.connectWithToken(TOKEN));
     logins = 0;
     now = 60_000;
     const changed: number[] = [];
@@ -257,7 +261,7 @@ describe("OnePasswordConnectorService", () => {
       if (status.loginCount !== null) changed.push(status.loginCount);
     });
 
-    await connector.checkSetup();
+    await runCauseEffect(connector.checkSetup());
 
     await vi.waitFor(() => expect(changed).toContain(0));
   });
@@ -265,19 +269,21 @@ describe("OnePasswordConnectorService", () => {
   it("walks the setup from no CLI, through Install, to an app integration that is off", async () => {
     let installed = false;
     const { connector } = service(fakeCli([]), {
-      findCli: async () => (installed ? ["/openbot/1password-cli/2.39.0/op"] : []),
-      installCli: async () => {
-        installed = true;
-      },
+      findCli: () => Effect.sync(() => (installed ? ["/openbot/1password-cli/2.39.0/op"] : [])),
+      installCli: () =>
+        Effect.sync(() => {
+          installed = true;
+          return "/openbot/1password-cli/2.39.0/op";
+        }),
     });
 
-    expect((await connector.checkSetup()).setup).toEqual({
+    expect((await runCauseEffect(connector.checkSetup())).setup).toEqual({
       cli: "missing",
       cliVersion: null,
       canInstall: true,
       appIntegration: null,
     });
-    expect((await connector.installCli()).setup).toEqual({
+    expect((await runCauseEffect(connector.installCli())).setup).toEqual({
       cli: "ready",
       cliVersion: "2.30.0",
       canInstall: true,

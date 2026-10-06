@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { Effect, Result } from "effect";
 import { migrateOpenBotDatabase } from "../openbot-database-schema";
+import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 
 export interface OrchestrationEventInput {
@@ -55,30 +57,37 @@ export class DatabaseCore {
     this.#legacyBackupRoot = join(options.userDataPath, "legacy-backup-v1");
   }
 
-  async initialize(): Promise<void> {
+  initialize = Effect.fn("DatabaseCore.initialize")(function* (this: DatabaseCore) {
     if (this.#db) return;
-    await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-    const db = new DatabaseSync(this.path);
-    try {
-      db.exec("PRAGMA journal_mode = WAL");
-      db.exec("PRAGMA foreign_keys = ON");
-      db.exec("PRAGMA busy_timeout = 5000");
-      db.exec("PRAGMA synchronous = NORMAL");
-      db.function(COLLAPSE_WHITESPACE_FUNCTION, { deterministic: true }, (value) =>
-        typeof value === "string" ? value.replace(/\s+/gu, " ") : value,
-      );
-      db.function(LOWERCASE_FUNCTION, { deterministic: true }, (value) =>
-        typeof value === "string" ? value.toLocaleLowerCase() : value,
-      );
-      this.#db = db;
-      this.#migrate();
-      await chmod(this.path, 0o600);
-    } catch (error) {
-      db.close();
-      this.#db = null;
-      throw error;
+    yield* storedIO(() => mkdir(dirname(this.path), { recursive: true, mode: 0o700 }));
+    const db = yield* storedSync(() => new DatabaseSync(this.path));
+    const configured = yield* Effect.result(
+      Effect.gen({ self: this }, function* () {
+        yield* storedSync(() => {
+          db.exec("PRAGMA journal_mode = WAL");
+          db.exec("PRAGMA foreign_keys = ON");
+          db.exec("PRAGMA busy_timeout = 5000");
+          db.exec("PRAGMA synchronous = NORMAL");
+          db.function(COLLAPSE_WHITESPACE_FUNCTION, { deterministic: true }, (value) =>
+            typeof value === "string" ? value.replace(/\s+/gu, " ") : value,
+          );
+          db.function(LOWERCASE_FUNCTION, { deterministic: true }, (value) =>
+            typeof value === "string" ? value.toLocaleLowerCase() : value,
+          );
+          this.#db = db;
+          this.#migrate();
+        });
+        yield* storedIO(() => chmod(this.path, 0o600));
+      }),
+    );
+    if (Result.isFailure(configured)) {
+      yield* storedSync(() => {
+        db.close();
+        this.#db = null;
+      });
+      return yield* configured.failure;
     }
-  }
+  }, Effect.uninterruptible);
 
   close(): void {
     this.#db?.close();
@@ -167,22 +176,19 @@ export class DatabaseCore {
     }
   }
 
-  async backupLegacyFile(path: string): Promise<void> {
-    try {
-      await readFile(path);
-    } catch (error) {
-      if (errorCode(error) === "ENOENT") return;
-      throw error;
+  backupLegacyFile = Effect.fn("DatabaseCore.backupLegacyFile")(function* (this: DatabaseCore, path: string) {
+    const found = yield* Effect.result(storedIO(() => readFile(path)));
+    if (Result.isFailure(found)) {
+      if (errorCode(found.failure.cause) === "ENOENT") return;
+      return yield* found.failure;
     }
-    await mkdir(this.#legacyBackupRoot, { recursive: true, mode: 0o700 });
+    yield* storedIO(() => mkdir(this.#legacyBackupRoot, { recursive: true, mode: 0o700 }));
     const target = join(this.#legacyBackupRoot, basename(path));
-    try {
-      await copyFile(path, target, 1);
-    } catch (error) {
-      if (errorCode(error) !== "EEXIST") throw error;
-    }
-    await chmod(target, 0o600);
-  }
+    yield* storedIO(() => copyFile(path, target, 1)).pipe(
+      Effect.catch((failure) => (errorCode(failure.cause) === "EEXIST" ? Effect.void : Effect.fail(failure))),
+    );
+    yield* storedIO(() => chmod(target, 0o600));
+  }, Effect.uninterruptible);
 
   hasAggregateEvents(aggregateType: string, aggregateId: string): boolean {
     return Boolean(

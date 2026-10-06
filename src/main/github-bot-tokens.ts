@@ -2,8 +2,10 @@
 // that GitHub shows an agent's work as the app and not as the signed-in user.
 
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { z } from "zod";
 import type { GitHubFetch } from "./github-device-flow";
+import { GitHubOperationError, githubCall, githubDecode } from "./github-effects";
 
 const logger = createOpenBotLogger("github-bot-tokens");
 
@@ -97,16 +99,23 @@ export class GitHubBotTokens {
    * Replaces the set with the API's answer. A failure keeps the tokens that are still valid and
    * does not reject. An answer that arrives after `clear` is discarded.
    */
-  async renew(userToken: string, signal?: AbortSignal): Promise<void> {
+
+  readonly renew = Effect.fn("GitHubBotTokens.renew")(function* (
+    this: GitHubBotTokens,
+    userToken: string,
+    signal?: AbortSignal,
+  ): Effect.fn.Return<void, GitHubOperationError> {
     const epoch = this.#epoch;
-    try {
-      const response = await this.#fetch(new URL("/v1/github/installation-tokens", this.#apiUrl).toString(), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${userToken}`, Accept: "application/json" },
-        signal: signal
-          ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
-          : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
+    yield* Effect.gen({ self: this }, function* () {
+      const response = yield* githubCall((fiberSignal) =>
+        this.#fetch(new URL("/v1/github/installation-tokens", this.#apiUrl).toString(), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${userToken}`, Accept: "application/json" },
+          signal: signal
+            ? AbortSignal.any([signal, fiberSignal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+            : AbortSignal.any([fiberSignal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        }),
+      );
       if (epoch !== this.#epoch) return;
       if (response.status === 503) {
         // This API has no app key: agents act as the user until it does.
@@ -114,8 +123,12 @@ export class GitHubBotTokens {
         this.#nextAt = this.#now() + RETRY_MS;
         return;
       }
-      if (!response.ok) throw new Error(`The OpenBot API refused the GitHub token request (HTTP ${response.status}).`);
-      const answer = answerSchema.parse(await response.json());
+      if (!response.ok)
+        return yield* new GitHubOperationError({
+          cause: new Error(`The OpenBot API refused the GitHub token request (HTTP ${response.status}).`),
+        });
+      const json = yield* githubCall(() => response.json());
+      const answer = yield* githubDecode(() => answerSchema.parse(json));
       if (epoch !== this.#epoch) return;
       const next = new Map<string, GitHubBotToken>();
       for (const installation of answer.installations) {
@@ -130,18 +143,22 @@ export class GitHubBotTokens {
       const firstExpiry = Math.min(...[...next.values()].map((entry) => entry.expiresAt));
       this.#nextAt = next.size > 0 ? firstExpiry - RENEW_MARGIN_MS : this.#now() + RETRY_MS;
       this.#failureLogged = false;
-    } catch (error) {
-      if (signal?.aborted || epoch !== this.#epoch) return;
-      // Due again when the first token ends, so that the caller removes it from its files.
-      const now = this.#now();
-      const expiries = [...this.#byRepository.values()].map((entry) => entry.expiresAt).filter((at) => at > now);
-      this.#nextAt = Math.min(now + RETRY_MS, ...expiries);
-      if (!this.#failureLogged) {
-        this.#failureLogged = true;
-        logger.warn("The GitHub App tokens could not be renewed. Agents act on GitHub as the signed-in user.", {
-          cause: toLogValue(error),
-        });
-      }
-    }
-  }
+    }).pipe(
+      Effect.catch(({ cause: error }) =>
+        Effect.sync(() => {
+          if (signal?.aborted || epoch !== this.#epoch) return;
+          // Due again when the first token ends, so that the caller removes it from its files.
+          const now = this.#now();
+          const expiries = [...this.#byRepository.values()].map((entry) => entry.expiresAt).filter((at) => at > now);
+          this.#nextAt = Math.min(now + RETRY_MS, ...expiries);
+          if (!this.#failureLogged) {
+            this.#failureLogged = true;
+            logger.warn("The GitHub App tokens could not be renewed. Agents act on GitHub as the signed-in user.", {
+              cause: toLogValue(error),
+            });
+          }
+        }),
+      ),
+    );
+  });
 }

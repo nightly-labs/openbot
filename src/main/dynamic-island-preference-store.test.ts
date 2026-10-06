@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -15,7 +16,7 @@ afterEach(async () => {
 describe("dynamic island preference store", () => {
   it("defaults to enabled when no preference exists", async () => {
     const root = await temporaryRoot();
-    await expect(readDynamicIslandPreference(join(root, "dynamic-island.json"))).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(join(root, "dynamic-island.json")))).resolves.toEqual({
       enabled: true,
       hapticsEnabled: true,
       idleVisible: true,
@@ -29,7 +30,7 @@ describe("dynamic island preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     await writeFile(path, '{"version":1,"enabled":"yes"}\n');
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual({
       enabled: true,
       hapticsEnabled: true,
       idleVisible: true,
@@ -43,7 +44,7 @@ describe("dynamic island preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     await writeFile(path, '{"version":1,"enabled":false}\n');
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual({
       enabled: false,
       hapticsEnabled: true,
       idleVisible: true,
@@ -57,7 +58,7 @@ describe("dynamic island preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     await writeFile(path, '{"version":2,"enabled":true,"hapticsEnabled":false}\n');
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual({
       enabled: true,
       hapticsEnabled: false,
       idleVisible: true,
@@ -74,7 +75,7 @@ describe("dynamic island preference store", () => {
       path,
       '{"version":3,"enabled":true,"hapticsEnabled":false,"idleVisible":false,"additionalDisplaysEnabled":false}\n',
     );
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual({
       enabled: true,
       hapticsEnabled: false,
       idleVisible: false,
@@ -91,7 +92,7 @@ describe("dynamic island preference store", () => {
       path,
       '{"version":3,"enabled":true,"hapticsEnabled":false,"idleVisible":true,"additionalDisplaysEnabled":false,"widthPercent":5,"heightPercent":110}\n',
     );
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual({
       enabled: true,
       hapticsEnabled: false,
       idleVisible: true,
@@ -112,8 +113,8 @@ describe("dynamic island preference store", () => {
       widthPercent: 80,
       heightPercent: 90,
     };
-    await expect(writeDynamicIslandPreference(path, preference)).resolves.toEqual(preference);
-    await expect(readDynamicIslandPreference(path)).resolves.toEqual(preference);
+    await expect(Effect.runPromise(writeDynamicIslandPreference(path, preference))).resolves.toEqual(preference);
+    await expect(Effect.runPromise(readDynamicIslandPreference(path))).resolves.toEqual(preference);
     expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ version: 3, ...preference });
   });
 });

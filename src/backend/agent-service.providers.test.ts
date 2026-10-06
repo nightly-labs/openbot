@@ -15,9 +15,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
-import type { AgentService } from "./agent-service";
+import { AgentLifecycleFailed, type AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
@@ -37,6 +38,7 @@ import {
   waitFor,
   waitForQueue,
 } from "./agent-service-test-harness";
+import { runCauseEffect } from "./effect-boundary";
 import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS } from "./provider-drivers";
@@ -54,7 +56,7 @@ let service: AgentService | null = null;
  * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
  */
 async function launchEnvironment(pairs: Record<string, string> = {}): Promise<Record<string, string>> {
-  const path = await loginShellPath();
+  const path = await Effect.runPromise(loginShellPath());
   return { ...(path ? { PATH: path } : {}), ...pairs };
 }
 
@@ -75,41 +77,45 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await service.sendMessage({ agentId: "chief", text: "This is my normal conversation." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "This is my normal conversation." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const agent = service.listAgents().find((item) => item.id === "chief");
     if (!agent?.threadId) throw new Error("Normal conversation did not start.");
     const normalSession = store.activeProviderSession(agent.id)?.externalSessionId;
-    const before = await service.readConversation(agent.id);
+    const before = await runCauseEffect(service.readConversation(agent.id));
     const actor = { id: "human", name: "Alex" };
-    await service.channels.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: "create",
-        draft: {
-          name: "Project",
-          title: "",
-          instructions: "Shared work",
-          members: [{ agentId: agent.id }],
-          leadAgentId: agent.id,
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "save",
+          channelId: "channel-1",
+          operationId: "create",
+          draft: {
+            name: "Project",
+            title: "",
+            instructions: "Shared work",
+            members: [{ agentId: agent.id }],
+            leadAgentId: agent.id,
+          },
         },
-      },
-      actor,
+        actor,
+      ),
     );
-    await service.channels.command(
-      {
-        type: "send",
-        channelId: "channel-1",
-        operationId: "send",
-        text: "Work only in this channel.",
-        recipientAgentId: agent.id,
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      actor,
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "send",
+          channelId: "channel-1",
+          operationId: "send",
+          text: "Work only in this channel.",
+          recipientAgentId: agent.id,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
     );
     await waitFor(() => service?.channels.store.tasks("channel-1")[0]?.state === "completed");
     expect(
@@ -118,14 +124,14 @@ describe.sequential("AgentService: providers", () => {
         .filter((item) => item.author.kind === "agent")
         .map((item) => item.message.text),
     ).toEqual(["CODEX_DONE"]);
-    expect((await service.readConversation(agent.id)).messages).toEqual(before.messages);
+    expect((await runCauseEffect(service.readConversation(agent.id))).messages).toEqual(before.messages);
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
     expect(store.list().find((item) => item.id === agent.id)?.threadId).toBe(agent.threadId);
     const execution = service.channels.store.context("channel-1", agent.id);
     expect(store.database.activeProviderSession(execution.threadId, agent.provider)?.externalSessionId).not.toBe(
       normalSession,
     );
-    await service.sendMessage({ agentId: agent.id, text: "Continue in the normal conversation." });
+    await runCauseEffect(service.sendMessage({ agentId: agent.id, text: "Continue in the normal conversation." }));
     await waitFor(() => service?.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"));
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
   });
@@ -141,36 +147,42 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await store.getOrCreate("chief");
+    await runCauseEffect(store.getOrCreate("chief"));
     const actor = { id: "human", name: "Alex" };
-    await service.channels.command(
-      {
-        type: "save",
-        channelId: "channel-1",
-        operationId: "create",
-        draft: {
-          name: "Project",
-          title: "",
-          instructions: "Shared work",
-          members: [{ agentId: "chief" }],
-          leadAgentId: "chief",
-        },
-      },
-      actor,
-    );
-    const ask = async (operationId: string, text: string, tasks: number): Promise<void> => {
-      await service?.channels.command(
+    await runCauseEffect(
+      service.channels.command(
         {
-          type: "send",
+          type: "save",
           channelId: "channel-1",
-          operationId,
-          text,
-          recipientAgentId: "chief",
-          replyToMessageId: null,
-          attachmentDraftIds: [],
+          operationId: "create",
+          draft: {
+            name: "Project",
+            title: "",
+            instructions: "Shared work",
+            members: [{ agentId: "chief" }],
+            leadAgentId: "chief",
+          },
         },
         actor,
-      );
+      ),
+    );
+    const ask = async (operationId: string, text: string, tasks: number): Promise<void> => {
+      await (service
+        ? runCauseEffect(
+            service.channels.command(
+              {
+                type: "send",
+                channelId: "channel-1",
+                operationId,
+                text,
+                recipientAgentId: "chief",
+                replyToMessageId: null,
+                attachmentDraftIds: [],
+              },
+              actor,
+            ),
+          )
+        : undefined);
       // The count is part of the wait: the request of this ask has to reach the channel before the
       // tasks of the ask before it can answer for it.
       await waitFor(() => {
@@ -202,7 +214,7 @@ describe.sequential("AgentService: providers", () => {
       store.database.activeProviderSession(execution.threadId, "codex")?.externalSessionId;
     const lastStart = (): string =>
       JSON.stringify(client.requests.filter((request) => request.method === "thread/start").at(-1)?.params ?? "");
-    await service.updateAgent({ agentId: "chief", description: "Owns the quarterly report." });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", description: "Owns the quarterly report." }));
     await ask("third", "Report on the shared work.", 3);
     const editedSession = channelSessionNow();
     expect(editedSession).not.toBe(channelSession);
@@ -211,21 +223,23 @@ describe.sequential("AgentService: providers", () => {
 
     // The profile dialog saves through a second path, which holds the same standing instructions.
     const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
-    await sidebar.initialize();
-    await service.saveProfile(
-      {
-        operationId: randomUUID(),
-        agentId: "chief",
-        draft: {
-          name: "Chief",
-          title: "Local teammate",
-          description: "Runs the weekly review.",
-          avatarSeed: "first-bot",
-          avatarHue: null,
-          sectionId: null,
+    await runCauseEffect(sidebar.initialize());
+    await runCauseEffect(
+      service.saveProfile(
+        {
+          operationId: randomUUID(),
+          agentId: "chief",
+          draft: {
+            name: "Chief",
+            title: "Local teammate",
+            description: "Runs the weekly review.",
+            avatarSeed: "first-bot",
+            avatarHue: null,
+            sectionId: null,
+          },
         },
-      },
-      sidebar,
+        sidebar,
+      ),
     );
     await ask("fourth", "Review the shared work.", 4);
     expect(channelSessionNow()).not.toBe(editedSession);
@@ -240,37 +254,41 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.channels.command(
-      {
-        type: "save",
-        channelId: "channel-busy",
-        operationId: "create-busy",
-        draft: {
-          name: "Project",
-          title: "",
-          instructions: "Shared work",
-          members: [{ agentId: "chief" }],
-          leadAgentId: "chief",
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "save",
+          channelId: "channel-busy",
+          operationId: "create-busy",
+          draft: {
+            name: "Project",
+            title: "",
+            instructions: "Shared work",
+            members: [{ agentId: "chief" }],
+            leadAgentId: "chief",
+          },
         },
-      },
-      { id: "human", name: "Alex" },
+        { id: "human", name: "Alex" },
+      ),
     );
-    await service.channels.command(
-      {
-        type: "send",
-        channelId: "channel-busy",
-        operationId: "send-busy",
-        text: "Continue working",
-        recipientAgentId: "chief",
-        replyToMessageId: null,
-        attachmentDraftIds: [],
-      },
-      { id: "human", name: "Alex" },
+    await runCauseEffect(
+      service.channels.command(
+        {
+          type: "send",
+          channelId: "channel-busy",
+          operationId: "send-busy",
+          text: "Continue working",
+          recipientAgentId: "chief",
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        { id: "human", name: "Alex" },
+      ),
     );
     await waitFor(() => service?.channels.store.tasks("channel-busy")[0]?.state === "running");
     expect(service.listQueue("chief").deliveries).toEqual([]);
-    await expect(service.deleteAgent("chief")).rejects.toThrow("Stop the agent");
+    await expect(runCauseEffect(service.deleteAgent("chief"))).rejects.toThrow("Stop the agent");
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
   });
 
@@ -287,18 +305,20 @@ describe.sequential("AgentService: providers", () => {
         preferredProvider: "codex",
         clientFactory: () => client,
       });
-      await next.initialize();
+      await runCauseEffect(next.initialize());
       return next;
     };
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Remember that my researchers cover tennis and football." });
+    await runCauseEffect(
+      service.sendMessage({ agentId: "chief", text: "Remember that my researchers cover tennis and football." }),
+    );
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const original = service.listAgents().find((agent) => agent.id === "chief");
     const originalSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!original || !originalSession) throw new Error("The original session did not start.");
-    await service.stop();
+    await runCauseEffect(service.stop());
     const directory = join(store.database.userDataPath, "provider-toolsets");
     const [manifest] = await readdir(directory);
     if (!manifest) throw new Error("The session tool manifest was not saved.");
@@ -306,12 +326,12 @@ describe.sequential("AgentService: providers", () => {
 
     rejectTurn = true;
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Group my researchers." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Group my researchers." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
-    await service.stop();
+    await runCauseEffect(service.stop());
     rejectTurn = false;
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Try grouping them again." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Try grouping them again." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -323,7 +343,7 @@ describe.sequential("AgentService: providers", () => {
       workspacePath: original.workspacePath,
     });
     expect(
-      (await service.readConversation("chief")).messages.some((message) =>
+      (await runCauseEffect(service.readConversation("chief"))).messages.some((message) =>
         message.text.includes("tennis and football"),
       ),
     ).toBe(true);
@@ -339,10 +359,10 @@ describe.sequential("AgentService: providers", () => {
     );
     const turns = client.requests.filter((request) => request.method === "turn/start");
     expect(JSON.stringify(turns.at(-1)?.params)).toContain("tennis and football");
-    await service.stop();
+    await runCauseEffect(service.stop());
 
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -360,11 +380,11 @@ describe.sequential("AgentService: providers", () => {
         preferredProvider: "codex",
         clientFactory: () => client,
       });
-      await next.initialize();
+      await runCauseEffect(next.initialize());
       return next;
     };
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -374,24 +394,26 @@ describe.sequential("AgentService: providers", () => {
     });
 
     // Codex ignores the configuration on resume, so a new MCP server has to force a new session.
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["ready"],
-        env: [{ key: "TOKEN", value: "secret" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    await service.stop();
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [{ key: "TOKEN", value: "secret" }],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
+    await runCauseEffect(service.stop());
     service = await startService();
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -415,24 +437,26 @@ describe.sequential("AgentService: providers", () => {
     const events: AgentEvent[] = [];
     service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Local SQLite",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["ready"],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "/tmp",
-        url: "",
-        headers: [],
-      },
-    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Local SQLite",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "/tmp",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -447,7 +471,7 @@ describe.sequential("AgentService: providers", () => {
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({ tools: CODEX_TOOLS });
 
-    await service.sendMessage({ agentId: "chief", text: "Again." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Again." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -475,31 +499,33 @@ describe.sequential("AgentService: providers", () => {
         customProviders: () => [],
         mcpServers: () => [],
         mcpOAuth: {
-          accessToken: async (url) => (url === "https://mcp.example.com/mcp" ? token : null),
+          accessToken: (url) => Effect.succeed(url === "https://mcp.example.com/mcp" ? token : null),
           signIn: () => null,
-          forget: async () => undefined,
+          forget: () => Effect.void,
         },
       },
     });
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Signed in",
-        transport: "http",
-        enabled: true,
-        command: "",
-        args: [],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "https://mcp.example.com/mcp",
-        headers: [],
-      },
-    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Signed in",
+          transport: "http",
+          enabled: true,
+          command: "",
+          args: [],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "https://mcp.example.com/mcp",
+          headers: [],
+        },
+      }),
+    );
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.every((delivery) => delivery.status === "failed"));
 
     const starts = client.requests.filter((request) => request.method === "thread/start");
@@ -545,13 +571,13 @@ describe.sequential("AgentService: providers", () => {
           url: GITHUB_CONNECTOR_MCP_SERVER_URL,
           headers: [],
         }),
-        mcpAuthorization: async () => token,
+        mcpAuthorization: () => Effect.succeed(token),
       },
     });
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runCauseEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.every((delivery) => delivery.status === "failed"));
 
     const starts = client.requests.filter((request) => request.method === "thread/start");
@@ -583,8 +609,8 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -595,7 +621,7 @@ describe.sequential("AgentService: providers", () => {
       "stale-manifest",
     );
 
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -624,26 +650,28 @@ describe.sequential("AgentService: providers", () => {
         mcpToolRuntimes: () => toolRuntimes,
       },
     });
-    await service.initialize();
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Npx tool",
-        transport: "stdio",
-        enabled: true,
-        command: "npx",
-        args: ["-y", "some-tool"],
-        // An isolated `PATH` stands in for a machine with no Node: the command is looked up in
-        // this list, so `npx` is missing until the managed runtime joins it.
-        env: [{ key: "PATH", value: "/nonexistent-test-dir" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Npx tool",
+          transport: "stdio",
+          enabled: true,
+          command: "npx",
+          args: ["-y", "some-tool"],
+          // An isolated `PATH` stands in for a machine with no Node: the command is looked up in
+          // this list, so `npx` is missing until the managed runtime joins it.
+          env: [{ key: "PATH", value: "/nonexistent-test-dir" }],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -656,7 +684,7 @@ describe.sequential("AgentService: providers", () => {
     // Bun finishes downloading between the turns. Nothing about the stored set changed.
     toolRuntimes = { binDirectories: ["/tmp/fake-bun-bin"], commandAliases: { npx: "/tmp/fake-bun-bin/bunx" } };
 
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -684,17 +712,17 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!firstSession) throw new Error("The Codex session did not start.");
 
-    service.refreshAllAgentRuntimes();
+    await runCauseEffect(service.refreshAllAgentRuntimes());
 
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -706,7 +734,7 @@ describe.sequential("AgentService: providers", () => {
   // sign-in. Compared normalized, as the store keys it - a trailing slash names the same account.
   it("keeps the shared sign-in until the last row on its URL is removed", async () => {
     const { store, mailbox } = stores(root);
-    const forget = vi.fn(async (_url: string) => undefined);
+    const forget = vi.fn((_url: string) => Effect.void);
     service = createTestService({
       store,
       mailbox,
@@ -715,13 +743,13 @@ describe.sequential("AgentService: providers", () => {
         customProviders: () => [],
         mcpServers: () => [],
         mcpOAuth: {
-          accessToken: async () => null,
+          accessToken: () => Effect.succeed(null),
           signIn: () => null,
           forget,
         },
       },
     });
-    await service.initialize();
+    await runCauseEffect(service.initialize());
     const httpConfig = (name: string, url: string): McpServerConfig => ({
       id: "",
       name,
@@ -735,16 +763,18 @@ describe.sequential("AgentService: providers", () => {
       url,
       headers: [],
     });
-    const [first] = service.saveMcpServer({ config: httpConfig("Stripe", "https://mcp.stripe.com") });
-    const [second] = service
-      .saveMcpServer({ config: httpConfig("Stripe copy", "https://mcp.stripe.com/") })
-      .filter((config) => config.name === "Stripe copy");
+    const [first] = await runCauseEffect(
+      service.saveMcpServer({ config: httpConfig("Stripe", "https://mcp.stripe.com") }),
+    );
+    const [second] = (
+      await runCauseEffect(service.saveMcpServer({ config: httpConfig("Stripe copy", "https://mcp.stripe.com/") }))
+    ).filter((config) => config.name === "Stripe copy");
     if (!first || !second) throw new Error("The Stripe rows were not saved.");
 
-    service.removeMcpServer({ mcpServerId: first.id });
+    await runCauseEffect(service.removeMcpServer({ mcpServerId: first.id }));
     expect(forget).not.toHaveBeenCalled();
 
-    service.removeMcpServer({ mcpServerId: second.id });
+    await runCauseEffect(service.removeMcpServer({ mcpServerId: second.id }));
     expect(forget).toHaveBeenCalledTimes(1);
     expect(forget).toHaveBeenCalledWith("https://mcp.stripe.com/");
   });
@@ -758,45 +788,49 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["ready"],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Database",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["--database", "./data.db"],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: root,
-        url: "",
-        headers: [],
-      },
-    });
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Database",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["--database", "./data.db"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: root,
+          url: "",
+          headers: [],
+        },
+      }),
+    );
 
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -843,10 +877,10 @@ describe.sequential("AgentService: providers", () => {
             }
           : null,
     });
-    await service.initialize();
+    await runCauseEffect(service.initialize());
 
     expect(service.enabledMcpServers().map((entry) => entry.name)).toEqual([COMPUTER_USE_MCP_SERVER_NAME]);
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -864,8 +898,8 @@ describe.sequential("AgentService: providers", () => {
 
     // The user turns Computer Use off for this agent. Codex ignores MCP changes on resume, so the
     // session must be replaced without the server.
-    await service.updateAgent({ agentId: "chief", computerUse: false });
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", computerUse: false }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -902,23 +936,25 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["ready"],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -940,7 +976,7 @@ describe.sequential("AgentService: providers", () => {
         mcp_servers: { "Local notes": { command: "/usr/bin/notes" }, Scratch: { command: "/usr/bin/scratch" } },
       },
     };
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -965,24 +1001,26 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [{ key: "API_KEY", value: "abcdef123456" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: [],
+          env: [{ key: "API_KEY", value: "abcdef123456" }],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     const failed = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "failed");
     expect(failed?.error).toBe("Rejected ••• from Filesystem.");
@@ -997,21 +1035,25 @@ describe.sequential("AgentService: providers", () => {
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
       if (method !== "thread/start" || started) return;
       started = true;
-      service?.saveMcpServer({
-        config: {
-          id: "",
-          name: "Filesystem",
-          transport: "stdio",
-          enabled: true,
-          command: "/bin/echo",
-          args: ["ready"],
-          env: [],
-          envPassthrough: [],
-          workingDirectory: "",
-          url: "",
-          headers: [],
-        },
-      });
+      await (service
+        ? runCauseEffect(
+            service.saveMcpServer({
+              config: {
+                id: "",
+                name: "Filesystem",
+                transport: "stdio",
+                enabled: true,
+                command: "/bin/echo",
+                args: ["ready"],
+                env: [],
+                envPassthrough: [],
+                workingDirectory: "",
+                url: "",
+                headers: [],
+              },
+            }),
+          )
+        : undefined);
     });
     service = createTestService({
       store,
@@ -1019,14 +1061,14 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -1052,21 +1094,25 @@ describe.sequential("AgentService: providers", () => {
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
       if (method !== "turn/start" || changed) return;
       changed = true;
-      service?.saveMcpServer({
-        config: {
-          id: "",
-          name: "Filesystem",
-          transport: "stdio",
-          enabled: true,
-          command: "/bin/echo",
-          args: ["ready"],
-          env: [],
-          envPassthrough: [],
-          workingDirectory: "",
-          url: "",
-          headers: [],
-        },
-      });
+      await (service
+        ? runCauseEffect(
+            service.saveMcpServer({
+              config: {
+                id: "",
+                name: "Filesystem",
+                transport: "stdio",
+                enabled: true,
+                command: "/bin/echo",
+                args: ["ready"],
+                env: [],
+                envPassthrough: [],
+                workingDirectory: "",
+                url: "",
+                headers: [],
+              },
+            }),
+          )
+        : undefined);
     });
     service = createTestService({
       store,
@@ -1074,9 +1120,9 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
+    await runCauseEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     // Completed, not left running: the turn that was starting still owns its routing.
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
@@ -1085,7 +1131,7 @@ describe.sequential("AgentService: providers", () => {
     expect(client.releasedThreads).toEqual([]);
 
     // The change is not lost either: the next turn is the one that applies it.
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -1110,32 +1156,34 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
       clientFactory: () => client,
     });
-    await service.initialize();
+    await runCauseEffect(service.initialize());
     const errors: string[] = [];
     service.on("event", (event) => {
       if (event.type === "error") errors.push(event.code);
     });
 
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitFor(() => errors.includes("delivery_start_unconfirmed"));
     const session = store.activeProviderSession("chief")?.externalSessionId;
     if (!session) throw new Error("The unconfirmed start left no provider session.");
 
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: ["ready"],
-        env: [],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
+    await runCauseEffect(
+      service.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      }),
+    );
     expect(client.releasedThreads).toEqual([]);
 
     // The turn the provider did start after all, reported the only way it can be: its events.
@@ -1160,21 +1208,25 @@ describe.sequential("AgentService: providers", () => {
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
       if (method !== "thread/start" || started) return;
       started = true;
-      service?.saveMcpServer({
-        config: {
-          id: "",
-          name: "Filesystem",
-          transport: "stdio",
-          enabled: true,
-          command: "/bin/echo",
-          args: ["ready"],
-          env: [],
-          envPassthrough: [],
-          workingDirectory: "",
-          url: "",
-          headers: [],
-        },
-      });
+      await (service
+        ? runCauseEffect(
+            service.saveMcpServer({
+              config: {
+                id: "",
+                name: "Filesystem",
+                transport: "stdio",
+                enabled: true,
+                command: "/bin/echo",
+                args: ["ready"],
+                env: [],
+                envPassthrough: [],
+                workingDirectory: "",
+                url: "",
+                headers: [],
+              },
+            }),
+          )
+        : undefined);
     });
     const start = async () => {
       const next = createTestService({
@@ -1183,20 +1235,20 @@ describe.sequential("AgentService: providers", () => {
         preferredProvider: "codex",
         clientFactory: () => client,
       });
-      await next.initialize();
+      await runCauseEffect(next.initialize());
       return next;
     };
     service = await start();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
     // The restart drops the held refresh, so the manifest alone decides whether the session is kept.
-    await service.stop();
+    await runCauseEffect(service.stop());
     service = await start();
-    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue." }));
     await waitFor(() =>
       service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
     );
@@ -1216,8 +1268,8 @@ describe.sequential("AgentService: providers", () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex");
     service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -1225,12 +1277,14 @@ describe.sequential("AgentService: providers", () => {
     if (!session) throw new Error("The Codex session did not start.");
     const removeFiles = store.deleteAgent.bind(store);
     let releasedAtRemoval: string[] = [];
-    vi.spyOn(store, "deleteAgent").mockImplementationOnce(async (id) => {
-      releasedAtRemoval = [...client.releasedThreads];
-      return removeFiles(id);
-    });
+    vi.spyOn(store, "deleteAgent").mockImplementationOnce((id) =>
+      Effect.suspend(() => {
+        releasedAtRemoval = [...client.releasedThreads];
+        return removeFiles(id);
+      }),
+    );
 
-    await service.deleteAgent("chief");
+    await runCauseEffect(service.deleteAgent("chief"));
     expect(releasedAtRemoval).toEqual([session]);
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
   });
@@ -1248,11 +1302,13 @@ describe.sequential("AgentService: providers", () => {
         preferredProvider: "codex",
         clientFactory: () => client,
       });
-      await next.initialize();
+      await runCauseEffect(next.initialize());
       return next;
     };
     service = await start();
-    await service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." });
+    await runCauseEffect(
+      service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." }),
+    );
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -1260,10 +1316,10 @@ describe.sequential("AgentService: providers", () => {
     const handoffs = join(store.database.userDataPath, "provider-handoffs");
     rejectTurn = true;
     for (const attempt of [1, 2]) {
-      await service.stop();
+      await runCauseEffect(service.stop());
       for (const file of await readdir(manifests)) await writeFile(join(manifests, file), "outdated");
       service = await start();
-      await service.sendMessage({ agentId: "chief", text: `Continue ${attempt}` });
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: `Continue ${attempt}` }));
       await waitFor(
         () =>
           service?.listQueue("chief").deliveries.filter((delivery) => delivery.status === "failed").length === attempt,
@@ -1272,14 +1328,14 @@ describe.sequential("AgentService: providers", () => {
     const recordedHandoffs = await readdir(handoffs);
     const recordedManifests = await readdir(manifests);
     expect(recordedHandoffs).toHaveLength(2);
-    await service.stop();
+    await runCauseEffect(service.stop());
     const orphan = createHash("sha256").update("unrecorded-session").digest("hex");
     await writeFile(join(handoffs, orphan), "Private history written before a crash.");
     await writeFile(join(manifests, orphan), "unrecorded-toolset");
     service = await start();
     expect(await readdir(handoffs)).toEqual(recordedHandoffs);
     expect(await readdir(manifests)).toEqual(recordedManifests);
-    await service.deleteAgent("chief");
+    await runCauseEffect(service.deleteAgent("chief"));
     expect(await readdir(handoffs)).toEqual([]);
     expect(await readdir(manifests)).toEqual([]);
     expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
@@ -1291,7 +1347,9 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
+    await runCauseEffect(
+      service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." }),
+    );
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -1303,7 +1361,7 @@ describe.sequential("AgentService: providers", () => {
       throw new Error("Session binding failed.");
     });
     try {
-      await service.sendMessage({ agentId: "chief", text: "Continue with new tools." });
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Continue with new tools." }));
       await waitForQueue(service, "chief", (queue) =>
         queue.deliveries.some((delivery) => delivery.status === "failed"),
       );
@@ -1334,23 +1392,27 @@ describe.sequential("AgentService: providers", () => {
             return client;
           },
         });
-        await service.initialize();
+        await runCauseEffect(service.initialize());
         if (method === "thread/start") {
-          await store.getOrCreate("chief");
-          await service.updateAgent({
-            agentId: "chief",
-            provider,
-            model:
-              provider === "codex"
-                ? "gpt-5.6-luna"
-                : provider === "claude"
-                  ? "claude-sonnet-5"
-                  : provider === "grok"
-                    ? "grok-4.5"
-                    : "opencode/example-model",
-          });
+          await runCauseEffect(store.getOrCreate("chief"));
+          await runCauseEffect(
+            service.updateAgent({
+              agentId: "chief",
+              provider,
+              model:
+                provider === "codex"
+                  ? "gpt-5.6-luna"
+                  : provider === "claude"
+                    ? "claude-sonnet-5"
+                    : provider === "grok"
+                      ? "grok-4.5"
+                      : "opencode/example-model",
+            }),
+          );
         }
-        await service.sendMessage({ agentId: "chief", text: "Continue coordinating the research task." });
+        await runCauseEffect(
+          service.sendMessage({ agentId: "chief", text: "Continue coordinating the research task." }),
+        );
         await waitFor(() =>
           service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"),
         );
@@ -1367,7 +1429,7 @@ describe.sequential("AgentService: providers", () => {
         expect(instructions).toContain("send the result back in the Status/Result/Evidence format");
         expect(instructions).toContain("Do not create acknowledgement loops");
         expect(instructions).not.toContain("When you receive a reply, summarize it for the user");
-        await service.stop();
+        await runCauseEffect(service.stop());
       }
     },
   );
@@ -1388,14 +1450,16 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    const agent = await service.updateAgent({
-      agentId: "chief",
-      provider: "grok",
-      model: "grok-4.5",
-      access: "workspace",
-    });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const agent = await runCauseEffect(
+      service.updateAgent({
+        agentId: "chief",
+        provider: "grok",
+        model: "grok-4.5",
+        access: "workspace",
+      }),
+    );
     const turnStarts = (client: FakeAgentClient | undefined) =>
       client?.requests.filter((request) => request.method === "turn/start").length ?? 0;
     const sharedStarts = () =>
@@ -1403,7 +1467,7 @@ describe.sequential("AgentService: providers", () => {
         .filter((entry) => entry.roots === null && entry.client.provider === "grok")
         .reduce((count, entry) => count + turnStarts(entry.client), 0);
 
-    await service.sendMessage({ agentId: "chief", text: "Write a file." });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Write a file." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -1412,8 +1476,8 @@ describe.sequential("AgentService: providers", () => {
     expect(turnStarts(own?.client)).toBe(1);
     expect(sharedStarts()).toBe(0);
 
-    await service.updateAgent({ agentId: "chief", access: "full" });
-    await service.sendMessage({ agentId: "chief", text: "Again." });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", access: "full" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Again." }));
     await waitForQueue(service, "chief", (queue) =>
       queue.deliveries.every((delivery) => delivery.status === "completed"),
     );
@@ -1442,9 +1506,9 @@ describe.sequential("AgentService: providers", () => {
       );
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" }));
     const refuse = async (session: string) => {
       const started = [...events].reverse().find((event) => event.type === "turn-started");
       if (started?.type !== "turn-started") throw new Error("The fake Grok turn did not start.");
@@ -1465,7 +1529,7 @@ describe.sequential("AgentService: providers", () => {
       );
     };
 
-    await service.sendMessage({ agentId: "chief", text: "Say hi" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Say hi" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     await refuse("grok-session-1");
 
@@ -1502,13 +1566,15 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("helper");
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5", access: "workspace" });
-    await service.updateAgent({ agentId: "helper", provider: "grok", model: "grok-4.5" });
-    await service.sendMessage({ agentId: "chief", text: "Long work." });
-    await service.sendMessage({ agentId: "helper", text: "Long work." });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("helper"));
+    await runCauseEffect(
+      service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5", access: "workspace" }),
+    );
+    await runCauseEffect(service.updateAgent({ agentId: "helper", provider: "grok", model: "grok-4.5" }));
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Long work." }));
+    await runCauseEffect(service.sendMessage({ agentId: "helper", text: "Long work." }));
     for (const agentId of ["chief", "helper"]) {
       await waitForQueue(service, agentId, (queue) => queue.deliveries[0]?.status === "running");
     }
@@ -1537,10 +1603,10 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" }));
 
-    await service.removeCustomProvider("lmstudio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("lmstudio", () => Effect.void));
 
     // OpenCode declares no default model of its own, so the fallback has to be read from what it
     // lists. An empty model id is refused by `updateAgent`, and that refusal reached the user as a
@@ -1562,12 +1628,12 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }));
 
     listed = ["gpt-6-luna"];
-    await service.stop();
-    await service.initialize();
+    await runCauseEffect(service.stop());
+    await runCauseEffect(service.initialize());
 
     // The provider stays, so the agent keeps its thread; only the model it can no longer run changes.
     await waitFor(() => service?.listAgents().find((agent) => agent.id === "chief")?.model === "gpt-6-luna");
@@ -1593,18 +1659,20 @@ describe.sequential("AgentService: providers", () => {
       },
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await store.getOrCreate("scout");
-    await service.updateAgent({ agentId: "chief", provider: "acp", model: "goose/opus", reasoningEffort: "high" });
-    await service.updateAgent({ agentId: "scout", provider: "acp", model: "qwen/max" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("scout"));
+    await runCauseEffect(
+      service.updateAgent({ agentId: "chief", provider: "acp", model: "goose/opus", reasoningEffort: "high" }),
+    );
+    await runCauseEffect(service.updateAgent({ agentId: "scout", provider: "acp", model: "qwen/max" }));
 
     listed = ["goose/default", "qwen/mini"];
-    await service.stop();
-    await service.initialize();
+    await runCauseEffect(service.stop());
+    await runCauseEffect(service.initialize());
 
     // Qwen listed models and dropped `max`, so scout moves. The update after it runs after the sweep.
     await waitFor(() => service?.listAgents().find((agent) => agent.id === "scout")?.model === "qwen/mini");
-    await service.updateAgent({ agentId: "scout", model: "qwen/mini" });
+    await runCauseEffect(service.updateAgent({ agentId: "scout", model: "qwen/mini" }));
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "acp",
       model: "goose/opus",
@@ -1629,16 +1697,16 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.ensureProvider("codex"));
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
 
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "house/router-llm",
     });
 
-    await service.removeCustomProvider("house", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("house", () => Effect.void));
 
     const chief = service.listAgents().find((agent) => agent.id === "chief");
     expect(chief?.model).not.toBe("studio/local-llm");
@@ -1661,10 +1729,10 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" }));
 
-    await service.removeCustomProvider("lmstudio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("lmstudio", () => Effect.void));
 
     // The agent keeps its model: the endpoint is gone, and the next OpenCode start decides what it
     // can still serve. A refusal here would trap the user on an endpoint they asked to remove.
@@ -1675,7 +1743,7 @@ describe.sequential("AgentService: providers", () => {
 
     // The running OpenCode process still serves the removed endpoint, with the credentials it
     // started with, so a later message must not reach it.
-    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Keep working" }));
     await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     expect(service.listQueue("chief").deliveries.at(-1)?.error).toBe(
       "The endpoint this agent used was removed. Choose another model for it.",
@@ -1697,18 +1765,22 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.ensureProvider("codex"));
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
 
     // Removing `studio` moves the agent, and then the file write fails, so `studio` is still an
     // endpoint the user has, and still one the next removal may move agents onto.
     await expect(
-      service.removeCustomProvider("studio", () => Promise.reject(new Error("The disk is full."))),
+      runCauseEffect(
+        service.removeCustomProvider("studio", () =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "persist", cause: new Error("The disk is full.") })),
+        ),
+      ),
     ).rejects.toThrow("The disk is full.");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
 
-    await service.removeCustomProvider("house", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("house", () => Effect.void));
 
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "opencode",
@@ -1732,21 +1804,21 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await store.getOrCreate("chief");
+    await runCauseEffect(store.getOrCreate("chief"));
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
 
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
 
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     await expect(
-      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+      runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" })),
     ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // Saved again under the same id, and a fresh process lists it, so both the list and the
     // selection accept it once more.
-    await service.reloadOpenCodeConfig();
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.reloadOpenCodeConfig());
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
   });
 
@@ -1765,20 +1837,25 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" }));
 
     // The write is held open, so the update below has every chance to run inside the removal.
     const writes: (() => void)[] = [];
-    const removal = service.removeCustomProvider(
-      "studio",
-      () =>
-        new Promise<undefined>((resolve) => {
-          writes.push(() => resolve(undefined));
-        }),
+    const removal = runCauseEffect(
+      service.removeCustomProvider("studio", () =>
+        Effect.promise(
+          () =>
+            new Promise<undefined>((resolve) => {
+              writes.push(() => resolve(undefined));
+            }),
+        ),
+      ),
     );
     await waitFor(() => writes.length === 1);
-    const selection = service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    const selection = runCauseEffect(
+      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+    );
     writes[0]?.();
     await removal;
 
@@ -1823,21 +1900,21 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
 
     // The endpoint is removed and saved again under the same id, which may now name another server.
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
 
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
-      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+      runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" })),
     ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A restart that fails is reported as a provider status, not as a throw of its own, so what it
     // answers here says nothing about which process answers on the endpoint now.
     opencodeFailsToStart = true;
-    await service.reloadOpenCodeConfig().catch(() => undefined);
+    await runCauseEffect(service.reloadOpenCodeConfig()).catch(() => undefined);
     // The process from before still answers, which its other model shows, and the removed id is
     // still not among what may be given to an agent.
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
@@ -1845,15 +1922,15 @@ describe.sequential("AgentService: providers", () => {
 
     // Connecting another provider starts no new OpenCode process, so it may not give the id back.
     claudeFailsToStart = false;
-    await service.ensureProvider("claude");
+    await runCauseEffect(service.ensureProvider("claude"));
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
 
     // A process that started read the endpoint files as they are, and what it lists is the truth.
     opencodeFailsToStart = false;
-    await service.reloadOpenCodeConfig();
+    await runCauseEffect(service.reloadOpenCodeConfig());
 
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "studio/local-llm" });
   });
 
@@ -1888,14 +1965,14 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
 
     // The restart spawns the second process and then waits for it. Its process read the files with
     // the endpoint still on them.
-    const restart = service.reloadOpenCodeConfig();
+    const restart = runCauseEffect(service.reloadOpenCodeConfig());
     await started;
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
     releaseStart();
     expect(await restart).toBe("restarted");
 
@@ -1904,11 +1981,11 @@ describe.sequential("AgentService: providers", () => {
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
     await expect(
-      service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }),
+      runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" })),
     ).rejects.toThrow('The selected agent model "studio/local-llm" is unavailable: OpenCode does not list it.');
 
     // A process that spawned after the removal read the files as they are, so its catalogue counts.
-    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(await runCauseEffect(service.reloadOpenCodeConfig())).toBe("restarted");
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
   });
 
@@ -1931,12 +2008,12 @@ describe.sequential("AgentService: providers", () => {
     const written = new Promise<void>((resolve) => {
       releaseWrite = resolve;
     });
-    const removal = service.removeCustomProvider("studio", () => written);
+    const removal = runCauseEffect(service.removeCustomProvider("studio", () => Effect.promise(() => written)));
     // The removal runs on the endpoint chain, so the exclusion arrives on a later tick.
     await waitFor(() => !service?.listModels().some((model) => model.id === "studio/local-llm"));
 
     // This process reads the file as it still is, so its catalogue does not confirm the removal.
-    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(await runCauseEffect(service.reloadOpenCodeConfig())).toBe("restarted");
     expect(service.listModels().map((model) => model.id)).toContain("house/router-llm");
     expect(service.listModels().map((model) => model.id)).not.toContain("studio/local-llm");
 
@@ -1944,7 +2021,7 @@ describe.sequential("AgentService: providers", () => {
     await removal;
 
     // The removal is on disk now, so the next process reads it and its catalogue counts.
-    expect(await service.reloadOpenCodeConfig()).toBe("restarted");
+    expect(await runCauseEffect(service.reloadOpenCodeConfig())).toBe("restarted");
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
   });
 
@@ -1978,13 +2055,13 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" }));
 
-    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Keep working" }));
     await preparing;
-    await service.removeCustomProvider("lmstudio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("lmstudio", () => Effect.void));
     releasePreparing();
 
     await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
@@ -2015,24 +2092,26 @@ describe.sequential("AgentService: providers", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" }));
 
-    await service.sendMessage({ agentId: "chief", text: "Start this turn" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start this turn" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const active = events.find((event) => event.type === "turn-started");
     if (active?.type !== "turn-started") throw new Error("Turn did not start.");
-    await service.sendMessage({ agentId: "chief", text: "Add this to the active turn" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Add this to the active turn" }));
     const queued = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "queued");
     if (!queued) throw new Error("Queued delivery was not created.");
 
-    await service.removeCustomProvider("lmstudio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("lmstudio", () => Effect.void));
 
     // The process still holds the session it opened on the removed endpoint, so a steered message
     // would arrive there with the credentials that process started with.
     await expect(
-      service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+      runCauseEffect(
+        service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+      ),
     ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
     expect(clients.get("opencode")?.requests.some((request) => request.method === "turn/steer")).toBe(false);
     // The message stays in the queue, so the user can send it again once a model is chosen.
@@ -2059,26 +2138,28 @@ describe.sequential("AgentService: providers", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
 
-    await service.sendMessage({ agentId: "chief", text: "Start this turn" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start this turn" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const active = events.find((event) => event.type === "turn-started");
     if (active?.type !== "turn-started") throw new Error("Turn did not start.");
-    await service.sendMessage({ agentId: "chief", text: "Add this to the active turn" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Add this to the active turn" }));
     const queued = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "queued");
     if (!queued) throw new Error("Queued delivery was not created.");
 
     // The other endpoint is a fallback, so the removal moves the agent record onto it at once.
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ model: "house/router-llm" });
 
     // The turn the message would join still runs on the session the CLI opened for the removed
     // endpoint, so the model the agent names now says nothing about where the message arrives.
     await expect(
-      service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+      runCauseEffect(
+        service.steerQueuedMessage({ agentId: "chief", deliveryId: queued.id, expectedTurnId: active.turnId }),
+      ),
     ).rejects.toThrow("The endpoint this agent used was removed. Choose another model for it.");
     expect(clients.get("opencode")?.requests.some((request) => request.method === "turn/steer")).toBe(false);
     expect(service.listQueue("chief").deliveries.find((delivery) => delivery.id === queued.id)?.status).toBe("queued");
@@ -2116,12 +2197,12 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" }));
 
     generating = true;
-    const generation = service.generateProfile({ prompt: "Describe a research assistant" }, []);
+    const generation = runCauseEffect(service.generateProfile({ prompt: "Describe a research assistant" }, []));
     void generation.catch(() => undefined);
     await profileStarted;
     generating = false;
@@ -2129,7 +2210,7 @@ describe.sequential("AgentService: providers", () => {
     if (!profileClient) throw new Error("No profile client was created.");
     expect(profileClient.running).toBe(true);
 
-    await service.removeCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
 
     // No restart of the main client reaches this process, so it is ended instead.
     expect(profileClient.running).toBe(false);
@@ -2161,12 +2242,12 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" }));
 
-    await service.removeCustomProvider("studio", async () => undefined);
-    await service.reloadOpenCodeConfig();
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
+    await runCauseEffect(service.reloadOpenCodeConfig());
 
     expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
   });
@@ -2186,14 +2267,14 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" }));
 
-    await service.saveCustomProvider("studio", async () => undefined);
+    await runCauseEffect(service.saveCustomProvider("studio", () => Effect.void));
 
     expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
 
-    await service.reloadOpenCodeConfig();
+    await runCauseEffect(service.reloadOpenCodeConfig());
 
     expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(true);
   });
@@ -2212,14 +2293,14 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "opencode",
     });
     service = agentService;
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
+    await runCauseEffect(service.ensureProvider("codex"));
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" }));
 
-    await service.removeCustomProvider("studio", async () => undefined);
-    await service.reloadOpenCodeConfig();
+    await runCauseEffect(service.removeCustomProvider("studio", () => Effect.void));
+    await runCauseEffect(service.reloadOpenCodeConfig());
 
-    await service.removeCustomProvider("house", async () => undefined);
+    await runCauseEffect(service.removeCustomProvider("house", () => Effect.void));
 
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       provider: "opencode",
@@ -2245,16 +2326,16 @@ describe.sequential("AgentService: providers", () => {
         return client;
       },
     });
-    await service.initialize();
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.ensureProvider("codex"));
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" }));
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.sendMessage({ agentId: "chief", text: "Keep working" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Keep working" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
-    await expect(service.removeCustomProvider("lmstudio", async () => undefined)).rejects.toThrow(
+    await expect(runCauseEffect(service.removeCustomProvider("lmstudio", () => Effect.void))).rejects.toThrow(
       "Wait for the active turn and queue to finish before you remove this endpoint.",
     );
 
@@ -2281,8 +2362,8 @@ describe.sequential("AgentService: providers", () => {
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await service.sendMessage({ agentId: "chief", text: "Check the latest result" });
+    await runCauseEffect(service.initialize());
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Check the latest result" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
     const client = clients.get("codex");
@@ -2298,7 +2379,7 @@ describe.sequential("AgentService: providers", () => {
           event.type === "turn-progress" && event.turnId === turnId,
       );
     expect(progress()).toEqual([]);
-    const stored = await service.readConversation("chief");
+    const stored = await runCauseEffect(service.readConversation("chief"));
     expect(stored.messages.find((message) => message.id === `activity:${turnId}`)).toBeUndefined();
     client.emit(
       "notification",
@@ -2337,7 +2418,7 @@ describe.sequential("AgentService: providers", () => {
         delta: "Comparing the results.",
       }),
     );
-    const reasoning = (await service.readConversation("chief")).messages.find(
+    const reasoning = (await runCauseEffect(service.readConversation("chief"))).messages.find(
       (message) => message.id === "reasoning-1",
     );
     expect(reasoning).toMatchObject({
@@ -2359,7 +2440,9 @@ describe.sequential("AgentService: providers", () => {
       }),
     );
     expect(
-      (await service.readConversation("chief")).messages.find((message) => message.id === "reasoning-1"),
+      (await runCauseEffect(service.readConversation("chief"))).messages.find(
+        (message) => message.id === "reasoning-1",
+      ),
     ).toMatchObject({
       itemType: "commentary",
       status: "completed",
@@ -2407,7 +2490,7 @@ describe.sequential("AgentService: providers", () => {
   it("creates a bounded runtime snapshot for reconnecting clients", async () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;
-    await store.getOrCreate("chief");
+    await runCauseEffect(store.getOrCreate("chief"));
 
     expect(service.getRuntimeSnapshot()).toMatchObject({
       agents: [expect.objectContaining({ id: "chief" })],
@@ -2436,36 +2519,42 @@ describe.sequential("AgentService: providers", () => {
     await writeFile(outside, "secret\n");
     await symlink(outside, link);
 
-    await expect(service.resolveSharedFile("~/OpenBot/Shared/nested/report.csv")).resolves.toMatchObject({
+    await expect(
+      runCauseEffect(service.resolveSharedFile("~/OpenBot/Shared/nested/report.csv")),
+    ).resolves.toMatchObject({
       path: await realpath(sharedFile),
       name: "report.csv",
       size: 6,
     });
-    await expect(service.resolveSharedFile(outside)).rejects.toThrow("inside the shared directory");
-    await expect(service.resolveSharedFile(link)).rejects.toThrow("inside the shared directory");
+    await expect(runCauseEffect(service.resolveSharedFile(outside))).rejects.toThrow("inside the shared directory");
+    await expect(runCauseEffect(service.resolveSharedFile(link))).rejects.toThrow("inside the shared directory");
   });
 
   it("opens a historical routine message that only exists in the mailbox", async () => {
     const { service: agentService, store, mailbox } = await startService(root);
     service = agentService;
-    await store.getOrCreate("chief");
-    await store.ensureThreadId("chief");
-    const receipt = await mailbox.enqueue({
-      sender: {
-        kind: "routine",
-        routineId: "routine-1",
-        runId: "run-1",
-        routineName: "Morning brief",
-        scheduledFor: "2026-08-25T07:00:00.000Z",
-      },
-      recipientAgentIds: ["chief"],
-      text: "Prepare the morning brief.",
-      idempotencyKey: "test:routine-history:run-1",
-    });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.ensureThreadId("chief"));
+    const receipt = await runCauseEffect(
+      mailbox.enqueue({
+        sender: {
+          kind: "routine",
+          routineId: "routine-1",
+          runId: "run-1",
+          routineName: "Morning brief",
+          scheduledFor: "2026-08-25T07:00:00.000Z",
+        },
+        recipientAgentIds: ["chief"],
+        text: "Prepare the morning brief.",
+        idempotencyKey: "test:routine-history:run-1",
+      }),
+    );
     const messageId = receipt.deliveries[0]?.id;
     if (!messageId) throw new Error("The routine delivery was not created.");
 
-    const page = await service.readConversationPageFor("chief", "member-1", { type: "around", messageId }, 50);
+    const page = await runCauseEffect(
+      service.readConversationPageFor("chief", "member-1", { type: "around", messageId }, 50),
+    );
 
     expect(page.messages).toContainEqual(
       expect.objectContaining({
@@ -2480,7 +2569,7 @@ describe.sequential("AgentService: providers", () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;
 
-    const agent = await store.createAgent(CREATE_AGENT_INPUT);
+    const agent = await runCauseEffect(store.createAgent(CREATE_AGENT_INPUT));
     const appDirectory = join(agent.workspacePath, "app");
     const page = join(appDirectory, "page.tsx");
     const spaced = join(agent.workspacePath, "lutra brand board.html");
@@ -2492,28 +2581,34 @@ describe.sequential("AgentService: providers", () => {
     await writeFile(outside, "secret\n");
     await symlink(outside, link);
 
-    await expect(service.resolveWorkspaceFile(agent.id, "app/page.tsx")).resolves.toMatchObject({
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "app/page.tsx"))).resolves.toMatchObject({
       path: await realpath(page),
       name: "page.tsx",
     });
-    await expect(service.resolveWorkspaceFile(agent.id, page)).resolves.toMatchObject({
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, page))).resolves.toMatchObject({
       path: await realpath(page),
       name: "page.tsx",
     });
-    await expect(service.resolveWorkspaceFile(agent.id, "lutra%20brand%20board.html")).resolves.toMatchObject({
+    await expect(
+      runCauseEffect(service.resolveWorkspaceFile(agent.id, "lutra%20brand%20board.html")),
+    ).resolves.toMatchObject({
       path: await realpath(spaced),
       name: "lutra brand board.html",
     });
-    await expect(service.resolveWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
-    await expect(service.resolveWorkspaceFile(agent.id, link)).rejects.toThrow("inside the agent workspace");
-    await expect(service.resolveWorkspaceFile("missing", page)).rejects.toThrow("Unknown agent");
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, outside))).rejects.toThrow(
+      "inside the agent workspace",
+    );
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, link))).rejects.toThrow(
+      "inside the agent workspace",
+    );
+    await expect(runCauseEffect(service.resolveWorkspaceFile("missing", page))).rejects.toThrow("Unknown agent");
   });
 
   it("opens local links to files the agent edited anywhere, but serves remote members only the workspace", async () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;
 
-    const agent = await store.createAgent(CREATE_AGENT_INPUT);
+    const agent = await runCauseEffect(store.createAgent(CREATE_AGENT_INPUT));
     const page = join(agent.workspacePath, "page.tsx");
     const colonName = join(agent.workspacePath, "notes:2");
     const outside = join(root, "project", "edited.ts");
@@ -2527,44 +2622,58 @@ describe.sequential("AgentService: providers", () => {
     const realOutside = await realpath(outside);
 
     for (const reference of ["page.tsx:12", "page.tsx:12:3", "page.tsx#L12", "page.tsx#L12-L20", "page.tsx#L12C3"]) {
-      await expect(service.resolveWorkspaceFile(agent.id, reference)).resolves.toMatchObject({
+      await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, reference))).resolves.toMatchObject({
         path: realPage,
         insideWorkspace: true,
       });
     }
-    await expect(service.resolveWorkspaceFile(agent.id, "notes:2")).resolves.toMatchObject({
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "notes:2"))).resolves.toMatchObject({
       path: await realpath(colonName),
     });
-    await expect(service.resolveWorkspaceFile(agent.id, "missing.ts:4")).rejects.toThrow(/ENOENT/u);
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "missing.ts:4"))).rejects.toThrow(/ENOENT/u);
 
     const home = process.env.HOME;
     process.env.HOME = root;
     try {
-      await expect(service.resolveLocalWorkspaceFile(agent.id, "~/project/edited.ts:7")).resolves.toMatchObject({
+      await expect(
+        runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, "~/project/edited.ts:7")),
+      ).resolves.toMatchObject({
         path: realOutside,
         insideWorkspace: false,
       });
-      await expect(service.resolveWorkspaceFile(agent.id, "~/project/edited.ts")).rejects.toThrow(
+      await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, "~/project/edited.ts"))).rejects.toThrow(
         "inside the agent workspace",
       );
     } finally {
       process.env.HOME = home;
     }
 
-    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).resolves.toMatchObject({
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, outside))).resolves.toMatchObject({
       path: realOutside,
       name: "edited.ts",
       insideWorkspace: false,
     });
-    await expect(service.resolveLocalWorkspaceFile(agent.id, link)).resolves.toMatchObject({ path: realOutside });
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, link))).resolves.toMatchObject({
+      path: realOutside,
+    });
     // The Team API and the web client call `resolveWorkspaceFile`; it keeps the workspace boundary.
-    await expect(service.resolveWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
-    await expect(service.resolveWorkspaceFile(agent.id, link)).rejects.toThrow("inside the agent workspace");
-    await expect(service.resolveLocalWorkspaceFile(agent.id, join(root, "project"))).rejects.toThrow("not a file");
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, outside))).rejects.toThrow(
+      "inside the agent workspace",
+    );
+    await expect(runCauseEffect(service.resolveWorkspaceFile(agent.id, link))).rejects.toThrow(
+      "inside the agent workspace",
+    );
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, join(root, "project")))).rejects.toThrow(
+      "not a file",
+    );
 
-    await store.updateAgent({ agentId: agent.id, access: "workspace" });
-    await expect(service.resolveLocalWorkspaceFile(agent.id, outside)).rejects.toThrow("inside the agent workspace");
-    await expect(service.resolveLocalWorkspaceFile(agent.id, page)).resolves.toMatchObject({ path: realPage });
+    await runCauseEffect(store.updateAgent({ agentId: agent.id, access: "workspace" }));
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, outside))).rejects.toThrow(
+      "inside the agent workspace",
+    );
+    await expect(runCauseEffect(service.resolveLocalWorkspaceFile(agent.id, page))).resolves.toMatchObject({
+      path: realPage,
+    });
   });
 
   it("does not surface the skills context-budget notice as an agent error", async () => {
@@ -2573,9 +2682,9 @@ describe.sequential("AgentService: providers", () => {
     service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
-    await service.initialize();
+    await runCauseEffect(service.initialize());
 
-    await service.sendMessage({ agentId: "chief", text: "First task" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First task" }));
     await waitFor(() => events.some((event) => event.type === "turn-started"));
 
     expect(events).not.toEqual(
@@ -2601,14 +2710,16 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    const [draft] = await service.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(service.prepareAttachments([source]));
     assert(draft);
 
-    await service.sendMessage({
-      agentId: "chief",
-      text: `Review ${serializeAttachmentReference(draft.name, draft.id)}`,
-      attachmentDraftIds: [draft.id],
-    });
+    await runCauseEffect(
+      service.sendMessage({
+        agentId: "chief",
+        text: `Review ${serializeAttachmentReference(draft.name, draft.id)}`,
+        attachmentDraftIds: [draft.id],
+      }),
+    );
     await waitFor(() => Boolean(clients.get("codex")?.requests.some((request) => request.method === "turn/start")));
 
     const turn = clients.get("codex")?.requests.find((request) => request.method === "turn/start");
@@ -2628,12 +2739,14 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await store.getOrCreate("research", "Research Lead", "Research partner");
+    await runCauseEffect(store.getOrCreate("research", "Research Lead", "Research partner"));
 
-    await service.sendMessage({
-      agentId: "chief",
-      text: `Ask ${serializeChatTagReference("agent", "Old Research", "research")} to use ${serializeChatTagReference("skill", "Release Notes", "skill-1")}.`,
-    });
+    await runCauseEffect(
+      service.sendMessage({
+        agentId: "chief",
+        text: `Ask ${serializeChatTagReference("agent", "Old Research", "research")} to use ${serializeChatTagReference("skill", "Release Notes", "skill-1")}.`,
+      }),
+    );
     await waitFor(() => Boolean(clients.get("codex")?.requests.some((request) => request.method === "turn/start")));
 
     const turn = clients.get("codex")?.requests.find((request) => request.method === "turn/start");
@@ -2667,7 +2780,7 @@ describe.sequential("AgentService: providers", () => {
       // from Codex being connected.
       capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
     });
-    await expect(service.getUsage()).resolves.toMatchObject({
+    await expect(runCauseEffect(service.getUsage())).resolves.toMatchObject({
       limits: [
         {
           id: "codex",
@@ -2676,9 +2789,9 @@ describe.sequential("AgentService: providers", () => {
         },
       ],
     });
-    expect((await service.getUsage()).limits).toHaveLength(1);
-    await service.sendMessage({ agentId: "chief", text: "First task" });
-    await service.sendMessage({ agentId: "sales-outbound", text: "Second task" });
+    expect((await runCauseEffect(service.getUsage())).limits).toHaveLength(1);
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "First task" }));
+    await runCauseEffect(service.sendMessage({ agentId: "sales-outbound", text: "Second task" }));
     await waitFor(
       async () => (await protocolMessages(logPath)).filter((item) => item.method === "turn/start").length === 2,
     );
@@ -2776,7 +2889,9 @@ describe.sequential("AgentService: providers", () => {
       });
       expect(params.runtimeWorkspaceRoots).toEqual([params.cwd, store.sharedRoot]);
     }
-    expect((await store.getOrCreate("chief")).threadId).not.toBe((await store.getOrCreate("sales-outbound")).threadId);
+    expect((await runCauseEffect(store.getOrCreate("chief"))).threadId).not.toBe(
+      (await runCauseEffect(store.getOrCreate("sales-outbound"))).threadId,
+    );
   });
 
   it("reads usage for the selected agent provider and prefers its model-specific bucket", async () => {
@@ -2791,8 +2906,8 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-luna" });
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-luna" }));
     const codex = clients.get("codex");
     if (!codex) throw new Error("Codex test client was not created.");
     codex.accountRateLimits = {
@@ -2809,16 +2924,16 @@ describe.sequential("AgentService: providers", () => {
       },
     };
 
-    await expect(service.getUsage("chief")).resolves.toMatchObject({
+    await expect(runCauseEffect(service.getUsage("chief"))).resolves.toMatchObject({
       limits: [{ id: "luna", secondary: { usedPercent: 70 } }],
     });
 
-    await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" });
-    await expect(service.getUsage("chief")).resolves.toMatchObject({
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" }));
+    await expect(runCauseEffect(service.getUsage("chief"))).resolves.toMatchObject({
       limits: [{ id: "codex", secondary: { usedPercent: 40 } }],
     });
 
-    await service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" });
+    await runCauseEffect(service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }));
     const claude = clients.get("claude");
     if (!claude) throw new Error("Claude test client was not created.");
     claude.accountRateLimits = {
@@ -2829,7 +2944,7 @@ describe.sequential("AgentService: providers", () => {
       rateLimitsByLimitId: null,
     };
 
-    await expect(service.getUsage("chief")).resolves.toMatchObject({
+    await expect(runCauseEffect(service.getUsage("chief"))).resolves.toMatchObject({
       limits: [{ id: "claude", secondary: { usedPercent: 55 } }],
     });
     expect(claude.requests).toContainEqual({
@@ -2874,7 +2989,7 @@ describe.sequential("AgentService: providers", () => {
       rateLimitsByLimitId: null,
     };
 
-    await expect(service.getUsage()).resolves.toMatchObject({
+    await expect(runCauseEffect(service.getUsage())).resolves.toMatchObject({
       limits: [
         {
           id: "claude",
@@ -2887,16 +3002,17 @@ describe.sequential("AgentService: providers", () => {
         },
       ],
     });
-    expect((await service.getUsage()).limits.map((limit) => limit.id)).toEqual(["claude", "codex"]);
+    expect((await runCauseEffect(service.getUsage())).limits.map((limit) => limit.id)).toEqual(["claude", "codex"]);
   });
 
   it("maps provider browser tool calls to the stable OpenBot thread", async () => {
     const calls: DynamicToolCallParams[] = [];
     const browser = fakeBrowser();
-    browser.handleDynamicTool = async (params) => {
-      calls.push(params);
-      return { success: true, contentItems: [] };
-    };
+    browser.handleDynamicTool = (params) =>
+      Effect.sync(() => {
+        calls.push(params);
+        return { success: true, contentItems: [] };
+      });
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
@@ -2908,11 +3024,11 @@ describe.sequential("AgentService: providers", () => {
       preferredProvider: "codex",
     });
     service = agentService;
-    await service.sendMessage({ agentId: "chief", text: "Browse" });
+    await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Browse" }));
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
 
     const providerThreadId = store.activeProviderSession("chief")?.externalSessionId;
-    const openbotThreadId = (await store.getOrCreate("chief")).threadId;
+    const openbotThreadId = (await runCauseEffect(store.getOrCreate("chief"))).threadId;
     const client = clients.get("codex");
     if (!providerThreadId || !openbotThreadId || !client) throw new Error("Browser test thread was not created.");
     expect(providerThreadId).not.toBe(openbotThreadId);
