@@ -5,9 +5,9 @@ import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   callOpenBotTool,
-  createFakeClaude,
   createTestService,
   FakeAgentClient,
+  fakeClaudeCli,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -29,7 +29,7 @@ describe.sequential("local skill provider tools", () => {
   it.each(["codex", "claude"] as const)(
     "routes %s skill tools to the caller and rejects agent overrides",
     async (provider) => {
-      process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+      process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
       const { store, mailbox } = stores(root);
       const clients = new Map<AgentProvider, FakeAgentClient>();
       const create = vi.fn<LocalSkillTools["create"]>().mockRejectedValue(new Error("validation test"));

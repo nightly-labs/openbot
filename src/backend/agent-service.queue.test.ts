@@ -12,12 +12,12 @@ import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   callOpenBotTool,
-  createFakeClaude,
-  createFakeGrok,
-  createFakeOpencode,
   createTestService,
   expectOpenBotToolFailure,
   FakeAgentClient,
+  fakeClaudeCli,
+  fakeGrokCli,
+  fakeOpencodeCli,
   firstInputText,
   inputRecords,
   notification,
@@ -213,7 +213,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("starts a new agent in a development build on the OpenCode development model", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     service = createTestService({
       store,
@@ -243,8 +243,8 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("leaves a packaged build and a recorded preference on their own model", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -288,7 +288,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("starts a new agent on the requested provider and model before the initial message", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     service = createTestService({
@@ -316,7 +316,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("rejects creation with an unlisted model and removes the incomplete agent", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService } = await startService(root, {
       client: (provider) => new FakeAgentClient(provider),
     });
@@ -329,7 +329,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("updates the active account and new-agent defaults with the preferred provider", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const { service: agentService } = await startService(root, { preferredProvider: "claude" });
     service = agentService;
 
@@ -402,7 +402,7 @@ describe.sequential("AgentService: queue", () => {
     // Grok has no built-in model list, so a Grok CLI that is not ready lists nothing. Codex and
     // Claude are not installed either, but still list their built-in models.
     process.env.OPENBOT_CODEX_PATH = join(root, "missing-codex");
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService } = await startService(root, {
       preferredProvider: "grok",
       client: (provider) => new FakeAgentClient(provider),
@@ -676,7 +676,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("starts the second provider when an agent selects its model", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const { service: agentService, store } = await startService(root);
     service = agentService;
     await store.getOrCreate("chief");
@@ -698,8 +698,8 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("hands one SQLite conversation across repeated provider switches", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
@@ -753,7 +753,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("captures the work steps at the switch and hands them to the next provider, with secrets redacted", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const secret = "handoff-secret-7c1f9e2a4b";
     registerSecretValue(secret);
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -829,7 +829,7 @@ describe.sequential("AgentService: queue", () => {
   });
 
   it("resumes and retries once when Grok loses its in-memory session", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     let rejectTurnStart = true;
     let grokClient: FakeAgentClient | undefined;
     const { store, mailbox } = stores(root);
@@ -875,8 +875,8 @@ describe.sequential("AgentService: queue", () => {
   it.each(["grok", "opencode"] as const)(
     "replaces a %s session that the provider can no longer resume",
     async (target) => {
-      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
-      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
+      process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
       let rejectResume = false;
       let providerClient: FakeAgentClient | undefined;
       const { store, mailbox } = stores(root);
@@ -934,7 +934,7 @@ describe.sequential("AgentService: queue", () => {
   );
 
   it("stores a visible summary when a provider handoff exceeds its budget", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
@@ -1229,7 +1229,7 @@ describe.sequential("AgentService: queue", () => {
 
   describe("a message sent while the agent works, in steer mode", () => {
     async function startBusyAgent(provider: AgentProvider, requestHook?: (method: string) => Promise<void>) {
-      if (provider === "opencode") process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      if (provider === "opencode") process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
       const started = await startService(root, {
         provider,
         preferredProvider: provider,
@@ -1971,8 +1971,8 @@ describe.sequential("AgentService: queue", () => {
     { provider: "codex", context: "unavailable" },
     { provider: "codex", context: "rollback" },
   ])("preserves the caller's space for $provider with $context context", async ({ provider, context }) => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const sidebarPath = join(root, "sidebar-layout.json");
     const sidebar = new SidebarLayoutStore(sidebarPath);

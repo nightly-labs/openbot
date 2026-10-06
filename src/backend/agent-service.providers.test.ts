@@ -20,12 +20,12 @@ import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
-  createFakeClaude,
-  createFakeGrok,
-  createFakeOpencode,
   createTestService,
   FakeAgentClient,
   fakeBrowser,
+  fakeClaudeCli,
+  fakeGrokCli,
+  fakeOpencodeCli,
   firstInputText,
   notification,
   paramsRecord,
@@ -1318,9 +1318,9 @@ describe.sequential("AgentService: providers", () => {
   it.each<AgentProvider>(["codex", "claude", "grok", "opencode"])(
     "delivers the quiet collaboration policy to %s on startup and after restart",
     async (provider) => {
-      process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
-      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
-      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
+      process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
+      process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
       const { store, mailbox } = stores(root);
       for (const method of ["thread/start", "thread/resume"]) {
         const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -1375,7 +1375,7 @@ describe.sequential("AgentService: providers", () => {
   /* Grok takes no sandbox per session. A Workspace only turn that reached the shared process would
      run with full access, so the turn must go to the agent's own sandboxed process. */
   it("runs a Workspace only Grok agent in a sandboxed process of its own, and back on the shared one", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const created: Array<{ client: FakeAgentClient; roots: readonly string[] | null }> = [];
     service = createTestService({
@@ -1422,7 +1422,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("runs a message again on a new Grok session when xAI refuses the session's reasoning", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
     service = createTestService({
@@ -1488,7 +1488,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("keeps the turn of a Workspace only agent when the shared Grok process exits", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    process.env.OPENBOT_GROK_PATH = await fakeGrokCli();
     const { store, mailbox } = stores(root);
     const created: Array<{ client: FakeAgentClient; confined: boolean }> = [];
     service = createTestService({
@@ -1524,7 +1524,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1615,7 +1615,7 @@ describe.sequential("AgentService: providers", () => {
   // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
   // models of an endpoint already removed are therefore still listed, and must not be chosen.
   it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1648,7 +1648,7 @@ describe.sequential("AgentService: providers", () => {
   // A user who runs custom endpoints only has no other provider to move to. The removal must still
   // go through, or the last endpoint can never be taken out.
   it("removes the last endpoint when the built-in provider cannot be reached", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     // No Codex CLI, so the built-in fallback reports `not-installed` and connecting to it throws.
     process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
     const { service: agentService, store } = await startService(root, {
@@ -1685,7 +1685,7 @@ describe.sequential("AgentService: providers", () => {
   // A removal that fails on disk leaves the endpoint saved and served by the running CLI, so the
   // next removal may still move agents onto it.
   it("keeps an endpoint selectable when its own removal was never written", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1720,7 +1720,7 @@ describe.sequential("AgentService: providers", () => {
   // during a turn skips the restart, so the running CLI keeps listing the endpoint; nothing may offer
   // it after the file that defines it is gone.
   it("hides a removed endpoint's models from the catalogue and from selection", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1753,7 +1753,7 @@ describe.sequential("AgentService: providers", () => {
   // A removal runs a sweep and then a file write, and an agent update that landed between the two
   // would leave one agent on the endpoint that the removal has already finished with.
   it("refuses a model of an endpoint whose removal is still running", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1792,8 +1792,8 @@ describe.sequential("AgentService: providers", () => {
   // it is the one the save before started, offering the id again would send the next message to the
   // endpoint the user has just replaced.
   it("keeps a replaced endpoint out until a new process reads it", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const { store, mailbox } = stores(root);
     // Each flag decides whether the *next* process of that CLI starts. OpenCode's says whether the
     // restart works; Claude's keeps Claude unconnected until the test connects it, which is a
@@ -1858,7 +1858,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("keeps an endpoint removed while a process starts out of that process", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     let opencodeClients = 0;
     // Holds the second process at `initialize`, which is the window between the spawn, where the CLI
@@ -1913,7 +1913,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("keeps an endpoint out while its removal is still being written", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1949,7 +1949,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("fails a delivery whose endpoint is removed while the thread is prepared", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     // No Codex CLI, so no fallback exists and the removal goes ahead while the agent is busy.
     process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
     const { store, mailbox } = stores(root);
@@ -1996,7 +1996,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("refuses to steer a message into a turn that runs on a removed endpoint", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     // No Codex CLI, so no fallback exists and the removal goes ahead while the turn runs.
     process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
     const { store, mailbox } = stores(root);
@@ -2040,7 +2040,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("refuses to steer although the removal already moved the agent to another model", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     service = createTestService({
@@ -2085,7 +2085,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("stops a profile client when the endpoint it may hold is removed", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     const profileClients: FakeAgentClient[] = [];
     // The profile client is a process of its own, so it is the one created while this is true.
@@ -2141,7 +2141,7 @@ describe.sequential("AgentService: providers", () => {
   // The models of a removed endpoint must not come back because the replacement said nothing about
   // them. A kept catalogue describes the process that reported it, which is the one already gone.
   it("keeps a removed endpoint out when the replacement cannot list its models", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     let opencodeClients = 0;
     service = createTestService({
@@ -2174,7 +2174,7 @@ describe.sequential("AgentService: providers", () => {
   // An id this app never saved can already exist in OpenCode's own configuration. Until a process
   // that read the save answers, those models belong to the old URL, not to the endpoint just saved.
   it("keeps a saved id out until a process that read the save answers", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -2200,7 +2200,7 @@ describe.sequential("AgentService: providers", () => {
 
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -2228,7 +2228,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("refuses to release a busy agent when the only model left belongs to another provider", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    process.env.OPENBOT_OPENCODE_PATH = await fakeOpencodeCli();
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     service = createTestService({
@@ -2780,7 +2780,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("reads usage for the selected agent provider and prefers its model-specific bucket", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService, store } = await startService(root, {
       client: (provider) => {
@@ -2839,7 +2839,7 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("reads account-wide usage from every connected provider", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { service: agentService } = await startService(root, {
       client: (provider) => {

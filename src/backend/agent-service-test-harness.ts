@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, BrowserControlState, BrowserTab, QueueSnapshot } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { expect, vi } from "vitest";
+import { afterAll, expect, vi } from "vitest";
 import type { BrowserUploadHooks } from "./agent/browser-uploads";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import { AgentService, type AgentServiceOptions } from "./agent-service";
@@ -76,7 +76,7 @@ export async function startAgentTestFixture(): Promise<{ root: string; logPath: 
   const root = await mkdtemp(join(tmpdir(), "openbot-agent-test-"));
   const logPath = join(root, "protocol.jsonl");
   process.env.OPENBOT_FAKE_CODEX_LOG = logPath;
-  process.env.OPENBOT_CODEX_PATH = await createFakeCodex(root);
+  process.env.OPENBOT_CODEX_PATH = await fakeCodexCli();
   process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
   process.env.OPENBOT_GROK_PATH = join(root, "missing-grok");
   process.env.OPENBOT_OPENCODE_PATH = join(root, "missing-opencode");
@@ -557,10 +557,36 @@ export async function waitFor(check: () => boolean | undefined | Promise<boolean
   );
 }
 
-export async function createFakeCodex(directory: string): Promise<string> {
-  const executable = join(directory, "codex");
-  await writeFile(
-    executable,
+/**
+ * The fake CLIs, written once for each test file and not once for each test. macOS checks an
+ * executable the first time it runs from a new path, and that check cost about 200 ms in every test
+ * that wrote its own copy. A fake's source is fixed: a test changes what it does through the
+ * `OPENBOT_FAKE_*` variables, so no test can change the file that the next test runs.
+ */
+let fakeCliDirectory: Promise<string> | null = null;
+const fakeClis = new Map<string, Promise<string>>();
+
+afterAll(async () => {
+  if (fakeCliDirectory) await rm(await fakeCliDirectory, { recursive: true, force: true });
+});
+
+function sharedFakeCli(name: string, source: string): Promise<string> {
+  let executable = fakeClis.get(name);
+  if (!executable) {
+    executable = (async () => {
+      fakeCliDirectory ??= mkdtemp(join(tmpdir(), "openbot-fake-cli-"));
+      const path = join(await fakeCliDirectory, name);
+      await writeFile(path, source, { mode: 0o755 });
+      return path;
+    })();
+    fakeClis.set(name, executable);
+  }
+  return executable;
+}
+
+export function fakeCodexCli(): Promise<string> {
+  return sharedFakeCli(
+    "codex",
     `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -704,26 +730,21 @@ process.stdin.on("data", (chunk) => {
   }
 });
 `,
-    { mode: 0o700 },
   );
-  await chmod(executable, 0o700);
-  return executable;
 }
 
-export async function createFakeClaude(directory: string): Promise<string> {
-  const executable = join(directory, "claude");
-  await writeFile(
-    executable,
+/** A signed-in Claude CLI. Each version is its own file, so a test can install a newer one beside it. */
+export function fakeClaudeCli(version = "2.1.246"): Promise<string> {
+  return sharedFakeCli(
+    `claude-${version}`,
     `#!/bin/sh
 if [ "$1" = "--version" ]; then
-  printf '%s\\n' '2.1.246 (Claude Code)'
+  printf '%s\\n' '${version} (Claude Code)'
 elif [ "$1" = "auth" ]; then
   printf '%s' '{"loggedIn":true,"email":"claude@example.com","subscriptionType":"max"}'
 fi
 `,
   );
-  await chmod(executable, 0o755);
-  return executable;
 }
 
 /**
@@ -771,10 +792,9 @@ fi
   return { executable, marker, started };
 }
 
-export async function createPendingFakeClaude(directory: string): Promise<string> {
-  const executable = join(directory, "claude-pending");
-  await writeFile(
-    executable,
+export function pendingFakeClaudeCli(): Promise<string> {
+  return sharedFakeCli(
+    "claude-pending",
     `#!/bin/sh
 if [ "$1" = "--version" ]; then
   printf '%s\\n' '2.1.246 (Claude Code)'
@@ -787,8 +807,6 @@ elif [ "$1" = "auth" ]; then
 fi
 `,
   );
-  await chmod(executable, 0o755);
-  return executable;
 }
 
 export async function readTextOrEmpty(path: string): Promise<string> {
@@ -799,23 +817,17 @@ export async function readTextOrEmpty(path: string): Promise<string> {
   }
 }
 
-export async function createFakeGrok(directory: string): Promise<string> {
-  const executable = join(directory, "grok");
-  await writeFile(
-    executable,
+export function fakeGrokCli(): Promise<string> {
+  return sharedFakeCli(
+    "grok",
     `#!/bin/sh
 if [ "$1" = "--version" ]; then
   printf '%s\\n' 'grok 1.0.5'
 fi
 `,
   );
-  await chmod(executable, 0o755);
-  return executable;
 }
 
-export async function createFakeOpencode(directory: string): Promise<string> {
-  const executable = join(directory, "opencode");
-  await writeFile(executable, "#!/bin/sh\nprintf '1.3.13\\n'\n");
-  await chmod(executable, 0o755);
-  return executable;
+export function fakeOpencodeCli(): Promise<string> {
+  return sharedFakeCli("opencode", "#!/bin/sh\nprintf '1.3.13\\n'\n");
 }

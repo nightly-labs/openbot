@@ -2,12 +2,12 @@ import { AcpAgentClient } from "./acp-client";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "./provider-drivers";
 // @vitest-environment node
 
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { GrokAgentClient } from "./grok-client";
 import {
   type AppServerNotification,
@@ -21,16 +21,29 @@ import {
 } from "./protocol";
 
 let root: string;
+/**
+ * The fake agent, written once for this file and not once for each test. macOS checks an executable
+ * the first time it runs from a new path, and that check cost about 200 ms in each test that wrote
+ * its own copy. The agent reads its mode and its log path from the environment.
+ */
+let executableRoot: string;
 let executable: string;
 let logPath: string;
 let client: AcpAgentClient | null = null;
 
+beforeAll(async () => {
+  executableRoot = await mkdtemp(join(tmpdir(), "openbot-grok-acp-cli-"));
+  executable = join(executableRoot, "grok");
+  await writeFile(executable, FAKE_GROK_ACP, { mode: 0o700 });
+});
+
+afterAll(async () => {
+  await rm(executableRoot, { recursive: true, force: true });
+});
+
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-grok-acp-"));
-  executable = join(root, "grok");
   logPath = join(root, "fake-grok.jsonl");
-  await writeFile(executable, FAKE_GROK_ACP);
-  await chmod(executable, 0o700);
   process.env.OPENBOT_FAKE_GROK_LOG = logPath;
   delete process.env.OPENBOT_FAKE_GROK_MODE;
 });

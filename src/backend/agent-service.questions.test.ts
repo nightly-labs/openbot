@@ -4,10 +4,10 @@ import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
-  createFakeClaude,
   createTestService,
   FakeAgentClient,
   fakeBrowser,
+  fakeClaudeCli,
   notification,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -101,7 +101,7 @@ describe.sequential("AgentService: questions", () => {
   });
 
   it("keeps prompts, approvals and takeovers from a healthy provider active when another provider exits", async () => {
-    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_CLAUDE_PATH = await fakeClaudeCli();
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const tabs: BrowserTab[] = [];
     const { store, mailbox } = stores(root);

@@ -12,13 +12,13 @@
  * answers what the CLI was told about the endpoints the user saved.
  */
 
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
@@ -250,17 +250,38 @@ interface FakeOpencode {
   >;
 }
 
+/**
+ * The fake agent, written once for this file and not once for each test. macOS checks an executable
+ * the first time it runs from a new path, and that check cost about 200 ms in each test that wrote
+ * its own copy. The agent reads its behaviour and its log paths from the environment, so each test
+ * still gets its own directory for the logs.
+ */
+let fakeAgentDirectory: Promise<string> | null = null;
+const FAKE_AGENT_NAME = process.platform === "win32" ? "opencode.cmd" : "opencode";
+
+afterAll(async () => {
+  if (fakeAgentDirectory) await rm(await fakeAgentDirectory, { recursive: true, force: true });
+});
+
+async function fakeAgentExecutable(): Promise<string> {
+  fakeAgentDirectory ??= (async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-acp-opencode-cli-"));
+    const executable = join(directory, FAKE_AGENT_NAME);
+    if (process.platform === "win32") {
+      const script = join(directory, "fake-opencode.js");
+      await writeFile(script, FAKE_AGENT);
+      await writeFile(executable, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+    } else {
+      await writeFile(executable, FAKE_AGENT, { mode: 0o755 });
+    }
+    return directory;
+  })();
+  return join(await fakeAgentDirectory, FAKE_AGENT_NAME);
+}
+
 async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<FakeOpencode> {
   const directory = await mkdtemp(join(tmpdir(), "openbot-acp-opencode-"));
-  const executable = join(directory, process.platform === "win32" ? "opencode.cmd" : "opencode");
-  if (process.platform === "win32") {
-    const script = join(directory, "fake-opencode.js");
-    await writeFile(script, FAKE_AGENT);
-    await writeFile(executable, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
-  } else {
-    await writeFile(executable, FAKE_AGENT);
-    await chmod(executable, 0o755);
-  }
+  const executable = await fakeAgentExecutable();
   const envLog = join(directory, "spawn-env.ndjson");
   const promptLog = join(directory, "prompts.ndjson");
   const configLog = join(directory, "config-options.ndjson");
