@@ -16,6 +16,7 @@ export const messages = {
     "Não foi possível reservar um conjunto de portas livres do Sunshine para a área de trabalho remota.",
   "error.backend.moonlightPortsUnavailable":
     "Não foi possível reservar uma faixa de portas livres do Moonlight WebRTC para a área de trabalho remota.",
+  "error.backend.iceServerNoPort": "O servidor ICE da área de trabalho remota não recebeu uma porta.",
   "error.backend.remoteDesktopStoppedWhileStarting":
     "O ambiente de execução da área de trabalho remota foi interrompido durante a inicialização.",
   "error.backend.sunshineNotStarted": "O Sunshine não iniciou em um conjunto de portas reservadas.",

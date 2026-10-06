@@ -166,8 +166,8 @@ deliveries while it writes, and reports success only after a new process runs wi
 
 That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
 catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
-supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-runtime.ts`
-drops the paid Zen models from `#refreshModelCatalog` while OpenBot is the one supplying the key;
+supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/model-catalog.ts`
+drops the paid Zen models from `ModelCatalog.refresh` while OpenBot is the one supplying the key;
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.

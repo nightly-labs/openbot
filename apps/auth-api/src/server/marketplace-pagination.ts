@@ -1,4 +1,5 @@
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { decodeBase64Url, encodeBase64Url } from "./crypto";
 
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 24;
 const MARKETPLACE_MAX_PAGE_SIZE = 50;
@@ -51,10 +52,7 @@ export function marketplaceLikePattern(value: string): string {
 
 export function encodeMarketplaceCursor(sort: MarketplaceSort, cursor: MarketplaceCursor): string {
   const value = JSON.stringify({ v: 1, s: sort, p: cursor.primary, u: cursor.updatedAt, i: cursor.id });
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+  return encodeBase64Url(new TextEncoder().encode(value));
 }
 
 export function decodeMarketplaceCursor(
@@ -68,10 +66,7 @@ export function decodeMarketplaceCursor(
     if (Number.isSafeInteger(legacyUpdatedAt)) return { legacyUpdatedAt };
   }
   try {
-    const encoded = value.replaceAll("-", "+").replaceAll("_", "/");
-    const binary = atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "="));
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const parsed = JSON.parse(new TextDecoder().decode(bytes));
+    const parsed = JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
     if (
       !isDynamicRecord(parsed) ||
       parsed.v !== 1 ||

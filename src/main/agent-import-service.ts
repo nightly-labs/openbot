@@ -43,6 +43,7 @@ import {
   type ImportAgent,
   type ImportChannel,
 } from "./agent-import-manifest";
+import { validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
@@ -759,15 +760,6 @@ function avatarImage(bytes: Uint8Array | undefined): AvatarImageInput | null {
   if (!bytes) return null;
   const mimeType = AVATAR_MIME_TYPES.find((type) => isValidAvatarImage(type, bytes));
   return mimeType ? { mimeType, bytes } : null;
-}
-
-function validTimezone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function bounded(warnings: string[]): string[] {

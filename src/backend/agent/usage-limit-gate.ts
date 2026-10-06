@@ -2,6 +2,7 @@ import type { AccountUsage, AgentEvent, AgentRuntimeSnapshot } from "@openbot/co
 import { Effect, Exit, Schema, Scope } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import { providerForAgent } from "./thread-items";
 
 /** A provider client's report that the plan refused this turn, with the reset in epoch seconds when it gave one. */
@@ -240,3 +241,5 @@ function spentWindowReset(usage: AccountUsage): number | null {
 export class UsageReadFailed extends Schema.TaggedError<UsageReadFailed>()("UsageReadFailed", {
   cause: Schema.Defect(),
 }) {}
+
+export const { rewrap: toUsageReadFailed } = causeHelpers(UsageReadFailed);

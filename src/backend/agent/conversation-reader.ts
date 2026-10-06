@@ -10,6 +10,7 @@ import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "../conversation-read-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MailboxSync } from "./mailbox-sync";
 
@@ -47,9 +48,7 @@ export class ConversationReader {
   }
 
   readonly read = Effect.fn("ConversationReader.read")(function* (this: ConversationReader, agentId: string) {
-    const agent = yield* this.#store
-      .getOrCreate(agentId)
-      .pipe(Effect.mapError((failure) => new ConversationReadFailed({ cause: failure.cause })));
+    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       const persisted = this.#store.database.readConversation(agentId, agent.threadId);
       const live = this.#conversation.snapshot(agentId);
@@ -82,9 +81,7 @@ export class ConversationReader {
     limit = 50,
     options: ConversationMarkerExclusions = {},
   ) {
-    const agent = yield* this.#store
-      .getOrCreate(agentId)
-      .pipe(Effect.mapError((failure) => new ConversationReadFailed({ cause: failure.cause })));
+    const agent = yield* this.#store.getOrCreate(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
       const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
@@ -149,6 +146,4 @@ class ConversationReadFailed extends Schema.TaggedError<ConversationReadFailed>(
   cause: Schema.Defect(),
 }) {}
 
-function readerStep<A>(run: () => A): Effect.Effect<A, ConversationReadFailed> {
-  return Effect.try({ try: run, catch: (cause) => new ConversationReadFailed({ cause }) });
-}
+const { sync: readerStep, rewrap: toConversationReadFailed } = causeHelpers(ConversationReadFailed);

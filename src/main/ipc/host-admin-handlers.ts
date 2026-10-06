@@ -20,7 +20,7 @@ import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/t
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
-import type { ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseHostUpdateSettings } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
@@ -44,9 +44,6 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity">;
   remoteServers: HostAdminRemoteServers;
 }
-
-// The host-admin-v1 codec has already checked the empty reply.
-const acceptEmpty = (): undefined => undefined;
 
 /** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
 type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | HostUpdateSettingsChange;

@@ -12,7 +12,9 @@ import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
-import { runCauseEffect } from "../backend/effect-boundary";
+import { causeHelpers, runCauseEffect } from "../backend/effect-boundary";
+import { readBodyWithin } from "./http-body";
+import { listenLoopback } from "./listen-loopback";
 
 const logger = createOpenBotLogger("automation");
 
@@ -28,9 +30,7 @@ class AutomationServerFailed extends Schema.TaggedError<AutomationServerFailed>(
   cause: Schema.Defect(),
 }) {}
 
-function automationIO<A>(operation: () => Promise<A>): Effect.Effect<A, AutomationServerFailed> {
-  return Effect.tryPromise({ try: operation, catch: (cause) => new AutomationServerFailed({ cause }) });
-}
+const { io: automationIO, rewrap: toAutomationServerFailed } = causeHelpers(AutomationServerFailed);
 
 export interface AutomationServerOptions {
   /** The folder that holds the URL and token files. Only the user can read it. */
@@ -114,27 +114,14 @@ export class AutomationServer {
     const token = randomBytes(32).toString("base64url");
     registerSecretValue(token);
     const server = createServer((request, response) => void this.#handle(request, response));
-    yield* automationIO(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          server.once("error", reject);
-          server.listen(0, "127.0.0.1", () => {
-            server.off("error", reject);
-            resolve();
-          });
-        }),
+    const port = yield* automationIO(() =>
+      listenLoopback(server, () => new Error("Unable to bind the automation server.")),
     );
-    const address = server.address();
-    if (!address || isString(address)) {
-      server.close();
-      return yield* new AutomationServerFailed({ cause: new Error("Unable to bind the automation server.") });
-    }
     this.#server = server;
-    this.#port = address.port;
+    this.#port = port;
     this.#token = Buffer.from(token);
     this.#filesClean = false;
     const { root } = this.#options;
-    const port = this.#port;
     yield* Effect.gen(function* () {
       yield* automationIO(() => mkdir(root, { recursive: true, mode: 0o700 }));
       // `mkdir` keeps the mode of a folder that already exists.
@@ -270,9 +257,7 @@ export class AutomationServer {
 }
 
 function writeAutomationFile(path: string, content: string): Effect.Effect<void, AutomationServerFailed> {
-  return writeFileAtomically(path, content).pipe(
-    Effect.mapError((error) => new AutomationServerFailed({ cause: error.cause })),
-  );
+  return writeFileAtomically(path, content).pipe(toAutomationServerFailed);
 }
 
 /** A path segment, or null when its percent encoding is not valid. */
@@ -286,15 +271,8 @@ function decodePathPart(value: string): string | null {
 
 /** The body as text, or null when it is larger than the limit. */
 async function readBody(request: IncomingMessage): Promise<string | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > BODY_LIMIT_BYTES) return null;
-    chunks.push(bytes);
-  }
-  return Buffer.concat(chunks).toString("utf8");
+  const body = await readBodyWithin(request, BODY_LIMIT_BYTES);
+  return body === null ? null : body.toString("utf8");
 }
 
 function send(response: ServerResponse, status: number, body: unknown): void {

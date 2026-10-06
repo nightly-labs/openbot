@@ -43,7 +43,7 @@ import {
   type StoredGeneratedAttachment,
   toAttachmentSummary,
 } from "./attachment-files";
-import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "./stored-state-effects";
 
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
@@ -959,6 +959,14 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /** The delivery of one message to one recipient. A message reaches each recipient once. */
+  deliveryForMessage(messageId: string, recipientAgentId: string): DeliveryContext | null {
+    const delivery = this.#state.deliveries.find(
+      (candidate) => candidate.messageId === messageId && candidate.recipientAgentId === recipientAgentId,
+    );
+    return delivery ? this.#context(delivery) : null;
+  }
+
   findDeliveryByTurn(turnId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.turnId === turnId);
     return delivery ? this.#context(delivery) : null;
@@ -1762,12 +1770,7 @@ export class MailboxStore {
       // markers without their outbox entry, and a failed save restores a copy that has all other changes.
       const managedPaths = new Map<string, string | null>();
       for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
-        managedPaths.set(
-          path,
-          yield* this.#files
-            .managedTransferFile(path)
-            .pipe(Effect.mapError((failure) => new StoredStateFailure({ cause: failure.cause }))),
-        );
+        managedPaths.set(path, yield* this.#files.managedTransferFile(path).pipe(toStoredStateFailure));
       }
       const records = this.#fileRecords();
       const targets = this.#undeletedFileRecords(fileId);

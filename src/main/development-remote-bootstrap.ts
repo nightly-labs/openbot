@@ -19,7 +19,7 @@ import type { CentralAuthManager } from "./central-auth-manager";
 import { developmentRemoteConnectionPath } from "./development-runtime-directory";
 import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, type HostService } from "./host-service";
 import type { DevelopmentRemoteServerConnection, RemoteServerManager } from "./remote-server-manager";
-import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import { writeSetupState } from "./setup-store";
 import type { TeamStore } from "./team-store";
 
@@ -60,9 +60,7 @@ export const applyDevelopmentRemoteAccount = Effect.fn("DevelopmentRemote.applyA
     yield* teamStore.configureWithAccount("OpenBot Local Dev Host", user);
   }
   if (role === "client" && !setupCompleted) {
-    yield* writeSetupState(setupFile, { preferredProvider: "codex", preferredModel: null }).pipe(
-      Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
-    );
+    yield* writeSetupState(setupFile, { preferredProvider: "codex", preferredModel: null }).pipe(toRemoteWorkflowError);
   }
   if (role === "host" && !testClientEnabled) {
     const technicalMember = teamStore
@@ -101,15 +99,10 @@ export const ensureDevelopmentAccount = Effect.fn("DevelopmentRemote.ensureAccou
   manager: Pick<CentralAuthManager, "initialize" | "logout" | "requestEmailCode" | "verifyEmailCode">,
   email: string,
 ) {
-  const initialized = yield* manager
-    .initialize()
-    .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+  const initialized = yield* manager.initialize().pipe(toRemoteWorkflowError);
   if (initialized.status === "signed_in" && initialized.user.email === email) return initialized.user;
-  if (initialized.status === "signed_in")
-    yield* manager.logout().pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
-  let challenge = yield* manager
-    .requestEmailCode(email)
-    .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+  if (initialized.status === "signed_in") yield* manager.logout().pipe(toRemoteWorkflowError);
+  let challenge = yield* manager.requestEmailCode(email).pipe(toRemoteWorkflowError);
   if (
     challenge.status === "error" &&
     challenge.issue.code === "code_recently_sent" &&
@@ -118,9 +111,7 @@ export const ensureDevelopmentAccount = Effect.fn("DevelopmentRemote.ensureAccou
     challenge.issue.retryAfterSeconds <= 60
   ) {
     yield* Effect.sleep(challenge.issue.retryAfterSeconds * 1000);
-    challenge = yield* manager
-      .requestEmailCode(email)
-      .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+    challenge = yield* manager.requestEmailCode(email).pipe(toRemoteWorkflowError);
   }
   if (challenge.status === "error")
     return yield* new RemoteWorkflowError({ cause: new Error(challenge.issue.message) });
@@ -130,7 +121,7 @@ export const ensureDevelopmentAccount = Effect.fn("DevelopmentRemote.ensureAccou
     });
   const verified = yield* manager
     .verifyEmailCode(challenge.challengeId, challenge.developmentCode)
-    .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+    .pipe(toRemoteWorkflowError);
   if (verified.status === "error") return yield* new RemoteWorkflowError({ cause: new Error(verified.issue.message) });
   if (verified.status !== "signed_in")
     return yield* new RemoteWorkflowError({ cause: new Error("The local development account could not sign in.") });

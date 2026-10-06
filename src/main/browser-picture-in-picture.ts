@@ -2,6 +2,7 @@ import type { BrowserBounds, BrowserPictureInPictureEvent } from "@openbot/contr
 import { Effect, Schema } from "effect";
 import { BrowserWindow, screen, WebContentsView } from "electron";
 import type { BrowserHost } from "../backend/browser-host";
+import { causeHelpers } from "../backend/effect-boundary";
 import {
   BROWSER_PIP_MIN_HEIGHT,
   BROWSER_PIP_MIN_WIDTH,
@@ -234,5 +235,4 @@ export class PictureInPictureFailed extends Schema.TaggedError<PictureInPictureF
   cause: Schema.Defect(),
 }) {}
 
-const pipCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({ try: operation, catch: (cause) => new PictureInPictureFailed({ cause }) });
+const { io: pipCall } = causeHelpers(PictureInPictureFailed);

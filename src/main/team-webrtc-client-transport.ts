@@ -34,7 +34,7 @@ import type {
   RemoteInviteRecord,
   RemoteMemberRecord,
 } from "./central-auth-records";
-import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
@@ -186,9 +186,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly listHosts = Effect.fn("TeamWebRtcClient.listHosts")(function* (
     this: TeamWebRtcClientTransport,
   ): Effect.fn.Return<RemoteHostSummary[], RemoteWorkflowError> {
-    return yield* this.#owned(
-      this.#options.listHosts().pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return yield* this.#owned(this.#options.listHosts().pipe(toRemoteWorkflowError));
   }).bind(this);
 
   pinHostKey(hostId: string, publicKey: string): void {
@@ -200,75 +198,39 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   }
 
   downloadHostLogo(hostId: string, version: string) {
-    return this.#owned(
-      this.#options
-        .downloadHostLogo(hostId, version)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.downloadHostLogo(hostId, version).pipe(toRemoteWorkflowError));
   }
 
   createInvite(hostId: string, input: { role: "admin" | "member"; email?: string }) {
-    return this.#owned(
-      this.#options
-        .createInvite(hostId, input)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.createInvite(hostId, input).pipe(toRemoteWorkflowError));
   }
 
   listInvites(hostId: string) {
-    return this.#owned(
-      this.#options
-        .listInvites(hostId)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.listInvites(hostId).pipe(toRemoteWorkflowError));
   }
 
   previewInvite(token: string) {
-    return this.#owned(
-      this.#options
-        .previewInvite(token)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.previewInvite(token).pipe(toRemoteWorkflowError));
   }
 
   acceptInvite(token: string) {
-    return this.#owned(
-      this.#options
-        .acceptInvite(token)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.acceptInvite(token).pipe(toRemoteWorkflowError));
   }
 
   revokeInvite(inviteId: string) {
-    return this.#owned(
-      this.#options
-        .revokeInvite(inviteId)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.revokeInvite(inviteId).pipe(toRemoteWorkflowError));
   }
 
   listMembers(hostId: string) {
-    return this.#owned(
-      this.#options
-        .listMembers(hostId)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.listMembers(hostId).pipe(toRemoteWorkflowError));
   }
 
   updateMember(hostId: string, membershipId: string, role: "admin" | "member", reactivate = false) {
-    return this.#owned(
-      this.#options
-        .updateMember(hostId, membershipId, role, reactivate)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.updateMember(hostId, membershipId, role, reactivate).pipe(toRemoteWorkflowError));
   }
 
   removeMember(hostId: string, membershipId: string) {
-    return this.#owned(
-      this.#options
-        .removeMember(hostId, membershipId)
-        .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause }))),
-    );
+    return this.#owned(this.#options.removeMember(hostId, membershipId).pipe(toRemoteWorkflowError));
   }
 
   readonly leaveHost = Effect.fn("TeamWebRtcClient.leaveHost")(function* (
@@ -277,17 +239,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     return yield* this.#owned(
       Effect.gen({ self: this }, function* () {
-        const host = (yield* this.#options
-          .listHosts()
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))).find(
+        const host = (yield* this.#options.listHosts().pipe(toRemoteWorkflowError)).find(
           (candidate) => candidate.hostId === hostId,
         );
         if (!host) return;
         if (host.role === "owner")
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.ownerCannotLeave")) });
-        yield* this.#options
-          .removeMember(hostId, host.membershipId)
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+        yield* this.#options.removeMember(hostId, host.membershipId).pipe(toRemoteWorkflowError);
       }),
     );
   }).bind(this);
@@ -518,7 +476,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         if (sessionId)
           yield* this.#options
             .endSession(sessionId)
-            .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+            .pipe(toRemoteWorkflowError)
             .pipe(Effect.catch(() => Effect.void));
         if (disconnectError) return yield* new RemoteWorkflowError({ cause: disconnectError });
       }),
@@ -631,9 +589,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     let startedNewSession = false;
     const bootstrap = yield* Effect.gen({ self: this }, function* () {
       if (!sessionId) {
-        const session = yield* this.#options
-          .startSession(hostId)
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+        const session = yield* this.#options.startSession(hostId).pipe(toRemoteWorkflowError);
         sessionId = session.sessionId;
         active.sessionId = sessionId;
         active.expiresAt = session.expiresAt;
@@ -642,9 +598,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }
       const ticketSessionId = sessionId;
       return yield* Effect.gen({ self: this }, function* () {
-        const ticket = yield* this.#options
-          .issueTicket(ticketSessionId, clientPublicKey)
-          .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+        const ticket = yield* this.#options.issueTicket(ticketSessionId, clientPublicKey).pipe(toRemoteWorkflowError);
         yield* this.#assertCurrentEffect(hostId, active, ticketSessionId);
         return ticket;
       }).pipe(
@@ -654,11 +608,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             if (!existingSessionId || !isEndedSessionError(failure.cause)) return yield* failure;
             yield* this.#options
               .endSession(existingSessionId)
-              .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+              .pipe(toRemoteWorkflowError)
               .pipe(Effect.catch(() => Effect.void));
-            const session = yield* this.#options
-              .startSession(hostId)
-              .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+            const session = yield* this.#options.startSession(hostId).pipe(toRemoteWorkflowError);
             sessionId = session.sessionId;
             active.sessionId = sessionId;
             active.expiresAt = session.expiresAt;
@@ -666,7 +618,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             yield* this.#assertCurrentEffect(hostId, active, session.sessionId);
             const ticket = yield* this.#options
               .issueTicket(session.sessionId, clientPublicKey)
-              .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })));
+              .pipe(toRemoteWorkflowError);
             yield* this.#assertCurrentEffect(hostId, active, session.sessionId);
             return ticket;
           }),
@@ -679,7 +631,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           if (failedSessionId && !this.#retainSession(hostId, active, failedSessionId)) {
             yield* this.#options
               .endSession(failedSessionId)
-              .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+              .pipe(toRemoteWorkflowError)
               .pipe(Effect.catch(() => Effect.void));
           }
           return yield* failure;
@@ -757,7 +709,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           if (!retained)
             yield* this.#options
               .endSession(connectedSessionId)
-              .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+              .pipe(toRemoteWorkflowError)
               .pipe(Effect.catch(() => Effect.void));
           return yield* failure;
         }),
@@ -794,7 +746,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
     yield* this.#options
       .endSession(sessionId)
-      .pipe(Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })))
+      .pipe(toRemoteWorkflowError)
       .pipe(Effect.catch(() => Effect.void));
     return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
   });

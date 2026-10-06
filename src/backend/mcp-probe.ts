@@ -9,6 +9,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
+import { causeHelpers } from "./effect-boundary";
 import { type McpOAuthAuthority, type McpSignIn, secureOAuthFetch } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
@@ -42,6 +43,8 @@ export interface McpProbeResult {
 export class McpProbeFailure extends Schema.TaggedError<McpProbeFailure>()("McpProbeFailure", {
   cause: Schema.Defect(),
 }) {}
+
+const { io: probeIo, rewrap: toMcpProbeFailure } = causeHelpers(McpProbeFailure);
 
 export const testMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
@@ -83,10 +86,9 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   // The person's sign-in has its own deadline; the retried connection gets a fresh transport.
   const retry = yield* Effect.result(
-    signIn.complete().pipe(
-      Effect.mapError((error) => new McpProbeFailure({ cause: error.cause })),
-      Effect.andThen(connectAndCountEffect(server, timeoutMs, signIn.provider)),
-    ),
+    signIn
+      .complete()
+      .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, signIn.provider))),
   );
   return Result.isFailure(retry) ? failure(retry.failure.cause) : { toolCount: retry.success, error: null };
 });
@@ -222,10 +224,6 @@ const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transpor
     Effect.catch(() => Effect.void),
   );
 });
-
-function probeIo<A>(run: (signal: AbortSignal) => Promise<A>): Effect.Effect<A, McpProbeFailure> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new McpProbeFailure({ cause }) });
-}
 
 class McpTimeout extends Error {
   constructor(readonly timeoutMs: number) {

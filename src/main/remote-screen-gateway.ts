@@ -20,6 +20,8 @@ import type * as Ws from "ws";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { recordRestartActivity } from "../backend/restart-activity";
+import { readBodyWithin } from "./http-body";
+import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
@@ -433,24 +435,15 @@ export class RemoteScreenGateway {
         this.handleUpgrade(request, socket, head, url);
       });
       return yield* Effect.gen({ self: this }, function* () {
-        yield* remoteCall(
-          () =>
-            new Promise<void>((resolve, reject) => {
-              server.once("error", reject);
-              server.listen(0, "127.0.0.1", resolve);
-            }),
+        const port = yield* remoteCall(() =>
+          listenLoopback(server, () => new Error(sourceText("error.remote.localTestListenerUnavailable"))),
         );
-        const address = server.address();
-        if (!address || typeof address === "string")
-          return yield* new RemoteWorkflowError({
-            cause: new Error(sourceText("error.remote.localTestListenerUnavailable")),
-          });
         const session = yield* this.createSession({
           serverId: "local",
           memberId: "local-setup",
           teamSessionId: randomUUID(),
           teamSessionExpiresAt: new Date(Date.now() + 180_000).toISOString(),
-          publicHttpBaseUrl: `http://127.0.0.1:${address.port}`,
+          publicHttpBaseUrl: `http://127.0.0.1:${port}`,
         });
         this.#localTestServers.set(session.id, server);
         return session;
@@ -1278,16 +1271,10 @@ function moonlightRuntimeUser(session: ManagedRemoteScreenSession): string {
 }
 
 async function readSmallJson<T>(request: IncomingMessage, schema: z.ZodType<T>): Promise<T | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > 4096) throw new RemoteScreenError(413, "connection_failed", "Viewer authorization is too large.");
-    chunks.push(bytes);
-  }
+  const body = await readBodyWithin(request, 4096);
+  if (body === null) throw new RemoteScreenError(413, "connection_failed", "Viewer authorization is too large.");
   try {
-    return schema.parse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    return schema.parse(JSON.parse(body.toString("utf8")));
   } catch {
     return null;
   }

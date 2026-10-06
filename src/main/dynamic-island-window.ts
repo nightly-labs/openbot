@@ -15,6 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle } from "electron";
+import { causeHelpers } from "../backend/effect-boundary";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -42,6 +43,8 @@ const MACBOOK_NOTCH_ASPECT_RATIO_TOLERANCE = 0.01;
 export class DynamicIslandFailed extends Schema.TaggedError<DynamicIslandFailed>()("DynamicIslandFailed", {
   cause: Schema.Defect(),
 }) {}
+
+export const { rewrap: toDynamicIslandFailed } = causeHelpers(DynamicIslandFailed);
 
 type CriticalAction = Extract<DynamicIslandAction, { type: "answer-prompt" | "respond-approval" }>;
 
@@ -112,7 +115,7 @@ export class DynamicIslandWindowController {
     return this.#preferenceMutation.withPermit(
       Effect.gen({ self: this }, function* () {
         const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          Effect.mapError((error) => new DynamicIslandFailed({ cause: error.cause })),
+          toDynamicIslandFailed,
         );
         this.#preference = savedPreference;
         yield* this.reconcileWindow();

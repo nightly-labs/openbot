@@ -17,7 +17,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Semaphore } from "effect";
 import { sha256File } from "../backend/file-hash";
 import { recordRestartActivity } from "../backend/restart-activity";
-import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, remoteDecode, toRemoteWorkflowError } from "./remote-service-effects";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 
 const FILE_CHUNK_BYTES = 60 * 1024;
@@ -466,11 +466,7 @@ export class TeamWebRtcFileTransfer {
         if (!transfer || transfer.received !== transfer.size)
           return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC file is incomplete.") });
         yield* remoteCall(() => transfer.file.close());
-        if (
-          (yield* sha256File(transfer.path).pipe(
-            Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
-          )) !== transfer.sha256
-        ) {
+        if ((yield* sha256File(transfer.path).pipe(toRemoteWorkflowError)) !== transfer.sha256) {
           const error = new Error("The WebRTC file hash is invalid.");
           yield* this.#bridge
             .send(

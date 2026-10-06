@@ -15,14 +15,11 @@ import { sourceText } from "@openbot/i18n/source";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
-import type { ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseDeleteHostedSite, parsePublishHostedSite, parseReplaceHostedSite } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
-
-// The hosted-sites-v1 codec has already checked that the body is an empty record.
-const acceptEmpty = (): undefined => undefined;
 
 function decodeRemoteSiteList(value: unknown): HostedSiteList {
   const list = parseHostedSiteList(value);

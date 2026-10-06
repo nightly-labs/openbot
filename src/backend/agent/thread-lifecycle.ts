@@ -18,6 +18,7 @@ import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import type { ProviderSession } from "../database/provider-sessions";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import {
   agentMcpServers,
@@ -28,11 +29,11 @@ import {
   type McpAuthorizationSource,
   type McpServerDrop,
   type McpServerSource,
-  McpShapeFailed,
   type McpToolRuntimeSource,
   type McpToolRuntimes,
   mcpFingerprintValues,
   NO_MCP_TOOL_RUNTIMES,
+  toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
@@ -41,7 +42,14 @@ import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { agentNamesById, estimateTokens, renderHandoffMessage, summarizeOldMessages } from "./delivery-content";
+import {
+  agentNamesById,
+  estimateTokens,
+  HANDOFF_END,
+  HANDOFF_START,
+  renderHandoffMessage,
+  summarizeOldMessages,
+} from "./delivery-content";
 import { developerInstructions } from "./developer-instructions";
 import {
   decodeCapturedSteps,
@@ -243,7 +251,7 @@ export class ThreadLifecycle {
           const releaseThread = client.releaseThread?.bind(client);
           if (releaseThread)
             yield* releaseThread(externalThreadId)
-              .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })))
+              .pipe(toThreadOperationFailed)
               .pipe(
                 Effect.catch((failure) =>
                   Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause)),
@@ -303,10 +311,7 @@ export class ThreadLifecycle {
     executionThreadId?: string,
   ) {
     const publicThreadId =
-      executionThreadId ??
-      (yield* this.#store
-        .ensureThreadId(agent.id)
-        .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause }))));
+      executionThreadId ?? (yield* this.#store.ensureThreadId(agent.id).pipe(toThreadOperationFailed));
     if (executionThreadId) this.#conversation.registerExecutionThread(agent.id, executionThreadId);
     const { currentAgent, session } = yield* threadStep(() => ({
       currentAgent: this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent,
@@ -420,7 +425,7 @@ export class ThreadLifecycle {
         },
         decodeThreadResponse,
       )
-      .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })));
+      .pipe(toThreadOperationFailed);
     const externalThreadId = response.thread.id;
     const prepared = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
@@ -535,9 +540,7 @@ export class ThreadLifecycle {
     ThreadOperationFailed
   > {
     if (client.provider !== "codex") return {};
-    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpAuthorization).pipe(
-      Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })),
-    );
+    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpAuthorization).pipe(toThreadOperationFailed);
     const { servers, dropped } = yield* threadStep(() => codexMcpServers(usable));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
@@ -566,9 +569,7 @@ export class ThreadLifecycle {
   ): Effect.fn.Return<Record<string, CodexDisabledMcpServer>> {
     if (client.provider !== "codex") return {};
     return yield* codexDisabledServers(() =>
-      client
-        .request("config/read", { includeLayers: false }, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new McpShapeFailed({ cause: failure.cause }))),
+      client.request("config/read", { includeLayers: false }, decodeRecordResponse).pipe(toMcpShapeFailed),
     ).pipe(Effect.catch(() => Effect.succeed({})));
   });
 
@@ -731,18 +732,14 @@ export class ThreadLifecycle {
     this.#conversation.bindThread(externalThreadId, agent.id);
     const params = yield* this.threadParams(agent, client, externalThreadId);
     const resumed = yield* Effect.result(
-      client
-        .request("thread/resume", params, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause }))),
+      client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed),
     );
     if (Result.isFailure(resumed)) {
       if (client.provider !== "codex" || !isArchivedThreadError(resumed.failure.cause)) return yield* resumed.failure;
       yield* client
         .request("thread/unarchive", { threadId: externalThreadId }, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })));
-      yield* client
-        .request("thread/resume", params, decodeRecordResponse)
-        .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })));
+        .pipe(toThreadOperationFailed);
+      yield* client.request("thread/resume", params, decodeRecordResponse).pipe(toThreadOperationFailed);
     }
     this.#conversation.markThreadLoaded(externalThreadId, client);
   }).bind(this);
@@ -784,19 +781,13 @@ export class ThreadLifecycle {
       params: unknown,
       decoder: ResponseDecoder<T>,
     ) {
-      const response = yield* Effect.result(
-        client
-          .request(method, params, decoder)
-          .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause }))),
-      );
+      const response = yield* Effect.result(client.request(method, params, decoder).pipe(toThreadOperationFailed));
       if (Result.isSuccess(response)) return response.success;
       if (client.provider !== "codex" || !isArchivedThreadError(response.failure.cause)) return yield* response.failure;
       const threadId = getString(params, "threadId");
       if (!threadId) return yield* response.failure;
       yield* this.resumeThread(agent, client, threadId);
-      return yield* client
-        .request(method, params, decoder)
-        .pipe(Effect.mapError((failure) => new ThreadOperationFailed({ cause: failure.cause })));
+      return yield* client.request(method, params, decoder).pipe(toThreadOperationFailed);
     },
   );
 
@@ -1069,12 +1060,12 @@ export class ThreadLifecycle {
     const fullText = rendered.join("\n\n");
     if (estimateTokens(fullText) <= budgetTokens) {
       return [
-        "Continue this OpenBot conversation. The following transcript is user-visible history from the previous provider, with the work steps it recorded.",
+        `${HANDOFF_START} The following transcript is user-visible history from the previous provider, with the work steps it recorded.`,
         HANDOFF_PRECEDENCE,
         "Do not repeat completed work unless the current message asks for it.",
         "--- previous transcript ---",
         fullText,
-        "--- end previous transcript ---",
+        HANDOFF_END,
       ].join("\n");
     }
 
@@ -1100,13 +1091,13 @@ export class ThreadLifecycle {
       estimateTokens(summaryText),
     );
     return [
-      "Continue this OpenBot conversation. The oldest visible history was summarized because the provider handoff exceeded its context budget.",
+      `${HANDOFF_START} The oldest visible history was summarized because the provider handoff exceeded its context budget.`,
       HANDOFF_PRECEDENCE,
       "--- saved summary of older history ---",
       summaryText,
       "--- full recent transcript ---",
       newest.join("\n\n"),
-      "--- end previous transcript ---",
+      HANDOFF_END,
     ].join("\n");
   }).bind(this);
 }
@@ -1115,13 +1106,7 @@ export class ThreadOperationFailed extends Schema.TaggedError<ThreadOperationFai
   cause: Schema.Defect(),
 }) {}
 
-function threadIo<A>(run: () => Promise<A>): Effect.Effect<A, ThreadOperationFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new ThreadOperationFailed({ cause }) });
-}
-
-function threadStep<A>(run: () => A): Effect.Effect<A, ThreadOperationFailed> {
-  return Effect.try({ try: run, catch: (cause) => new ThreadOperationFailed({ cause }) });
-}
+const { io: threadIo, sync: threadStep, rewrap: toThreadOperationFailed } = causeHelpers(ThreadOperationFailed);
 
 function missingSessionFile(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT";

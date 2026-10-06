@@ -9,6 +9,7 @@ import { decodeSaveAgentProfileResult } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Semaphore } from "effect";
 import type { AgentStore } from "../agent-store";
+import { causeHelpers } from "../effect-boundary";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
 
 interface ProfileSaveHooks {
@@ -76,12 +77,11 @@ export class ProfileSave {
           previous,
           commandId,
           sidebar.getSnapshot(),
-          (agentId) =>
-            assign(agentId).pipe(Effect.mapError((failure) => new ProfileSaveFailed({ cause: failure.cause }))),
+          (agentId) => assign(agentId).pipe(toProfileSaveFailed),
           sender,
         ),
       )
-      .pipe(Effect.mapError((failure) => new ProfileSaveFailed({ cause: failure.cause })));
+      .pipe(toProfileSaveFailed);
     if (oldAvatar) yield* profileIo(() => rm(oldAvatar.path, { force: true })).pipe(Effect.ignore);
     this.hooks.changed(result.agent);
     return result;
@@ -144,10 +144,6 @@ export class ProfileSaveFailed extends Schema.TaggedError<ProfileSaveFailed>()("
   cause: Schema.Defect(),
 }) {}
 
-function profileIo<A>(run: () => Promise<A>): Effect.Effect<A, ProfileSaveFailed> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new ProfileSaveFailed({ cause }) });
-}
+const { io: profileIo, sync: profileStep, rewrap: toProfileSaveFailed } = causeHelpers(ProfileSaveFailed);
 
-function profileStep<A>(run: () => A): Effect.Effect<A, ProfileSaveFailed> {
-  return Effect.try({ try: run, catch: (cause) => new ProfileSaveFailed({ cause }) });
-}
+export { toProfileSaveFailed };

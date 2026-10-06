@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Schema } from "effect";
+import { causeHelpers } from "../backend/effect-boundary";
 
 export class CentralAuthOperationError extends Schema.TaggedError<CentralAuthOperationError>()(
   "CentralAuthOperationError",
@@ -6,10 +7,8 @@ export class CentralAuthOperationError extends Schema.TaggedError<CentralAuthOpe
     cause: Schema.Defect(),
   },
 ) {}
-export const authCall = <A>(operation: () => Promise<A>) =>
-  Effect.tryPromise({ try: operation, catch: (cause) => new CentralAuthOperationError({ cause }) });
-export const authDecode = <A>(operation: () => A) =>
-  Effect.try({ try: operation, catch: (cause) => new CentralAuthOperationError({ cause }) });
+
+export const { io: authCall, sync: authDecode } = causeHelpers(CentralAuthOperationError);
 
 export class CentralAuthTransport extends Context.Service<
   CentralAuthTransport,
