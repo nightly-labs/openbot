@@ -54,6 +54,19 @@ export function nullableNumber(record: DynamicRecord, field: string): number | n
   throw new Error(`Invalid ${field}.`);
 }
 
+/** The optional unloaded length of a history page: its older message count and oldest time. */
+export function optionalHistoryExtent(record: DynamicRecord): { olderCount?: number; oldestAt?: string } {
+  const { olderCount, oldestAt } = record;
+  if (olderCount !== undefined && !(isNumber(olderCount) && Number.isSafeInteger(olderCount) && olderCount >= 0)) {
+    throw new Error("Invalid olderCount.");
+  }
+  if (oldestAt !== undefined && !isString(oldestAt)) throw new Error("Invalid oldestAt.");
+  return {
+    ...(olderCount === undefined ? {} : { olderCount }),
+    ...(oldestAt === undefined ? {} : { oldestAt }),
+  };
+}
+
 // A decoder is a `(value: unknown) => T` callback, so the label cannot be a parameter of the decoder
 // itself without every call site wrapping it in a lambda. These build one instead, which keeps each
 // boundary's own wording - the message is what tells a reader which side rejected the payload.

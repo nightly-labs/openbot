@@ -1,4 +1,5 @@
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
+import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { useText } from "@openbot/ui/text";
 import { Loading } from "solid-js";
 import { DirectConversation } from "../../lazy-views";
@@ -55,6 +56,7 @@ export function WorkspaceDirectConversation(props: { member: TeamPresenceMember 
           activeServerSupportsCapability("conversation-pagination") &&
           (directConversationPages()[props.member.id]?.hasOlder ?? false)
         }
+        unloadedHistory={unloadedHistory(directConversationPages()[props.member.id])}
         loadingOlder={directOlderLoading()[props.member.id] === true}
         olderError={directOlderErrors()[props.member.id] ?? null}
         typing={directTypingMemberIds().has(props.member.id)}

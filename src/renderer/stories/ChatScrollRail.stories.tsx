@@ -1,5 +1,9 @@
 import { Bubble, BubbleContent, Message, MessageContent } from "@openbot/ui";
-import { ChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
+import {
+  ChatScrollRail,
+  chatScrollSections,
+  type UnloadedHistory,
+} from "@openbot/ui/features/conversation/ChatScrollRail";
 import { chatDaySections, dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import {
   calculateChatScrollMargin,
@@ -52,7 +56,7 @@ function storyRows(days: number[], start = 0): StoryRow[] {
 }
 
 /** A transcript with the same scroll container, virtualizer and day rule as the chats. */
-function RailTranscript(props: { rows: StoryRow[] }) {
+function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory }) {
   const { t, format } = useText();
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>();
   const [virtualRoot, setVirtualRoot] = createSignal<HTMLDivElement>();
@@ -66,10 +70,16 @@ function RailTranscript(props: { rows: StoryRow[] }) {
     scrollMargin,
   });
   const days = createMemo(() => chatDaySections(props.rows, { now: NOW, t, format }));
-  const sections = createMemo(() => {
-    void virtualizer.getTotalSize();
-    return days().map((day) => ({ label: day.label, start: virtualizer.itemStart(day.index) }));
-  });
+  const sections = createMemo(() =>
+    chatScrollSections({
+      days: days(),
+      rows: props.rows,
+      itemStart: virtualizer.itemStart,
+      totalSize: virtualizer.getTotalSize(),
+      unloaded: props.unloaded,
+      text: { t, format },
+    }),
+  );
   const updateMargin = () => setScrollMargin(calculateChatScrollMargin(scrollElement(), virtualRoot()));
 
   return (
@@ -88,10 +98,7 @@ function RailTranscript(props: { rows: StoryRow[] }) {
         <ChatScrollRail
           scrollElement={scrollElement}
           sections={sections}
-          onJump={(section) => {
-            const day = days()[section];
-            if (day) virtualizer.scrollToIndex(day.index);
-          }}
+          onJump={(index) => virtualizer.scrollToIndex(sections()[index]?.row ?? 0)}
         />
         <div
           ref={setVirtualRoot}
@@ -160,6 +167,17 @@ export const SeveralDays: Story = {};
 /** Fewer than 100 messages: every row renders. */
 export const ShortHistory: Story = {
   args: { rows: storyRows([10, 22, 16]) },
+};
+
+/**
+ * Two days are loaded and 600 older messages are not, back to five days ago: the top segment stands
+ * for them at the loaded rows' height, so the rail shows the whole chat.
+ */
+export const OlderHistoryNotLoaded: Story = {
+  args: {
+    rows: storyRows([30, 30]),
+    unloaded: { count: 600, oldestAt: new Date(NOW.getTime() - 5 * 86_400_000).toISOString() },
+  },
 };
 
 /** Two days: no rail, because the transcript is short enough to read through. */

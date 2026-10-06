@@ -205,6 +205,8 @@ export const messages = {
   "chat.day.date": "{date} {time}",
   "chat.history.loadingOlder": "Chargement des messages plus anciens…",
   "chat.scrollRail.label": "Dans cette discussion",
+  "chat.scrollRail.earlier": "Messages plus anciens",
+  "chat.scrollRail.earlierSince": "Plus anciens, depuis le {date}",
   "chat.day.now": "maintenant",
   "chat.errorStatus.readState": "Échec de l’état de lecture",
   "chat.errorStatus.load": "Échec du chargement",

@@ -199,6 +199,8 @@ export const messages = {
   "chat.day.date": "{date} {time}",
   "chat.history.loadingOlder": "以前のメッセージを読み込んでいます…",
   "chat.scrollRail.label": "このチャット内",
+  "chat.scrollRail.earlier": "以前のメッセージ",
+  "chat.scrollRail.earlierSince": "{date}からの以前のメッセージ",
   "chat.day.now": "今",
   "chat.errorStatus.readState": "既読状態の更新に失敗しました",
   "chat.errorStatus.load": "読み込みに失敗しました",

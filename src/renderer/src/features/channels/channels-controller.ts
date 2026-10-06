@@ -260,6 +260,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
           const ids = new Set(page.messages.map((item) => item.id));
           reconcile([...older.messages.filter((item) => !ids.has(item.id)), ...page.messages], "id")(page.messages);
           page.olderCursor = older.olderCursor;
+          page.olderCount = older.olderCount;
+          page.oldestAt = older.oldestAt;
         });
     } catch (error) {
       if (!disposed && account === env.scopeKey() && state.selectedId === channelId)

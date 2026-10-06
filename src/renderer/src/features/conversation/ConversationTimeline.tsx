@@ -6,7 +6,7 @@ import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCar
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
-import { ChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
+import { ChatScrollRail, chatScrollSections } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { chatDaySections, dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
@@ -184,15 +184,23 @@ export function ConversationTimeline() {
   // The rail reads the scroll container reactively; the scope keeps it in a plain variable.
   const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
   const days = createMemo(() => chatDaySections(timelineMessages(), { t, format }));
-  const daySections = createMemo(() => {
-    void messageVirtualizer.getTotalSize();
-    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
-  });
-  const jumpToDay = (section: number) => {
-    const day = days()[section];
-    if (!day) return;
+  const daySections = createMemo(() =>
+    chatScrollSections({
+      days: days(),
+      rows: timelineMessages(),
+      itemStart: messageVirtualizer.itemStart,
+      totalSize: messageVirtualizer.getTotalSize(),
+      unloaded: props.unloadedHistory,
+      text: { t, format },
+    }),
+  );
+  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
+  const jumpToDay = (index: number) => {
+    const section = daySections()[index];
+    if (!section) return;
     setStickToLatest(false);
-    messageVirtualizer.scrollToIndex(day.index);
+    messageVirtualizer.scrollToIndex(section.row ?? 0);
+    if (section.row === undefined) props.onLoadOlder?.();
   };
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {

@@ -85,6 +85,9 @@ export interface ChannelPage {
   tasks: ChannelTask[];
   olderCursor: number | null;
   throughSequence: number;
+  /** As in `ConversationPageInfo`: the unloaded length, for the day rail. Absent from a remote host. */
+  olderCount?: number;
+  oldestAt?: string;
 }
 
 export type ChannelCommand =
@@ -257,7 +260,9 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     !Array.isArray(value.tasks) ||
     !value.tasks.every(isChannelTask) ||
     !(value.olderCursor === null || sequence(value.olderCursor)) ||
-    !sequence(value.throughSequence)
+    !sequence(value.throughSequence) ||
+    !(value.olderCount === undefined || sequence(value.olderCount)) ||
+    !(value.oldestAt === undefined || isString(value.oldestAt))
   ) {
     throw new Error("Invalid channel conversation response.");
   }
@@ -267,6 +272,8 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     tasks: value.tasks,
     olderCursor: value.olderCursor,
     throughSequence: value.throughSequence,
+    ...(value.olderCount === undefined ? {} : { olderCount: value.olderCount }),
+    ...(value.oldestAt === undefined ? {} : { oldestAt: value.oldestAt }),
   };
 }
 

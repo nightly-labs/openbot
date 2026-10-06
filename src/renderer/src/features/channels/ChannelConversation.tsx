@@ -25,7 +25,7 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
-import { ChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
+import { ChatScrollRail, chatScrollSections, unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -333,15 +333,23 @@ export function ChannelConversation(props: ChannelConversationProps) {
   const days = createMemo(() =>
     timeline().flatMap((entry, index) => (entry.dayMarker === null ? [] : [{ index, label: entry.dayMarker }])),
   );
-  const daySections = createMemo(() => {
-    void messageVirtualizer.getTotalSize();
-    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
-  });
-  const jumpToDay = (section: number) => {
-    const day = days()[section];
-    if (!day) return;
+  const daySections = createMemo(() =>
+    chatScrollSections({
+      days: days(),
+      rows: timeline().map((entry) => entry.message),
+      itemStart: messageVirtualizer.itemStart,
+      totalSize: messageVirtualizer.getTotalSize(),
+      unloaded: unloadedHistory(channels.state.page),
+      text: { t, format },
+    }),
+  );
+  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
+  const jumpToDay = (index: number) => {
+    const section = daySections()[index];
+    if (!section) return;
     stickToLatest = false;
-    messageVirtualizer.scrollToIndex(day.index);
+    messageVirtualizer.scrollToIndex(section.row ?? 0);
+    if (section.row === undefined) void channels.loadOlder();
   };
   /*
    * A message animates in once, and only after the channel has drawn its first page: everything

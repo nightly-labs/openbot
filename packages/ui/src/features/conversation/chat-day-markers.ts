@@ -63,6 +63,14 @@ export function dayMarkerLabel(
   return t("chat.day.date", { date: dateOf(current, options), time });
 }
 
+/** How many calendar days lie from one time to a later one, in local time: 0 for the same day. */
+export function calendarDaysBetween(fromIso: string, toIso: string): number {
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+  return Math.max(0, dayDifference(from, to));
+}
+
 /** Where a day starts in a transcript: the row that carries its separator, and the separator's text. */
 export interface ChatDaySection {
   index: number;

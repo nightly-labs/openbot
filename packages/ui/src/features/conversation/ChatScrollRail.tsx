@@ -1,18 +1,76 @@
 import { Button } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { type ChatDaySection, calendarDaysBetween, type DayMarkerOptions } from "./chat-day-markers";
 
 /** How long the rail stays after the reader stops scrolling. */
 const IDLE_MS = 1_200;
 
 /** A transcript of one or two days is short enough to find a place in without the rail. */
-const MIN_SECTIONS = 3;
+const MIN_DAYS = 3;
 
 /** One part of the transcript, such as a day. */
 export interface ChatScrollSection {
   label: string;
-  /** Where the part starts in the scroll content. Unknown until its first row has a position. */
+  /**
+   * Where the part starts in the scroll content. Unknown until its first row has a position. The part
+   * above the loaded rows starts above the content, so its start is negative.
+   */
   start: number | undefined;
+  /** The days the part covers, for the rule that shows the rail. One when absent. */
+  days?: number;
+  /** The row the part opens with. Absent for the part that is not loaded yet. */
+  row?: number;
+}
+
+/** The messages above the loaded page, from the page's `olderCount` and `oldestAt`. */
+export interface UnloadedHistory {
+  count: number;
+  oldestAt?: string | undefined;
+}
+
+/** The unloaded part a history page reports, or nothing when its host does not count it. */
+export function unloadedHistory(
+  page: { olderCount?: number | undefined; oldestAt?: string | undefined } | null | undefined,
+): UnloadedHistory | undefined {
+  return page?.olderCount ? { count: page.olderCount, oldestAt: page.oldestAt } : undefined;
+}
+
+/**
+ * The rail's sections: one per loaded day, and above them one for the history that is not loaded yet.
+ * That part is as tall as its messages would be at the loaded rows' average height, so the rail shows
+ * the whole length of the chat before the reader pages through it.
+ */
+export function chatScrollSections(input: {
+  days: readonly ChatDaySection[];
+  rows: readonly { createdAt?: string | undefined }[];
+  itemStart: (index: number) => number | undefined;
+  totalSize: number;
+  unloaded: UnloadedHistory | undefined;
+  text: Required<Pick<DayMarkerOptions, "t" | "format">>;
+}): ChatScrollSection[] {
+  const loaded: ChatScrollSection[] = input.days.map((day) => ({
+    label: day.label,
+    start: input.itemStart(day.index),
+    row: day.index,
+  }));
+  const unloaded = input.unloaded;
+  if (!unloaded || unloaded.count === 0 || input.rows.length === 0) return loaded;
+  const firstStart = input.itemStart(0) ?? 0;
+  const averageRow = input.totalSize / input.rows.length;
+  const firstLoadedAt = input.rows[0]?.createdAt;
+  const { t, format } = input.text;
+  const oldest = unloaded.oldestAt ? new Date(unloaded.oldestAt) : undefined;
+  const earlier: ChatScrollSection = {
+    label:
+      oldest && !Number.isNaN(oldest.getTime())
+        ? t("chat.scrollRail.earlierSince", { date: format.date(oldest, { month: "short", day: "numeric" }) })
+        : t("chat.scrollRail.earlier"),
+    start: firstStart - unloaded.count * averageRow,
+    // The days before the first loaded one. History on that same day adds none.
+    days: unloaded.oldestAt && firstLoadedAt ? calendarDaysBetween(unloaded.oldestAt, firstLoadedAt) : 1,
+  };
+  return [earlier, ...loaded];
 }
 
 export interface ChatScrollRailProps {
@@ -30,7 +88,7 @@ export interface ChatScrollRailProps {
  * the section titles, and each title opens its section. A scroll that the app makes, such as following a
  * reply that streams in, does not bring it in.
  *
- * It is there only when the transcript scrolls and has at least three sections.
+ * It is there only when the transcript scrolls and covers at least three days.
  *
  * Render it as the first child of the scroll container: it stays in place over the transcript and
  * takes no room in it.
@@ -65,12 +123,16 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       const lastScroll = Math.max(0, content - height);
       const sections = props.sections();
       setViewport({ height, inset: Number.parseFloat(getComputedStyle(element).paddingRight) || 0 });
-      setShown(lastScroll > 0 && sections.length >= MIN_SECTIONS);
-      if (sections.length < MIN_SECTIONS) return;
+      const days = sections.reduce((total, section) => total + (section.days ?? 1), 0);
+      setShown(lastScroll > 0 && days >= MIN_DAYS);
+      if (days < MIN_DAYS) return;
 
       // Each start is at least the one before it: an unknown start ends the section above it at once.
       const starts: number[] = [];
-      for (const section of sections) starts.push(Math.max(section.start ?? 0, starts.at(-1) ?? 0));
+      for (const section of sections) {
+        const previous = starts.at(-1);
+        starts.push(Math.max(section.start ?? previous ?? 0, previous ?? Number.NEGATIVE_INFINITY));
+      }
       const ends = [...starts.slice(1), content];
       // The reader's place moves from the top of the viewport to its bottom over the whole scroll, so
       // the first section is empty at the top and the last one is full at the bottom.

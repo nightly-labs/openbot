@@ -202,15 +202,16 @@ export class ConversationQueries {
       }
     }
     const first = rows[0];
-    const hasOlder = first
-      ? this.#hasConversationRowsBefore(
+    const older = first
+      ? this.#conversationRowsBefore(
           threadId,
           conversationRowCursor(first),
           options.excludeRoutineEvents === true,
           options.excludeRoutineRunEvents === true,
           options.excludeHostedSiteEvents === true,
         )
-      : false;
+      : { count: 0, oldestAt: null };
+    const hasOlder = older.count > 0;
     return {
       agentId,
       threadId,
@@ -221,6 +222,8 @@ export class ConversationQueries {
       pageInfo: {
         hasOlder,
         olderCursor: hasOlder && first ? encodePageCursor(conversationRowCursor(first)) : null,
+        ...(hasOlder ? { olderCount: older.count } : {}),
+        ...(older.oldestAt ? { oldestAt: older.oldestAt } : {}),
       },
     };
   }
@@ -506,29 +509,29 @@ export class ConversationQueries {
     return [...older, ...newer];
   }
 
-  #hasConversationRowsBefore(
+  /** How many rows are older than the page, and when the oldest was written: the chat's unloaded length. */
+  #conversationRowsBefore(
     threadId: string,
     cursor: ConversationPageCursor,
     excludeRoutineEvents: boolean,
     excludeRoutineRunEvents: boolean,
     excludeHostedSiteEvents: boolean,
-  ): boolean {
+  ): { count: number; oldestAt: string | null } {
     const routineFilter = conversationMarkerSqlFilter(
       excludeRoutineEvents,
       excludeRoutineRunEvents,
       excludeHostedSiteEvents,
     );
-    return Boolean(
+    const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT 1 FROM projection_thread_messages
+          `SELECT COUNT(*) AS older_count, MIN(created_at) AS oldest_at FROM projection_thread_messages
            WHERE thread_id = ? AND (
              created_at < ? OR
              (created_at = ? AND ordinal < ?) OR
              (created_at = ? AND ordinal = ? AND message_id < ?)
            )
-           ${routineFilter}
-           LIMIT 1`,
+           ${routineFilter}`,
         )
         .get(
           threadId,
@@ -540,6 +543,10 @@ export class ConversationQueries {
           cursor.messageId,
         ),
     );
+    return {
+      count: row ? requiredNumberColumn(row, "older_count") : 0,
+      oldestAt: row ? optionalStringColumn(row, "oldest_at") : null,
+    };
   }
 }
 

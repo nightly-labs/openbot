@@ -22,7 +22,7 @@ import {
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
-import { ChatScrollRail } from "./ChatScrollRail";
+import { ChatScrollRail, chatScrollSections, type UnloadedHistory } from "./ChatScrollRail";
 import { chatDaySections } from "./chat-day-markers";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
@@ -35,6 +35,8 @@ interface DirectConversationProps {
   loading: boolean;
   loadError: string | null;
   hasOlder?: boolean;
+  /** The messages above the loaded page, for the day rail. Absent when the host does not count them. */
+  unloadedHistory?: UnloadedHistory;
   loadingOlder?: boolean;
   olderError?: string | null;
   typing: boolean;
@@ -104,15 +106,23 @@ export function DirectConversation(props: DirectConversationProps) {
   // The rail reads the scroll container reactively; the handlers below keep it in a plain variable.
   const [railScrollElement, setRailScrollElement] = createSignal<HTMLDivElement>();
   const days = createMemo(() => chatDaySections(props.snapshot?.messages ?? [], { t, format }));
-  const daySections = createMemo(() => {
-    void messageVirtualizer.getTotalSize();
-    return days().map((day) => ({ label: day.label, start: messageVirtualizer.itemStart(day.index) }));
-  });
-  const jumpToDay = (section: number) => {
-    const day = days()[section];
-    if (!day) return;
+  const daySections = createMemo(() =>
+    chatScrollSections({
+      days: days(),
+      rows: props.snapshot?.messages ?? [],
+      itemStart: messageVirtualizer.itemStart,
+      totalSize: messageVirtualizer.getTotalSize(),
+      unloaded: props.unloadedHistory,
+      text: { t, format },
+    }),
+  );
+  // A loaded day opens at its first row. The part that is not loaded opens at the top and loads a page.
+  const jumpToDay = (index: number) => {
+    const section = daySections()[index];
+    if (!section) return;
     stickToLatest = false;
-    messageVirtualizer.scrollToIndex(day.index);
+    messageVirtualizer.scrollToIndex(section.row ?? 0);
+    if (section.row === undefined) props.onLoadOlder?.();
   };
   const unreadBannerReady = (): boolean => {
     const unreadMessageId = props.snapshot?.readState?.firstUnreadMessageId;

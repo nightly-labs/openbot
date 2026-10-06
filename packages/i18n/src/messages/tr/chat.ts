@@ -214,6 +214,8 @@ export const messages = {
   "chat.day.date": "{date} {time}",
   "chat.history.loadingOlder": "Daha eski mesajlar yükleniyor…",
   "chat.scrollRail.label": "Bu sohbette",
+  "chat.scrollRail.earlier": "Daha eski mesajlar",
+  "chat.scrollRail.earlierSince": "{date} tarihinden beri daha eski",
   "chat.day.now": "şimdi",
   "chat.errorStatus.readState": "Okuma durumu başarısız",
   "chat.errorStatus.load": "Yükleme başarısız",

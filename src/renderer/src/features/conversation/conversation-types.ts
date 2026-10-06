@@ -21,6 +21,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import type { AccountProfilePanelProps } from "@openbot/ui/features/settings/AccountProfilePanel";
 import type { JSX } from "@solidjs/web";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -96,6 +97,8 @@ export interface ConversationProps {
   firstUnreadMessageId: string | null;
   loaded: boolean;
   hasOlder?: boolean;
+  /** The messages above the loaded page, for the day rail. Absent when the host does not count them. */
+  unloadedHistory?: UnloadedHistory;
   discontinuous?: boolean;
   loadingOlder?: boolean;
   olderError?: string | null;

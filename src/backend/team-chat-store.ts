@@ -14,6 +14,7 @@ import {
   databaseRow,
   databaseRows,
   optionalNumberColumn,
+  optionalStringColumn,
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
@@ -163,15 +164,21 @@ export class TeamChatStore {
     }
     const messages = rows.map((row) => decodeDirectMessage(JSON.parse(requiredStringColumn(row, "message_json"))));
     const firstSequence = rows[0] ? requiredNumberColumn(rows[0], "last_event_sequence") : 0;
-    const hasOlder = Boolean(
-      firstSequence > 0 &&
-        this.database.connection
-          .prepare(
-            `SELECT 1 FROM projection_direct_messages
-             WHERE thread_id = ? AND last_event_sequence < ? LIMIT 1`,
+    // How much is older than the page, and since when: the day rail draws the unloaded part from it.
+    const older =
+      firstSequence > 0
+        ? databaseRow(
+            this.database.connection
+              .prepare(
+                `SELECT COUNT(*) AS older_count, MIN(created_at) AS oldest_at FROM projection_direct_messages
+                 WHERE thread_id = ? AND last_event_sequence < ?`,
+              )
+              .get(threadId, firstSequence),
           )
-          .get(threadId, firstSequence),
-    );
+        : undefined;
+    const olderCount = older ? requiredNumberColumn(older, "older_count") : 0;
+    const oldestAt = older ? optionalStringColumn(older, "oldest_at") : null;
+    const hasOlder = olderCount > 0;
     return {
       threadId,
       otherMemberId,
@@ -180,6 +187,8 @@ export class TeamChatStore {
       pageInfo: {
         hasOlder,
         olderCursor: hasOlder ? encodeDirectCursor(firstSequence) : null,
+        ...(hasOlder ? { olderCount } : {}),
+        ...(oldestAt ? { oldestAt } : {}),
       },
       readState: this.#readStateFromDatabase(memberId, threadId),
     };
