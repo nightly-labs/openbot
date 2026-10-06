@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/validation";
+import { Effect, Fiber, Option, Result, Schema } from "effect";
 import { type RenderedEmail, renderSignInCodeEmail, renderTeamInviteEmail } from "./email-templates";
 
 export interface SmtpEmailConfig {
@@ -44,14 +45,27 @@ interface SmtpSocket {
 
 // Carries the reply that refused a stage. `message` keeps the same `smtp_<stage>_failed` shape the
 // service logs and tests read, so only the added fields are new.
-class SmtpReplyError extends Error {
-  constructor(
-    readonly stage: string,
-    readonly replyCode: number,
-    readonly replyText: string,
-  ) {
-    super(`smtp_${stage}_failed`);
+class SmtpReplyError extends Schema.TaggedError<SmtpReplyError>()("SmtpReplyError", {
+  stage: Schema.String,
+  replyCode: Schema.Number,
+  replyText: Schema.String,
+  message: Schema.String,
+}) {
+  constructor(stage: string, replyCode: number, replyText: string) {
+    super({ stage, replyCode, replyText, message: `smtp_${stage}_failed` });
   }
+}
+class SmtpError extends Schema.TaggedError<SmtpError>()("SmtpError", { message: Schema.String }) {
+  constructor(message: string) {
+    super({ message });
+  }
+}
+export type SmtpFailure = SmtpError | SmtpReplyError;
+function smtpCall<A>(operation: () => Promise<A>): Effect.Effect<A, SmtpFailure> {
+  return Effect.tryPromise({ try: operation, catch: normalizeSmtpError });
+}
+function smtpValidate<A>(operation: () => A): Effect.Effect<A, SmtpFailure> {
+  return Effect.try({ try: operation, catch: normalizeSmtpError });
 }
 
 export type SmtpConnector = (
@@ -74,18 +88,19 @@ const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
-export async function sendPrivateEmailCode(
+export const sendPrivateEmailCode = Effect.fn("Smtp.sendPrivateEmailCode ")(function* (
   config: SmtpEmailConfig,
   message: SmtpEmailMessage,
   connector?: SmtpConnector,
-): Promise<void> {
-  validateConfig(config);
-  validateEmail(message.email, "recipient");
-  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/u.test(message.code)) {
-    throw new Error("smtp_invalid_code");
-  }
-
-  return sendPrivateEmail(
+) {
+  yield* smtpValidate(() => {
+    validateConfig(config);
+    validateEmail(message.email, "recipient");
+    if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/u.test(message.code)) {
+      throw new Error("smtp_invalid_code");
+    }
+  });
+  return yield* sendPrivateEmail(
     config,
     {
       email: message.email,
@@ -96,26 +111,28 @@ export async function sendPrivateEmailCode(
     },
     connector,
   );
-}
+});
 
-export function sendPrivateTeamInvite(
+export const sendPrivateTeamInvite = Effect.fn("Smtp.sendPrivateTeamInvite ")(function* (
   config: SmtpEmailConfig,
   message: SmtpTeamInviteMessage,
   connector?: SmtpConnector,
-): Promise<void> {
-  validateEmail(message.email, "recipient");
-  validateEmail(message.inviterEmail, "inviter");
-  if (
-    !message.serverName.trim() ||
-    message.serverName.length > INPUT_LIMITS.serverName ||
-    hasHeaderBreak(message.serverName)
-  ) {
-    throw new Error("smtp_invalid_server_name");
-  }
-  if (!isCanonicalInviteUrl(message.inviteUrl)) {
-    throw new Error("smtp_invalid_invite_url");
-  }
-  return sendPrivateEmail(
+) {
+  yield* smtpValidate(() => {
+    validateEmail(message.email, "recipient");
+    validateEmail(message.inviterEmail, "inviter");
+    if (
+      !message.serverName.trim() ||
+      message.serverName.length > INPUT_LIMITS.serverName ||
+      hasHeaderBreak(message.serverName)
+    ) {
+      throw new Error("smtp_invalid_server_name");
+    }
+    if (!isCanonicalInviteUrl(message.inviteUrl)) {
+      throw new Error("smtp_invalid_invite_url");
+    }
+  });
+  return yield* sendPrivateEmail(
     config,
     {
       email: message.email,
@@ -128,99 +145,98 @@ export function sendPrivateTeamInvite(
     },
     connector,
   );
-}
+});
 
-async function sendPrivateEmail(
+const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
   connector?: SmtpConnector,
-): Promise<void> {
-  validateConfig(config);
-  validateEmail(message.email, "recipient");
+): Effect.fn.Return<void, SmtpFailure> {
+  yield* smtpValidate(() => validateConfig(config));
+  yield* smtpValidate(() => validateEmail(message.email, "recipient"));
   const { subject } = message.content;
-  if (!subject || subject.length > 160 || hasHeaderBreak(subject)) {
-    throw new Error("smtp_invalid_subject");
-  }
-  const connect =
-    connector ??
-    (await loadCloudflareConnector().catch(() => {
-      throw wrapTransportError();
-    }));
+  if (!subject || subject.length > 160 || hasHeaderBreak(subject)) return yield* new SmtpError("smtp_invalid_subject");
+  const connect = connector ?? (yield* smtpCall(loadCloudflareConnector));
   for (let attempt = 1; attempt <= SMTP_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      await sendPrivateEmailAttempt(config, message, connect);
-      return;
-    } catch (error) {
-      const smtpError = normalizeSmtpError(error);
-      if (smtpError instanceof SmtpReplyError && isSenderRateLimited(smtpError)) {
-        // The stage and reply code only. A reply can quote the recipient address, which belongs in
-        // the database and not in a log line.
-        console.warn("Email delivery refused by a sender limit:", {
-          stage: smtpError.stage,
-          replyCode: smtpError.replyCode,
-        });
-        throw new Error(RATE_LIMITED_DELIVERY_ERROR);
-      }
-      if (!isRetryableSmtpError(smtpError) || attempt === SMTP_MAX_ATTEMPTS) throw smtpError;
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 250));
+    const result = yield* Effect.result(sendPrivateEmailAttempt(config, message, connect));
+    if (Result.isSuccess(result)) return;
+    const smtpError = result.failure;
+    if (smtpError instanceof SmtpReplyError && isSenderRateLimited(smtpError)) {
+      console.warn("Email delivery refused by a sender limit:", {
+        stage: smtpError.stage,
+        replyCode: smtpError.replyCode,
+      });
+      return yield* new SmtpError(RATE_LIMITED_DELIVERY_ERROR);
     }
+    if (!isRetryableSmtpError(smtpError) || attempt === SMTP_MAX_ATTEMPTS) return yield* smtpError;
+    yield* Effect.sleep(attempt * 250);
   }
-}
+});
 
-async function sendPrivateEmailAttempt(
+const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
   connect: SmtpConnector,
-): Promise<void> {
-  const socket = connect({ hostname: config.host, port: config.port }, { secureTransport: "on", allowHalfOpen: false });
+): Effect.fn.Return<void, SmtpFailure> {
   const state: SmtpAttemptState = { submissionStarted: false, accepted: false };
-  let attemptError: Error | null = null;
-
-  try {
-    await withTimeout(runSmtpSession(socket, config, message, state), SMTP_TIMEOUT_MS);
-  } catch (error) {
-    const smtpError = normalizeSmtpError(error);
-    if (!state.accepted) {
-      attemptError =
-        state.submissionStarted && smtpError.message !== "smtp_message_failed"
-          ? new Error("smtp_delivery_unknown")
-          : smtpError;
-    }
-  }
-  const closeConfirmed = await closeSmtpSocket(socket);
-  if (state.accepted) return;
-  if (attemptError && !isRetryableSmtpError(attemptError)) throw attemptError;
-  if (state.submissionStarted || !closeConfirmed) throw new Error("smtp_delivery_unknown");
-  if (attemptError) throw attemptError;
-  throw new Error("smtp_delivery_unknown");
-}
-
-async function closeSmtpSocket(socket: SmtpSocket): Promise<boolean> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      Promise.resolve()
-        .then(() => socket.close())
-        .then(
-          () => true,
-          () => false,
-        ),
-      new Promise<boolean>((resolve) => {
-        timeout = setTimeout(() => resolve(false), SMTP_CLOSE_TIMEOUT_MS);
+  const outcome: { error: SmtpFailure | null; closeConfirmed: boolean } = { error: null, closeConfirmed: false };
+  yield* Effect.acquireUseRelease(
+    Effect.gen(function* () {
+      const socket = yield* smtpValidate(() =>
+        connect({ hostname: config.host, port: config.port }, { secureTransport: "on", allowHalfOpen: false }),
+      );
+      const session = yield* Effect.forkChild(Effect.result(runSmtpSession(socket, config, message, state)), {
+        uninterruptible: false,
+        startImmediately: true,
+      });
+      return { socket, session };
+    }),
+    ({ session }) =>
+      Effect.gen(function* () {
+        // Observe the deadline without stopping the session before socket closure confirms its final state.
+        const result = yield* Fiber.join(session).pipe(
+          Effect.timeoutOrElse({
+            duration: SMTP_TIMEOUT_MS,
+            orElse: () => Effect.succeed(Result.fail(new SmtpError("smtp_timeout"))),
+          }),
+        );
+        if (Result.isFailure(result) && !state.accepted) {
+          outcome.error =
+            state.submissionStarted && result.failure.message !== "smtp_message_failed"
+              ? new SmtpError("smtp_delivery_unknown")
+              : result.failure;
+        }
       }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
+    ({ socket, session }) =>
+      Effect.gen(function* () {
+        outcome.closeConfirmed = yield* closeSmtpSocket(socket);
+        yield* Fiber.interrupt(session);
+      }),
+  );
+  if (state.accepted) return;
+  if (outcome.error && !isRetryableSmtpError(outcome.error)) return yield* outcome.error;
+  if (state.submissionStarted || !outcome.closeConfirmed) return yield* new SmtpError("smtp_delivery_unknown");
+  if (outcome.error) return yield* outcome.error;
+  return yield* new SmtpError("smtp_delivery_unknown");
+});
+
+/** True when the socket confirms its close before the deadline. */
+function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<boolean> {
+  return Effect.tryPromise(async () => socket.close()).pipe(
+    Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS),
+    Effect.map(Option.isSome),
+    Effect.orElseSucceed(() => false),
+  );
 }
 
-function normalizeSmtpError(error: unknown): Error {
-  if (error instanceof Error && /^smtp_[a-z_]+$/u.test(error.message)) return error;
+function normalizeSmtpError(error: unknown): SmtpFailure {
+  if (error instanceof SmtpReplyError || error instanceof SmtpError) return error;
+  if (error instanceof Error && /^smtp_[a-z_]+$/u.test(error.message)) return new SmtpError(error.message);
   return wrapTransportError();
 }
 
-function wrapTransportError(): Error {
-  return new Error("smtp_transport_failed");
+function wrapTransportError(): SmtpError {
+  return new SmtpError("smtp_transport_failed");
 }
 
 // A 4xx reply is temporary by definition, so waiting is the right answer whichever stage refused.
@@ -234,38 +250,38 @@ function isRetryableSmtpError(error: Error): boolean {
   return ["smtp_transport_failed", "smtp_timeout", "smtp_connection_closed"].includes(error.message);
 }
 
-async function runSmtpSession(
+const runSmtpSession = Effect.fn("SmtpEmail.session")(function* (
   socket: SmtpSocket,
   config: SmtpEmailConfig,
   message: PreparedEmailMessage,
   state: SmtpAttemptState,
-): Promise<void> {
-  await socket.opened;
+): Effect.fn.Return<void, SmtpFailure> {
+  yield* smtpCall(() => socket.opened);
   const reader = new SmtpResponseReader(socket.readable.getReader());
   const writer = socket.writable.getWriter();
 
-  await reader.expect([220], "greeting");
-  await writeCommand(writer, "EHLO openbot.run");
-  await reader.expect([250], "ehlo");
-  await writeCommand(writer, "AUTH LOGIN");
-  await reader.expect([334], "auth_username");
-  await writeCommand(writer, encodeBase64(config.username));
-  await reader.expect([334], "auth_password");
-  await writeCommand(writer, encodeBase64(config.password));
-  await reader.expect([235], "auth");
-  await writeCommand(writer, `MAIL FROM:<${config.from}>`);
-  await reader.expect([250], "mail_from");
-  await writeCommand(writer, `RCPT TO:<${message.email}>`);
-  await reader.expect([250, 251], "recipient");
-  await writeCommand(writer, "DATA");
-  await reader.expect([354], "data");
+  yield* reader.expect([220], "greeting");
+  yield* writeCommand(writer, "EHLO openbot.run");
+  yield* reader.expect([250], "ehlo");
+  yield* writeCommand(writer, "AUTH LOGIN");
+  yield* reader.expect([334], "auth_username");
+  yield* writeCommand(writer, encodeBase64(config.username));
+  yield* reader.expect([334], "auth_password");
+  yield* writeCommand(writer, encodeBase64(config.password));
+  yield* reader.expect([235], "auth");
+  yield* writeCommand(writer, `MAIL FROM:<${config.from}>`);
+  yield* reader.expect([250], "mail_from");
+  yield* writeCommand(writer, `RCPT TO:<${message.email}>`);
+  yield* reader.expect([250, 251], "recipient");
+  yield* writeCommand(writer, "DATA");
+  yield* reader.expect([354], "data");
   state.submissionStarted = true;
-  await writeCommand(writer, `${createMimeMessage(config.from, message)}\r\n.`);
-  await reader.expect([250], "message");
+  yield* writeCommand(writer, `${createMimeMessage(config.from, message)}\r\n.`);
+  yield* reader.expect([250], "message");
   state.accepted = true;
-  await writeCommand(writer, "QUIT");
-  await reader.expect([221], "quit");
-}
+  yield* writeCommand(writer, "QUIT");
+  yield* reader.expect([221], "quit");
+});
 
 class SmtpResponseReader {
   readonly #decoder = new TextDecoder();
@@ -273,25 +289,31 @@ class SmtpResponseReader {
 
   constructor(private readonly reader: ReadableStreamDefaultReader<Uint8Array>) {}
 
-  async expect(expectedCodes: number[], stage: string): Promise<void> {
+  readonly expect = Effect.fn("SmtpResponseReader.expect")(function* (
+    this: SmtpResponseReader,
+    expectedCodes: number[],
+    stage: string,
+  ): Effect.fn.Return<void, SmtpFailure> {
     let responseCode: number | null = null;
     const lines: string[] = [];
     while (true) {
-      const line = await this.#readLine();
+      const line = yield* this.#readLine();
       const match = /^(\d{3})([ -])/u.exec(line);
-      if (!match) throw new Error(`smtp_${stage}_invalid_response`);
+      if (!match) return yield* new SmtpError(`smtp_${stage}_invalid_response`);
       const lineCode = Number(match[1]);
       responseCode ??= lineCode;
-      if (lineCode !== responseCode) throw new Error(`smtp_${stage}_invalid_response`);
+      if (lineCode !== responseCode) return yield* new SmtpError(`smtp_${stage}_invalid_response`);
       lines.push(line);
       if (match[2] === " ") break;
     }
     if (!expectedCodes.includes(responseCode)) {
-      throw new SmtpReplyError(stage, responseCode, lines.join(" "));
+      return yield* new SmtpReplyError(stage, responseCode, lines.join(" "));
     }
-  }
+  }).bind(this);
 
-  async #readLine(): Promise<string> {
+  readonly #readLine = Effect.fn("SmtpResponseReader.readLine")(function* (
+    this: SmtpResponseReader,
+  ): Effect.fn.Return<string, SmtpFailure> {
     while (true) {
       const lineEnd = this.#buffer.indexOf("\r\n");
       if (lineEnd >= 0) {
@@ -299,12 +321,12 @@ class SmtpResponseReader {
         this.#buffer = this.#buffer.slice(lineEnd + 2);
         return line;
       }
-      const chunk = await this.reader.read();
-      if (chunk.done) throw new Error("smtp_connection_closed");
+      const chunk = yield* smtpCall(() => this.reader.read());
+      if (chunk.done) return yield* new SmtpError("smtp_connection_closed");
       this.#buffer += this.#decoder.decode(chunk.value, { stream: true });
-      if (this.#buffer.length > 64 * 1024) throw new Error("smtp_response_too_large");
+      if (this.#buffer.length > 64 * 1024) return yield* new SmtpError("smtp_response_too_large");
     }
-  }
+  });
 }
 
 // Plain text first and HTML last: a client shows the last part it can render. Both parts are
@@ -398,9 +420,10 @@ function dotStuff(value: string): string {
     .join("\r\n");
 }
 
-async function writeCommand(writer: WritableStreamDefaultWriter<Uint8Array>, value: string): Promise<void> {
-  await writer.write(new TextEncoder().encode(`${value}\r\n`));
-}
+const writeCommand = Effect.fn("SmtpEmail.writeCommand")(
+  (writer: WritableStreamDefaultWriter<Uint8Array>, value: string) =>
+    smtpCall(() => writer.write(new TextEncoder().encode(`${value}\r\n`))),
+);
 
 function validateConfig(config: SmtpEmailConfig): void {
   if (!isValidHostname(config.host)) throw new Error("smtp_invalid_host");
@@ -434,18 +457,4 @@ function encodeBase64(value: string): string {
 async function loadCloudflareConnector(): Promise<SmtpConnector> {
   const { connect } = await import("cloudflare:sockets");
   return connect;
-}
-
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      operation,
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error("smtp_timeout")), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
 }

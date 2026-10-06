@@ -5,6 +5,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { describe, expect, it } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { latestRelease } from "./provider-runtime-releases";
 
 const lock = parseAgentRuntimeLock(structuredClone(lockValue));
@@ -35,7 +36,7 @@ describe("latestRelease", () => {
       },
     });
 
-    const spec = await latestRelease("codex", { target: "darwin-arm64", lock, fetch });
+    const spec = await runCauseEffect(latestRelease("codex", { target: "darwin-arm64", lock, fetch }));
 
     expect(spec).toMatchObject({
       version: "0.160.0",
@@ -58,7 +59,7 @@ describe("latestRelease", () => {
       },
     });
 
-    const spec = await latestRelease("claude", { target: "darwin-arm64", lock, fetch });
+    const spec = await runCauseEffect(latestRelease("claude", { target: "darwin-arm64", lock, fetch }));
 
     expect(spec).toMatchObject({
       version: "2.1.280",
@@ -81,7 +82,7 @@ describe("latestRelease", () => {
       },
     });
 
-    await expect(latestRelease("opencode", { target: "darwin-arm64", lock, fetch })).rejects.toThrow(
+    await expect(runCauseEffect(latestRelease("opencode", { target: "darwin-arm64", lock, fetch }))).rejects.toThrow(
       "no verifiable download",
     );
   });
@@ -97,15 +98,15 @@ describe("latestRelease", () => {
       });
 
     await expect(
-      latestRelease("antigravity", { target: "darwin-arm64", lock, fetch: registry(google) }),
+      runCauseEffect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch: registry(google) })),
     ).resolves.toMatchObject({ version: "1.3.0", url: google, archiveDigest: null, downloadBytes: tarball.byteLength });
     for (const fetch of [
       registry("https://mirror.example/agy-acp-server-1.3.0-darwin-arm64.zip"),
       registry(google, "./other_server"),
     ]) {
-      await expect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch })).rejects.toThrow(
-        "The Gemini release has an unexpected shape.",
-      );
+      await expect(
+        runCauseEffect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch })),
+      ).rejects.toThrow("The Gemini release has an unexpected shape.");
     }
   });
 });

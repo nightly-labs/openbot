@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { AgentLifecycleFailed } from "../../backend/agent-service";
 // @vitest-environment node
 
 import { describe, expect, it, vi } from "vitest";
@@ -30,27 +32,36 @@ describe("custom provider endpoint changes", () => {
     const releases = new Map<string, () => void>();
     const service: CustomProviderChangeDependencies["service"] = {
       // Held open, so the second delete has every chance to start inside the first one.
-      removeCustomProvider: <T>(id: string, persist: () => Promise<T>) =>
-        new Promise<T>((resolve) => {
+      removeCustomProvider: <T>(id: string, persist: () => Effect.Effect<T, AgentLifecycleFailed>) =>
+        Effect.gen(function* () {
           steps.push(`remove:${id}`);
-          releases.set(id, () => resolve(persist()));
+          yield* Effect.callback<void>((resume) => {
+            releases.set(id, () => resume(Effect.void));
+          });
+          return yield* persist();
         }),
-      saveCustomProvider: <T>(id: string, persist: () => Promise<T>) => {
-        steps.push(`save:${id}`);
-        return persist();
-      },
-      updateCustomProvider: <T>(_id: string, _removed: readonly string[], persist: () => Promise<T>) => persist(),
-      reloadOpenCodeConfig: async () => "restarted",
+      saveCustomProvider: <T>(id: string, persist: () => Effect.Effect<T, AgentLifecycleFailed>) =>
+        Effect.suspend(() => {
+          steps.push(`save:${id}`);
+          return persist();
+        }),
+      updateCustomProvider: <T>(
+        _id: string,
+        _removed: readonly string[],
+        persist: () => Effect.Effect<T, AgentLifecycleFailed>,
+      ) => persist(),
+      reloadOpenCodeConfig: () => Effect.sync(() => "restarted"),
     };
     const customProviders: CustomProviderChangeDependencies["customProviders"] = {
       list: () => [],
-      save: async () => [],
+      save: () => Effect.sync(() => []),
       checkUpdate: () => undefined,
-      update: async () => [],
-      remove: async (id: string) => {
-        steps.push(`removed:${id}`);
-        return [];
-      },
+      update: () => Effect.sync(() => []),
+      remove: (id: string) =>
+        Effect.sync(() => {
+          steps.push(`removed:${id}`);
+          return [];
+        }),
     };
 
     const { customProviders: endpoints } = customProviderIpcHandlers(

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Attachments, shared files and workspace files: `src/main/team-api/route-files.ts`.
@@ -18,7 +19,9 @@ describe("TeamApiServer files", () => {
     const path = join(root, "private-image.png");
     await writeFile(path, "full attachment bytes");
     const { base } = await start({
-      mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png", name: "private-image.png" }) },
+      mailbox: {
+        resolveAttachment: () => Effect.sync(() => ({ path, mimeType: "image/png", name: "private-image.png" })),
+      },
     });
     const unauthorized = await fetch(`${base}/v1/attachments/image`);
     expect(unauthorized.status).toBe(401);
@@ -35,17 +38,19 @@ describe("TeamApiServer files", () => {
     const filePath = join(root, "report.csv");
     await writeFile(filePath, "name,value\nOpenBot,1\n");
     const agents = createAgents({
-      resolveSharedFile: async (path) => ({
-        path: filePath,
-        name: path.includes("large") ? "large.csv" : "report.csv",
-        size: path.includes("large") ? ATTACHMENT_LIMITS.fileBytes + 1 : 21,
-      }),
-      resolveWorkspaceFile: async (agentId, path) => ({
-        path: filePath,
-        name: `${agentId}-${path.split("/").at(-1)}`,
-        size: 21,
-        insideWorkspace: true,
-      }),
+      resolveSharedFile: (path) =>
+        Effect.sync(() => ({
+          path: filePath,
+          name: path.includes("large") ? "large.csv" : "report.csv",
+          size: path.includes("large") ? ATTACHMENT_LIMITS.fileBytes + 1 : 21,
+        })),
+      resolveWorkspaceFile: (agentId, path) =>
+        Effect.sync(() => ({
+          path: filePath,
+          name: `${agentId}-${path.split("/").at(-1)}`,
+          size: 21,
+          insideWorkspace: true,
+        })),
     });
     const { base } = await start({ agents });
 
@@ -90,22 +95,23 @@ describe("TeamApiServer files", () => {
     await writeFile(path, bytes);
     const uploads: Uint8Array[] = [];
     const agents = createAgents({
-      prepareImportedAttachments: async (_paths, data) => {
-        uploads.push(...data.map((item) => item.bytes));
-        return data.map((item) => ({
-          id: "draft-1",
-          name: item.name,
-          size: item.bytes.byteLength,
-          kind: "file" as const,
-          mimeType: item.mimeType,
-          previewKind: "none" as const,
-          previewUrl: null,
-        }));
-      },
+      prepareImportedAttachments: (_paths, data) =>
+        Effect.sync(() => {
+          uploads.push(...data.map((item) => item.bytes));
+          return data.map((item) => ({
+            id: "draft-1",
+            name: item.name,
+            size: item.bytes.byteLength,
+            kind: "file" as const,
+            mimeType: item.mimeType,
+            previewKind: "none" as const,
+            previewUrl: null,
+          }));
+        }),
     });
     const { base } = await start({
       agents,
-      mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png", name: "photo one.png" }) },
+      mailbox: { resolveAttachment: () => Effect.sync(() => ({ path, mimeType: "image/png", name: "photo one.png" })) },
     });
     const authorization = `Bearer ${await signIn()}`;
 

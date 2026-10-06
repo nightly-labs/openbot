@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -6,8 +7,10 @@ import { MODEL_LIST_BODY_LIMIT, probeModels } from "./model-server-probe";
 import { createProviderDetection } from "./provider-detection";
 
 const servers: Server[] = [];
+const detections: Effect.Success<ReturnType<typeof createProviderDetection>>[] = [];
 
 afterEach(async () => {
+  for (const detection of detections.splice(0)) await Effect.runPromise(detection.close());
   await Promise.all(
     servers.splice(0).map(
       (server) =>
@@ -55,9 +58,8 @@ describe("probeModels", () => {
   it("lists the models once each and sends the key as a Bearer token", async () => {
     const server = await serve((_request, response) => modelList(response));
 
-    const models = await probeModels(
-      { baseUrl: server.baseUrl, apiKey: "sk-probe", headers: [{ name: "X-Tenant", value: "t1" }] },
-      2_000,
+    const models = await Effect.runPromise(
+      probeModels({ baseUrl: server.baseUrl, apiKey: "sk-probe", headers: [{ name: "X-Tenant", value: "t1" }] }, 2_000),
     );
 
     expect(models).toEqual([{ id: "qwen3" }, { id: "llama" }]);
@@ -66,7 +68,7 @@ describe("probeModels", () => {
 
   it("sends no Authorization header without a key", async () => {
     const server = await serve((_request, response) => modelList(response));
-    await probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 2_000);
+    await Effect.runPromise(probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 2_000));
     expect(server.seen[0]?.authorization).toBeUndefined();
   });
 
@@ -77,9 +79,9 @@ describe("probeModels", () => {
       response.end();
     });
 
-    await expect(probeModels({ baseUrl: server.baseUrl, apiKey: "sk-probe", headers: [] }, 2_000)).rejects.toThrow(
-      server.host,
-    );
+    await expect(
+      Effect.runPromise(probeModels({ baseUrl: server.baseUrl, apiKey: "sk-probe", headers: [] }, 2_000)),
+    ).rejects.toThrow(server.host);
     expect(target.seen).toEqual([]);
   });
 
@@ -87,7 +89,9 @@ describe("probeModels", () => {
     const server = await serve(() => {
       // Never answers.
     });
-    await expect(probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 200)).rejects.toThrow(server.host);
+    await expect(
+      Effect.runPromise(probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 200)),
+    ).rejects.toThrow(server.host);
   });
 
   it("refuses a body over the limit, declared or streamed", async () => {
@@ -103,9 +107,9 @@ describe("probeModels", () => {
     });
 
     for (const server of [declared, streamed]) {
-      await expect(probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 2_000)).rejects.toThrow(
-        server.host,
-      );
+      await expect(
+        Effect.runPromise(probeModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }, 2_000)),
+      ).rejects.toThrow(server.host);
     }
   });
 
@@ -114,9 +118,11 @@ describe("probeModels", () => {
       response.writeHead(500);
       response.end("sk-probe");
     });
-    const message = await probeModels(
-      { baseUrl: `${server.baseUrl}/tenant-token?token=query-secret`, apiKey: "sk-probe", headers: [] },
-      2_000,
+    const message = await Effect.runPromise(
+      probeModels(
+        { baseUrl: `${server.baseUrl}/tenant-token?token=query-secret`, apiKey: "sk-probe", headers: [] },
+        2_000,
+      ),
     ).then(
       () => "",
       (caught: unknown) => (caught instanceof Error ? caught.message : ""),
@@ -136,33 +142,64 @@ describe("discoverModels", () => {
     models: [],
     headers: [{ name: "X-Tenant", value: "saved-tenant" }],
   });
-  const detection = (baseUrl: string) =>
-    createProviderDetection({
-      settings: { get: () => ({ enabled: true, addresses: [], folders: [], hiddenIds: [] }) },
-      customProviders: { configs: () => [saved(baseUrl)] },
-      customAgents: { configs: () => [] },
-      probe: probeModels,
+  const detection = async (baseUrl: string) => {
+    const service = await Effect.runPromise(
+      createProviderDetection({
+        settings: { get: () => ({ enabled: true, addresses: [], folders: [], hiddenIds: [] }) },
+        customProviders: { configs: () => [saved(baseUrl)] },
+        customAgents: { configs: () => [] },
+        probe: probeModels,
+      }),
+    );
+    detections.push(service);
+    return service;
+  };
+
+  it("cancels an active model request when the desktop service stops", async () => {
+    let signalArrival = () => {};
+    let signalClose = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      signalArrival = resolve;
     });
+    const closed = new Promise<void>((resolve) => {
+      signalClose = resolve;
+    });
+    const server = await serve((_request, response) => {
+      response.on("close", () => signalClose());
+      signalArrival();
+    });
+    const service = await detection(server.baseUrl);
+    const pending = Effect.runPromise(service.discoverModels({ baseUrl: server.baseUrl, apiKey: null, headers: [] }));
+    const rejected = expect(pending).rejects.toBeDefined();
+    await arrived;
+    await Effect.runPromise(service.close());
+    await rejected;
+    await closed;
+  });
 
   it("uses the stored key and headers for the saved origin", async () => {
     const server = await serve((_request, response) => modelList(response));
-    await detection(server.baseUrl).discoverModels({
-      baseUrl: `${server.baseUrl}/`,
-      apiKey: null,
-      headers: [],
-      savedProviderId: "studio",
-    });
+    await Effect.runPromise(
+      (await detection(server.baseUrl)).discoverModels({
+        baseUrl: `${server.baseUrl}/`,
+        apiKey: null,
+        headers: [],
+        savedProviderId: "studio",
+      }),
+    );
     expect(server.seen[0]).toMatchObject({ authorization: "Bearer sk-saved", tenant: "saved-tenant" });
   });
 
   it("never sends the stored key to another origin", async () => {
     const server = await serve((_request, response) => modelList(response));
-    await detection("http://127.0.0.1:1/v1").discoverModels({
-      baseUrl: server.baseUrl,
-      apiKey: null,
-      headers: [],
-      savedProviderId: "studio",
-    });
+    await Effect.runPromise(
+      (await detection("http://127.0.0.1:1/v1")).discoverModels({
+        baseUrl: server.baseUrl,
+        apiKey: null,
+        headers: [],
+        savedProviderId: "studio",
+      }),
+    );
     expect(server.seen[0]).toMatchObject({ authorization: undefined, tenant: undefined });
   });
 });

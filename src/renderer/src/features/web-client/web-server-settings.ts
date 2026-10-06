@@ -9,6 +9,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { runTeamEffect } from "@openbot/team-client";
 import {
   listMcpServers,
   removeMcpServer as removeMcpServerRequest,
@@ -18,6 +19,7 @@ import {
   updateHostIdentity,
 } from "@openbot/team-client/team-admin-requests";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import { createEffect, createStore, untrack } from "solid-js";
 import { serverCanAdminister, serverRoleCanAdminister } from "../servers/server-capabilities";
 import type { WebAdminRuntime } from "./web-runtime";
@@ -158,7 +160,7 @@ export function createWebServerSettings(options: {
     const { server, admin } = requireAdmin();
     if (!serverCanAdminister(server, "host-admin-v1"))
       throw new Error(currentText().t("server.settings.identityLocalOnly"));
-    await updateHostIdentity(admin.request, input);
+    await runTeamEffect(updateHostIdentity(admin.request, input).pipe(Effect.mapError((error) => error.cause)));
     await options.refreshHosts();
     await refresh();
   }
@@ -172,7 +174,9 @@ export function createWebServerSettings(options: {
   async function refreshMcp(): Promise<void> {
     const current = ++mcpRequest;
     try {
-      const configs = await listMcpServers(requireAdmin().admin.request);
+      const configs = await runTeamEffect(
+        listMcpServers(requireAdmin().admin.request).pipe(Effect.mapError((error) => error.cause)),
+      );
       if (current !== mcpRequest) return;
       setState((draft) => {
         draft.mcp = configs;
@@ -212,12 +216,27 @@ export function createWebServerSettings(options: {
     removeMember: (memberId: string): Promise<void> => mutateTeam((admin) => admin.team.removeMember(memberId)),
     revokeInvite: (inviteId: string): Promise<void> => mutateTeam((admin) => admin.team.revokeInvite(inviteId)),
     refreshMcp,
-    saveMcpServer: (config: McpServerConfig) => mutateMcp((admin) => saveMcpServerRequest(admin.request, { config })),
+    saveMcpServer: (config: McpServerConfig) =>
+      mutateMcp((admin) =>
+        runTeamEffect(saveMcpServerRequest(admin.request, { config }).pipe(Effect.mapError((error) => error.cause))),
+      ),
     removeMcpServer: (mcpServerId: string) =>
-      mutateMcp((admin) => removeMcpServerRequest(admin.request, { mcpServerId })),
+      mutateMcp((admin) =>
+        runTeamEffect(
+          removeMcpServerRequest(admin.request, { mcpServerId }).pipe(Effect.mapError((error) => error.cause)),
+        ),
+      ),
     setMcpServerEnabled: (mcpServerId: string, enabled: boolean) =>
-      mutateMcp((admin) => setMcpServerEnabledRequest(admin.request, { mcpServerId, enabled })),
+      mutateMcp((admin) =>
+        runTeamEffect(
+          setMcpServerEnabledRequest(admin.request, { mcpServerId, enabled }).pipe(
+            Effect.mapError((error) => error.cause),
+          ),
+        ),
+      ),
     testMcpServer: (config: McpServerConfig): Promise<McpTestResult> =>
-      testMcpServerRequest(requireAdmin().admin.request, { config }),
+      runTeamEffect(
+        testMcpServerRequest(requireAdmin().admin.request, { config }).pipe(Effect.mapError((error) => error.cause)),
+      ),
   };
 }

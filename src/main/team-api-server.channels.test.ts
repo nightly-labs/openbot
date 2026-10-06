@@ -1,4 +1,5 @@
 import { decodeChannelPage } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { stores } from "../backend/agent-service-test-harness";
 import { ChannelService } from "../backend/channel-service";
@@ -14,19 +15,19 @@ describe("Team API channel access", () => {
   it("requires the capability and derives authorship from the signed-in caller", async () => {
     const fixture = await createTeamApiFixture("channels", { configure: true });
     const data = stores(fixture.root);
-    await data.store.initialize();
-    await data.mailbox.initialize();
+    await Effect.runPromise(data.store.initialize());
+    await Effect.runPromise(data.mailbox.initialize());
     const channels = new ChannelService(data.store.database, data.mailbox, {
       agents: () => [],
-      generate: async () => "",
+      generate: () => Effect.sync(() => ""),
       schedule: () => undefined,
-      interrupt: async () => undefined,
+      interrupt: () => Effect.sync(() => undefined),
       busy: () => false,
       changed: () => undefined,
       error: () => undefined,
     });
     cleanups.push(async () => {
-      await channels.stop();
+      await Effect.runPromise(channels.stop());
       data.store.database.close();
     });
     const { base } = await fixture.start({ channels });
@@ -84,8 +85,8 @@ describe("Team API channel access", () => {
       body: deleteBody,
     });
     expect(withoutDeleteCapability.status).toBe(400);
-    const invite = await fixture.store.createInvite("member");
-    const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+    const invite = await Effect.runPromise(fixture.store.createInvite("member"));
+    const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
     const memberDelete = await fetch(`${base}/v1/channels/delete`, {
       method: "POST",
       headers: {

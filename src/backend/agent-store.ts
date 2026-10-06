@@ -50,12 +50,15 @@ import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@ope
 import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Effect, Result, Semaphore, Stream } from "effect";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
+import { writeFileAtomically } from "./atomic-json-file";
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
+import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 
 type StoredAgent = AgentSummary & { access: AgentAccess; computerUse: boolean };
 type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access" | "computerUse"> & {
@@ -141,8 +144,8 @@ export class AgentStore {
   readonly #profileCreationRecovery: ProfileCreationRecovery;
   readonly #database: OpenBotDatabase;
   #state: StoredState = { version: 2, examplesInitialized: false, agents: [] };
-  #avatarUpdateQueue: Promise<void> = Promise.resolve();
-  #creationQueue: Promise<void> = Promise.resolve();
+  readonly #avatarUpdateQueue = Semaphore.makeUnsafe(1);
+  readonly #creationQueue = Semaphore.makeUnsafe(1);
 
   constructor(userDataPath: string, homePath: string, database = new OpenBotDatabase(userDataPath)) {
     const openbotRoot = join(homePath, "OpenBot");
@@ -178,224 +181,261 @@ export class AgentStore {
     return this.#automationRoot;
   }
 
-  async initialize(): Promise<void> {
-    await Promise.all([
-      mkdir(this.#agentsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#sharedRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#downloadsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#avatarsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(this.#duplicationsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 }),
-    ]);
+  initialize = Effect.fn("AgentStore.initialize")(function* (
+    this: AgentStore,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      yield* Effect.all(
+        [
+          storedIO(() => mkdir(this.#agentsRoot, { recursive: true, mode: 0o700 })),
+          storedIO(() => mkdir(this.#sharedRoot, { recursive: true, mode: 0o700 })),
+          storedIO(() => mkdir(this.#downloadsRoot, { recursive: true, mode: 0o700 })),
+          storedIO(() => mkdir(this.#avatarsRoot, { recursive: true, mode: 0o700 })),
+          storedIO(() => mkdir(this.#duplicationsRoot, { recursive: true, mode: 0o700 })),
+          storedIO(() => mkdir(dirname(this.#statePath), { recursive: true, mode: 0o700 })),
+        ],
+        { concurrency: "unbounded" },
+      );
 
-    await this.#database.initialize();
-    const persisted = this.#database.listAgents();
-    if (persisted.length > 0 || this.#database.hasAggregateEvents("agents", "agents")) {
-      // Repaired field by field rather than accepted or refused as a whole. One stored value this build
-      // cannot read -- a model id a provider CLI has since renamed, an effort or a hue added by a later
-      // release, a marketplace source written as `null` -- used to stop the app from starting at all,
-      // and the message named the one cause this branch never tests: a `role` field cannot reach the
-      // database, because the `bots.json` import below rejects it before anything is written. Dropping
-      // the profile instead is not an option either: `replaceAgents` truncates the roster and re-inserts
-      // this list, so a dropped agent takes its chat out of the sidebar while its thread and every
-      // message stay on disk, unreachable. What `readStoredAgent` cannot guess -- the id, the workspace
-      // path, the thread -- still refuses to start, because guessing one of those three would point an
-      // agent at another agent's files or at an empty history.
-      const agents: StoredAgent[] = [];
-      const repairs: string[] = [];
-      for (const stored of persisted) {
-        const read = readStoredAgent(stored);
-        if ("unreadable" in read) throw new Error(unreadableProfileMessage(read));
-        agents.push(normalizeStoredAgent(read.agent));
-        if (read.repaired.length > 0) repairs.push(`${read.agent.id}: ${read.repaired.join(", ")}`);
-      }
-      this.#state = { version: 2, examplesInitialized: true, agents };
-      // Recover missing agents before writing repairs. The latest roster event may still contain a
-      // complete roster, and writing the shortened projection first would make that incomplete list
-      // the newest event and erase the only source from which the missing agents can be restored.
-      this.#restoreRosterFromEvents();
-      if (repairs.length > 0) {
-        logger.warn("Stored agent profile fields could not be read and were reset.", toLogValue(repairs));
-        // Written back at once, so the repair survives the next launch instead of running again on every
-        // start. The persist carries the whole roster, so the profiles that needed no repair are unchanged.
-        this.#persist("agents.repaired");
-      }
-    } else {
-      const legacy = await this.#readState();
-      await this.#database.backupLegacyFile(this.#statePath);
-      const sessions: Array<{ agent: StoredAgent; externalSessionId: string }> = [];
-      legacy.agents = legacy.agents.map((agent) => {
-        if (!agent.threadId) return agent;
-        sessions.push({ agent, externalSessionId: agent.threadId });
-        return { ...agent, threadId: stableThreadId(agent.id) };
-      });
-      legacy.examplesInitialized = true;
-      this.#state = legacy;
-      this.#database.replaceAgents(LEGACY_AGENTS_IMPORT_COMMAND_ID, legacy.agents, "agents.legacy-imported");
-      // Bound, then retired in the same breath. Migration v14 deactivates every provider session on this
-      // upgrade because the tool parameters were renamed, and a resumed transcript still remembers calls
-      // written against the old ones -- but a session imported out of `bots.json` arrives *after* the
-      // migrations ran, so it would be the one active session on the machine that v14 never saw. The row is
-      // kept rather than dropped: it is what a later handoff and the thread's own history read.
-      for (const { agent, externalSessionId } of sessions) {
-        const threadId = stableThreadId(agent.id);
-        this.#database.bindProviderSession({
-          threadId,
-          provider: agent.provider,
-          externalSessionId,
-          model: agent.model,
-          effort: agent.reasoningEffort,
+      yield* this.#database.initialize();
+      const persisted = this.#database.listAgents();
+      if (persisted.length > 0 || this.#database.hasAggregateEvents("agents", "agents")) {
+        // Repaired field by field rather than accepted or refused as a whole. One stored value this build
+        // cannot read -- a model id a provider CLI has since renamed, an effort or a hue added by a later
+        // release, a marketplace source written as `null` -- used to stop the app from starting at all,
+        // and the message named the one cause this branch never tests: a `role` field cannot reach the
+        // database, because the `bots.json` import below rejects it before anything is written. Dropping
+        // the profile instead is not an option either: `replaceAgents` truncates the roster and re-inserts
+        // this list, so a dropped agent takes its chat out of the sidebar while its thread and every
+        // message stay on disk, unreachable. What `readStoredAgent` cannot guess -- the id, the workspace
+        // path, the thread -- still refuses to start, because guessing one of those three would point an
+        // agent at another agent's files or at an empty history.
+        const agents: StoredAgent[] = [];
+        const repairs: string[] = [];
+        for (const stored of persisted) {
+          const read = readStoredAgent(stored);
+          if ("unreadable" in read) throw new Error(unreadableProfileMessage(read));
+          agents.push(normalizeStoredAgent(read.agent));
+          if (read.repaired.length > 0) repairs.push(`${read.agent.id}: ${read.repaired.join(", ")}`);
+        }
+        this.#state = { version: 2, examplesInitialized: true, agents };
+        // Recover missing agents before writing repairs. The latest roster event may still contain a
+        // complete roster, and writing the shortened projection first would make that incomplete list
+        // the newest event and erase the only source from which the missing agents can be restored.
+        this.#restoreRosterFromEvents();
+        if (repairs.length > 0) {
+          logger.warn("Stored agent profile fields could not be read and were reset.", toLogValue(repairs));
+          // Written back at once, so the repair survives the next launch instead of running again on every
+          // start. The persist carries the whole roster, so the profiles that needed no repair are unchanged.
+          this.#persist("agents.repaired");
+        }
+      } else {
+        const legacy = yield* this.#readStateEffect();
+        yield* this.#database.backupLegacyFile(this.#statePath);
+        const sessions: Array<{ agent: StoredAgent; externalSessionId: string }> = [];
+        legacy.agents = legacy.agents.map((agent) => {
+          if (!agent.threadId) return agent;
+          sessions.push({ agent, externalSessionId: agent.threadId });
+          return { ...agent, threadId: stableThreadId(agent.id) };
         });
-        this.#database.deactivateProviderSessions(threadId);
+        legacy.examplesInitialized = true;
+        this.#state = legacy;
+        this.#database.replaceAgents(LEGACY_AGENTS_IMPORT_COMMAND_ID, legacy.agents, "agents.legacy-imported");
+        // Bound, then retired in the same breath. Migration v14 deactivates every provider session on this
+        // upgrade because the tool parameters were renamed, and a resumed transcript still remembers calls
+        // written against the old ones -- but a session imported out of `bots.json` arrives *after* the
+        // migrations ran, so it would be the one active session on the machine that v14 never saw. The row is
+        // kept rather than dropped: it is what a later handoff and the thread's own history read.
+        for (const { agent, externalSessionId } of sessions) {
+          const threadId = stableThreadId(agent.id);
+          this.#database.bindProviderSession({
+            threadId,
+            provider: agent.provider,
+            externalSessionId,
+            model: agent.model,
+            effort: agent.reasoningEffort,
+          });
+          this.#database.deactivateProviderSessions(threadId);
+        }
       }
+      yield* this.#reconcileLegacyDirectoriesEffect();
+      yield* this.#recoverPendingDuplicationsEffect();
+      yield* this.#profileCreationRecovery.recover(this.#database, (agentId) =>
+        this.deleteAgent(agentId).pipe(Effect.asVoid),
+      );
+      // Last, so that a thread belonging to an agent the two recoveries above have just removed is gone
+      // rather than re-adopted.
+      this.#reconcileUnclaimedThreads();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await this.#reconcileLegacyDirectories();
-    await this.#recoverPendingDuplications();
-    await this.#profileCreationRecovery.recover(this.#database, async (agentId) => {
-      await this.deleteAgent(agentId);
-    });
-    // Last, so that a thread belonging to an agent the two recoveries above have just removed is gone
-    // rather than re-adopted.
-    this.#reconcileUnclaimedThreads();
-  }
+  }, Effect.uninterruptible).bind(this);
 
   list(): AgentSummary[] {
     return this.#state.agents.map((agent) => ({ ...agent }));
   }
 
-  createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string): Promise<AgentSummary> {
-    return this.#enqueueCreation(() => this.#createAgent(input, profileOperationId));
+  createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string) {
+    return this.#creationQueue.withPermit(this.#createAgent(input, profileOperationId));
   }
 
-  async #createAgent(
+  #createAgent = Effect.fn("AgentStore.createAgent")(function* (
+    this: AgentStore,
     input: Omit<CreateAgentInput, "initialMessage">,
     profileOperationId?: string,
-  ): Promise<AgentSummary> {
-    if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
-    }
-    const name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
-    const description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
-    if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
-    if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
-    const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
-    record.avatarSeed = input.avatarSeed;
-    record.avatarHue = input.avatarHue;
-    if (profileOperationId) await this.#profileCreationRecovery.begin(record.id, profileOperationId);
-    await mkdir(record.workspacePath, { recursive: true, mode: 0o700 });
-    this.#state.agents.unshift(record);
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
     try {
-      this.#persist("agent.created");
-    } catch (error) {
-      this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== record.id);
-      await rm(record.workspacePath, { recursive: true, force: true });
-      throw error;
-    }
-    return { ...record };
-  }
-
-  duplicateAgent(sourceId: string, operationId: string = randomUUID()): Promise<AgentSummary> {
-    if (!isUuidV4(operationId)) throw new Error("Invalid agent duplication operation id.");
-    return this.#enqueueCreation(() => this.#duplicateAgent(sourceId, operationId));
-  }
-
-  #enqueueCreation<T>(create: () => Promise<T>): Promise<T> {
-    const operation = this.#creationQueue.then(create);
-    this.#creationQueue = operation.then(
-      () => undefined,
-      () => undefined,
-    );
-    return operation;
-  }
-
-  async #duplicateAgent(sourceId: string, operationId: string): Promise<AgentSummary> {
-    if (this.#database.commandResult(duplicationCommandId(operationId)) !== undefined) {
-      throw new Error("This agent duplication operation is already committed.");
-    }
-    if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
-    }
-    const source = this.#requireAgent(sourceId);
-    const sourceProfileSignature = duplicationProfileSignature(source);
-    const sourceWorkspaceManifest = await workspaceMetadataFingerprint(source.workspacePath);
-    const sourceAvatar = this.resolveAvatar(source.id);
-    const sourceAvatarSignature = sourceAvatar ? await fileFingerprint(sourceAvatar.path) : null;
-    const id = `agent-${randomUUID()}`;
-    const record = this.#createRecord(
-      id,
-      duplicateAgentName(source.name, this.#state.agents),
-      source.title,
-      source.description,
-    );
-    record.notifications = source.notifications;
-    record.provider = source.provider;
-    record.model = source.model;
-    record.reasoningEffort = source.reasoningEffort;
-    record.access = source.access;
-    record.computerUse = source.computerUse;
-    if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
-    record.avatarSeed = source.avatarSeed;
-    record.avatarHue = source.avatarHue;
-
-    const stagedWorkspace = `${record.workspacePath}.openbot-stage`;
-    const avatarDirectory = join(this.#avatarsRoot, record.id);
-    const stagedAvatarDirectory = `${avatarDirectory}.openbot-stage`;
-    const duplicationMarker = this.#duplicationMarkerPath(record.id);
-    let stagedAvatarPath: string | null = null;
-    try {
-      await writeFile(duplicationMarker, `${JSON.stringify({ operationId, sourceAgentId: sourceId })}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-        flag: "wx",
-      });
-      await cp(source.workspacePath, stagedWorkspace, {
-        recursive: true,
-        dereference: false,
-        errorOnExist: true,
-        force: false,
-        verbatimSymlinks: true,
-      });
-      if (sourceAvatar) {
-        await mkdir(stagedAvatarDirectory, { recursive: true, mode: 0o700 });
-        const extension = avatarFileExtension(sourceAvatar.mimeType);
-        stagedAvatarPath = join(stagedAvatarDirectory, `${sourceAvatar.version}.${extension}`);
-        await copyFile(sourceAvatar.path, stagedAvatarPath);
-        record.avatarUrl = agentAvatarUrl(record.id, sourceAvatar.version, sourceAvatar.mimeType);
-      }
-      if (
-        duplicationProfileSignature(source) !== sourceProfileSignature ||
-        (await workspaceMetadataFingerprint(source.workspacePath)) !== sourceWorkspaceManifest ||
-        (stagedAvatarPath ? await fileFingerprint(stagedAvatarPath) : null) !== sourceAvatarSignature ||
-        (sourceAvatar ? await fileFingerprint(sourceAvatar.path) : null) !== sourceAvatarSignature
-      ) {
-        throw new Error(sourceText("error.agent.changedWhileDuplicating"));
-      }
-      await rewriteInternalWorkspaceSymlinks(source.workspacePath, stagedWorkspace, record.workspacePath);
       if (this.#state.agents.length >= INPUT_LIMITS.agents) {
         throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
       }
-      record.name = duplicateAgentName(source.name, this.#state.agents);
-      await rename(stagedWorkspace, record.workspacePath);
-      if (sourceAvatar) await rename(stagedAvatarDirectory, avatarDirectory);
+      const name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
+      const description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
+      if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
+      if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
+      const record = this.#createRecord(`agent-${randomUUID()}`, name, "", description);
+      record.avatarSeed = input.avatarSeed;
+      record.avatarHue = input.avatarHue;
+      if (profileOperationId) yield* this.#profileCreationRecovery.begin(record.id, profileOperationId);
+      yield* storedIO(() => mkdir(record.workspacePath, { recursive: true, mode: 0o700 }));
       this.#state.agents.unshift(record);
       try {
-        this.#persist("agent.duplicated");
+        this.#persist("agent.created");
       } catch (error) {
         this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== record.id);
+        yield* storedIO(() => rm(record.workspacePath, { recursive: true, force: true }));
         throw error;
       }
       return { ...record };
-    } catch (error) {
-      await Promise.all([
-        rm(stagedWorkspace, { recursive: true, force: true }),
-        rm(record.workspacePath, { recursive: true, force: true }),
-        rm(stagedAvatarDirectory, { recursive: true, force: true }),
-        rm(avatarDirectory, { recursive: true, force: true }),
-        rm(duplicationMarker, { force: true }),
-      ]);
-      throw error;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
+  }, Effect.uninterruptible);
+
+  duplicateAgent(sourceId: string, operationId: string = randomUUID()) {
+    return this.#creationQueue.withPermit(this.#duplicateAgent(sourceId, operationId));
   }
+
+  #duplicateAgent = Effect.fn("AgentStore.duplicateAgent")(function* (
+    this: AgentStore,
+    sourceId: string,
+    operationId: string,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
+    try {
+      if (!isUuidV4(operationId)) throw new Error("Invalid agent duplication operation id.");
+      if (this.#database.commandResult(duplicationCommandId(operationId)) !== undefined) {
+        throw new Error("This agent duplication operation is already committed.");
+      }
+      if (this.#state.agents.length >= INPUT_LIMITS.agents) {
+        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+      }
+      const source = this.#requireAgent(sourceId);
+      const sourceProfileSignature = duplicationProfileSignature(source);
+      const sourceWorkspaceManifest = yield* workspaceMetadataFingerprintEffect(source.workspacePath);
+      const sourceAvatar = this.resolveAvatar(source.id);
+      const sourceAvatarSignature = sourceAvatar ? yield* fileFingerprintEffect(sourceAvatar.path) : null;
+      const id = `agent-${randomUUID()}`;
+      const record = this.#createRecord(
+        id,
+        duplicateAgentName(source.name, this.#state.agents),
+        source.title,
+        source.description,
+      );
+      record.notifications = source.notifications;
+      record.provider = source.provider;
+      record.model = source.model;
+      record.reasoningEffort = source.reasoningEffort;
+      record.access = source.access;
+      record.computerUse = source.computerUse;
+      if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
+      record.avatarSeed = source.avatarSeed;
+      record.avatarHue = source.avatarHue;
+
+      const stagedWorkspace = `${record.workspacePath}.openbot-stage`;
+      const avatarDirectory = join(this.#avatarsRoot, record.id);
+      const stagedAvatarDirectory = `${avatarDirectory}.openbot-stage`;
+      const duplicationMarker = this.#duplicationMarkerPath(record.id);
+      let stagedAvatarPath: string | null = null;
+      {
+        const attempt1 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              yield* storedIO(() =>
+                writeFile(duplicationMarker, `${JSON.stringify({ operationId, sourceAgentId: sourceId })}\n`, {
+                  encoding: "utf8",
+                  mode: 0o600,
+                  flag: "wx",
+                }),
+              );
+              yield* storedIO(() =>
+                cp(source.workspacePath, stagedWorkspace, {
+                  recursive: true,
+                  dereference: false,
+                  errorOnExist: true,
+                  force: false,
+                  verbatimSymlinks: true,
+                }),
+              );
+              if (sourceAvatar) {
+                yield* storedIO(() => mkdir(stagedAvatarDirectory, { recursive: true, mode: 0o700 }));
+                const extension = avatarFileExtension(sourceAvatar.mimeType);
+                const avatarCopy = join(stagedAvatarDirectory, `${sourceAvatar.version}.${extension}`);
+                stagedAvatarPath = avatarCopy;
+                yield* storedIO(() => copyFile(sourceAvatar.path, avatarCopy));
+                record.avatarUrl = agentAvatarUrl(record.id, sourceAvatar.version, sourceAvatar.mimeType);
+              }
+              if (
+                duplicationProfileSignature(source) !== sourceProfileSignature ||
+                (yield* workspaceMetadataFingerprintEffect(source.workspacePath)) !== sourceWorkspaceManifest ||
+                (stagedAvatarPath ? yield* fileFingerprintEffect(stagedAvatarPath) : null) !== sourceAvatarSignature ||
+                (sourceAvatar ? yield* fileFingerprintEffect(sourceAvatar.path) : null) !== sourceAvatarSignature
+              ) {
+                throw new Error(sourceText("error.agent.changedWhileDuplicating"));
+              }
+              yield* rewriteInternalWorkspaceSymlinksEffect(
+                source.workspacePath,
+                stagedWorkspace,
+                record.workspacePath,
+              );
+              if (this.#state.agents.length >= INPUT_LIMITS.agents) {
+                throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+              }
+              record.name = duplicateAgentName(source.name, this.#state.agents);
+              yield* storedIO(() => rename(stagedWorkspace, record.workspacePath));
+              if (sourceAvatar) yield* storedIO(() => rename(stagedAvatarDirectory, avatarDirectory));
+              this.#state.agents.unshift(record);
+              try {
+                this.#persist("agent.duplicated");
+              } catch (error) {
+                this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== record.id);
+                throw error;
+              }
+              return { ...record };
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(attempt1)) {
+          const error = attempt1.failure.cause;
+          yield* Effect.all(
+            [
+              storedIO(() => rm(stagedWorkspace, { recursive: true, force: true })),
+              storedIO(() => rm(record.workspacePath, { recursive: true, force: true })),
+              storedIO(() => rm(stagedAvatarDirectory, { recursive: true, force: true })),
+              storedIO(() => rm(avatarDirectory, { recursive: true, force: true })),
+              storedIO(() => rm(duplicationMarker, { force: true })),
+            ],
+            { concurrency: "unbounded" },
+          );
+          throw error;
+        } else {
+          return attempt1.success;
+        }
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible);
 
   committedAgentDuplication(operationId: string, sourceAgentId: string): DuplicateAgentResult | null {
     if (!isUuidV4(operationId)) throw new Error("Invalid agent duplication operation id.");
@@ -427,44 +467,49 @@ export class AgentStore {
     };
   }
 
-  async commitAgentDuplication(
+  commitAgentDuplication = Effect.fn("AgentStore.commitAgentDuplication")(function* (
+    this: AgentStore,
     id: string,
     operationId: string,
     sourceAgentId: string,
     layout: SidebarLayoutSnapshot,
-  ): Promise<DuplicateAgentResult> {
-    const agent = this.#requireAgent(id);
-    const marker = await this.#readDuplicationMarker(id);
-    if (!marker || marker.operationId !== operationId || marker.sourceAgentId !== sourceAgentId) {
-      throw new Error("This agent duplication marker is invalid.");
+  ): Effect.fn.Return<DuplicateAgentResult, StoredStateFailure> {
+    try {
+      const agent = this.#requireAgent(id);
+      const marker = yield* this.#readDuplicationMarkerEffect(id);
+      if (!marker || marker.operationId !== operationId || marker.sourceAgentId !== sourceAgentId) {
+        throw new Error("This agent duplication marker is invalid.");
+      }
+      const result = { agent: { ...agent }, layout: structuredClone(layout) };
+      const receipt = this.#database.dispatch(
+        duplicationCommandId(operationId),
+        [
+          {
+            aggregateType: "agent-duplications",
+            aggregateId: id,
+            eventType: "agent-duplication.committed",
+            payload: { sourceAgentId, duplicateAgentId: id },
+          },
+        ],
+        () => ({ sourceAgentId, result }),
+      );
+      yield* storedIO(() => rm(this.#duplicationMarkerPath(id), { force: true }).catch(() => undefined));
+      if (
+        !isRecord(receipt) ||
+        !isRecord(receipt.result) ||
+        !isStoredAgent(receipt.result.agent) ||
+        !isSidebarLayoutSnapshot(receipt.result.layout)
+      ) {
+        throw new Error("The agent duplication receipt is invalid.");
+      }
+      return {
+        agent: { ...normalizeStoredAgent(receipt.result.agent) },
+        layout: structuredClone(receipt.result.layout),
+      };
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    const result = { agent: { ...agent }, layout: structuredClone(layout) };
-    const receipt = this.#database.dispatch(
-      duplicationCommandId(operationId),
-      [
-        {
-          aggregateType: "agent-duplications",
-          aggregateId: id,
-          eventType: "agent-duplication.committed",
-          payload: { sourceAgentId, duplicateAgentId: id },
-        },
-      ],
-      () => ({ sourceAgentId, result }),
-    );
-    await rm(this.#duplicationMarkerPath(id), { force: true }).catch(() => undefined);
-    if (
-      !isRecord(receipt) ||
-      !isRecord(receipt.result) ||
-      !isStoredAgent(receipt.result.agent) ||
-      !isSidebarLayoutSnapshot(receipt.result.layout)
-    ) {
-      throw new Error("The agent duplication receipt is invalid.");
-    }
-    return {
-      agent: { ...normalizeStoredAgent(receipt.result.agent) },
-      layout: structuredClone(receipt.result.layout),
-    };
-  }
+  }, Effect.uninterruptible).bind(this);
 
   saveReviewedProfile(agentId: string, draft: AgentProfileDraft): AgentSummary {
     draft = decodeAgentProfileDraft(draft);
@@ -519,86 +564,97 @@ export class AgentStore {
   }
 
   /** `initiatingAgentId` names the agent that asked for the change, for the audit entry of a model change. */
-  async updateAgent(input: UpdateAgentInput, initiatingAgentId?: string): Promise<AgentSummary> {
-    const agent = this.#requireAgent(input.agentId);
-    const next = { ...agent };
-    if (input.name !== undefined) {
-      next.name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
-    }
-    if (input.title !== undefined) {
-      next.title = limitedText(input.title, "Agent title", INPUT_LIMITS.agentTitle);
-    }
-    if (input.description !== undefined) {
-      next.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
-    }
-    if (input.notifications !== undefined) next.notifications = input.notifications;
-    // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
-    // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
-    // is a list of ids a provider CLI minted and can rename under a running install. A value the read
-    // guards reject must not reach the roster at all -- before `readStoredAgent`, storing one made the
-    // app refuse to start on its next launch.
-    if (input.provider !== undefined) {
-      if (!isOneOf(AGENT_PROVIDERS, input.provider)) throw new Error("Invalid agent provider.");
-      next.provider = input.provider;
-    }
-    if (input.model !== undefined) {
-      if (!isAgentModel(input.model)) throw new Error("Invalid agent model.");
-      next.model = input.model;
-    }
-    if (input.reasoningEffort !== undefined) {
-      if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
-      next.reasoningEffort = input.reasoningEffort;
-    }
-    if (input.access !== undefined) {
-      if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
-      next.access = input.access;
-    }
-    if (input.computerUse !== undefined) {
-      if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
-      next.computerUse = input.computerUse;
-    }
-    if (input.allowAutomation !== undefined) {
-      if (!isBoolean(input.allowAutomation)) throw new Error("Invalid automation value.");
-      next.allowAutomation = input.allowAutomation;
-    }
-    if (input.busyMessageMode === null) delete next.busyMessageMode;
-    else if (input.busyMessageMode !== undefined) {
-      if (!isBusyMessageMode(input.busyMessageMode)) throw new Error("Invalid busy message mode.");
-      next.busyMessageMode = input.busyMessageMode;
-    }
-    if (input.avatarSeed !== undefined) {
-      if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
-      next.avatarSeed = input.avatarSeed;
-    }
-    if (input.avatarHue !== undefined) {
-      if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
-      next.avatarHue = input.avatarHue;
-    }
-    next.updatedAt = new Date().toISOString();
-    const previous = { ...agent };
-    const modelChanged =
-      next.provider !== agent.provider || next.model !== agent.model || next.reasoningEffort !== agent.reasoningEffort;
-    const modelChange: AgentModelChange | undefined =
-      initiatingAgentId !== undefined && modelChanged
-        ? {
-            initiatingAgentId,
-            targetAgentId: agent.id,
-            previous: { provider: agent.provider, model: agent.model, reasoningEffort: agent.reasoningEffort },
-            next: { provider: next.provider, model: next.model, reasoningEffort: next.reasoningEffort },
-          }
-        : undefined;
-    Object.assign(agent, next);
-    // A copy cannot remove a field, and `null` above returned the agent to the app default.
-    if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
+
+  updateAgent = Effect.fn("AgentStore.updateAgent")(function* (
+    this: AgentStore,
+    input: UpdateAgentInput,
+    initiatingAgentId?: string,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
     try {
-      this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
-    } catch (error) {
-      Object.assign(agent, previous);
-      if (previous.busyMessageMode === undefined) delete agent.busyMessageMode;
-      throw error;
+      const agent = this.#requireAgent(input.agentId);
+      const next = { ...agent };
+      if (input.name !== undefined) {
+        next.name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
+      }
+      if (input.title !== undefined) {
+        next.title = limitedText(input.title, "Agent title", INPUT_LIMITS.agentTitle);
+      }
+      if (input.description !== undefined) {
+        next.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
+      }
+      if (input.notifications !== undefined) next.notifications = input.notifications;
+      // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
+      // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
+      // is a list of ids a provider CLI minted and can rename under a running install. A value the read
+      // guards reject must not reach the roster at all -- before `readStoredAgent`, storing one made the
+      // app refuse to start on its next launch.
+      if (input.provider !== undefined) {
+        if (!isOneOf(AGENT_PROVIDERS, input.provider)) throw new Error("Invalid agent provider.");
+        next.provider = input.provider;
+      }
+      if (input.model !== undefined) {
+        if (!isAgentModel(input.model)) throw new Error("Invalid agent model.");
+        next.model = input.model;
+      }
+      if (input.reasoningEffort !== undefined) {
+        if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
+        next.reasoningEffort = input.reasoningEffort;
+      }
+      if (input.access !== undefined) {
+        if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
+        next.access = input.access;
+      }
+      if (input.computerUse !== undefined) {
+        if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
+        next.computerUse = input.computerUse;
+      }
+      if (input.allowAutomation !== undefined) {
+        if (!isBoolean(input.allowAutomation)) throw new Error("Invalid automation value.");
+        next.allowAutomation = input.allowAutomation;
+      }
+      if (input.busyMessageMode === null) delete next.busyMessageMode;
+      else if (input.busyMessageMode !== undefined) {
+        if (!isBusyMessageMode(input.busyMessageMode)) throw new Error("Invalid busy message mode.");
+        next.busyMessageMode = input.busyMessageMode;
+      }
+      if (input.avatarSeed !== undefined) {
+        if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
+        next.avatarSeed = input.avatarSeed;
+      }
+      if (input.avatarHue !== undefined) {
+        if (input.avatarHue !== null && !isAvatarHue(input.avatarHue)) throw new Error("Invalid avatar hue.");
+        next.avatarHue = input.avatarHue;
+      }
+      next.updatedAt = new Date().toISOString();
+      const previous = { ...agent };
+      const modelChanged =
+        next.provider !== agent.provider ||
+        next.model !== agent.model ||
+        next.reasoningEffort !== agent.reasoningEffort;
+      const modelChange: AgentModelChange | undefined =
+        initiatingAgentId !== undefined && modelChanged
+          ? {
+              initiatingAgentId,
+              targetAgentId: agent.id,
+              previous: { provider: agent.provider, model: agent.model, reasoningEffort: agent.reasoningEffort },
+              next: { provider: next.provider, model: next.model, reasoningEffort: next.reasoningEffort },
+            }
+          : undefined;
+      Object.assign(agent, next);
+      // A copy cannot remove a field, and `null` above returned the agent to the app default.
+      if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
+      try {
+        this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
+      } catch (error) {
+        Object.assign(agent, previous);
+        if (previous.busyMessageMode === undefined) delete agent.busyMessageMode;
+        throw error;
+      }
+      return { ...agent };
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    return { ...agent };
-  }
+  }, Effect.uninterruptible).bind(this);
 
   setMarketplaceSource(agentId: string, source: NonNullable<AgentSummary["marketplaceSource"]>): AgentSummary {
     const agent = this.#requireAgent(agentId);
@@ -608,57 +664,60 @@ export class AgentStore {
     return { ...agent, marketplaceSource: structuredClone(source) };
   }
 
-  async setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary> {
-    const operation = this.#avatarUpdateQueue.then(() => this.#setAvatar(agentId, image));
-    this.#avatarUpdateQueue = operation.then(
-      () => undefined,
-      () => undefined,
-    );
-    return operation;
+  setAvatar(agentId: string, image: AvatarImageInput | null) {
+    return this.#avatarUpdateQueue.withPermit(this.#setAvatar(agentId, image));
   }
 
-  async #setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary> {
-    const agent = this.#requireAgent(agentId);
-    const previous = this.resolveAvatar(agentId);
-    const previousAvatarUrl = agent.avatarUrl;
-    const previousUpdatedAt = agent.updatedAt;
-    if (image === null) {
-      agent.avatarUrl = null;
+  #setAvatar = Effect.fn("AgentStore.setAvatar")(function* (
+    this: AgentStore,
+    agentId: string,
+    image: AvatarImageInput | null,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
+    try {
+      const agent = this.#requireAgent(agentId);
+      const previous = this.resolveAvatar(agentId);
+      const previousAvatarUrl = agent.avatarUrl;
+      const previousUpdatedAt = agent.updatedAt;
+      if (image === null) {
+        agent.avatarUrl = null;
+        agent.updatedAt = new Date().toISOString();
+        try {
+          this.#persist("agent.avatar-removed");
+        } catch (error) {
+          agent.avatarUrl = previousAvatarUrl;
+          agent.updatedAt = previousUpdatedAt;
+          throw error;
+        }
+        if (previous) yield* storedIO(() => rm(previous.path, { force: true }).catch(() => undefined));
+        return { ...agent };
+      }
+      if (!isValidAvatarImage(image.mimeType, image.bytes)) {
+        throw new Error(sourceText("error.team.logoInvalid"));
+      }
+      const version = randomUUID();
+      const extension = avatarFileExtension(image.mimeType);
+      const directory = join(this.#avatarsRoot, agent.id);
+      const target = join(directory, `${version}.${extension}`);
+      yield* storedIO(() => mkdir(directory, { recursive: true, mode: 0o700 }));
+      yield* writeFileAtomically(target, image.bytes).pipe(
+        Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
+      );
+      agent.avatarUrl = agentAvatarUrl(agent.id, version, image.mimeType);
       agent.updatedAt = new Date().toISOString();
       try {
-        this.#persist("agent.avatar-removed");
+        this.#persist("agent.avatar-updated");
       } catch (error) {
         agent.avatarUrl = previousAvatarUrl;
         agent.updatedAt = previousUpdatedAt;
+        yield* storedIO(() => rm(target, { force: true }));
         throw error;
       }
-      if (previous) await rm(previous.path, { force: true }).catch(() => undefined);
+      if (previous) yield* storedIO(() => rm(previous.path, { force: true }).catch(() => undefined));
       return { ...agent };
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    if (!isValidAvatarImage(image.mimeType, image.bytes)) {
-      throw new Error(sourceText("error.team.logoInvalid"));
-    }
-    const version = randomUUID();
-    const extension = avatarFileExtension(image.mimeType);
-    const directory = join(this.#avatarsRoot, agent.id);
-    const target = join(directory, `${version}.${extension}`);
-    const temporary = `${target}.tmp`;
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    await writeFile(temporary, image.bytes, { mode: 0o600 });
-    await rename(temporary, target);
-    agent.avatarUrl = agentAvatarUrl(agent.id, version, image.mimeType);
-    agent.updatedAt = new Date().toISOString();
-    try {
-      this.#persist("agent.avatar-updated");
-    } catch (error) {
-      agent.avatarUrl = previousAvatarUrl;
-      agent.updatedAt = previousUpdatedAt;
-      await rm(target, { force: true });
-      throw error;
-    }
-    if (previous) await rm(previous.path, { force: true }).catch(() => undefined);
-    return { ...agent };
-  }
+  }, Effect.uninterruptible);
 
   resolveAvatar(agentId: string): { path: string; mimeType: AvatarImageInput["mimeType"]; version: string } | null {
     const agent = this.#requireAgent(agentId);
@@ -673,68 +732,89 @@ export class AgentStore {
     };
   }
 
-  async deleteAgent(id: string): Promise<AgentSummary | null> {
-    validateAgentId(id);
-    const agent = this.#state.agents.find((candidate) => candidate.id === id);
-    for (const path of [
-      join(this.#avatarsRoot, id),
-      `${join(this.#avatarsRoot, id)}.openbot-stage`,
-      join(this.#agentsRoot, id),
-      `${join(this.#agentsRoot, id)}.openbot-stage`,
-    ]) {
-      await rm(path, AGENT_FILES_REMOVAL);
+  deleteAgent = Effect.fn("AgentStore.deleteAgent")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<AgentSummary | null, StoredStateFailure> {
+    try {
+      validateAgentId(id);
+      const agent = this.#state.agents.find((candidate) => candidate.id === id);
+      for (const path of [
+        join(this.#avatarsRoot, id),
+        `${join(this.#avatarsRoot, id)}.openbot-stage`,
+        join(this.#agentsRoot, id),
+        `${join(this.#agentsRoot, id)}.openbot-stage`,
+      ]) {
+        yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+      }
+      yield* storedIO(() => rm(this.#duplicationMarkerPath(id), { force: true }));
+      // A workspace that could not follow the rename legitimately sits under the pre-rename root, and deleting
+      // only the derived path would leave that agent's files behind. Every path here is derived rather than
+      // read from `workspacePath`, because that column comes out of the user's own database file and a
+      // recursive delete must never follow a string this code did not build.
+      //
+      // The agent's own id is always safe to clear under the old root: nobody else can be stored under it.
+      // Migration v13 leaves a `bot-` id alone unless the application minted it, and a legacy `bots.json`
+      // import runs afterwards and keeps both the id and the `~/OpenBot/Bots/<id>` workspace it read, so an
+      // agent whose workspace is only ever there is a state the user can reach.
+      const legacyPaths = [join(this.#legacyAgentsRoot, id)];
+      const legacyId = this.#unclaimedLegacyId(id);
+      if (legacyId !== null) {
+        legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
+      }
+      for (const path of legacyPaths) yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+      // Keep the record for retry until every managed path is removed. Publish the new
+      // in-memory list only after the database transaction succeeds.
+      const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
+      this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
+      this.#state.agents = remaining;
+      return agent ? { ...agent } : null;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    await rm(this.#duplicationMarkerPath(id), { force: true });
-    // A workspace that could not follow the rename legitimately sits under the pre-rename root, and deleting
-    // only the derived path would leave that agent's files behind. Every path here is derived rather than
-    // read from `workspacePath`, because that column comes out of the user's own database file and a
-    // recursive delete must never follow a string this code did not build.
-    //
-    // The agent's own id is always safe to clear under the old root: nobody else can be stored under it.
-    // Migration v13 leaves a `bot-` id alone unless the application minted it, and a legacy `bots.json`
-    // import runs afterwards and keeps both the id and the `~/OpenBot/Bots/<id>` workspace it read, so an
-    // agent whose workspace is only ever there is a state the user can reach.
-    const legacyPaths = [join(this.#legacyAgentsRoot, id)];
-    const legacyId = this.#unclaimedLegacyId(id);
-    if (legacyId !== null) {
-      legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
-    }
-    for (const path of legacyPaths) await rm(path, AGENT_FILES_REMOVAL);
-    // Keep the record for retry until every managed path is removed. Publish the new
-    // in-memory list only after the database transaction succeeds.
-    const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
-    this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
-    this.#state.agents = remaining;
-    return agent ? { ...agent } : null;
-  }
+  }, Effect.uninterruptible).bind(this);
 
-  async getOrCreate(id: string, name?: string, title?: string): Promise<AgentSummary> {
-    validateAgentId(id);
+  getOrCreate = Effect.fn("AgentStore.getOrCreate")(function* (
+    this: AgentStore,
+    id: string,
+    name?: string,
+    title?: string,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
+    yield* storedSync(() => validateAgentId(id));
     const existing = this.#state.agents.find((agent) => agent.id === id);
     if (existing) {
-      await mkdir(existing.workspacePath, { recursive: true, mode: 0o700 });
+      yield* storedIO(() => mkdir(existing.workspacePath, { recursive: true, mode: 0o700 }));
       return { ...existing };
     }
-    return this.#enqueueCreation(() => this.#getOrCreate(id, name, title));
-  }
+    return yield* this.#creationQueue.withPermit(this.#getOrCreate(id, name, title));
+  }).bind(this);
 
-  async #getOrCreate(id: string, name?: string, title?: string): Promise<AgentSummary> {
-    validateAgentId(id);
-    const existing = this.#state.agents.find((agent) => agent.id === id);
-    if (existing) {
-      await mkdir(existing.workspacePath, { recursive: true, mode: 0o700 });
-      return { ...existing };
-    }
-    if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
-    }
+  #getOrCreate = Effect.fn("AgentStore.getOrCreate")(function* (
+    this: AgentStore,
+    id: string,
+    name?: string,
+    title?: string,
+  ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
+    try {
+      validateAgentId(id);
+      const existing = this.#state.agents.find((agent) => agent.id === id);
+      if (existing) {
+        yield* storedIO(() => mkdir(existing.workspacePath, { recursive: true, mode: 0o700 }));
+        return { ...existing };
+      }
+      if (this.#state.agents.length >= INPUT_LIMITS.agents) {
+        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+      }
 
-    const record = this.#createRecord(id, name ?? titleFromId(id), title ?? "Local teammate");
-    this.#state.agents.push(record);
-    await mkdir(record.workspacePath, { recursive: true, mode: 0o700 });
-    this.#persist("agent.created");
-    return { ...record };
-  }
+      const record = this.#createRecord(id, name ?? titleFromId(id), title ?? "Local teammate");
+      this.#state.agents.push(record);
+      yield* storedIO(() => mkdir(record.workspacePath, { recursive: true, mode: 0o700 }));
+      this.#persist("agent.created");
+      return { ...record };
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible);
 
   /**
    * The file half of migration v13: `~/OpenBot/Bots/bot-<uuid>` becomes `~/OpenBot/Agents/agent-<uuid>`,
@@ -748,15 +828,22 @@ export class AgentStore {
    * database has already migrated by this point, so refusing to start over a directory name would leave
    * the user with no way back in.
    */
-  async #reconcileLegacyDirectories(): Promise<void> {
-    let relocated = false;
-    for (const agent of this.#state.agents) {
-      relocated = (await this.#reconcileWorkspaceDirectory(agent)) || relocated;
-      await this.#reconcileAvatarDirectory(agent);
+
+  #reconcileLegacyDirectoriesEffect = Effect.fn("AgentStore.reconcileLegacyDirectories")(function* (
+    this: AgentStore,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      let relocated = false;
+      for (const agent of this.#state.agents) {
+        relocated = (yield* this.#reconcileWorkspaceDirectoryEffect(agent)) || relocated;
+        yield* this.#reconcileAvatarDirectoryEffect(agent);
+      }
+      if (relocated) this.#persist("agent.workspace-relocated");
+      yield* this.#removeLegacyWorkspaceRootEffect();
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-    if (relocated) this.#persist("agent.workspace-relocated");
-    await this.#removeLegacyWorkspaceRoot();
-  }
+  }, Effect.uninterruptible);
 
   /**
    * The name a pre-rename build would have given this agent, or `null` when another agent in the store is
@@ -784,72 +871,110 @@ export class AgentStore {
    * migration v13 rewrites id values and that id did not change -- so trusting the stored path would find
    * the workspace already "at" its destination and leave it in the old root forever.
    */
-  async #reconcileWorkspaceDirectory(agent: StoredAgent): Promise<boolean> {
-    const legacyId = this.#unclaimedLegacyId(agent.id);
-    if (legacyId === null) return false;
-    const targetPath = join(this.#agentsRoot, agent.id);
-    const legacyPath = join(this.#legacyAgentsRoot, legacyId);
-    if (legacyPath === targetPath) return false;
-    // A probe that cannot answer is not permission to guess. `EACCES` on either directory, or a Windows
-    // lock, leaves this run unable to tell a moved workspace from a missing one -- so it does nothing and
-    // the next launch tries again, rather than moving a directory on a false negative.
-    const current = await probeDirectory(targetPath);
-    const legacy = await probeDirectory(legacyPath);
-    if (current !== false || legacy !== true) {
-      // A previous run moved the files but was interrupted before it could persist where they went -- and
-      // only then. Two directories at once is not that story: the move is a single atomic `rename`, so it
-      // never leaves both behind, and what this run is looking at is a destination that was never this
-      // agent's. Repointing the record at it would hand the agent somebody else's files and put its own
-      // out of reach, so an ambiguous pair leaves the path the agent has actually been reading alone.
-      if (current === true && legacy === false && agent.workspacePath !== targetPath) {
-        agent.workspacePath = targetPath;
-        return true;
-      }
-      return false;
-    }
+
+  #reconcileWorkspaceDirectoryEffect = Effect.fn("AgentStore.reconcileWorkspaceDirectory")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
     try {
-      await rename(legacyPath, targetPath);
-      if (agent.workspacePath === targetPath) return false;
-      agent.workspacePath = targetPath;
-      return true;
-    } catch (error) {
-      // Only the move failed; the workspace itself is still there and still readable. `EXDEV` means
-      // `~/OpenBot/Bots` is a link onto another volume, so the move would be a copy, and a copy of a
-      // workspace interrupted halfway is lost data. A permission error, a Windows lock or an open handle
-      // leave exactly the same situation, so they get the same answer: the files stay where they are and
-      // the stored path is pointed back at them. An out-of-date directory name is cosmetic.
-      logger.warn("Could not move an agent workspace to its new directory.", toLogValue(error));
-      if (agent.workspacePath === legacyPath) return false;
-      agent.workspacePath = legacyPath;
-      return true;
+      const legacyId = this.#unclaimedLegacyId(agent.id);
+      if (legacyId === null) return false;
+      const targetPath = join(this.#agentsRoot, agent.id);
+      const legacyPath = join(this.#legacyAgentsRoot, legacyId);
+      if (legacyPath === targetPath) return false;
+      // A probe that cannot answer is not permission to guess. `EACCES` on either directory, or a Windows
+      // lock, leaves this run unable to tell a moved workspace from a missing one -- so it does nothing and
+      // the next launch tries again, rather than moving a directory on a false negative.
+      const current = yield* probeDirectoryEffect(targetPath);
+      const legacy = yield* probeDirectoryEffect(legacyPath);
+      if (current !== false || legacy !== true) {
+        // A previous run moved the files but was interrupted before it could persist where they went -- and
+        // only then. Two directories at once is not that story: the move is a single atomic `rename`, so it
+        // never leaves both behind, and what this run is looking at is a destination that was never this
+        // agent's. Repointing the record at it would hand the agent somebody else's files and put its own
+        // out of reach, so an ambiguous pair leaves the path the agent has actually been reading alone.
+        if (current === true && legacy === false && agent.workspacePath !== targetPath) {
+          agent.workspacePath = targetPath;
+          return true;
+        }
+        return false;
+      }
+      {
+        const attempt2 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              yield* storedIO(() => rename(legacyPath, targetPath));
+              if (agent.workspacePath === targetPath) return false;
+              agent.workspacePath = targetPath;
+              return true;
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(attempt2)) {
+          const error = attempt2.failure.cause;
+          // Only the move failed; the workspace itself is still there and still readable. `EXDEV` means
+          // `~/OpenBot/Bots` is a link onto another volume, so the move would be a copy, and a copy of a
+          // workspace interrupted halfway is lost data. A permission error, a Windows lock or an open handle
+          // leave exactly the same situation, so they get the same answer: the files stay where they are and
+          // the stored path is pointed back at them. An out-of-date directory name is cosmetic.
+          logger.warn("Could not move an agent workspace to its new directory.", toLogValue(error));
+          if (agent.workspacePath === legacyPath) return false;
+          agent.workspacePath = legacyPath;
+          return true;
+        } else {
+          return attempt2.success;
+        }
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible);
 
   /**
    * An uploaded avatar lives under the agent id, and `avatarUrl` derives that directory from the id
    * migration v13 has just rewritten. Without this the file is still on disk under the old name and the
    * app looks for it under the new one, so every uploaded avatar silently falls back to a drawn face.
    */
-  async #reconcileAvatarDirectory(agent: StoredAgent): Promise<void> {
-    const legacyId = this.#unclaimedLegacyId(agent.id);
-    // An avatar directory is named after the id alone, so an id the rename left untouched has nowhere to
-    // move from. Only the workspace root changed for those.
-    if (legacyId === null || legacyId === agent.id) return;
-    const currentPath = join(this.#avatarsRoot, agent.id);
-    const legacyPath = join(this.#avatarsRoot, legacyId);
-    if ((await probeDirectory(legacyPath)) !== true) return;
-    const current = await probeDirectory(currentPath);
-    if (current === true) {
-      await this.#adoptLegacyAvatarFile(agent, legacyPath, currentPath);
-      return;
-    }
-    if (current !== false) return;
+
+  #reconcileAvatarDirectoryEffect = Effect.fn("AgentStore.reconcileAvatarDirectory")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      await rename(legacyPath, currentPath);
-    } catch (error) {
-      logger.warn("Could not move an uploaded agent avatar to its new directory.", toLogValue(error));
+      const legacyId = this.#unclaimedLegacyId(agent.id);
+      // An avatar directory is named after the id alone, so an id the rename left untouched has nowhere to
+      // move from. Only the workspace root changed for those.
+      if (legacyId === null || legacyId === agent.id) return;
+      const currentPath = join(this.#avatarsRoot, agent.id);
+      const legacyPath = join(this.#avatarsRoot, legacyId);
+      if ((yield* probeDirectoryEffect(legacyPath)) !== true) return;
+      const current = yield* probeDirectoryEffect(currentPath);
+      if (current === true) {
+        yield* this.#adoptLegacyAvatarFileEffect(agent, legacyPath, currentPath);
+        return;
+      }
+      if (current !== false) return;
+      {
+        const attempt3 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              yield* storedIO(() => rename(legacyPath, currentPath));
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(attempt3)) {
+          const error = attempt3.failure.cause;
+          logger.warn("Could not move an uploaded agent avatar to its new directory.", toLogValue(error));
+        }
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Both directories exist, so neither can be moved onto the other -- but abandoning the old one strands the
@@ -857,95 +982,123 @@ export class AgentStore {
    * fall back to a drawn face. What that URL names is one file, and one file is what gets carried across.
    * Nothing is overwritten: a name already answering in the new directory is the newer upload.
    */
-  async #adoptLegacyAvatarFile(agent: StoredAgent, legacyPath: string, currentPath: string): Promise<void> {
-    if (!agent.avatarUrl) return;
-    const parsed = parseAgentAvatarUrl(agent.avatarUrl, agent.id);
-    if (!parsed) return;
-    const name = `${parsed.version}.${avatarFileExtension(parsed.mimeType)}`;
-    try {
-      if (await fileExists(join(currentPath, name))) return;
-      await rename(join(legacyPath, name), join(currentPath, name));
-    } catch (error) {
-      logger.warn("Could not move an uploaded agent avatar to its new directory.", toLogValue(error));
-    }
-  }
 
-  async #removeLegacyWorkspaceRoot(): Promise<void> {
-    let entries: string[];
+  #adoptLegacyAvatarFileEffect = Effect.fn("AgentStore.adoptLegacyAvatarFile")(function* (
+    this: AgentStore,
+    agent: StoredAgent,
+    legacyPath: string,
+    currentPath: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      entries = await readdir(this.#legacyAgentsRoot);
-    } catch (error) {
-      // A legacy root that cannot even be listed is one this run leaves alone.
-      if (!isRecord(error) || error.code !== "ENOENT") {
-        logger.warn("Could not read the legacy workspace root.", toLogValue(error));
-      }
-      return;
-    }
-    // Unfinished copies from a duplication that crashed. Nothing committed ever points at one, so they
-    // are deleted rather than moved.
-    await Promise.all(
-      entries
-        .filter((entry) => entry.endsWith(".openbot-stage"))
-        .map((entry) =>
-          rm(join(this.#legacyAgentsRoot, entry), { recursive: true, force: true }).catch((error: unknown) => {
-            logger.warn("Could not remove an unfinished copy under the legacy workspace root.", toLogValue(error));
+      if (!agent.avatarUrl) return;
+      const parsed = parseAgentAvatarUrl(agent.avatarUrl, agent.id);
+      if (!parsed) return;
+      const name = `${parsed.version}.${avatarFileExtension(parsed.mimeType)}`;
+      {
+        const attempt4 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              if (yield* fileExistsEffect(join(currentPath, name))) return;
+              yield* storedIO(() => rename(join(legacyPath, name), join(currentPath, name)));
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
           }),
-        ),
-    );
-    if (!entries.every((entry) => entry.endsWith(".openbot-stage"))) return;
-    try {
-      await rmdir(this.#legacyAgentsRoot);
-    } catch (error) {
-      // Something arrived between the listing and the removal, or the root is not ours to delete. An
-      // empty directory left behind costs nothing.
-      logger.warn("Could not remove the legacy workspace root.", toLogValue(error));
-    }
-  }
-
-  async #recoverPendingDuplications(): Promise<void> {
-    const entries = await readdir(this.#duplicationsRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".pending")) continue;
-      const id = entry.name.slice(0, -".pending".length);
-      if (!isGeneratedAgentId(id)) continue;
-      const agent = this.#agentByEitherSpelling(id);
-      const marker = await this.#readDuplicationMarker(id);
-      // Everything below addresses the agent by the id it has *now*, which the marker name only equals
-      // when the same build wrote both. Using the file name would filter nothing out of the roster and
-      // hard-delete an id no row carries, leaving the half-made duplicate visible in the sidebar.
-      const agentId = agent?.id ?? id;
-      if (agent && marker) {
-        const committed = this.committedAgentDuplication(marker.operationId, marker.sourceAgentId);
-        if (committed?.agent.id === agentId) {
-          await rm(join(this.#duplicationsRoot, entry.name), { force: true });
-          continue;
+        );
+        if (Result.isFailure(attempt4)) {
+          const error = attempt4.failure.cause;
+          logger.warn("Could not move an uploaded agent avatar to its new directory.", toLogValue(error));
+        } else {
+          return attempt4.success;
         }
       }
-      if (agent) {
-        this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== agentId);
-        this.#database.hardDeleteAgent(
-          `agents:duplicate-recovery:${randomUUID()}`,
-          agentId,
-          agent.threadId,
-          this.#state.agents,
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible);
+
+  #removeLegacyWorkspaceRootEffect = Effect.fn("AgentStore.removeLegacyWorkspaceRoot")(function* (this: AgentStore) {
+    const listing = yield* Effect.result(storedIO(() => readdir(this.#legacyAgentsRoot)));
+    if (Result.isFailure(listing)) {
+      const error = listing.failure.cause;
+      if (!isRecord(error) || error.code !== "ENOENT")
+        logger.warn("Could not read the legacy workspace root.", toLogValue(error));
+      return;
+    }
+    const entries = listing.success;
+    yield* Effect.forEach(
+      entries.filter((entry) => entry.endsWith(".openbot-stage")),
+      (entry) =>
+        storedIO(() => rm(join(this.#legacyAgentsRoot, entry), { recursive: true, force: true })).pipe(
+          Effect.catch(({ cause }) =>
+            Effect.sync(() =>
+              logger.warn("Could not remove an unfinished copy under the legacy workspace root.", toLogValue(cause)),
+            ),
+          ),
+        ),
+      { concurrency: "unbounded", discard: true },
+    );
+    if (!entries.every((entry) => entry.endsWith(".openbot-stage"))) return;
+    yield* storedIO(() => rmdir(this.#legacyAgentsRoot)).pipe(
+      Effect.catch(({ cause }) =>
+        Effect.sync(() => logger.warn("Could not remove the legacy workspace root.", toLogValue(cause))),
+      ),
+    );
+  });
+
+  #recoverPendingDuplicationsEffect = Effect.fn("AgentStore.recoverPendingDuplications")(function* (
+    this: AgentStore,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const entries = yield* storedIO(() => readdir(this.#duplicationsRoot, { withFileTypes: true }));
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".pending")) continue;
+        const id = entry.name.slice(0, -".pending".length);
+        if (!isGeneratedAgentId(id)) continue;
+        const agent = this.#agentByEitherSpelling(id);
+        const marker = yield* this.#readDuplicationMarkerEffect(id);
+        // Everything below addresses the agent by the id it has *now*, which the marker name only equals
+        // when the same build wrote both. Using the file name would filter nothing out of the roster and
+        // hard-delete an id no row carries, leaving the half-made duplicate visible in the sidebar.
+        const agentId = agent?.id ?? id;
+        if (agent && marker) {
+          const committed = this.committedAgentDuplication(marker.operationId, marker.sourceAgentId);
+          if (committed?.agent.id === agentId) {
+            yield* storedIO(() => rm(join(this.#duplicationsRoot, entry.name), { force: true }));
+            continue;
+          }
+        }
+        if (agent) {
+          this.#state.agents = this.#state.agents.filter((candidate) => candidate.id !== agentId);
+          this.#database.hardDeleteAgent(
+            `agents:duplicate-recovery:${randomUUID()}`,
+            agentId,
+            agent.threadId,
+            this.#state.agents,
+          );
+        }
+        // The copy this marker was tracking was made by whichever build crashed, so it can be sitting
+        // under either root, under either spelling of the id. Removing only the current one reports a
+        // clean recovery and leaves the half-written workspace on disk forever.
+        const names = agentId === id ? [id] : [id, agentId];
+        const roots = [this.#agentsRoot, this.#legacyAgentsRoot, this.#avatarsRoot];
+        yield* Effect.all(
+          [
+            ...roots.flatMap((root) =>
+              names.flatMap((name) => [
+                storedIO(() => rm(join(root, name), { recursive: true, force: true })),
+                storedIO(() => rm(`${join(root, name)}.openbot-stage`, { recursive: true, force: true })),
+              ]),
+            ),
+            storedIO(() => rm(join(this.#duplicationsRoot, entry.name), { force: true })),
+          ],
+          { concurrency: "unbounded" },
         );
       }
-      // The copy this marker was tracking was made by whichever build crashed, so it can be sitting
-      // under either root, under either spelling of the id. Removing only the current one reports a
-      // clean recovery and leaves the half-written workspace on disk forever.
-      const names = agentId === id ? [id] : [id, agentId];
-      const roots = [this.#agentsRoot, this.#legacyAgentsRoot, this.#avatarsRoot];
-      await Promise.all([
-        ...roots.flatMap((root) =>
-          names.flatMap((name) => [
-            rm(join(root, name), { recursive: true, force: true }),
-            rm(`${join(root, name)}.openbot-stage`, { recursive: true, force: true }),
-          ]),
-        ),
-        rm(join(this.#duplicationsRoot, entry.name), { force: true }),
-      ]);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Gives an agent back a thread that fell out of the roster, so its history stops being unreachable.
@@ -996,38 +1149,63 @@ export class AgentStore {
     return join(this.#duplicationsRoot, `${id}.pending`);
   }
 
-  async #readDuplicationMarker(id: string): Promise<AgentDuplicationMarker | null> {
+  #readDuplicationMarkerEffect = Effect.fn("AgentStore.readDuplicationMarker")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<AgentDuplicationMarker | null, StoredStateFailure> {
     try {
-      const value = JSON.parse(await readFile(this.#duplicationMarkerPath(id), "utf8"));
-      // A marker on disk was written by whichever build crashed, and a released one spells this
-      // `sourceBotId`. Failing to read it drops the file on the floor: recovery cannot then tell a
-      // duplication that finished from one that died mid-copy, so it deletes the agent the user kept
-      // along with its workspace.
-      const storedSource = isRecord(value) ? (value.sourceAgentId ?? value.sourceBotId) : null;
-      if (
-        !isRecord(value) ||
-        !isString(value.operationId) ||
-        !isUuidV4(value.operationId) ||
-        !isString(storedSource) ||
-        !storedSource
-      ) {
-        return null;
+      {
+        const attempt7 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              const value = JSON.parse(yield* storedIO(() => readFile(this.#duplicationMarkerPath(id), "utf8")));
+              // A marker on disk was written by whichever build crashed, and a released one spells this
+              // `sourceBotId`. Failing to read it drops the file on the floor: recovery cannot then tell a
+              // duplication that finished from one that died mid-copy, so it deletes the agent the user kept
+              // along with its workspace.
+              const storedSource = isRecord(value) ? (value.sourceAgentId ?? value.sourceBotId) : null;
+              if (
+                !isRecord(value) ||
+                !isString(value.operationId) ||
+                !isUuidV4(value.operationId) ||
+                !isString(storedSource) ||
+                !storedSource
+              ) {
+                return null;
+              }
+              // The value beside that key names the source agent as it was spelled when the marker was written,
+              // and migration v13 has renamed it since. Nothing rewrites a file outside the database, so the
+              // receipt this is about to be compared against already says `agent-<uuid>` while the marker still
+              // says `bot-<uuid>`: comparing them raw throws "The agent duplication receipt is invalid." out of
+              // recovery, and the app never finishes starting.
+              const sourceAgentId = this.#agentByEitherSpelling(storedSource)?.id ?? storedSource;
+              return { operationId: value.operationId, sourceAgentId };
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(attempt7)) {
+          return null;
+        } else {
+          return attempt7.success;
+        }
       }
-      // The value beside that key names the source agent as it was spelled when the marker was written,
-      // and migration v13 has renamed it since. Nothing rewrites a file outside the database, so the
-      // receipt this is about to be compared against already says `agent-<uuid>` while the marker still
-      // says `bot-<uuid>`: comparing them raw throws "The agent duplication receipt is invalid." out of
-      // recovery, and the app never finishes starting.
-      const sourceAgentId = this.#agentByEitherSpelling(storedSource)?.id ?? storedSource;
-      return { operationId: value.operationId, sourceAgentId };
-    } catch {
-      return null;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible);
 
-  async ensureThreadId(id: string): Promise<string> {
-    return this.ensureThreadIdNow(id);
-  }
+  ensureThreadId = Effect.fn("AgentStore.ensureThreadId")(function* (
+    this: AgentStore,
+    id: string,
+  ): Effect.fn.Return<string, StoredStateFailure> {
+    try {
+      return this.ensureThreadIdNow(id);
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Derived from the agent id, never minted at random, and that is what makes losing a roster row
@@ -1073,43 +1251,70 @@ export class AgentStore {
     });
   }
 
-  async updatePreview(id: string, preview: string): Promise<void> {
-    const agent = this.#requireAgent(id);
-    agent.preview = preview.slice(0, 180);
-    agent.updatedAt = new Date().toISOString();
-    this.#persist("agent.preview-updated");
-  }
-
-  async #readState(): Promise<StoredState> {
+  updatePreview = Effect.fn("AgentStore.updatePreview")(function* (
+    this: AgentStore,
+    id: string,
+    preview: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const parsed = JSON.parse(await readFile(this.#statePath, "utf8"));
-      const stored = isRecord(parsed) ? parsed[LEGACY_AGENTS_STATE_KEY] : null;
-      if (!isRecord(parsed) || !isBoolean(parsed.examplesInitialized) || !Array.isArray(stored)) {
-        throw new Error(sourceText("error.agent.stateCorrupt"));
-      }
-      if (stored.some((agent) => isRecord(agent) && "role" in agent)) {
-        throw new Error(sourceText("error.agent.oldRoleField"));
-      }
-
-      let agents: StoredAgent[];
-      if (parsed.version === 1 && stored.every(isLegacyStoredAgent)) {
-        agents = stored.map(migrateLegacyAgent);
-      } else if (parsed.version === 2 && stored.every(isStoredAgent)) {
-        agents = stored.map(normalizeStoredAgent);
-      } else {
-        throw new Error(sourceText("error.agent.stateCorrupt"));
-      }
-      if (new Set(agents.map((agent) => agent.id)).size !== agents.length) {
-        throw new Error(sourceText("error.agent.duplicateIds"));
-      }
-      return { version: 2, examplesInitialized: parsed.examplesInitialized, agents };
-    } catch (error) {
-      if (isRecord(error) && error.code === "ENOENT") {
-        return { version: 2, examplesInitialized: false, agents: [] };
-      }
-      throw error;
+      const agent = this.#requireAgent(id);
+      agent.preview = preview.slice(0, 180);
+      agent.updatedAt = new Date().toISOString();
+      this.#persist("agent.preview-updated");
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
     }
-  }
+  }, Effect.uninterruptible).bind(this);
+
+  #readStateEffect = Effect.fn("AgentStore.readState")(function* (
+    this: AgentStore,
+  ): Effect.fn.Return<StoredState, StoredStateFailure> {
+    try {
+      {
+        const attempt8 = yield* Effect.result(
+          Effect.gen({ self: this }, function* () {
+            try {
+              const parsed = JSON.parse(yield* storedIO(() => readFile(this.#statePath, "utf8")));
+              const stored = isRecord(parsed) ? parsed[LEGACY_AGENTS_STATE_KEY] : null;
+              if (!isRecord(parsed) || !isBoolean(parsed.examplesInitialized) || !Array.isArray(stored)) {
+                throw new Error(sourceText("error.agent.stateCorrupt"));
+              }
+              if (stored.some((agent) => isRecord(agent) && "role" in agent)) {
+                throw new Error(sourceText("error.agent.oldRoleField"));
+              }
+
+              let agents: StoredAgent[];
+              if (parsed.version === 1 && stored.every(isLegacyStoredAgent)) {
+                agents = stored.map(migrateLegacyAgent);
+              } else if (parsed.version === 2 && stored.every(isStoredAgent)) {
+                agents = stored.map(normalizeStoredAgent);
+              } else {
+                throw new Error(sourceText("error.agent.stateCorrupt"));
+              }
+              if (new Set(agents.map((agent) => agent.id)).size !== agents.length) {
+                throw new Error(sourceText("error.agent.duplicateIds"));
+              }
+              const state: StoredState = { version: 2, examplesInitialized: parsed.examplesInitialized, agents };
+              return state;
+            } catch (cause) {
+              return yield* new StoredStateFailure({ cause });
+            }
+          }),
+        );
+        if (Result.isFailure(attempt8)) {
+          const error = attempt8.failure.cause;
+          if (isRecord(error) && error.code === "ENOENT") {
+            return { version: 2, examplesInitialized: false, agents: [] };
+          }
+          throw error;
+        } else {
+          return attempt8.success;
+        }
+      }
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible);
 
   /**
    * Put back any agent the roster projection has lost but the event log still names.
@@ -1233,79 +1438,90 @@ function duplicationCommandId(operationId: string): string {
   return `agent-duplication:${operationId}`;
 }
 
-async function rewriteInternalWorkspaceSymlinks(
+const rewriteInternalWorkspaceSymlinksEffect = Effect.fn("AgentStore.rewriteWorkspaceSymlinks")(function* (
   sourceRoot: string,
   stagedRoot: string,
   finalRoot: string,
-): Promise<void> {
-  const canonicalSourceRoot = await realpath(sourceRoot);
-  const visit = async (stagedDirectory: string, sourceDirectory: string, finalDirectory: string): Promise<void> => {
-    const entries = await readdir(stagedDirectory, { withFileTypes: true });
+) {
+  const canonicalSourceRoot = yield* storedIO(() => realpath(sourceRoot));
+  const visit = Effect.fn("AgentStore.visitWorkspaceSymlinks")(function* (
+    stagedDirectory: string,
+    sourceDirectory: string,
+    finalDirectory: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const entries = yield* storedIO(() => readdir(stagedDirectory, { withFileTypes: true }));
     for (const entry of entries) {
       const stagedPath = join(stagedDirectory, entry.name);
       const sourcePath = join(sourceDirectory, entry.name);
       const finalPath = join(finalDirectory, entry.name);
       if (entry.isSymbolicLink()) {
-        const target = await readlink(stagedPath);
+        const target = yield* storedIO(() => readlink(stagedPath));
         const resolvedSourceTarget = resolve(dirname(sourcePath), target);
+        const resolved = yield* Effect.result(storedIO(() => realpath(resolvedSourceTarget)));
         let sourceRelativePath: string;
-        try {
-          const canonicalTarget = await realpath(resolvedSourceTarget);
-          if (!isPathInside(canonicalSourceRoot, canonicalTarget)) continue;
-          sourceRelativePath = relative(canonicalSourceRoot, canonicalTarget);
-        } catch {
+        if (Result.isSuccess(resolved)) {
+          if (!isPathInside(canonicalSourceRoot, resolved.success)) continue;
+          sourceRelativePath = relative(canonicalSourceRoot, resolved.success);
+        } else {
           if (!isPathInside(sourceRoot, resolvedSourceTarget)) continue;
           sourceRelativePath = relative(sourceRoot, resolvedSourceTarget);
         }
         const finalTarget = join(finalRoot, sourceRelativePath);
         const rewrittenTarget = isAbsolute(target) ? finalTarget : relative(dirname(finalPath), finalTarget) || ".";
-        await rm(stagedPath);
-        await symlink(rewrittenTarget, stagedPath);
-      } else if (entry.isDirectory()) {
-        await visit(stagedPath, sourcePath, finalPath);
-      }
+        yield* storedIO(() => rm(stagedPath));
+        yield* storedIO(() => symlink(rewrittenTarget, stagedPath));
+      } else if (entry.isDirectory()) yield* visit(stagedPath, sourcePath, finalPath);
     }
-  };
-  await visit(stagedRoot, sourceRoot, finalRoot);
-}
+  });
+  yield* visit(stagedRoot, sourceRoot, finalRoot);
+});
 
-async function workspaceMetadataFingerprint(root: string): Promise<string> {
+const workspaceMetadataFingerprintEffect = Effect.fn("AgentStore.workspaceFingerprint")(function* (root: string) {
   const hash = createHash("sha256");
-  const visit = async (directory: string, prefix: string): Promise<void> => {
-    const entries = await readdir(directory, { withFileTypes: true });
+  const visit = Effect.fn("AgentStore.visitWorkspaceMetadata")(function* (
+    directory: string,
+    prefix: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    const entries = yield* storedIO(() => readdir(directory, { withFileTypes: true }));
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const path = join(directory, entry.name);
       const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-      const stats = await lstat(path, { bigint: true });
+      const stats = yield* storedIO(() => lstat(path, { bigint: true }));
       hash.update(`${relativePath}\0${stats.mode}\0${stats.size}\0${stats.mtimeNs}\0${stats.ctimeNs}\0`);
-      if (stats.isSymbolicLink()) {
-        hash.update(`link\0${await readlink(path)}\0`);
-      } else if (stats.isDirectory()) {
+      if (stats.isSymbolicLink()) hash.update(`link\0${yield* storedIO(() => readlink(path))}\0`);
+      else if (stats.isDirectory()) {
         hash.update("directory\0");
-        await visit(path, relativePath);
-      } else if (stats.isFile()) {
-        hash.update("file\0");
-      } else {
-        hash.update("other\0");
-      }
+        yield* visit(path, relativePath);
+      } else if (stats.isFile()) hash.update("file\0");
+      else hash.update("other\0");
     }
-  };
-  await visit(root, "");
+  });
+  yield* visit(root, "");
   return hash.digest("hex");
-}
+});
 
-async function fileFingerprint(path: string): Promise<string> {
-  const stats = await lstat(path);
+const fileFingerprintEffect = Effect.fn("AgentStore.fileFingerprint")(function* (path: string) {
+  const stats = yield* storedIO(() => lstat(path));
   const hash = createHash("sha256");
   hash.update(`${stats.mode}\0`);
-  await updateHashFromFile(hash, path);
+  yield* Effect.acquireUseRelease(
+    storedSync(() => createReadStream(path)),
+    (stream) =>
+      Stream.fromAsyncIterable(stream, (cause) => new StoredStateFailure({ cause })).pipe(
+        Stream.runForEach((chunk) =>
+          storedSync(() => {
+            hash.update(chunk);
+          }),
+        ),
+      ),
+    (stream) =>
+      Effect.sync(() => {
+        stream.destroy();
+      }),
+  );
   return hash.digest("hex");
-}
-
-async function updateHashFromFile(hash: ReturnType<typeof createHash>, path: string): Promise<void> {
-  for await (const chunk of createReadStream(path)) hash.update(chunk);
-}
+});
 
 function validateAgentId(id: string): void {
   if (!isValidAgentId(id)) {
@@ -1317,37 +1533,32 @@ function isValidAgentId(id: string): boolean {
   return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && basename(id) === id;
 }
 
-async function directoryExists(path: string): Promise<boolean> {
-  try {
-    return (await lstat(path)).isDirectory();
-  } catch (error) {
-    if (isRecord(error) && error.code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-/**
- * {@link directoryExists}, but for the startup reconciliation, which runs after the database has already
- * migrated and so must never be the reason the app refuses to open. `null` is "could not tell" -- an
- * `EACCES`, an `EPERM`, a Windows lock -- and every caller treats it as "leave this alone".
- */
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    return (await lstat(path)).isFile();
-  } catch (error) {
-    if (isRecord(error) && error.code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-async function probeDirectory(path: string): Promise<boolean | null> {
-  try {
-    return await directoryExists(path);
-  } catch (error) {
-    logger.warn("Could not check an agent directory during startup reconciliation.", toLogValue(error));
-    return null;
-  }
-}
+const directoryExistsEffect = Effect.fn("AgentStore.directoryExists")((path: string) =>
+  storedIO(() => lstat(path)).pipe(
+    Effect.map((stats) => stats.isDirectory()),
+    Effect.catch((failure) =>
+      isRecord(failure.cause) && failure.cause.code === "ENOENT" ? Effect.succeed(false) : Effect.fail(failure),
+    ),
+  ),
+);
+const fileExistsEffect = Effect.fn("AgentStore.fileExists")((path: string) =>
+  storedIO(() => lstat(path)).pipe(
+    Effect.map((stats) => stats.isFile()),
+    Effect.catch((failure) =>
+      isRecord(failure.cause) && failure.cause.code === "ENOENT" ? Effect.succeed(false) : Effect.fail(failure),
+    ),
+  ),
+);
+const probeDirectoryEffect = Effect.fn("AgentStore.probeDirectory")((path: string) =>
+  directoryExistsEffect(path).pipe(
+    Effect.catch(({ cause }) =>
+      Effect.sync(() => {
+        logger.warn("Could not check an agent directory during startup reconciliation.", toLogValue(cause));
+        return null;
+      }),
+    ),
+  ),
+);
 
 function titleFromId(id: string): string {
   return id

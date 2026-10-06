@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
@@ -46,6 +47,7 @@ import {
   type SpawnTarget,
 } from "./process-confinement";
 import type { AccountReadResult } from "./protocol";
+import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
 interface ProviderCliCommand {
@@ -216,7 +218,9 @@ export interface BuiltInProviderDriver {
   signIn: ProviderSignIn;
   /** Absent for a provider that has no sign-in on another device. */
   codeSignIn?: ProviderCodeSignIn;
-  resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
+  resolveCli(options?: {
+    bundledExecutable?: string | null;
+  }): Effect.Effect<AgentCliInfo, ProviderClientOperationError>;
   createClient(
     cli: AgentCliInfo,
     requestTimeoutMs: number,
@@ -348,7 +352,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpAuthorization: context.mcpAuthorization,
-        readRateLimits: () => readOpenCodeGoUsage(context.apiKey("opencode")),
+        readRateLimits: () =>
+          readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
+            Effect.mapError((failure) => providerFailure(failure.cause)),
+          ),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
@@ -493,7 +500,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "acp",
     // Each custom agent signs in its own way, in its own CLI. OpenBot only checks it again.
     signIn: { kind: "external" },
-    resolveCli: async () => CUSTOM_AGENTS_CLI,
+    resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
         () => savedCustomAgents(context),

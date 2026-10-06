@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 
 /** A daemon that answers one line per line, and remembers what it was asked. */
@@ -72,9 +73,9 @@ describe("CuaDriverDaemonClient", () => {
     await daemon.listen(socketPath);
     const client = new CuaDriverDaemonClient(() => socketPath);
 
-    expect(await client.listWindows()).toEqual({ windows: [{ window_id: 7 }] });
-    expect(await client.sessions()).toEqual({ count: 0 });
-    await client.close();
+    expect(await runCauseEffect(client.listWindows())).toEqual({ windows: [{ window_id: 7 }] });
+    expect(await runCauseEffect(client.sessions())).toEqual({ count: 0 });
+    await runCauseEffect(client.close());
 
     // The whole point of this client: the reads the rim makes many times a second cost no process
     // and no second connection.
@@ -90,9 +91,9 @@ describe("CuaDriverDaemonClient", () => {
     daemon = fakeDaemon(() => ({ ok: true, result: windowsResult }));
     await daemon.listen(socketPath);
     const client = new CuaDriverDaemonClient(() => socketPath);
-    await client.listWindows();
+    await runCauseEffect(client.listWindows());
 
-    await client.close();
+    await runCauseEffect(client.close());
 
     expect(daemon.requests.at(-1)).toEqual({
       method: "session_end",
@@ -105,15 +106,15 @@ describe("CuaDriverDaemonClient", () => {
     daemon = fakeDaemon(() => ({ ok: true, result: windowsResult }));
     await daemon.listen(socketPath);
     const client = new CuaDriverDaemonClient(() => socketPath);
-    await client.listWindows();
+    await runCauseEffect(client.listWindows());
 
     daemon.dropConnections();
 
     // A daemon that restarts, or a socket the system closes, costs the read that is in the air and
     // nothing after it: the next read opens a connection of its own.
-    await expect(client.listWindows()).rejects.toThrow();
-    expect(await client.listWindows()).toEqual({ windows: [{ window_id: 7 }] });
-    await client.close();
+    await expect(runCauseEffect(client.listWindows())).rejects.toThrow();
+    expect(await runCauseEffect(client.listWindows())).toEqual({ windows: [{ window_id: 7 }] });
+    await runCauseEffect(client.close());
   });
 
   it("reports what the daemon refused, rather than an answer it did not give", async () => {
@@ -121,13 +122,13 @@ describe("CuaDriverDaemonClient", () => {
     await daemon.listen(socketPath);
     const client = new CuaDriverDaemonClient(() => socketPath);
 
-    await expect(client.listWindows()).rejects.toThrow("permissions_pending");
-    await client.close();
+    await expect(runCauseEffect(client.listWindows())).rejects.toThrow("permissions_pending");
+    await runCauseEffect(client.close());
   });
 
   it("says the driver is not running rather than connecting to nothing", async () => {
     const client = new CuaDriverDaemonClient(() => null);
 
-    await expect(client.sessions()).rejects.toThrow("not running");
+    await expect(runCauseEffect(client.sessions())).rejects.toThrow("not running");
   });
 });

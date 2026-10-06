@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,14 +16,18 @@ afterEach(async () => {
 describe("language preference store", () => {
   it("follows the system language when no preference exists", async () => {
     const root = await temporaryRoot();
-    await expect(readLanguagePreference(join(root, "language.json"))).resolves.toEqual({ language: "system" });
+    await expect(Effect.runPromise(readLanguagePreference(join(root, "language.json")))).resolves.toEqual({
+      language: "system",
+    });
   });
 
   it("persists a chosen language", async () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");
-    await expect(writeLanguagePreference(path, { language: "fr" })).resolves.toEqual({ language: "fr" });
-    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "fr" });
+    await expect(Effect.runPromise(writeLanguagePreference(path, { language: "fr" }))).resolves.toEqual({
+      language: "fr",
+    });
+    await expect(Effect.runPromise(readLanguagePreference(path))).resolves.toEqual({ language: "fr" });
   });
 
   it("follows the system language when the file names one this build no longer ships", async () => {
@@ -31,7 +36,7 @@ describe("language preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");
     await writeFile(path, '{"version":1,"language":"kl"}\n');
-    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "system" });
+    await expect(Effect.runPromise(readLanguagePreference(path))).resolves.toEqual({ language: "system" });
   });
 
   it("follows the system language when the file cannot be read at all", async () => {
@@ -40,14 +45,14 @@ describe("language preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");
     await mkdir(path);
-    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "system" });
+    await expect(Effect.runPromise(readLanguagePreference(path))).resolves.toEqual({ language: "system" });
   });
 
   it("follows the system language when the file is not valid JSON", async () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");
     await writeFile(path, "{\n");
-    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "system" });
+    await expect(Effect.runPromise(readLanguagePreference(path))).resolves.toEqual({ language: "system" });
   });
 });
 

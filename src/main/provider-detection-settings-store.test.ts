@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -5,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DEFAULT_PROVIDER_DETECTION_SETTINGS } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
 
 let root = "";
@@ -28,7 +30,7 @@ const settings = {
 
 async function loaded(): Promise<ProviderDetectionSettingsStore> {
   const store = new ProviderDetectionSettingsStore(path);
-  await store.load();
+  await Effect.runPromise(store.load());
   return store;
 }
 
@@ -37,7 +39,7 @@ describe("ProviderDetectionSettingsStore", () => {
     const store = await loaded();
     expect(store.get()).toEqual(DEFAULT_PROVIDER_DETECTION_SETTINGS);
 
-    await store.set(settings);
+    await runCauseEffect(store.set(settings));
 
     expect((await loaded()).get()).toEqual(settings);
   });
@@ -50,7 +52,7 @@ describe("ProviderDetectionSettingsStore", () => {
     const store = await loaded();
 
     expect(store.get()).toEqual(DEFAULT_PROVIDER_DETECTION_SETTINGS);
-    await expect(store.set(settings)).rejects.toThrow();
+    await expect(runCauseEffect(store.set(settings))).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe(newer);
   });
 
@@ -58,7 +60,7 @@ describe("ProviderDetectionSettingsStore", () => {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, "{");
 
-    await expect((await loaded()).set(settings)).rejects.toThrow();
+    await expect(Effect.runPromise((await loaded()).set(settings))).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe("{");
   });
 });

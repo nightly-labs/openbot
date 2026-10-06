@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,21 +16,23 @@ afterEach(async () => {
 describe("analytics preference store", () => {
   it("defaults to enabled when no preference exists", async () => {
     const root = await temporaryRoot();
-    await expect(readAnalyticsPreference(join(root, "analytics.json"))).resolves.toEqual({ enabled: true });
+    await expect(Effect.runPromise(readAnalyticsPreference(join(root, "analytics.json")))).resolves.toEqual({
+      enabled: true,
+    });
   });
 
   it("defaults safely when the stored preference is malformed", async () => {
     const root = await temporaryRoot();
     const path = join(root, "analytics.json");
     await writeFile(path, '{"version":1,"enabled":"private"}\n');
-    await expect(readAnalyticsPreference(path)).resolves.toEqual({ enabled: false });
+    await expect(Effect.runPromise(readAnalyticsPreference(path))).resolves.toEqual({ enabled: false });
   });
 
   it("persists an opt-out atomically", async () => {
     const root = await temporaryRoot();
     const path = join(root, "analytics.json");
-    await expect(writeAnalyticsPreference(path, false)).resolves.toEqual({ enabled: false });
-    await expect(readAnalyticsPreference(path)).resolves.toEqual({ enabled: false });
+    await expect(Effect.runPromise(writeAnalyticsPreference(path, false))).resolves.toEqual({ enabled: false });
+    await expect(Effect.runPromise(readAnalyticsPreference(path))).resolves.toEqual({ enabled: false });
   });
 });
 

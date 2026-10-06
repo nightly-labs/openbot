@@ -47,6 +47,31 @@ adding a module or moving ownership between workspaces.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
 
+## Effect
+
+- Use Effect 4.0.0 for migrated server and desktop domain services, schemas, typed errors,
+  asynchronous workflows, and external I/O. Keep the Bun catalog and lockfile aligned.
+- Read the installed Effect source and documentation. Do not use v3 compatibility aliases.
+- Prefer named `Effect.fn`, `Effect.gen`, `Context.Service`, explicit layers, and `Schema.TaggedError`.
+- Derive validated domain types from schemas. Decode untrusted values at their boundary;
+  preserve released decoder behavior. Do not validate trusted internal values again.
+- Wrap expected I/O failures with `Effect.tryPromise` or `Effect.try` at the adapter.
+  Keep causes private and safe. Preserve public error codes and localized messages.
+- Run Effects at framework boundaries. Keep routing, request schemas, rendering, and callbacks native.
+  Expose one Effect-returning operation per async service method. Do not add paired Promise methods
+  or run an Effect only to wrap its Promise in another Effect. Adapt browser and mobile native
+  callbacks at their call sites; preserve released wire and event contracts.
+- Reuse process-owned managed runtimes and await disposal in existing shutdown paths. Preserve
+  desktop teardown ordinals. Worker bindings and background I/O belong to their invocation;
+  retain `waitUntil` and streaming lifetimes rather than adding a process shutdown hook.
+- Tie owned resources to finalizers. Preserve existing deadlines and retries, and forward cancellation
+  where the API supports it. Do not add generic retry, fallback, or service-wrapper policies.
+- Keep business authorization and validation in domain operations, and centralize public error mapping.
+- The database host may import `effect` in addition to `node:*`. It remains a separate killable process
+  and must not import Electron or the application database. Effect cannot interrupt blocked SQLite.
+- Test through injected boundaries and include affected tests in CI selections. Mobile and browser
+  application workflow migration is outside this change; shared package consumers still need checks.
+
 ## Shared UI
 
 `packages/ui` (`@openbot/ui`) owns shared SolidJS controls and feature components used by

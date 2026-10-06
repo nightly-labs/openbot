@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 
 describe("resolveRemoteDesktopRuntime", () => {
@@ -14,14 +15,16 @@ describe("resolveRemoteDesktopRuntime", () => {
       writeFile(join(root, "streamer"), "streamer"),
     ]);
     await expect(
-      resolveRemoteDesktopRuntime({
-        isPackaged: false,
-        resourcesPath: root,
-        sourceRoot: root,
-        platform: "darwin",
-        architecture: "arm64",
-        overrideRoot: root,
-      }),
+      runCauseEffect(
+        resolveRemoteDesktopRuntime({
+          isPackaged: false,
+          resourcesPath: root,
+          sourceRoot: root,
+          platform: "darwin",
+          architecture: "arm64",
+          overrideRoot: root,
+        }),
+      ),
     ).resolves.toEqual({
       sunshine: join(root, "Sunshine.app", "Contents", "MacOS", "Sunshine"),
       moonlightWebServer: join(root, "web-server"),

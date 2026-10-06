@@ -2,7 +2,9 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { CentralAuthManager } from "./central-auth-manager";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
@@ -50,7 +52,7 @@ beforeEach(async () => {
   service = new SkillMarketplaceService(
     auth,
     () => agents,
-    async () => undefined,
+    () => Effect.void,
     library,
   );
 });
@@ -61,7 +63,7 @@ afterEach(async () => {
 
 describe("local skill library", () => {
   it("creates offline, installs for the author, and retains revisions across restarts", async () => {
-    const first = await localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" });
+    const first = await runCauseEffect(localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" }));
     expect(first.examplePrompt).toBe("Summarize this week.");
     expect(await readFile(join(agents[0].workspacePath, ".agents/skills/weekly-summary/SKILL.md"), "utf8")).toContain(
       "First version",
@@ -69,25 +71,25 @@ describe("local skill library", () => {
     expect(await readFile(join(agents[0].workspacePath, ".claude/skills/weekly-summary/SKILL.md"), "utf8")).toContain(
       "First version",
     );
-    expect(await service.listInstalled("reader")).toEqual([]);
+    expect(await runCauseEffect(service.listInstalled("reader"))).toEqual([]);
     await writeFile(join(agents[0].workspacePath, "draft/SKILL.md"), markdown("Second version"));
-    const second = await library.revise("writer", first.id, 1, "draft");
+    const second = await runCauseEffect(library.revise("writer", first.id, 1, "draft"));
     const restarted = new LocalSkillLibrary(library.root, () => agents);
-    expect((await restarted.list())[0]?.version).toBe(2);
-    expect((await restarted.get(first.id, 1)).instructions).toBe("First version");
-    expect((await service.listInstalled("writer"))[0]).toMatchObject({
+    expect((await runCauseEffect(restarted.list()))[0]?.version).toBe(2);
+    expect((await runCauseEffect(restarted.get(first.id, 1))).instructions).toBe("First version");
+    expect((await runCauseEffect(service.listInstalled("writer")))[0]).toMatchObject({
       installedVersion: 1,
       availableVersion: 2,
       state: "update-available",
     });
-    await service.installLocal({ agentId: "reader", skillId: first.id, revision: 1 });
-    await service.setEnabled({ agentId: "reader", skillId: first.id, enabled: false });
-    await service.install({ agentId: "reader", skillId: first.id });
-    expect((await service.listInstalled("reader"))[0]).toMatchObject({
+    await runCauseEffect(service.installLocal({ agentId: "reader", skillId: first.id, revision: 1 }));
+    await runCauseEffect(service.setEnabled({ agentId: "reader", skillId: first.id, enabled: false }));
+    await runCauseEffect(service.install({ agentId: "reader", skillId: first.id }));
+    expect((await runCauseEffect(service.listInstalled("reader")))[0]).toMatchObject({
       installedVersion: second.version,
       enabled: false,
     });
-    await service.setEnabled({ agentId: "reader", skillId: first.id, enabled: true });
+    await runCauseEffect(service.setEnabled({ agentId: "reader", skillId: first.id, enabled: true }));
     expect(await readFile(join(agents[1].workspacePath, ".claude/skills/weekly-summary/SKILL.md"), "utf8")).toContain(
       "Second version",
     );
@@ -95,81 +97,83 @@ describe("local skill library", () => {
   });
 
   it("rejects stale and concurrent revisions without changing installed files", async () => {
-    const first = await library.create("writer", "draft");
+    const first = await runCauseEffect(library.create("writer", "draft"));
     const results = await Promise.allSettled([
-      library.revise("writer", first.id, 1, "draft"),
-      library.revise("writer", first.id, 1, "draft"),
+      runCauseEffect(library.revise("writer", first.id, 1, "draft")),
+      runCauseEffect(library.revise("writer", first.id, 1, "draft")),
     ]);
     expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
-    await expect(library.revise("writer", first.id, 1, "draft")).rejects.toThrow("Read its latest revision");
-    expect((await library.get(first.id)).version).toBe(2);
+    await expect(runCauseEffect(library.revise("writer", first.id, 1, "draft"))).rejects.toThrow(
+      "Read its latest revision",
+    );
+    expect((await runCauseEffect(library.get(first.id))).version).toBe(2);
   });
 
   it("ignores interrupted staging directories and preserves previous revisions", async () => {
-    const first = await library.create("writer", "draft");
+    const first = await runCauseEffect(library.create("writer", "draft"));
     await mkdir(join(library.root, first.id, ".stage-interrupted"));
     await writeFile(join(library.root, first.id, ".stage-interrupted/bundle.zip"), "partial");
     await mkdir(join(library.root, "local-skill-22222222-2222-4222-8222-222222222222", ".stage-interrupted"), {
       recursive: true,
     });
-    expect((await new LocalSkillLibrary(library.root, () => agents).list()).map((skill) => skill.id)).toEqual([
-      first.id,
-    ]);
+    expect(
+      (await runCauseEffect(new LocalSkillLibrary(library.root, () => agents).list())).map((skill) => skill.id),
+    ).toEqual([first.id]);
     await writeFile(join(agents[0].workspacePath, "draft/SKILL.md"), "invalid");
-    await expect(library.revise("writer", first.id, 1, "draft")).rejects.toThrow("frontmatter");
-    expect((await library.get(first.id)).version).toBe(1);
+    await expect(runCauseEffect(library.revise("writer", first.id, 1, "draft"))).rejects.toThrow("frontmatter");
+    expect((await runCauseEffect(library.get(first.id))).version).toBe(1);
     expect(await readdir(join(library.root, first.id))).not.toContain("2");
   });
 
   it.each(["../reader/draft", "/tmp/skill", "draft/../draft", "draft\\other"])(
     "rejects an unsafe source %s",
     async (sourcePath) => {
-      await expect(library.create("writer", sourcePath)).rejects.toThrow();
+      await expect(runCauseEffect(library.create("writer", sourcePath))).rejects.toThrow();
     },
   );
 
   it("rejects root and nested symbolic links", async () => {
     await symlink(join(agents[0].workspacePath, "draft"), join(agents[0].workspacePath, "link"));
-    await expect(library.create("writer", "link")).rejects.toThrow("symbolic links");
+    await expect(runCauseEffect(library.create("writer", "link"))).rejects.toThrow("symbolic links");
     await symlink(join(agents[1].workspacePath, "draft"), join(agents[0].workspacePath, "draft/link"));
-    await expect(library.create("writer", "draft")).rejects.toThrow("symbolic links");
+    await expect(runCauseEffect(library.create("writer", "draft"))).rejects.toThrow("symbolic links");
   });
 
   it("protects modified and extra installed files and rejects folder collisions", async () => {
-    const skill = await localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" });
+    const skill = await runCauseEffect(localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" }));
     const extra = join(agents[0].workspacePath, ".agents/skills/weekly-summary/custom.md");
     await writeFile(extra, "user content");
-    await expect(service.installLocal({ agentId: "writer", skillId: skill.id, revision: 1 })).rejects.toThrow(
-      "local changes",
-    );
+    await expect(
+      runCauseEffect(service.installLocal({ agentId: "writer", skillId: skill.id, revision: 1 })),
+    ).rejects.toThrow("local changes");
     expect(await readFile(extra, "utf8")).toBe("user content");
     await mkdir(join(agents[1].workspacePath, ".agents/skills/weekly-summary"), { recursive: true });
     await writeFile(join(agents[1].workspacePath, ".agents/skills/weekly-summary/SKILL.md"), "unmanaged");
-    await expect(service.installLocal({ agentId: "reader", skillId: skill.id, revision: 1 })).rejects.toThrow(
-      "unmanaged",
-    );
+    await expect(
+      runCauseEffect(service.installLocal({ agentId: "reader", skillId: skill.id, revision: 1 })),
+    ).rejects.toThrow("unmanaged");
   });
 
   it("rejects symlinked install destinations without writing outside the workspace", async () => {
-    const skill = await library.create("writer", "draft");
+    const skill = await runCauseEffect(library.create("writer", "draft"));
     const outside = join(root, "outside");
     await mkdir(outside);
     await symlink(outside, join(agents[1].workspacePath, ".agents"));
-    await expect(service.installLocal({ agentId: "reader", skillId: skill.id, revision: 1 })).rejects.toThrow(
-      "symbolic links",
-    );
+    await expect(
+      runCauseEffect(service.installLocal({ agentId: "reader", skillId: skill.id, revision: 1 })),
+    ).rejects.toThrow("symbolic links");
     expect(await readdir(outside)).toEqual([]);
   });
 
   it("removes obsolete files when updating a disabled skill", async () => {
     const source = join(agents[0].workspacePath, "draft");
     await writeFile(join(source, "old.md"), "old reference");
-    const first = await localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" });
-    await service.setEnabled({ agentId: "writer", skillId: first.id, enabled: false });
+    const first = await runCauseEffect(localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" }));
+    await runCauseEffect(service.setEnabled({ agentId: "writer", skillId: first.id, enabled: false }));
     await rm(join(source, "old.md"));
-    await library.revise("writer", first.id, 1, "draft");
-    await service.install({ agentId: "writer", skillId: first.id });
-    expect((await service.listInstalled("writer"))[0]).toMatchObject({
+    await runCauseEffect(library.revise("writer", first.id, 1, "draft"));
+    await runCauseEffect(service.install({ agentId: "writer", skillId: first.id }));
+    expect((await runCauseEffect(service.listInstalled("writer")))[0]).toMatchObject({
       enabled: false,
       installedVersion: 2,
       state: "installed",
@@ -182,30 +186,32 @@ describe("local skill library", () => {
   it("supports old metadata and rejects invalid metadata or oversized folders", async () => {
     const path = join(agents[0].workspacePath, "draft/SKILL.md");
     await writeFile(path, "---\nname: Old skill\ndescription: An older bundle.\n---\nInstructions");
-    expect((await library.create("writer", "draft")).examplePrompt).toBeUndefined();
+    expect((await runCauseEffect(library.create("writer", "draft"))).examplePrompt).toBeUndefined();
     await writeFile(path, "---\nname: ''\ndescription: Missing name.\n---\nInstructions");
-    await expect(library.create("writer", "draft")).rejects.toThrow("valid name");
+    await expect(runCauseEffect(library.create("writer", "draft"))).rejects.toThrow("valid name");
     await writeFile(path, markdown("Valid"));
     await writeFile(join(agents[0].workspacePath, "draft/large.txt"), Buffer.alloc(10 * 1024 * 1024));
-    await expect(library.create("writer", "draft")).rejects.toThrow("under 10 MB");
+    await expect(runCauseEffect(library.create("writer", "draft"))).rejects.toThrow("under 10 MB");
   });
 
   it("does not overwrite a damaged installation record", async () => {
-    const skill = await library.create("writer", "draft");
+    const skill = await runCauseEffect(library.create("writer", "draft"));
     const directory = join(agents[0].workspacePath, ".openbot");
     await mkdir(directory);
     const path = join(directory, "skills-lock.json");
     await writeFile(path, "damaged record");
-    await expect(service.installLocal({ agentId: "writer", skillId: skill.id, revision: 1 })).rejects.toThrow();
+    await expect(
+      runCauseEffect(service.installLocal({ agentId: "writer", skillId: skill.id, revision: 1 })),
+    ).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe("damaged record");
   });
 
   it("leaves a created revision available when installation cannot complete", async () => {
     await mkdir(join(agents[0].workspacePath, ".agents/skills/weekly-summary"), { recursive: true });
-    await expect(localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" })).rejects.toThrow(
-      "was saved as revision 1",
-    );
-    expect(await library.list()).toHaveLength(1);
-    await expect(library.create("writer", "draft")).rejects.toThrow("already exists");
+    await expect(
+      runCauseEffect(localSkillTools(service).create({ agentId: "writer", sourcePath: "draft" })),
+    ).rejects.toThrow("was saved as revision 1");
+    expect(await runCauseEffect(library.list())).toHaveLength(1);
+    await expect(runCauseEffect(library.create("writer", "draft"))).rejects.toThrow("already exists");
   });
 });

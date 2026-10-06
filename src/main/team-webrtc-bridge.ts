@@ -4,8 +4,10 @@ import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
+import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
 export type TeamWebRtcChannel = "rpc" | "events" | "files" | "desktop";
 
@@ -90,13 +92,12 @@ const SEND_COMMAND_TIMEOUT_MS = 75_000;
 
 export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   readonly #options: TeamWebRtcBridgeOptions;
-  readonly #pending = new Map<
-    string,
-    { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
-  >();
+  readonly #pending = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
   #window: BrowserWindow | null = null;
   #port: MessagePortMain | null = null;
-  #ready: Promise<void> | null = null;
+  #ready: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
+  #scope = Scope.makeUnsafe();
+  #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #iceServers = new Map<string, RemoteDesktopIceServer[]>();
 
   constructor(options: TeamWebRtcBridgeOptions = {}) {
@@ -104,53 +105,76 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     this.#options = options;
   }
 
-  start(): Promise<void> {
-    if (this.#ready) return this.#ready;
-    let ready: Promise<void>;
-    ready = this.#start().catch((error) => {
-      if (this.#ready === ready) {
+  readonly start = Effect.fn("TeamWebRtcBridge.start")(function* (this: TeamWebRtcBridge) {
+    if (this.#stopping) yield* Deferred.await(this.#stopping);
+    if (this.#ready) return yield* Fiber.join(this.#ready);
+    const ready = yield* Effect.forkIn(this.#start(), this.#scope, { startImmediately: false });
+    this.#ready = ready;
+    ready.addObserver((exit) => {
+      if (Exit.isFailure(exit) && this.#ready === ready) {
         this.#reset(sourceText("error.remote.bridgeStartFailed"));
         this.#ready = null;
       }
-      throw error;
     });
-    this.#ready = ready;
-    return this.#ready;
-  }
+    yield* Fiber.join(ready);
+  }).bind(this);
 
-  async connect(input: { peerId: string; signalUrl: string; token: string; peer: "host" | "client" }): Promise<void> {
-    await this.start();
-    await this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
-  }
+  readonly connect = Effect.fn("TeamWebRtcBridge.connect")(function* (
+    this: TeamWebRtcBridge,
+    input: { peerId: string; signalUrl: string; token: string; peer: "host" | "client" },
+  ) {
+    yield* this.start();
+    yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
+  }).bind(this);
 
-  async disconnect(peerId: string): Promise<void> {
-    if (!this.#port) return;
-    await this.#command({ type: "disconnect", peerId });
-  }
+  readonly disconnect = Effect.fn("TeamWebRtcBridge.disconnect")(function* (this: TeamWebRtcBridge, peerId: string) {
+    if (this.#port) yield* this.#command({ type: "disconnect", peerId });
+  }).bind(this);
 
-  async disconnectPeer(peerId: string): Promise<void> {
-    if (!this.#port) return;
-    await this.#command({ type: "disconnect-peer", peerId });
-  }
+  readonly disconnectPeer = Effect.fn("TeamWebRtcBridge.disconnectPeer")(function* (
+    this: TeamWebRtcBridge,
+    peerId: string,
+  ) {
+    if (this.#port) yield* this.#command({ type: "disconnect-peer", peerId });
+  }).bind(this);
 
-  async send(peerId: string, channel: TeamWebRtcChannel, data: string | ArrayBuffer): Promise<void> {
-    await this.start();
-    await this.#command({ type: "send", peerId, channel, data });
-  }
+  readonly send = Effect.fn("TeamWebRtcBridge.send")(function* (
+    this: TeamWebRtcBridge,
+    peerId: string,
+    channel: TeamWebRtcChannel,
+    data: string | ArrayBuffer,
+  ) {
+    yield* this.start();
+    yield* this.#command({ type: "send", peerId, channel, data });
+  }).bind(this);
 
-  async restartIce(peerId: string): Promise<void> {
-    await this.#command({ type: "restart-ice", peerId });
-  }
+  readonly restartIce = Effect.fn("TeamWebRtcBridge.restartIce")(function* (this: TeamWebRtcBridge, peerId: string) {
+    yield* this.#command({ type: "restart-ice", peerId });
+  }).bind(this);
 
   getIceServers(peerId: string): RemoteDesktopIceServer[] {
     return structuredClone(this.#iceServers.get(peerId) ?? []);
   }
 
-  async stop(): Promise<void> {
-    if (this.#port) await this.#command({ type: "close", peerId: "all" }).catch(() => undefined);
-    this.#reset(sourceText("error.remote.bridgeStopped"));
-    this.#ready = null;
-  }
+  readonly stop = Effect.fn("TeamWebRtcBridge.stop")(function* (this: TeamWebRtcBridge) {
+    if (this.#stopping) return yield* Deferred.await(this.#stopping);
+    const stopping = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+    this.#stopping = stopping;
+    yield* Effect.gen({ self: this }, function* () {
+      if (this.#port) yield* this.#command({ type: "close", peerId: "all" }).pipe(Effect.ignore);
+      this.#ready = null;
+      yield* Scope.close(this.#scope, Exit.void);
+      yield* remoteDecode(() => this.#reset(sourceText("error.remote.bridgeStopped")));
+      this.#scope = Scope.makeUnsafe();
+    }).pipe(
+      Effect.onExit((exit) =>
+        Effect.gen({ self: this }, function* () {
+          yield* Deferred.done(stopping, exit);
+          if (this.#stopping === stopping) this.#stopping = null;
+        }),
+      ),
+    );
+  }, Effect.uninterruptible).bind(this);
 
   #reset(message: string): void {
     this.#port?.close();
@@ -159,72 +183,107 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     this.#window = null;
     this.#iceServers.clear();
     for (const pending of this.#pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(message));
+      Deferred.doneUnsafe(pending, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
     }
     this.#pending.clear();
   }
 
-  async #start(): Promise<void> {
-    const window = new BrowserWindow({
-      show: false,
-      webPreferences: {
-        preload: this.#options.preloadPath ?? join(__dirname, "../preload/teamWebrtc.cjs"),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        webSecurity: true,
-      },
-    });
+  readonly #start = Effect.fn("TeamWebRtcBridge.load")(function* (this: TeamWebRtcBridge) {
+    const window = yield* remoteDecode(
+      () =>
+        new BrowserWindow({
+          show: false,
+          webPreferences: {
+            preload: this.#options.preloadPath ?? join(__dirname, "../preload/teamWebrtc.cjs"),
+            sandbox: true,
+            contextIsolation: true,
+            nodeIntegration: false,
+            webSecurity: true,
+          },
+        }),
+    );
     this.#window = window;
-    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    await (this.#options.developmentUrl
-      ? window.loadURL(new URL("team-webrtc.html", `${this.#options.developmentUrl}/`).toString())
-      : window.loadURL("openbot-app://app/team-webrtc.html"));
-    const { port1, port2 } = new MessageChannelMain();
+    yield* remoteDecode(() => window.webContents.setWindowOpenHandler(() => ({ action: "deny" })));
+    yield* remoteCall(() =>
+      this.#options.developmentUrl
+        ? window.loadURL(new URL("team-webrtc.html", `${this.#options.developmentUrl}/`).toString())
+        : window.loadURL("openbot-app://app/team-webrtc.html"),
+    );
+    const { port1, port2 } = yield* remoteDecode(() => new MessageChannelMain());
     this.#port = port1;
-    port1.on("message", (event) => this.#handleMessage(bridgeMessageSchema.parse(event.data)));
-    port1.start();
-    const rendererReady = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(sourceText("error.remote.bridgeDidNotStart"))), 10_000);
-      const ready = (message: BridgeMessage) => {
-        if (message.type !== "bridge-ready") return;
-        clearTimeout(timer);
-        port1.off("message", listener);
-        resolve();
-      };
-      const listener = (event: { data: unknown }) => ready(bridgeMessageSchema.parse(event.data));
+    const ready = Deferred.makeUnsafe<void>();
+    const listener = (event: { data: unknown }) => {
+      const message = bridgeMessageSchema.parse(event.data);
+      this.#handleMessage(message);
+      if (message.type === "bridge-ready") Deferred.doneUnsafe(ready, Effect.void);
+    };
+    yield* remoteDecode(() => {
       port1.on("message", listener);
+      port1.start();
     });
-    window.webContents.postMessage("openbot-team-webrtc-port", null, [port2]);
-    await rendererReady;
-  }
-
-  #command(command: BridgeCommand): Promise<void> {
-    const port = this.#port;
-    if (!port) return Promise.reject(new Error(sourceText("error.remote.bridgeNotReady")));
-    const commandId = crypto.randomUUID();
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(
-        () => {
-          this.#pending.delete(commandId);
-          reject(new Error(sourceText("error.remote.bridgeCommandTimeout", { command: command.type })));
-        },
-        command.type === "send" ? SEND_COMMAND_TIMEOUT_MS : COMMAND_TIMEOUT_MS,
+    yield* Effect.gen(function* () {
+      yield* remoteDecode(() => window.webContents.postMessage("openbot-team-webrtc-port", null, [port2]));
+      yield* Deferred.await(ready).pipe(
+        Effect.timeoutOrElse({
+          duration: 10_000,
+          orElse: () =>
+            Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeDidNotStart")) })),
+        }),
       );
-      this.#pending.set(commandId, { resolve, reject, timer });
-      port.postMessage({ ...command, commandId });
-    });
-  }
+    }).pipe(
+      Effect.onExit((exit) =>
+        Exit.isFailure(exit) ? remoteDecode(() => port1.off("message", listener)).pipe(Effect.orDie) : Effect.void,
+      ),
+    );
+  });
+
+  readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
+    const port = this.#port;
+    if (!port) return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeNotReady")) });
+    const commandId = crypto.randomUUID();
+    yield* Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const pending = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+        this.#pending.set(commandId, pending);
+        return pending;
+      }),
+      (pending) =>
+        Effect.gen(function* () {
+          yield* remoteDecode(() => port.postMessage({ ...command, commandId }));
+          yield* Deferred.await(pending).pipe(
+            Effect.timeoutOrElse({
+              duration: command.type === "send" ? SEND_COMMAND_TIMEOUT_MS : COMMAND_TIMEOUT_MS,
+              orElse: () =>
+                Effect.fail(
+                  new RemoteWorkflowError({
+                    cause: new Error(sourceText("error.remote.bridgeCommandTimeout", { command: command.type })),
+                  }),
+                ),
+            }),
+          );
+        }),
+      () =>
+        Effect.sync(() => {
+          this.#pending.delete(commandId);
+        }),
+    );
+  });
 
   #handleMessage(message: BridgeMessage): void {
     if ((message.type === "command-complete" || message.type === "command-error") && message.commandId) {
       const pending = this.#pending.get(message.commandId);
       if (!pending) return;
-      clearTimeout(pending.timer);
       this.#pending.delete(message.commandId);
-      if (message.type === "command-complete") pending.resolve();
-      else pending.reject(new Error(message.message ?? sourceText("error.remote.bridgeCommandFailed")));
+      Deferred.doneUnsafe(
+        pending,
+        message.type === "command-complete"
+          ? Effect.void
+          : Effect.fail(
+              new RemoteWorkflowError({
+                cause: new Error(message.message ?? sourceText("error.remote.bridgeCommandFailed")),
+              }),
+            ),
+      );
       return;
     }
     if (!message.peerId) return;

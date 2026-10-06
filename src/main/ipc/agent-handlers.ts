@@ -32,6 +32,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
 import {
@@ -118,14 +119,17 @@ export function agentIpcHandlers({
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
-        remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
+        remote: (serverId) =>
+          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)),
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
         local: (input) => service.getHostAnalytics(input),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "host-analytics")
-            ? remoteServers.request(serverId, `${TEAM_API_ROUTES.analytics}?${hostAnalyticsQuery(input)}`, (value) =>
-                assertHostAnalyticsScope(decodeHostAnalyticsFromHost(value), input),
+            ? runCauseEffect(
+                remoteServers.request(serverId, `${TEAM_API_ROUTES.analytics}?${hostAnalyticsQuery(input)}`, (value) =>
+                  assertHostAnalyticsScope(decodeHostAnalyticsFromHost(value), input),
+                ),
               )
             : null,
       }),
@@ -133,115 +137,141 @@ export function agentIpcHandlers({
         local: (input) => service.getAnalytics(input),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "agent-analytics")
-            ? remoteServers.request(
-                serverId,
-                `${TEAM_API_ROUTES.agent.analytics(input.agentId)}?${analyticsQuery(input)}`,
-                (value) => assertAnalyticsScope(decodeAgentAnalyticsFromHost(value), input),
+            ? runCauseEffect(
+                remoteServers.request(
+                  serverId,
+                  `${TEAM_API_ROUTES.agent.analytics(input.agentId)}?${analyticsQuery(input)}`,
+                  (value) => assertAnalyticsScope(decodeAgentAnalyticsFromHost(value), input),
+                ),
               )
             : null,
       }),
       getUsage: scopedHandler(parseOptionalAgentId, {
-        local: (agentId) => service.getUsage(agentId),
+        local: (agentId) => runCauseEffect(service.getUsage(agentId)),
         remote: (agentId, serverId) =>
           agentId
             ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
+              ? runCauseEffect(
+                  remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost),
+                )
               : { limits: [] }
-            : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
+            : runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost)),
       }),
       listModels: scopedQueryHandler({
         local: () => logRejectedModels(service.listModels(), "local"),
         remote: (serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
-            decodeAgentModelOptions(logRejectedModels(value, "remote")),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
+              decodeAgentModelOptions(logRejectedModels(value, "remote")),
+            ),
           ),
       }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
-        remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
+        remote: (serverId) =>
+          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)),
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
-        local: (agentId) => skills.listInstalledForChatTags(agentId),
+        local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId)),
         // A server too old to know the endpoint would answer 404, so ask its advertised capabilities first.
         remote: (agentId, serverId) =>
           remoteServers
             .list()
             .find((server) => server.id === serverId)
             ?.compatibility?.capabilities.includes("installed-skills")
-            ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkillsFromHost)
+            ? runCauseEffect(
+                remoteServers.request(serverId, TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkillsFromHost),
+              )
             : Promise.resolve([]),
       }),
       listChannels: scopedQueryHandler({
         // The reader here is the host user of this computer, so messages they wrote before they
         // signed in are their own.
         local: () => service.channels.store.list(host.channelActor().id, true),
-        remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
+        remote: (serverId) =>
+          runCauseEffect(remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)),
       }),
       readChannel: scopedHandler(parseChannelRead, {
         local: (input) => service.channels.store.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
+          ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
-        local: (input) => service.channels.command(input, host.channelActor()),
+        local: (input) => runCauseEffect(service.channels.command(input, host.channelActor())),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
+          runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
+          ),
       }),
       deleteChannel: scopedHandler(parseChannelId, {
-        local: (channelId) => service.deleteChannel(channelId),
+        local: (channelId) => runCauseEffect(service.deleteChannel(channelId)),
         remote: async (channelId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CHANNEL_DELETE_CAPABILITY))
             throw new Error(sourceText("error.backend.channelDeleteUnsupported"));
-          await remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
-            method: "POST",
-            body: { channelId },
-          });
+          await runCauseEffect(
+            remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
+              method: "POST",
+              body: { channelId },
+            }),
+          );
         },
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),
         remote: (serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
+          ),
       }),
       mutateSidebarLayout: scopedHandler(parseSidebarLayoutAction, {
-        local: (action) => sidebarLayout.mutate(action, service.sidebarChatIds()),
+        local: (action) => runCauseEffect(sidebarLayout.mutate(action, service.sidebarChatIds())),
         remote: (action, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
-            method: "POST",
-            body: action,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
+              method: "POST",
+              body: action,
+            }),
+          ),
       }),
       generateProfile: scopedHandler(parseGenerateAgentProfile, {
-        local: (input) => service.generateProfile(input, sidebarLayout.getSnapshot().sections),
+        local: (input) => runCauseEffect(service.generateProfile(input, sidebarLayout.getSnapshot().sections)),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
-            method: "POST",
-            body: input,
-            timeoutMs: 150_000,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.generateProfile, decodeAgentProfileDraft, {
+              method: "POST",
+              body: input,
+              timeoutMs: 150_000,
+            }),
+          ),
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
-        local: (input) => service.saveProfile(input, sidebarLayout, host.conversationSender()),
+        local: (input) => runCauseEffect(service.saveProfile(input, sidebarLayout, host.conversationSender())),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
-            method: "POST",
-            body: input,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
+              method: "POST",
+              body: input,
+            }),
+          ),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => service.createAgent(parsed, undefined, undefined, host.conversationSender()),
+        local: (parsed) => runCauseEffect(service.createAgent(parsed, undefined, undefined, host.conversationSender())),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
-            method: "POST",
-            body: parsed,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
+              method: "POST",
+              body: parsed,
+            }),
+          ),
       }),
       duplicateAgent: scopedHandler(parseAgentId, {
-        local: (agentId) => duplicateAgentIntoLayout(service, sidebarLayout, agentId),
-        remote: (agentId, serverId) => remoteServers.duplicateAgent(agentId, serverId),
+        local: (agentId) => runCauseEffect(duplicateAgentIntoLayout(service, sidebarLayout, agentId)),
+        remote: (agentId, serverId) => runCauseEffect(remoteServers.duplicateAgent(agentId, serverId)),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
-        local: (input) => service.updateAgent(input),
+        local: (input) => runCauseEffect(service.updateAgent(input)),
         remote: (input, serverId) => {
           // The Team API does not carry access, and a team member must not be able to widen it.
           if (input.access !== undefined) {
@@ -256,44 +286,53 @@ export function agentIpcHandlers({
           if (input.busyMessageMode !== undefined) {
             throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
           }
-          return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-            method: "PATCH",
-            body: input,
-          });
+          return runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+              method: "PATCH",
+              body: input,
+            }),
+          );
         },
       }),
       setAvatar: scopedHandler(parseSetAgentAvatar, {
-        local: (parsed) => service.setAvatar(parsed.agentId, parsed.image),
-        remote: (parsed, serverId) => remoteServers.setAgentAvatar(parsed.agentId, parsed.image, serverId),
+        local: (parsed) => runCauseEffect(service.setAvatar(parsed.agentId, parsed.image)),
+        remote: (parsed, serverId) =>
+          runCauseEffect(remoteServers.setAgentAvatar(parsed.agentId, parsed.image, serverId)),
       }),
       deleteAgent: scopedHandler(parseAgentId, {
         local: async (agentId) => {
-          await service.deleteAgent(agentId);
-          await sidebarLayout.removeAgent(agentId);
+          await runCauseEffect(service.deleteAgent(agentId));
+          await runCauseEffect(sidebarLayout.removeAgent(agentId));
         },
         remote: async (agentId, serverId) => {
-          await remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(agentId), decodeVoid, { method: "DELETE" });
+          await runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(agentId), decodeVoid, { method: "DELETE" }),
+          );
         },
       }),
       readConversation: scopedHandler(parseAgentId, {
-        local: (agentId) => host.readAgentConversation(agentId),
-        remote: (agentId, serverId) => remoteServers.readAgentConversation(agentId, serverId),
+        local: (agentId) => runCauseEffect(host.readAgentConversation(agentId)),
+        remote: (agentId, serverId) => runCauseEffect(remoteServers.readAgentConversation(agentId, serverId)),
       }),
       readConversationPage: scopedHandler(parseReadConversationPage, {
-        local: (parsed) => host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit),
+        local: (parsed) => runCauseEffect(host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit)),
         remote: (parsed, serverId) =>
-          remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+          runCauseEffect(
+            remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+          ),
       }),
       searchConversationMessages: scopedHandler(parseSearchConversationMessages, {
         local: (parsed) =>
           host.searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit),
         remote: (parsed, serverId) =>
-          remoteServers.searchAgentConversationMessages(
-            parsed.query,
-            parsed.agentId,
-            parsed.cursor,
-            parsed.limit,
-            serverId,
+          runCauseEffect(
+            remoteServers.searchAgentConversationMessages(
+              parsed.query,
+              parsed.agentId,
+              parsed.cursor,
+              parsed.limit,
+              serverId,
+            ),
           ),
       }),
       searchConversationFiles: payloadHandler(parseSearchConversationFiles, (parsed) =>
@@ -301,135 +340,164 @@ export function agentIpcHandlers({
       ),
       listConversationReads: scopedQueryHandler({
         local: () => host.listAgentConversationReads(),
-        remote: (serverId) => remoteServers.listAgentConversationReads(serverId),
+        remote: (serverId) => runCauseEffect(remoteServers.listAgentConversationReads(serverId)),
       }),
       markConversationRead: scopedHandler(parseMarkConversationRead, {
-        local: (parsed) => host.markAgentConversationRead(parsed),
-        remote: (parsed, serverId) => remoteServers.markAgentConversationRead(parsed, serverId),
+        local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
+        remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
       }),
       sendMessage: scopedHandler(parseSendMessage, {
-        local: (input) => service.sendMessage(input, host.conversationSender()),
+        local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),
         remote: (input, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
-            method: "POST",
-            // The host uses this computer's zone for a routine the agent creates from the message.
-            body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
+              method: "POST",
+              // The host uses this computer's zone for a routine the agent creates from the message.
+              body: { ...input, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+            }),
+          ),
       }),
       setMessageReaction: scopedHandler(parseMessageReaction, {
-        local: (parsed) => service.setMessageReaction(parsed),
+        local: (parsed) => runCauseEffect(service.setMessageReaction(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: parsed,
+            }),
+          ),
       }),
       listQueue: scopedHandler(parseAgentId, {
         local: (agentId) => service.listQueue(agentId),
         remote: (agentId, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot),
+          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot)),
       }),
       acknowledgeFailedTurn: scopedHandler(parseAcknowledgeFailedTurn, {
         local: (parsed) => service.acknowledgeFailedTurn(parsed.agentId, parsed.turnId),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { turnId: parsed.turnId },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: { turnId: parsed.turnId },
+            }),
+          ),
       }),
       cancelQueuedMessage: scopedHandler(parseCancelQueuedMessage, {
-        local: (parsed) => service.cancelQueuedMessage(parsed.agentId, parsed.deliveryId),
+        local: (parsed) => runCauseEffect(service.cancelQueuedMessage(parsed.agentId, parsed.deliveryId)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueCancel(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryId: parsed.deliveryId },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueCancel(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: { deliveryId: parsed.deliveryId },
+            }),
+          ),
       }),
       steerQueuedMessage: scopedHandler(parseSteerQueuedMessage, {
-        local: (parsed) => service.steerQueuedMessage(parsed),
+        local: (parsed) => runCauseEffect(service.steerQueuedMessage(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
+            }),
+          ),
       }),
       editQueuedMessage: scopedHandler(parseQueueEdit, {
-        local: ({ agentId, ...input }) => service.editQueuedMessage(agentId, input, host.conversationSender()),
+        local: ({ agentId, ...input }) =>
+          runCauseEffect(service.editQueuedMessage(agentId, input, host.conversationSender())),
         remote: ({ agentId, ...input }, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
-            method: "POST",
-            body: { ...input },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
+              method: "POST",
+              body: { ...input },
+            }),
+          ),
       }),
       updateQueuedMessage: scopedHandler(parseUpdateQueuedMessage, {
-        local: (parsed) => service.updateQueuedMessage(parsed, host.conversationSender()),
+        local: (parsed) => runCauseEffect(service.updateQueuedMessage(parsed, host.conversationSender())),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueUpdate(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: {
-              deliveryId: parsed.deliveryId,
-              text: parsed.text,
-              keepAttachmentIds: parsed.keepAttachmentIds,
-              attachmentDraftIds: parsed.attachmentDraftIds,
-            },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueUpdate(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: {
+                deliveryId: parsed.deliveryId,
+                text: parsed.text,
+                keepAttachmentIds: parsed.keepAttachmentIds,
+                attachmentDraftIds: parsed.attachmentDraftIds,
+              },
+            }),
+          ),
       }),
       reorderQueue: scopedHandler(parseReorderQueue, {
-        local: (parsed) => service.reorderQueue(parsed),
+        local: (parsed) => runCauseEffect(service.reorderQueue(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { deliveryIds: parsed.deliveryIds },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueReorder(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: { deliveryIds: parsed.deliveryIds },
+            }),
+          ),
       }),
       interrupt: scopedHandler(parseInterrupt, {
-        local: (parsed) => service.interrupt(parsed.agentId, parsed.turnId),
+        local: (parsed) => runCauseEffect(service.interrupt(parsed.agentId, parsed.turnId)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.agent.interrupt(parsed.agentId), decodeVoid, {
-            method: "POST",
-            body: { turnId: parsed.turnId },
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.interrupt(parsed.agentId), decodeVoid, {
+              method: "POST",
+              body: { turnId: parsed.turnId },
+            }),
+          ),
       }),
       clearContext: scopedHandler(parseAgentId, {
-        local: (agentId) => service.clearAgentContext(agentId),
+        local: (agentId) => runCauseEffect(service.clearAgentContext(agentId)),
         remote: async (agentId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CONTEXT_RESET_CAPABILITY))
             throw new Error(sourceText("error.team.contextResetUnsupported"));
           // The context-reset-v1 codec has already checked the empty reply.
-          await remoteServers.request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
-            method: "POST",
-            body: { agentId },
-          });
+          await runCauseEffect(
+            remoteServers.request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
+              method: "POST",
+              body: { agentId },
+            }),
+          );
         },
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => service.respondToPrompt(parsed),
+        local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
+              method: "POST",
+              body: parsed,
+            }),
+          ),
       }),
       respondToApproval: scopedHandler(parseApprovalResponse, {
-        local: (parsed) => service.respondToApproval(parsed),
+        local: (parsed) => runCauseEffect(service.respondToApproval(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.approval, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.respond.approval, decodeVoid, {
+              method: "POST",
+              body: parsed,
+            }),
+          ),
       }),
       respondToBrowserSecret: scopedHandler(parseBrowserSecretResponse, {
-        local: (parsed) => service.respondToBrowserSecret(parsed),
+        local: (parsed) => runCauseEffect(service.respondToBrowserSecret(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
+          runCauseEffect(
+            remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
+          ),
       }),
       respondToBrowserTakeover: scopedHandler(parseBrowserTakeoverResponse, {
-        local: (parsed) => service.respondToBrowserTakeover(parsed),
+        local: (parsed) => runCauseEffect(service.respondToBrowserTakeover(parsed)),
         remote: (parsed, serverId) =>
-          remoteServers.request(serverId, TEAM_API_ROUTES.respond.browserTakeover, decodeVoid, {
-            method: "POST",
-            body: parsed,
-          }),
+          runCauseEffect(
+            remoteServers.request(serverId, TEAM_API_ROUTES.respond.browserTakeover, decodeVoid, {
+              method: "POST",
+              body: parsed,
+            }),
+          ),
       }),
     },
   };

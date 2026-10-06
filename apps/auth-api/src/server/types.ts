@@ -1,5 +1,9 @@
 import type { AccountSession } from "@openbot/contracts/mobile-connect";
 import { isDynamicRecord, isFunction } from "@openbot/contracts/runtime-values";
+import type { Effect } from "effect";
+import type { AuthStoreError } from "./d1-auth-repository";
+import type { EmailDeliveryError } from "./email-delivery";
+import type { SmtpFailure } from "./smtp-email-delivery";
 
 export interface WorkerBindings {
   DB: D1Database;
@@ -149,7 +153,11 @@ export interface MobileAuthDeviceIdentity {
 }
 
 export interface EmailCodeDelivery {
-  send(message: { email: string; code: string; expiresAt: number }): Promise<void>;
+  send(message: {
+    email: string;
+    code: string;
+    expiresAt: number;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export interface TeamInviteEmailDelivery {
@@ -159,7 +167,7 @@ export interface TeamInviteEmailDelivery {
     serverName: string;
     inviteUrl: string;
     role: "admin" | "member";
-  }): Promise<void>;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
 export type EmailVerificationResult =
@@ -177,10 +185,14 @@ export interface EmailChallengeRecord {
 }
 
 export interface AuthRepository {
-  listAccountSessions(userId: string, currentToken: string, now: number): Promise<AccountSession[]>;
-  revokeAccountSession(userId: string, sessionId: string, now: number): Promise<boolean>;
-  latestEmailChallengeAt(email: string): Promise<number | null>;
-  findEmailChallenge(idHash: string): Promise<EmailChallengeRecord | null>;
+  listAccountSessions(
+    userId: string,
+    currentToken: string,
+    now: number,
+  ): Effect.Effect<AccountSession[], AuthStoreError>;
+  revokeAccountSession(userId: string, sessionId: string, now: number): Effect.Effect<boolean, AuthStoreError>;
+  latestEmailChallengeAt(email: string): Effect.Effect<number | null, AuthStoreError>;
+  findEmailChallenge(idHash: string): Effect.Effect<EmailChallengeRecord | null, AuthStoreError>;
   createEmailChallenge(input: {
     idHash: string;
     email: string;
@@ -189,37 +201,41 @@ export interface AuthRepository {
     createdAt: number;
     expiresAt: number;
     maxAttempts: number;
-  }): Promise<boolean>;
-  completeEmailChallengeDelivery(idHash: string, state: "sent" | "failed", now: number): Promise<void>;
+  }): Effect.Effect<boolean, AuthStoreError>;
+  completeEmailChallengeDelivery(
+    idHash: string,
+    state: "sent" | "failed",
+    now: number,
+  ): Effect.Effect<void, AuthStoreError>;
   verifyEmailChallenge(input: {
     idHash: string;
     codeHash: string;
     now: number;
     session: { id: string; token: string; expiresAt: number };
-  }): Promise<EmailVerificationResult>;
+  }): Effect.Effect<EmailVerificationResult, AuthStoreError>;
   incrementRateLimit(
     keyHash: string,
     windowStart: number,
     limit: number,
-  ): Promise<{ allowed: boolean; count: number; windowStart: number }>;
-  authenticate(sessionToken: string, now: number): Promise<AuthUser | null>;
-  authenticateDesktopSession(sessionToken: string, now: number): Promise<AuthUser | null>;
-  revokeSession(sessionToken: string, now: number): Promise<void>;
-  revokeMobileSession(sessionToken: string, now: number): Promise<boolean>;
-  updateUserName(userId: string, name: string, now: number): Promise<AuthUser>;
+  ): Effect.Effect<{ allowed: boolean; count: number; windowStart: number }, AuthStoreError>;
+  authenticate(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  authenticateDesktopSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
+  revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
+  updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,
     expectedAvatarUrl: string | null,
     now: number,
-  ): Promise<AuthUser | null>;
+  ): Effect.Effect<AuthUser | null, AuthStoreError>;
   createTeamAuthTicket(input: {
     ticketHash: string;
     userId: string;
     serverId: string;
     createdAt: number;
     expiresAt: number;
-  }): Promise<void>;
+  }): Effect.Effect<void, AuthStoreError>;
   replaceMobileAuthTicket(input: {
     host?: import("@openbot/contracts/mobile-connect").MobileConnectHostBinding;
     ticketHash: string;
@@ -227,16 +243,20 @@ export interface AuthRepository {
     serverId: string;
     createdAt: number;
     expiresAt: number;
-  }): Promise<void>;
-  redeemTeamAuthTicket(input: { ticketHash: string; serverId: string; now: number }): Promise<AuthUser | null>;
+  }): Effect.Effect<void, AuthStoreError>;
+  redeemTeamAuthTicket(input: {
+    ticketHash: string;
+    serverId: string;
+    now: number;
+  }): Effect.Effect<AuthUser | null, AuthStoreError>;
   redeemMobileAuthTicket(input: {
     ticketHash: string;
     serverId: string;
     now: number;
     session: { id: string; token: string; expiresAt: number };
     device: MobileAuthDeviceIdentity;
-  }): Promise<MobileAuthSessionResult | null>;
-  authenticateMobileSession(sessionToken: string, now: number): Promise<AuthUser | null>;
-  listMobileAuthDevices(userId: string, now: number): Promise<MobileAuthDevice[]>;
-  revokeMobileAuthDevice(userId: string, sessionId: string, now: number): Promise<boolean>;
+  }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
+  authenticateMobileSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
+  listMobileAuthDevices(userId: string, now: number): Effect.Effect<MobileAuthDevice[], AuthStoreError>;
+  revokeMobileAuthDevice(userId: string, sessionId: string, now: number): Effect.Effect<boolean, AuthStoreError>;
 }

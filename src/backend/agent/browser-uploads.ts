@@ -5,6 +5,14 @@ import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { redactText } from "@openbot/logging";
+import { Effect, Exit, Fiber, Scope } from "effect";
+import {
+  type AttachmentOperationError,
+  attachmentCall,
+  attachmentFailure,
+  attachmentSync,
+} from "../attachment-effects";
+import type { BrowserOperationError } from "../browser-effects";
 import { parseBrowserToolArguments } from "../browser-tools";
 import type { GeneratedAttachmentSource } from "../mailbox-store";
 import type { DynamicToolCallParams, DynamicToolResult } from "../protocol";
@@ -34,18 +42,27 @@ interface BrowserUploadReservation {
 export interface BrowserUploadHooks {
   onUploadTargetResolved?: (inputId: string, documentId: string) => void;
   onUploadAssigned?: (inputId: string, documentId: string) => void;
-  onUploadOperationStarted?: (completion: Promise<void>) => void;
+  onUploadOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void;
 }
 
 /** The browser surface staging needs. `BrowserHost` satisfies it. */
 export interface BrowserUploadTarget {
-  resolveUploadTarget(params: DynamicToolCallParams): Promise<{ inputId: string; documentId: string }>;
-  handleDynamicTool(params: DynamicToolCallParams, hooks?: BrowserUploadHooks): Promise<DynamicToolResult>;
+  resolveUploadTarget(
+    params: DynamicToolCallParams,
+  ): Effect.Effect<{ inputId: string; documentId: string }, BrowserOperationError>;
+  handleDynamicTool(
+    params: DynamicToolCallParams,
+    hooks?: BrowserUploadHooks,
+  ): Effect.Effect<DynamicToolResult, BrowserOperationError>;
 }
 
 /** The file-opening half of `AttachmentGateway`, which owns the path policy this controller asks for. */
 export interface BrowserUploadSources {
-  openSources(agentId: string, paths: string[], scope: AttachmentSourceScope): Promise<GeneratedAttachmentSource[]>;
+  openSources(
+    agentId: string,
+    paths: string[],
+    scope: AttachmentSourceScope,
+  ): Effect.Effect<GeneratedAttachmentSource[], AttachmentOperationError>;
 }
 
 export interface BrowserUploadsOptions {
@@ -62,6 +79,13 @@ export interface BrowserUploadsOptions {
 
 /** Uploads read from anywhere on the disk; `AttachmentSourceScope` documents what that does and does not widen. */
 const UPLOAD_SCOPE: AttachmentSourceScope = { allowAnyReadablePath: true };
+
+const removeUploadRoot = Effect.fn("BrowserUploads.removeRoot")((path: string) =>
+  attachmentCall(() => rm(path, { recursive: true, force: true })).pipe(
+    Effect.uninterruptible,
+    Effect.catch(() => Effect.void),
+  ),
+);
 
 const MAX_BROWSER_UPLOAD_INPUTS_PER_TAB = 10;
 const MAX_BROWSER_UPLOAD_BYTES_PER_TAB = ATTACHMENT_LIMITS.totalBytes;
@@ -90,6 +114,7 @@ export class BrowserUploads {
   readonly #attachments: BrowserUploadSources;
   readonly #isStopping: () => boolean;
   readonly #hasTakeover: (agentId: string) => boolean;
+  #scope = Scope.makeUnsafe();
   readonly #roots = new Map<string, Map<string, BrowserUploadRoot[]>>();
   readonly #reservations = new Map<string, Map<symbol, BrowserUploadReservation>>();
 
@@ -100,174 +125,227 @@ export class BrowserUploads {
     this.#hasTakeover = options.hasTakeover;
   }
 
-  async uploadFiles(agentId: string, params: DynamicToolCallParams): Promise<DynamicToolResult> {
-    try {
-      return await this.#stageAndAssign(agentId, params);
-    } catch (error) {
-      // `BrowserHost.handleDynamicTool` redacts what it *returns*, but everything this controller does
-      // around that call -- resolving the target, opening the sources, the quotas, staging -- throws
-      // past it to the facade, which forwards `String(error)` to the provider unchanged. The page picks
-      // some of that text: an ambiguous semantic target names both candidates by accessible name, so
-      // two inputs labelled `Upload password=hunter2` put the password in the error.
-      throw new Error(redactText(error instanceof Error ? error.message : String(error)));
-    }
-  }
+  readonly uploadFiles = Effect.fn("BrowserUploads.uploadFiles")(function* (
+    this: BrowserUploads,
+    agentId: string,
+    params: DynamicToolCallParams,
+  ): Effect.fn.Return<DynamicToolResult, AttachmentOperationError> {
+    return yield* this.#stageAndAssign(agentId, params).pipe(
+      Effect.mapError((error) =>
+        attachmentFailure(
+          new Error(redactText(error.cause instanceof Error ? error.cause.message : String(error.cause))),
+        ),
+      ),
+    );
+  });
 
-  async #stageAndAssign(agentId: string, params: DynamicToolCallParams): Promise<DynamicToolResult> {
-    const args = parseBrowserToolArguments("upload_files", params.arguments);
+  readonly #stageAndAssign = Effect.fn("BrowserUploads.stageAndAssign")(function* (
+    this: BrowserUploads,
+    agentId: string,
+    params: DynamicToolCallParams,
+  ): Effect.fn.Return<DynamicToolResult, AttachmentOperationError> {
+    const args = yield* attachmentSync(() => parseBrowserToolArguments("upload_files", params.arguments));
     const tabId = args.tabId;
     const paths = args.paths;
-    const uploadTarget = await this.#browser.resolveUploadTarget(params);
-    const sources = await this.#attachments.openSources(agentId, paths, UPLOAD_SCOPE);
-    let stagingRoot: string | null = null;
-    const reservationId = Symbol("browser-upload");
-    let reservation: BrowserUploadReservation | null = null;
-    const uploadState: { completion?: Promise<void> } = {};
-    const releaseReservation = () => {
-      if (!reservation) return;
-      this.#releaseReservation(tabId, reservationId);
-      reservation = null;
-    };
-    try {
-      const sizes = await Promise.all(sources.map((source) => source.handle.stat().then((metadata) => metadata.size)));
-      if (sizes.some((size) => size > ATTACHMENT_LIMITS.fileBytes)) {
-        throw new Error(`Each browser upload file must not exceed ${ATTACHMENT_LIMITS.fileBytes} bytes.`);
-      }
-      const stagedBytes = sizes.reduce((total, size) => total + size, 0);
-      if (stagedBytes > ATTACHMENT_LIMITS.totalBytes) {
-        throw new Error(`Browser upload files must not exceed ${ATTACHMENT_LIMITS.totalBytes} bytes in total.`);
-      }
-      reservation = {
-        bytes: stagedBytes,
-        inputId: uploadTarget.inputId,
-        documentId: uploadTarget.documentId,
-        invalidated: false,
-        root: null,
-      };
-      this.#reserve(tabId, reservationId, reservation);
-      stagingRoot = await mkdtemp(join(tmpdir(), "openbot-browser-upload-"));
-      reservation.root = stagingRoot;
-      if (reservation.invalidated) throw new Error("The browser document changed during upload staging.");
-      await chmod(stagingRoot, 0o700);
-      const stagedPaths: string[] = [];
-      for (const [index, source] of sources.entries()) {
-        // One directory per file, so two uploads that share a basename do not collide and the name the
-        // page reports is the name the user recognizes.
-        const stagedDirectory = join(stagingRoot, String(index));
-        await mkdir(stagedDirectory, { mode: 0o700 });
-        const stagedPath = join(stagedDirectory, basename(source.path));
-        const expectedBytes = sizes[index];
-        if (expectedBytes === undefined) throw new Error("The upload size is missing.");
-        if (expectedBytes === 0) {
-          await writeFile(stagedPath, "", { flag: "wx", mode: 0o600 });
-        } else {
-          await pipeline(
-            source.handle.createReadStream({ autoClose: false, start: 0, end: expectedBytes - 1 }),
-            createWriteStream(stagedPath, { flags: "wx", mode: 0o600 }),
+    const uploadTarget = yield* this.#browser
+      .resolveUploadTarget(params)
+      .pipe(Effect.mapError((error) => attachmentFailure(error.cause)));
+    return yield* Effect.acquireUseRelease(
+      this.#attachments.openSources(agentId, paths, UPLOAD_SCOPE),
+      (sources) =>
+        Effect.gen({ self: this }, function* () {
+          let stagingRoot: string | null = null;
+          const reservationId = Symbol("browser-upload");
+          let reservation: BrowserUploadReservation | null = null;
+          const uploadState: { completion?: Fiber.Fiber<void, BrowserOperationError> } = {};
+          const releaseReservation = () => {
+            if (!reservation) return;
+            this.#releaseReservation(tabId, reservationId);
+            reservation = null;
+          };
+          return yield* Effect.gen({ self: this }, function* () {
+            const sizes = yield* attachmentCall(() =>
+              Promise.all(sources.map((source) => source.handle.stat().then((metadata) => metadata.size))),
+            );
+            if (sizes.some((size) => size > ATTACHMENT_LIMITS.fileBytes)) {
+              return yield* attachmentFailure(
+                new Error(`Each browser upload file must not exceed ${ATTACHMENT_LIMITS.fileBytes} bytes.`),
+              );
+            }
+            const stagedBytes = sizes.reduce((total, size) => total + size, 0);
+            if (stagedBytes > ATTACHMENT_LIMITS.totalBytes) {
+              return yield* attachmentFailure(
+                new Error(`Browser upload files must not exceed ${ATTACHMENT_LIMITS.totalBytes} bytes in total.`),
+              );
+            }
+            reservation = {
+              bytes: stagedBytes,
+              inputId: uploadTarget.inputId,
+              documentId: uploadTarget.documentId,
+              invalidated: false,
+              root: null,
+            };
+            const currentReservation = reservation;
+            yield* attachmentSync(() => this.#reserve(tabId, reservationId, currentReservation));
+            // Node cannot cancel this allocation. Record its path before interruption can run cleanup.
+            yield* Effect.gen(function* () {
+              stagingRoot = yield* attachmentCall(() => mkdtemp(join(tmpdir(), "openbot-browser-upload-")));
+              currentReservation.root = stagingRoot;
+            }).pipe(Effect.uninterruptible);
+            if (reservation.invalidated)
+              return yield* attachmentFailure(new Error("The browser document changed during upload staging."));
+            const currentRoot = currentReservation.root;
+            if (!currentRoot)
+              return yield* attachmentFailure(new Error("The browser document changed during upload staging."));
+            yield* attachmentCall(() => chmod(currentRoot, 0o700)).pipe(Effect.uninterruptible);
+            const stagedPaths: string[] = [];
+            for (const [index, source] of sources.entries()) {
+              // One directory per file, so two uploads that share a basename do not collide and the name the
+              // page reports is the name the user recognizes.
+              const stagedDirectory = join(currentRoot, String(index));
+              yield* attachmentCall(() => mkdir(stagedDirectory, { mode: 0o700 })).pipe(Effect.uninterruptible);
+              const stagedPath = join(stagedDirectory, basename(source.path));
+              const expectedBytes = sizes[index];
+              if (expectedBytes === undefined)
+                return yield* attachmentFailure(new Error("The upload size is missing."));
+              if (expectedBytes === 0) {
+                yield* attachmentCall(() => writeFile(stagedPath, "", { flag: "wx", mode: 0o600 })).pipe(
+                  Effect.uninterruptible,
+                );
+              } else {
+                yield* attachmentCall(() =>
+                  pipeline(
+                    source.handle.createReadStream({ autoClose: false, start: 0, end: expectedBytes - 1 }),
+                    createWriteStream(stagedPath, { flags: "wx", mode: 0o600 }),
+                  ),
+                ).pipe(Effect.uninterruptible);
+              }
+              const copiedBytes = (yield* attachmentCall(() => stat(stagedPath))).size;
+              // The size was measured before the copy and the quotas were reserved against it, so a file that
+              // changed underneath us has already been charged the wrong amount. The staged size alone only
+              // catches a file that shrank: the read stops at `expectedBytes - 1`, so one that grew produces a
+              // copy of exactly the expected length. Re-stat the descriptor the copy read from -- the same open
+              // handle, so it is the same file even if the path was replaced -- and reject either direction.
+              const sourceBytes = (yield* attachmentCall(() => source.handle.stat())).size;
+              if (copiedBytes !== expectedBytes || sourceBytes !== expectedBytes)
+                return yield* attachmentFailure(new Error("A browser upload file changed while it was staged."));
+              stagedPaths.push(stagedPath);
+            }
+            if (reservation.invalidated)
+              return yield* attachmentFailure(new Error("The browser document changed during upload staging."));
+            return yield* this.#browser
+              .handleDynamicTool(
+                { ...params, arguments: { ...args, paths: stagedPaths } },
+                {
+                  onUploadTargetResolved: (inputId, documentId) => {
+                    if (!reservation || reservation.invalidated) {
+                      throw new Error("The browser document changed while files were being staged.");
+                    }
+                    // Inside the tab queue, and the last point before the input is assigned. The caller
+                    // checked takeover before staging began; a takeover that started during staging would
+                    // otherwise let this write files into a page the user is holding, since `BrowserHost`
+                    // checks tab ownership and not takeover.
+                    if (this.#hasTakeover(agentId)) {
+                      reservation.invalidated = true;
+                      throw new Error("Browser tools are unavailable during user takeover.");
+                    }
+                    if (inputId !== uploadTarget.inputId || documentId !== uploadTarget.documentId) {
+                      reservation.invalidated = true;
+                      throw new Error("The browser upload target changed while files were being staged.");
+                    }
+                  },
+                  onUploadAssigned: (inputId) => {
+                    if (!stagingRoot || this.#isStopping() || !reservation || reservation.invalidated) {
+                      throw new Error("The browser document changed while files were being staged.");
+                    }
+                    const roots = this.#roots.get(tabId) ?? new Map<string, BrowserUploadRoot[]>();
+                    // Appended rather than replacing what the input held before. Setting `input.files` again
+                    // does not invalidate the `File` objects a page already took from it, so deleting the
+                    // earlier directory here would break a page that is accumulating attachments across
+                    // selections -- it reads a file that is no longer there. The earlier copies stay until the
+                    // tab closes, and their bytes keep counting against the quotas.
+                    roots.set(inputId, [...(roots.get(inputId) ?? []), { path: stagingRoot, bytes: stagedBytes }]);
+                    this.#roots.set(tabId, roots);
+                    // Ownership moves from the reservation to the root here: the `finally` below must not delete
+                    // a directory the input is now reading from.
+                    reservation.root = null;
+                    stagingRoot = null;
+                    releaseReservation();
+                  },
+                  onUploadOperationStarted: (completion) => {
+                    uploadState.completion = completion;
+                  },
+                },
+              )
+              .pipe(Effect.mapError((error) => attachmentFailure(error.cause)));
+          }).pipe(
+            Effect.ensuring(
+              Effect.gen({ self: this }, function* () {
+                if (stagingRoot) {
+                  const unassignedRoot = stagingRoot;
+                  const cleanup = Effect.gen({ self: this }, function* () {
+                    if (stagingRoot !== unassignedRoot) return;
+                    stagingRoot = null;
+                    if (reservation) reservation.root = null;
+                    releaseReservation();
+                    yield* removeUploadRoot(unassignedRoot);
+                  });
+                  // The tool can reject while the input-setting operation is still reading the staged files, so
+                  // cleanup waits for it rather than pulling the directory out from under the renderer.
+                  if (uploadState.completion)
+                    yield* Effect.forkIn(
+                      Fiber.await(uploadState.completion).pipe(Effect.andThen(cleanup)),
+                      this.#scope,
+                      { startImmediately: true, uninterruptible: true },
+                    );
+                  else yield* cleanup;
+                } else releaseReservation();
+              }).pipe(Effect.orDie),
+            ),
           );
-        }
-        const copiedBytes = (await stat(stagedPath)).size;
-        // The size was measured before the copy and the quotas were reserved against it, so a file that
-        // changed underneath us has already been charged the wrong amount. The staged size alone only
-        // catches a file that shrank: the read stops at `expectedBytes - 1`, so one that grew produces a
-        // copy of exactly the expected length. Re-stat the descriptor the copy read from -- the same open
-        // handle, so it is the same file even if the path was replaced -- and reject either direction.
-        const sourceBytes = (await source.handle.stat()).size;
-        if (copiedBytes !== expectedBytes || sourceBytes !== expectedBytes)
-          throw new Error("A browser upload file changed while it was staged.");
-        stagedPaths.push(stagedPath);
-      }
-      if (reservation.invalidated) throw new Error("The browser document changed during upload staging.");
-      return await this.#browser.handleDynamicTool(
-        { ...params, arguments: { ...args, paths: stagedPaths } },
-        {
-          onUploadTargetResolved: (inputId, documentId) => {
-            if (!reservation || reservation.invalidated) {
-              throw new Error("The browser document changed while files were being staged.");
-            }
-            // Inside the tab queue, and the last point before the input is assigned. The caller
-            // checked takeover before staging began; a takeover that started during staging would
-            // otherwise let this write files into a page the user is holding, since `BrowserHost`
-            // checks tab ownership and not takeover.
-            if (this.#hasTakeover(agentId)) {
-              reservation.invalidated = true;
-              throw new Error("Browser tools are unavailable during user takeover.");
-            }
-            if (inputId !== uploadTarget.inputId || documentId !== uploadTarget.documentId) {
-              reservation.invalidated = true;
-              throw new Error("The browser upload target changed while files were being staged.");
-            }
-          },
-          onUploadAssigned: (inputId) => {
-            if (!stagingRoot || this.#isStopping() || !reservation || reservation.invalidated) {
-              throw new Error("The browser document changed while files were being staged.");
-            }
-            const roots = this.#roots.get(tabId) ?? new Map<string, BrowserUploadRoot[]>();
-            // Appended rather than replacing what the input held before. Setting `input.files` again
-            // does not invalidate the `File` objects a page already took from it, so deleting the
-            // earlier directory here would break a page that is accumulating attachments across
-            // selections -- it reads a file that is no longer there. The earlier copies stay until the
-            // tab closes, and their bytes keep counting against the quotas.
-            roots.set(inputId, [...(roots.get(inputId) ?? []), { path: stagingRoot, bytes: stagedBytes }]);
-            this.#roots.set(tabId, roots);
-            // Ownership moves from the reservation to the root here: the `finally` below must not delete
-            // a directory the input is now reading from.
-            reservation.root = null;
-            stagingRoot = null;
-            releaseReservation();
-          },
-          onUploadOperationStarted: (completion) => {
-            uploadState.completion = completion;
-          },
-        },
-      );
-    } finally {
-      await Promise.allSettled(sources.map((source) => source.handle.close()));
-      if (stagingRoot) {
-        const unassignedRoot = stagingRoot;
-        const cleanup = async () => {
-          if (stagingRoot !== unassignedRoot) return;
-          stagingRoot = null;
-          if (reservation) reservation.root = null;
-          releaseReservation();
-          await rm(unassignedRoot, { recursive: true, force: true }).catch(() => undefined);
-        };
-        // The tool can reject while the input-setting operation is still reading the staged files, so
-        // cleanup waits for it rather than pulling the directory out from under the renderer.
-        if (uploadState.completion) void uploadState.completion.then(cleanup, cleanup);
-        else await cleanup();
-      } else releaseReservation();
-    }
-  }
+        }),
+      (sources) =>
+        attachmentCall(() => Promise.allSettled(sources.map((source) => source.handle.close()))).pipe(Effect.orDie),
+    );
+  });
 
   /** A closed tab can never read its staged files again, so the tab roster shrinking frees them. */
-  retainTabs(tabs: readonly { id: string }[]): void {
+  readonly retainTabs = Effect.fn("BrowserUploads.retainTabs")(function* (
+    this: BrowserUploads,
+    tabs: readonly { id: string }[],
+  ) {
     const open = new Set(tabs.map((tab) => tab.id));
     for (const tabId of new Set([...this.#roots.keys(), ...this.#reservations.keys()])) {
       if (open.has(tabId)) continue;
-      this.#discardTab(tabId);
+      yield* this.#discardTab(tabId);
     }
-  }
+  });
 
   /**
    * Cancels staging for a removed document. Assigned files stay: a surviving parent document can
    * retain File objects from the document that navigated. The byte quotas continue to bound them.
    */
-  retainDocuments(tabId: string, documentIds: ReadonlySet<string>): void {
+  readonly retainDocuments = Effect.fn("BrowserUploads.retainDocuments")(function* (
+    this: BrowserUploads,
+    tabId: string,
+    documentIds: ReadonlySet<string>,
+  ) {
     const reservations = this.#reservations.get(tabId);
     if (reservations) {
       for (const [id, reservation] of reservations) {
         if (documentIds.has(reservation.documentId)) continue;
         reservations.delete(id);
         reservation.invalidated = true;
-        if (reservation.root) void rm(reservation.root, { recursive: true, force: true }).catch(() => undefined);
+        if (reservation.root) yield* removeUploadRoot(reservation.root);
       }
       if (reservations.size === 0) this.#reservations.delete(tabId);
     }
-  }
+  });
 
-  /** Deletes every staging directory. Awaited, because after this the process is expected to exit. */
-  async dispose(): Promise<void> {
+  readonly dispose = Effect.fn("BrowserUploads.dispose")(function* (
+    this: BrowserUploads,
+  ): Effect.fn.Return<void, AttachmentOperationError> {
+    yield* Scope.close(this.#scope, Exit.void);
     const roots = [...this.#roots.values()].flatMap((values) => [...values.values()].flat().map((root) => root.path));
     const reserved = [...this.#reservations.values()].flatMap((values) =>
       [...values.values()].flatMap((reservation) => {
@@ -277,8 +355,9 @@ export class BrowserUploads {
     );
     this.#roots.clear();
     this.#reservations.clear();
-    await Promise.allSettled([...roots, ...reserved].map((root) => rm(root, { recursive: true, force: true })));
-  }
+    yield* Effect.forEach([...roots, ...reserved], removeUploadRoot, { concurrency: "unbounded" });
+    this.#scope = Scope.makeUnsafe();
+  }, Effect.uninterruptible);
 
   #reserve(tabId: string, id: symbol, reservation: BrowserUploadReservation): void {
     const roots = this.#roots.get(tabId);
@@ -323,17 +402,17 @@ export class BrowserUploads {
     if (reservations.size === 0) this.#reservations.delete(tabId);
   }
 
-  #discardTab(tabId: string): void {
+  readonly #discardTab = Effect.fn("BrowserUploads.discardTab")(function* (this: BrowserUploads, tabId: string) {
     const roots = this.#roots.get(tabId);
     this.#roots.delete(tabId);
     for (const root of [...(roots?.values() ?? [])].flat()) {
-      void rm(root.path, { recursive: true, force: true }).catch(() => undefined);
+      yield* removeUploadRoot(root.path);
     }
     const reservations = this.#reservations.get(tabId);
     this.#reservations.delete(tabId);
     for (const reservation of reservations?.values() ?? []) {
       reservation.invalidated = true;
-      if (reservation.root) void rm(reservation.root, { recursive: true, force: true }).catch(() => undefined);
+      if (reservation.root) yield* removeUploadRoot(reservation.root);
     }
-  }
+  });
 }

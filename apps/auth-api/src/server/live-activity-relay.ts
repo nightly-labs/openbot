@@ -3,7 +3,8 @@ import {
   LIVE_ACTIVITY_TOKEN_PATTERN,
   type LiveActivityRelayPush,
 } from "@openbot/contracts/live-activity-relay";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
 
 /**
@@ -41,6 +42,8 @@ const GONE_REASONS = new Set(["BadDeviceToken", "DeviceTokenNotForTopic", "Expir
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 
+class ApnsProviderError extends Schema.TaggedError<ApnsProviderError>()("ApnsProviderError", {}) {}
+
 export class ApnsLiveActivitySender {
   readonly #config: ApnsConfig;
   readonly #fetch: Fetch;
@@ -54,53 +57,71 @@ export class ApnsLiveActivitySender {
     this.#now = now;
   }
 
-  async send(push: LiveActivityRelayPush): Promise<LiveActivityRelayResult> {
+  readonly send = Effect.fn("ApnsLiveActivitySender.send")(function* (
+    this: ApnsLiveActivitySender,
+    push: LiveActivityRelayPush,
+  ): Effect.fn.Return<LiveActivityRelayResult, ApnsProviderError> {
     const sandbox = push.environment === "development";
     const url = this.#config.origin
       ? `${this.#config.origin}/${sandbox ? "sandbox" : "production"}/3/device/${push.token}`
       : `https://${sandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com"}/3/device/${push.token}`;
-    const response = await this.#fetch(url, {
-      method: "POST",
-      headers: {
-        authorization: `bearer ${await this.#providerToken()}`,
-        "apns-push-type": "liveactivity",
-        "apns-topic": `${this.#config.topic}.push-type.liveactivity`,
-        "apns-priority": String(push.priority),
-        "apns-expiration": String(push.staleAt ?? 0),
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(apnsPayload(push)),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    }).catch(() => null);
-    // A timeout or a network fault. The host tries again on the next change.
+    const token = yield* this.#providerToken();
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        this.#fetch(url, {
+          method: "POST",
+          headers: {
+            authorization: `bearer ${token}`,
+            "apns-push-type": "liveactivity",
+            "apns-topic": `${this.#config.topic}.push-type.liveactivity`,
+            "apns-priority": String(push.priority),
+            "apns-expiration": String(push.staleAt ?? 0),
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(apnsPayload(push)),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        }),
+      catch: () => new ApnsProviderError({}),
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!response) return "unavailable";
     if (response.ok) return "sent";
     if (response.status === 410) return "gone";
     if (response.status === 429 || response.status >= 500) return "unavailable";
-    const reason = await response
-      .json()
-      .then((value: unknown) => (isDynamicRecord(value) && isString(value.reason) ? value.reason : ""))
-      .catch(() => "");
+    const reason = yield* Effect.tryPromise({
+      try: () => response.json(),
+      catch: () => new ApnsProviderError({}),
+    }).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(Schema.Struct({ reason: Schema.String }))),
+      Effect.map((value) => value.reason),
+      Effect.catch(() => Effect.succeed("")),
+    );
     if (reason === "ExpiredProviderToken" || reason === "InvalidProviderToken") this.#token = null;
     return GONE_REASONS.has(reason) ? "gone" : "rejected";
-  }
+  }).bind(this);
 
-  /**
-   * Every request in the isolate shares this sender, so only resolved values are kept: the runtime
-   * refuses a promise that another request made.
-   */
-  async #providerToken(): Promise<string> {
+  /** Only resolved values cross Worker requests; pending I/O remains with its invocation. */
+  readonly #providerToken = Effect.fn("ApnsLiveActivitySender.providerToken")(function* (
+    this: ApnsLiveActivitySender,
+  ): Effect.fn.Return<string, ApnsProviderError> {
     const now = Math.floor(this.#now() / 1000);
     if (this.#token && now - this.#token.issuedAt < TOKEN_REUSE_SECONDS) return this.#token.value;
-    this.#key ??= await importPKCS8(this.#config.privateKey, "ES256");
-    const value = await new SignJWT({})
-      .setProtectedHeader({ alg: "ES256", kid: this.#config.keyId })
-      .setIssuer(this.#config.teamId)
-      .setIssuedAt(now)
-      .sign(this.#key);
+    this.#key ??= yield* Effect.tryPromise({
+      try: () => importPKCS8(this.#config.privateKey, "ES256"),
+      catch: () => new ApnsProviderError({}),
+    });
+    const key = this.#key;
+    const value = yield* Effect.tryPromise({
+      try: () =>
+        new SignJWT({})
+          .setProtectedHeader({ alg: "ES256", kid: this.#config.keyId })
+          .setIssuer(this.#config.teamId)
+          .setIssuedAt(now)
+          .sign(key),
+      catch: () => new ApnsProviderError({}),
+    });
     this.#token = { value, issuedAt: now };
     return value;
-  }
+  });
 }
 
 function apnsPayload(push: LiveActivityRelayPush) {

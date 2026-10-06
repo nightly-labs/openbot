@@ -57,8 +57,15 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
       }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     conversationReads: () => agent.listConversationReads(),
-    send: async (agentId, text, attachmentDraftIds) => {
-      await agent.sendMessage({ agentId, text, attachmentDraftIds });
+    send: async (agentId, text, attachmentDraftIds, replyToMessageId, clientMessageId) => {
+      const receipt = await agent.sendMessage({
+        agentId,
+        text,
+        attachmentDraftIds,
+        ...(replyToMessageId ? { replyToMessageId } : {}),
+        ...(clientMessageId ? { clientMessageId } : {}),
+      });
+      return receipt.deliveries[0]?.id ?? receipt.messageId;
     },
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
     setTyping: () => {},

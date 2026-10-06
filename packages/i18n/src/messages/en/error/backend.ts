@@ -131,7 +131,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerGone": "This MCP server no longer exists.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
-  "error.backend.mcpConnectionCancelled": "The connection was cancelled.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
