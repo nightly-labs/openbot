@@ -578,12 +578,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         });
     };
     socket.onerror = () => socket.close();
-    socket.onclose = (event) => {
+    // The event is optional: a diagnostic that throws here would stop the reconnect.
+    socket.onclose = (event?: CloseEvent) => {
       if (state.socket !== socket) return;
       state.socket = null;
       state.signalReady = false;
       if (state.closed || peer !== state) return;
-      diagnose(state, "signal-closed", `code ${event.code}`);
+      diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
       scheduleReconnect(state, actions);
     };
   }
