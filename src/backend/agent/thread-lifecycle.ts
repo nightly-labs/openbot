@@ -41,7 +41,14 @@ import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { agentNamesById, estimateTokens, renderHandoffMessage, summarizeOldMessages } from "./delivery-content";
+import {
+  agentNamesById,
+  estimateTokens,
+  HANDOFF_END,
+  HANDOFF_START,
+  renderHandoffMessage,
+  summarizeOldMessages,
+} from "./delivery-content";
 import { developerInstructions } from "./developer-instructions";
 import {
   decodeCapturedSteps,
@@ -1069,12 +1076,12 @@ export class ThreadLifecycle {
     const fullText = rendered.join("\n\n");
     if (estimateTokens(fullText) <= budgetTokens) {
       return [
-        "Continue this OpenBot conversation. The following transcript is user-visible history from the previous provider, with the work steps it recorded.",
+        `${HANDOFF_START} The following transcript is user-visible history from the previous provider, with the work steps it recorded.`,
         HANDOFF_PRECEDENCE,
         "Do not repeat completed work unless the current message asks for it.",
         "--- previous transcript ---",
         fullText,
-        "--- end previous transcript ---",
+        HANDOFF_END,
       ].join("\n");
     }
 
@@ -1100,13 +1107,13 @@ export class ThreadLifecycle {
       estimateTokens(summaryText),
     );
     return [
-      "Continue this OpenBot conversation. The oldest visible history was summarized because the provider handoff exceeded its context budget.",
+      `${HANDOFF_START} The oldest visible history was summarized because the provider handoff exceeded its context budget.`,
       HANDOFF_PRECEDENCE,
       "--- saved summary of older history ---",
       summaryText,
       "--- full recent transcript ---",
       newest.join("\n\n"),
-      "--- end previous transcript ---",
+      HANDOFF_END,
     ].join("\n");
   }).bind(this);
 }

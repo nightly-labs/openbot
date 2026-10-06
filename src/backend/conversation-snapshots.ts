@@ -34,38 +34,31 @@ export function snapshotFromThread(
           .join("\n");
         const delivery = item.clientId ? findDelivery(item.clientId) : null;
         if (!text) continue;
-        if (delivery) messages.push(deliveredMessage(delivery, turn.id));
+        const row = { id: item.id, turnId: turn.id, text, createdAt };
+        if (delivery) messages.push(promptMessage(delivery, row));
         else {
           /* The provider can keep a prompt under an ID that names no delivery. A teammate's message
              still names its sender and its mailbox message in the prompt, so it is not shown as one
              the user wrote. */
-          const teammates = teammatePrompts(text);
-          for (const [index, teammate] of teammates.entries()) {
-            const found = findMessageDelivery(teammate.messageId);
-            messages.push(
-              found
-                ? deliveredMessage(found, turn.id)
-                : teammateMessage(agentId, teammate, {
-                    id: index === 0 ? item.id : `${item.id}:${teammate.messageId}`,
-                    turnId: turn.id,
-                    createdAt,
-                  }),
-            );
-          }
-          if (teammates.length === 0)
-            messages.push({
-              id: item.id,
-              turnId: turn.id,
-              author: "user",
-              source: "user",
-              senderAgentId: undefined,
-              replyToMessageId: undefined,
-              attachments: undefined,
-              delivery: undefined,
-              text,
-              createdAt,
-              status: "completed",
-            });
+          const teammates = teammatePrompts(text).map((teammate) => ({
+            teammate,
+            found: findMessageDelivery(teammate.messageId),
+          }));
+          const fromTeammates =
+            teammates.length > 0 &&
+            teammates.every(({ teammate, found }) => !found || isTeammatePromptOf(teammate, promptMessage(found, row)));
+          if (!fromTeammates) messages.push(promptMessage(null, row));
+          else
+            for (const [index, { teammate, found }] of teammates.entries())
+              messages.push(
+                found
+                  ? promptMessage(found, row)
+                  : teammateMessage(agentId, teammate, {
+                      id: index === 0 ? item.id : `${item.id}:${teammate.messageId}`,
+                      turnId: turn.id,
+                      createdAt,
+                    }),
+              );
         }
       }
       if (item.type === "agentMessage" && isString(item.id) && item.text) {
@@ -105,18 +98,23 @@ export function snapshotFromThread(
   return { agentId, threadId: thread.id, activeTurnId: null, revision: 0, messages };
 }
 
-function deliveredMessage({ delivery }: DeliveryContext, turnId: string): ConversationMessage {
+/** A user prompt from provider history, or the mailbox delivery that the prompt came from. */
+function promptMessage(
+  context: DeliveryContext | null,
+  row: Pick<ConversationMessage, "id" | "turnId" | "text" | "createdAt">,
+): ConversationMessage {
+  const delivery = context?.delivery;
   return {
-    id: delivery.id,
-    turnId,
-    author: delivery.sender.kind === "agent" ? "agent" : "user",
-    source: delivery.sender.kind === "agent" ? "agent" : "user",
-    senderAgentId: delivery.sender.kind === "agent" ? delivery.sender.agentId : undefined,
-    replyToMessageId: delivery.replyToMessageId,
-    attachments: delivery.attachments,
-    delivery: { id: delivery.id, status: delivery.status, position: delivery.position },
-    text: delivery.text,
-    createdAt: delivery.createdAt,
+    id: delivery?.id ?? row.id,
+    turnId: row.turnId,
+    author: delivery?.sender.kind === "agent" ? "agent" : "user",
+    source: delivery?.sender.kind === "agent" ? "agent" : "user",
+    senderAgentId: delivery?.sender.kind === "agent" ? delivery.sender.agentId : undefined,
+    replyToMessageId: delivery?.replyToMessageId,
+    attachments: delivery?.attachments,
+    delivery: delivery ? { id: delivery.id, status: delivery.status, position: delivery.position } : undefined,
+    text: delivery?.text ?? row.text,
+    createdAt: delivery?.createdAt ?? row.createdAt,
     status: "completed",
   };
 }
@@ -165,12 +163,17 @@ export function isMailboxMessageCopy(
     teammates.length > 0 &&
     teammates.every((teammate) => {
       const original = mailboxMessages.get(teammate.messageId);
-      // A chat tag keeps its name, so the prompt text comes back without the agent list.
-      return (
-        original !== undefined &&
-        displayMessageReferences(original.text, original.attachments ?? [], new Map()).trimEnd() === teammate.text
-      );
+      return original !== undefined && isTeammatePromptOf(teammate, original);
     })
+  );
+}
+
+/** Whether a prompt holds this message and nothing more, so the message can take the prompt's place. */
+function isTeammatePromptOf(teammate: TeammatePrompt, message: ConversationMessage): boolean {
+  // A chat tag keeps its name, so the prompt text comes back without the agent list.
+  return (
+    message.senderAgentId === teammate.senderAgentId &&
+    displayMessageReferences(message.text, message.attachments ?? [], new Map()).trimEnd() === teammate.text
   );
 }
 

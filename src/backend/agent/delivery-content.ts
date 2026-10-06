@@ -58,6 +58,10 @@ const COLLABORATOR_SEPARATOR = "--- collaborator message ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
+/** The first words of a provider handoff. */
+export const HANDOFF_START = "Continue this OpenBot conversation.";
+/** The last line of a provider handoff. */
+export const HANDOFF_END = "--- end previous transcript ---";
 /** Between a provider handoff and the prompt of the turn that takes it. */
 export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
 const TEAMMATE_PROMPT = new RegExp(
@@ -85,10 +89,11 @@ export interface TeammatePrompt {
  * person's own message in the same turn or a pasted prompt, gives none, so it stays the person's.
  */
 export function teammatePrompts(prompt: string): TeammatePrompt[] {
-  const handoff = prompt.lastIndexOf(CURRENT_MESSAGE_SEPARATOR);
+  const handoffEnd = `\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+  const handoff = prompt.startsWith(HANDOFF_START) ? prompt.lastIndexOf(handoffEnd) : -1;
   return (
     currentTeammatePrompts(prompt) ??
-    (handoff < 0 ? null : currentTeammatePrompts(prompt.slice(handoff + CURRENT_MESSAGE_SEPARATOR.length))) ??
+    (handoff < 0 ? null : currentTeammatePrompts(prompt.slice(handoff + handoffEnd.length))) ??
     []
   );
 }
