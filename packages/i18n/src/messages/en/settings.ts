@@ -42,6 +42,9 @@ export const messages = defineMessages("settings", {
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",
+  "settings.busyMessage.title": "Steer agents while they work",
+  "settings.busyMessage.description":
+    "A message you send while an agent works joins its current work at the next step, instead of waiting in the queue. ChatGPT and Claude can steer; other providers queue the message.",
   "settings.autonomy.title": "Agent autonomy",
   "settings.turbo.title": "Turbo mode",
   "settings.turbo.description":

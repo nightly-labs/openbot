@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -80,7 +81,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentAutomationAllowed,
+  type BusyMessageMode,
   CONTEXT_RESET_ITEM_TYPE,
+  DEFAULT_BUSY_MESSAGE_MODE,
   isContextResetMarker,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -204,6 +207,11 @@ export interface AgentServiceOptions {
    * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
    */
   approvalAutomation?: ApprovalAutomationPolicy;
+  /**
+   * The app default for a message sent while its agent works. The main process owns the preference.
+   * Omitted, such a message waits in the queue, as every one did before the setting existed.
+   */
+  busyMessageMode?: () => BusyMessageMode;
   deleteWithRevokedApproval?: (agentId: string, remove: () => Promise<void>) => Promise<void>;
   /**
    * The shared database agents keep their tables in. Injected because the host child's packaged
@@ -277,6 +285,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
   readonly #developmentDefaults: boolean;
+  readonly #busyMessageMode: () => BusyMessageMode;
   #initialized = false;
   #stopping = false;
 
@@ -300,8 +309,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer = () => null,
       githubConnector = null,
       hostMemory = null,
+      busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
     } = options;
     this.#developmentDefaults = developmentDefaults;
+    this.#busyMessageMode = busyMessageMode;
     this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
@@ -1941,8 +1952,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     this.#conversation.emitConversation(snapshot);
     this.#mailboxSync.emitQueue(agent.id);
+    if (snapshot.activeTurnId && (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer") {
+      await this.#steerSentMessage(agent, delivery.delivery.id, snapshot.activeTurnId);
+    }
     this.#drain.scheduleDrain(agent.id);
     return receipt;
+  }
+
+  /**
+   * Takes a message the user sent while the agent works into the running turn. The message is
+   * queued before this runs, so a refusal leaves it there: it says why on its row and starts when
+   * the turn ends. Only a provider that reads a message at its next step is asked; the ACP ones can
+   * hold a second prompt until the turn ends, which is a queue the user cannot see.
+   */
+  async #steerSentMessage(agent: AgentSummary, deliveryId: string, turnId: string): Promise<void> {
+    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+      await this.#mailbox.markSteerFallback(deliveryId, "provider-unsupported");
+      this.#mailboxSync.emitQueue(agent.id);
+      return;
+    }
+    try {
+      await this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId });
+    } catch (error) {
+      logger.warn("A message sent to steer the running turn waits in the queue.", { agentId: agent.id, error });
+      // The turn may have ended in between. The message then starts as the next turn, which is no
+      // fallback worth naming.
+      if (!this.#conversation.ensureSnapshot(agent.id, agent.threadId).activeTurnId) return;
+      await this.#mailbox.markSteerFallback(deliveryId, "steer-failed");
+      this.#mailboxSync.emitQueue(agent.id);
+    }
   }
 
   async setMessageReaction(input: SetMessageReactionInput): Promise<void> {

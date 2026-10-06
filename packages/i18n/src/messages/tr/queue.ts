@@ -21,4 +21,8 @@ export const messages = {
   "queue.deleteHeld.title": "Kuyruktaki mesaj silinsin mi?",
   "queue.deleteHeld.body": "Başka bir cihaz bu mesajı düzenliyor. Ajan bu mesajı almayacak.",
   "queue.deleteHeld.keep": "Koru",
+  "queue.item.notSteered": "Yönlendirilmedi",
+  "queue.item.steerFallback.providerUnsupported":
+    "Bu sağlayıcı çalışan bir turu yönlendiremez, bu yüzden mesaj kuyrukta bekler.",
+  "queue.item.steerFallback.steerFailed": "Yönlendirme başarısız oldu, bu yüzden mesaj kuyrukta bekler.",
 } as const satisfies PartialTranslation<typeof source>;

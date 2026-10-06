@@ -16,6 +16,7 @@ import {
   type AppSetupState,
   type AttachmentImportEvent,
   agentAutoApprovalEnabled,
+  type BusyMessageModePreference,
   type CentralAuthState,
   CONTEXT_RESET_ITEM_TYPE,
   type ComputerUseState,
@@ -28,6 +29,7 @@ import {
   DEFAULT_AGENT_ACCESS,
   DEFAULT_APP_LOGO_COLOR,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
+  DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   type DirectConversationSnapshot,
@@ -213,6 +215,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
+  let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let logoColorPreference: AppLogoColorPreference = { color: DEFAULT_APP_LOGO_COLOR };
@@ -445,6 +448,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);
       return () => approvalAutomationListeners.delete(listener);
+    },
+    getBusyMessageModePreference: async () => clone(busyMessageMode),
+    setBusyMessageModePreference: async ({ mode }) => {
+      busyMessageMode = { mode };
+      return clone(busyMessageMode);
     },
     getAppLanguagePreference: async () => clone(languagePreference),
     setAppLanguagePreference: async ({ language }) => {
@@ -1122,8 +1130,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgent: async (input: UpdateAgentInput) => {
         const current = agents.find((agent) => agent.id === input.agentId);
         if (!current) throw new Error("Agent not found");
-        const { agentId: _agentId, ...updates } = input;
-        const updated = { ...current, ...updates };
+        const { agentId: _agentId, busyMessageMode, ...updates } = input;
+        const updated: AgentSummary = { ...current, ...updates };
+        // `null` returns the agent to the app default, which an agent records by having no value.
+        if (busyMessageMode === null) delete updated.busyMessageMode;
+        else if (busyMessageMode) updated.busyMessageMode = busyMessageMode;
         agents = agents.map((agent) => (agent.id === updated.id ? updated : agent));
         emitAgentEvent({ type: "agents-changed", agents });
         return clone(updated);

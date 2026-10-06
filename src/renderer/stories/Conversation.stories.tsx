@@ -1431,6 +1431,29 @@ export const ThreeQueuedMessages: Story = {
   args: { queue: queueWithItems(3), activeTurnId: "turn-active" },
 };
 
+/** Messages sent to steer that wait in the queue instead, each with the reason on its row. */
+export const QueuedAfterSteerFallback: Story = {
+  args: {
+    activeTurnId: "turn-active",
+    queue: {
+      ...queue,
+      deliveries: [
+        { ...queuedDelivery, text: "Use the staging database, not production.", steerFallback: "provider-unsupported" },
+        {
+          ...queuedDelivery,
+          id: "queued-2",
+          messageId: "queued-message-2",
+          text: "Skip the flaky browser tests.",
+          position: 2,
+          createdAt: "2026-08-19T10:01:00.000Z",
+          steerFallback: "steer-failed",
+        },
+        runningDelivery,
+      ],
+    },
+  },
+};
+
 export const SevenQueuedMessages: Story = {
   args: {
     queue: referenceQueue,

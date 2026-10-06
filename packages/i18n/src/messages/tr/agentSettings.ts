@@ -92,4 +92,12 @@ export const messages = {
   "agentSettings.automation.title": "Yerel betikler",
   "agentSettings.automation.description":
     "Bu bilgisayardaki betiklerin bu ajanın rutinlerini çalıştırmasına izin verin",
+  "agentSettings.runtime.busyMessage": "Çalışırken",
+  "agentSettings.runtime.busyMessageLabel": "Ajan çalışırken gönderilen mesajlar",
+  "agentSettings.busyMessage.appDefaultQueue": "Uygulama varsayılanı (Kuyruk)",
+  "agentSettings.busyMessage.appDefaultSteer": "Uygulama varsayılanı (Yönlendir)",
+  "agentSettings.busyMessage.queue": "Kuyruk",
+  "agentSettings.busyMessage.steer": "Yönlendir",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
 } as const satisfies PartialTranslation<typeof source>;

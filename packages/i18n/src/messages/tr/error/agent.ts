@@ -70,6 +70,8 @@ export const messages = {
   "error.agent.queueEditRejected": "Kuyruk düzenlemesi reddedildi: {reason}",
   "error.agent.computerUseLocalOnly": "Bilgisayar Kullanımı yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.automationLocalOnly": "Yerel betiklere yalnızca ajanı çalıştıran bilgisayarda izin verilebilir.",
+  "error.agent.busyMessageModeLocalOnly":
+    "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.automationOff": "Bu ajan, yerel betiklerin rutinlerini çalıştırmasına izin vermiyor.",
   "error.agent.automationPayloadTooLong": "Veri yükü {limit} karakterden daha uzun.",
   "error.agent.automationRateLimited":

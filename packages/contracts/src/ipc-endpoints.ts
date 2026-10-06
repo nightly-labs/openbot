@@ -217,6 +217,7 @@ import type {
 } from "./ipc-provider-detection";
 import type {
   AcknowledgeFailedTurnInput,
+  BusyMessageModePreference,
   CancelQueuedMessageInput,
   EditQueuedMessageInput,
   InterruptTurnInput,
@@ -404,6 +405,10 @@ export const IPC_ENDPOINTS = {
     // A remote owner or admin can change a grant from a phone or the web client, so main tells the
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
+    getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
+    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
+      "app:set-busy-message-mode",
+    ),
     getAppLanguagePreference: request<undefined, AppLanguagePreference>()("app:get-language-preference"),
     setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
       "app:set-language-preference",

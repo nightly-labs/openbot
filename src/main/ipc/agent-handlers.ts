@@ -253,6 +253,9 @@ export function agentIpcHandlers({
           if (input.allowAutomation !== undefined) {
             throw new Error(sourceText("error.agent.automationLocalOnly"));
           }
+          if (input.busyMessageMode !== undefined) {
+            throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
+          }
           return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
             method: "PATCH",
             body: input,

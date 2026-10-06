@@ -27,6 +27,7 @@ import {
   type AgentReasoningEffort,
   type AgentSummary,
   type AvatarImageInput,
+  type BusyMessageMode,
   type CreateAgentInput,
   DEFAULT_AGENT_ACCESS,
   type DuplicateAgentResult,
@@ -37,6 +38,7 @@ import {
   isAgentModel,
   isAvatarHue,
   isAvatarSeed,
+  isBusyMessageMode,
   isReasoningEffort,
   isSidebarLayoutSnapshot,
   providerForLegacyModel,
@@ -65,6 +67,8 @@ type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access
   computerUse?: boolean;
   // Absent on every agent stored before the setting existed, which keeps automation off.
   allowAutomation?: boolean;
+  // Absent means the app default, as for every agent stored before the setting existed.
+  busyMessageMode?: BusyMessageMode;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -556,6 +560,11 @@ export class AgentStore {
       if (!isBoolean(input.allowAutomation)) throw new Error("Invalid automation value.");
       next.allowAutomation = input.allowAutomation;
     }
+    if (input.busyMessageMode === null) delete next.busyMessageMode;
+    else if (input.busyMessageMode !== undefined) {
+      if (!isBusyMessageMode(input.busyMessageMode)) throw new Error("Invalid busy message mode.");
+      next.busyMessageMode = input.busyMessageMode;
+    }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
       next.avatarSeed = input.avatarSeed;
@@ -578,6 +587,8 @@ export class AgentStore {
           }
         : undefined;
     Object.assign(agent, next);
+    // A copy cannot remove a field, and `null` above returned the agent to the app default.
+    if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
     try {
       this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
     } catch (error) {
@@ -1369,6 +1380,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.access === undefined || isAgentAccess(record.access)) &&
     (record.computerUse === undefined || isBoolean(record.computerUse)) &&
     (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
+    (record.busyMessageMode === undefined || isBusyMessageMode(record.busyMessageMode)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1427,6 +1439,10 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.allowAutomation === undefined || isBoolean(value.allowAutomation)
       ? value.allowAutomation
       : reset("allowAutomation", undefined);
+  const busyMessageMode =
+    value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)
+      ? value.busyMessageMode
+      : reset("busyMessageMode", undefined);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1459,6 +1475,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(access === undefined ? {} : { access }),
     ...(computerUse === undefined ? {} : { computerUse }),
     ...(allowAutomation === undefined ? {} : { allowAutomation }),
+    ...(busyMessageMode === undefined ? {} : { busyMessageMode }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };

@@ -106,6 +106,12 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemActions>
           </Item>
           <SwitchField
+            checked={props.value.busyMessageMode === "steer"}
+            onChange={(checked) => props.onUpdateSetting("busyMessageMode", checked ? "steer" : "queue")}
+            label={i18n.t("settings.busyMessage.title")}
+            description={i18n.t("settings.busyMessage.description")}
+          />
+          <SwitchField
             checked={props.value.launchAtLogin}
             onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
             label={i18n.t("settings.launchAtLogin.title")}

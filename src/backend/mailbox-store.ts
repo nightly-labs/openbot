@@ -18,6 +18,7 @@ import type {
   QueueDeliveryStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
+  QueueSteerFallback,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
@@ -25,8 +26,9 @@ import {
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   isConversationMessageSender,
   isMessageReaction,
+  QUEUE_STEER_FALLBACKS,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -106,6 +108,8 @@ interface StoredDelivery {
   turnId: string | null;
   error: string | null;
   createdAt: string;
+  /** Sent to steer the running turn, and waiting in the queue instead. Shown only while queued. */
+  steerFallback?: QueueSteerFallback;
 }
 
 interface StoredState {
@@ -1383,6 +1387,11 @@ export class MailboxStore {
     });
   }
 
+  /** Says why a message sent to steer waits in the queue. A message that has left the queue keeps its state. */
+  async markSteerFallback(deliveryId: string, steerFallback: QueueSteerFallback): Promise<void> {
+    await this.#updateDelivery(deliveryId, ["queued"], { steerFallback });
+  }
+
   async restoreQueued(deliveryId: string): Promise<void> {
     await this.#updateDelivery(deliveryId, ["starting"], {
       status: "queued",
@@ -1640,9 +1649,10 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
-    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, ...publicDelivery } = delivery;
+    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, steerFallback, ...publicDelivery } = delivery;
     return {
       ...publicDelivery,
+      ...(steerFallback && delivery.status === "queued" ? { steerFallback } : {}),
       sender: structuredClone(message.sender),
       text: message.text,
       attachments: message.attachments.map(toAttachmentSummary),
@@ -1948,7 +1958,8 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
       value.status === "cancelled") &&
     (isString(value.turnId) || value.turnId === null) &&
     (isString(value.error) || value.error === null) &&
-    isString(value.createdAt)
+    isString(value.createdAt) &&
+    (value.steerFallback === undefined || isOneOf(QUEUE_STEER_FALLBACKS, value.steerFallback))
   );
 }
 

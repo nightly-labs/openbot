@@ -98,4 +98,12 @@ export const messages = {
   "agentSettings.computerUse.description": "このエージェントにこのコンピューターのアプリの操作を許可します",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} のプロセス全体がサンドボックス内で実行されるため、外部への書き込みは失敗します。macOS でのみ利用できます。",
+  "agentSettings.runtime.busyMessage": "作業中",
+  "agentSettings.runtime.busyMessageLabel": "エージェントの作業中に送るメッセージ",
+  "agentSettings.busyMessage.appDefaultQueue": "アプリの既定 (キュー)",
+  "agentSettings.busyMessage.appDefaultSteer": "アプリの既定 (方向を修正)",
+  "agentSettings.busyMessage.queue": "キュー",
+  "agentSettings.busyMessage.steer": "方向を修正",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
 } as const satisfies PartialTranslation<typeof source>;

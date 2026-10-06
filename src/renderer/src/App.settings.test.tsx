@@ -697,6 +697,7 @@ describe("OpenBot connected desktop shell", () => {
       .mockImplementationOnce(async (input) => ({
         ...chief,
         ...input,
+        busyMessageMode: chief.busyMessageMode,
         provider: "claude",
         model: "claude-opus-5",
       }));

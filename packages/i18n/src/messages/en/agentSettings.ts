@@ -46,6 +46,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.selectReasoning": "Select reasoning",
   "agentSettings.runtime.access": "Access",
   "agentSettings.runtime.accessLabel": "Agent access",
+  "agentSettings.runtime.busyMessage": "While working",
+  "agentSettings.runtime.busyMessageLabel": "Messages while the agent works",
   "agentSettings.runtime.workingDirectory": "Working directory",
   "agentSettings.runtime.notAvailable": "Not available yet",
   "agentSettings.runtime.fullAccessNote":
@@ -57,6 +59,12 @@ export const messages = defineMessages("agentSettings", {
 
   "agentSettings.access.workspace": "Workspace only",
   "agentSettings.access.full": "Full access",
+  "agentSettings.busyMessage.appDefaultQueue": "App default (Queue)",
+  "agentSettings.busyMessage.appDefaultSteer": "App default (Steer)",
+  "agentSettings.busyMessage.queue": "Queue",
+  "agentSettings.busyMessage.steer": "Steer",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
 
   "agentSettings.notifications.title": "Notifications",
   "agentSettings.notifications.description": "Get notified when this agent finishes or needs input",
