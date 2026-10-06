@@ -595,7 +595,7 @@ export function createConversationViewScope(props: ConversationProps) {
         return;
       }
       if (currentEditingDeliveryId()) {
-        cancelQueuedMessageEdit();
+        void cancelQueuedMessageEdit();
         return;
       }
       setOpenReactionMessageId(null);

@@ -91,9 +91,6 @@ jobs:
       - name: Check desktop application
         run: bun run check:desktop:static
 
-      - name: Check ratcheted lint rules
-        run: bun run lint:ratchet
-
       - name: Check translation catalogs
         run: bun run i18n:check
 

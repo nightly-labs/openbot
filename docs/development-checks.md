@@ -82,7 +82,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run lint:ratchet`, `bun run types:ratchet` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run types:ratchet` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
@@ -262,33 +262,29 @@ It rejects direct `window.openbot` and `globalThis.openbot` access, including op
 literal indexed forms. Browser APIs, comments, and string documentation remain valid.
 Its positive and negative fixtures run in `scripts/ui-foundation-check.test.ts`.
 
-### Lint debt ratchet
+### Promise rules
 
-`bun run lint:ratchet` runs the Biome rules in `tools/biome/lint-baseline.json` and compares the
-findings of each file to the baseline. A higher count fails, so a rule stops new debt before the old
-debt is fixed. A lower count also fails until `--write` lowers the baseline: this keeps the baseline
-tight. The script never raises a count; a higher count is a hand edit that a reviewer sees. When a
-rule has no findings left, turn it on in `biome.json` and remove it from the baseline.
+`nursery/noFloatingPromises` is an error in `biome.json`. Await a promise, or write `void` when the
+call is fire-and-forget and the called function handles its own errors. Until 2026-10 a separate
+`lint:ratchet` script held this rule to a per-file baseline. That cost a second full Biome pass in
+CI, so the last findings were fixed and the script was removed.
+`nursery/noMisusedPromises` was rejected: its 37 findings were all `if (cachedPromise)` presence
+checks.
 
-`nursery/noFloatingPromises` is the first rule. `nursery/noMisusedPromises` was rejected: its 37
-findings were all `if (cachedPromise)` presence checks.
-
-Biome cannot select a GritQL plugin with `--only`, and it reports every plugin under the one
-category `plugin`. So a plugin rule enters the baseline as `plugin/<name>`, and its message must
-start with `[<name>]`. The ratchet runs Biome once more with every built-in group skipped, and counts
-each plugin by that prefix. `plugin/no-hardcoded-ui-text`
-(`tools/ui-foundation/no-hardcoded-ui-text.grit`) used this path until its last finding was fixed;
-it is now an error. See [i18n.md](i18n.md). Other new GritQL rules must start clean.
+Biome reports every GritQL plugin under the one category `plugin`, so each plugin message starts
+with `[<name>]`. A new GritQL rule must start with no findings.
 
 ### Type debt ratchet
 
-`bun run types:ratchet` does the same for TypeScript options. For each option in
-`tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
+`bun run types:ratchet` holds TypeScript options that are not on yet to a baseline. For each option
+in `tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
 extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares the errors of each
 file to the baseline. An error that two projects report counts once. `apps/mobile` extends the Expo
-base config, so the ratchet does not check it. The rules for `--write` and `--add=<option>` are the
-same as for the lint ratchet: `scripts/debt-ratchet.ts` holds them for both. The run takes about 4
-seconds. When an option has no errors left, turn it on in
+base config, so the ratchet does not check it. A higher count fails, so an option stops new debt
+before the old debt is fixed. A lower count also fails until `--write` lowers the baseline: this
+keeps the baseline tight. The script never raises a count; a higher count is a hand edit that a
+reviewer sees. `--add=<option>` starts an option at its current counts. `scripts/debt-ratchet.ts`
+holds these rules. The run takes about 4 seconds. When an option has no errors left, turn it on in
 `tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
 

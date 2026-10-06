@@ -163,7 +163,7 @@ export function browserIpcHandlers({
       // at coordinates that mean nothing there, and still showed the remote user nothing.
       // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
-        if (remoteServers.activeServerId === LOCAL_SERVER_ID) browser.setVisible(parsed);
+        if (remoteServers.activeServerId === LOCAL_SERVER_ID) await browser.setVisible(parsed);
       }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
       startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => browserView.start(tabId)),
