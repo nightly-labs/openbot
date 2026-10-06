@@ -8,6 +8,7 @@ import {
   type DevelopmentCommandRunner,
   prepareDevelopmentEnvironment,
   prepareDevelopmentWorktree,
+  writeInstallStamp,
 } from "./prepare-dev-environment";
 
 const temporaryRoots: string[] = [];
@@ -86,6 +87,13 @@ describe("development environment preparation", () => {
     rmSync(join(root, "apps", "auth-api", ".wrangler", "state"), { recursive: true });
     prepare();
     expect(calls.slice(2)).toEqual(["install --frozen-lockfile", "run api:migrate:local", "run api:migrate:local"]);
+
+    // A plain `bun install` on another branch stamps that branch, so the return installs again.
+    writeFileSync(join(root, "bun.lock"), "lock v3");
+    writeInstallStamp(root);
+    writeFileSync(join(root, "bun.lock"), "lock v2");
+    prepare();
+    expect(calls.slice(5)).toEqual(["install --frozen-lockfile"]);
   });
 
   it("prepares the isolated worktree fixtures after the base environment", () => {
