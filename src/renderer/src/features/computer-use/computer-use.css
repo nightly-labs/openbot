@@ -222,19 +222,8 @@ body:has(.computer-use-highlight-surface),
   /* Under the fill, so the outline reads as an edge rather than as a second, thicker dart. */
   paint-order: stroke fill;
   filter: drop-shadow(0 0 6px var(--openbot-accent-strong));
-  /*
-   * One step between two points the agent asked for. The cursor has to move - that is the whole of
-   * what it says - and a jump of a thousand pixels tells the eye nothing about where it came from.
-   * The shortest token, because a slower cursor would still be travelling when the click lands.
-   */
-  transition: translate var(--openbot-duration-fast) linear;
+  /* No transition: `ComputerUseAgentCursor` plays each move, and a transition would fight it. */
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .computer-use-agent-cursor {
-    transition: none;
-  }
 }
 
 /*

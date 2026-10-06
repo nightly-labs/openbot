@@ -104,8 +104,9 @@ docker exec -it openbot openbot login
 See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits.
 
 > [!IMPORTANT]
-> The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
-> warning. Check the release checksum or GitHub build attestation before you run the installer.
+> Windows releases are signed by `SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ`. Older
+> releases are not code-signed. SmartScreen can still warn about a new release. Check the release
+> checksum or GitHub build attestation before you run the installer.
 
 ### Agent setup
 
@@ -524,7 +525,7 @@ described above.
 
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 and x64 release, an unsigned Windows x64 release, and unsigned Linux x64
+signed and notarized macOS ARM64 and x64 release, a signed Windows x64 release, and unsigned Linux x64
 and arm64 AppImages in GitHub Actions. After the release is published, the workflow pushes the Docker
 image to `ghcr.io/nightly-labs/openbot`.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account

@@ -307,6 +307,7 @@
     "fflate": "catalog:",
     "katex": "catalog:",
     "marked": "catalog:",
+    "mermaid": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "zod": "catalog:",
     "@openbot/i18n": "workspace:*"

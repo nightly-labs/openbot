@@ -845,6 +845,42 @@ describe("CentralAuthManager", () => {
     });
   });
 
+  it("keeps the stored session when a network filter answers for the account service", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    await writeFile(storagePath, Buffer.from("session-token").toString("base64"));
+    const blockPage = () =>
+      new Response("<html>Web Page Blocked</html>", { status: 401, headers: { "Content-Type": "text/html" } });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => blockPage());
+    const manager = new CentralAuthManager({
+      apiUrl: "https://api.openbot.run",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: fetchMock,
+      startupRetryWindowMs: 25,
+      startupRequestTimeoutMs: 5,
+      startupRetryDelaysMs: [5, 10],
+    });
+
+    await expect(manager.initialize()).resolves.toEqual({
+      status: "error",
+      issue: {
+        code: "auth_api_unavailable",
+        message:
+          "A firewall or proxy on this network blocked OpenBot from reaching api.openbot.run. Ask your network administrator to allow api.openbot.run, then try again.",
+      },
+    });
+    await expect(readFile(storagePath, "utf8")).resolves.toBe(Buffer.from("session-token").toString("base64"));
+
+    const certificateError = new TypeError("fetch failed", { cause: { code: "SELF_SIGNED_CERT_IN_CHAIN" } });
+    fetchMock.mockReset().mockRejectedValue(certificateError);
+    await expect(manager.retry()).resolves.toMatchObject({
+      status: "error",
+      issue: { message: expect.stringContaining("blocked OpenBot from reaching api.openbot.run") },
+    });
+  });
+
   it("uploads and removes the signed-in account avatar", async () => {
     const root = await createRoot();
     const requests: Request[] = [];

@@ -329,6 +329,11 @@ cannot follow a display connected after startup. Keeping cursor ownership in Ope
 highlight controller add, resize, and remove display overlays without restarting the daemon or
 changing provider sessions.
 
+Because the driver draws no cursor, its motion styles do not apply. The renderer plays the driver's
+`adaptive` style itself (`agent-cursor-motion.ts`, a port of the driver's `trajectory.rs`): a Fitts
+min-jerk glide, or a wide swoop for a move over 900 points. The tap does not delay a request, so the
+cursor shows where an action went, from 180 ms to about 1.1 s after the driver acts.
+
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot

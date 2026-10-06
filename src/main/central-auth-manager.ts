@@ -144,7 +144,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       ...options,
       mobileConnectApiUrl: options.mobileConnectApiUrl ?? options.apiUrl,
       canPersist: options.canPersist ?? (() => true),
-      fetch: options.fetch ?? fetch,
+      fetch: detectBlockingNetwork(options.fetch ?? fetch, options.apiUrl),
       startupRetryWindowMs: options.startupRetryWindowMs ?? STARTUP_RETRY_WINDOW_MS,
       startupRequestTimeoutMs: options.startupRequestTimeoutMs ?? STARTUP_REQUEST_TIMEOUT_MS,
       startupRetryDelaysMs: options.startupRetryDelaysMs ?? STARTUP_RETRY_DELAYS_MS,
@@ -1430,6 +1430,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   #setInitializationError(error: unknown): CentralAuthState {
+    if (error instanceof NetworkBlockedError) {
+      return this.#setState({ status: "error", issue: { code: "auth_api_unavailable", message: error.message } });
+    }
     const apiError = error instanceof AuthApiError ? error : null;
     const unavailable = !apiError || apiError.status >= 500;
     return this.#setState({
@@ -1488,7 +1491,60 @@ class AuthApiError extends Schema.TaggedError<AuthApiError>()("AuthApiError", {
   });
 }
 
+// A company firewall or proxy answers in place of the account service: with an HTML block page, or
+// by re-signing TLS with a root that this computer does not trust. Neither is the API's answer, so
+// its status must not reach a handler, such as the 401 that clears the stored session.
+class NetworkBlockedError extends Error {}
+
+const INTERCEPTED_TLS_CODES = new Set([
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_UNTRUSTED",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+function detectBlockingNetwork(fetcher: AuthFetcher, apiUrl: string): AuthFetcher {
+  const blocked = () =>
+    new NetworkBlockedError(sourceText("error.auth.networkBlocked", { host: new URL(apiUrl).host }));
+  return async (input, init) => {
+    let response: Response;
+    try {
+      response = await fetcher(input, init);
+    } catch (error) {
+      if (isInterceptedTlsError(error)) throw blocked();
+      throw error;
+    }
+    if (isFilterPage(response)) {
+      void response.body?.cancel().catch(() => undefined);
+      throw blocked();
+    }
+    return response;
+  };
+}
+
+// The account service answers with JSON or an image, never with HTML. Cloudflare's own error pages
+// are HTML too, but they carry `cf-ray`. A self-hosted service behind nginx can send an HTML 404 or
+// 413, so only the statuses that a filter uses for its block page count.
+const FILTER_PAGE_STATUSES = new Set([200, 401, 403, 407, 451]);
+
+function isFilterPage(response: Response): boolean {
+  return (
+    FILTER_PAGE_STATUSES.has(response.status) &&
+    !response.headers.has("cf-ray") &&
+    Boolean(response.headers.get("content-type")?.toLowerCase().startsWith("text/html"))
+  );
+}
+
+function isInterceptedTlsError(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : undefined;
+  return isDynamicRecord(cause) && isString(cause.code) && INTERCEPTED_TLS_CODES.has(cause.code);
+}
+
 function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage: string): CentralAuthIssue {
+  if (error instanceof NetworkBlockedError) return { code: "network_blocked", message: error.message };
   if (error instanceof AuthApiError) {
     return {
       code: error.code,
@@ -1500,7 +1556,7 @@ function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage:
 }
 
 function emailCodeRequestIssue(error: unknown): CentralAuthIssue {
-  if (error instanceof AuthApiError) {
+  if (error instanceof AuthApiError || error instanceof NetworkBlockedError) {
     return centralAuthIssue(error, "email_sign_in_start_failed", sourceText("error.auth.codeNotSent"));
   }
   if (error instanceof DOMException && error.name === "TimeoutError") {
@@ -1543,6 +1599,8 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+// A block page gives the same answer on each attempt, so it is not transient.
 function isTransientStartupError(error: unknown): boolean {
+  if (error instanceof NetworkBlockedError) return false;
   return !(error instanceof AuthApiError) || error.status >= 500;
 }

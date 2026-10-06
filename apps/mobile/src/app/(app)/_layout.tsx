@@ -7,6 +7,7 @@ import { AgentPinTransitionProvider } from "@/features/agents/components/agent-p
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { MermaidRendererHost } from "@/features/chat/components/mermaid-renderer-host";
 import { MessageActionsProvider } from "@/features/chat/context/message-actions-context";
 import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
@@ -82,6 +83,18 @@ function AuthenticatedStack() {
             contentStyle: { backgroundColor: background },
             fullScreenGestureEnabled: false,
             gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="code-preview/[previewId]"
+          options={{
+            animation: "slide_from_right",
+            contentStyle: { backgroundColor: background },
+            // The diagram pans with one finger, so only the screen edge goes back.
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            // The screen draws the app's glass header, as the chat does.
             headerShown: false,
           }}
         />
@@ -316,6 +329,7 @@ export default function AuthenticatedLayout() {
           <MessageActionsProvider>
             <QueuedMessagesProvider>
               <AuthenticatedStack />
+              <MermaidRendererHost />
             </QueuedMessagesProvider>
           </MessageActionsProvider>
         </AppDrawerShell>

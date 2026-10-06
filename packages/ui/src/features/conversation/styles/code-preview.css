@@ -1,0 +1,214 @@
+/* A ```html or ```mermaid block drawn in the code block's frame, and its larger dialog. */
+.message-code-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+}
+
+/* The same icon size as Copy beside it. */
+.message-preview-expand svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+/* The Preview and Code switch, sized to the header's buttons. */
+.ui-sliding-tabs.message-preview-switch {
+  gap: var(--openbot-space-0-5);
+  padding: var(--openbot-space-0-5);
+}
+
+.message-preview-switch .ui-sliding-tabs-trigger {
+  height: 22px;
+  padding: 0 var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+.message-preview-switch .ui-sliding-tabs-pill {
+  top: var(--openbot-space-0-5);
+  height: 22px;
+}
+
+/* The two views share one cell. Only the selected view sets the height, so the block eases from
+   one height to the other while the views cross-fade. */
+.message-preview-resize {
+  overflow: hidden;
+}
+
+.message-preview-views {
+  position: relative;
+}
+
+.message-preview-view:not([data-selected]) {
+  position: absolute;
+  inset: 0 0 auto;
+}
+
+.message-preview-body {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--openbot-bg-sidebar);
+}
+
+.message-preview-body[data-preview-kind="mermaid"] {
+  max-height: 420px;
+  overflow: auto;
+  padding: var(--openbot-space-3);
+  overscroll-behavior-x: contain;
+}
+
+/* The frame takes the page height that the app measures, up to the height of a code block. The
+   page scrolls inside the frame beyond that. */
+.message-preview-frame {
+  width: 100%;
+  height: min(var(--message-preview-height, 160px), 420px);
+  display: block;
+  border: 0;
+  background: var(--openbot-bg-sidebar);
+}
+
+.message-preview-diagram {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.message-preview-status {
+  margin: 0;
+  padding: var(--openbot-space-6) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.message-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+}
+
+.message-preview-dialog {
+  width: min(1100px, 100%);
+  height: calc(100dvh - var(--openbot-space-6) * 2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+  /* The dialog grows from the block that opened it: the block's corner is the fixed point. */
+  transform-origin: 0 0;
+}
+
+/* Hidden until its first frame of motion, so it never shows at full size before it grows. */
+.message-preview-dialog:not([data-shown]) {
+  opacity: 0;
+}
+
+.message-preview-dialog-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-4);
+  border-bottom: 1px solid var(--openbot-border);
+}
+
+.message-preview-dialog-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.message-preview-dialog-body {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  overflow: auto;
+  background: var(--openbot-bg-sidebar);
+}
+
+/* The diagram canvas fills the dialog body and moves inside it, so the body does not scroll. */
+.message-preview-dialog-body[data-preview-kind="mermaid"] {
+  overflow: hidden;
+}
+
+.message-preview-canvas {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.message-preview-canvas-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  outline: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.message-preview-canvas-viewport[data-dragging] {
+  cursor: grabbing;
+}
+
+.message-preview-canvas-viewport:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--openbot-border-focus);
+}
+
+/* Hidden until it has its first place, so it never shows at its drawn size in a corner. */
+.message-preview-canvas-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  height: auto;
+  opacity: 0;
+  transform-origin: 0 0;
+  -webkit-user-drag: none;
+}
+
+.message-preview-canvas-image[data-ready] {
+  opacity: 1;
+}
+
+.message-preview-canvas-image[data-settling] {
+  transition:
+    transform var(--openbot-duration-slow) var(--openbot-ease-out),
+    width var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+/* The zoom controls float over the bottom of the canvas. */
+.message-preview-zoom {
+  position: absolute;
+  bottom: var(--openbot-space-4);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+  translate: -50% 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-overlay);
+  box-shadow: 0 0 0 1px var(--openbot-border);
+  padding: var(--openbot-space-1);
+}
+
+.message-preview-zoom .ui-button {
+  border-radius: var(--openbot-radius-pill);
+}
+
+:where(.ui-button).message-preview-zoom-level {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+}
+
+.message-preview-dialog-body .message-preview-frame {
+  height: 100%;
+}
