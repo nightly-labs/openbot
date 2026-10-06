@@ -74,6 +74,8 @@ describe("listWorkspaceDirectory", () => {
     // tell which host paths exist.
     const missing = await refusal(listWorkspaceDirectory(agent, "../nothing"));
     expect(outside.memberMessage).toBe(missing.memberMessage.replace("../nothing", "../private"));
+    const throughFile = await refusal(listWorkspaceDirectory(agent, "../private/secret.env/child"));
+    expect(throughFile.reason).toBe("missing");
     const linked = await refusal(listWorkspaceDirectory(agent, "research/eyeliner/outside"));
     expect(linked.reason).toBe("outside");
   });

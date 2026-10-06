@@ -186,8 +186,9 @@ function homeRelative(path: string): string {
   return path === home || path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;
 }
 
+/** `ENOTDIR` is a path through a file, such as `notes.md/child`: nothing exists there either. */
 function isMissing(error: AttachmentOperationError): boolean {
-  return isRecord(error.cause) && error.cause.code === "ENOENT";
+  return isRecord(error.cause) && (error.cause.code === "ENOENT" || error.cause.code === "ENOTDIR");
 }
 
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
