@@ -129,9 +129,14 @@ export class BrowserViewGateway {
     }
   }
 
+  /**
+   * Ends every view, not the gateway: the host service keeps this gateway across the Team API's
+   * stop and start (an account switch, a failed publish, a signal recovery), and a closed
+   * `WebSocketServer` answers every later upgrade with 503. A `noServer` server holds no port, so
+   * there is nothing to release here beyond the sessions.
+   */
   async stop(): Promise<void> {
     for (const session of [...this.#sessions.values()]) await this.#closeSession(session, "The host stopped.");
-    this.#webSockets.close();
   }
 
   handlesUpgrade(url: URL): boolean {
