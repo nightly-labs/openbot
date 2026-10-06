@@ -174,7 +174,7 @@ to one remote-screen session. On 2026-09-23 the user decided not to add this ori
 ## Local checks
 
 Run `bun install --frozen-lockfile` in a fresh worktree. Start the API with
-`bun run dev:api --isolated`. The supervisor chooses and prints the port.
+`bun run dev:api`. The supervisor chooses and prints the port.
 For synthetic local email checks, `AUTH_EXPOSE_DEVELOPMENT_CODE=true` returns development codes;
 do not enable it in production or print codes and cookies in logs. Keep the cookie's security
 attributes in development. A browser that refuses secure loopback cookies needs a local HTTPS

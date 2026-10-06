@@ -84,9 +84,12 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
     remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
     Because several worktrees run dev side by side, each instance publishes its worktree, profile,
-    renderer port and debugging port to a registry in the per-user temporary directory
-    (`scripts/dev-automation/instance-registry.ts`); automation resolves the record of the worktree
-    it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
+    renderer port and debugging port to a registry in the dev runtime directory
+    (`devRuntimeDirectory()` in `src/main/development-runtime-directory.ts`,
+    `scripts/dev-automation/instance-registry.ts`). That directory does not follow `TMPDIR`, which can
+    differ from one shell to the next, so every command reads the registry the stack wrote to. The
+    file in which a dev host hands its test client the connection is there too, one for each stack.
+    Automation resolves the record of the worktree it runs in, verifies the renderer port and the `window.openbot` preload bridge before driving a
     page, and refuses `click` or `type` on an instance it only inferred. A second registry beside it
     (`scripts/dev-automation/stack-registry.ts`) records every port and pid a whole dev stack holds,
     Storybook included, and `scripts/dev-automation/port-allocation.ts` serializes read, choose and

@@ -18,6 +18,9 @@ env:
   GIT_CONFIG_COUNT: 1
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
+  # No job here builds the native mobile app, so the postinstall skips the React Native Skia
+  # library copy. The jobs that install with `--ignore-scripts` skip it already.
+  OPENBOT_SKIP_SKIA: "1"
 
 jobs:
   detect:
@@ -300,14 +303,23 @@ jobs:
         run: bun run remote:check:compose
 
   api:
+    # `check:api` ends with `api:build:check`, the preview build of the Worker. For a pull request
+    # from this repository, this job uploads that build. It has no secrets and no write token. The
+    # trusted `cloudflare-preview.yml` workflow uploads the build and comments on the pull request
+    # after this run completes; it runs code from `main` only. Forks get no preview. A pull request
+    # that skips this lane, or fails it, keeps the preview of its last commit that built one.
     name: API
     needs: detect
     if: needs.detect.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -316,6 +328,17 @@ jobs:
 
       - name: Check API
         run: bun run check:api
+
+      - name: Upload preview build
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloudflare-preview
+          path: apps/auth-api/dist
+          # The build writes `.assetsignore`, which keeps the config out of the public assets.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
 
   storybook:
     name: Storybook build
@@ -338,52 +361,13 @@ jobs:
           # This output is not published. Skip Solid's per-component docgen analysis.
           OPENBOT_STORYBOOK_CHECK: "true"
 
-  preview:
-    # This job builds the pull request's Worker with no secrets and no write token. The trusted
-    # `cloudflare-preview.yml` workflow uploads the build and comments on the pull request after
-    # this run completes; it runs code from `main` only. Forks get no preview. A pull request that
-    # skips the `api` lane keeps the preview of its last commit that built one.
-    name: Cloudflare preview build
-    needs: detect
-    if: >-
-      needs.detect.outputs.api == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Bun
-        uses: ./.github/actions/setup-bun
-
-      - name: Build isolated preview
-        run: bun run api:build
-        env:
-          CLOUDFLARE_ENV: preview
-
-      - name: Upload preview build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: cloudflare-preview
-          path: apps/auth-api/dist
-          # The build writes `.assetsignore`, which keeps the config out of the public assets.
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 3
-
   all-checks-pass:
     # A summary of every job. Branch protection requires `Check`, not this job. A lane that
     # `detect` skipped counts as passed; a failed or cancelled job, including `detect` itself,
     # fails this one.
     name: All required checks pass
     if: always()
-    needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook, preview]
+    needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

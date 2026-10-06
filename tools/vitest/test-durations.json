@@ -209,7 +209,7 @@
   "src/main/managed-skill-service.test.ts": 0.03,
   "src/main/mobile-connect-host.test.ts": 0.0,
   "src/main/provider-credential-store.test.ts": 0.01,
-  "src/main/provider-runtime-manager.test.ts": 41.22,
+  "src/main/provider-runtime-manager.test.ts": 17.11,
   "src/main/remote-desktop-manager.test.ts": 0.0,
   "src/main/remote-desktop-runtime-artifact.test.ts": 0.0,
   "src/main/remote-desktop-secret-store.test.ts": 0.01,

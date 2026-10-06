@@ -90,7 +90,6 @@ export function supportedAttachmentExtensions(support: AttachmentSupport): strin
   );
 }
 
-export const IMAGE_ATTACHMENT_ACCEPT = IMAGE_ATTACHMENT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
   "images, MP3 audio, MOV video, PDF, Office documents, EML, text, Markdown, data, or source files";

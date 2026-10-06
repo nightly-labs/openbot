@@ -114,11 +114,11 @@ Its main jobs are:
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
 | Tests (remote) | `ubuntu-latest` | `bun run test:remote` |
 | Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n`, `bun run remote:check:compose` |
-| API | `ubuntu-latest` | `bun run check:api` |
+| API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
-| Cloudflare preview build | `ubuntu-latest` | `CLOUDFLARE_ENV=preview bun run api:build`, then upload `apps/auth-api/dist` |
 
-The preview build job has no secrets. After the CI run completes, the trusted
+`check:api` ends with `api:build:check`, which is the preview build of the Worker, so the API job
+uploads that build as the `cloudflare-preview` artifact. The job has no secrets. After the CI run completes, the trusted
 [cloudflare-preview.yml](../.github/workflows/cloudflare-preview.yml) workflow runs its `main`
 version with the preview deploy token. It skips a closed pull request, a newer commit, and a fork. It
 builds the `main` Worker config, and `scripts/check-preview-worker-config.ts` stops the upload when
@@ -126,7 +126,7 @@ the pull request's generated `wrangler.json` differs from it in anything but the
 compatibility settings. Thus a pull request that changes the preview Worker name, bindings, vars, or
 routes gets no preview. A change to `cloudflare-preview.yml` takes effect only after it merges.
 
-All of these jobs except the preview build gate Cloudflare production deployment on `main`. Surfaces was previously missing from
+All of these jobs gate Cloudflare production deployment on `main`. Surfaces was previously missing from
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
@@ -141,7 +141,7 @@ renderer bundles it. Then it selects the lanes:
 | `code` | Check, Tests (desktop) | anything that is left |
 | `docs` | Check, with only `check:doc-links` when `code` is off | any Markdown file, before the removal above, or `scripts/check-doc-links.ts` |
 | `desktop` | Browser smoke | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `remote` and `docker` |
-| `api` | API, Cloudflare preview build | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
+| `api` | API | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
 | `sites` | Tests (sites) | in `apps/site-router` |
 | `remote` | Tests (remote) | in `remote` or `scripts` |
 | `storybook` | Storybook build | in `src`, `apps/auth-api`, `.storybook`, `resources`, `marketplace` or `build` |
@@ -362,6 +362,27 @@ reviewer sees. `--add=<option>` starts an option at its current counts. `scripts
 holds these rules. The run takes about 4 seconds. When an option has no errors left, turn it on in
 `tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
+
+### Plugin cost
+
+Each GritQL plugin walks every file in its scope again. On 2026-10-06 the plugins used about 60 of
+79 CPU-seconds of a full `biome lint .`. To measure one plugin, lint with a temporary config that
+turns off the built-in rules and enables only that plugin, and subtract the time with no plugins.
+
+- Check a cheap condition before a costly one. `no-hardcoded-ui-text` matched its long attribute
+  regex on every JSX attribute: about 16 of its 23 CPU-seconds. It now checks the attribute name
+  first.
+- One snippet with a metavariable can cost less than one snippet per spelling.
+  `Reflect.$method($args)` costs about half as much as two `Reflect.<method>($args)` snippets.
+  `JsCallExpression(callee=...)` was faster still, but it also matched `Reflect.get?.()` and a call
+  with type arguments, so it was rejected.
+- Do not merge rules into one `or { ... }` file. A merged file of the 8 global rules cost 71
+  CPU-seconds, against 24 for the separate files.
+- Scope a plugin only to where its pattern can mean something. `no-collections-in-stores` runs on
+  the SolidJS code only. The type rules stay global, because they apply to scripts and tests too.
+
+Before you change a pattern for speed, show that the old and the new rule report the same
+locations over the whole repository and on a file of edge cases.
 
 ### Removed rules and their limits
 

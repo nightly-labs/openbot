@@ -150,8 +150,8 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - Do not delete a dead stack record you did not resolve. Stop keeps the record and exits non-zero
   when it cannot confirm a PID's identity; resolve the process, then `bun run dev:forget`. Dead
   records do not reserve ports.
-- Reuse a running dev instance, or use `bun run dev --isolated` for a profile tied to this worktree.
-  Use the ports the stack reports rather than a fixed port.
+- Reuse a running dev instance. `bun run dev` opens a profile tied to this worktree; `--shared`
+  opens the shared `OpenBot Dev` profile. Use the ports the stack reports rather than a fixed port.
 
 See [README.md — Commands](README.md#commands) for the flags these commands take, and
 [docs/architecture/change-rules.md](docs/architecture/change-rules.md#change-rules) for why the registry works this way, when a dev command

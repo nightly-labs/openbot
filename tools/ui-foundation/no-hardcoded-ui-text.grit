@@ -7,13 +7,17 @@ language js(typescript)
 // English to a reader who chose another language. Text without a letter, such as "·" or "/", is not
 // matched. The message starts with the rule name, because Biome reports every plugin under the one
 // category `plugin`.
+//
+// The attribute arm checks the attribute name first. Without it, the long regex runs on every JSX
+// attribute, and that one arm used about 16 of the rule's 23 CPU-seconds in a full lint.
 
 or {
   JsxText() as $text where {
     $text <: r"(?s).*\p{L}.*",
     register_diagnostic(span=$text, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
-  JsxAttribute() as $attr where {
+  JsxAttribute(name=$name) as $attr where {
+    $name <: r"aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint",
     $attr <: r"(?s)(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)=(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*'|\{\s*\"[^\"]*\p{L}[^\"]*\"\s*\}|\{\s*'[^']*\p{L}[^']*'\s*\}|\{\s*`[^`$]*\p{L}[^`$]*`\s*\})",
     register_diagnostic(span=$attr, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },

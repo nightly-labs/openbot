@@ -11,6 +11,7 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   type DevInstanceRecord,
   describeDevInstance,
+  devInstanceRegistryDirectory,
   readAllDevInstanceRecords,
   readDevInstanceRecords,
   removeDevInstanceRecord,
@@ -234,6 +235,9 @@ async function main(): Promise<void> {
 
   if (invocation.command === "status") {
     const document = {
+      // The directory this command read, so a stack that is missing from the output can be traced to
+      // an `OPENBOT_DEV_REGISTRY_DIR` that differs between shells.
+      registryDirectory: redactText(devInstanceRegistryDirectory()),
       stacks: selectDevStacks(records, devStackScope(invocation, projectRoot)).map((record) =>
         reportableStack(record, projectRoot),
       ),

@@ -1,7 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
   "plugins": [
-    "./tools/biome/anti-slop/rules/no-collections-in-stores.grit",
     "./tools/biome/anti-slop/rules/no-known-value-widening.grit",
     "./tools/biome/anti-slop/rules/no-module-mocking.grit",
     "./tools/biome/anti-slop/rules/no-object-parameters.grit",
@@ -270,6 +269,10 @@
         "./tools/biome/anti-slop/rules/no-class-selector-queries.grit",
         "./tools/biome/anti-slop/rules/no-sleep-in-tests.grit"
       ]
+    },
+    {
+      "includes": ["src/renderer/**", "packages/ui/**", "packages/brand/**", "apps/auth-api/**", ".storybook/**"],
+      "plugins": ["./tools/biome/anti-slop/rules/no-collections-in-stores.grit"]
     },
     {
       "includes": ["**/*.stories.ts", "**/*.stories.tsx"],
