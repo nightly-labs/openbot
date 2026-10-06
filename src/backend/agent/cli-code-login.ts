@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { cliSpawnTarget } from "../cli";
+import { stopProcessTree } from "../windows-process-tree";
 import { waitForSuccessfulProcess } from "./provider-status";
 
 /**
@@ -84,7 +85,8 @@ export function startCliCodeLogin(options: {
       child.stdout?.off("data", read);
       child.stderr?.off("data", read);
       if (result instanceof Error) {
-        if (child.exitCode === null) child.kill("SIGTERM");
+        // Cursor's Windows launcher runs under `cmd.exe`, so the whole tree has to stop.
+        if (child.exitCode === null) stopProcessTree(child);
         reject(result);
       } else resolve(result);
     };
@@ -158,8 +160,8 @@ function shellQuote(value: string): string {
  */
 export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
-  // Only a link the line has ended after: a chunk can stop in the middle of one.
-  const url = text.match(/https:\/\/[^\s"'<>]+(?=\s)/)?.[0];
+  // Only a link that something has ended: a chunk can stop in the middle of one.
+  const url = text.match(/https:\/\/[^\s"'<>]+(?=[\s"'<>])/)?.[0];
   if (!url) return null;
   let parsed: URL;
   try {

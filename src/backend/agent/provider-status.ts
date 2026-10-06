@@ -3,6 +3,7 @@ import type { AgentProviderStatus } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import type { AgentProvider } from "../agent-client";
 import { CodexCliError } from "../cli";
+import { stopProcessTree } from "../windows-process-tree";
 
 export function setProviderStatus(
   statuses: AgentProviderStatus[],
@@ -62,7 +63,8 @@ export function waitForSuccessfulProcess(
 ): Promise<void> {
   return new Promise((resolveProcess, reject) => {
     const timer = setTimeout(() => {
-      child.kill("SIGTERM");
+      // A `.cmd` launcher runs under `cmd.exe`, and a kill of the wrapper leaves the CLI running.
+      stopProcessTree(child);
       reject(new Error(`${description} timed out.`));
     }, timeoutMs);
     timer.unref?.();

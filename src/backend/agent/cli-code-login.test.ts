@@ -55,6 +55,7 @@ describe("parseCliCodePrompt", () => {
     expect(parseCliCodePrompt("link", CURSOR_OUTPUT)).toEqual({ flow: "link", verificationUrl: CURSOR_URL });
     expect(parseCliCodePrompt("link", CURSOR_OUTPUT.slice(0, CURSOR_OUTPUT.indexOf("&mode")))).toBeNull();
     expect(parseCliCodePrompt("link", CURSOR_OUTPUT.trimEnd())).toBeNull();
+    expect(parseCliCodePrompt("link", `Open <${CURSOR_URL}>`)).toEqual({ flow: "link", verificationUrl: CURSOR_URL });
   });
 
   it("reads the Cline device code that comes before its link", () => {
