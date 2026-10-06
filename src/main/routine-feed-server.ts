@@ -78,8 +78,16 @@ export class RoutineFeedServer {
           return;
         }
         if (!stored.success) return;
-        const opened = yield* Effect.result(this.#open(stored.success.token, stored.success.port));
-        if (Result.isFailure(opened)) logger.warn("The routine feed could not open.", opened.failure.cause);
+        const { token, port } = stored.success;
+        const opened = yield* Effect.result(this.#open(token, port));
+        if (Result.isFailure(opened)) {
+          logger.warn("The routine feed could not open.", opened.failure.cause);
+          return;
+        }
+        if (this.#port === port) return;
+        // The port was not free. Keep the new one, so the URL that the user subscribes to now stays.
+        const saved = yield* Effect.result(this.#write(token, this.#port));
+        if (Result.isFailure(saved)) logger.warn("The new routine feed port could not be saved.", saved.failure.cause);
       }),
     );
   }).bind(this);

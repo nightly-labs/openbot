@@ -181,7 +181,7 @@ export const messages = defineMessages("server", {
   "server.routineFeed.title": "Calendar feed",
   "server.routineFeed.offTitle": "The calendar feed is off",
   "server.routineFeed.offDescription":
-    "Make a private URL, then subscribe to it in Apple Calendar, Outlook or Fantastical on this computer. Each run of the next 30 days shows as an event. Paused routines are not shown.",
+    "Make a private URL, then subscribe to it in Apple Calendar (On My Mac) or in another calendar app that reads it on this computer. Each run of the next 30 days shows as an event. Paused routines are not shown.",
   "server.routineFeed.create": "Make feed URL",
   "server.routineFeed.urlLabel": "Feed URL",
   "server.routineFeed.agentLabel": "Agent filter",
