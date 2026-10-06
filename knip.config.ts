@@ -15,6 +15,7 @@ const config: KnipConfig = {
   ignoreIssues: {
     "packages/contracts/src/team-protocol/v*.ts": ["exports", "types"],
     "packages/contracts/src/team-protocol/*-v*.ts": ["exports", "types"],
+    "packages/contracts/src/team-protocol/provider-aware-codec.ts": ["exports", "types"],
     // A generator writes this file, and `build-plugin-catalog.test.ts` requires its exact output.
     "apps/auth-api/src/lib/plugin-catalog.generated.ts": ["exports", "types"],
   },
