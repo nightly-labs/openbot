@@ -30,6 +30,10 @@ const RELATIVE_IMPORTS: Record<string, string[]> = {
   "typecheck:node": ["apps/mobile/src", "apps/auth-api/src"],
   // The account Worker routes hosted sites with the site router.
   "typecheck:api": ["apps/site-router/src"],
+  // `Conversation.stories.tsx` reads pasted files with the preload helper.
+  "typecheck:renderer": ["src/preload/clipboard-files.ts"],
+  // `.storybook/preview.tsx` imports the renderer i18n context.
+  "typecheck:storybook": ["src/renderer/src"],
 };
 
 interface PackageJson {

@@ -70,7 +70,8 @@ of only text or data JSON is fast.
 see a staged file: the file is under a fixed part of the project's tsconfig `include`, in its
 workspace package, in a workspace package that it depends on (also through other workspace
 packages), or in a folder that it imports through a relative path. That last list is in the script:
-`scripts` imports mobile and account Worker modules, and the account Worker imports the site router.
+`scripts` imports mobile and account Worker modules, the account Worker imports the site router, a
+renderer story imports a preload helper, and `.storybook/preview.tsx` imports the renderer.
 A root `tsconfig*.json`, `package.json` or `bun.lock` selects all projects. A mobile codegen input,
 such as `app.json` or the brand CSS, selects mobile. `biome.json` and GritQL files select no project:
 TypeScript does not read them. The script runs the projects one at a time and reports each one that

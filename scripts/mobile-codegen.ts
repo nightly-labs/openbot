@@ -37,11 +37,14 @@ const STAMP = `${MOBILE}/.expo/codegen-inputs.sha256`;
 function inputHash(): string {
   const hash = createHash("sha256");
   for (const path of MOBILE_CODEGEN_INPUTS) hash.update(`${path}\0`).update(readFileSync(join(ROOT, path)));
-  const routes = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", ROUTES], {
+  // The index still lists a route that was deleted and not staged; Expo Router reads the disk.
+  const routes = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ROUTES], {
     cwd: ROOT,
     encoding: "utf8",
-  });
-  return hash.update(routes).digest("hex");
+  })
+    .split("\0")
+    .filter((path) => path && existsSync(join(ROOT, path)));
+  return hash.update(routes.join("\0")).digest("hex");
 }
 
 if (import.meta.main) {
