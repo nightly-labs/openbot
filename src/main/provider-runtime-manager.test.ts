@@ -22,6 +22,7 @@ import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeS
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { HELD_FILE_RETRY_WAITS_MS } from "../backend/test-deadlines";
 import {
   ProviderRuntimeManager,
   type ProviderRuntimeManagerOptions,
@@ -1508,6 +1509,7 @@ function siblingManager(
     lock: fixture.lock,
     updateRuntime: options.updateRuntime,
     heldStageWaitMs: options.heldStageWaitMs,
+    heldSourceWaitsMs: HELD_FILE_RETRY_WAITS_MS,
     fetchImpl: async (input) => {
       const url = String(input);
       options.onFetch?.(url);

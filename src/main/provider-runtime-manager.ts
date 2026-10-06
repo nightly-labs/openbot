@@ -74,7 +74,7 @@ const COMMIT_ATTEMPTS = 3;
  * How long a move waits, in turn, for a file in its source that another program still holds open.
  * About a second and a half, the same budget Node gives `rm` with `maxRetries: 5`.
  */
-const HELD_SOURCE_WAITS_MS = [100, 200, 400, 800];
+const HELD_SOURCE_WAITS_MS: readonly number[] = [100, 200, 400, 800];
 /**
  * How long a commit keeps trying to move a stage that another program holds open. Windows Defender
  * can scan a new CLI for tens of seconds after its version check, and the move fails with `EPERM`
@@ -128,6 +128,8 @@ export interface ProviderRuntimeManagerOptions {
   availableDiskBytes?: () => Promise<number>;
   /** How long a commit waits for a stage that another program holds open. Tests shorten it. */
   heldStageWaitMs?: number;
+  /** The waits, in turn, of one move whose source another program holds open. Tests shorten them. */
+  heldSourceWaitsMs?: readonly number[];
   updateRuntime?: (runtime: ManagedRuntimeId, install: () => Promise<string>) => Promise<void>;
 }
 
@@ -158,6 +160,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
   readonly #heldStageWaitMs: number;
+  readonly #heldSourceWaitsMs: readonly number[];
   readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
   readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
   readonly #tasks = new Map<ManagedRuntimeId, Promise<void>>();
@@ -194,6 +197,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         return filesystem.bavail * filesystem.bsize;
       });
     this.#heldStageWaitMs = options.heldStageWaitMs ?? HELD_STAGE_WAIT_MS;
+    this.#heldSourceWaitsMs = options.heldSourceWaitsMs ?? HELD_SOURCE_WAITS_MS;
     const unsupportedMessage = this.#target ? null : "This platform is not supported.";
     this.#statuses = {
       codex: emptyStatus(unsupportedMessage),
@@ -709,7 +713,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
     if (!(await renameIfPresent(installRoot, aside))) return;
     if (await this.#verifies(aside, spec)) {
-      if (await renameIfVacant(aside, installRoot)) return;
+      if (await renameIfVacant(aside, installRoot, this.#heldSourceWaitsMs)) return;
     }
     await rm(aside, { recursive: true, force: true }).catch(() => undefined);
   }
@@ -735,7 +739,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     let attempts = 0;
     const heldUntil = Date.now() + this.#heldStageWaitMs;
     while (attempts < COMMIT_ATTEMPTS) {
-      if (await renameIfVacant(staging, destination)) return true;
+      if (await renameIfVacant(staging, destination, this.#heldSourceWaitsMs)) return true;
       // Still vacant: the stage is held open, and there is nothing to adopt or replace. Each refusal
       // has already waited in `renameIfVacant`, so a held pass uses no attempt, only time.
       held = !(await pathExists(destination));
@@ -792,12 +796,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // install a sibling committed in between, so it goes back where the sibling left it and is
       // adopted. Nothing that verifies is ever replaced, whatever the claim said.
       if (await this.#verifies(aside, spec)) {
-        if (await renameIfVacant(aside, destination)) return "adopted";
+        if (await renameIfVacant(aside, destination, this.#heldSourceWaitsMs)) return "adopted";
         await rm(aside, { recursive: true, force: true }).catch(() => undefined);
         return "moved";
       }
       try {
-        if (await renameIfVacant(staging, destination)) return "committed";
+        if (await renameIfVacant(staging, destination, this.#heldSourceWaitsMs)) return "committed";
       } finally {
         await rm(aside, { recursive: true, force: true }).catch(() => undefined);
       }
@@ -1008,7 +1012,11 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
  * held after the wait answers `false` like an occupied one, so every caller keeps its own reading of
  * what is there; `#commit` is the one that tells the user which of the two it was.
  */
-async function renameIfVacant(from: string, to: string): Promise<boolean> {
+async function renameIfVacant(
+  from: string,
+  to: string,
+  waits: readonly number[] = HELD_SOURCE_WAITS_MS,
+): Promise<boolean> {
   for (let attempt = 0; ; attempt += 1) {
     try {
       await rename(from, to);
@@ -1017,7 +1025,7 @@ async function renameIfVacant(from: string, to: string): Promise<boolean> {
       const code = errorCode(error);
       if (code === "ENOTEMPTY" || code === "EEXIST") return false;
       if (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY") throw error;
-      const wait = HELD_SOURCE_WAITS_MS[attempt];
+      const wait = waits[attempt];
       if (wait === undefined || (await pathExists(to))) return false;
       await delay(wait);
     }
