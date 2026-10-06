@@ -172,7 +172,7 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot n’a pas pu activer la CLI gérée.",
   "error.provider.cliBusyReconnect": "La CLI {provider} traite un tour. Attendez la fin, puis reconnectez-vous.",
   "error.provider.opencodeCredentialsRejected":
-    "Le fournisseur du modèle a refusé les identifiants du modèle sélectionné. Pour un modèle OpenCode Zen ou Go, mettez à jour ou supprimez la clé OpenCode dans les réglages. Pour un autre fournisseur, comme Google, exécutez `opencode auth login` pour vous reconnecter, ou corrigez sa clé d’API dans l’environnement. Réessayez ensuite ou choisissez un autre modèle.\n{detail}",
+    "Le fournisseur du modèle a refusé la clé d’API. Corrigez la clé OpenCode dans les réglages, ou la clé du fournisseur avec `opencode auth login`. Réessayez ensuite ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeServiceFailure":
     "OpenCode n’a pas pu terminer ce tour, car son service local a échoué. Réessayez. Si l’erreur continue, reconnectez OpenCode dans les réglages.",
   "error.provider.opencodeRateLimited":

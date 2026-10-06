@@ -151,7 +151,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliActivateFailed": "OpenBot could not activate the managed CLI.",
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
   "error.provider.opencodeCredentialsRejected":
-    "The model provider rejected the credentials for the selected model. For an OpenCode Zen or Go model, update or remove the OpenCode key in Settings. For a different provider, such as Google, run `opencode auth login` to sign in again, or correct its API key in the environment. Then try again or choose another model.\n{detail}",
+    "The model provider rejected the API key. Fix the OpenCode key in Settings, or the provider's key with `opencode auth login`. Then try again or choose another model.\n{detail}",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
