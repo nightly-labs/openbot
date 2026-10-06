@@ -106,6 +106,12 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
   let frame = 0;
   let idle: ReturnType<typeof setTimeout> | undefined;
   let measure = () => {};
+  /*
+   * The section the reader opened from the rail, by its label. Near the end of a chat the jump stops at
+   * the bottom, where the place on the rail is the last section; the opened one stays current until the
+   * reader scrolls. A label, not an index: a page that loads above it moves its index.
+   */
+  let opened: string | undefined;
   const schedule = () => {
     if (frame) return;
     frame = requestAnimationFrame(() => {
@@ -140,11 +146,14 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
 
       setLengths(starts.map((start, index) => Math.max(1, (ends[index] ?? content) - start)));
       setFills(starts.map((start, index) => clamp((position - start) / Math.max(1, (ends[index] ?? content) - start))));
+      const openedIndex = opened === undefined ? -1 : sections.findIndex((section) => section.label === opened);
       setActive(
-        Math.max(
-          0,
-          starts.findLastIndex((start) => position >= start),
-        ),
+        openedIndex >= 0
+          ? openedIndex
+          : Math.max(
+              0,
+              starts.findLastIndex((start) => position >= start),
+            ),
       );
     };
 
@@ -155,18 +164,23 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
       idle = setTimeout(() => setScrolling(false), IDLE_MS);
       schedule();
     };
+    // The reader scrolls on their own again, so their place decides the current section.
+    const onInput = () => {
+      opened = undefined;
+      reveal();
+    };
     // Every scroll moves the current day, also one the app makes: focus can open the rail at any time.
     const onScroll = () => {
       if (scrolling()) reveal();
       else schedule();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (SCROLL_KEYS.has(event.key)) reveal();
+      if (SCROLL_KEYS.has(event.key)) onInput();
     };
 
     element.addEventListener("scroll", onScroll, { passive: true });
-    element.addEventListener("wheel", reveal, { passive: true });
-    element.addEventListener("touchmove", reveal, { passive: true });
+    element.addEventListener("wheel", onInput, { passive: true });
+    element.addEventListener("touchmove", onInput, { passive: true });
     element.addEventListener("keydown", onKey);
     const resizes = new ResizeObserver(schedule);
     resizes.observe(element);
@@ -174,8 +188,8 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
 
     return () => {
       element.removeEventListener("scroll", onScroll);
-      element.removeEventListener("wheel", reveal);
-      element.removeEventListener("touchmove", reveal);
+      element.removeEventListener("wheel", onInput);
+      element.removeEventListener("touchmove", onInput);
       element.removeEventListener("keydown", onKey);
       resizes.disconnect();
     };
@@ -236,7 +250,11 @@ export function ChatScrollRail(props: ChatScrollRailProps) {
                     type="button"
                     class="chat-scroll-rail-link"
                     aria-current={index === active() ? "location" : undefined}
-                    onClick={() => props.onJump(index)}
+                    onClick={() => {
+                      opened = section().label;
+                      schedule();
+                      props.onJump(index);
+                    }}
                   >
                     <span class="chat-scroll-rail-label">{section().label}</span>
                     <span class="chat-scroll-rail-bar" aria-hidden="true">
