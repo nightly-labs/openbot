@@ -15,6 +15,7 @@ import {
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { supportLogUrl } from "@/features/support/model/support-log";
 import { supportLog } from "@/features/support/model/support-log-capture";
 import { currentText } from "@/shared/lib/text";
 
@@ -60,6 +61,8 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
     const mailboxRef = useRef<ReturnType<typeof createRemoteCommandMailbox> | null>(null);
     if (!mailboxRef.current) mailboxRef.current = createRemoteCommandMailbox(setCommands);
     const mailbox = mailboxRef.current;
+    // The server of this transport, for support log lines. Requests do not name it.
+    const hostIdRef = useRef<string | null>(null);
     useEffect(() => () => mailbox.dispose(), [mailbox]);
 
     // Upload progress arrives from the web view by command ID, while the command is still pending.
@@ -87,6 +90,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
       ref,
       () => ({
         connect: async (hostId, hostPublicKey) => {
+          hostIdRef.current = hostId;
           const result = await enqueue({ type: "connect", hostId, hostPublicKey });
           if (!result.ok) throw new Error(result.error ?? currentText().t("mobile.workspace.error.connectFailed"));
         },
@@ -102,7 +106,19 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
         ): Promise<T> => {
+          const started = Date.now();
           const result = await enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
+          // Method, path, status and time only. Never the body or the upload.
+          const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
+          const time = `(${Date.now() - started} ms)`;
+          if (!result.ok)
+            supportLog.add("warn", "connection", `${request} -> failed: ${result.error ?? "no error"} ${time}`);
+          else
+            supportLog.add(
+              result.status !== undefined && result.status >= 400 ? "warn" : "info",
+              "connection",
+              `${request} -> ${result.status ?? "no status"} ${time}`,
+            );
           if (!result.ok) throw new Error(result.error ?? sourceText("error.remote.serverRequestFailed"));
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));

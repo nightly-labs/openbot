@@ -41,8 +41,12 @@ function appVersion(): string {
   return Application.nativeBuildVersion ? `${version} (${Application.nativeBuildVersion})` : version;
 }
 
+/** Such as `iOS 27.0, iPhone 16 Plus (iPhone17,4)`. The identifier names the exact hardware. */
 function systemName(): string {
-  return `${Device.osName ?? "unknown"} ${Device.osVersion ?? ""} (${Device.modelId ?? Device.modelName ?? "unknown"})`;
+  const { modelName, modelId } = Device;
+  const model =
+    modelName && modelId && modelName !== modelId ? `${modelName} (${modelId})` : (modelName ?? modelId ?? "unknown");
+  return `${Device.osName ?? "unknown"} ${Device.osVersion ?? ""}, ${model}`;
 }
 
 /** The text of the file the user saves: a short header, then one line for each entry. */
