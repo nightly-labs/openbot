@@ -344,6 +344,56 @@ the selected Xcode and EAS CLI versions when upgrading Expo. GitHub Actions usag
 See [local EAS builds](https://docs.expo.dev/build-reference/local-builds/) and
 [Fastlane TestFlight upload](https://docs.fastlane.tools/actions/upload_to_testflight/).
 
+### GitHub Actions Google Play release
+
+The `Release Android to Google Play` workflow builds the selected `main` commit on a GitHub-hosted
+`ubuntu-24.04` runner with JDK 17 and the runner's Android SDK. EAS CLI 24.1.2 runs with
+`--local --non-interactive`, so compilation uses GitHub Actions compute. Fastlane 2.240.1 uploads
+the `.aab` directly to Google Play without EAS Submit. The workflow uploads only to the `internal`
+or `alpha` (closed testing) track. Promote a release to production in Play Console.
+
+One-time setup:
+
+1. In GitHub repository settings, create the `release-android` environment. Under deployment branches
+   and tags, select only the `main` branch.
+2. Add environment secrets `EXPO_TOKEN` and `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY`. The Expo token is the
+   same as in `release-ios`. The Google secret is the full JSON key of a Google Cloud service account.
+3. In the Google Cloud project of that service account, enable the Google Play Android Developer API.
+   In Play Console, under **Users and permissions**, invite the service account email and give it
+   access to `run.openbot.mobile` with the release permissions for testing tracks.
+4. Keep the Android upload keystore configured in EAS as the default build credentials. CI downloads
+   it. Play App Signing keeps the app signing key; the EAS keystore is the upload key.
+5. Keep the OpenPanel variables in EAS `production`, as for iOS.
+6. Google Play accepts API uploads only after the app has one bundle. For the first release, dispatch
+   the workflow with `upload` cleared, download the `android-*` artifact, and upload the `.aab` in
+   Play Console under **Test and release → Testing → Internal testing**. Until the app has a
+   published release, Play accepts only draft releases: dispatch with `release_status` set to `draft`
+   and roll out the release in Play Console.
+
+After this workflow is merged into `main`, run from the repository root:
+
+```bash
+bun run mobile:android:release:play
+```
+
+From `apps/mobile`, run `bun run android:release:play`. This dispatches a release of remote `main`
+to the `internal` track with status `completed`. To choose another track, status, or a build without
+upload, select **Run workflow** on `main` in GitHub, or run
+`gh workflow run release-android.yml --ref main -f track=alpha -f release_status=draft -f upload=true`.
+
+EAS increments the remote Android `versionCode`; a failed build can consume a number. iOS and Android
+use the same marketing version in `app.json` and the same notes in `apps/mobile/CHANGELOG.md`. Run
+`bun run mobile:release:published` when testers on both platforms can install the build.
+The signed `.aab` is saved as a GitHub Actions artifact for seven days before upload. If upload fails,
+upload that artifact in Play Console to avoid rebuilding.
+
+A successful workflow means Google Play accepted the bundle on the selected track. Fastlane does not
+upload store metadata, screenshots or release notes. Write the release notes in Play Console.
+
+To build a signed `.aab` on your computer, run `bun run mobile:android:build:local`. It needs JDK 17
+and the Android SDK, and writes `/private/tmp/openbot-play.aab`.
+See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_play_store/).
+
 ## OpenPanel product analytics
 
 The app uses the official [`@openpanel/react-native` SDK](https://openpanel.dev/docs/sdks/react-native)

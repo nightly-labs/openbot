@@ -115,6 +115,8 @@
     "mobile:go": "bun run --cwd apps/mobile start:go",
     "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
     "mobile:android": "bun run --cwd apps/mobile android",
+    "mobile:android:build:local": "bun run --cwd apps/mobile android:build:local",
+    "mobile:android:release:play": "bun run --cwd apps/mobile android:release:play",
     "mobile:ios": "bun run --cwd apps/mobile ios",
     "mobile:ios:rocketsim": "bun run --cwd apps/mobile ios:rocketsim",
     "mobile:ios:build:local": "bun run --cwd apps/mobile ios:build:local",

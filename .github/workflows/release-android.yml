@@ -1,0 +1,152 @@
+name: Release Android to Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Google Play testing track. Promote to production in Play Console.
+        type: choice
+        options:
+          - internal
+          - alpha
+        default: internal
+      release_status:
+        description: Use draft while the app has no published release in Play Console.
+        type: choice
+        options:
+          - completed
+          - draft
+        default: completed
+      upload:
+        description: Upload to Google Play. Clear it to only build the signed AAB.
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build Android and upload to Google Play
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: release-android
+    permissions:
+      contents: read
+    env:
+      CI: "1"
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      FASTLANE_OPT_OUT_USAGE: "1"
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require release credentials
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+        run: |
+          missing=()
+          for name in EXPO_TOKEN GOOGLE_PLAY_SERVICE_ACCOUNT_KEY; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing release-android secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      # A React Native release build needs more disk than the runner leaves free.
+      - name: Free runner disk
+        shell: bash
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h "$GITHUB_WORKSPACE"
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Ruby for Fastlane
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: "3.4"
+          bundler: none
+
+      - name: Install and verify Android tools
+        shell: bash
+        run: |
+          echo "AAB_PATH=$RUNNER_TEMP/openbot-play.aab" >> "$GITHUB_ENV"
+          gem install fastlane --version 2.240.1 --no-document
+          java -version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          fastlane --version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check source
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test:desktop -- apps/mobile/src packages/contracts packages/team-client scripts/mobile-release.test.ts
+
+      - name: Build production Android on this runner
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: >-
+          bunx eas-cli@24.1.2 build
+          --platform android --profile production --local --non-interactive
+          --output "$AAB_PATH"
+
+      - name: Save signed AAB
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.AAB_PATH }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload to Google Play
+        if: inputs.upload
+        working-directory: apps/mobile
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+          PLAY_TRACK: ${{ inputs.track }}
+          PLAY_RELEASE_STATUS: ${{ inputs.release_status }}
+        run: fastlane android play
+
+      - name: Summarize release
+        shell: bash
+        env:
+          UPLOADED: ${{ inputs.upload }}
+          PLAY_TRACK: ${{ inputs.track }}
+          PLAY_RELEASE_STATUS: ${{ inputs.release_status }}
+        run: |
+          {
+            if [[ "$UPLOADED" == "true" ]]; then
+              echo '## Android upload complete'
+              echo "Track: $PLAY_TRACK ($PLAY_RELEASE_STATUS)"
+            else
+              echo '## Android build complete'
+              echo 'The AAB was not uploaded. Upload the artifact in Play Console.'
+            fi
+            echo "Commit: $GITHUB_SHA"
+            echo "Artifact: android-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            echo 'Manage testers and promote releases in Play Console. This workflow does not publish to production.'
+          } >> "$GITHUB_STEP_SUMMARY"
