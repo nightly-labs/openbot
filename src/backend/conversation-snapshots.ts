@@ -1,9 +1,10 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isString } from "@openbot/contracts/runtime-values";
+import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
-import type { ThreadItem, ThreadResponse } from "./protocol";
+import type { ThreadResponse } from "./protocol";
 
 export function snapshotFromThread(
   agentId: string,
@@ -303,19 +304,6 @@ function isProviderAssistantMessage(message: ConversationMessage): boolean {
 
 function providerMessageIdentity(message: ConversationMessage): string {
   return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
-}
-
-function isImageGenerationItem(item: { type: string }): boolean {
-  return item.type === "image_generation_call" || item.type === "imageGeneration";
-}
-
-function imageGenerationFailure(item: ThreadItem): string | null {
-  const failure = item.failure;
-  if (isDynamicRecord(failure)) {
-    const message = failure.message;
-    if (isString(message)) return message;
-  }
-  return isString(item.error) ? item.error : isString(failure) ? failure : null;
 }
 
 export function newAssistantMessage(id: string, turnId: string): ConversationMessage {
