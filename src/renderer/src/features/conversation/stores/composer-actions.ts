@@ -68,8 +68,7 @@ export interface ComposerActionsDeps {
   setConversationError: (target: ConversationTarget, message: string) => void;
   setStickToLatest: (value: boolean) => void;
   pendingSends: PendingSendStore;
-  imageAttachmentPicker: () => HTMLInputElement | undefined;
-  contextAttachmentPicker: () => HTMLInputElement | undefined;
+  attachmentPicker: () => HTMLInputElement | undefined;
 }
 
 export function createComposerActions(deps: ComposerActionsDeps) {
@@ -157,17 +156,17 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setShowComposerActions(false);
   }
 
-  function openAttachmentPicker(filter: "all" | "images") {
+  function openAttachmentPicker() {
     deps.setShowComposerActions(false);
     deps.setComposerError(null, deps.currentTarget());
-    const picker = filter === "images" ? deps.imageAttachmentPicker() : deps.contextAttachmentPicker();
+    const picker = deps.attachmentPicker();
     if (!picker) return;
     picker.value = "";
     picker.click();
   }
 
-  function openAttachmentPickerFromKey(event: KeyboardEvent, filter: "all" | "images") {
-    if (event.key === "Enter" || event.key === " ") openAttachmentPicker(filter);
+  function openAttachmentPickerFromKey(event: KeyboardEvent) {
+    if (event.key === "Enter" || event.key === " ") openAttachmentPicker();
   }
 
   async function editQueuedMessage(delivery: QueueDelivery) {
