@@ -48,26 +48,28 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-function forgetOldest(): void {
-  if (diagrams.size < DIAGRAM_LIMIT) return;
-  // A diagram that is still drawing has a job that will report to it, and a diagram on screen is
-  // in use, so both stay. When every diagram is in use, the cache grows past its limit.
+/**
+ * Lets go of the oldest unused diagrams until the cache is at its limit. A diagram that is still
+ * drawing has a job that will report to it, and a diagram on screen is in use, so both stay: while
+ * every diagram is in use, the cache grows past its limit, and it shrinks again when they leave.
+ */
+function trim(): void {
   for (const [key, diagram] of diagrams) {
+    if (diagrams.size <= DIAGRAM_LIMIT) return;
     if (diagram.status === "drawing" || consumers.has(key)) continue;
     diagrams.delete(key);
-    return;
   }
 }
 
 function requestMermaidDiagram(source: string, dark: boolean): void {
   const key = diagramKey(source, dark);
   if (diagrams.has(key)) return;
-  forgetOldest();
   diagrams.set(key, DRAWING);
   jobCount += 1;
   const id = String(jobCount);
   jobKeys.set(id, key);
   jobs = [...jobs, { id, source, dark }];
+  trim();
   emit();
 }
 
@@ -80,6 +82,7 @@ function retainMermaidDiagram(source: string, dark: boolean): () => void {
     const count = (consumers.get(key) ?? 1) - 1;
     if (count > 0) consumers.set(key, count);
     else consumers.delete(key);
+    trim();
   };
 }
 
@@ -101,6 +104,7 @@ export function receiveMermaidResult(result: MermaidResult): void {
           }
         : { status: "failed" },
     );
+  trim();
   emit();
 }
 
