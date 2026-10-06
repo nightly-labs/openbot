@@ -12,13 +12,44 @@ import {
   type RemoteTeamDiagnostic,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog, supportLogUrl } from "@/features/support/model/support-log";
+import { isAndroid } from "@/shared/lib/platform";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
+
+// Expo Go on Android does not include @expo/dom-webview. It includes react-native-webview.
+const useExpoDOMWebView = !(isAndroid && Constants.executionEnvironment === ExecutionEnvironment.StoreClient);
+// Expo's DOM page reads the host values from react-native-webview in an inline script. On Android the
+// values arrive in onPageStarted, after that script and before the DOM bundle. This script runs there and
+// gives the bundle the values. The props come again when the DOM side reports that it is ready.
+const restoreDomHostValues = `(function () {
+  function injected() {
+    try {
+      return JSON.parse(window.ReactNativeWebView.injectedObjectJson()) || {};
+    } catch (error) {
+      return {};
+    }
+  }
+  function keep(name, read) {
+    var value = window[name];
+    Object.defineProperty(window, name, {
+      configurable: true,
+      get: function () { return value === undefined ? read() : value; },
+      set: function (next) { if (next !== undefined) value = next; },
+    });
+  }
+  keep("$$EXPO_DOM_HOST_OS", function () { return injected().EXPO_DOM_HOST_OS || "android"; });
+  keep("$$EXPO_INITIAL_PROPS", function () { return injected().initialProps || { names: [], props: {} }; });
+})();
+true;`;
+const webViewOptions = useExpoDOMWebView
+  ? { useExpoDOMWebView }
+  : { useExpoDOMWebView, injectedJavaScriptBeforeContentLoaded: restoreDomHostValues };
 
 export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<void>;
@@ -141,6 +172,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         active={foreground}
         commands={commands}
         dom={{
+          ...webViewOptions,
           containerStyle: {
             flex: 0,
             height: 1,
