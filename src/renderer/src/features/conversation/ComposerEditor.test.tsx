@@ -212,16 +212,18 @@ describe("ComposerEditor", () => {
 });
 
 describe("ComposerEditor window focus", () => {
+  const fixtures: HTMLElement[] = [];
+
   afterEach(() => {
     document.getSelection()?.removeAllRanges();
-    for (const element of document.querySelectorAll("[data-window-focus-fixture]")) element.remove();
+    for (const element of fixtures.splice(0)) element.remove();
   });
 
   function fixture(html: string) {
     const element = document.createElement("div");
-    element.dataset.windowFocusFixture = "";
     element.innerHTML = html;
     document.body.append(element);
+    fixtures.push(element);
     return element;
   }
 

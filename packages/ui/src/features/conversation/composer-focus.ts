@@ -1,4 +1,4 @@
-const OPEN_POPUP = '[role="dialog"], [role="alertdialog"], [role="menu"]';
+const OPEN_POPUP = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 const TEXT_ENTRY = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
 /**

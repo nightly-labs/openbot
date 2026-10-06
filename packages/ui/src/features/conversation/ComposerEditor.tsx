@@ -303,15 +303,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     },
   );
 
-  // Coming back to the window puts the caret back here, so the first keys are not lost.
+  // Coming back to the window puts the caret back here, so the first keys are not lost. A touch
+  // device would open its keyboard instead, and focus leaving an embedded frame (an HTML preview)
+  // also fires `focus` here without the window having been away.
   onSettled(() => {
     const view = editor?.ownerDocument.defaultView;
     if (!view) return;
+    let focusInFrame = false;
+    const noteFrameFocus = () => {
+      focusInFrame = view.document.activeElement instanceof view.HTMLIFrameElement;
+    };
     const restoreFocus = () => {
+      if (focusInFrame || usesTouchLayout()) return;
       if (editor && shouldRestoreComposerFocus(editor)) editor.focus();
     };
+    view.addEventListener("blur", noteFrameFocus);
     view.addEventListener("focus", restoreFocus);
-    return () => view.removeEventListener("focus", restoreFocus);
+    return () => {
+      view.removeEventListener("blur", noteFrameFocus);
+      view.removeEventListener("focus", restoreFocus);
+    };
   });
 
   function emitValue() {
