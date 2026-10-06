@@ -18,7 +18,8 @@ export const Route = createFileRoute("/v1/marketplace/agents/admin/featured/$age
       PATCH: ({ request, params }) =>
         runApiResponse(
           Effect.gen(function* () {
-            if (!requireSkillsAdmin(request)) return apiError(401, "unauthorized", "Admin access is required.");
+            if (!(yield* requireSkillsAdmin(request)))
+              return apiError(401, "unauthorized", "Admin access is required.");
             yield* enforceMarketplaceMutationRateLimit("mutation", "marketplace-admin");
             const value = yield* readJsonObject(request);
             if (!isDynamicRecord(value) || !isBoolean(value.featured))

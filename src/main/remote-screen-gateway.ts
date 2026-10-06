@@ -20,6 +20,7 @@ import type * as Ws from "ws";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { recordRestartActivity } from "../backend/restart-activity";
+import { readBodyWithin } from "./http-body";
 import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -1270,16 +1271,10 @@ function moonlightRuntimeUser(session: ManagedRemoteScreenSession): string {
 }
 
 async function readSmallJson<T>(request: IncomingMessage, schema: z.ZodType<T>): Promise<T | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    size += bytes.length;
-    if (size > 4096) throw new RemoteScreenError(413, "connection_failed", "Viewer authorization is too large.");
-    chunks.push(bytes);
-  }
+  const body = await readBodyWithin(request, 4096);
+  if (body === null) throw new RemoteScreenError(413, "connection_failed", "Viewer authorization is too large.");
   try {
-    return schema.parse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    return schema.parse(JSON.parse(body.toString("utf8")));
   } catch {
     return null;
   }

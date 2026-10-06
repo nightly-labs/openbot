@@ -36,7 +36,7 @@ import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { decodeAgentStatusFromHost } from "../remote-agent-decoding";
-import type { ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseProviderId } from "./app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
@@ -64,9 +64,6 @@ interface ProviderAdminIpcDependencies {
   customProviders: PeerCustomProviderChanges;
   remoteServers: ProviderAdminRemoteServers;
 }
-
-// The providers-v1 codec has already checked the fields of every reply below.
-const acceptEmpty = (): undefined => undefined;
 
 export function providerAdminIpcHandlers({
   service,

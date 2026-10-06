@@ -13,15 +13,13 @@ import { SHARED_TABLES_CAPABILITY, SHARED_TABLES_ROUTES } from "@openbot/contrac
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
-import type { ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 const parseDeleteSharedTable = guardedDecoder(isDeleteSharedTableInput, "table deletion request");
 const decodeRemoteTables = guardedListDecoder(isSharedTable, "remote shared tables");
-// The shared-tables-v1 codec has already checked that the body is an empty record.
-const acceptEmpty = (): undefined => undefined;
 
 interface SharedTableRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;

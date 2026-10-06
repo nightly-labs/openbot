@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect, Fiber, Schema } from "effect";
+import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
 import { waitForSuccessfulProcess } from "./provider-status";
@@ -183,10 +184,6 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
     return { file: "script", args: ["-q", "-e", "-f", "-c", line, "/dev/null"] };
   }
   throw new Error(sourceText("error.provider.codeLoginUnsupported"));
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 /**

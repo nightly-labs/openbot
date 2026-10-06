@@ -22,6 +22,7 @@ import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import {
@@ -32,7 +33,7 @@ import {
   type RuntimeSpec,
   type RuntimeTarget,
 } from "./provider-runtime-descriptors";
-import { ProviderRuntimeFailure, runRuntime, runtimeIO, runtimeSync } from "./provider-runtime-effects";
+import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 import {
   type BlockedVersions,
   fetchBlockedVersions,
@@ -276,7 +277,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   /** Checks now and then every hour, until `stop`. The caller starts it once the app is up. */
   startUpdateChecks(intervalMs = UPDATE_CHECK_INTERVAL_MS): void {
     if (this.#checkTimer || !this.#target || this.#stopping) return;
-    const check = () => void runRuntime(this.checkForUpdates()).catch(() => undefined);
+    const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
     this.#checkTimer = setInterval(check, intervalMs);
     this.#checkTimer.unref();
     check();

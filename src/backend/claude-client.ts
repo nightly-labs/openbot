@@ -80,6 +80,7 @@ import {
   providerFailure,
   providerResult,
   providerSync,
+  requiredString,
 } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
@@ -1552,12 +1553,6 @@ function readThreadConfig(params: unknown): ThreadConfig {
     computerUse: computerUseParam(params),
     workspaceOnly: isRecord(params) && params.workspaceOnly === true,
   };
-}
-
-function requiredString(value: unknown, key: string): string {
-  const result = getString(value, key);
-  if (!result) throw new Error(`${key} is required.`);
-  return result;
 }
 
 function parseAuthStatus(stdout: unknown): DynamicRecord | null {

@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { chmod, copyFile, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
 import { type AgentRuntimeLock, loadAgentRuntimeLock } from "./agent-runtime-lock";
 import { sha256 } from "./remote-desktop-runtime-release";
+import { download, escapeRegExp, installValidatedTree, isCurrentInstallation } from "./runtime-install";
 
 const logger = createOpenBotLogger("install-grok-runtime");
 
@@ -35,7 +36,7 @@ export async function installGrokRuntime(
   const artifact = lock.grok.artifacts[target];
   const targetRoot = grokRuntimePath(outputRoot, target);
 
-  if (await isCurrentInstallation(targetRoot, target, lock)) {
+  if (await isCurrentInstallation(() => verifyGrokRuntime(targetRoot, target, lock))) {
     await writeMetadata(outputRoot, targetRoot, lock);
     logger.info(`Using verified bundled Grok CLI ${lock.grok.version} for ${target}.`);
     return "current";
@@ -142,39 +143,8 @@ export async function verifyGrokRuntime(
   }
 }
 
-async function download(fetchImpl: typeof fetch, url: string, label: string): Promise<Buffer> {
-  const response = await fetchImpl(url, {
-    headers: { "User-Agent": "OpenBot-runtime-installer" },
-    redirect: "follow",
-  });
-  if (!response.ok) throw new Error(`${label} download failed with HTTP ${response.status}.`);
-  return Buffer.from(await response.arrayBuffer());
-}
-
 function verifyChecksum(value: Buffer, expected: string, label: string): void {
   if (sha256(value) !== expected) throw new Error(`The ${label} checksum is invalid.`);
-}
-
-async function isCurrentInstallation(
-  root: string,
-  target: GrokRuntimeTarget,
-  lock: AgentRuntimeLock,
-): Promise<boolean> {
-  try {
-    await verifyGrokRuntime(root, target, lock);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function installValidatedTree(source: string, destination: string): Promise<void> {
-  const temporaryTarget = join(dirname(destination), `.${destination.split(/[\\/]/u).at(-1)}.installing`);
-  await mkdir(dirname(destination), { recursive: true });
-  await rm(temporaryTarget, { recursive: true, force: true });
-  await cp(source, temporaryTarget, { recursive: true });
-  await rm(destination, { recursive: true, force: true });
-  await rename(temporaryTarget, destination);
 }
 
 async function writeMetadata(outputRoot: string, targetRoot: string, lock: AgentRuntimeLock): Promise<void> {
@@ -188,10 +158,6 @@ async function writeMetadata(outputRoot: string, targetRoot: string, lock: Agent
       `${JSON.stringify({ name: "grok-cli", ...lock.grok }, null, 2)}\n`,
     ),
   ]);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 if (import.meta.main) {

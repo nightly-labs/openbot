@@ -26,6 +26,7 @@ import { Deferred, Effect } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { HostService } from "./host-service";
+import { readBodyWithin } from "./http-body";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 
 const CONTROL_SOCKET_FILE = "control.sock";
@@ -280,15 +281,8 @@ export class ServerMode {
 
 /** The form body, or null when it is larger than a control request can be. */
 async function readBody(request: IncomingMessage): Promise<URLSearchParams | null> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
-    size += bytes.length;
-    if (size > MAX_BODY_BYTES) return null;
-    chunks.push(bytes);
-  }
-  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+  const body = await readBodyWithin(request, MAX_BODY_BYTES);
+  return body === null ? null : new URLSearchParams(body.toString("utf8"));
 }
 
 function failure(status: number, error: string, message: string | null = null): Answer {
