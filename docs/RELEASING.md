@@ -21,7 +21,7 @@ OpenBot. Linux has no code-signature contract to check, so its provider artifact
 SHA-256 and version only.
 
 Installed apps do not wait for a release to get a new provider CLI: they offer the latest upstream
-release (see [Provider CLI updates](ARCHITECTURE.md#provider-cli-updates)). The pinned version is the
+release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
 blocked version is no longer offered, but it stays on the computers that already installed it.
@@ -230,7 +230,7 @@ entry and re-run it with that exact version: the command reports `already pins O
 when the committed block matches byte for byte.
 
 Run it on a version bump only. A bump also needs the Windows checks in
-[the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
+[the OpenCode notes](architecture/providers.md#opencode-and-acp): the `win32-x64` values come from the
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
 

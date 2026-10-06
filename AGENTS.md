@@ -34,7 +34,7 @@ and state which default you set aside. Do not argue by citing this file.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
-boundary or a security test, and [architecture change rules](docs/ARCHITECTURE.md#change-rules) when
+boundary or a security test, and [architecture change rules](docs/architecture/change-rules.md#change-rules) when
 adding a module or moving ownership between workspaces.
 
 ## Product constraints
@@ -105,7 +105,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
 - Migrations and the separate latest schema for new databases.
-- Documentation: `README.md` commands, `docs/ARCHITECTURE.md`, and `PRIVACY.md` when outbound data
+- Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 
 ## Development data and processes
@@ -124,7 +124,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Use the ports the stack reports rather than a fixed port.
 
 See [README.md — Commands](README.md#commands) for the flags these commands take, and
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why the registry works this way, when a dev command
+[docs/architecture/change-rules.md](docs/architecture/change-rules.md#change-rules) for why the registry works this way, when a dev command
 does not behave as expected.
 
 ## Terms
@@ -139,7 +139,7 @@ string, or when a term in the code disagrees with the UI.
 ## Task-specific instructions
 
 Read the instruction file for each directory you change. Use the
-[workspace map](docs/ARCHITECTURE.md#workspace-map) to find its owner.
+[workspace map](docs/architecture/structure.md#workspace-map) to find its owner.
 
 | File | Scope |
 | --- | --- |

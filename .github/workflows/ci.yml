@@ -88,6 +88,9 @@ jobs:
       - name: Check image asset directories
         run: bun run check:assets
 
+      - name: Check Markdown links and anchors
+        run: bun run check:doc-links
+
       - name: Check desktop application
         run: bun run check:desktop:static
 

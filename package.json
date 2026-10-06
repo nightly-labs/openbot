@@ -220,6 +220,7 @@
     "api:build:check": "CLOUDFLARE_ENV=preview bun run api:build",
     "check:ui": "bun scripts/ui-foundation-check.ts",
     "check:assets": "bun scripts/check-image-assets.ts",
+    "check:doc-links": "bun scripts/check-doc-links.ts",
     "verify:preload": "bun scripts/verify-preload-bundle.ts",
     "package": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --dir --mac --config.mac.identity=null --config.mac.notarize=false",
     "verify:package": "bun scripts/verify-macos-package.ts",

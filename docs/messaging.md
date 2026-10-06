@@ -1,7 +1,7 @@
 # Messaging connections
 
 The agents of this computer can answer in an external chat platform. Slack is supported today. The
-design notes are in [ARCHITECTURE.md](ARCHITECTURE.md#messaging-connections), and the launch steps
+design notes are in [architecture/channels-and-messaging.md](architecture/channels-and-messaging.md#messaging-connections), and the launch steps
 in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md).
 
 ## Connect Slack

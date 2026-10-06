@@ -47,6 +47,11 @@ listed in `scripts/check-image-assets.ts`. `AGENTS.md` does not permit pull requ
 the repository, and a screenshot committed for a review stays in the history of `main`. The check
 reads the whole tree, not only the pull request diff, so it gives the same result locally and in CI.
 
+`check:doc-links` reads every tracked Markdown file. It fails on a relative link to a Markdown file
+that does not exist, and on a `#anchor` that the target file has no heading or `<a id>` for. It makes
+anchors the way GitHub does. It does not check web links or links to other file types. When you move
+a section to another file, such as one in `docs/architecture/`, update each link to its anchor.
+
 `src/backend/transfer-budget.test.ts` runs two turns with a fake provider. It counts the SQL
 statements of each turn and of one conversation read, and the JSON bytes of that read and of the
 events that one turn sends to the renderer. Each value has a hard cap about 30% above the value
@@ -82,7 +87,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run lint:ratchet`, `bun run types:ratchet` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, `bun run lint:ratchet`, `bun run types:ratchet` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
