@@ -14,6 +14,7 @@ export const messages = {
     "Impossible de réserver une famille de ports Sunshine libre pour le Bureau à distance.",
   "error.backend.moonlightPortsUnavailable":
     "Impossible de réserver une plage de ports WebRTC Moonlight libre pour le Bureau à distance.",
+  "error.backend.iceServerNoPort": "Le serveur ICE du Bureau à distance n’a pas obtenu de port.",
   "error.backend.remoteDesktopStoppedWhileStarting":
     "L’environnement du bureau à distance a été arrêté pendant son démarrage.",
   "error.backend.sunshineNotStarted": "Sunshine n’a pas démarré sur une famille de ports réservée.",

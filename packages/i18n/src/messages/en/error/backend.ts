@@ -12,6 +12,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sunshineApiHttp": "Sunshine API failed with HTTP {status}.",
   "error.backend.sunshinePortsUnavailable": "Could not reserve a free Sunshine port family for Remote Desktop.",
   "error.backend.moonlightPortsUnavailable": "Could not reserve a free Moonlight WebRTC port range for Remote Desktop.",
+  "error.backend.iceServerNoPort": "The Remote Desktop ICE server did not get a port.",
   "error.backend.remoteDesktopStoppedWhileStarting": "The remote desktop runtime was stopped while it started.",
   "error.backend.sunshineNotStarted": "Sunshine did not start on a reserved port family.",
   "error.backend.moonlightNoHost": "Moonlight has no paired local host.",

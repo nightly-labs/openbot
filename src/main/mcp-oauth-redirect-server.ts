@@ -23,6 +23,7 @@ import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 import type { AppTextKey } from "@openbot/i18n";
 import type { LanguageService } from "./language-service";
+import { listenLoopback } from "./listen-loopback";
 
 /** The one path this listener answers. Everything else is a 404, including `/`. */
 const REDIRECT_PATH = "/mcp-auth";
@@ -77,7 +78,7 @@ export async function startMcpOAuthRedirectServer({
     socket.on("close", () => sockets.delete(socket));
   });
 
-  const port = await listen(server);
+  const port = await listenLoopback(server, () => new Error("The MCP sign-in listener was given no port."));
   return {
     redirectUrl: `http://127.0.0.1:${port}${REDIRECT_PATH}`,
     close: async () => {
@@ -86,24 +87,6 @@ export async function startMcpOAuthRedirectServer({
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
-}
-
-function listen(server: Server): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    server.once("error", reject);
-    // `127.0.0.1` and not `localhost`: a name resolves to whatever the machine says it resolves
-    // to, and this must be the loopback interface alone - a listener any other computer can reach
-    // is a listener that can be handed a grant.
-    server.listen(0, "127.0.0.1", () => {
-      server.removeListener("error", reject);
-      const address = server.address();
-      if (address === null || typeof address === "string") {
-        reject(new Error("The MCP sign-in listener was given no port."));
-        return;
-      }
-      resolve(address.port);
-    });
-  });
 }
 
 interface Answer {

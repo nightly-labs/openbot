@@ -14,6 +14,7 @@ export const messages = {
   "error.backend.sunshinePortsUnavailable": "Uzak Masaüstü için boş bir Sunshine bağlantı noktası ailesi ayrılamadı.",
   "error.backend.moonlightPortsUnavailable":
     "Uzak Masaüstü için boş bir Moonlight WebRTC bağlantı noktası aralığı ayrılamadı.",
+  "error.backend.iceServerNoPort": "Uzak Masaüstü ICE sunucusu bir bağlantı noktası almadı.",
   "error.backend.remoteDesktopStoppedWhileStarting": "Uzak masaüstü çalışma zamanı başlatılırken durduruldu.",
   "error.backend.sunshineNotStarted": "Sunshine ayrılmış bir bağlantı noktası ailesinde başlamadı.",
   "error.backend.moonlightNoHost": "Moonlight eşleştirilmiş yerel bir ana makineye sahip değil.",

@@ -20,6 +20,7 @@ import type * as Ws from "ws";
 import { z } from "zod";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { recordRestartActivity } from "../backend/restart-activity";
+import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
@@ -433,24 +434,15 @@ export class RemoteScreenGateway {
         this.handleUpgrade(request, socket, head, url);
       });
       return yield* Effect.gen({ self: this }, function* () {
-        yield* remoteCall(
-          () =>
-            new Promise<void>((resolve, reject) => {
-              server.once("error", reject);
-              server.listen(0, "127.0.0.1", resolve);
-            }),
+        const port = yield* remoteCall(() =>
+          listenLoopback(server, () => new Error(sourceText("error.remote.localTestListenerUnavailable"))),
         );
-        const address = server.address();
-        if (!address || typeof address === "string")
-          return yield* new RemoteWorkflowError({
-            cause: new Error(sourceText("error.remote.localTestListenerUnavailable")),
-          });
         const session = yield* this.createSession({
           serverId: "local",
           memberId: "local-setup",
           teamSessionId: randomUUID(),
           teamSessionExpiresAt: new Date(Date.now() + 180_000).toISOString(),
-          publicHttpBaseUrl: `http://127.0.0.1:${address.port}`,
+          publicHttpBaseUrl: `http://127.0.0.1:${port}`,
         });
         this.#localTestServers.set(session.id, server);
         return session;

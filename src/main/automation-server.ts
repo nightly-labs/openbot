@@ -13,6 +13,7 @@ import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { listenLoopback } from "./listen-loopback";
 
 const logger = createOpenBotLogger("automation");
 
@@ -114,27 +115,14 @@ export class AutomationServer {
     const token = randomBytes(32).toString("base64url");
     registerSecretValue(token);
     const server = createServer((request, response) => void this.#handle(request, response));
-    yield* automationIO(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          server.once("error", reject);
-          server.listen(0, "127.0.0.1", () => {
-            server.off("error", reject);
-            resolve();
-          });
-        }),
+    const port = yield* automationIO(() =>
+      listenLoopback(server, () => new Error("Unable to bind the automation server.")),
     );
-    const address = server.address();
-    if (!address || isString(address)) {
-      server.close();
-      return yield* new AutomationServerFailed({ cause: new Error("Unable to bind the automation server.") });
-    }
     this.#server = server;
-    this.#port = address.port;
+    this.#port = port;
     this.#token = Buffer.from(token);
     this.#filesClean = false;
     const { root } = this.#options;
-    const port = this.#port;
     yield* Effect.gen(function* () {
       yield* automationIO(() => mkdir(root, { recursive: true, mode: 0o700 }));
       // `mkdir` keeps the mode of a folder that already exists.
