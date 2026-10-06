@@ -60,7 +60,9 @@ lifecycle and dispatch work.
 `createApplicationServices` remains one function because control-flow narrowing makes construction
 order explicit: a service assigned to a `const` can satisfy later non-null constructor parameters.
 Splitting it into stages would pass a roughly 15-field object between stages and restore ordering
-hazards. It only constructs. Adding event wiring would require more inputs than outputs and invert
+hazards. A self-contained block with a few inputs, such as `createMessagingServices`, can move to a
+helper in the same file that the function awaits at the same position; the helper keeps its teardown
+ordinals. It only constructs. Adding event wiring would require more inputs than outputs and invert
 the dependency direction.
 
 Shutdown is largely in construction order, rather than reverse order. The browser host closes
