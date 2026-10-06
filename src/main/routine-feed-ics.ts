@@ -6,8 +6,6 @@
 
 import type { RoutineCalendar } from "@openbot/contracts/ipc";
 
-/** The routine that runs most often still leaves room for the others in a file a calendar app reads. */
-export const ROUTINE_FEED_EVENTS_PER_ROUTINE = 1000;
 /** A run has no end; the event is long enough for a calendar to show it. */
 const EVENT_DURATION = "PT15M";
 /** What the feed asks a calendar app to wait between reads. Most apps choose their own interval. */
@@ -22,7 +20,6 @@ export interface RoutineFeedText {
 
 export function routineFeedIcs(calendar: RoutineCalendar, text: RoutineFeedText, now: Date): string {
   const names = new Map(calendar.routines.map((routine) => [routine.id, routine.name]));
-  const counts = new Map<string, number>();
   const stamp = icsUtc(now);
   const lines = [
     "BEGIN:VCALENDAR",
@@ -38,9 +35,6 @@ export function routineFeedIcs(calendar: RoutineCalendar, text: RoutineFeedText,
   for (const run of [...calendar.runs].sort((left, right) => Date.parse(left.at) - Date.parse(right.at))) {
     const name = names.get(run.routineId);
     if (name === undefined) continue;
-    const count = counts.get(run.routineId) ?? 0;
-    if (count >= ROUTINE_FEED_EVENTS_PER_ROUTINE) continue;
-    counts.set(run.routineId, count + 1);
     const start = icsUtc(new Date(run.at));
     lines.push(
       "BEGIN:VEVENT",
