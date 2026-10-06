@@ -429,6 +429,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
     ensureEditorSelection();
     const selection = window.getSelection();
     if (!selection?.rangeCount) return;
+    // Keep selected text: put the `$` after it.
+    if (!selection.isCollapsed) selection.collapseToEnd();
     const range = selection.getRangeAt(0).cloneRange();
     range.selectNodeContents(editor);
     range.setEnd(selection.anchorNode ?? editor, selection.anchorOffset);
@@ -737,7 +739,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
           isComposing = false;
           // A menu can return the focus to the editor within this delay; keep the picker it opened.
           window.setTimeout(() => {
-            if (!editor || editor.ownerDocument.activeElement !== editor) setMention(null);
+            const ownerDocument = editor?.ownerDocument;
+            if (!ownerDocument?.hasFocus() || ownerDocument.activeElement !== editor) setMention(null);
           }, 100);
         }}
       />
