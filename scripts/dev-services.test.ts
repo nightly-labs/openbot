@@ -1,10 +1,12 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
 import {
   configureMobileConnectDevelopmentNetwork,
   createDevelopmentServiceSpec,
   createDevStackRecord,
   developmentEnvironmentForTarget,
+  developmentInstanceIdForStart,
   developmentProfileToSeed,
   findAvailablePort,
   parseDevelopmentTarget,
@@ -155,6 +157,14 @@ describe("development service runner", () => {
     expect(parseDevelopmentTarget(["app"]).shared).toBe(false);
     expect(parseDevelopmentTarget(["app", "--isolated"]).shared).toBe(false);
     expect(parseDevelopmentTarget(["app", "--shared"]).shared).toBe(true);
+  });
+
+  it("opens the worktree profile only when no other app of this worktree holds it", () => {
+    const start = { configured: undefined, shared: false, besideOwnStack: false, projectRoot: "/work/tree" };
+    expect(developmentInstanceIdForStart(start)).toBe(developmentInstanceIdForWorktree("/work/tree"));
+    expect(developmentInstanceIdForStart({ ...start, shared: true })).toBeUndefined();
+    expect(developmentInstanceIdForStart({ ...start, besideOwnStack: true })).toBeUndefined();
+    expect(developmentInstanceIdForStart({ ...start, configured: "5180" })).toBe("5180");
   });
 
   it("takes a port a running stack has published as gone without probing it", async () => {

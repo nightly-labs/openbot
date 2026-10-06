@@ -321,11 +321,6 @@ async function main(): Promise<void> {
     sharedEnvironment.OPENBOT_DEV_REMOTE_ROLE = "none";
     logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
   }
-  if (!shared && !sharedEnvironment.OPENBOT_DEV_INSTANCE_ID) {
-    sharedEnvironment.OPENBOT_DEV_INSTANCE_ID = developmentInstanceIdForWorktree(projectRoot);
-    // The default changed from the shared profile, so a developer who expects their old data learns where it is.
-    logger.info("This worktree opens its own dev profile. Pass --shared to open the shared OpenBot Dev profile.");
-  }
   // The host and the test client of this stack find each other through a file named after it.
   sharedEnvironment.OPENBOT_DEV_STACK_ID = String(process.pid);
 
@@ -343,6 +338,17 @@ async function main(): Promise<void> {
         );
       }
       logger.warn(`This worktree already runs a dev stack:\n${detail}`);
+    }
+    const instanceId = developmentInstanceIdForStart({
+      configured: sharedEnvironment.OPENBOT_DEV_INSTANCE_ID,
+      shared,
+      besideOwnStack: conflicts.length > 0,
+      projectRoot,
+    });
+    if (instanceId !== sharedEnvironment.OPENBOT_DEV_INSTANCE_ID) {
+      sharedEnvironment.OPENBOT_DEV_INSTANCE_ID = instanceId;
+      // The default changed from the shared profile, so a developer who expects their old data learns where it is.
+      logger.info("This worktree opens its own dev profile. Pass --shared to open the shared OpenBot Dev profile.");
     }
     const allocated = await allocateDevelopmentPorts(services, sharedEnvironment, heldDevStackPorts(records));
     validateServiceSpecs(allocated);
@@ -375,6 +381,22 @@ async function main(): Promise<void> {
     closeSlackTunnels?.();
     throw error;
   }
+}
+
+/**
+ * The profile the start opens before the ports are chosen. An explicit id wins, and `--shared`
+ * keeps the shared `OpenBot Dev` profile. Beside a running stack of this worktree, that stack
+ * already holds the worktree profile and Chromium lets one app hold a profile, so the start keeps
+ * no id and the port allocation names a profile after the renderer port.
+ */
+export function developmentInstanceIdForStart(input: {
+  configured: string | undefined;
+  shared: boolean;
+  besideOwnStack: boolean;
+  projectRoot: string;
+}): string | undefined {
+  if (input.configured || input.shared || input.besideOwnStack) return input.configured;
+  return developmentInstanceIdForWorktree(input.projectRoot);
 }
 
 // The ports the stack won, under the label a developer reads in
