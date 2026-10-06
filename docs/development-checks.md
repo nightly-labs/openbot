@@ -149,7 +149,10 @@ restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no ca
 
 ## Focused tests
 
-`bun run test:changed` is `vitest run --changed origin/main --maxWorkers=1`. Vitest takes the files
+`bun run test:changed` is `vitest run --changed origin/main --maxWorkers=1`. First it runs
+`git merge-base origin/main HEAD`, and stops with an error when `origin/main` or a common commit is
+missing. Without this guard, Vitest ignores the failed `git diff`, finds no test files and exits
+with code 0, so a broken test would pass. Vitest takes the files
 in `git diff origin/main...HEAD`, the staged files, and the unstaged and untracked files. Then it
 runs each test file whose import graph contains one of them. It uses the root `vitest.config.ts`,
 so each file goes to its usual project (`node`, `renderer` or `mobile-ui`) and environment. When
@@ -159,10 +162,12 @@ first if it is old: an old base selects tests for changes that are already on `m
 `bun run test:related -- <source>...` is `vitest related --run --maxWorkers=1`. It runs the test
 files that import the named source files, with no Git query.
 
-Vitest 4.1.10 does not select tests for a change to `vitest.config.ts`, a setup file or
-`package.json`. Its default `forceRerunTriggers` (`**/package.json/**`,
-`**/{vitest,vite}.config.*/**`) do not match these files, and a setup file is not in a test's
-import graph. After such a change, run the test files that it can affect with
+A change to `vitest.config.ts`, a setup file or `package.json` selects no test. The root config
+sets `forceRerunTriggers: []`. The Vitest default (`**/package.json/**`,
+`**/{vitest,vite}.config.*/**`) selects every test for such a change, but only when the checkout
+path has no dot directory: `**` does not match a dot directory such as `.t3` or `.claude`. A full
+run on one worker is not a focused check. A setup file is not in a test's import graph. After such
+a change, run the test files that it can affect with
 `bun run test:desktop -- <path>`.
 
 A shared module can have many dependents. For example, `packages/ui/src/digit-roll.ts` selects 16
