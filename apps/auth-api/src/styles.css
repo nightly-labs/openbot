@@ -6741,6 +6741,12 @@ a {
   backdrop-filter: blur(6px);
 }
 
+/* A modal dialog does not stop the page under it from scrolling. `:modal` leaves out the
+   Storybook stage, whose dialog is only open. */
+html:has(.ph-dialog:modal) {
+  overflow: hidden;
+}
+
 .ph-dialog-art {
   position: relative;
   height: 148px;
