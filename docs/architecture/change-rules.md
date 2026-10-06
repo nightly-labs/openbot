@@ -1,5 +1,45 @@
 # Change rules and verification
 
+## Effect service execution
+
+Service workflows use the catalog-pinned `effect` 4.0.0 package. Read the source and
+reference material in the installed package when changing these workflows. The Electron
+main process, account Worker, site-router Worker, Signal service, and shared team client
+use the same version. Framework routing, IPC validation, UI rendering, and event delivery
+keep their native interfaces.
+
+Effects compose domain operations and typed failures. Promise interfaces remain at
+framework and SDK boundaries. These interfaces unwrap expected failures with
+`Effect.result`; defects and interruption can still reject. Existing public error
+mapping and secret redaction remain the responsibility of each boundary.
+
+Long-lived service graphs own their managed runtime and dispose it at shutdown. Provider
+discovery registers disposal in the desktop teardown registry. Each remote peer owns its
+runtime until peer disposal. Signal owns a process runtime. Worker service dependencies
+belong to a request or invocation; they must not retain request bindings in a global
+runtime. Response streams and `waitUntil` tasks retain their framework lifetimes.
+
+Constructor-injected services expose one Effect operation per async method. Service ports
+accept Effects, and callers compose them directly. There are no paired Promise facades.
+Deferred values share pending results; semaphores preserve operation order; owned scopes
+retain background fibers until cleanup. Synchronous SQLite transactions stay synchronous.
+A mutation that must finish before rollback or shutdown uses an explicit interruption boundary.
+
+The renderer and mobile application workflows remain outside this migration. Their native
+callbacks execute shared client Effects and keep existing UI and event behavior. Electron window management,
+HTTP routing, IPC handlers, SDK callback registration, and startup/teardown hooks remain
+framework code. They call Effect service boundaries and await resource disposal.
+
+The isolated agent database host imports Effect from the installed package. It keeps
+its separate process, SQL authorizer, and frozen line protocol. The supervisor can still
+terminate a process blocked in synchronous SQLite work. Desktop packages unpack Effect
+with the host, and package verification checks that the dependency exists there.
+
+Resources belong to the operation that acquires them. Use finalizers for file handles,
+streams, temporary files, permits, and pending callbacks. Forward cancellation only to
+adapters that support it. Cancellation does not make a database write or a remote mutation
+safe to replay. Keep domain retry and recovery rules at their existing owners.
+
 ## Change rules
 
 1. Put a type in `packages/contracts` only when it crosses a process or application boundary.

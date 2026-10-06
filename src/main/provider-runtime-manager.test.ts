@@ -1,3 +1,4 @@
+import { runtimeIO } from "./provider-runtime-effects";
 // @vitest-environment node
 
 import { execFileSync } from "node:child_process";
@@ -22,6 +23,7 @@ import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeS
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
+import { runCauseEffect } from "../backend/effect-boundary";
 import {
   ProviderRuntimeManager,
   type ProviderRuntimeManagerOptions,
@@ -81,7 +83,7 @@ describe("ProviderRuntimeManager", () => {
         return chunkedResponse(executable, 1_024, { etag: '"runtime-1"' });
       },
     });
-    const initial = await manager.initialize();
+    const initial = await runCauseEffect(manager.initialize());
     expect(initial.providers.grok).toMatchObject({
       phase: "not-downloaded",
       version: "1.0.21",
@@ -93,7 +95,7 @@ describe("ProviderRuntimeManager", () => {
       if (value !== null) progress.push(value);
     });
 
-    const accepted = await manager.download("grok");
+    const accepted = await runCauseEffect(manager.download("grok"));
     expect(accepted.providers.grok).toMatchObject({
       phase: "downloading",
       version: "1.0.21",
@@ -119,7 +121,7 @@ describe("ProviderRuntimeManager", () => {
       await mkdir(bin, { recursive: true });
       if (version !== "1.0.21") await writeFile(join(bin, "grok"), "not an older runtime");
       const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-      const snapshot = await manager.initialize();
+      const snapshot = await runCauseEffect(manager.initialize());
       expect(snapshot.providers.grok).toMatchObject({ phase: "not-downloaded", version: null, availableVersion: null });
     },
   );
@@ -133,18 +135,21 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = latestGrokFixture("1.0.30");
     const manager = latestGrokManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     manager.setSystemVersion("grok", fixture.lock.grok.version);
     expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
 
-    const checked = await manager.checkForUpdates();
+    const checked = await runCauseEffect(manager.checkForUpdates());
     expect(checked.providers.grok.availableVersion).toBe("1.0.30");
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
     expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
-    await manager.stop();
+    await runCauseEffect(manager.stop());
 
     const restarted = latestGrokManager(root, fixture);
-    expect((await restarted.initialize()).providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
+    expect((await runCauseEffect(restarted.initialize())).providers.grok).toMatchObject({
+      phase: "ready",
+      version: "1.0.30",
+    });
     const executable = restarted.executablePath("grok");
     if (!executable) throw new Error("The managed Grok path is missing.");
     expect(executable).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
@@ -153,23 +158,23 @@ describe("ProviderRuntimeManager", () => {
     const added = join(root, "grok", "darwin-arm64", "1.0.30", "bin", "added");
     await writeFile(added, "#!/bin/sh\n");
     const extended = latestGrokManager(root, fixture);
-    expect((await extended.initialize()).providers.grok.phase).not.toBe("ready");
+    expect((await runCauseEffect(extended.initialize())).providers.grok.phase).not.toBe("ready");
     await rm(added);
 
     // A binary changed after install no longer matches its record, so it is not started.
     await writeFile(executable, "#!/bin/sh\necho 1.0.30\n# changed\n");
     const tampered = latestGrokManager(root, fixture);
-    expect((await tampered.initialize()).providers.grok.phase).not.toBe("ready");
+    expect((await runCauseEffect(tampered.initialize())).providers.grok.phase).not.toBe("ready");
   });
 
   it("does not offer a release the block list names", async () => {
     const root = await temporaryRoot();
     const fixture = latestGrokFixture("1.0.30", ["1.0.30"]);
     const manager = latestGrokManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     manager.setSystemVersion("grok", "1.0.21");
 
-    const checked = await manager.checkForUpdates();
+    const checked = await runCauseEffect(manager.checkForUpdates());
 
     expect(checked.providers.grok.availableVersion).toBe(fixture.lock.grok.version);
   });
@@ -178,20 +183,20 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = latestGrokFixture("1.0.30");
     const manager = latestGrokManager(root, fixture);
-    await manager.initialize();
-    await manager.checkForUpdates();
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.initialize());
+    await runCauseEffect(manager.checkForUpdates());
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     // 1.0.31 reports another version, so its install fails and 1.0.30 stays.
     fixture.version = "1.0.31";
     fixture.executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.30\n${"# runtime\n".repeat(1_000)}`);
-    await manager.checkForUpdates();
-    await expect(manager.downloadAndWait("grok")).rejects.toThrow();
+    await runCauseEffect(manager.checkForUpdates());
+    await expect(runCauseEffect(manager.downloadAndWait("grok"))).rejects.toThrow();
     expect(manager.getStatus().providers.grok).toMatchObject({ phase: "download-error", version: "1.0.30" });
 
     fixture.blocked = ["1.0.31"];
-    await manager.checkForUpdates();
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.checkForUpdates());
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
     expect(manager.executablePath("grok")).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
@@ -205,15 +210,17 @@ describe("ProviderRuntimeManager", () => {
       architecture: "arm64",
       fetchImpl: async () => new Response(null, { status: 503 }),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await expect(manager.checkForUpdates()).rejects.toThrow("could not reach the provider release sources");
+    await expect(runCauseEffect(manager.checkForUpdates())).rejects.toThrow(
+      "could not reach the provider release sources",
+    );
   });
 
   it("offers the pinned version to an older CLI the user installed", async () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const pinned = parseAgentRuntimeLock(structuredClone(lockValue)).grok.version;
     const snapshots: ProviderRuntimeSnapshot[] = [];
     manager.on("status", (snapshot) => snapshots.push(snapshot));
@@ -235,7 +242,7 @@ describe("ProviderRuntimeManager", () => {
       JSON.stringify({ grok: { version: "0.0.1", pinnedVersion: "1.0.22" } }),
     );
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     manager.setSystemVersion("grok", "0.0.1");
     expect(manager.getStatus().providers.grok.availableVersion).toBe("1.0.22");
   });
@@ -245,10 +252,10 @@ describe("ProviderRuntimeManager", () => {
     vi.stubEnv("OPENBOT_GROK_PATH", "/custom/grok");
     const fetchImpl = vi.fn(async () => new Response());
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", fetchImpl });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     manager.setSystemVersion("grok", "1.0.5");
     expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
-    await expect(manager.downloadAndWait("grok")).rejects.toThrow("explicit CLI path override");
+    await expect(runCauseEffect(manager.downloadAndWait("grok"))).rejects.toThrow("explicit CLI path override");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -281,15 +288,16 @@ describe("ProviderRuntimeManager", () => {
               : fixture.executable,
           1024,
         ),
-      updateRuntime: async (_provider, install) => {
-        await install();
-        finishInstall?.();
-        await activation;
-        if (failActivation) throw new Error("Candidate failed. Authorization: Bearer abcdef123456");
-      },
+      updateRuntime: (_provider, install) =>
+        runtimeIO(async () => {
+          await runCauseEffect(install());
+          finishInstall?.();
+          await activation;
+          if (failActivation) throw new Error("Candidate failed. Authorization: Bearer abcdef123456");
+        }),
     });
-    await manager.initialize();
-    const update = manager.downloadAndWait("grok");
+    await runCauseEffect(manager.initialize());
+    const update = runCauseEffect(manager.downloadAndWait("grok"));
     await installed;
     expect(manager.getStatus().providers.grok.phase).toBe("finishing");
     activate?.();
@@ -302,11 +310,14 @@ describe("ProviderRuntimeManager", () => {
       architecture: "arm64",
       lock: fixture.lock,
     });
-    expect((await restarted.initialize()).providers.grok).toMatchObject({ phase: "not-downloaded", version: "1.0.21" });
+    expect((await runCauseEffect(restarted.initialize())).providers.grok).toMatchObject({
+      phase: "not-downloaded",
+      version: "1.0.21",
+    });
     expect(restarted.executablePath("grok")).toBe(previous);
     expect(await readFile(previous, "utf8")).toBe("previous runtime");
     failActivation = false;
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
     expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
     const successfulRestart = new ProviderRuntimeManager({
       root,
@@ -314,7 +325,10 @@ describe("ProviderRuntimeManager", () => {
       architecture: "arm64",
       lock: fixture.lock,
     });
-    expect((await successfulRestart.initialize()).providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
+    expect((await runCauseEffect(successfulRestart.initialize())).providers.grok).toMatchObject({
+      phase: "ready",
+      version: "1.0.22",
+    });
   });
 
   it("rejects a binary whose version only contains the pinned version as a prefix", async () => {
@@ -339,8 +353,8 @@ describe("ProviderRuntimeManager", () => {
           1024,
         ),
     });
-    await manager.initialize();
-    await expect(manager.downloadAndWait("grok")).rejects.toThrow("unexpected version");
+    await runCauseEffect(manager.initialize());
+    await expect(runCauseEffect(manager.downloadAndWait("grok"))).rejects.toThrow("unexpected version");
   });
 
   it("allows three transfers and cancels only the selected provider", async () => {
@@ -355,9 +369,13 @@ describe("ProviderRuntimeManager", () => {
       architecture: "arm64",
       fetchImpl: async () => slowResponse(responseBody),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await Promise.all([manager.download("codex"), manager.download("claude"), manager.download("grok")]);
+    await Promise.all([
+      runCauseEffect(manager.download("codex")),
+      runCauseEffect(manager.download("claude")),
+      runCauseEffect(manager.download("grok")),
+    ]);
     // Named one by one rather than read off the snapshot in order: the managed set grows, and a
     // fourth provider nobody asked to download must not read as a fourth transfer here.
     const started = manager.getStatus().providers;
@@ -368,7 +386,7 @@ describe("ProviderRuntimeManager", () => {
     ]);
     expect(started.opencode.phase).toBe("not-downloaded");
 
-    await manager.cancel("claude");
+    await runCauseEffect(manager.cancel("claude"));
     const snapshot = manager.getStatus();
     expect(snapshot.providers.claude).toMatchObject({
       phase: "not-downloaded",
@@ -379,7 +397,7 @@ describe("ProviderRuntimeManager", () => {
     expect(snapshot.providers.codex.phase).toBe("downloading");
     expect(snapshot.providers.grok.phase).toBe("downloading");
     await expect(access(join(root, ".downloads", "claude-darwin-arm64-2.1.263.partial"))).rejects.toThrow();
-    await manager.stop();
+    await runCauseEffect(manager.stop());
   });
 
   it("restarts a partial transfer when the vendor ETag changes", async () => {
@@ -428,10 +446,10 @@ describe("ProviderRuntimeManager", () => {
         return chunkedResponse(executable, 512, { etag: '"changed"' });
       },
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const finished = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
 
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     await finished;
 
     expect(ranges).toEqual([`bytes=${offset}-`, null]);
@@ -467,13 +485,13 @@ describe("ProviderRuntimeManager", () => {
         });
       },
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const failed = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "download-error");
 
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     await failed;
     const ready = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     await ready;
 
     expect(ranges[0]).toBeNull();
@@ -509,10 +527,10 @@ describe("ProviderRuntimeManager", () => {
         return chunkedResponse(fixture.executable, 512, { etag: '"runtime-1"' });
       },
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const ready = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "ready");
 
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     await ready;
 
     expect(ranges).toEqual(["bytes=128-", null]);
@@ -529,10 +547,10 @@ describe("ProviderRuntimeManager", () => {
       lock: fixture.lock,
       fetchImpl: async () => chunkedResponse(fixture.executable, 512),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const failed = waitFor(manager, (snapshot) => snapshot.providers.grok.phase === "download-error");
 
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     const snapshot = await failed;
 
     expect(snapshot.providers.grok.message).toContain("integrity check");
@@ -551,10 +569,10 @@ describe("ProviderRuntimeManager", () => {
       fetchImpl,
       availableDiskBytes: async () => 0,
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const failed = waitFor(manager, (snapshot) => snapshot.providers.codex.phase === "download-error");
 
-    await manager.download("codex");
+    await runCauseEffect(manager.download("codex"));
     const snapshot = await failed;
 
     expect(snapshot.providers.codex.message).toContain("free disk space");
@@ -590,7 +608,7 @@ describe("ProviderRuntimeManager", () => {
     await Promise.all([abandoned, replaced, released].map((path) => aged(path)));
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
     expect((await readdir(join(root, "grok"))).sort()).toEqual([basename(live)]);
   });
@@ -607,9 +625,9 @@ describe("ProviderRuntimeManager", () => {
         if (url.endsWith("/LICENSE")) staged = readdir(join(root, "grok"));
       },
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     // Released builds share this store, and the manager they carry deletes every `.installing-`
     // directory when it starts, whatever its age and whoever is filling it.
@@ -628,7 +646,7 @@ describe("ProviderRuntimeManager", () => {
     await aged(collected, VERSION_AGE_MS);
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
     expect((await readdir(join(root, "grok", "darwin-arm64"))).sort()).toEqual(["1.0.19", "1.0.21"]);
   });
@@ -649,8 +667,8 @@ describe("ProviderRuntimeManager", () => {
     const behind = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
     const ahead = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
-    expect((await behind.initialize()).providers.grok.version).toBe("1.0.20");
-    await ahead.initialize();
+    expect((await runCauseEffect(behind.initialize())).providers.grok.version).toBe("1.0.20");
+    await runCauseEffect(ahead.initialize());
 
     // The other instance collects by its own reckoning, where 1.0.20 is neither the pinned version
     // nor its own spare. What the first instance left on the directory is the only thing that says
@@ -671,7 +689,7 @@ describe("ProviderRuntimeManager", () => {
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
     try {
-      const snapshot = await manager.initialize();
+      const snapshot = await runCauseEffect(manager.initialize());
       expect(snapshot.providers.grok).toMatchObject({ phase: "not-downloaded", availableVersion: null });
       await expect(access(collected)).resolves.toBeUndefined();
     } finally {
@@ -688,11 +706,11 @@ describe("ProviderRuntimeManager", () => {
     });
     const sibling = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-b") });
     const heldManager = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-a"), held });
-    await Promise.all([sibling.initialize(), heldManager.initialize()]);
+    await Promise.all([runCauseEffect(sibling.initialize()), runCauseEffect(heldManager.initialize())]);
 
-    const waiting = heldManager.downloadAndWait("grok");
+    const waiting = runCauseEffect(heldManager.downloadAndWait("grok"));
     await waitFor(heldManager, (snapshot) => snapshot.providers.grok.phase === "downloading");
-    await sibling.downloadAndWait("grok");
+    await runCauseEffect(sibling.downloadAndWait("grok"));
     const installed = sibling.executablePath("grok");
     if (!installed) throw new Error("The managed Grok path is missing.");
     const committed = (await stat(installed)).ino;
@@ -721,16 +739,19 @@ describe("ProviderRuntimeManager", () => {
     const heldManager = siblingManager(root, fixture, {
       downloadRoot: join(root, "downloads-a"),
       held,
-      updateRuntime: async (_provider, install) => {
-        await install();
-        throw new Error("Grok rejected the credentials.");
-      },
+      updateRuntime: (_provider, install) =>
+        runtimeIO(async () => {
+          await runCauseEffect(install());
+          throw new Error("Grok rejected the credentials.");
+        }),
     });
-    await Promise.all([sibling.initialize(), heldManager.initialize()]);
+    await Promise.all([runCauseEffect(sibling.initialize()), runCauseEffect(heldManager.initialize())]);
 
-    const waiting = expect(heldManager.downloadAndWait("grok")).rejects.toThrow("Grok rejected the credentials.");
+    const waiting = expect(runCauseEffect(heldManager.downloadAndWait("grok"))).rejects.toThrow(
+      "Grok rejected the credentials.",
+    );
     await waitFor(heldManager, (snapshot) => snapshot.providers.grok.phase === "downloading");
-    await sibling.downloadAndWait("grok");
+    await runCauseEffect(sibling.downloadAndWait("grok"));
     const installed = sibling.executablePath("grok");
     if (!installed) throw new Error("The managed Grok path is missing.");
     release?.();
@@ -752,18 +773,19 @@ describe("ProviderRuntimeManager", () => {
     const adopter = siblingManager(root, fixture, {
       downloadRoot: join(root, "downloads-b"),
       onFetch: (url) => fetched.push(url),
-      updateRuntime: async (_provider, install) => {
-        activated.push(await install());
-      },
+      updateRuntime: (_provider, install) =>
+        runtimeIO(async () => {
+          activated.push(await runCauseEffect(install()));
+        }),
     });
     // This instance starts before the store holds the version, the way a running app does when the
     // offer appears; the sibling installs it while the offer waits on screen.
-    await adopter.initialize();
+    await runCauseEffect(adopter.initialize());
     const installer = siblingManager(root, fixture, { downloadRoot: join(root, "downloads-a") });
-    await installer.initialize();
-    await installer.downloadAndWait("grok");
+    await runCauseEffect(installer.initialize());
+    await runCauseEffect(installer.downloadAndWait("grok"));
 
-    await adopter.downloadAndWait("grok");
+    await runCauseEffect(adopter.downloadAndWait("grok"));
 
     // The whole point of the second instance's update: the agent service swaps its running clients
     // onto the pinned executable. Reporting "ready" without it left the old CLI in use, and the
@@ -781,12 +803,15 @@ describe("ProviderRuntimeManager", () => {
       downloadRoot: join(root, ".downloads"),
       onFetch: (url) => fetched.push(url),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
     // Two presses of Update, or an update and the agent service asking for the same CLI. The second
     // has to find the first task rather than start a transfer of its own over the same file.
-    const [first, second] = await Promise.all([manager.download("grok"), manager.download("grok")]);
-    await manager.downloadAndWait("grok");
+    const [first, second] = await Promise.all([
+      runCauseEffect(manager.download("grok")),
+      runCauseEffect(manager.download("grok")),
+    ]);
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(first.providers.grok.phase).toBe("downloading");
     expect(second.providers.grok.phase).toBe("downloading");
@@ -800,9 +825,9 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
-    expect((await manager.initialize()).providers.grok.phase).toBe("not-downloaded");
+    expect((await runCauseEffect(manager.initialize())).providers.grok.phase).toBe("not-downloaded");
 
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
@@ -815,11 +840,11 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     // The claim a sibling instance holds while it puts its own copy in place of the damaged one.
     await heldClaim(join(root, "grok", ".locking-darwin-arm64-1.0.22"), "4242-c0ffee11");
 
-    await expect(manager.downloadAndWait("grok")).rejects.toThrow(/another instance/);
+    await expect(runCauseEffect(manager.downloadAndWait("grok"))).rejects.toThrow(/another instance/);
 
     // Untouched: the sibling is entitled to finish, and the install it commits is the one both use.
     expect(await readFile(destination, "utf8")).toBe("#!/bin/sh\necho 1.0.22\n");
@@ -832,14 +857,14 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     // An instance killed while it held the claim. Age is the only evidence there is that no one is
     // coming back for it, so the store must not stay unwritable because of it.
     const lock = join(root, "grok", ".locking-darwin-arm64-1.0.22");
     await heldClaim(lock, "4242-c0ffee11");
     await aged(lock);
 
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
@@ -854,12 +879,12 @@ describe("ProviderRuntimeManager", () => {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, "#!/bin/sh\necho 1.0.22\n");
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     // A claim directory with no claim in it names no owner, so it can only be what an instance
     // killed part-way through making one left. The store must not stay unwritable because of it.
     await mkdir(join(root, "grok", ".locking-darwin-arm64-1.0.22"), { recursive: true });
 
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
@@ -872,12 +897,12 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads") });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     // More than the 15 moves that three passes of `renameIfVacant` try: a scan can hold the stage for
     // longer than one wait.
     heldStage.renames = 16;
 
-    await manager.downloadAndWait("grok");
+    await runCauseEffect(manager.downloadAndWait("grok"));
 
     expect(heldStage.renames).toBe(0);
     expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.22" });
@@ -887,10 +912,10 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = grokFixture();
     const manager = siblingManager(root, fixture, { downloadRoot: join(root, ".downloads"), heldStageWaitMs: 0 });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     heldStage.renames = Number.POSITIVE_INFINITY;
 
-    await expect(manager.downloadAndWait("grok")).rejects.toThrow(
+    await expect(runCauseEffect(manager.downloadAndWait("grok"))).rejects.toThrow(
       "The runtime could not be installed because another program has its files open. Close it and try again.",
     );
 
@@ -911,19 +936,19 @@ describe("ProviderRuntimeManager", () => {
       lock,
       fetchImpl: async () => slowResponse(new Uint8Array(64_000)),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const partial = join(downloadRoot, `grok-darwin-arm64-${lock.grok.version}.partial`);
     const transferring = waitFor(manager, (snapshot) => (snapshot.providers.grok.progress ?? 0) > 0);
 
-    await manager.download("grok");
+    await runCauseEffect(manager.download("grok"));
     await transferring;
 
     await expect(access(partial)).resolves.toBeUndefined();
     expect(await readdir(root)).not.toContain(".downloads");
 
-    await manager.cancel("grok");
+    await runCauseEffect(manager.cancel("grok"));
     await expect(access(partial)).rejects.toThrow();
-    await manager.stop();
+    await runCauseEffect(manager.stop());
   });
 
   it("rejects an archive that contains a link", async () => {
@@ -946,10 +971,10 @@ describe("ProviderRuntimeManager", () => {
       lock,
       fetchImpl: async () => new Response(bytes),
     });
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     const failed = waitFor(manager, (snapshot) => snapshot.providers.codex.phase === "download-error");
 
-    await manager.download("codex");
+    await runCauseEffect(manager.download("codex"));
     const snapshot = await failed;
 
     expect(snapshot.providers.codex.message).toContain("link or special file");
@@ -985,9 +1010,9 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = await opencodeFixture();
     const manager = opencodeManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await manager.downloadAndWait("opencode");
+    await runCauseEffect(manager.downloadAndWait("opencode"));
 
     const version = fixture.lock.opencode.version;
     expect(manager.getStatus().providers.opencode).toMatchObject({ phase: "ready", version });
@@ -1008,9 +1033,11 @@ describe("ProviderRuntimeManager", () => {
     // is what a registry mix-up or a stale mirror hands back.
     const fixture = await opencodeFixture({ manifestVersion: "1.18.29" });
     const manager = opencodeManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("does not match the runtime catalog");
+    await expect(runCauseEffect(manager.downloadAndWait("opencode"))).rejects.toThrow(
+      "does not match the runtime catalog",
+    );
   });
 
   it("refuses a binary whose checksum is not the pinned one", async () => {
@@ -1018,9 +1045,9 @@ describe("ProviderRuntimeManager", () => {
     const fixture = await opencodeFixture();
     fixture.lock.opencode.artifacts["darwin-arm64"].binarySha256 = digest(new TextEncoder().encode("wrong"));
     const manager = opencodeManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("checksum mismatch");
+    await expect(runCauseEffect(manager.downloadAndWait("opencode"))).rejects.toThrow("checksum mismatch");
   });
 
   it("installs nothing when the staged OpenCode reports another version", async () => {
@@ -1029,9 +1056,9 @@ describe("ProviderRuntimeManager", () => {
     // it: a binary that answers with any other version must not become the runtime OpenBot starts.
     const fixture = await opencodeFixture({ reportedVersion: "1.18.29" });
     const manager = opencodeManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await expect(manager.downloadAndWait("opencode")).rejects.toThrow("unexpected version");
+    await expect(runCauseEffect(manager.downloadAndWait("opencode"))).rejects.toThrow("unexpected version");
 
     const entries = await readdir(join(root, "opencode")).catch(() => []);
     expect(entries).not.toContain("darwin-arm64");
@@ -1047,9 +1074,9 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = antigravityFixture();
     const manager = antigravityManager(root, fixture.lock, fixture.archive);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await manager.downloadAndWait("antigravity");
+    await runCauseEffect(manager.downloadAndWait("antigravity"));
 
     const version = fixture.lock.antigravity.version;
     expect(manager.getStatus().providers.antigravity).toMatchObject({ phase: "ready", version });
@@ -1066,8 +1093,10 @@ describe("ProviderRuntimeManager", () => {
     const otherRoot = await temporaryRoot();
     const extra = antigravityFixture([["../outside", "x"]]);
     const refused = antigravityManager(otherRoot, extra.lock, extra.archive);
-    await refused.initialize();
-    await expect(refused.downloadAndWait("antigravity")).rejects.toThrow("The Gemini archive has an unexpected file.");
+    await runCauseEffect(refused.initialize());
+    await expect(runCauseEffect(refused.downloadAndWait("antigravity"))).rejects.toThrow(
+      "The Gemini archive has an unexpected file.",
+    );
     await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
   });
 
@@ -1079,9 +1108,9 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = cursorWindowsFixture();
     const manager = cursorWindowsManager(root, fixture.lock, fixture.archive);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
 
-    await manager.downloadAndWait("cursor");
+    await runCauseEffect(manager.downloadAndWait("cursor"));
 
     const version = fixture.lock.cursor.version;
     expect(manager.getStatus().providers.cursor).toMatchObject({ phase: "ready", version });
@@ -1097,8 +1126,10 @@ describe("ProviderRuntimeManager", () => {
     const otherRoot = await temporaryRoot();
     const escaping = cursorWindowsFixture([["dist-package/../../outside", "x"]]);
     const refused = cursorWindowsManager(otherRoot, escaping.lock, escaping.archive);
-    await refused.initialize();
-    await expect(refused.downloadAndWait("cursor")).rejects.toThrow("The Cursor archive has an unexpected file.");
+    await runCauseEffect(refused.initialize());
+    await expect(runCauseEffect(refused.downloadAndWait("cursor"))).rejects.toThrow(
+      "The Cursor archive has an unexpected file.",
+    );
     await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
   });
 
@@ -1112,10 +1143,10 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = await bunFixture();
     const manager = bunManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     expect(manager.mcpToolRuntimes()).toEqual({ binDirectories: [], commandAliases: {} });
 
-    await manager.downloadAndWait("bun");
+    await runCauseEffect(manager.downloadAndWait("bun"));
 
     const version = fixture.lock.bun.version;
     expect(manager.getStatus().toolRuntimes.bun).toMatchObject({ phase: "ready", version });
@@ -1134,10 +1165,10 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const fixture = await bunFixture();
     const manager = bunManager(root, fixture);
-    await manager.initialize();
+    await runCauseEffect(manager.initialize());
     expect(manager.mcpToolRuntimes().binDirectories).toEqual([]);
 
-    await manager.ensureToolRuntimesReady();
+    await runCauseEffect(manager.ensureToolRuntimesReady());
 
     expect(manager.getStatus().toolRuntimes.bun).toMatchObject({ phase: "ready" });
     expect(manager.mcpToolRuntimes().binDirectories).toHaveLength(1);
@@ -1149,7 +1180,7 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
 
-    const snapshot = await manager.initialize();
+    const snapshot = await runCauseEffect(manager.initialize());
 
     expect(Object.keys(snapshot.providers)).toEqual([...MANAGED_RUNTIME_PROVIDERS]);
   });
@@ -1163,7 +1194,7 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({ root, platform, architecture });
 
-    const snapshot = await manager.initialize();
+    const snapshot = await runCauseEffect(manager.initialize());
 
     for (const provider of MANAGED_RUNTIME_PROVIDERS) {
       expect(snapshot.providers[provider]).toMatchObject({ phase: "not-downloaded", message: null });
@@ -1177,7 +1208,7 @@ describe("ProviderRuntimeManager", () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({ root, platform: "win32", architecture: "arm64" });
 
-    const snapshot = await manager.initialize();
+    const snapshot = await runCauseEffect(manager.initialize());
 
     expect(snapshot.providers.codex.message).toBe("This platform is not supported.");
   });

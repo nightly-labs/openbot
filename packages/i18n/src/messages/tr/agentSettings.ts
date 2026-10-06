@@ -44,6 +44,8 @@ export const messages = {
   "agentSettings.runtime.selectReasoning": "Akıl yürütmeyi seçin",
   "agentSettings.runtime.access": "Erişim",
   "agentSettings.runtime.accessLabel": "Ajan erişimi",
+  "agentSettings.runtime.busyMessage": "Çalışırken",
+  "agentSettings.runtime.busyMessageLabel": "Ajan çalışırken gönderilen mesajlar",
   "agentSettings.runtime.workingDirectory": "Çalışma dizini",
   "agentSettings.runtime.notAvailable": "Henüz kullanılamıyor",
   "agentSettings.runtime.fullAccessNote":
@@ -52,6 +54,12 @@ export const messages = {
   "agentSettings.runtime.providerApprovalNote": "Sağlayıcıya bağlı olarak, hassas komutlar önce onay isteyebilir.",
   "agentSettings.access.workspace": "Yalnızca çalışma alanı",
   "agentSettings.access.full": "Tam erişim",
+  "agentSettings.busyMessage.appDefaultQueue": "Uygulama varsayılanı (Kuyruk)",
+  "agentSettings.busyMessage.appDefaultSteer": "Uygulama varsayılanı (Yönlendir)",
+  "agentSettings.busyMessage.queue": "Kuyruk",
+  "agentSettings.busyMessage.steer": "Yönlendir",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
   "agentSettings.notifications.title": "Bildirimler",
   "agentSettings.notifications.description": "Bu ajan tamamlandığında veya girdi gerektiğinde bildirim alın",
   "agentSettings.newChat.title": "Yeni sohbet",
@@ -87,17 +95,9 @@ export const messages = {
     "Bilgisayar Kullanımı ve OpenBot tarayıcısı sınırlandırılmamıştır; Bilgisayar Kullanımını aşağıdan kapatabilirsiniz.",
   "agentSettings.computerUse.title": "Bilgisayar Kullanımı",
   "agentSettings.computerUse.description": "Bu ajanın bu bilgisayardaki uygulamaları kontrol etmesine izin verin",
-  "agentSettings.runtime.workspaceEnforcedProcess":
-    "Tüm {provider} süreci bir korumalı alanda (sandbox) çalışır, bu nedenle dışarıya yazma işlemi başarısız olur. Yalnızca macOS'ta kullanılabilir.",
   "agentSettings.automation.title": "Yerel betikler",
   "agentSettings.automation.description":
     "Bu bilgisayardaki betiklerin bu ajanın rutinlerini çalıştırmasına izin verin",
-  "agentSettings.runtime.busyMessage": "Çalışırken",
-  "agentSettings.runtime.busyMessageLabel": "Ajan çalışırken gönderilen mesajlar",
-  "agentSettings.busyMessage.appDefaultQueue": "Uygulama varsayılanı (Kuyruk)",
-  "agentSettings.busyMessage.appDefaultSteer": "Uygulama varsayılanı (Yönlendir)",
-  "agentSettings.busyMessage.queue": "Kuyruk",
-  "agentSettings.busyMessage.steer": "Yönlendir",
-  "agentSettings.busyMessage.steerUnsupported":
-    "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "agentSettings.runtime.workspaceEnforcedProcess":
+    "Tüm {provider} süreci bir korumalı alanda (sandbox) çalışır, bu nedenle dışarıya yazma işlemi başarısız olur. Yalnızca macOS'ta kullanılabilir.",
 } as const satisfies PartialTranslation<typeof source>;

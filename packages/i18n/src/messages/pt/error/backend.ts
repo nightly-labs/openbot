@@ -141,7 +141,6 @@ export const messages = {
   "error.backend.mcpServerGone": "Este servidor MCP não existe mais.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
-  "error.backend.mcpConnectionCancelled": "A conexão foi cancelada.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou essa autenticação.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",

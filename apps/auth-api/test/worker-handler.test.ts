@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthRetentionResult } from "../src/server/auth-data-retention";
 import type { WorkerBindings } from "../src/server/types";
@@ -111,17 +112,19 @@ describe("worker handler", () => {
     let deliveredAt: number | null = null;
     const handler = createWorkerHandler(
       () => new Response("ok"),
-      async (value, now) => {
-        receivedDatabase = value;
-        receivedTime = now;
-        return result;
-      },
+      (value, now) =>
+        Effect.sync(() => {
+          receivedDatabase = value;
+          receivedTime = now;
+          return result;
+        }),
       (value) => {
         logged = value;
       },
-      async (_bindings, now) => {
-        deliveredAt = now;
-      },
+      (_bindings, now) =>
+        Effect.sync(() => {
+          deliveredAt = now;
+        }),
     );
 
     await handler.scheduled({ scheduledTime: 1_234 }, { DB: database });
@@ -138,16 +141,18 @@ describe("worker handler", () => {
     let logCalls = 0;
     const handler = createWorkerHandler(
       () => new Response("ok"),
-      async () => {
-        pruneCalls += 1;
-        throw new Error("Retention must not run outside the daily window.");
-      },
+      () =>
+        Effect.sync(() => {
+          pruneCalls += 1;
+          throw new Error("Retention must not run outside the daily window.");
+        }),
       () => {
         logCalls += 1;
       },
-      async () => {
-        deliveryCalls += 1;
-      },
+      () =>
+        Effect.sync(() => {
+          deliveryCalls += 1;
+        }),
     );
 
     await handler.scheduled({ scheduledTime: Date.UTC(2026, 8, 1, 12, 34) }, { DB: fakeDatabase() });

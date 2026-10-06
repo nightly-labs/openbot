@@ -2,8 +2,10 @@
 
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result, Semaphore } from "effect";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { GitHubOperationError, githubCall, githubDecode } from "./github-effects";
 import type { SecretCipher } from "./provider-credential-store";
 
 const githubConnectorRecordSchema = z.object({
@@ -42,7 +44,7 @@ export class GitHubConnectorStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
   #record: GitHubConnectorRecord | null = null;
-  #queue: Promise<void> = Promise.resolve();
+  readonly #queue = Semaphore.makeUnsafe(1);
 
   constructor(path: string, cipher: SecretCipher) {
     this.#path = path;
@@ -50,58 +52,62 @@ export class GitHubConnectorStore {
   }
 
   /** Reads the file. Returns the error when the file is there but cannot be read. */
-  async load(): Promise<Error | null> {
+
+  readonly load = Effect.fn("GitHubConnectorStore.load")(function* (this: GitHubConnectorStore) {
     this.#record = null;
-    try {
-      this.#record = await this.#read();
-      return null;
-    } catch (error) {
+    const result = yield* this.#readEffect().pipe(Effect.result);
+    if (Result.isFailure(result)) {
+      const error = result.failure.cause;
       return error instanceof Error ? error : new Error(sourceText("error.connector.githubFileUnreadable"));
     }
-  }
+    this.#record = result.success;
+    return null;
+  });
 
   read(): GitHubConnectorRecord | null {
     return this.#record;
   }
 
-  write(record: GitHubConnectorRecord): Promise<void> {
-    return this.#enqueue(async () => {
-      const encrypted = this.#cipher.encrypt(JSON.stringify(record)).toString("base64");
-      // Write then rename, so a crash leaves the previous sign-in readable.
-      await writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true });
+  readonly write = Effect.fn("GitHubConnectorStore.write")(
+    function* (this: GitHubConnectorStore, record: GitHubConnectorRecord) {
+      const encrypted = yield* githubDecode(() => this.#cipher.encrypt(JSON.stringify(record)).toString("base64"));
+      yield* writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true }).pipe(
+        Effect.mapError((error) => new GitHubOperationError({ cause: error.cause })),
+      );
       this.#record = record;
-    });
-  }
+    },
+    (operation) => this.#queue.withPermit(operation).pipe(Effect.uninterruptible),
+  );
 
-  clear(): Promise<void> {
-    return this.#enqueue(async () => {
-      await rm(this.#path, { force: true });
+  readonly clear = Effect.fn("GitHubConnectorStore.clear")(
+    function* (this: GitHubConnectorStore) {
+      yield* githubCall(() => rm(this.#path, { force: true }));
       this.#record = null;
-    });
-  }
+    },
+    (operation) => this.#queue.withPermit(operation).pipe(Effect.uninterruptible),
+  );
 
-  #enqueue(change: () => Promise<void>): Promise<void> {
-    const result = this.#queue.then(change, change);
-    this.#queue = result.catch(() => undefined);
-    return result;
-  }
-
-  async #read(): Promise<GitHubConnectorRecord | null> {
-    let source: string;
-    try {
-      source = await readFile(this.#path, "utf8");
-    } catch (error) {
+  readonly #readEffect = Effect.fn("GitHubConnectorStore.read")(function* (
+    this: GitHubConnectorStore,
+  ): Effect.fn.Return<GitHubConnectorRecord | null, GitHubOperationError> {
+    const result = yield* githubCall(() => readFile(this.#path, "utf8")).pipe(Effect.result);
+    if (Result.isFailure(result)) {
+      const error = result.failure.cause;
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
-      throw error;
+      return yield* result.failure;
     }
-    if (source.length > MAX_ENVELOPE_BYTES) throw new Error(sourceText("error.connector.githubFileTooLarge"));
-    try {
+    const source = result.success;
+    if (source.length > MAX_ENVELOPE_BYTES)
+      return yield* new GitHubOperationError({ cause: new Error(sourceText("error.connector.githubFileTooLarge")) });
+    return yield* githubDecode(() => {
       const envelope = envelopeSchema.parse(JSON.parse(source));
       return githubConnectorRecordSchema.parse(
         JSON.parse(this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))),
       );
-    } catch {
-      throw new Error(sourceText("error.connector.githubFileUnreadable"));
-    }
-  }
+    }).pipe(
+      Effect.mapError(
+        () => new GitHubOperationError({ cause: new Error(sourceText("error.connector.githubFileUnreadable")) }),
+      ),
+    );
+  });
 }

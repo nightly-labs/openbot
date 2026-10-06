@@ -17,13 +17,6 @@ export const messages = {
   "server.compatibility.negotiatedProtocol": "Protocole négocié",
   "server.compatibility.unknown": "Inconnu",
   "server.compatibility.none": "Aucun",
-  "server.compatibility.versionMismatchTitle": "Versions d’OpenBot différentes sur {name}",
-  "server.compatibility.versionMismatchDescription":
-    "La connexion utilise le protocole {protocol}. Certaines fonctions récentes peuvent être indisponibles. Client {clientVersion} ; hôte {hostVersion}.",
-  "server.compatibility.versionMismatchUpdateHostDescription":
-    "Mettez à jour OpenBot sur {name} pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
-  "server.compatibility.versionMismatchUpdateClientDescription":
-    "Mettez à jour cette application OpenBot pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
   "server.join.title": "Rejoindre un serveur",
   "server.join.verifiedFrom": "Invitation vérifiée de {hostname}.",
   "server.join.pasteToContinue": "Collez un lien d’invitation pour continuer.",
@@ -45,7 +38,6 @@ export const messages = {
   "server.join.account": "Compte",
   "server.join.emailBound": "Cette invitation fonctionne uniquement pour son destinataire e-mail.",
   "server.join.unknownDate": "Inconnue",
-  "server.role.owner": "Propriétaire",
   "server.role.admin": "Admin",
   "server.role.member": "Membre",
   "server.mute.for15Minutes": "Pendant 15 minutes",
@@ -91,6 +83,13 @@ export const messages = {
   "server.settings.identityLocalOnly":
     "Le nom et le logo de ce serveur ne peuvent changer que sur l’ordinateur qui l’exécute.",
   "server.settings.publicationLocalOnly": "Seul le serveur local peut changer la publication.",
+  "server.compatibility.versionMismatchTitle": "Versions d’OpenBot différentes sur {name}",
+  "server.compatibility.versionMismatchDescription":
+    "La connexion utilise le protocole {protocol}. Certaines fonctions récentes peuvent être indisponibles. Client {clientVersion} ; hôte {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateHostDescription":
+    "Mettez à jour OpenBot sur {name} pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
+  "server.compatibility.versionMismatchUpdateClientDescription":
+    "Mettez à jour cette application OpenBot pour utiliser toutes les fonctions. La connexion utilise le protocole {protocol}. Client {clientVersion} ; hôte {hostVersion}.",
   "server.connection.failedTitle": "La connexion a échoué",
   "server.connection.failedDescription":
     "Impossible de se connecter à ce serveur. Vérifiez que l’hôte est en ligne et réessayez.",
@@ -100,6 +99,7 @@ export const messages = {
   "server.import.tryAgain": "Réessayez.",
   "server.import.readFailed": "Impossible de lire l’export.",
   "server.import.applyFailed": "L’import ne s’est pas terminé.",
+  "server.role.owner": "Propriétaire",
   "server.settings.generalTitle": "Général",
   "server.settings.generalDescription": "Gérez l’identité de ce serveur et son accès publié.",
   "server.settings.membersTitle": "Membres",

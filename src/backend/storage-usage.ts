@@ -3,7 +3,6 @@
 // database; folders are walked with a bound. Nothing here follows a symbolic link, and nothing here
 // deletes outside the cache and log folders the caller names.
 
-import type { Dirent } from "node:fs";
 import { lstat, readdir, realpath, rm, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -22,6 +21,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
   type StoragePlacement,
   type StorageThread,
@@ -30,6 +30,7 @@ import {
   storageThreads,
 } from "./database/storage-usage-queries";
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
+import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 
 export interface StorageRoots {
   /** The SQLite file. Its `-wal` and `-shm` companions are counted with it. */
@@ -52,7 +53,10 @@ export interface StorageAgent {
 export interface StorageUsageSources {
   roots: StorageRoots;
   database: () => DatabaseSync;
-  mailbox: Pick<MailboxStore, "listStoredFiles" | "deleteStoredFile">;
+  mailbox: {
+    listStoredFiles: MailboxStore["listStoredFiles"];
+    deleteStoredFile: OmitThisParameter<MailboxStore["deleteStoredFile"]>;
+  };
   agents: () => readonly StorageAgent[];
 }
 
@@ -65,7 +69,10 @@ const STAT_BATCH = 64;
 const LOG_FILE = /\.log(\.\d+)?$/;
 const CACHE_TTL_MS = 60_000;
 
-const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
+const yieldToEventLoop = Effect.callback<void>((resume) => {
+  const pending = setImmediate(() => resume(Effect.void));
+  return Effect.sync(() => clearImmediate(pending));
+});
 
 interface TreeSize {
   bytes: number;
@@ -76,67 +83,67 @@ interface TreeSize {
  * Bytes of the regular files under `root`. A symbolic link is never followed, so a workspace that
  * links to a large folder does not count it, and a loop cannot run forever.
  */
-async function measureTree(root: string, entryLimit = STORAGE_WALK_ENTRY_LIMIT): Promise<TreeSize> {
-  let start: string;
-  try {
-    start = await realpath(root);
-    if (!(await lstat(start)).isDirectory()) return { bytes: 0, complete: true };
-  } catch {
-    return { bytes: 0, complete: true };
-  }
+const measureTree = Effect.fn("StorageUsage.measureTree")(function* (
+  root: string,
+  entryLimit = STORAGE_WALK_ENTRY_LIMIT,
+): Effect.fn.Return<TreeSize, StoredStateFailure> {
+  const resolved = yield* Effect.result(
+    Effect.gen(function* () {
+      const path = yield* storedIO(() => realpath(root));
+      const stats = yield* storedIO(() => lstat(path));
+      return stats.isDirectory() ? path : null;
+    }),
+  );
+  if (Result.isFailure(resolved) || resolved.success === null) return { bytes: 0, complete: true };
+  const start = resolved.success;
   const pending = [start];
   let bytes = 0;
   let entries = 0;
   while (pending.length) {
     const directory = pending.pop() ?? start;
-    let children: Dirent[];
-    try {
-      children = await readdir(directory, { withFileTypes: true });
-    } catch {
-      continue;
-    }
+    const children = yield* Effect.result(storedIO(() => readdir(directory, { withFileTypes: true })));
+    if (Result.isFailure(children)) continue;
     const files: string[] = [];
-    for (const child of children) {
+    for (const child of children.success) {
       if (++entries > entryLimit) return { bytes, complete: false };
       const path = join(directory, child.name);
       if (child.isDirectory()) pending.push(path);
       else if (child.isFile()) files.push(path);
     }
     for (let index = 0; index < files.length; index += STAT_BATCH)
-      for (const size of await Promise.all(files.slice(index, index + STAT_BATCH).map(fileSize))) bytes += size;
+      for (const size of yield* Effect.forEach(files.slice(index, index + STAT_BATCH), fileSize, {
+        concurrency: STAT_BATCH,
+      }))
+        bytes += size;
   }
   return { bytes, complete: true };
-}
+});
 
-async function fileSize(path: string): Promise<number> {
-  try {
-    const info = await lstat(path);
-    return info.isFile() ? info.size : 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function logFiles(directory: string): Promise<string[]> {
-  try {
-    const children = await readdir(directory, { withFileTypes: true });
-    return children
-      .filter((child) => child.isFile() && LOG_FILE.test(child.name))
-      .map((child) => join(directory, child.name));
-  } catch {
-    return [];
-  }
-}
-
-async function freeBytes(path: string): Promise<number | null> {
-  try {
-    const filesystem = await statfs(path);
-    const free = filesystem.bavail * filesystem.bsize;
-    return Number.isSafeInteger(free) && free >= 0 ? free : null;
-  } catch {
-    return null;
-  }
-}
+const fileSize = Effect.fn("StorageUsage.fileSize")((path: string) =>
+  storedIO(() => lstat(path)).pipe(
+    Effect.map((info) => (info.isFile() ? info.size : 0)),
+    Effect.catch(() => Effect.succeed(0)),
+  ),
+);
+const logFiles = Effect.fn("StorageUsage.logFiles")((directory: string) =>
+  storedIO(() => readdir(directory, { withFileTypes: true })).pipe(
+    Effect.map((children) =>
+      children
+        .filter((child) => child.isFile() && LOG_FILE.test(child.name))
+        .map((child) => join(directory, child.name)),
+    ),
+    Effect.catch(() => Effect.succeed([])),
+  ),
+);
+const freeBytes = Effect.fn("StorageUsage.freeBytes")((path: string) =>
+  storedIO(() => statfs(path)).pipe(
+    Effect.map((filesystem) => {
+      const free = filesystem.bavail * filesystem.bsize;
+      return Number.isSafeInteger(free) && free >= 0 ? free : null;
+    }),
+    Effect.catch(() => Effect.succeed(null)),
+  ),
+);
 
 /** A wire identifier or nothing, so one odd id drops a link instead of failing the whole answer. */
 function wireId(value: string | null | undefined): string | null {
@@ -170,23 +177,28 @@ export class StorageUsageScanner {
     this.#sources = sources;
   }
 
-  async scan(input: GetStorageUsageInput): Promise<StorageUsage> {
+  scan = Effect.fn("StorageUsage.scan")(function* (
+    this: StorageUsageScanner,
+    input: GetStorageUsageInput,
+  ): Effect.fn.Return<StorageUsage, StoredStateFailure> {
     const scannedAt = new Date().toISOString();
     const agents = this.#sources.agents();
     const scopeAgent = input.agentId === undefined ? null : agents.find((agent) => agent.id === input.agentId);
     if (input.scope === "agent" && !scopeAgent)
-      throw new StorageNotFoundError(sourceText("error.storage.agentMissing"));
+      return yield* new StoredStateFailure({
+        cause: new StorageNotFoundError(sourceText("error.storage.agentMissing")),
+      });
 
     const db = this.#sources.database();
-    let threads = storageThreads(db, input.agentId);
+    let threads = yield* storedSync(() => storageThreads(db, input.agentId));
     if (input.scope === "conversation") threads = threads.filter((thread) => thread.threadId === input.conversationId);
     const threadById = new Map(threads.map((thread) => [thread.threadId, thread]));
-    const placements = await this.#placements(db, threadById);
-    const files = await this.#measureFiles(input, placements, threadById);
+    const placements = yield* this.#placements(db, threadById);
+    const files = yield* this.#measureFiles(input, placements, threadById);
     const threadSizes = new Map<string, { messageCount: number; bytes: number }>();
     for (const thread of threads) {
-      threadSizes.set(thread.threadId, storageThreadSize(db, thread.threadId));
-      await yieldToEventLoop();
+      threadSizes.set(thread.threadId, yield* storedSync(() => storageThreadSize(db, thread.threadId)));
+      yield* yieldToEventLoop;
     }
 
     const filesByThread = new Map<string, MeasuredFile[]>();
@@ -215,13 +227,13 @@ export class StorageUsageScanner {
     let breakdown: StorageBreakdown[];
     let agentRows: AgentStorageRow[] = [];
     if (input.scope === "host") {
-      const measured = await this.#hostFolders(agents);
+      const measured = yield* this.#hostFolders(agents);
       truncated ||= !measured.complete;
       breakdown = [
         breakdownRow("workspaces", measured.workspaces),
         breakdownRow("attachments", sum("attachment")),
         breakdownRow("generated", sum("generated")),
-        breakdownRow("chats", await this.#databaseBytes()),
+        breakdownRow("chats", yield* this.#databaseBytes()),
         breakdownRow("downloads", measured.downloads),
         breakdownRow("caches", measured.caches),
         breakdownRow("runtimes", measured.runtimes),
@@ -238,7 +250,7 @@ export class StorageUsageScanner {
       agentRows = agentList.rows;
       truncated ||= agentList.cut;
     } else if (input.scope === "agent" && scopeAgent) {
-      const workspace = await measureTree(scopeAgent.workspacePath);
+      const workspace = yield* measureTree(scopeAgent.workspacePath);
       truncated ||= !workspace.complete;
       breakdown = [
         breakdownRow("workspaces", workspace.bytes),
@@ -260,25 +272,27 @@ export class StorageUsageScanner {
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
       scannedAt,
-      freeBytes: await freeBytes(this.#sources.roots.data),
+      freeBytes: yield* freeBytes(this.#sources.roots.data),
       breakdown,
       agents: agentRows,
       conversations: conversations.rows,
       files: fileRows.rows.map((entry) => entry.row),
       truncated,
     };
-  }
+  }).bind(this);
 
   /** Placements in the scope's chats, by attachment id. Paged, with a yield between pages. */
-  async #placements(
+  #placements = Effect.fn("StorageUsage.placements")(function* (
+    this: StorageUsageScanner,
     db: DatabaseSync,
     threadById: ReadonlyMap<string, StorageThread>,
-  ): Promise<Map<string, StoragePlacement[]>> {
+  ): Effect.fn.Return<Map<string, StoragePlacement[]>, StoredStateFailure> {
     const byAttachment = new Map<string, StoragePlacement[]>();
     if (threadById.size === 0) return byAttachment;
     let afterId: string | null = "";
     while (afterId !== null) {
-      const page = storagePlacementPage(db, afterId);
+      const cursor: string = afterId;
+      const page: ReturnType<typeof storagePlacementPage> = yield* storedSync(() => storagePlacementPage(db, cursor));
       for (const placement of page.placements) {
         if (!threadById.has(placement.threadId)) continue;
         const list = byAttachment.get(placement.attachmentId);
@@ -286,16 +300,17 @@ export class StorageUsageScanner {
         else byAttachment.set(placement.attachmentId, [placement]);
       }
       afterId = page.nextId;
-      await yieldToEventLoop();
+      yield* yieldToEventLoop;
     }
     return byAttachment;
-  }
+  });
 
-  async #measureFiles(
+  #measureFiles = Effect.fn("StorageUsage.measureFiles")(function* (
+    this: StorageUsageScanner,
     input: GetStorageUsageInput,
     placements: ReadonlyMap<string, StoragePlacement[]>,
     threadById: ReadonlyMap<string, StorageThread>,
-  ): Promise<MeasuredFile[]> {
+  ): Effect.fn.Return<MeasuredFile[], StoredStateFailure> {
     const seen = new Set<string>();
     const selected: Omit<MeasuredFile, "bytes" | "status" | "modifiedAt">[] = [];
     for (const stored of this.#sources.mailbox.listStoredFiles()) {
@@ -319,7 +334,11 @@ export class StorageUsageScanner {
     const measured: MeasuredFile[] = [];
     for (let index = 0; index < selected.length; index += STAT_BATCH) {
       const batch = selected.slice(index, index + STAT_BATCH);
-      const infos = await Promise.all(batch.map((file) => lstat(file.stored.path).catch(() => null)));
+      const infos = yield* Effect.forEach(
+        batch,
+        (file) => storedIO(() => lstat(file.stored.path)).pipe(Effect.catch(() => Effect.succeed(null))),
+        { concurrency: STAT_BATCH },
+      );
       batch.forEach((file, offset) => {
         const info = infos[offset];
         const available = info?.isFile() === true;
@@ -332,7 +351,7 @@ export class StorageUsageScanner {
       });
     }
     return measured;
-  }
+  });
 
   #fileRow(file: MeasuredFile, threadById: ReadonlyMap<string, StorageThread>, scannedAt: string): StoredFileRow {
     const thread = file.placement ? threadById.get(file.placement.threadId) : undefined;
@@ -393,38 +412,45 @@ export class StorageUsageScanner {
     };
   }
 
-  async #databaseBytes(): Promise<number> {
+  #databaseBytes = Effect.fn("StorageUsage.databaseBytes")(function* (
+    this: StorageUsageScanner,
+  ): Effect.fn.Return<number, StoredStateFailure> {
     const path = this.#sources.roots.database;
-    const sizes = await Promise.all([path, `${path}-wal`, `${path}-shm`].map(fileSize));
+    const sizes = yield* Effect.forEach([path, `${path}-wal`, `${path}-shm`], fileSize, { concurrency: "unbounded" });
     return sizes.reduce((total, size) => total + size, 0);
-  }
+  });
 
-  async #hostFolders(agents: readonly StorageAgent[]) {
+  #hostFolders = Effect.fn("StorageUsage.hostFolders")(function* (
+    this: StorageUsageScanner,
+    agents: readonly StorageAgent[],
+  ) {
     const roots = this.#sources.roots;
     let complete = true;
-    const measure = async (path: string) => {
-      const size = await measureTree(path);
-      complete &&= size.complete;
-      return size.bytes;
-    };
+    const measure = (path: string) =>
+      Effect.gen(function* () {
+        const size = yield* measureTree(path);
+        complete &&= size.complete;
+        return size.bytes;
+      });
     // Two agents can share a workspace folder; the disk holds it once.
     const byWorkspace = new Map<string, number>();
-    for (const path of new Set(agents.map((agent) => agent.workspacePath))) byWorkspace.set(path, await measure(path));
+    for (const path of new Set(agents.map((agent) => agent.workspacePath))) byWorkspace.set(path, yield* measure(path));
     let caches = 0;
-    for (const path of roots.caches) caches += await measure(path);
+    for (const path of roots.caches) caches += yield* measure(path);
     let logs = 0;
     for (const directory of roots.logs)
-      for (const size of await Promise.all((await logFiles(directory)).map(fileSize))) logs += size;
+      for (const size of yield* Effect.forEach(yield* logFiles(directory), fileSize, { concurrency: "unbounded" }))
+        logs += size;
     return {
       byWorkspace,
       workspaces: [...byWorkspace.values()].reduce((total, bytes) => total + bytes, 0),
-      downloads: await measure(roots.downloads),
+      downloads: yield* measure(roots.downloads),
       caches,
-      runtimes: roots.runtimes ? await measure(roots.runtimes) : 0,
+      runtimes: roots.runtimes ? yield* measure(roots.runtimes) : 0,
       logs,
       complete,
     };
-  }
+  });
 }
 
 /** Two records can point at one file on disk; count it once. */
@@ -438,22 +464,28 @@ function uniqueBytes(files: readonly MeasuredFile[]): number {
  * Removes what is in each cache folder, or the rotated log files, and nothing else: the folders
  * stay, and a subfolder of a log folder (such as the transfer journal) is not touched.
  */
-async function clearStorageCategory(roots: StorageRoots, category: ClearableStorageCategory): Promise<void> {
+const clearStorageCategory = Effect.fn("StorageUsage.clearCategory")(function* (
+  roots: StorageRoots,
+  category: ClearableStorageCategory,
+) {
   if (category === "logs") {
     for (const directory of roots.logs)
-      await Promise.all((await logFiles(directory)).map((path) => rm(path, { force: true })));
+      yield* Effect.forEach(yield* logFiles(directory), (path) => storedIO(() => rm(path, { force: true })), {
+        concurrency: "unbounded",
+        discard: true,
+      });
     return;
   }
   for (const directory of roots.caches) {
-    let children: Dirent[];
-    try {
-      children = await readdir(directory, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    await Promise.all(children.map((child) => rm(join(directory, child.name), { recursive: true, force: true })));
+    const children = yield* Effect.result(storedIO(() => readdir(directory, { withFileTypes: true })));
+    if (Result.isFailure(children)) continue;
+    yield* Effect.forEach(
+      children.success,
+      (child) => storedIO(() => rm(join(directory, child.name), { recursive: true, force: true })),
+      { concurrency: "unbounded", discard: true },
+    );
   }
-}
+});
 
 function scopeKey(input: GetStorageUsageInput): string {
   return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null]);
@@ -465,15 +497,17 @@ function scopeKey(input: GetStorageUsageInput): string {
  * drops every answer, and a scan that was running at that moment is not kept.
  */
 export class StorageUsageService {
-  readonly #scanner: Pick<StorageUsageScanner, "scan">;
+  readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
   readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
-  readonly #running = new Map<string, Promise<StorageUsage>>();
+  readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
+  readonly #scope = Scope.makeUnsafe();
+  readonly #scanGate = Semaphore.makeUnsafe(1);
   #generation = 0;
 
   constructor(
-    scanner: Pick<StorageUsageScanner, "scan">,
+    scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
     sources: Pick<StorageUsageSources, "roots" | "mailbox">,
     now: () => number = Date.now,
   ) {
@@ -482,42 +516,50 @@ export class StorageUsageService {
     this.#now = now;
   }
 
-  usage(input: GetStorageUsageInput): Promise<StorageUsage> {
-    const key = scopeKey(input);
-    const cached = this.#cache.get(key);
-    if (!input.force && cached && this.#now() - cached.at < CACHE_TTL_MS) return Promise.resolve(cached.usage);
-    const running = this.#running.get(key);
-    if (running) return running;
-    const generation = this.#generation;
-    const settled = this.#scanner
-      .scan(input)
-      .then((usage) => {
-        if (generation === this.#generation) this.#cache.set(key, { at: this.#now(), usage });
-        return usage;
-      })
-      .finally(() => {
-        if (this.#running.get(key) === settled) this.#running.delete(key);
-      });
-    this.#running.set(key, settled);
-    return settled;
-  }
+  readonly usage = Effect.fn("StorageUsage.usage")(function* (this: StorageUsageService, input: GetStorageUsageInput) {
+    const work = yield* this.#scanGate.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const key = scopeKey(input);
+        const cached = this.#cache.get(key);
+        if (!input.force && cached && this.#now() - cached.at < CACHE_TTL_MS) return Effect.succeed(cached.usage);
+        const running = this.#running.get(key);
+        if (running) return Fiber.join(running.fiber);
+        const generation = this.#generation;
+        const token = Symbol();
+        const fiber = yield* this.#scanner.scan(input).pipe(
+          Effect.tap((usage) =>
+            Effect.sync(() => {
+              if (generation === this.#generation) this.#cache.set(key, { at: this.#now(), usage });
+            }),
+          ),
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (this.#running.get(key)?.token === token) this.#running.delete(key);
+            }),
+          ),
+          Effect.forkIn(this.#scope),
+        );
+        this.#running.set(key, { token, fiber });
+        return Fiber.join(fiber);
+      }),
+    );
+    return yield* work;
+  }).bind(this);
 
-  async deleteFile(fileId: string): Promise<void> {
+  readonly deleteFile = Effect.fn("StorageUsage.deleteFile")(function* (this: StorageUsageService, fileId: string) {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
-      throw new StorageNotFoundError(sourceText("error.backend.fileGone"));
-    try {
-      await this.#sources.mailbox.deleteStoredFile(fileId);
-    } finally {
-      this.invalidate();
-    }
+      return yield* new StoredStateFailure({ cause: new StorageNotFoundError(sourceText("error.backend.fileGone")) });
+    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.invalidate())));
+  }).bind(this);
+
+  clear(category: ClearableStorageCategory) {
+    return clearStorageCategory(this.#sources.roots, category).pipe(
+      Effect.ensuring(Effect.sync(() => this.invalidate())),
+    );
   }
 
-  async clear(category: ClearableStorageCategory): Promise<void> {
-    try {
-      await clearStorageCategory(this.#sources.roots, category);
-    } finally {
-      this.invalidate();
-    }
+  dispose() {
+    return Scope.close(this.#scope, Exit.void);
   }
 
   invalidate(): void {

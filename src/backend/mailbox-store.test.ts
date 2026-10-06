@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+
 // @vitest-environment node
 
 import { access, mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
@@ -12,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachmentFiles } from "./attachment-files";
+import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -21,7 +24,7 @@ let store: MailboxStore;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-mailbox-test-"));
   store = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-  await store.initialize();
+  await runCauseEffect(store.initialize());
 });
 
 afterEach(async () => {
@@ -32,68 +35,80 @@ describe("MailboxStore", () => {
   it("preserves edit attachment bytes across restart and clears unrelated drafts", async () => {
     const file = join(root, "pasted.txt");
     await writeFile(file, "Pasted bytes");
-    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const receipt = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
     const id = required(receipt.deliveries[0]).id;
     store.beginQueueEdit("chief", id, "edit-files");
-    const [kept] = await store.prepareImportedAttachments([file], []);
+    const [kept] = await runCauseEffect(store.prepareImportedAttachments([file], []));
     assert(kept);
-    const [unrelated] = await store.prepareImportedAttachments([file], []);
+    const [unrelated] = await runCauseEffect(store.prepareImportedAttachments([file], []));
     assert(unrelated);
     store.retainQueueEditAttachments("chief", id, "edit-files", [kept.id]);
     await expect(
-      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Other", draftIds: [kept.id] }),
+      runCauseEffect(
+        store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Other", draftIds: [kept.id] }),
+      ),
     ).rejects.toThrow("belongs to a queue edit");
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
-    await expect(restored.updateQueuedMessage("chief", id, "Edited", [], [unrelated.id], "edit-files")).rejects.toThrow(
-      "no longer exists",
-    );
-    await restored.updateQueuedMessage("chief", id, "Edited", [], [kept.id], "edit-files");
+    await runCauseEffect(restored.initialize());
+    await expect(
+      runCauseEffect(restored.updateQueuedMessage("chief", id, "Edited", [], [unrelated.id], "edit-files")),
+    ).rejects.toThrow("no longer exists");
+    await runCauseEffect(restored.updateQueuedMessage("chief", id, "Edited", [], [kept.id], "edit-files"));
     const next = restored.nextQueued("chief");
     expect(next?.delivery.text).toBe("Edited");
     expect(next?.delivery.attachments).toHaveLength(1);
-    const saved = await restored.resolveAttachment(next?.delivery.attachments[0]?.id ?? "");
+    const saved = await runCauseEffect(restored.resolveAttachment(next?.delivery.attachments[0]?.id ?? ""));
     await expect(readFile(saved?.path ?? "", "utf8")).resolves.toBe("Pasted bytes");
   });
 
   it("retains a composer backup across restart and releases it when the edit ends", async () => {
     const file = join(root, "backup.txt");
     await writeFile(file, "Backup bytes");
-    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const receipt = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
     const id = required(receipt.deliveries[0]).id;
-    const [backup] = await store.prepareImportedAttachments([file], []);
+    const [backup] = await runCauseEffect(store.prepareImportedAttachments([file], []));
     assert(backup);
     store.beginQueueEdit("chief", id, "edit-backup");
     store.retainQueueEditAttachments("chief", id, "edit-backup", [backup.id]);
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     await expect(
+      runCauseEffect(
+        restored.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: ["chief"],
+          text: "Other",
+          draftIds: [backup.id],
+        }),
+      ),
+    ).rejects.toThrow("belongs to a queue edit");
+    restored.finishQueueEdit("chief", id, "edit-backup");
+    const reuse = await runCauseEffect(
       restored.enqueue({
         sender: { kind: "user" },
         recipientAgentIds: ["chief"],
-        text: "Other",
+        text: "Reuse backup",
         draftIds: [backup.id],
       }),
-    ).rejects.toThrow("belongs to a queue edit");
-    restored.finishQueueEdit("chief", id, "edit-backup");
-    const reuse = await restored.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Reuse backup",
-      draftIds: [backup.id],
-    });
+    );
     expect(reuse.deliveries[0]).toBeDefined();
-    const [secondBackup] = await restored.prepareImportedAttachments([file], []);
+    const [secondBackup] = await runCauseEffect(restored.prepareImportedAttachments([file], []));
     assert(secondBackup);
     restored.beginQueueEdit("chief", id, "edit-save");
     restored.retainQueueEditAttachments("chief", id, "edit-save", [secondBackup.id]);
-    await restored.updateQueuedMessage("chief", id, "Saved edit", [], [], "edit-save");
-    const savedReuse = await restored.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Reuse after save",
-      draftIds: [secondBackup.id],
-    });
+    await runCauseEffect(restored.updateQueuedMessage("chief", id, "Saved edit", [], [], "edit-save"));
+    const savedReuse = await runCauseEffect(
+      restored.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Reuse after save",
+        draftIds: [secondBackup.id],
+      }),
+    );
     expect(savedReuse.deliveries[0]).toBeDefined();
   });
 
@@ -102,12 +117,14 @@ describe("MailboxStore", () => {
     async (action) => {
       const database = new OpenBotDatabase(join(root, "user-data"));
       const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
-      await mailbox.initialize();
+      await runCauseEffect(mailbox.initialize());
       const file = join(root, "backup.txt");
       await writeFile(file, "Recover my backup");
-      const [backup] = await mailbox.prepareImportedAttachments([file], []);
+      const [backup] = await runCauseEffect(mailbox.prepareImportedAttachments([file], []));
       assert(backup);
-      const receipt = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Queued" });
+      const receipt = await runCauseEffect(
+        mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Queued" }),
+      );
       const id = required(receipt.deliveries[0]).id;
       mailbox.beginQueueEdit("chief", id, "recover-edit");
       mailbox.retainQueueEditAttachments("chief", id, "recover-edit", [backup.id]);
@@ -122,30 +139,34 @@ describe("MailboxStore", () => {
       expect(mailbox.listQueue("chief").deliveries[0]).toMatchObject({ status: "queued", editing: true });
       expect(mailbox.finishedQueueEditAction("chief", id, "recover-edit")).toBeUndefined();
       await expect(
-        mailbox.enqueue({
-          sender: { kind: "user" },
-          recipientAgentIds: ["chief"],
-          text: "Backup",
-          draftIds: [backup.id],
-        }),
+        runCauseEffect(
+          mailbox.enqueue({
+            sender: { kind: "user" },
+            recipientAgentIds: ["chief"],
+            text: "Backup",
+            draftIds: [backup.id],
+          }),
+        ),
       ).rejects.toThrow("belongs to a queue edit");
       cancel();
       // The response can be lost. Restart must preserve both the outcome and unlocked bytes.
       const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-      await restored.initialize();
+      await runCauseEffect(restored.initialize());
       expect(restored.finishedQueueEditAction("chief", id, "recover-edit")).toBe("cancel");
       expect(restored.listQueue("chief").deliveries[0]).toMatchObject({
         status: action === "delete-message" ? "cancelled" : "queued",
         editing: false,
       });
-      const reuse = await restored.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: ["chief"],
-        text: "Recovered backup",
-        draftIds: [backup.id],
-      });
+      const reuse = await runCauseEffect(
+        restored.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: ["chief"],
+          text: "Recovered backup",
+          draftIds: [backup.id],
+        }),
+      );
       const sent = restored.getDelivery(required(reuse.deliveries[0]).id);
-      const saved = await restored.resolveAttachment(sent?.delivery.attachments[0]?.id ?? "");
+      const saved = await runCauseEffect(restored.resolveAttachment(sent?.delivery.attachments[0]?.id ?? ""));
       await expect(readFile(saved?.path ?? "", "utf8")).resolves.toBe("Recover my backup");
     },
   );
@@ -153,8 +174,10 @@ describe("MailboxStore", () => {
   it("rolls back failed hold, save and release writes without changing the message", async () => {
     const database = new OpenBotDatabase(join(root, "user-data"));
     const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
-    await mailbox.initialize();
-    const receipt = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    await runCauseEffect(mailbox.initialize());
+    const receipt = await runCauseEffect(
+      mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
     const id = required(receipt.deliveries[0]).id;
     const failWrite = () =>
       vi.spyOn(database, "replaceMailboxState").mockImplementationOnce(() => {
@@ -165,35 +188,41 @@ describe("MailboxStore", () => {
     expect(mailbox.nextQueued("chief")?.delivery.text).toBe("Original");
     mailbox.beginQueueEdit("chief", id, "edit-rollback");
     failWrite();
-    await expect(mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback")).rejects.toThrow(
-      "Disk full",
-    );
+    await expect(
+      runCauseEffect(mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback")),
+    ).rejects.toThrow("Disk full");
     expect(mailbox.nextQueued("chief")).toBeNull();
     expect(mailbox.listQueue("chief").deliveries[0]?.text).toBe("Original");
     failWrite();
     expect(() => mailbox.finishQueueEdit("chief", id, "edit-rollback")).toThrow("Disk full");
     expect(mailbox.nextQueued("chief")).toBeNull();
-    await mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback");
+    await runCauseEffect(mailbox.updateQueuedMessage("chief", id, "Changed", [], [], "edit-rollback"));
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Changed", position: 1 });
     expect(restored.finishedQueueEditAction("chief", id, "edit-rollback")).toBe("save");
   });
 
   it("holds an edit across a restart and rejects dispatch, steer and a second editor", async () => {
-    const first = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
-    const second = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Next" });
+    const first = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
+    const second = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Next" }),
+    );
     const id = required(first.deliveries[0]).id;
     store.beginQueueEdit("chief", id, "phone-edit");
     store.beginQueueEdit("chief", id, "phone-edit");
     expect(() => store.beginQueueEdit("chief", id, "other-edit")).toThrow("another device");
     expect(() => store.beginQueueEdit("other-agent", id, "phone-edit")).toThrow("no longer available");
     expect(store.nextQueued("chief")).toBeNull();
-    await expect(store.markStarting(id)).rejects.toThrow("being edited");
-    await expect(store.markSteering(id, "turn-1")).rejects.toThrow("being edited");
-    await expect(store.updateQueuedMessage("chief", id, "Desktop edit", [], [])).rejects.toThrow("another device");
+    await expect(runCauseEffect(store.markStarting(id))).rejects.toThrow("being edited");
+    await expect(runCauseEffect(store.markSteering(id, "turn-1"))).rejects.toThrow("being edited");
+    await expect(runCauseEffect(store.updateQueuedMessage("chief", id, "Desktop edit", [], []))).rejects.toThrow(
+      "another device",
+    );
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.nextQueued("chief")).toBeNull();
     // The hold is visible to every device, keeps its place, and never leaks the private edit id.
     expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([
@@ -203,35 +232,39 @@ describe("MailboxStore", () => {
     expect(restored.listQueue("chief").deliveries.map((item) => item.editing)).toEqual([true, false]);
     expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("editId");
     expect(restored.listQueue("chief").deliveries.map((item) => item.position)).toEqual([1, 2]);
-    await restored.reorderQueue("chief", [required(second.deliveries[0]).id]);
-    await restored.reorderQueue("chief", [id, required(second.deliveries[0]).id]);
+    await runCauseEffect(restored.reorderQueue("chief", [required(second.deliveries[0]).id]));
+    await runCauseEffect(restored.reorderQueue("chief", [id, required(second.deliveries[0]).id]));
     expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([
       id,
       required(second.deliveries[0]).id,
     ]);
-    await restored.updateQueuedMessage("chief", id, "Edited", [], [], "phone-edit");
+    await runCauseEffect(restored.updateQueuedMessage("chief", id, "Edited", [], [], "phone-edit"));
     expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Edited", position: 1 });
     expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
     expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditOutcomes");
-    await restored.markStarting(id);
+    await runCauseEffect(restored.markStarting(id));
     expect(restored.nextQueued("chief")).toBeNull();
   });
 
   it("makes the member who saves a queued edit its sender", async () => {
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      senderMember: { id: "member-ada", name: "Ada" },
-      recipientAgentIds: ["chief"],
-      text: "Ada wrote this",
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        senderMember: { id: "member-ada", name: "Ada" },
+        recipientAgentIds: ["chief"],
+        text: "Ada wrote this",
+      }),
+    );
     const id = required(receipt.deliveries[0]).id;
-    await store.updateQueuedMessage("chief", id, "Bob wrote this", [], [], undefined, {
-      id: "member-bob",
-      name: "Bob",
-    });
+    await runCauseEffect(
+      store.updateQueuedMessage("chief", id, "Bob wrote this", [], [], undefined, {
+        id: "member-bob",
+        name: "Bob",
+      }),
+    );
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.conversationMessages("chief")[0]).toMatchObject({
       text: "Bob wrote this",
       senderMember: { id: "member-bob", name: "Bob" },
@@ -239,10 +272,12 @@ describe("MailboxStore", () => {
   });
 
   it("keeps finished edit outcomes across many later edits per delivery", async () => {
-    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const receipt = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
     const id = required(receipt.deliveries[0]).id;
     store.beginQueueEdit("chief", id, "edit-save");
-    await store.updateQueuedMessage("chief", id, "Edited save", [], [], "edit-save");
+    await runCauseEffect(store.updateQueuedMessage("chief", id, "Edited save", [], [], "edit-save"));
     for (let index = 0; index < 24; index += 1) {
       const editId = `edit-${index}`;
       store.beginQueueEdit("chief", id, editId);
@@ -257,17 +292,21 @@ describe("MailboxStore", () => {
   it("keeps files and order through edit cancellation and permits remote deletion of a held item", async () => {
     const file = join(root, "notes.txt");
     await writeFile(file, "Preserve these bytes");
-    const drafts = await store.prepareImportedAttachments([file], []);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Original",
-      draftIds: drafts.map((item) => item.id),
-    });
+    const drafts = await runCauseEffect(store.prepareImportedAttachments([file], []));
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Original",
+        draftIds: drafts.map((item) => item.id),
+      }),
+    );
     const id = required(receipt.deliveries[0]).id;
     const before = store.listQueue("chief").deliveries[0];
     store.beginQueueEdit("chief", id, "edit-cancel");
-    await expect(store.updateQueuedMessage("chief", id, "", [], [], "edit-cancel")).rejects.toThrow("empty");
+    await expect(runCauseEffect(store.updateQueuedMessage("chief", id, "", [], [], "edit-cancel"))).rejects.toThrow(
+      "empty",
+    );
     expect(store.nextQueued("chief")).toBeNull();
     store.finishQueueEdit("chief", id, "edit-cancel");
     // A cancelled edit is remembered as a cancellation, so a lost Save response cannot
@@ -275,33 +314,37 @@ describe("MailboxStore", () => {
     expect(store.finishedQueueEditAction("chief", id, "edit-cancel")).toBe("cancel");
     expect(store.listQueue("chief").deliveries[0]).toEqual(before);
     store.beginQueueEdit("chief", id, "edit-delete");
-    await store.cancel("chief", id);
-    await expect(store.updateQueuedMessage("chief", id, "Must not return", [], [], "edit-delete")).rejects.toThrow(
-      "Only queued messages",
-    );
+    await runCauseEffect(store.cancel("chief", id));
+    await expect(
+      runCauseEffect(store.updateQueuedMessage("chief", id, "Must not return", [], [], "edit-delete")),
+    ).rejects.toThrow("Only queued messages");
     expect(store.finishedQueueEditAction("chief", id, "edit-delete")).toBe("cancel");
     expect(store.listQueue("chief").deliveries[0]?.status).toBe("cancelled");
     expect(store.nextQueued("chief")).toBeNull();
   });
 
   it("rejects cancel and steer during an attachment save, then returns the edited files in order", async () => {
-    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const receipt = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" }),
+    );
     const id = required(receipt.deliveries[0]).id;
     const file = join(root, "added.txt");
     await writeFile(file, "Added file");
-    const drafts = await store.prepareImportedAttachments([file], []);
+    const drafts = await runCauseEffect(store.prepareImportedAttachments([file], []));
     store.beginQueueEdit("chief", id, "edit-files");
-    const save = store.updateQueuedMessage(
-      "chief",
-      id,
-      "Updated",
-      [],
-      drafts.map((item) => item.id),
-      "edit-files",
+    const save = runCauseEffect(
+      store.updateQueuedMessage(
+        "chief",
+        id,
+        "Updated",
+        [],
+        drafts.map((item) => item.id),
+        "edit-files",
+      ),
     );
     expect(() => store.cancelNow("chief", id)).toThrow("being saved");
     expect(() => store.finishQueueEdit("chief", id, "edit-files")).toThrow("being saved");
-    await expect(store.markSteering(id, "turn-1")).rejects.toThrow("being saved");
+    await expect(runCauseEffect(store.markSteering(id, "turn-1"))).rejects.toThrow("being saved");
     await save;
     const delivery = store.nextQueued("chief")?.delivery;
     expect(delivery?.text).toBe("Updated");
@@ -313,10 +356,12 @@ describe("MailboxStore", () => {
     const sourcePath = join(root, "staged-screenshot.png");
     await writeFile(sourcePath, "image bytes");
     const source = await open(sourcePath, "r");
-    const staged = await store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] });
+    const staged = await runCauseEffect(
+      store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] }),
+    );
     await source.close();
 
-    await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(runCauseEffect(store.listExportAttachments())).resolves.toEqual([]);
     expect(() =>
       store.persistGeneratedAttachmentsWithConversation(
         { agentId: "missing-agent", threadId: "missing-thread", activeTurnId: null, revision: 0, messages: [] },
@@ -325,12 +370,14 @@ describe("MailboxStore", () => {
         staged.map((attachment) => attachment.id),
       ),
     ).toThrow("Unknown agent for conversation");
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Unrelated work" });
+    await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Unrelated work" }),
+    );
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
-    await expect(restored.listExportAttachments()).resolves.toEqual([]);
+    await runCauseEffect(restored.initialize());
+    await expect(runCauseEffect(restored.listExportAttachments())).resolves.toEqual([]);
 
-    await store.discardStagedGeneratedAttachments(staged.map((attachment) => attachment.id));
+    await runCauseEffect(store.discardStagedGeneratedAttachments(staged.map((attachment) => attachment.id)));
     await expect(readdir(join(root, "Shared", "Transfers", "generated"))).resolves.toEqual([]);
   });
 
@@ -342,13 +389,15 @@ describe("MailboxStore", () => {
       await rename(sourcePath, join(root, "original.png"));
       await writeFile(sourcePath, "replacement data");
 
-      const [attachment] = await store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] });
+      const [attachment] = await runCauseEffect(
+        store.stageGeneratedAttachments({ sources: [{ path: sourcePath, handle: source }] }),
+      );
       assert(attachment);
 
       await expect(
         readFile(join(root, "Shared", "Transfers", "generated", attachment.id, attachment.name), "utf8"),
       ).resolves.toBe("authorized image");
-      await store.discardStagedGeneratedAttachments([attachment.id]);
+      await runCauseEffect(store.discardStagedGeneratedAttachments([attachment.id]));
     } finally {
       await source.close();
     }
@@ -358,7 +407,7 @@ describe("MailboxStore", () => {
     const source = join(root, `${"screenshot-".repeat(19)}capture.png`);
     await writeFile(source, "image bytes");
 
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
 
     expect(draft.name).toHaveLength(180);
@@ -369,21 +418,25 @@ describe("MailboxStore", () => {
   it("keeps runtime queues small and excludes queued work", async () => {
     const source = join(root, "runtime.txt");
     await writeFile(source, "runtime attachment");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
     const agentIds = Array.from({ length: AGENT_RUNTIME_WORKING_ITEMS_LIMIT + 2 }, (_, index) => `bot-${index}`);
     for (const [index, agentId] of agentIds.entries()) {
-      const receipt = await store.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: [agentId],
-        text: index === 0 ? "x".repeat(AGENT_RUNTIME_TEXT_LIMIT + 100) : `Work ${index}`,
-        draftIds: index === 0 ? [draft.id] : undefined,
-      });
+      const receipt = await runCauseEffect(
+        store.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: [agentId],
+          text: index === 0 ? "x".repeat(AGENT_RUNTIME_TEXT_LIMIT + 100) : `Work ${index}`,
+          draftIds: index === 0 ? [draft.id] : undefined,
+        }),
+      );
       const deliveryId = required(receipt.deliveries[0]).id;
-      await store.markStarting(deliveryId);
-      await store.markRunning(deliveryId, `turn-${index}`);
+      await runCauseEffect(store.markStarting(deliveryId));
+      await runCauseEffect(store.markRunning(deliveryId, `turn-${index}`));
     }
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["queued"], text: "Still queued" });
+    await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["queued"], text: "Still queued" }),
+    );
 
     const runtime = store.listRuntimeWork([...agentIds, "queued"], new Map());
 
@@ -432,7 +485,7 @@ describe("MailboxStore", () => {
     const legacyPath = join(userData, "mailbox.json");
     await writeFile(legacyPath, `${JSON.stringify(legacy, null, 2)}\n`);
     const imported = new MailboxStore(userData, join(root, "Legacy Shared"));
-    await imported.initialize();
+    await runCauseEffect(imported.initialize());
 
     expect(imported.listQueue("chief").deliveries).toMatchObject([
       { id: "delivery-1", text: "Legacy request", status: "completed" },
@@ -444,7 +497,7 @@ describe("MailboxStore", () => {
       "Legacy request",
     );
     const restored = new MailboxStore(userData, join(root, "Legacy Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("chief").deliveries).toHaveLength(1);
   });
 
@@ -499,7 +552,7 @@ describe("MailboxStore", () => {
     };
     await writeFile(join(userData, "mailbox.json"), `${JSON.stringify(legacy, null, 2)}\n`);
     const imported = new MailboxStore(userData, join(root, "No Preview Shared"));
-    await imported.initialize();
+    await runCauseEffect(imported.initialize());
 
     const attachment = imported.listQueue("chief").deliveries[0]?.attachments[0];
     expect(attachment).toMatchObject({ id: "attachment-1", previewUrl: null });
@@ -509,13 +562,15 @@ describe("MailboxStore", () => {
   it("copies attachments once and fans out independent FIFO deliveries", async () => {
     const original = join(root, "report.csv");
     await writeFile(original, "account,value\nAcme,42\n");
-    const drafts = await store.prepareAttachments([original]);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief", "sales-outbound"],
-      text: "Review this data",
-      draftIds: drafts.map((draft) => draft.id),
-    });
+    const drafts = await runCauseEffect(store.prepareAttachments([original]));
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief", "sales-outbound"],
+        text: "Review this data",
+        draftIds: drafts.map((draft) => draft.id),
+      }),
+    );
     await rm(original);
 
     expect(receipt.deliveries).toHaveLength(2);
@@ -548,20 +603,24 @@ describe("MailboxStore", () => {
   it("rejects managed attachments after their contents change without changing size", async () => {
     const source = join(root, "mutable.txt");
     await writeFile(source, "original");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Review",
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Review",
+        draftIds: [draft.id],
+      }),
+    );
     const attachment = store.getDelivery(required(receipt.deliveries[0]).id)?.managedAttachments[0];
     await writeFile(attachment?.path ?? "missing", "modified");
 
-    await expect(store.verifyDeliveryAttachments(required(receipt.deliveries[0]).id)).rejects.toThrow("has changed");
-    await expect(store.resolveAttachment(attachment?.id ?? "")).resolves.toBeNull();
-    await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(runCauseEffect(store.verifyDeliveryAttachments(required(receipt.deliveries[0]).id))).rejects.toThrow(
+      "has changed",
+    );
+    await expect(runCauseEffect(store.resolveAttachment(attachment?.id ?? ""))).resolves.toBeNull();
+    await expect(runCauseEffect(store.listExportAttachments())).resolves.toEqual([]);
   });
 
   it("remaps inline references from draft IDs to committed attachment IDs", async () => {
@@ -569,14 +628,16 @@ describe("MailboxStore", () => {
     const extra = join(root, "AGENTS.md");
     await writeFile(original, "export type Start = true;\n");
     await writeFile(extra, "# Agents\n");
-    const [draft] = await store.prepareAttachments([original]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([original]));
     assert(draft);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: `Review ${serializeAttachmentReference(draft.name, draft.id)}`,
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: `Review ${serializeAttachmentReference(draft.name, draft.id)}`,
+        draftIds: [draft.id],
+      }),
+    );
     const deliveryId = required(receipt.deliveries[0]).id;
     const committed = store.getDelivery(deliveryId)?.delivery.attachments[0];
     expect(committed).toBeDefined();
@@ -584,18 +645,20 @@ describe("MailboxStore", () => {
       `Review ${serializeAttachmentReference("start-types.d.ts", committed?.id ?? "")}`,
     );
 
-    const [extraDraft] = await store.prepareAttachments([extra]);
+    const [extraDraft] = await runCauseEffect(store.prepareAttachments([extra]));
     assert(extraDraft);
-    await store.updateQueuedMessage(
-      "chief",
-      deliveryId,
-      [
-        serializeAttachmentReference("start-types.d.ts", committed?.id ?? ""),
-        serializeAttachmentReference(extraDraft.name, extraDraft.id),
-        serializeAttachmentReference("missing.txt", "missing"),
-      ].join(" and "),
-      [committed?.id ?? ""],
-      [extraDraft.id],
+    await runCauseEffect(
+      store.updateQueuedMessage(
+        "chief",
+        deliveryId,
+        [
+          serializeAttachmentReference("start-types.d.ts", committed?.id ?? ""),
+          serializeAttachmentReference(extraDraft.name, extraDraft.id),
+          serializeAttachmentReference("missing.txt", "missing"),
+        ].join(" and "),
+        [committed?.id ?? ""],
+        [extraDraft.id],
+      ),
     );
 
     const edited = store.getDelivery(deliveryId)?.delivery;
@@ -610,43 +673,51 @@ describe("MailboxStore", () => {
   });
 
   it("persists cancellation and idempotent agent sends", async () => {
-    const first = await store.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Prepare a report",
-      idempotencyKey: "thread:turn:call",
-    });
-    const duplicate = await store.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Prepare a report",
-      idempotencyKey: "thread:turn:call",
-    });
+    const first = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Prepare a report",
+        idempotencyKey: "thread:turn:call",
+      }),
+    );
+    const duplicate = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Prepare a report",
+        idempotencyKey: "thread:turn:call",
+      }),
+    );
     expect(duplicate).toEqual(first);
 
-    await store.cancel("sales-outbound", required(first.deliveries[0]).id);
+    await runCauseEffect(store.cancel("sales-outbound", required(first.deliveries[0]).id));
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("sales-outbound")).toMatchObject({
       deliveries: [{ status: "cancelled" }],
     });
   });
 
   it("redacts a provider failure before it is stored and read back", async () => {
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Ask the endpoint",
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Ask the endpoint",
+      }),
+    );
     const deliveryId = required(receipt.deliveries[0]).id;
-    await store.markStarting(deliveryId);
+    await runCauseEffect(store.markStarting(deliveryId));
 
     // The CLI quotes the request it was given, so a failure against a custom endpoint carries that
     // endpoint's credentials.
-    await store.markTerminal(
-      deliveryId,
-      "failed",
-      'Request failed: {"headers":{"Authorization":"Bearer sk-live-abc123"},"apiKey":"sk-proj-9999"}',
+    await runCauseEffect(
+      store.markTerminal(
+        deliveryId,
+        "failed",
+        'Request failed: {"headers":{"Authorization":"Bearer sk-live-abc123"},"apiKey":"sk-proj-9999"}',
+      ),
     );
 
     const stored = store.listQueue("chief").deliveries.find((delivery) => delivery.id === deliveryId);
@@ -655,28 +726,32 @@ describe("MailboxStore", () => {
     expect(stored?.error).toContain("[redacted]");
     // Read back from SQLite as well, because the queue the renderer pulls is served from the file.
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("chief").deliveries.at(-1)?.error).not.toContain("sk-live-abc123");
   });
 
   it("keeps enqueue idempotent in SQLite", async () => {
     const original = join(root, "retry.txt");
     await writeFile(original, "retry me\n");
-    const [draft] = await store.prepareAttachments([original]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([original]));
     assert(draft);
-    const first = await store.enqueue({
-      sender: { kind: "agent", agentId: "planner" },
-      recipientAgentIds: ["chief"],
-      text: "",
-      draftIds: [draft.id],
-      idempotencyKey: "session:turn:call",
-    });
-    const second = await store.enqueue({
-      sender: { kind: "agent", agentId: "planner" },
-      recipientAgentIds: ["chief"],
-      text: "ignored duplicate",
-      idempotencyKey: "session:turn:call",
-    });
+    const first = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "planner" },
+        recipientAgentIds: ["chief"],
+        text: "",
+        draftIds: [draft.id],
+        idempotencyKey: "session:turn:call",
+      }),
+    );
+    const second = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "planner" },
+        recipientAgentIds: ["chief"],
+        text: "ignored duplicate",
+        idempotencyKey: "session:turn:call",
+      }),
+    );
     expect(second).toEqual(first);
     expect(store.listQueue("chief").deliveries).toHaveLength(1);
   });
@@ -687,113 +762,133 @@ describe("MailboxStore", () => {
     await writeFile(statePath, unsupported);
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await expect(restored.initialize()).resolves.toBeUndefined();
+    await expect(runCauseEffect(restored.initialize())).resolves.toBeUndefined();
     await expect(readFile(statePath, "utf8")).resolves.toBe(unsupported);
   });
 
   it("persists one reaction per actor without overwriting other actors", async () => {
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Yes, continue",
-      replyToMessageId: "assistant-1",
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Yes, continue",
+        replyToMessageId: "assistant-1",
+      }),
+    );
     const deliveryId = required(receipt.deliveries[0]).id;
     expect(store.conversationMessages("chief")[0]).toMatchObject({
       id: deliveryId,
       replyToMessageId: "assistant-1",
     });
 
-    await store.setReaction("chief", "assistant-1", { kind: "user" }, "❤️");
-    await store.setReaction("chief", "assistant-1", { kind: "agent", agentId: "chief" }, "🎉");
+    await runCauseEffect(store.setReaction("chief", "assistant-1", { kind: "user" }, "❤️"));
+    await runCauseEffect(store.setReaction("chief", "assistant-1", { kind: "agent", agentId: "chief" }, "🎉"));
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.reactionFor("chief", "assistant-1")).toBe("❤️");
     expect(restored.reactionFor("chief", "assistant-1", { kind: "agent", agentId: "chief" })).toBe("🎉");
     expect(restored.reactionsFor("chief").get("assistant-1")).toEqual([
       { emoji: "❤️", actor: { kind: "user" } },
       { emoji: "🎉", actor: { kind: "agent", agentId: "chief" } },
     ]);
-    await restored.setReaction("chief", "assistant-1", { kind: "user" }, null);
+    await runCauseEffect(restored.setReaction("chief", "assistant-1", { kind: "user" }, null));
     expect(restored.reactionFor("chief", "assistant-1")).toBeNull();
     expect(restored.reactionFor("chief", "assistant-1", { kind: "agent", agentId: "chief" })).toBe("🎉");
   });
 
   it("tracks the initiating agent through a reply chain and detects explicit replies", async () => {
-    const rootMessage = await store.enqueue({
-      sender: { kind: "agent", agentId: "researcher" },
-      recipientAgentIds: ["weather"],
-      text: "Check tomorrow's weather.",
-    });
-    const weatherQuestion = await store.enqueue({
-      sender: { kind: "agent", agentId: "weather" },
-      recipientAgentIds: ["researcher"],
-      text: "Which city?",
-      replyToMessageId: rootMessage.messageId,
-    });
-    const locationReply = await store.enqueue({
-      sender: { kind: "agent", agentId: "researcher" },
-      recipientAgentIds: ["weather"],
-      text: "Kraków.",
-      replyToMessageId: weatherQuestion.messageId,
-    });
+    const rootMessage = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "researcher" },
+        recipientAgentIds: ["weather"],
+        text: "Check tomorrow's weather.",
+      }),
+    );
+    const weatherQuestion = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "Which city?",
+        replyToMessageId: rootMessage.messageId,
+      }),
+    );
+    const locationReply = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "researcher" },
+        recipientAgentIds: ["weather"],
+        text: "Kraków.",
+        replyToMessageId: weatherQuestion.messageId,
+      }),
+    );
 
     expect(store.chainOriginAgentId(locationReply.messageId)).toBe("researcher");
     expect(store.hasReplyFrom("weather", locationReply.messageId)).toBe(false);
-    await store.enqueue({
-      sender: { kind: "agent", agentId: "weather" },
-      recipientAgentIds: ["researcher"],
-      text: "It will be sunny.",
-      replyToMessageId: locationReply.messageId,
-    });
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "It will be sunny.",
+        replyToMessageId: locationReply.messageId,
+      }),
+    );
     expect(store.hasReplyFrom("weather", locationReply.messageId)).toBe(true);
-    await store.enqueue({
-      sender: { kind: "agent", agentId: "weather" },
-      recipientAgentIds: ["researcher"],
-      text: "A second explicit update.",
-      idempotencyKey: "thread-weather:turn-weather:call-1",
-    });
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "A second explicit update.",
+        idempotencyKey: "thread-weather:turn-weather:call-1",
+      }),
+    );
     expect(store.hasAgentMessageFromTurnTo("weather", "turn-weather", "researcher")).toBe(true);
     expect(store.hasAgentMessageFromTurnTo("weather", "turn-weather", "other-agent")).toBe(false);
   });
 
   it("holds teammate answers until every recipient of the request is done", async () => {
-    const request = await store.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["research", "builder", "launch"],
-      text: "One launch risk each.",
-    });
+    const request = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["research", "builder", "launch"],
+        text: "One launch risk each.",
+      }),
+    );
     const [research, builder, launch] = request.deliveries.map((delivery) => delivery.id);
     const answer = (agentId: string, text: string) =>
-      store.enqueue({
-        sender: { kind: "agent", agentId },
-        recipientAgentIds: ["chief"],
-        text,
-        replyToMessageId: request.messageId,
-        expectsReply: false,
-      });
-    await store.markStarting(required(research));
-    await store.markRunning(required(research), "turn-research");
+      runCauseEffect(
+        store.enqueue({
+          sender: { kind: "agent", agentId },
+          recipientAgentIds: ["chief"],
+          text,
+          replyToMessageId: request.messageId,
+          expectsReply: false,
+        }),
+      );
+    await runCauseEffect(store.markStarting(required(research)));
+    await runCauseEffect(store.markRunning(required(research), "turn-research"));
     // An answer sent during the teammate's own turn is not held by that same turn.
     const first = await answer("research", "Risk: stale docs.");
-    await store.markTerminal(required(research), "completed");
-    await store.markStarting(required(builder));
+    await runCauseEffect(store.markTerminal(required(research), "completed"));
+    await runCauseEffect(store.markStarting(required(builder)));
     const second = await answer("builder", "Risk: no rollback.");
     expect(store.nextQueued("chief")).toBeNull();
     // A linked question asks for a reply, so it is a request and is not held.
-    const question = await store.enqueue({
-      sender: { kind: "agent", agentId: "builder" },
-      recipientAgentIds: ["chief"],
-      text: "Which release?",
-      replyToMessageId: request.messageId,
-    });
+    const question = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "builder" },
+        recipientAgentIds: ["chief"],
+        text: "Which release?",
+        replyToMessageId: request.messageId,
+      }),
+    );
     expect(store.nextQueued("chief")?.delivery.messageId).toBe(question.messageId);
     expect(store.repliesToStartWith(required(question.deliveries[0]).id)).toEqual([]);
     store.cancelNow("chief", required(question.deliveries[0]).id);
 
-    await store.markTerminal(required(builder), "completed");
+    await runCauseEffect(store.markTerminal(required(builder), "completed"));
     expect(store.nextQueued("chief")).toBeNull();
-    const note = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Status?" });
+    const note = await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Status?" }),
+    );
     // The person writes first: the answers that are in start with that message.
     expect(store.nextQueued("chief")?.delivery.id).toBe(required(note.deliveries[0]).id);
     expect(
@@ -801,12 +896,14 @@ describe("MailboxStore", () => {
     ).toEqual([first.messageId, second.messageId]);
 
     // A linked question is not an answer, so the requester still hears that launch did not answer.
-    const launchQuestion = await store.enqueue({
-      sender: { kind: "agent", agentId: "launch" },
-      recipientAgentIds: ["chief"],
-      text: "Which launch?",
-      replyToMessageId: request.messageId,
-    });
+    const launchQuestion = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "launch" },
+        recipientAgentIds: ["chief"],
+        text: "Which launch?",
+        replyToMessageId: request.messageId,
+      }),
+    );
     store.cancelNow("chief", required(launchQuestion.deliveries[0]).id);
     store.cancelNow("launch", required(launch));
     expect(store.unansweredRecipients(request.messageId)).toEqual(["launch"]);
@@ -816,20 +913,24 @@ describe("MailboxStore", () => {
   });
 
   it("keeps a message that asks for no answer marked as one after a restart", async () => {
-    const notice = await store.enqueue({
-      sender: { kind: "agent", agentId: "weather" },
-      recipientAgentIds: ["researcher"],
-      text: "Kraków turned rainy.",
-      expectsReply: false,
-    });
-    const request = await store.enqueue({
-      sender: { kind: "agent", agentId: "weather" },
-      recipientAgentIds: ["researcher"],
-      text: "Which city next?",
-    });
+    const notice = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "Kraków turned rainy.",
+        expectsReply: false,
+      }),
+    );
+    const request = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "Which city next?",
+      }),
+    );
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.expectsReply(notice.messageId)).toBe(false);
     expect(restored.expectsReply(request.messageId)).toBe(true);
     expect(
@@ -850,31 +951,37 @@ describe("MailboxStore", () => {
   it("rejects directories and oversized recipient lists", async () => {
     const directory = join(root, "folder");
     await mkdir(directory);
-    await expect(store.prepareAttachments([directory])).rejects.toThrow("regular files");
+    await expect(runCauseEffect(store.prepareAttachments([directory]))).rejects.toThrow("regular files");
     await expect(
-      store.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: Array.from({ length: 33 }, (_, index) => `bot-${index}`),
-        text: "Too many",
-      }),
+      runCauseEffect(
+        store.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: Array.from({ length: 33 }, (_, index) => `bot-${index}`),
+          text: "Too many",
+        }),
+      ),
     ).rejects.toThrow("32 recipients");
     await expect(
-      store.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: ["x".repeat(INPUT_LIMITS.identifier + 1)],
-        text: "Invalid recipient",
-      }),
+      runCauseEffect(
+        store.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: ["x".repeat(INPUT_LIMITS.identifier + 1)],
+          text: "Invalid recipient",
+        }),
+      ),
     ).rejects.toThrow("recipient is invalid");
     await expect(
-      store.prepareImportedAttachments(
-        [],
-        [
-          {
-            name: "x".repeat(INPUT_LIMITS.attachmentName + 1),
-            mimeType: "image/png",
-            bytes: new Uint8Array(),
-          },
-        ],
+      runCauseEffect(
+        store.prepareImportedAttachments(
+          [],
+          [
+            {
+              name: "x".repeat(INPUT_LIMITS.attachmentName + 1),
+              mimeType: "image/png",
+              bytes: new Uint8Array(),
+            },
+          ],
+        ),
       ),
     ).rejects.toThrow("metadata is too long");
   });
@@ -885,7 +992,7 @@ describe("MailboxStore", () => {
     );
     await Promise.all(paths.map((path) => writeFile(path, "fixture")));
 
-    await expect(store.prepareAttachments(paths)).resolves.toMatchObject([
+    await expect(runCauseEffect(store.prepareAttachments(paths))).resolves.toMatchObject([
       { name: "brief.pdf", mimeType: "application/pdf", previewKind: "pdf" },
       { name: "notes.txt", mimeType: "text/plain", previewKind: "text" },
       { name: "README.md", mimeType: "text/markdown", previewKind: "text" },
@@ -899,11 +1006,13 @@ describe("MailboxStore", () => {
 
     const archive = join(root, "bundle.zip");
     await writeFile(archive, "fixture");
-    await expect(store.prepareAttachments([archive])).rejects.toThrow("bundle.zip is not supported");
+    await expect(runCauseEffect(store.prepareAttachments([archive]))).rejects.toThrow("bundle.zip is not supported");
     await expect(
-      store.prepareImportedAttachments(
-        [],
-        [{ name: "installer.exe", mimeType: "application/octet-stream", bytes: new Uint8Array([1]) }],
+      runCauseEffect(
+        store.prepareImportedAttachments(
+          [],
+          [{ name: "installer.exe", mimeType: "application/octet-stream", bytes: new Uint8Array([1]) }],
+        ),
       ),
     ).rejects.toThrow("installer.exe is not supported");
   });
@@ -916,20 +1025,24 @@ describe("MailboxStore", () => {
     const bytes = Buffer.from("truncated recording\0");
     const sourcePath = join(root, name);
     await writeFile(sourcePath, bytes);
-    const drafts = await store.prepareImportedAttachments([sourcePath], [{ name, mimeType: "image/png", bytes }]);
+    const drafts = await runCauseEffect(
+      store.prepareImportedAttachments([sourcePath], [{ name, mimeType: "image/png", bytes }]),
+    );
     expect(drafts).toMatchObject([
       { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
       { name, mimeType, kind: "file", previewKind: "none", size: bytes.length },
     ]);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Inspect this recording",
-      draftIds: drafts.map((draft) => draft.id),
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Inspect this recording",
+        draftIds: drafts.map((draft) => draft.id),
+      }),
+    );
     await rm(sourcePath);
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     const delivery = restored.getDelivery(required(receipt.deliveries[0]).id);
     expect(delivery?.managedAttachments).toHaveLength(2);
     for (const attachment of delivery?.managedAttachments ?? []) {
@@ -942,55 +1055,63 @@ describe("MailboxStore", () => {
     const file = await open(path, "w");
     await file.truncate(ATTACHMENT_LIMITS.fileBytes + 1);
     await file.close();
-    await expect(store.prepareAttachments([path])).rejects.toThrow("exceeds the 100 MB limit");
+    await expect(runCauseEffect(store.prepareAttachments([path]))).rejects.toThrow("exceeds the 100 MB limit");
   });
 
   it("enforces byte-import and combined recording size limits", async () => {
     await expect(
-      store.prepareImportedAttachments(
-        [],
-        [
-          {
-            name: "large.mp3",
-            mimeType: "audio/mpeg",
-            bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1),
-          },
-        ],
+      runCauseEffect(
+        store.prepareImportedAttachments(
+          [],
+          [
+            {
+              name: "large.mp3",
+              mimeType: "audio/mpeg",
+              bytes: new Uint8Array(ATTACHMENT_LIMITS.fileBytes + 1),
+            },
+          ],
+        ),
       ),
     ).rejects.toThrow("exceeds the 100 MB limit");
     const bytes = new Uint8Array(ATTACHMENT_LIMITS.fileBytes);
     await expect(
-      store.prepareImportedAttachments(
-        [],
-        [
-          { name: "first.mp3", mimeType: "audio/mpeg", bytes },
-          { name: "second.mov", mimeType: "video/quicktime", bytes },
-          { name: "third.mov", mimeType: "video/quicktime", bytes },
-        ],
+      runCauseEffect(
+        store.prepareImportedAttachments(
+          [],
+          [
+            { name: "first.mp3", mimeType: "audio/mpeg", bytes },
+            { name: "second.mov", mimeType: "video/quicktime", bytes },
+            { name: "third.mov", mimeType: "video/quicktime", bytes },
+          ],
+        ),
       ),
     ).rejects.toThrow("Attachments exceed the 250 MB total limit.");
-    await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(runCauseEffect(store.listExportAttachments())).resolves.toEqual([]);
   });
 
   it("gives an export alternative for unsupported media", async () => {
     await expect(
-      store.prepareImportedAttachments(
-        [],
-        [{ name: "recording.avi", mimeType: "video/x-msvideo", bytes: new Uint8Array([1]) }],
+      runCauseEffect(
+        store.prepareImportedAttachments(
+          [],
+          [{ name: "recording.avi", mimeType: "video/x-msvideo", bytes: new Uint8Array([1]) }],
+        ),
       ),
     ).rejects.toThrow("For other audio or video formats, export as MP3 or MOV, or attach a text transcript.");
   });
 
   it("imports pathless image bytes and accepts an attachment-only user message", async () => {
-    const [draft] = await store.prepareImportedAttachments(
-      [],
-      [
-        {
-          name: "clipboard.png",
-          mimeType: "image/png",
-          bytes: new Uint8Array([137, 80, 78, 71]),
-        },
-      ],
+    const [draft] = await runCauseEffect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          {
+            name: "clipboard.png",
+            mimeType: "image/png",
+            bytes: new Uint8Array([137, 80, 78, 71]),
+          },
+        ],
+      ),
     );
     assert(draft);
     expect(draft).toMatchObject({
@@ -998,12 +1119,14 @@ describe("MailboxStore", () => {
       mimeType: "image/png",
       previewKind: "image",
     });
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "",
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "",
+        draftIds: [draft.id],
+      }),
+    );
     expect(store.getDelivery(required(receipt.deliveries[0]).id)?.delivery).toMatchObject({
       text: "",
       attachments: [{ name: "clipboard.png" }],
@@ -1011,11 +1134,13 @@ describe("MailboxStore", () => {
   });
 
   it("persists generated image attachments and resolves them after restart", async () => {
-    const attachment = await store.storeGeneratedAttachment({
-      bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
-      name: "generated-image.png",
-      mimeType: "image/png",
-    });
+    const attachment = await runCauseEffect(
+      store.storeGeneratedAttachment({
+        bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+        name: "generated-image.png",
+        mimeType: "image/png",
+      }),
+    );
 
     expect(attachment).toMatchObject({
       kind: "image",
@@ -1023,132 +1148,148 @@ describe("MailboxStore", () => {
       previewKind: "image",
       previewUrl: `openbot-attachment://file/${attachment.id}`,
     });
-    await expect(store.resolveAttachment(attachment.id)).resolves.toMatchObject({
+    await expect(runCauseEffect(store.resolveAttachment(attachment.id))).resolves.toMatchObject({
       mimeType: "image/png",
     });
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
-    const resolved = await restored.resolveAttachment(attachment.id);
+    await runCauseEffect(restored.initialize());
+    const resolved = await runCauseEffect(restored.resolveAttachment(attachment.id));
     expect(resolved?.mimeType).toBe("image/png");
     await expect(readFile(resolved?.path ?? "")).resolves.toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   });
 
   it("deletes generated attachments owned by a deleted agent", async () => {
-    const attachment = await store.storeGeneratedAttachment({
-      bytes: new Uint8Array([1, 2, 3]),
-      name: "generated.bin",
-      ownerAgentId: "chief",
-      ownerThreadId: "thread-chief",
-    });
+    const attachment = await runCauseEffect(
+      store.storeGeneratedAttachment({
+        bytes: new Uint8Array([1, 2, 3]),
+        name: "generated.bin",
+        ownerAgentId: "chief",
+        ownerThreadId: "thread-chief",
+      }),
+    );
 
-    const resolved = await store.resolveAttachment(attachment.id);
+    const resolved = await runCauseEffect(store.resolveAttachment(attachment.id));
     expect(resolved).not.toBeNull();
-    await store.deleteAgentData("chief");
+    await runCauseEffect(store.deleteAgentData("chief"));
 
-    await expect(store.resolveAttachment(attachment.id)).resolves.toBeNull();
-    await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(runCauseEffect(store.resolveAttachment(attachment.id))).resolves.toBeNull();
+    await expect(runCauseEffect(store.listExportAttachments())).resolves.toEqual([]);
     await expect(access(resolved?.path ?? "missing")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("keeps the shared files of a channel when a member agent is deleted", async () => {
     const source = join(root, "shared-report.txt");
     await writeFile(source, "shared report");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    const receipt = await store.enqueue({
-      channelId: "channel-1",
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Read the report",
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        channelId: "channel-1",
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Read the report",
+        draftIds: [draft.id],
+      }),
+    );
     const shared = required(store.getDelivery(required(receipt.deliveries[0]).id)?.delivery.attachments[0]);
-    const generated = await store.storeGeneratedAttachment({
-      bytes: new Uint8Array([4, 5, 6]),
-      name: "channel-chart.bin",
-      ownerAgentId: "chief",
-      ownerThreadId: "thread-channel-1",
-    });
+    const generated = await runCauseEffect(
+      store.storeGeneratedAttachment({
+        bytes: new Uint8Array([4, 5, 6]),
+        name: "channel-chart.bin",
+        ownerAgentId: "chief",
+        ownerThreadId: "thread-channel-1",
+      }),
+    );
 
     // The channel still shows both files, so they leave with the channel, not with the member.
-    await store.deleteAgentData("chief", ["thread-channel-1"]);
-    await expect(store.resolveAttachment(shared.id)).resolves.not.toBeNull();
-    await expect(store.resolveAttachment(generated.id)).resolves.not.toBeNull();
+    await runCauseEffect(store.deleteAgentData("chief", ["thread-channel-1"]));
+    await expect(runCauseEffect(store.resolveAttachment(shared.id))).resolves.not.toBeNull();
+    await expect(runCauseEffect(store.resolveAttachment(generated.id))).resolves.not.toBeNull();
 
-    await store.deleteChannelData("channel-1", ["thread-channel-1"]);
-    await expect(store.resolveAttachment(shared.id)).resolves.toBeNull();
-    await expect(store.resolveAttachment(generated.id)).resolves.toBeNull();
+    await runCauseEffect(store.deleteChannelData("channel-1", ["thread-channel-1"]));
+    await expect(runCauseEffect(store.resolveAttachment(shared.id))).resolves.toBeNull();
+    await expect(runCauseEffect(store.resolveAttachment(generated.id))).resolves.toBeNull();
   });
 
   it("cleans unrecoverable attachment drafts when a new app session starts", async () => {
     const source = join(root, "abandoned.txt");
     await writeFile(source, "abandoned");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
     expect(draft).toBeDefined();
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
 
-    await expect(restored.resolveAttachment(draft.id)).resolves.toBeNull();
+    await expect(runCauseEffect(restored.resolveAttachment(draft.id))).resolves.toBeNull();
   });
 
   it("rejects deliveries during deletion and permits new work after release", async () => {
     const release = store.blockAgentDeliveries("chief");
     await expect(
-      store.enqueue({
-        sender: { kind: "agent", agentId: "sales" },
-        recipientAgentIds: ["chief", "sales"],
-        text: "Work",
-      }),
+      runCauseEffect(
+        store.enqueue({
+          sender: { kind: "agent", agentId: "sales" },
+          recipientAgentIds: ["chief", "sales"],
+          text: "Work",
+        }),
+      ),
     ).rejects.toThrow("The recipient is being deleted.");
     expect(store.listQueue("chief").deliveries).toEqual([]);
     expect(store.listQueue("sales").deliveries).toEqual([]);
     release();
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Retry" });
+    await runCauseEffect(store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Retry" }));
     expect(store.listQueue("chief").deliveries).toMatchObject([{ text: "Retry", status: "queued" }]);
   });
 
   it("rejects prepared attachments after deletion finishes without restoring deleted deliveries", async () => {
     const source = join(root, "overlapping.txt");
     await writeFile(source, "Keep this draft available for retry.");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    const sending = store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Overlapping delivery",
-      draftIds: [draft.id],
-    });
+    const sending = runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Overlapping delivery",
+        draftIds: [draft.id],
+      }),
+    );
     // Enqueue has reached asynchronous attachment preparation, but cannot insert yet.
     const release = store.blockAgentDeliveries("chief");
     const rejected = expect(sending).rejects.toThrow("The recipient is being deleted.");
     release();
     await rejected;
-    await store.deleteAgentData("chief");
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: "Unrelated write" });
+    await runCauseEffect(store.deleteAgentData("chief"));
+    await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["sales"], text: "Unrelated write" }),
+    );
     expect(store.listQueue("chief").deliveries).toEqual([]);
     expect(await readdir(join(root, "Shared", "Transfers"))).toEqual([]);
-    await expect(store.resolveAttachment(draft.id)).resolves.toBeTruthy();
+    await expect(runCauseEffect(store.resolveAttachment(draft.id))).resolves.toBeTruthy();
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("chief").deliveries).toEqual([]);
   });
 
   it("removes deleted agent deliveries while preserving messages visible to other agents", async () => {
-    await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Private to Chief",
-    });
-    await store.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound"],
-      text: "Keep this for Sales",
-    });
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Private to Chief",
+      }),
+    );
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound"],
+        text: "Keep this for Sales",
+      }),
+    );
 
-    await store.deleteAgentData("chief");
+    await runCauseEffect(store.deleteAgentData("chief"));
 
     expect(store.listQueue("chief").deliveries).toEqual([]);
     expect(store.conversationMessages("chief").map((message) => message.text)).not.toContain("Private to Chief");
@@ -1162,64 +1303,70 @@ describe("MailboxStore", () => {
     const outside = join(root, "outside.txt");
     await writeFile(source, "original");
     await writeFile(outside, "original");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Review",
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Review",
+        draftIds: [draft.id],
+      }),
+    );
     const attachment = store.getDelivery(required(receipt.deliveries[0]).id)?.managedAttachments[0];
     expect(attachment).toBeDefined();
     await rm(attachment?.path ?? "missing");
     await symlink(outside, attachment?.path ?? "missing");
 
-    await expect(store.resolveAttachment(attachment?.id ?? "")).resolves.toBeNull();
-    await expect(store.listExportAttachments()).resolves.toEqual([]);
+    await expect(runCauseEffect(store.resolveAttachment(attachment?.id ?? ""))).resolves.toBeNull();
+    await expect(runCauseEffect(store.listExportAttachments())).resolves.toEqual([]);
   });
 
   it("deletes a sent file from Storage and keeps the message that carried it", async () => {
     const source = join(root, "report.txt");
     await writeFile(source, "report");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Review",
-      draftIds: [draft.id],
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Review",
+        draftIds: [draft.id],
+      }),
+    );
     const [file] = store.listStoredFiles();
     assert(file);
     expect(file).toMatchObject({ source: "attachment", messageId: receipt.messageId, agentId: "chief" });
 
-    await store.deleteStoredFile(file.attachment.id);
+    await runCauseEffect(store.deleteStoredFile(file.attachment.id));
 
     await expect(access(file.path)).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(store.resolveAttachment(file.attachment.id)).resolves.toBeNull();
+    await expect(runCauseEffect(store.resolveAttachment(file.attachment.id))).resolves.toBeNull();
     expect(store.listStoredFiles()).toEqual([]);
     const delivery = store.getDelivery(required(receipt.deliveries[0]).id)?.delivery;
     expect(delivery?.attachments.map((attachment) => attachment.id)).toEqual([file.attachment.id]);
-    await expect(store.deleteStoredFile(file.attachment.id)).rejects.toThrow("already deleted");
+    await expect(runCauseEffect(store.deleteStoredFile(file.attachment.id))).rejects.toThrow("already deleted");
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listStoredFiles()).toEqual([]);
-    await expect(restored.resolveAttachment(file.attachment.id)).resolves.toBeNull();
+    await expect(runCauseEffect(restored.resolveAttachment(file.attachment.id))).resolves.toBeNull();
   });
 
   it("keeps a message sent while a file delete waits when the delete cannot be saved", async () => {
     const source = join(root, "report.txt");
     await writeFile(source, "report");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Review",
-      draftIds: [draft.id],
-    });
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Review",
+        draftIds: [draft.id],
+      }),
+    );
     const [file] = store.listStoredFiles();
     assert(file);
     let release = () => {};
@@ -1227,27 +1374,28 @@ describe("MailboxStore", () => {
       release = resolve;
     });
     const managedTransferFile = AttachmentFiles.prototype.managedTransferFile;
-    const pathCheck = vi.spyOn(AttachmentFiles.prototype, "managedTransferFile").mockImplementation(async function (
+    const pathCheck = vi.spyOn(AttachmentFiles.prototype, "managedTransferFile").mockImplementation(function (
       this: AttachmentFiles,
       path: string,
     ) {
-      await released;
-      return managedTransferFile.call(this, path);
+      return Effect.promise(() => released).pipe(Effect.flatMap(() => managedTransferFile.call(this, path)));
     });
 
-    const deletion = store.deleteStoredFile(file.attachment.id);
+    const deletion = runCauseEffect(store.deleteStoredFile(file.attachment.id));
     await vi.waitFor(() => expect(pathCheck).toHaveBeenCalled());
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent meanwhile" });
+    await runCauseEffect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent meanwhile" }),
+    );
     vi.spyOn(OpenBotDatabase.prototype, "replaceMailboxState").mockImplementationOnce(() => {
       throw new Error("The disk is full.");
     });
     release();
     await expect(deletion).rejects.toThrow("The disk is full.");
-    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent later" });
+    await runCauseEffect(store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent later" }));
     vi.restoreAllMocks();
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("chief").deliveries.map((delivery) => delivery.text)).toEqual([
       "Review",
       "Sent meanwhile",
@@ -1261,52 +1409,58 @@ describe("MailboxStore", () => {
     const outside = join(root, "outside.txt");
     await writeFile(source, "original");
     await writeFile(outside, "keep me");
-    const [draft] = await store.prepareAttachments([source]);
+    const [draft] = await runCauseEffect(store.prepareAttachments([source]));
     assert(draft);
-    await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Review",
-      draftIds: [draft.id],
-    });
+    await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Review",
+        draftIds: [draft.id],
+      }),
+    );
     const [file] = store.listStoredFiles();
     assert(file);
     await rm(file.path);
     await symlink(outside, file.path);
 
-    await store.deleteStoredFile(file.attachment.id);
+    await runCauseEffect(store.deleteStoredFile(file.attachment.id));
 
     await expect(readFile(outside, "utf8")).resolves.toBe("keep me");
     expect(store.listStoredFiles()).toEqual([]);
   });
 
   it("keeps the persisted MIME type as the single source for attachment serving", async () => {
-    const [draft] = await store.prepareImportedAttachments(
-      [],
-      [
-        {
-          name: "clipboard.txt",
-          mimeType: "image/png",
-          bytes: new Uint8Array([137, 80, 78, 71]),
-        },
-      ],
+    const [draft] = await runCauseEffect(
+      store.prepareImportedAttachments(
+        [],
+        [
+          {
+            name: "clipboard.txt",
+            mimeType: "image/png",
+            bytes: new Uint8Array([137, 80, 78, 71]),
+          },
+        ],
+      ),
     );
     assert(draft);
 
-    await expect(store.resolveAttachment(draft.id)).resolves.toMatchObject({
+    await expect(runCauseEffect(store.resolveAttachment(draft.id))).resolves.toMatchObject({
       mimeType: "image/png",
     });
   });
 
   it("reconstructs persistent outgoing and incoming exchanges with live delivery states", async () => {
-    const receipt = await store.enqueue({
-      sender: { kind: "agent", agentId: "chief" },
-      recipientAgentIds: ["sales-outbound", "inbox-manager"],
-      text: "Prepare your reports",
-      replyToMessageId: "previous-message",
-    });
-    await store.markStarting(required(receipt.deliveries[0]).id);
-    await store.markRunning(required(receipt.deliveries[0]).id, "turn-sales");
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "chief" },
+        recipientAgentIds: ["sales-outbound", "inbox-manager"],
+        text: "Prepare your reports",
+        replyToMessageId: "previous-message",
+      }),
+    );
+    await runCauseEffect(store.markStarting(required(receipt.deliveries[0]).id));
+    await runCauseEffect(store.markRunning(required(receipt.deliveries[0]).id, "turn-sales"));
 
     const outgoing = store.conversationMessages("chief")[0];
     expect(outgoing).toMatchObject({
@@ -1325,7 +1479,7 @@ describe("MailboxStore", () => {
     });
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.conversationMessages("chief")[0]?.exchange?.deliveries).toEqual(
       expect.arrayContaining([expect.objectContaining({ status: "running" })]),
     );
@@ -1336,34 +1490,40 @@ describe("MailboxStore", () => {
     const replacement = join(root, "replacement.txt");
     await writeFile(original, "original");
     await writeFile(replacement, "replacement");
-    const [originalDraft] = await store.prepareAttachments([original]);
+    const [originalDraft] = await runCauseEffect(store.prepareAttachments([original]));
     assert(originalDraft);
-    const first = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Keep this message",
-      draftIds: [originalDraft.id],
-    });
-    const second = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Move me first",
-    });
+    const first = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Keep this message",
+        draftIds: [originalDraft.id],
+      }),
+    );
+    const second = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Move me first",
+      }),
+    );
     const firstDeliveryId = required(first.deliveries[0]).id;
     const secondDeliveryId = required(second.deliveries[0]).id;
     const before = store.getDelivery(firstDeliveryId);
     const originalAttachmentId = before?.delivery.attachments[0]?.id;
     expect(originalAttachmentId).toBeDefined();
 
-    await store.reorderQueue("chief", [secondDeliveryId, firstDeliveryId]);
-    const [replacementDraft] = await store.prepareAttachments([replacement]);
+    await runCauseEffect(store.reorderQueue("chief", [secondDeliveryId, firstDeliveryId]));
+    const [replacementDraft] = await runCauseEffect(store.prepareAttachments([replacement]));
     assert(replacementDraft);
-    await store.updateQueuedMessage(
-      "chief",
-      firstDeliveryId,
-      "Edited in place",
-      [originalAttachmentId ?? ""],
-      [replacementDraft.id],
+    await runCauseEffect(
+      store.updateQueuedMessage(
+        "chief",
+        firstDeliveryId,
+        "Edited in place",
+        [originalAttachmentId ?? ""],
+        [replacementDraft.id],
+      ),
     );
 
     const edited = store.getDelivery(firstDeliveryId);
@@ -1378,7 +1538,7 @@ describe("MailboxStore", () => {
     expect(edited?.delivery.attachments[0]?.id).toBe(originalAttachmentId);
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     expect(restored.listQueue("chief").deliveries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: secondDeliveryId, position: 1 }),
@@ -1393,38 +1553,42 @@ describe("MailboxStore", () => {
   });
 
   it("rejects queue edits and reorders for non-queued deliveries", async () => {
-    const receipt = await store.enqueue({
-      sender: { kind: "user" },
-      recipientAgentIds: ["chief"],
-      text: "Already running",
-    });
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Already running",
+      }),
+    );
     const deliveryId = required(receipt.deliveries[0]).id;
-    await store.markStarting(deliveryId);
+    await runCauseEffect(store.markStarting(deliveryId));
 
-    await expect(store.updateQueuedMessage("chief", deliveryId, "Changed", [], [])).rejects.toThrow(
+    await expect(runCauseEffect(store.updateQueuedMessage("chief", deliveryId, "Changed", [], []))).rejects.toThrow(
       "Only queued messages can be edited",
     );
-    await expect(store.reorderQueue("chief", [deliveryId])).rejects.toThrow("Queue order is stale");
+    await expect(runCauseEffect(store.reorderQueue("chief", [deliveryId]))).rejects.toThrow("Queue order is stale");
   });
 
   it("writes only changed rows and keeps every delivery and idempotency key across a restart", async () => {
     const database = new OpenBotDatabase(join(root, "user-data"));
     const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
-    await mailbox.initialize();
+    await runCauseEffect(mailbox.initialize());
     const send = (recipient: string, text: string, idempotencyKey?: string) =>
-      mailbox.enqueue({
-        sender: { kind: "agent", agentId: "planner" },
-        recipientAgentIds: [recipient],
-        text,
-        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-      });
+      runCauseEffect(
+        mailbox.enqueue({
+          sender: { kind: "agent", agentId: "planner" },
+          recipientAgentIds: [recipient],
+          text,
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        }),
+      );
     const finished = required((await send("chief", "Finished work")).deliveries[0]).id;
-    await mailbox.markStarting(finished);
-    await mailbox.markRunning(finished, "turn-finished");
-    await mailbox.markTerminal(finished, "completed");
+    await runCauseEffect(mailbox.markStarting(finished));
+    await runCauseEffect(mailbox.markRunning(finished, "turn-finished"));
+    await runCauseEffect(mailbox.markTerminal(finished, "completed"));
     const running = required((await send("sales", "Running work")).deliveries[0]).id;
-    await mailbox.markStarting(running);
-    await mailbox.markRunning(running, "turn-running");
+    await runCauseEffect(mailbox.markStarting(running));
+    await runCauseEffect(mailbox.markRunning(running, "turn-running"));
     const queued = await send("chief", "Queued work", "thread:turn:call");
     await send("gone", "Removed with its agent");
     const rowSequence = (deliveryId: string) =>
@@ -1433,8 +1597,8 @@ describe("MailboxStore", () => {
         .get(deliveryId);
     const finishedRow = rowSequence(finished);
 
-    await mailbox.markStarting(required(queued.deliveries[0]).id);
-    await mailbox.deleteAgentData("gone");
+    await runCauseEffect(mailbox.markStarting(required(queued.deliveries[0]).id));
+    await runCauseEffect(mailbox.deleteAgentData("gone"));
 
     expect(rowSequence(finished)).toEqual(finishedRow);
     expect(rowSequence(required(queued.deliveries[0]).id)).not.toEqual(finishedRow);
@@ -1444,7 +1608,7 @@ describe("MailboxStore", () => {
     expect(JSON.stringify(event)).not.toContain("Finished work");
 
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
-    await restored.initialize();
+    await runCauseEffect(restored.initialize());
     for (const agentId of ["chief", "sales", "gone"]) {
       expect(restored.listQueue(agentId)).toEqual(mailbox.listQueue(agentId));
     }
@@ -1455,12 +1619,14 @@ describe("MailboxStore", () => {
     expect(restored.listQueue("sales").deliveries).toMatchObject([{ id: running, status: "running" }]);
     expect(restored.listQueue("gone").deliveries).toEqual([]);
     await expect(
-      restored.enqueue({
-        sender: { kind: "agent", agentId: "planner" },
-        recipientAgentIds: ["chief"],
-        text: "Queued work",
-        idempotencyKey: "thread:turn:call",
-      }),
+      runCauseEffect(
+        restored.enqueue({
+          sender: { kind: "agent", agentId: "planner" },
+          recipientAgentIds: ["chief"],
+          text: "Queued work",
+          idempotencyKey: "thread:turn:call",
+        }),
+      ),
     ).resolves.toMatchObject({ messageId: queued.messageId });
   });
 });

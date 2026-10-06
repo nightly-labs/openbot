@@ -32,6 +32,8 @@ files:
 asarUnpack:
   # The database host is loaded by path as a separate process, not required into the main bundle.
   - out/main/agent-database-host.js
+  # The unpacked host resolves Effect without loading any application module from asar.
+  - node_modules/effect/**/*
 extraResources:
   - from: resources/managed-skills
     to: managed-skills

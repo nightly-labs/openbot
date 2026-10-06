@@ -1,5 +1,6 @@
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseInstallSkill, parseSetEnabledSkill, parseUninstallSkill } from "../ipc/app-inputs";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -30,13 +31,13 @@ export async function routeSkillsAdmin(
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   try {
-    if (list) return json(200, await skills.listInstalled(stringField(body, "agentId")));
-    if (install) return json(200, await skills.install(parseInstallSkill(body)));
+    if (list) return json(200, await runCauseEffect(skills.listInstalled(stringField(body, "agentId"))));
+    if (install) return json(200, await runCauseEffect(skills.install(parseInstallSkill(body))));
     if (uninstall) {
-      await skills.uninstall(parseUninstallSkill(body));
+      await runCauseEffect(skills.uninstall(parseUninstallSkill(body)));
       return json(200, {});
     }
-    return json(200, await skills.setEnabled(parseSetEnabledSkill(body)));
+    return json(200, await runCauseEffect(skills.setEnabled(parseSetEnabledSkill(body))));
   } catch (error) {
     // The skill service throws only sentences written for the person who manages the agent, such
     // as a missing marketplace sign-in or a skill with local changes, so the admin reads the reason.

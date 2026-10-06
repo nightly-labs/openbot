@@ -1,5 +1,6 @@
 import type { RemoteDesktopSetupStatus } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Remote control and the Remote Desktop upgrade: `src/main/team-api/route-remote-screen.ts`, plus
@@ -33,31 +34,32 @@ describe("TeamApiServer remote screen", () => {
 
   it("allows an active member to create remote control and rejects an outsider", async () => {
     const { store, start } = await createTeamApiFixture("remote-screen", { configure: true });
-    const invite = await store.createInvite("member");
-    const joined = await store.acceptInvite(invite.token, "alice", "a secure team password");
+    const invite = await Effect.runPromise(store.createInvite("member"));
+    const joined = await Effect.runPromise(store.acceptInvite(invite.token, "alice", "a secure team password"));
     const now = "2026-08-20T12:00:00.000Z";
     const createSession = vi.fn(
-      async (input: { serverId: string; memberId: string; teamSessionId: string; teamSessionExpiresAt: string }) => ({
-        id: "remote-session-1",
-        serverId: input.serverId,
-        viewerUrl: "https://studio.example/v1/remote-screen/sessions/remote-session-1/viewer",
-        viewerGrant: "one-use-viewer-grant",
-        displays: [{ id: "primary", label: "Primary display", width: 1920, height: 1080, primary: true }],
-        selectedDisplayId: "primary",
-        phase: "connecting" as const,
-        transport: "unknown" as const,
-        errorCode: null,
-        message: "Waiting for the WebRTC client…",
-        createdAt: now,
-        grantExpiresAt: "2026-08-20T12:01:00.000Z",
-      }),
+      (input: { serverId: string; memberId: string; teamSessionId: string; teamSessionExpiresAt: string }) =>
+        Effect.sync(() => ({
+          id: "remote-session-1",
+          serverId: input.serverId,
+          viewerUrl: "https://studio.example/v1/remote-screen/sessions/remote-session-1/viewer",
+          viewerGrant: "one-use-viewer-grant",
+          displays: [{ id: "primary", label: "Primary display", width: 1920, height: 1080, primary: true }],
+          selectedDisplayId: "primary",
+          phase: "connecting" as const,
+          transport: "unknown" as const,
+          errorCode: null,
+          message: "Waiting for the WebRTC client…",
+          createdAt: now,
+          grantExpiresAt: "2026-08-20T12:01:00.000Z",
+        })),
     );
     const remoteScreen: NonNullable<TeamApiOptions["remoteScreen"]> = {
       handlesHttp: () => false,
       handleHttp: unimplemented,
       handlesUpgrade: () => false,
       handleUpgrade: unimplemented,
-      stop: vi.fn(async () => undefined),
+      stop: vi.fn(() => Effect.sync(() => undefined)),
       capabilities: () => ({
         ready: true,
         platform: "darwin" as const,
@@ -70,27 +72,28 @@ describe("TeamApiServer remote screen", () => {
         maxSessions: 4,
       }),
       checkSetup: vi.fn(
-        async (): Promise<RemoteDesktopSetupStatus> => ({
-          platform: "darwin",
-          hostName: "Mac mini",
-          username: "tenant",
-          checkedAt: "2026-09-21T10:00:00.000Z",
-          screenRecording: "blocked",
-          accessibility: "blocked",
-          service: "allowed",
-          displays: "allowed",
-          guiSession: "allowed",
-          restartRequired: false,
-          activeSessions: 0,
-          message: null,
-        }),
+        (): Effect.Effect<RemoteDesktopSetupStatus> =>
+          Effect.sync(() => ({
+            platform: "darwin",
+            hostName: "Mac mini",
+            username: "tenant",
+            checkedAt: "2026-09-21T10:00:00.000Z",
+            screenRecording: "blocked",
+            accessibility: "blocked",
+            service: "allowed",
+            displays: "allowed",
+            guiSession: "allowed",
+            restartRequired: false,
+            activeSessions: 0,
+            message: null,
+          })),
       ),
-      test: vi.fn(async () => ({ active: true, mouse: false, keyboard: false, code: "1234" })),
+      test: vi.fn(() => Effect.sync(() => ({ active: true, mouse: false, keyboard: false, code: "1234" }))),
       createSession,
-      selectDisplay: vi.fn(async () => undefined),
-      closeMemberSession: vi.fn(async () => true),
-      revokeTeamSession: vi.fn(async () => undefined),
-      revokeMember: vi.fn(async () => undefined),
+      selectDisplay: vi.fn(() => Effect.sync(() => undefined)),
+      closeMemberSession: vi.fn(() => Effect.sync(() => true)),
+      revokeTeamSession: vi.fn(() => Effect.sync(() => undefined)),
+      revokeMember: vi.fn(() => Effect.sync(() => undefined)),
     };
     const { base } = await start({ remoteScreen });
 
@@ -150,7 +153,7 @@ describe("TeamApiServer remote screen", () => {
     expect(invalid.status).toBe(400);
     expect(remoteScreen.test).toHaveBeenCalledTimes(1);
 
-    const owner = await store.login("owner", "correct horse battery");
+    const owner = await Effect.runPromise(store.login("owner", "correct horse battery"));
     const disabled = await fetch(`${base}/v1/team/members/${joined.member.id}`, {
       method: "PATCH",
       headers: {

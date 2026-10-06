@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 // The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
 // endpoints. On a joined server they belong to the host, so the request goes there, and the host
 // answers only an owner or admin. A key only travels towards the host; no result carries one.
@@ -28,7 +30,8 @@ import {
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { sourceText } from "@openbot/i18n/source";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
-import type { AgentService } from "../../backend/agent-service";
+import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -43,7 +46,12 @@ import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 interface ProviderAdminRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
-  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+  request<T>(
+    serverId: string,
+    path: string,
+    decoder: ResponseDecoder<T>,
+    init?: RemoteRequestInit,
+  ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
 interface ProviderAdminIpcDependencies {
@@ -70,13 +78,13 @@ export function providerAdminIpcHandlers({
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
       throw new Error(sourceText("error.provider.localOnly"));
-    return remoteServers.request(serverId, path, decoder, { method: "POST", body });
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
   /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
-    return remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost);
+    return runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost));
   }
 
   /**
@@ -108,7 +116,7 @@ export function providerAdminIpcHandlers({
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) => service.startProviderCodeLogin(provider),
+        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider)),
         remote: (provider, serverId) =>
           remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),
@@ -123,7 +131,7 @@ export function providerAdminIpcHandlers({
         },
       }),
       cancelCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) => service.cancelProviderCodeLogin(provider),
+        local: (provider) => runCauseEffect(service.cancelProviderCodeLogin(provider)),
         remote: (provider, serverId) =>
           remoteChange(serverId, signInRoutes(serverId, provider).codeLoginCancel, { provider }),
       }),
@@ -135,11 +143,33 @@ export function providerAdminIpcHandlers({
         }),
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
-        local: ({ provider, key }) => service.changeProviderCredential(provider, () => credentials.set(provider, key)),
+        local: ({ provider, key }) =>
+          runCauseEffect(
+            service.changeProviderCredential(provider, () =>
+              credentials
+                .set(provider, key)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
+                  ),
+                ),
+            ),
+          ),
         remote: (input, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeySet, input),
       }),
       clearApiKey: scopedHandler(parseProviderId, {
-        local: (provider) => service.changeProviderCredential(provider, () => credentials.clear(provider)),
+        local: (provider) =>
+          runCauseEffect(
+            service.changeProviderCredential(provider, () =>
+              credentials
+                .clear(provider)
+                .pipe(
+                  Effect.mapError(
+                    (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
+                  ),
+                ),
+            ),
+          ),
         remote: (provider, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyClear, { provider }),
       }),
       getRuntimes: scopedQueryHandler({
@@ -148,15 +178,15 @@ export function providerAdminIpcHandlers({
           remote(serverId, runtimeRoutes(serverId).runtimesStatus, {}, decodeProviderRuntimeSnapshot),
       }),
       downloadRuntime: scopedHandler(parseManagedProviderId, {
-        local: (provider) => runtimes.download(provider),
+        local: (provider) => runCauseEffect(runtimes.download(provider)),
         remote: runtime("runtimesDownload"),
       }),
       cancelRuntime: scopedHandler(parseManagedProviderId, {
-        local: (provider) => runtimes.cancel(provider),
+        local: (provider) => runCauseEffect(runtimes.cancel(provider)),
         remote: runtime("runtimesCancel"),
       }),
       checkRuntimeUpdates: scopedQueryHandler({
-        local: () => runtimes.checkForUpdates(),
+        local: () => runCauseEffect(runtimes.checkForUpdates()),
         remote: (serverId) =>
           remote(serverId, runtimeRoutes(serverId).runtimesCheck, {}, decodeProviderRuntimeSnapshot),
       }),
@@ -165,12 +195,12 @@ export function providerAdminIpcHandlers({
         remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeCustomProviderSummaries),
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
-        local: (input) => customProviders.save(input),
+        local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) =>
           remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeCustomProviderResult),
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
-        local: ({ id }) => customProviders.remove(id),
+        local: ({ id }) => runCauseEffect(customProviders.remove(id)),
         remote: (input, serverId) =>
           remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeCustomProviderResult),
       }),

@@ -132,7 +132,7 @@ check; a device holding no Signal socket finds the change at its next 15-minute 
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
 A foreground return checks absolute freshness: successful account and directory responses stay fresh
 for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
-one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+one minute while foregrounded. Concurrent requests share one Effect result through a Deferred; invalidations received during
 a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
 Stored mobile sessions become available before startup validation completes; network failures retain
 them, and validation results apply only to the initiating login.

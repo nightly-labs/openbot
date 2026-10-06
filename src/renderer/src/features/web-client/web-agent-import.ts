@@ -7,6 +7,7 @@ import {
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
+import { Effect } from "effect";
 import type { AgentImportCalls } from "../servers/ServerImportPanel";
 import { openWebLink } from "./web-attachments";
 import { chooseFiles } from "./web-channels-runtime";
@@ -41,18 +42,25 @@ export function createWebAgentImportCalls(options: {
       if (!file) return null;
       if (file.size === 0) throw new Error(currentText().t("error.import.chooseZip"));
       if (file.size > AGENT_IMPORT_UPLOAD_BYTES) throw new Error(currentText().t("error.import.remoteZipTooLarge"));
-      return stageAgentImport(request, {
-        name: file.name,
-        mimeType: "application/zip",
-        base64: await readBase64(file),
-      });
+      return Effect.runPromise(
+        stageAgentImport(request, {
+          name: file.name,
+          mimeType: "application/zip",
+          base64: await readBase64(file),
+        }).pipe(Effect.mapError((error) => error.cause)),
+      );
     },
     async apply(input, serverId) {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const result = await applyAgentImport(options.request(serverId), input, timezone);
+      const result = await Effect.runPromise(
+        applyAgentImport(options.request(serverId), input, timezone).pipe(Effect.mapError((error) => error.cause)),
+      );
       return resolveRemoteAgentImportResult(result, await options.listAgents());
     },
-    discard: (token, serverId) => discardAgentImport(options.request(serverId), token),
+    discard: (token, serverId) =>
+      Effect.runPromise(
+        discardAgentImport(options.request(serverId), token).pipe(Effect.mapError((error) => error.cause)),
+      ),
     async readSkill() {
       const skill = await import("../../../../../resources/agent-import/grok-bot/SKILL.md?raw");
       return skill.default;

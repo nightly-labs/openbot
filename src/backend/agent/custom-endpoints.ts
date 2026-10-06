@@ -6,6 +6,7 @@ import {
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Exit, Schema, Semaphore } from "effect";
 import type { AgentProvider } from "../agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
@@ -16,10 +17,10 @@ import { providerForAgent } from "./thread-items";
 
 export interface CustomEndpointsHooks {
   /** The facade's agent update without the chain: every caller here already holds it. */
-  applyAgentUpdate(input: UpdateAgentInput): Promise<AgentSummary>;
+  applyAgentUpdate(input: UpdateAgentInput): Effect.Effect<AgentSummary, EndpointChangeFailed>;
   /** Tells the renderer to read the catalogue again. */
   modelsChanged(): void;
-  stopProfileClients(): void;
+  stopProfileClients(): Effect.Effect<void>;
   emitError(code: string, error: unknown, agentId?: string): void;
   providerAvailable(provider: AgentProvider): boolean;
   preference(): ProviderPreference;
@@ -71,7 +72,7 @@ export class CustomEndpoints {
    * an agent back onto the endpoint after the sweep and before the write, and the removal would not
    * notice. Both paths run here, so neither can start inside the other.
    */
-  #chain: Promise<unknown> = Promise.resolve();
+  readonly #chain = Semaphore.makeUnsafe(1);
 
   constructor(options: CustomEndpointsOptions) {
     this.#store = options.store;
@@ -113,10 +114,8 @@ export class CustomEndpoints {
   }
 
   /** A failed change does not stop the next one, so the chain swallows what it re-throws here. */
-  runExclusive<T>(run: () => Promise<T>): Promise<T> {
-    const operation = this.#chain.then(run);
-    this.#chain = operation.catch(() => undefined);
-    return operation;
+  runExclusive<T, E>(run: () => Effect.Effect<T, E>): Effect.Effect<T, E> {
+    return this.#chain.withPermit(Effect.suspend(run));
   }
 
   /**
@@ -134,30 +133,39 @@ export class CustomEndpoints {
    * fresh process usually serves it within seconds. Until then its models are refused at delivery,
    * which is the safe answer while two different servers could answer to one id.
    */
-  save<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
-    return this.runExclusive(async () => {
-      const previous = this.#released.get(providerId);
-      this.#revision += 1;
-      const revision = this.#revision;
-      this.#released.set(providerId, revision);
-      this.#hooks.modelsChanged();
-      // The same reason as a removal: a profile or channel client is a process of its own, holding
-      // the endpoints it was spawned with, and no restart of the main client reaches it.
-      this.#hooks.stopProfileClients();
-      try {
-        const persisted = await persist();
-        // Only now can a spawning process read the saved endpoint.
-        this.#committedRevision = revision;
-        return persisted;
-      } catch (error) {
+
+  readonly save = Effect.fn("CustomEndpoints.save")(function* <T>(
+    this: CustomEndpoints,
+    providerId: string,
+    persist: () => Effect.Effect<T, EndpointChangeFailed>,
+  ) {
+    return yield* this.#chain.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const previous = this.#released.get(providerId);
+        this.#revision += 1;
+        const revision = this.#revision;
+        this.#released.set(providerId, revision);
+        this.#hooks.modelsChanged();
+        // The same reason as a removal: a profile or channel client is a process of its own, holding
+        // the endpoints it was spawned with, and no restart of the main client reaches it.
+        yield* this.#hooks.stopProfileClients();
+        const result = yield* Effect.exit(
+          Effect.gen({ self: this }, function* () {
+            const persisted = yield* Effect.suspend(persist);
+            // Only now can a spawning process read the saved endpoint.
+            this.#committedRevision = revision;
+            return persisted;
+          }),
+        );
+        if (Exit.isSuccess(result)) return result.value;
         // Nothing was written, so the id is served exactly as it was before this call.
         if (previous !== undefined) this.#released.set(providerId, previous);
         else this.#released.delete(providerId);
         this.#hooks.modelsChanged();
-        throw error;
-      }
-    });
-  }
+        return yield* Effect.failCause(result.cause);
+      }),
+    );
+  }, Effect.uninterruptible);
 
   /**
    * Changes one saved endpoint: the agents on a model it no longer lists, the exclusion of its id,
@@ -168,34 +176,48 @@ export class CustomEndpoints {
    * excluded as for a save: the running process still has the old address and credentials, and
    * only a process that read this write may serve the endpoint again.
    */
-  update<T>(providerId: string, removedModelIds: readonly string[], persist: () => Promise<T>): Promise<T> {
-    return this.runExclusive(async () => {
-      await this.#moveOffRemovedModels(providerId, new Set(removedModelIds));
-      const previous = this.#released.get(providerId);
-      this.#revision += 1;
-      const revision = this.#revision;
-      this.#released.set(providerId, revision);
-      this.#hooks.modelsChanged();
-      this.#hooks.stopProfileClients();
-      try {
-        const persisted = await persist();
-        this.#committedRevision = revision;
-        return persisted;
-      } catch (error) {
+
+  readonly update = Effect.fn("CustomEndpoints.update")(function* <T>(
+    this: CustomEndpoints,
+    providerId: string,
+    removedModelIds: readonly string[],
+    persist: () => Effect.Effect<T, EndpointChangeFailed>,
+  ) {
+    return yield* this.#chain.withPermit(
+      Effect.gen({ self: this }, function* () {
+        yield* this.#moveOffRemovedModels(providerId, new Set(removedModelIds));
+        const previous = this.#released.get(providerId);
+        this.#revision += 1;
+        const revision = this.#revision;
+        this.#released.set(providerId, revision);
+        this.#hooks.modelsChanged();
+        yield* this.#hooks.stopProfileClients();
+        const result = yield* Effect.exit(
+          Effect.gen({ self: this }, function* () {
+            const persisted = yield* Effect.suspend(persist);
+            this.#committedRevision = revision;
+            return persisted;
+          }),
+        );
+        if (Exit.isSuccess(result)) return result.value;
         if (previous !== undefined) this.#released.set(providerId, previous);
         else this.#released.delete(providerId);
         this.#hooks.modelsChanged();
-        throw error;
-      }
-    });
-  }
+        return yield* Effect.failCause(result.cause);
+      }),
+    );
+  }, Effect.uninterruptible);
 
   /**
    * The agents on `providerId/<removed>` go to a kept model of the same endpoint when the catalogue
    * lists one, then to the fallback a removal uses. Busy agents stop the change only when the move
    * is a provider switch.
    */
-  async #moveOffRemovedModels(providerId: string, removed: ReadonlySet<string>): Promise<void> {
+  readonly #moveOffRemovedModels = Effect.fn("CustomEndpoints.moveOffRemovedModels")(function* (
+    this: CustomEndpoints,
+    providerId: string,
+    removed: ReadonlySet<string>,
+  ) {
     if (removed.size === 0) return;
     const prefix = `${providerId}/`;
     const affected = this.#store
@@ -218,17 +240,19 @@ export class CustomEndpoints {
         : null);
     if (!fallback) return;
     if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
-      throw new Error(sourceText("error.provider.endpointRemoveBusy"));
+      return yield* new EndpointChangeFailed({ cause: new Error(sourceText("error.provider.endpointRemoveBusy")) });
     }
     for (const agent of affected) {
-      await this.#hooks.applyAgentUpdate({
-        agentId: agent.id,
-        provider: fallback.provider,
-        model: fallback.id,
-        reasoningEffort: fallback.defaultReasoningEffort,
-      });
+      yield* this.#hooks
+        .applyAgentUpdate({
+          agentId: agent.id,
+          provider: fallback.provider,
+          model: fallback.id,
+          reasoningEffort: fallback.defaultReasoningEffort,
+        })
+        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
     }
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Removes one endpoint: the exclusion, the agents that were on it, and `persist`, which is the
@@ -238,45 +262,59 @@ export class CustomEndpoints {
    * runs, and given back when the write throws: an endpoint that is still on disk is still saved and
    * still served, and its models stay a valid fallback for the next removal.
    */
-  remove<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
-    return this.runExclusive(async () => {
-      const previous = this.#released.get(providerId);
-      this.#revision += 1;
-      const revision = this.#revision;
-      this.#released.set(providerId, revision);
-      this.#hooks.modelsChanged();
-      // A profile or channel client is a process of its own, spawned with the endpoints as they
-      // were, and no restart of the main client reaches it. It is one short request, so it is
-      // stopped rather than watched: its caller reports a failure the user can repeat.
-      this.#hooks.stopProfileClients();
-      try {
-        await this.#releaseModels();
-        const persisted = await persist();
-        // Only now is the removal on disk, so only now can a process read it. Removals run one at a
-        // time on the chain, so this number never goes back.
-        this.#committedRevision = revision;
-        return persisted;
-      } catch (error) {
+
+  readonly remove = Effect.fn("CustomEndpoints.remove")(function* <T>(
+    this: CustomEndpoints,
+    providerId: string,
+    persist: () => Effect.Effect<T, EndpointChangeFailed>,
+  ) {
+    return yield* this.#chain.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const previous = this.#released.get(providerId);
+        this.#revision += 1;
+        const revision = this.#revision;
+        this.#released.set(providerId, revision);
+        this.#hooks.modelsChanged();
+        // A profile or channel client is a process of its own, spawned with the endpoints as they
+        // were, and no restart of the main client reaches it. It is one short request, so it is
+        // stopped rather than watched: its caller reports a failure the user can repeat.
+        yield* this.#hooks.stopProfileClients();
+        const result = yield* Effect.exit(
+          Effect.gen({ self: this }, function* () {
+            yield* this.#releaseModels();
+            const persisted = yield* Effect.suspend(persist);
+            // Only now is the removal on disk, so only now can a process read it. Removals run one at a
+            // time on the chain, so this number never goes back.
+            this.#committedRevision = revision;
+            return persisted;
+          }),
+        );
+        if (Exit.isSuccess(result)) return result.value;
         if (previous !== undefined) this.#released.set(providerId, previous);
         else this.#released.delete(providerId);
         this.#hooks.modelsChanged();
-        throw error;
-      }
-    });
-  }
+        return yield* Effect.failCause(result.cause);
+      }),
+    );
+  }, Effect.uninterruptible);
 
   /**
    * Saves one custom agent: `persist`, the caller's file write, inside the chain. No agent moves: an
    * agent on a model the changed agent no longer lists moves to another model of the same agent when
    * the new process lists its models (`moveAgentsOffUnlistedModels`).
    */
-  saveCustomAgent<T>(persist: () => Promise<T>): Promise<T> {
-    return this.runExclusive(async () => {
-      // A profile client is a process of its own, started with the agent as it was.
-      this.#hooks.stopProfileClients();
-      return persist();
-    });
-  }
+
+  readonly saveCustomAgent = Effect.fn("CustomEndpoints.saveCustomAgent")(function* <T>(
+    this: CustomEndpoints,
+    persist: () => Effect.Effect<T, EndpointChangeFailed>,
+  ) {
+    return yield* this.#chain.withPermit(
+      Effect.gen({ self: this }, function* () {
+        yield* this.#hooks.stopProfileClients();
+        return yield* Effect.suspend(persist);
+      }),
+    );
+  }, Effect.uninterruptible);
 
   /**
    * Removes one custom agent: the agents on it move to another provider, then `persist` writes the
@@ -284,29 +322,40 @@ export class CustomEndpoints {
    * With nothing to move to, the removal still goes ahead, and those agents ask for a model at their
    * next turn.
    */
-  removeCustomAgent<T>(customAgentId: string, persist: () => Promise<T>): Promise<T> {
-    return this.runExclusive(async () => {
-      this.#hooks.stopProfileClients();
-      const affected = this.#store
-        .list()
-        .filter((agent) => providerForAgent(agent) === "acp" && customAgentIdOfModel(agent.model) === customAgentId);
-      const fallback = affected.length > 0 ? this.#builtInFallback() : null;
-      if (fallback) {
-        if (affected.some((agent) => this.#hasWorkInFlight(agent))) {
-          throw new Error(sourceText("error.provider.customAgentRemoveBusy"));
+
+  readonly removeCustomAgent = Effect.fn("CustomEndpoints.removeCustomAgent")(function* <T>(
+    this: CustomEndpoints,
+    customAgentId: string,
+    persist: () => Effect.Effect<T, EndpointChangeFailed>,
+  ) {
+    return yield* this.#chain.withPermit(
+      Effect.gen({ self: this }, function* () {
+        yield* this.#hooks.stopProfileClients();
+        const affected = this.#store
+          .list()
+          .filter((agent) => providerForAgent(agent) === "acp" && customAgentIdOfModel(agent.model) === customAgentId);
+        const fallback = affected.length > 0 ? this.#builtInFallback() : null;
+        if (fallback) {
+          if (affected.some((agent) => this.#hasWorkInFlight(agent))) {
+            return yield* new EndpointChangeFailed({
+              cause: new Error(sourceText("error.provider.customAgentRemoveBusy")),
+            });
+          }
+          for (const agent of affected) {
+            yield* this.#hooks
+              .applyAgentUpdate({
+                agentId: agent.id,
+                provider: fallback.provider,
+                model: fallback.id,
+                reasoningEffort: fallback.defaultReasoningEffort,
+              })
+              .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
+          }
         }
-        for (const agent of affected) {
-          await this.#hooks.applyAgentUpdate({
-            agentId: agent.id,
-            provider: fallback.provider,
-            model: fallback.id,
-            reasoningEffort: fallback.defaultReasoningEffort,
-          });
-        }
-      }
-      return persist();
-    });
-  }
+        return yield* Effect.suspend(persist);
+      }),
+    );
+  }, Effect.uninterruptible);
 
   /** The model an agent moves to when its custom agent goes: the preferred provider's, then the others'. */
   #builtInFallback(): AgentModelOption | null {
@@ -353,7 +402,7 @@ export class CustomEndpoints {
    * and that is refused during a turn or a queued delivery. The check runs over all of them first,
    * so a refusal moves no agent at all.
    */
-  async #releaseModels(): Promise<void> {
+  readonly #releaseModels = Effect.fn("CustomEndpoints.releaseModels")(function* (this: CustomEndpoints) {
     // Every endpoint already removed, not only this one. A removal during a turn leaves the running
     // CLI's catalogue as it was, so the models of an endpoint already taken out are still listed,
     // and choosing one here would move agents onto an endpoint that is gone.
@@ -379,18 +428,20 @@ export class CustomEndpoints {
     // would trap the user on an endpoint that may be the reason no model is listed.
     if (!fallback) return;
     if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
-      throw new Error(sourceText("error.provider.endpointRemoveBusy"));
+      return yield* new EndpointChangeFailed({ cause: new Error(sourceText("error.provider.endpointRemoveBusy")) });
     }
     for (const agent of affected) {
       // Not the public `updateAgent`: this already runs inside the chain that one takes.
-      await this.#hooks.applyAgentUpdate({
-        agentId: agent.id,
-        provider: fallback.provider,
-        model: fallback.id,
-        reasoningEffort: fallback.defaultReasoningEffort,
-      });
+      yield* this.#hooks
+        .applyAgentUpdate({
+          agentId: agent.id,
+          provider: fallback.provider,
+          model: fallback.id,
+          reasoningEffort: fallback.defaultReasoningEffort,
+        })
+        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })));
     }
-  }
+  }, Effect.uninterruptible);
 
   /**
    * Moves each agent of `provider` whose model the provider no longer lists to the provider's default,
@@ -401,7 +452,11 @@ export class CustomEndpoints {
    * keeps the model it started with. An empty catalogue moves nobody: that is a provider with no
    * usable account, not a provider with no models.
    */
-  async moveAgentsOffUnlistedModels(provider: AgentProvider): Promise<void> {
+
+  readonly moveAgentsOffUnlistedModels = Effect.fn("CustomEndpoints.moveAgentsOffUnlistedModels")(function* (
+    this: CustomEndpoints,
+    provider: AgentProvider,
+  ) {
     const models = this.available().filter((model) => model.provider === provider);
     const providerFallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
     if (!providerFallback) return;
@@ -418,17 +473,20 @@ export class CustomEndpoints {
           ? models.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
           : providerFallback;
       if (!fallback) continue;
-      try {
-        await this.#hooks.applyAgentUpdate({
+      yield* this.#hooks
+        .applyAgentUpdate({
           agentId: agent.id,
           model: fallback.id,
           reasoningEffort: fallback.defaultReasoningEffort,
-        });
-      } catch (error) {
-        this.#hooks.emitError("agent_model_fallback_failed", error, agent.id);
-      }
+        })
+        .pipe(Effect.mapError((failure) => new EndpointChangeFailed({ cause: failure.cause })))
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id)),
+          ),
+        );
     }
-  }
+  }, Effect.uninterruptible).bind(this);
 
   /**
    * Whether a turn is running for this agent or a delivery is still queued for it. Read from the
@@ -452,3 +510,7 @@ function sameCustomAgent(model: string, agentModel: string): boolean {
   const id = customAgentIdOfModel(model);
   return id !== null && id === customAgentIdOfModel(agentModel);
 }
+
+export class EndpointChangeFailed extends Schema.TaggedError<EndpointChangeFailed>()("EndpointChangeFailed", {
+  cause: Schema.Defect(),
+}) {}

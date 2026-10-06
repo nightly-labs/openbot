@@ -11,6 +11,7 @@ The architecture notes are in one file for each topic:
   - [State ownership](architecture/structure.md#state-ownership)
   - [Shared UI package](architecture/structure.md#shared-ui-package)
 - [Change rules and verification](architecture/change-rules.md)
+  - [Effect service execution](architecture/change-rules.md#effect-service-execution)
   - [Change rules](architecture/change-rules.md#change-rules)
   - [Required verification](architecture/change-rules.md#required-verification)
 - [Team API compatibility](architecture/team-api.md)

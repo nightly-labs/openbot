@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // Read-only: where the Computer Use driver is on this computer, and what it says about itself.
 //
 // Separate from `codex-doctor.ts` because the driver is no longer a Codex plugin. It answers the
@@ -12,19 +13,21 @@ import { CUA_DRIVER_VENDOR_CALLS_OFF, resolveCuaDriver } from "../src/main/cua-d
 
 const run = promisify(execFile);
 
-const executable = await resolveCuaDriver({
-  isPackaged: false,
-  resourcesPath: "",
-  sourceRoot: resolve(import.meta.dirname, ".."),
-  platform: process.platform,
-  architecture: process.arch,
-  homeDirectory: homedir(),
-  pathVariable: process.env.PATH ?? null,
-  overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
-  installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
-  localAppDataDirectory: process.env.LOCALAPPDATA,
-  applicationsDirectory: "/Applications",
-});
+const executable = await Effect.runPromise(
+  resolveCuaDriver({
+    isPackaged: false,
+    resourcesPath: "",
+    sourceRoot: resolve(import.meta.dirname, ".."),
+    platform: process.platform,
+    architecture: process.arch,
+    homeDirectory: homedir(),
+    pathVariable: process.env.PATH ?? null,
+    overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
+    installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
+    localAppDataDirectory: process.env.LOCALAPPDATA,
+    applicationsDirectory: "/Applications",
+  }),
+);
 
 if (!executable) {
   // Machine-readable: doctor result JSON consumed by tooling.

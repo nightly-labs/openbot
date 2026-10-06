@@ -4,6 +4,8 @@ import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
+import { type AttachmentOperationError, attachmentCall, attachmentFailure } from "./attachment-effects";
 import { isRecord } from "./protocol";
 
 export interface ResolvedSharedFile {
@@ -96,58 +98,57 @@ function decodePath(value: string): string {
     return value;
   }
 }
-
-export async function resolveSharedFile(sharedRootPath: string, inputPath: string): Promise<ResolvedSharedFile> {
-  const sharedRoot = await realpath(sharedRootPath);
+export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(function* (
+  sharedRootPath: string,
+  inputPath: string,
+): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
+  const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
   const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
-  const resolvedPath = await realpath(candidatePath);
+  const resolvedPath = yield* attachmentCall(() => realpath(candidatePath));
   if (!isWithin(sharedRoot, resolvedPath)) {
-    throw new Error(sourceText("error.backend.sharedFileOutside"));
+    return yield* attachmentFailure(new Error(sourceText("error.backend.sharedFileOutside")));
   }
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error(sourceText("error.backend.sharedPathNotFile"));
+  const metadata = yield* attachmentCall(() => stat(resolvedPath));
+  if (!metadata.isFile()) return yield* attachmentFailure(new Error(sourceText("error.backend.sharedPathNotFile")));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
-}
-
-/**
- * `allowOutside` is for the local desktop only, and only for an agent with full computer access: that
- * agent could already read the file. The Team API and the web client never pass it, so a remote member
- * still reaches nothing outside the workspace.
- */
-export async function resolveWorkspaceFile(
+});
+export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
   options: { allowOutside?: boolean } = {},
-): Promise<ResolvedWorkspaceFile> {
-  const workspaceRoot = await realpath(agent.workspacePath);
+): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
+  const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
-  const resolvedPath = await realpathWithLegacyRoot(agent, candidatePath).catch(async (error: unknown) => {
-    // The literal path goes first, so a real file named `notes:2` still opens.
-    const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
-    if (!isRecord(error) || error.code !== "ENOENT" || withoutLocation === candidatePath) throw error;
-    return await realpathWithLegacyRoot(agent, withoutLocation);
-  });
+  const resolvedPath = yield* realpathWithLegacyRoot(agent, candidatePath).pipe(
+    Effect.catch((error) => {
+      // The literal path goes first, so a real file named `notes:2` still opens.
+      const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
+      if (!isRecord(error.cause) || error.cause.code !== "ENOENT" || withoutLocation === candidatePath)
+        return Effect.fail(error);
+      return realpathWithLegacyRoot(agent, withoutLocation);
+    }),
+  );
   const insideWorkspace = isWithin(workspaceRoot, resolvedPath);
   if (!insideWorkspace && !options.allowOutside) {
-    throw new Error(sourceText("error.backend.workspaceFileOutside"));
+    return yield* attachmentFailure(new Error(sourceText("error.backend.workspaceFileOutside")));
   }
-  const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error(sourceText("error.backend.workspacePathNotFile"));
+  const metadata = yield* attachmentCall(() => stat(resolvedPath));
+  if (!metadata.isFile()) return yield* attachmentFailure(new Error(sourceText("error.backend.workspacePathNotFile")));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size, insideWorkspace };
-}
+});
 
-async function realpathWithLegacyRoot(
+const realpathWithLegacyRoot = Effect.fn("Workspace.realpathWithLegacyRoot")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   candidatePath: string,
-): Promise<string> {
-  return await realpath(candidatePath).catch(async (error: unknown) => {
-    // The file may be one the provider's own transcript still names under this agent's pre-rename
-    // workspace root. The containment check in the caller is unchanged and runs on whatever comes back.
-    const rebased =
-      isRecord(error) && error.code === "ENOENT"
-        ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
-        : null;
-    if (rebased === null) throw error;
-    return await realpath(rebased);
-  });
-}
+): Effect.fn.Return<string, AttachmentOperationError> {
+  return yield* attachmentCall(() => realpath(candidatePath)).pipe(
+    Effect.catch((error) => {
+      // Apply the same containment check to paths from released provider transcripts.
+      const rebased =
+        isRecord(error.cause) && error.cause.code === "ENOENT"
+          ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
+          : null;
+      return rebased === null ? Effect.fail(error) : attachmentCall(() => realpath(rebased));
+    }),
+  );
+});

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import type { RemoteHostSummary } from "./central-auth-records";
@@ -179,9 +180,9 @@ describe("reconcileWebRtcHosts", () => {
 });
 
 it("refreshes cross-device memberships only while active and stops on shutdown", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   let active = false;
-  const refresh = vi.fn(async () => undefined);
+  const refresh = vi.fn(() => Effect.void);
   const stop = watchRemoteHostDirectory({ isActive: () => active, refresh });
   try {
     await vi.advanceTimersByTimeAsync(15 * 60_000);

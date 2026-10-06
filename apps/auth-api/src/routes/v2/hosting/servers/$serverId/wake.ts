@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { Effect } from "effect";
+import { runApiResponse } from "../../../../../server/effect-runtime";
 import {
   apiError,
   hostedServerErrorResponse,
@@ -10,15 +12,15 @@ import {
 export const Route = createFileRoute("/v2/hosting/servers/$serverId/wake")({
   server: {
     handlers: {
-      POST: async ({ request, params }) => {
-        try {
-          const user = await requestUser(request);
-          if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json(await requestHostedServerService().wake(user, params.serverId));
-        } catch (error) {
-          return hostedServerErrorResponse(error);
-        }
-      },
+      POST: ({ request, params }) =>
+        runApiResponse(
+          Effect.gen(function* () {
+            const user = yield* requestUser(request);
+            if (!user) return apiError(401, "unauthorized", "Sign in is required.");
+            return json(yield* requestHostedServerService().wake(user, params.serverId));
+          }),
+          hostedServerErrorResponse,
+        ),
     },
   },
 });

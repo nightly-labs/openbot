@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -72,9 +73,11 @@ function bind(options: {
       ...options.browser,
     },
     browserView: {
-      start: async (tabId) => {
-        liveView.started.push(tabId);
-      },
+      start: (tabId) =>
+        Effect.sync(() => {
+          liveView.started.push(tabId);
+          return undefined;
+        }),
       stop: unreached("stopLiveView"),
       sendInput: (input) => {
         liveView.input.push(input);
@@ -83,10 +86,11 @@ function bind(options: {
     remoteServers: {
       activeServerId: options.activeServerId,
       supportsCapability: (_serverId, capability) => (options.capabilities ?? []).includes(capability),
-      request: async (_serverId, path, decoder, init) => {
-        calls.push({ path, body: init?.body });
-        return decoder(options.answer?.(path));
-      },
+      request: (_serverId, path, decoder, init) =>
+        Effect.sync(() => {
+          calls.push({ path, body: init?.body });
+          return decoder(options.answer?.(path));
+        }),
     },
   };
   bound.clear();
@@ -98,7 +102,7 @@ function bind(options: {
 describe("the browser on a remote host", () => {
   it("keeps the panel's placement off the host's screen", async () => {
     delete process.env.ELECTRON_RENDERER_URL;
-    const setVisible = vi.fn(async () => undefined);
+    const setVisible = vi.fn(() => Effect.sync(() => undefined));
     const { calls } = bind({ activeServerId: REMOTE, browser: { setVisible } });
 
     await bound.get("setVisible")?.(APP_FRAME, {

@@ -1,11 +1,13 @@
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { Effect } from "effect";
 import { decodeJwt, exportJWK, generateKeyPair, importJWK, jwtVerify } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { AuthService } from "../src/server/auth-service";
 import { sha256 } from "../src/server/crypto";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
+import { runApiEffect } from "../src/server/effect-runtime";
 import {
   deliverPendingRemoteAuthEvents,
   notifyAccountProfileChanged,
@@ -107,9 +109,11 @@ describe("account profile invalidation outbox", () => {
             });
           },
         );
-        await notifyAccountProfileChanged(bindings, "owner", (delivery) => {
-          background = delivery;
-        });
+        await runApiEffect(
+          notifyAccountProfileChanged(bindings, "owner", (delivery) => {
+            background = runApiEffect(delivery);
+          }),
+        );
         expect(database.prepare("SELECT payload, attempts FROM remote_auth_events").all()).toEqual([
           { payload, attempts: 0 },
         ]);
@@ -125,10 +129,12 @@ describe("account profile invalidation outbox", () => {
         expect(database.prepare("SELECT payload, attempts FROM remote_auth_events").all()).toEqual([
           { payload, attempts: 1 },
         ]);
-        await deliverPendingRemoteAuthEvents(bindings, Date.now() + 3_600_000, async (_url, init) => {
-          expect(init?.body).toBe(payload);
-          return new Response(null, { status: 204 });
-        });
+        await runApiEffect(
+          deliverPendingRemoteAuthEvents(bindings, Date.now() + 3_600_000, async (_url, init) => {
+            expect(init?.body).toBe(payload);
+            return new Response(null, { status: 204 });
+          }),
+        );
         expect(database.prepare("SELECT payload FROM remote_auth_events").all()).toEqual([]);
       } finally {
         vi.unstubAllGlobals();
@@ -151,17 +157,19 @@ describe("RemoteTicketSigner", () => {
       keyId: "test-key",
     });
 
-    const result = await signer.issue({
-      sessionId: "session-1",
-      hostId: "host-1",
-      userId: "user-1",
-      membershipId: "member-1",
-      role: "member",
-      authEpoch: 3,
-      clientPublicKey: "client-public-key",
-      sessionExpiresAt: 1_900_086_400_000,
-      now: 1_900_000_000_000,
-    });
+    const result = await runApiEffect(
+      signer.issue({
+        sessionId: "session-1",
+        hostId: "host-1",
+        userId: "user-1",
+        membershipId: "member-1",
+        role: "member",
+        authEpoch: 3,
+        clientPublicKey: "client-public-key",
+        sessionExpiresAt: 1_900_086_400_000,
+        now: 1_900_000_000_000,
+      }),
+    );
     const key = await importJWK(publicJwk, "ES256");
     const verified = await jwtVerify(result.ticket, key, {
       audience: "openbot-remote",
@@ -192,16 +200,18 @@ describe("RemoteTicketSigner", () => {
       publicJwks: JSON.stringify({ keys: [publicJwk] }),
       keyId: "test-key",
     });
-    const result = await signer.issue({
-      sessionId: "session-1",
-      hostId: "host-1",
-      userId: "user-1",
-      membershipId: "member-1",
-      role: "member",
-      authEpoch: 1,
-      sessionExpiresAt: 1_900_000_030_000,
-      now: 1_900_000_000_000,
-    });
+    const result = await runApiEffect(
+      signer.issue({
+        sessionId: "session-1",
+        hostId: "host-1",
+        userId: "user-1",
+        membershipId: "member-1",
+        role: "member",
+        authEpoch: 1,
+        sessionExpiresAt: 1_900_000_030_000,
+        now: 1_900_000_000_000,
+      }),
+    );
     expect(result.expiresAt).toBe(1_900_000_030_000);
   });
 });
@@ -212,15 +222,15 @@ describe("Remote service authentication", () => {
     const body = '{"sessionId":"session-1"}';
     const timestamp = "1900000000";
     const signature = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("base64url");
-    await expect(verifyRemoteServiceSignature(secret, body, timestamp, signature, 1_900_000_000_000)).resolves.toBe(
-      true,
-    );
-    await expect(verifyRemoteServiceSignature(secret, body, timestamp, "invalid", 1_900_000_000_000)).resolves.toBe(
-      false,
-    );
-    await expect(verifyRemoteServiceSignature(secret, body, timestamp, signature, 1_900_001_000_000)).resolves.toBe(
-      false,
-    );
+    await expect(
+      runApiEffect(verifyRemoteServiceSignature(secret, body, timestamp, signature, 1_900_000_000_000)),
+    ).resolves.toBe(true);
+    await expect(
+      runApiEffect(verifyRemoteServiceSignature(secret, body, timestamp, "invalid", 1_900_000_000_000)),
+    ).resolves.toBe(false);
+    await expect(
+      runApiEffect(verifyRemoteServiceSignature(secret, body, timestamp, signature, 1_900_001_000_000)),
+    ).resolves.toBe(false);
   });
 });
 
@@ -247,9 +257,9 @@ describe("RemoteControlPlane", () => {
       const insert = database.prepare(
         "INSERT INTO auth_sessions(id, token_hash, user_id, created_at, last_used_at, expires_at) VALUES (?, ?, ?, 1, 1, 8640000000000000)",
       );
-      insert.run(currentId, await sha256("current-token"), "owner");
-      insert.run(targetId, await sha256("target-token"), "owner");
-      insert.run(strangerId, await sha256("stranger-token"), "stranger");
+      insert.run(currentId, await runApiEffect(sha256("current-token")), "owner");
+      insert.run(targetId, await runApiEffect(sha256("target-token")), "owner");
+      insert.run(strangerId, await runApiEffect(sha256("stranger-token")), "stranger");
       const db = sqliteD1(database);
       const repository = new D1AuthRepository(db);
       const delivered: unknown[] = [];
@@ -257,7 +267,7 @@ describe("RemoteControlPlane", () => {
       const service = new AuthService({
         repository,
         now: () => now,
-        delivery: { send: async () => {} },
+        delivery: { send: () => Effect.void },
         flushSessionRevocations: () =>
           deliverPendingRemoteAuthEvents(
             {
@@ -272,21 +282,23 @@ describe("RemoteControlPlane", () => {
             },
           ),
       });
-      expect(await service.listAccountSessions("current-token")).toEqual([
+      expect(await runApiEffect(service.listAccountSessions("current-token"))).toEqual([
         { sessionId: currentId, name: "Desktop", kind: "desktop", current: true, connectedAt: 1, lastActiveAt: now },
         { sessionId: targetId, name: "Desktop", kind: "desktop", current: false, connectedAt: 1, lastActiveAt: 1 },
       ]);
-      await expect(service.listAccountSessions("invalid-token")).rejects.toMatchObject({ status: 401 });
-      await expect(service.revokeAccountSession("invalid-token", targetId)).rejects.toMatchObject({ status: 401 });
-      await service.revokeAccountSession("stranger-token", targetId);
-      expect(await service.authenticate("target-token")).toMatchObject({ id: "owner" });
+      await expect(runApiEffect(service.listAccountSessions("invalid-token"))).rejects.toMatchObject({ status: 401 });
+      await expect(runApiEffect(service.revokeAccountSession("invalid-token", targetId))).rejects.toMatchObject({
+        status: 401,
+      });
+      await runApiEffect(service.revokeAccountSession("stranger-token", targetId));
+      expect(await runApiEffect(service.authenticate("target-token"))).toMatchObject({ id: "owner" });
       expect(delivered).toEqual([]);
-      await service.revokeAccountSession("current-token", targetId);
-      expect(await service.authenticate("target-token")).toBeNull();
-      expect((await service.listAccountSessions("current-token")).map((session) => session.sessionId)).toEqual([
-        currentId,
-      ]);
-      expect(await service.authenticate("stranger-token")).toMatchObject({ id: "stranger" });
+      await runApiEffect(service.revokeAccountSession("current-token", targetId));
+      expect(await runApiEffect(service.authenticate("target-token"))).toBeNull();
+      expect(
+        (await runApiEffect(service.listAccountSessions("current-token"))).map((session) => session.sessionId),
+      ).toEqual([currentId]);
+      expect(await runApiEffect(service.authenticate("stranger-token"))).toMatchObject({ id: "stranger" });
       expect(database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = 'live-desktop'").get()).toEqual({
         ended_at: now,
       });
@@ -312,7 +324,7 @@ describe("RemoteControlPlane", () => {
         INSERT INTO remote_hosts(host_id, owner_user_id, name, device_public_key, auth_epoch, created_at, updated_at) VALUES ('host-a', 'owner', 'Desktop A', 'public-key-a', 1, 1, 1);
         INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at) VALUES ('owner-member', 'host-a', 'owner', 'owner', 'active', 1, 1);
       `);
-      const host = { hostId: "host-a", fingerprint: await sha256("public-key-a") };
+      const host = { hostId: "host-a", fingerprint: await runApiEffect(sha256("public-key-a")) };
       const ticket = {
         ticketHash: "ticket-a",
         userId: "owner",
@@ -328,51 +340,57 @@ describe("RemoteControlPlane", () => {
         session: { id: "phone", token: "phone-token", expiresAt: 8_640_000_000_000_000 },
         device: { id: "phone-device", name: "Phone", platform: "ios" as const },
       };
-      await repository.replaceMobileAuthTicket(ticket);
+      await runApiEffect(repository.replaceMobileAuthTicket(ticket));
       database.exec("UPDATE remote_hosts SET device_public_key = 'substituted-key' WHERE host_id = 'host-a'");
-      await expect(repository.redeemMobileAuthTicket(redemption)).resolves.toBeNull();
+      await expect(runApiEffect(repository.redeemMobileAuthTicket(redemption))).resolves.toBeNull();
       database.exec("UPDATE remote_hosts SET device_public_key = 'public-key-a' WHERE host_id = 'host-a'");
-      await expect(repository.redeemMobileAuthTicket(redemption)).resolves.toMatchObject({
+      await expect(runApiEffect(repository.redeemMobileAuthTicket(redemption))).resolves.toMatchObject({
         host,
         sessionToken: "phone-token",
       });
-      expect(await repository.listAccountSessions("owner", "phone-token", 1001)).toEqual([
+      expect(await runApiEffect(repository.listAccountSessions("owner", "phone-token", 1001))).toEqual([
         { sessionId: "phone", name: "Phone", kind: "mobile", current: true, connectedAt: 1001, lastActiveAt: 1001 },
       ]);
-      await expect(repository.authenticateMobileSession("phone-token", 10_000_000_000_000)).resolves.toMatchObject({
+      await expect(
+        runApiEffect(repository.authenticateMobileSession("phone-token", 10_000_000_000_000)),
+      ).resolves.toMatchObject({
         id: "owner",
       });
       database.exec(`INSERT INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at)
         VALUES ('live-phone', 'host-a', 'owner', 'owner-member', 1001, 8640000000000000)`);
-      await expect(repository.revokeMobileAuthDevice("other-user", "phone", 1002)).resolves.toBe(false);
+      await expect(runApiEffect(repository.revokeMobileAuthDevice("other-user", "phone", 1002))).resolves.toBe(false);
       expect(database.prepare("SELECT ended_at FROM remote_sessions").get()).toEqual({ ended_at: null });
-      await expect(repository.revokeMobileAuthDevice("owner", "phone", 1003)).resolves.toBe(true);
-      await expect(repository.authenticateMobileSession("phone-token", 1004)).resolves.toBeNull();
+      await expect(runApiEffect(repository.revokeMobileAuthDevice("owner", "phone", 1003))).resolves.toBe(true);
+      await expect(runApiEffect(repository.authenticateMobileSession("phone-token", 1004))).resolves.toBeNull();
       expect(database.prepare("SELECT ended_at FROM remote_sessions").get()).toEqual({ ended_at: 1003 });
       const delivered: unknown[] = [];
-      await deliverPendingRemoteAuthEvents(
-        {
-          DB: db,
-          REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
-          REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
-        },
-        1004,
-        async (_url, init) => {
-          delivered.push(JSON.parse(String(init?.body)));
-          return new Response(null, { status: 204 });
-        },
+      await runApiEffect(
+        deliverPendingRemoteAuthEvents(
+          {
+            DB: db,
+            REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
+            REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
+          },
+          1004,
+          async (_url, init) => {
+            delivered.push(JSON.parse(String(init?.body)));
+            return new Response(null, { status: 204 });
+          },
+        ),
       );
       expect(delivered).toEqual([{ type: "remote-session-ended", hostId: "host-a", sessionId: "live-phone" }]);
       expect(database.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").get()).toEqual({ count: 0 });
-      await repository.replaceMobileAuthTicket({ ...ticket, ticketHash: "ticket-b" });
-      await repository.redeemMobileAuthTicket({
-        ...redemption,
-        ticketHash: "ticket-b",
-        session: { ...redemption.session, id: "phone-2", token: "phone-token-2" },
-      });
+      await runApiEffect(repository.replaceMobileAuthTicket({ ...ticket, ticketHash: "ticket-b" }));
+      await runApiEffect(
+        repository.redeemMobileAuthTicket({
+          ...redemption,
+          ticketHash: "ticket-b",
+          session: { ...redemption.session, id: "phone-2", token: "phone-token-2" },
+        }),
+      );
       database.exec(`INSERT INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at)
         VALUES ('live-phone-2', 'host-a', 'owner', 'owner-member', 1001, 8640000000000000)`);
-      await expect(repository.revokeMobileSession("phone-token-2", 1005)).resolves.toBe(true);
+      await expect(runApiEffect(repository.revokeMobileSession("phone-token-2", 1005))).resolves.toBe(true);
       expect(database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = 'live-phone-2'").get()).toEqual({
         ended_at: 1005,
       });
@@ -444,13 +462,15 @@ describe("RemoteControlPlane", () => {
       { now: () => 1_000 },
     );
     database.prepare("UPDATE remote_hosts SET device_public_key = 'host-public-key' WHERE host_id = 'host-1'").run();
-    await expect(controlPlane.previewInvite(token)).resolves.toMatchObject({
+    await expect(runApiEffect(controlPlane.previewInvite(token))).resolves.toMatchObject({
       hostId: "host-1",
       devicePublicKey: "host-public-key",
     });
 
     await expect(
-      controlPlane.acceptInvite({ id: "member", email: "member@example.com", name: null, avatarUrl: null }, token),
+      runApiEffect(
+        controlPlane.acceptInvite({ id: "member", email: "member@example.com", name: null, avatarUrl: null }, token),
+      ),
     ).resolves.toEqual({ hostId: "host-1", membershipId: "existing-member", role: "member" });
     expect(
       database.prepare("SELECT role FROM remote_memberships WHERE membership_id = 'existing-member'").get(),
@@ -531,52 +551,71 @@ describe("RemoteControlPlane", () => {
       fetch: webhookFetch,
     });
     const owner = { id: "owner", email: "owner@example.com", name: null, avatarUrl: null };
-    const firstRegistration = await controlPlane.registerHost(owner, {
-      hostId: "host-1",
-      name: "Studio Mac",
-      ownerMembershipId: "local-owner",
-      devicePublicKey: "public-key-a",
-      rotateCredential: false,
-    });
-    const registration = await controlPlane.registerHost(owner, {
-      hostId: "host-1",
-      name: "Studio Mac",
-      ownerMembershipId: "local-owner",
-      devicePublicKey: "public-key-a",
-    });
+    const firstRegistration = await runApiEffect(
+      controlPlane.registerHost(owner, {
+        hostId: "host-1",
+        name: "Studio Mac",
+        ownerMembershipId: "local-owner",
+        devicePublicKey: "public-key-a",
+        rotateCredential: false,
+      }),
+    );
+    const registration = await runApiEffect(
+      controlPlane.registerHost(owner, {
+        hostId: "host-1",
+        name: "Studio Mac",
+        ownerMembershipId: "local-owner",
+        devicePublicKey: "public-key-a",
+      }),
+    );
     if (!firstRegistration.machineToken || !registration.machineToken) {
       throw new Error("The rotated host credential is missing.");
     }
     expect(registration.authEpoch).toBe(firstRegistration.authEpoch + 1);
-    const metadataUpdate = await controlPlane.registerHost(owner, {
-      hostId: "host-1",
-      name: "Renamed Studio Mac",
-      ownerMembershipId: "local-owner",
-      devicePublicKey: "public-key-a",
-      rotateCredential: false,
-      machineToken: registration.machineToken,
-    });
+    const metadataUpdate = await runApiEffect(
+      controlPlane.registerHost(owner, {
+        hostId: "host-1",
+        name: "Renamed Studio Mac",
+        ownerMembershipId: "local-owner",
+        devicePublicKey: "public-key-a",
+        rotateCredential: false,
+        machineToken: registration.machineToken,
+      }),
+    );
     expect(metadataUpdate).toMatchObject({ authEpoch: registration.authEpoch, machineToken: null });
     // Republishing a host this account already had rotates a credential and changes no server
     // list, so none of these three registrations tells the owner's other devices anything.
     expect(webhookBodies.filter((body) => body.includes("account-servers-changed"))).toEqual([]);
-    const mobileHost = { hostId: "host-1", fingerprint: await sha256("public-key-a") };
-    await expect(controlPlane.validateMobileConnectHost(owner.id, mobileHost)).resolves.toBeUndefined();
-    await expect(controlPlane.validateMobileConnectHost("another-owner", mobileHost)).rejects.toMatchObject({
+    const mobileHost = { hostId: "host-1", fingerprint: await runApiEffect(sha256("public-key-a")) };
+    await expect(runApiEffect(controlPlane.validateMobileConnectHost(owner.id, mobileHost))).resolves.toBeUndefined();
+    await expect(
+      runApiEffect(controlPlane.validateMobileConnectHost("another-owner", mobileHost)),
+    ).rejects.toMatchObject({
       code: "mobile_host_mismatch",
     });
     await expect(
-      controlPlane.validateMobileConnectHost(owner.id, { ...mobileHost, fingerprint: await sha256("another-key") }),
+      runApiEffect(
+        controlPlane.validateMobileConnectHost(owner.id, {
+          ...mobileHost,
+          fingerprint: await runApiEffect(sha256("another-key")),
+        }),
+      ),
     ).rejects.toMatchObject({ code: "mobile_host_mismatch" });
-    await expect(controlPlane.issueHostTicket("host-1", registration.machineToken)).resolves.toMatchObject({
+    await expect(
+      runApiEffect(controlPlane.issueHostTicket("host-1", registration.machineToken)),
+    ).resolves.toMatchObject({
       ticket: expect.any(String),
     });
-    await expect(controlPlane.issueHostTicket("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
+    await expect(
+      runApiEffect(controlPlane.issueHostTicket("host-1", firstRegistration.machineToken)),
+    ).rejects.toMatchObject({
       code: "host_unauthorized",
     });
     // A Slack route ticket routes a workspace's messages to a host, so only that host's credential
     // gets one, and it names only the workspaces linked to that host.
-    await expect(controlPlane.issueSlackRoute("host-1", firstRegistration.machineToken)).rejects.toMatchObject({
+    await expect(
+      runApiEffect(controlPlane.issueSlackRoute("host-1", firstRegistration.machineToken)),
+    ).rejects.toMatchObject({
       code: "host_unauthorized",
     });
     database
@@ -585,7 +624,7 @@ describe("RemoteControlPlane", () => {
          VALUES ('T1', 'host-1', 'owner', 'A1', 'U1', 1)`,
       )
       .run();
-    const route = await controlPlane.issueSlackRoute("host-1", registration.machineToken);
+    const route = await runApiEffect(controlPlane.issueSlackRoute("host-1", registration.machineToken));
     expect(route.teams).toEqual(["T1"]);
     expect(decodeJwt(route.ticket)).toMatchObject({
       aud: "openbot-slack-route",
@@ -593,79 +632,93 @@ describe("RemoteControlPlane", () => {
       teams: [{ id: "T1", appId: "A1", linkedAt: 1 }],
     });
     await expect(
-      controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1"),
+      runApiEffect(controlPlane.disconnectSlackWorkspace("host-1", firstRegistration.machineToken, "T1")),
     ).rejects.toMatchObject({ code: "host_unauthorized" });
     // After Signal starts, it keeps only the links that D1 still has.
     await expect(
-      controlPlane.validateSlackRoute({
-        hostId: "host-1",
-        teams: [
-          { id: "T1", appId: "A1", linkedAt: 1 },
-          { id: "T2", appId: "A1", linkedAt: 1 },
-        ],
-      }),
+      runApiEffect(
+        controlPlane.validateSlackRoute({
+          hostId: "host-1",
+          teams: [
+            { id: "T1", appId: "A1", linkedAt: 1 },
+            { id: "T2", appId: "A1", linkedAt: 1 },
+          ],
+        }),
+      ),
     ).resolves.toEqual(["T1"]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 0 }] }),
+      runApiEffect(
+        controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 0 }] }),
+      ),
     ).resolves.toEqual([]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-2", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+      runApiEffect(
+        controlPlane.validateSlackRoute({ hostId: "host-2", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+      ),
     ).resolves.toEqual([]);
     // Another app's link to the same workspace is not this one.
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A2", linkedAt: 1 }] }),
+      runApiEffect(
+        controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A2", linkedAt: 1 }] }),
+      ),
     ).resolves.toEqual([]);
     const revocations = () =>
       webhookBodies.map((body) => JSON.parse(body)).filter((event) => event.type === "slack-route-revoked");
-    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
-    expect((await controlPlane.issueSlackRoute("host-1", registration.machineToken)).teams).toEqual([]);
+    await runApiEffect(controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1"));
+    expect((await runApiEffect(controlPlane.issueSlackRoute("host-1", registration.machineToken))).teams).toEqual([]);
     // Signal drops the route, so the host cannot keep the workspace with the ticket it holds.
     expect(revocations()).toEqual([
       { type: "slack-route-revoked", appId: "A1", teamId: "T1", through: expect.any(Number) },
     ]);
     await expect(
-      controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+      runApiEffect(
+        controlPlane.validateSlackRoute({ hostId: "host-1", teams: [{ id: "T1", appId: "A1", linkedAt: 1 }] }),
+      ),
     ).resolves.toEqual([]);
-    await controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1");
+    await runApiEffect(controlPlane.disconnectSlackWorkspace("host-1", registration.machineToken, "T1"));
     expect(revocations()).toHaveLength(1);
     expect(database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       membership_id: "host-1:owner",
     });
-    const invite = await controlPlane.createInvite(owner, { hostId: "host-1", role: "member" });
-    await expect(controlPlane.acceptInvite(owner, invite.token)).rejects.toMatchObject({
+    const invite = await runApiEffect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" }));
+    await expect(runApiEffect(controlPlane.acceptInvite(owner, invite.token))).rejects.toMatchObject({
       code: "owner_membership_protected",
     });
     expect(database.prepare("SELECT role FROM remote_memberships WHERE user_id = 'owner'").get()).toEqual({
       role: "owner",
     });
 
-    const session = await controlPlane.startSession(owner.id, "host-1", "owner-auth");
-    await expect(controlPlane.startSession(owner.id, "host-1", "owner-auth")).resolves.toEqual(session);
+    const session = await runApiEffect(controlPlane.startSession(owner.id, "host-1", "owner-auth"));
+    await expect(runApiEffect(controlPlane.startSession(owner.id, "host-1", "owner-auth"))).resolves.toEqual(session);
     database
       .prepare("INSERT INTO auth_sessions(token_hash, user_id, expires_at) VALUES ('other-phone', 'owner', 5000)")
       .run();
-    const otherPhone = await controlPlane.startSession(owner.id, "host-1", "other-phone");
+    const otherPhone = await runApiEffect(controlPlane.startSession(owner.id, "host-1", "other-phone"));
     expect(otherPhone.sessionId).not.toBe(session.sessionId);
     await expect(
-      controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "other-phone"),
+      runApiEffect(controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "other-phone")),
     ).rejects.toMatchObject({ code: "session_inactive" });
-    await expect(controlPlane.endSession(owner.id, session.sessionId, "other-phone")).rejects.toMatchObject({
+    await expect(
+      runApiEffect(controlPlane.endSession(owner.id, session.sessionId, "other-phone")),
+    ).rejects.toMatchObject({
       code: "session_inactive",
     });
     await expect(
-      controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "owner-auth"),
+      runApiEffect(controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "owner-auth")),
     ).resolves.toMatchObject({ ticket: expect.any(String) });
-    await controlPlane.endAccountSession(owner.id, "other-phone");
-    await expect(controlPlane.issueSessionTicket(owner.id, otherPhone.sessionId, "public-key")).rejects.toMatchObject({
+    await runApiEffect(controlPlane.endAccountSession(owner.id, "other-phone"));
+    await expect(
+      runApiEffect(controlPlane.issueSessionTicket(owner.id, otherPhone.sessionId, "public-key")),
+    ).rejects.toMatchObject({
       code: "session_inactive",
     });
-    await expect(controlPlane.startSession(owner.id, "host-1", "owner-auth")).resolves.toEqual(session);
+    await expect(runApiEffect(controlPlane.startSession(owner.id, "host-1", "owner-auth"))).resolves.toEqual(session);
     database
       .prepare("INSERT INTO auth_sessions(token_hash, user_id, expires_at) VALUES ('repaired-phone', 'owner', 5000)")
       .run();
-    const repaired = await controlPlane.startSession(owner.id, "host-1", "repaired-phone");
+    const repaired = await runApiEffect(controlPlane.startSession(owner.id, "host-1", "repaired-phone"));
     expect(repaired.sessionId).not.toBe(otherPhone.sessionId);
-    await expect(controlPlane.startSession(owner.id, "host-1", "owner-auth")).resolves.toEqual(session);
+    await expect(runApiEffect(controlPlane.startSession(owner.id, "host-1", "owner-auth"))).resolves.toEqual(session);
     const claims = {
       sessionId: session.sessionId,
       hostId: "host-1",
@@ -675,13 +728,13 @@ describe("RemoteControlPlane", () => {
       authEpoch: registration.authEpoch,
       sessionExpiresAt: session.expiresAt / 1_000,
     };
-    await expect(controlPlane.validateResumeClaims(claims)).resolves.toBe(true);
+    await expect(runApiEffect(controlPlane.validateResumeClaims(claims))).resolves.toBe(true);
     webhookAvailable = false;
-    await controlPlane.endSession(owner.id, session.sessionId);
-    await expect(controlPlane.validateResumeClaims(claims)).resolves.toBe(false);
+    await runApiEffect(controlPlane.endSession(owner.id, session.sessionId));
+    await expect(runApiEffect(controlPlane.validateResumeClaims(claims))).resolves.toBe(false);
     expect(database.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").get()).toEqual({ count: 1 });
     webhookAvailable = true;
-    await deliverPendingRemoteAuthEvents(bindings, 61_001, webhookFetch);
+    await runApiEffect(deliverPendingRemoteAuthEvents(bindings, 61_001, webhookFetch));
     expect(database.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").get()).toEqual({ count: 0 });
     expect(webhookBodies).toContain(
       JSON.stringify({ type: "remote-session-ended", hostId: "host-1", sessionId: session.sessionId }),
@@ -700,29 +753,33 @@ describe("RemoteControlPlane", () => {
          ) VALUES ('revoked-membership', 'host-1', 'revoked-member', 'member', 'revoked', 1, 1)`,
       )
       .run();
-    await controlPlane.changeMembership(owner.id, {
-      hostId: "host-1",
-      membershipId: "revoked-membership",
-      role: "admin",
-    });
+    await runApiEffect(
+      controlPlane.changeMembership(owner.id, {
+        hostId: "host-1",
+        membershipId: "revoked-membership",
+        role: "admin",
+      }),
+    );
     expect(
       database.prepare("SELECT role, status FROM remote_memberships WHERE membership_id = 'revoked-membership'").get(),
     ).toEqual({ role: "admin", status: "revoked" });
-    await controlPlane.changeMembership(owner.id, {
-      hostId: "host-1",
-      membershipId: "revoked-membership",
-      role: "admin",
-      reactivate: true,
-    });
+    await runApiEffect(
+      controlPlane.changeMembership(owner.id, {
+        hostId: "host-1",
+        membershipId: "revoked-membership",
+        role: "admin",
+        reactivate: true,
+      }),
+    );
     expect(
       database.prepare("SELECT status FROM remote_memberships WHERE membership_id = 'revoked-membership'").get(),
     ).toEqual({ status: "active" });
-    const memberSession = await controlPlane.startSession("revoked-member", "host-1", "member-auth");
-    await controlPlane.endSession(owner.id, memberSession.sessionId);
+    const memberSession = await runApiEffect(controlPlane.startSession("revoked-member", "host-1", "member-auth"));
+    await runApiEffect(controlPlane.endSession(owner.id, memberSession.sessionId));
     expect(
       database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = ?").get(memberSession.sessionId),
     ).toEqual({ ended_at: 1_000 });
-    const currentAuthEpoch = (await controlPlane.listHosts(owner.id))[0]?.authEpoch;
+    const currentAuthEpoch = (await runApiEffect(controlPlane.listHosts(owner.id)))[0]?.authEpoch;
     if (currentAuthEpoch === undefined) throw new Error("The host auth epoch is missing.");
     const hostClaims = {
       sessionId: "host-host-1",
@@ -733,25 +790,31 @@ describe("RemoteControlPlane", () => {
       authEpoch: currentAuthEpoch,
       sessionExpiresAt: 100,
     };
-    await expect(controlPlane.validateResumeClaims({ ...hostClaims, authEpoch: currentAuthEpoch - 1 })).resolves.toBe(
-      false,
-    );
+    await expect(
+      runApiEffect(controlPlane.validateResumeClaims({ ...hostClaims, authEpoch: currentAuthEpoch - 1 })),
+    ).resolves.toBe(false);
     expect(database.prepare("SELECT auth_epoch FROM remote_hosts WHERE host_id = 'host-1'").get()).toEqual({
       auth_epoch: currentAuthEpoch,
     });
-    await expect(controlPlane.validateResumeClaims({ ...hostClaims, authEpoch: currentAuthEpoch })).resolves.toBe(true);
+    await expect(
+      runApiEffect(controlPlane.validateResumeClaims({ ...hostClaims, authEpoch: currentAuthEpoch })),
+    ).resolves.toBe(true);
 
     await Promise.all([
-      controlPlane.changeMembership(owner.id, {
-        hostId: "host-1",
-        membershipId: "revoked-membership",
-        role: "member",
-      }),
-      controlPlane.changeMembership(owner.id, {
-        hostId: "host-1",
-        membershipId: "revoked-membership",
-        role: "admin",
-      }),
+      runApiEffect(
+        controlPlane.changeMembership(owner.id, {
+          hostId: "host-1",
+          membershipId: "revoked-membership",
+          role: "member",
+        }),
+      ),
+      runApiEffect(
+        controlPlane.changeMembership(owner.id, {
+          hostId: "host-1",
+          membershipId: "revoked-membership",
+          role: "admin",
+        }),
+      ),
     ]);
     expect(database.prepare("SELECT auth_epoch FROM remote_hosts WHERE host_id = 'host-1'").get()).toEqual({
       auth_epoch: currentAuthEpoch + 2,
@@ -759,10 +822,12 @@ describe("RemoteControlPlane", () => {
     expect(webhookBodies).toContain(
       JSON.stringify({ type: "remote-session-ended", hostId: "host-1", sessionId: memberSession.sessionId }),
     );
-    const logoutSession = await controlPlane.startSession("revoked-member", "host-1", "member-auth");
+    const logoutSession = await runApiEffect(controlPlane.startSession("revoked-member", "host-1", "member-auth"));
     webhookAvailable = false;
-    await controlPlane.endAccountSession("revoked-member", "member-auth");
-    await expect(controlPlane.startSession("revoked-member", "host-1", "member-auth")).rejects.toMatchObject({
+    await runApiEffect(controlPlane.endAccountSession("revoked-member", "member-auth"));
+    await expect(
+      runApiEffect(controlPlane.startSession("revoked-member", "host-1", "member-auth")),
+    ).rejects.toMatchObject({
       code: "auth_session_revoked",
     });
     expect(
@@ -781,12 +846,14 @@ describe("RemoteControlPlane", () => {
       payload: JSON.stringify({ type: "remote-session-ended", hostId: "host-1", sessionId: logoutSession.sessionId }),
     });
     webhookAvailable = true;
-    await deliverPendingRemoteAuthEvents(bindings, 61_001, webhookFetch);
-    await controlPlane.changeMembership("revoked-member", {
-      hostId: "host-1",
-      membershipId: "revoked-membership",
-      revoke: true,
-    });
+    await runApiEffect(deliverPendingRemoteAuthEvents(bindings, 61_001, webhookFetch));
+    await runApiEffect(
+      controlPlane.changeMembership("revoked-member", {
+        hostId: "host-1",
+        membershipId: "revoked-membership",
+        revoke: true,
+      }),
+    );
     expect(
       database.prepare("SELECT status FROM remote_memberships WHERE membership_id = 'revoked-membership'").get(),
     ).toEqual({ status: "revoked" });
@@ -802,16 +869,20 @@ describe("RemoteControlPlane", () => {
       avatarUrl: null,
     };
     const registrations = await Promise.allSettled([
-      controlPlane.registerHost(owner, {
-        hostId: "race-host",
-        name: "Owner host",
-        ownerMembershipId: "race-owner-membership",
-      }),
-      controlPlane.registerHost(competingOwner, {
-        hostId: "race-host",
-        name: "Competing host",
-        ownerMembershipId: "race-competing-membership",
-      }),
+      runApiEffect(
+        controlPlane.registerHost(owner, {
+          hostId: "race-host",
+          name: "Owner host",
+          ownerMembershipId: "race-owner-membership",
+        }),
+      ),
+      runApiEffect(
+        controlPlane.registerHost(competingOwner, {
+          hostId: "race-host",
+          name: "Competing host",
+          ownerMembershipId: "race-competing-membership",
+        }),
+      ),
     ]);
     expect(registrations.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(registrations.filter((result) => result.status === "rejected")).toHaveLength(1);
@@ -821,7 +892,7 @@ describe("RemoteControlPlane", () => {
     }
     if (!successfulRegistration.value.machineToken) throw new Error("The winning host credential is missing.");
     await expect(
-      controlPlane.issueHostTicket("race-host", successfulRegistration.value.machineToken),
+      runApiEffect(controlPlane.issueHostTicket("race-host", successfulRegistration.value.machineToken)),
     ).resolves.toMatchObject({ ticket: expect.any(String) });
     expect(
       database
@@ -844,7 +915,9 @@ describe("RemoteControlPlane", () => {
        ) VALUES (?, 'host-1', ?, NULL, 'member', 'owner', 999999999, 1)`,
     );
     for (let index = 0; index < 49; index += 1) insertInvite.run(`limit-${index}`, `limit-hash-${index}`);
-    await expect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })).rejects.toMatchObject({
+    await expect(
+      runApiEffect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })),
+    ).rejects.toMatchObject({
       code: "invite_limit_reached",
     });
   });
@@ -886,7 +959,7 @@ describe("RemoteControlPlane", () => {
         {
           now: () => now,
           schedule: (delivery) => {
-            scheduled.push(delivery);
+            scheduled.push(runApiEffect(delivery));
           },
           // Signal answers only after the account has its answer, so an end that waited never returns.
           fetch: async () => {
@@ -895,8 +968,8 @@ describe("RemoteControlPlane", () => {
           },
         },
       );
-      const session = await controlPlane.startSession("owner", "host-1", "owner-auth");
-      await controlPlane.endSession("owner", session.sessionId, "owner-auth");
+      const session = await runApiEffect(controlPlane.startSession("owner", "host-1", "owner-auth"));
+      await runApiEffect(controlPlane.endSession("owner", session.sessionId, "owner-auth"));
 
       expect(
         database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = ?").get(session.sessionId),
@@ -1009,57 +1082,69 @@ describe("permanent invitation links", () => {
       const bob = { id: "bob", email: "bob@example.com", name: null, avatarUrl: null };
 
       await expect(
-        controlPlane.createInvite(owner, {
-          hostId: "host-1",
-          role: "member",
-          email: "alice@example.com",
-          permanent: true,
-        }),
+        runApiEffect(
+          controlPlane.createInvite(owner, {
+            hostId: "host-1",
+            role: "member",
+            email: "alice@example.com",
+            permanent: true,
+          }),
+        ),
       ).rejects.toMatchObject({ status: 400 });
       await expect(
-        controlPlane.createInvite(owner, {
-          hostId: "host-1",
-          role: "member",
-          expiresInSeconds: 3_600,
-          permanent: true,
-        }),
+        runApiEffect(
+          controlPlane.createInvite(owner, {
+            hostId: "host-1",
+            role: "member",
+            expiresInSeconds: 3_600,
+            permanent: true,
+          }),
+        ),
       ).rejects.toMatchObject({ status: 400 });
 
-      const invite = await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
+      const invite = await runApiEffect(
+        controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true }),
+      );
       expect(invite).toMatchObject({ permanent: true, useCount: 0 });
       expect(invite.expiresAt).toBeGreaterThan(8_000_000_000_000_000);
-      await expect(controlPlane.previewInvite(invite.token)).resolves.toMatchObject({
+      await expect(runApiEffect(controlPlane.previewInvite(invite.token))).resolves.toMatchObject({
         permanent: true,
         emailBound: false,
       });
 
-      await expect(controlPlane.acceptInvite(alice, invite.token)).resolves.toMatchObject({
+      await expect(runApiEffect(controlPlane.acceptInvite(alice, invite.token))).resolves.toMatchObject({
         hostId: "host-1",
         role: "member",
       });
-      await expect(controlPlane.acceptInvite(bob, invite.token)).resolves.toMatchObject({
+      await expect(runApiEffect(controlPlane.acceptInvite(bob, invite.token))).resolves.toMatchObject({
         hostId: "host-1",
         role: "member",
       });
       expect(
         database.prepare("SELECT use_count, used_at FROM remote_invites WHERE invite_id = ?").get(invite.inviteId),
       ).toEqual({ use_count: 2, used_at: null });
-      await expect(controlPlane.listInvites("owner", "host-1")).resolves.toEqual([
+      await expect(runApiEffect(controlPlane.listInvites("owner", "host-1"))).resolves.toEqual([
         expect.objectContaining({ inviteId: invite.inviteId, permanent: true, useCount: 2, usedAt: null }),
       ]);
 
       for (let index = 1; index < 5; index += 1) {
-        await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
+        await runApiEffect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true }));
       }
       await expect(
-        controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true }),
+        runApiEffect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true })),
       ).rejects.toMatchObject({ code: "invite_limit_reached" });
       // Permanent links do not consume the single-use budget.
-      await expect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })).resolves.toBeDefined();
+      await expect(
+        runApiEffect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })),
+      ).resolves.toBeDefined();
 
-      await controlPlane.revokeInvite("owner", invite.inviteId);
-      await expect(controlPlane.previewInvite(invite.token)).rejects.toMatchObject({ code: "invite_invalid" });
-      await expect(controlPlane.acceptInvite(alice, invite.token)).rejects.toMatchObject({ code: "invite_invalid" });
+      await runApiEffect(controlPlane.revokeInvite("owner", invite.inviteId));
+      await expect(runApiEffect(controlPlane.previewInvite(invite.token))).rejects.toMatchObject({
+        code: "invite_invalid",
+      });
+      await expect(runApiEffect(controlPlane.acceptInvite(alice, invite.token))).rejects.toMatchObject({
+        code: "invite_invalid",
+      });
     } finally {
       database.close();
     }
@@ -1121,12 +1206,14 @@ describe("member limits per plan", () => {
              ON CONFLICT(stripe_subscription_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
           )
           .run(subscriptionId, userId, plan, status, Date.now());
-      const limit = async () => (await controlPlane.listHosts("owner"))[0]?.memberLimit;
-      const invite = await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
+      const limit = async () => (await runApiEffect(controlPlane.listHosts("owner")))[0]?.memberLimit;
+      const invite = await runApiEffect(
+        controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true }),
+      );
 
       // No plan: the owner and two members.
-      for (const id of users.slice(0, 2)) await controlPlane.acceptInvite(member(id), invite.token);
-      await expect(controlPlane.acceptInvite(member("user-3"), invite.token)).rejects.toMatchObject({
+      for (const id of users.slice(0, 2)) await runApiEffect(controlPlane.acceptInvite(member(id), invite.token));
+      await expect(runApiEffect(controlPlane.acceptInvite(member("user-3"), invite.token))).rejects.toMatchObject({
         code: "member_limit_reached",
         message: "A host can have up to 3 members.",
       });
@@ -1139,8 +1226,8 @@ describe("member limits per plan", () => {
       // Standard: ten active members, owner included.
       subscribe("sub_owner", "owner", "standard", "active");
       expect(await limit()).toBe(10);
-      for (const id of users.slice(2, 9)) await controlPlane.acceptInvite(member(id), invite.token);
-      await expect(controlPlane.acceptInvite(member("user-10"), invite.token)).rejects.toMatchObject({
+      for (const id of users.slice(2, 9)) await runApiEffect(controlPlane.acceptInvite(member(id), invite.token));
+      await expect(runApiEffect(controlPlane.acceptInvite(member("user-10"), invite.token))).rejects.toMatchObject({
         code: "member_limit_reached",
         message: "A host can have up to 10 members.",
       });
@@ -1154,28 +1241,34 @@ describe("member limits per plan", () => {
       const membershipId = String(
         database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'user-9'").get()?.membership_id,
       );
-      await controlPlane.changeMembership("owner", {
-        hostId: "host-1",
-        membershipId,
-        role: "admin",
-      });
-      await controlPlane.changeMembership("owner", {
-        hostId: "host-1",
-        membershipId,
-        revoke: true,
-      });
-      await expect(
+      await runApiEffect(
         controlPlane.changeMembership("owner", {
           hostId: "host-1",
           membershipId,
-          reactivate: true,
+          role: "admin",
         }),
+      );
+      await runApiEffect(
+        controlPlane.changeMembership("owner", {
+          hostId: "host-1",
+          membershipId,
+          revoke: true,
+        }),
+      );
+      await expect(
+        runApiEffect(
+          controlPlane.changeMembership("owner", {
+            hostId: "host-1",
+            membershipId,
+            reactivate: true,
+          }),
+        ),
       ).rejects.toMatchObject({ code: "member_limit_reached" });
       expect(active()).toEqual({ count: 9 });
 
       // Each active member's devices read the server list again after a plan change.
       database.exec("DELETE FROM remote_auth_events");
-      await controlPlane.planChanged("host-1");
+      await runApiEffect(controlPlane.planChanged("host-1"));
       expect(
         database
           .prepare("SELECT json_extract(payload, '$.userId') AS userId FROM remote_auth_events ORDER BY userId")
