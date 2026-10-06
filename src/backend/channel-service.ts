@@ -1064,7 +1064,10 @@ export class ChannelService {
    * to give back, or when a transfer is pending on it. A task whose routine drops late work is
    * cancelled instead.
    */
-  requeueForLimit(deliveryId: string): boolean {
+  readonly requeueForLimit = Effect.fn("ChannelService.requeueForLimit")(function* (
+    this: ChannelService,
+    deliveryId: string,
+  ) {
     const assignment = this.store.assignmentForDelivery(deliveryId);
     if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
     const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
@@ -1077,10 +1080,10 @@ export class ChannelService {
     });
     this.resolveAssignmentTerminal(assignment.id);
     this.publish(assignment.channelId);
-    // The drain hook that calls this is synchronous, so the owned scope runs the release.
-    this.#dispatchEvent(this.#releaseHeldAgents());
+    // The drain that calls this must not wait for the release.
+    yield* this.#forkEvent(this.#releaseHeldAgents());
     return true;
-  }
+  });
 
   /** A queued task that a spent plan holds, and whose routine drops late work, is cancelled. */
   #dropForLimit(channelId: string, task: ChannelTask): void {
@@ -1347,15 +1350,24 @@ export class ChannelService {
 
   /** Native event callbacks and synchronous hooks own this work; stop drains it before closing the scope. */
   #dispatchEvent(operation: Effect.Effect<void, ChannelOperationError>): void {
-    const fiber = Effect.runSync(
-      Effect.forkIn(
-        operation.pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause)))),
-        this.#scope,
-        { startImmediately: true },
+    Effect.runSync(this.#forkEvent(operation));
+  }
+
+  /** Runs event work in the owned scope; `stop` waits for it. */
+  #forkEvent(operation: Effect.Effect<void, ChannelOperationError>): Effect.Effect<void> {
+    return Effect.forkIn(
+      operation.pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause)))),
+      this.#scope,
+      { startImmediately: true },
+    ).pipe(
+      Effect.tap((fiber) =>
+        Effect.sync(() => {
+          this.#events.add(fiber);
+          fiber.addObserver(() => this.#events.delete(fiber));
+        }),
       ),
+      Effect.asVoid,
     );
-    this.#events.add(fiber);
-    fiber.addObserver(() => this.#events.delete(fiber));
   }
 
   private capture(snapshot: ConversationSnapshot): boolean {

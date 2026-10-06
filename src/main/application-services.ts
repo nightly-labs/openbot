@@ -1,5 +1,5 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
-import { Effect } from "effect";
+import { Effect, Fiber } from "effect";
 import { AgentRemovalFailed } from "../backend/agent/agent-removal";
 import { HostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
@@ -104,7 +104,7 @@ import {
   startDevelopmentRemoteRole,
 } from "./development-remote-bootstrap";
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
-import { DynamicIslandWindowController } from "./dynamic-island-window";
+import { DynamicIslandFailed, DynamicIslandWindowController } from "./dynamic-island-window";
 import { githubAppConfig } from "./github-connector-config";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
@@ -434,11 +434,16 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
-    performCriticalAction: async (action) => {
-      if (!criticalActionTargets) throw new Error(sourceText("error.app.notReady"));
-      const { agents, remoteServers } = criticalActionTargets;
-      await runCauseEffect(performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid));
-    },
+    performCriticalAction: (action) =>
+      Effect.suspend(() => {
+        if (!criticalActionTargets) {
+          return Effect.fail(new DynamicIslandFailed({ cause: new Error(sourceText("error.app.notReady")) }));
+        }
+        const { agents, remoteServers } = criticalActionTargets;
+        return performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid).pipe(
+          Effect.mapError((error) => new DynamicIslandFailed({ cause: error.cause })),
+        );
+      }),
   });
   teardown.push(TEARDOWN_ORDER.dynamicIsland, "the Dynamic Island", () => dynamicIsland.destroy());
   const centralAuthApiUrl = readCentralAuthApiUrl(
@@ -869,32 +874,30 @@ export async function createApplicationServices({
       const pointer = cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS);
       return pointer ? computerUseDesktopPoint(pointer) : null;
     },
-    readTarget: async (previous) => {
-      if (!cuaDriver.mcpServerForProviders()) return null;
-      // The rim marks work in progress, so it goes down with the last turn: completed, failed or
-      // cancelled. The driver's lease outlives the turn, so only an action made while a turn that
-      // still runs was running counts: a lease left by the turn before would put the rim over a
-      // turn that does not touch the desktop. Neither a lease nor an action names its agent, so the
-      // oldest running turn is the bound: a newer turn of another agent does not hide this one's
-      // rim. `service` is built below; the controller starts only after it.
-      const turnStartedAt = service.earliestRunningTurnStartedAt();
-      if (turnStartedAt === null) return null;
-      const session = liveSession(
-        await runCauseEffect(computerUseReads.sessions()),
-        (Date.now() - turnStartedAt) / 1000,
-      );
-      if (!session) return null;
-      const windows = await runCauseEffect(computerUseReads.listWindows());
-      const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
-      return chooseTarget({
-        windows,
-        session,
-        action,
-        ownPid: process.pid,
-        previous,
-        toDesktop: computerUseDesktopRect,
-      });
-    },
+    readTarget: (previous) =>
+      Effect.gen(function* () {
+        if (!cuaDriver.mcpServerForProviders()) return null;
+        // The rim marks work in progress, so it goes down with the last turn: completed, failed or
+        // cancelled. The driver's lease outlives the turn, so only an action made while a turn that
+        // still runs was running counts: a lease left by the turn before would put the rim over a
+        // turn that does not touch the desktop. Neither a lease nor an action names its agent, so the
+        // oldest running turn is the bound: a newer turn of another agent does not hide this one's
+        // rim. `service` is built below; the controller starts only after it.
+        const turnStartedAt = service.earliestRunningTurnStartedAt();
+        if (turnStartedAt === null) return null;
+        const session = liveSession(yield* computerUseReads.sessions(), (Date.now() - turnStartedAt) / 1000);
+        if (!session) return null;
+        const windows = yield* computerUseReads.listWindows();
+        const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
+        return chooseTarget({
+          windows,
+          session,
+          action,
+          ownPid: process.pid,
+          previous,
+          toDesktop: computerUseDesktopRect,
+        });
+      }),
   });
   // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and
   // so the read connection lets its lease go while there is still a daemon to tell.
@@ -1013,9 +1016,9 @@ export async function createApplicationServices({
     runRoutine: (input) => service.runRoutineFromAutomation(input),
   });
   service.on("event", (event) => {
-    if (event.type === "agents-changed") void automation.sync();
+    if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
-  teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => automation.stop());
+  teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
   /*
    * The Slack workspaces where the agents answer. The tokens use the same cipher as every other
    * secret; an unreadable file is reported, not fatal, and each workspace then connects again.
@@ -1163,15 +1166,21 @@ export async function createApplicationServices({
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
   // nothing. It also tells no listener, because the sessions read back from the database were
   // written by a run that had this same entry.
-  const computerUseWarmUp = runCauseEffect(cuaDriver.warmUp());
-  computerUseWarmUp.catch(() => undefined);
+  //
   // The warm-up tells no listener on purpose, so the rim has to read the result itself: a user who
   // granted the permissions has a running daemon from here on, and nothing else would start it.
-  void computerUseWarmUp
-    .then(() => {
-      if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
-    })
-    .catch(() => undefined);
+  // The fiber ends with an exit rather than a failure, because agent initialization waits for it
+  // whether it worked or not.
+  const computerUseWarmUp = Effect.runFork(
+    cuaDriver.warmUp().pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+        }),
+      ),
+      Effect.exit,
+    ),
+  );
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
    * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
@@ -1570,7 +1579,7 @@ export async function createApplicationServices({
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
-  teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.flush()));
+  teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     safeStorageCipher("error.app.macSecureStorageUnavailable"),
@@ -1705,18 +1714,22 @@ export async function createApplicationServices({
     // the service refuses the install until every sibling session stopped. Unpackaged runs never
     // enable updates, so there is nothing to guard there.
     checkSiblingInstances: app.isPackaged
-      ? async () => {
-          const siblings = await listSiblingOpenBotInstances({
+      ? () =>
+          listSiblingOpenBotInstances({
             executablePath: app.getPath("exe"),
             currentPid: process.pid,
             platform: process.platform,
-          });
-          if (siblings.length > 0) {
-            const list = siblings.map(({ pid, uid }) => `pid ${pid} (uid ${uid})`).join(", ");
-            logger.warn(`OpenBot update install refused: other OpenBot processes run from this application: ${list}`);
-          }
-          return siblings;
-        }
+          }).pipe(
+            Effect.tap((siblings) =>
+              Effect.sync(() => {
+                if (siblings.length === 0) return;
+                const list = siblings.map(({ pid, uid }) => `pid ${pid} (uid ${uid})`).join(", ");
+                logger.warn(
+                  `OpenBot update install refused: other OpenBot processes run from this application: ${list}`,
+                );
+              }),
+            ),
+          )
       : undefined,
     currentUid: typeof process.getuid === "function" ? process.getuid() : undefined,
     platform: process.platform,
@@ -1728,12 +1741,9 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate(() =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => computerUseWarmUp.catch(() => undefined));
+      yield* Fiber.join(computerUseWarmUp);
       yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
-      yield* Effect.tryPromise({
-        try: () => automation.sync(),
-        catch: (cause) => new AgentLifecycleFailed({ operation: "automationListener", cause }),
-      });
+      yield* automation.sync();
     }),
   );
   const describeRestartReadiness = (): RestartReadiness =>
@@ -1859,9 +1869,9 @@ export async function createApplicationServices({
     : null;
   if (serverMode) {
     // Without the socket the server still runs, and the log says why nobody can sign it in.
-    await serverMode
-      .listen()
-      .catch((error) => logger.error("The server control socket did not start:", toLogValue(error)));
+    await runCauseEffect(serverMode.listen()).catch((error) =>
+      logger.error("The server control socket did not start:", toLogValue(error)),
+    );
     // Nobody presses Retry on a server either. A server that is signed out has nothing to publish.
     const serverStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -1878,7 +1888,7 @@ export async function createApplicationServices({
     serverStartRetry.start();
     teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
       await Effect.runPromise(serverStartRetry.stop());
-      await serverMode.close();
+      await Effect.runPromise(serverMode.close());
     });
   }
   await runCauseEffect(hostUpdateCoordinator.tick());

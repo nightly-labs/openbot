@@ -26,7 +26,7 @@ import { Deferred, Effect } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { HostService } from "./host-service";
-import { RemoteWorkflowError } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 
 const CONTROL_SOCKET_FILE = "control.sock";
 const MAX_BODY_BYTES = 4096;
@@ -81,45 +81,56 @@ export class ServerMode {
   }
 
   /** Binds the control socket. It refuses a runtime directory that another user could enter. */
-  async listen(): Promise<void> {
+  readonly listen = Effect.fn("ServerMode.listen")(function* (this: ServerMode) {
     const path = this.#options.environment.controlSocketPath;
-    const directory = await lstat(dirname(path));
+    const directory = yield* remoteCall(() => lstat(dirname(path)));
     const uid = this.#options.uid ?? process.getuid?.();
     if (!directory.isDirectory() || directory.uid !== uid || (directory.mode & 0o077) !== 0) {
-      throw new Error("The server runtime directory must be a private directory of the service user.");
+      return yield* new RemoteWorkflowError({
+        cause: new Error("The server runtime directory must be a private directory of the service user."),
+      });
     }
     // A socket from the last run stays after a crash. Anything else at that path is not ours.
-    const existing = await lstat(path).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    });
-    if (existing && !existing.isSocket()) throw new Error("The control socket path holds another file.");
-    if (existing) await unlink(path);
+    const existing = yield* remoteCall(() =>
+      lstat(path).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      }),
+    );
+    if (existing && !existing.isSocket()) {
+      return yield* new RemoteWorkflowError({ cause: new Error("The control socket path holds another file.") });
+    }
+    if (existing) yield* remoteCall(() => unlink(path));
 
     const server = createServer((request, response) => void this.#handle(request, response));
     server.on("connection", (socket) => {
       this.#sockets.add(socket);
       socket.on("close", () => this.#sockets.delete(socket));
     });
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(path, () => {
-        server.removeListener("error", reject);
-        resolve();
-      });
-    });
+    yield* remoteCall(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(path, () => {
+            server.removeListener("error", reject);
+            resolve();
+          });
+        }),
+    );
     this.#server = server;
-    await chmod(path, 0o600);
-  }
+    yield* remoteCall(() => chmod(path, 0o600));
+  }).bind(this);
 
-  async close(): Promise<void> {
+  readonly close = Effect.fn("ServerMode.close")(function* (this: ServerMode) {
     const server = this.#server;
     this.#server = null;
     if (!server) return;
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
+    yield* Effect.callback<void>((resume) => {
+      server.close(() => resume(Effect.void));
+    });
+  }).bind(this);
 
   /**
    * Names and starts the host of the signed-in account. The entry point calls this after each

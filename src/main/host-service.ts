@@ -46,7 +46,7 @@ import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activit
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
-import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -316,7 +316,7 @@ export class HostService extends EventEmitter<HostEvents> {
       Layer.succeed(
         HostApiRuntime,
         HostApiRuntime.of({
-          start: () => remoteCall(() => this.#api.start()),
+          start: () => this.#api.start(),
         }),
       ),
     );
@@ -1294,7 +1294,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return yield* Effect.acquireUseRelease(
       Effect.void,
       () => this.#webrtcGateway?.stop() ?? Effect.void,
-      () => remoteCall(() => this.#api.stop()).pipe(Effect.ensuring(Fiber.await(pendingPushes))),
+      () => this.#api.stop().pipe(Effect.ensuring(Fiber.await(pendingPushes))),
     );
   }, Effect.uninterruptible);
 

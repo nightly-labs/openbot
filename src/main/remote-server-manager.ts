@@ -280,7 +280,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#connections.markConnected(serverId);
       this.#emitChanged();
       const server = this.#store.find(serverId);
-      void Effect.runPromise(
+      this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
             // Read the host report before negotiating the fixed WebRTC transport. This keeps the
@@ -305,7 +305,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
             );
           }),
         ),
-      ).catch(() => undefined);
+      );
     });
     this.#webrtcTransport?.on("disconnected", (serverId) => {
       const wasOnline = this.#connections.statusFor(serverId).state === "online";
@@ -327,12 +327,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         this.#events.markHostOffline(serverId);
         // A hosted server that another reason stopped starts again only for the selected server with the
         // app in focus. A server that sleeps waits for the user's input.
-        void Effect.runPromise(
+        Effect.runFork(
           this.#checkHostedServer(
             serverId,
             !this.#hostedStartExpired.has(serverId) && this.#appFocused && serverId === this.#store.activeServerId,
           ),
-        ).catch(() => undefined);
+        );
       }
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
@@ -363,10 +363,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#events.suspendReconnect(serverId);
     if (this.#store.find(serverId)?.transport !== "webrtc-v2") return;
     const transport = this.#webrtcTransport;
-    if (transport)
-      void Effect.runPromise(this.#owned(transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void)))).catch(
-        () => undefined,
-      );
+    if (transport) this.#background(this.#owned(transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void))));
+  }
+
+  /**
+   * Starts work for a transport callback in this manager's scope, now, so events keep their order.
+   * `stop` interrupts it. A failure is dropped: the callback has nobody to answer.
+   */
+  #background(operation: Effect.Effect<unknown, RemoteWorkflowError>): void {
+    Effect.runFork(
+      Effect.forkIn(operation.pipe(Effect.catch(() => Effect.void)), this.#scope, { startImmediately: true }),
+    );
   }
 
   #owned<A>(operation: Effect.Effect<A, RemoteWorkflowError, RemoteRequest>): Effect.Effect<A, RemoteWorkflowError> {
@@ -1624,7 +1631,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     } else if (event.type === "team-direct-message") this.emit("directMessage", serverId, event);
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
-    else void Effect.runPromise(this.#owned(this.#refresh.forward(serverId, event))).catch(() => undefined);
+    else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
   }
 
   /** A host that restarts into an update is away for a short time: it keeps the fast retry for a limited time. */
@@ -1647,14 +1654,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   // so a store that cannot be written must not turn one of them into an uncaught exception in the main
   // process. The new name stays in memory and the next write of any field saves it.
   #applyServerIdentity(serverId: string, identity: { serverName: string; logoVersion: string | null }): void {
-    void Effect.runPromise(
+    this.#background(
       this.#owned(
         this.#store.update(serverId, { name: identity.serverName, logoVersion: identity.logoVersion }).pipe(
           Effect.tap(() => Effect.sync(() => this.#emitChanged())),
           Effect.catch(() => Effect.void),
         ),
       ),
-    ).catch(() => undefined);
+    );
   }
 
   #emitChanged(): void {

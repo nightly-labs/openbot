@@ -3,8 +3,8 @@ import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { redactValue } from "@openbot/logging";
-import { Effect, Semaphore } from "effect";
-import { analyticsIO, runAnalytics } from "./analytics-effects";
+import { Effect, Exit, Scope, Semaphore } from "effect";
+import { analyticsIO } from "./analytics-effects";
 
 /**
  * One timed operation. The name is a fixed string - an IPC channel, a turn origin, a crash origin -
@@ -49,6 +49,8 @@ export class TraceFile {
   #timer: NodeJS.Timeout | null = null;
   #writes = Semaphore.makeUnsafe(1);
   #writingLines = 0;
+  /** The flushes that `record` starts. `close` waits for them. */
+  readonly #scope = Scope.makeUnsafe();
 
   constructor(options: TraceFileOptions) {
     this.#directory = options.directory;
@@ -66,11 +68,11 @@ export class TraceFile {
     });
     this.#pending.push(JSON.stringify(line));
     if (this.#pending.length >= MAX_PENDING_LINES) {
-      void runAnalytics(this.flush());
+      this.#flushLater();
       return;
     }
     if (this.#timer) return;
-    this.#timer = setTimeout(() => void runAnalytics(this.flush()), FLUSH_DELAY_MS);
+    this.#timer = setTimeout(() => this.#flushLater(), FLUSH_DELAY_MS);
     this.#timer.unref();
   }
 
@@ -111,6 +113,16 @@ export class TraceFile {
       ),
     );
   }, Effect.uninterruptible);
+
+  /** Writes the pending lines and waits for every write that `record` started. */
+  readonly close = Effect.fn("TraceFile.close")(function* (this: TraceFile) {
+    yield* this.flush();
+    yield* Scope.close(this.#scope, Exit.void);
+  });
+
+  #flushLater(): void {
+    Effect.runFork(Effect.forkIn(this.flush(), this.#scope, { startImmediately: true }));
+  }
 
   readonly summarize = Effect.fn("TraceFile.summarize")(function* (this: TraceFile) {
     yield* this.flush();

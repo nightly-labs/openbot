@@ -283,7 +283,7 @@ describe("ChannelRoutineScheduler", () => {
     const assignment = required(service.store.assignments("channel-1")[0]);
 
     // The hold gives the task back, and the routine drops it rather than run it late.
-    expect(service.requeueForLimit(required(assignment.deliveryId))).toBe(true);
+    expect(await runCauseEffect(service.requeueForLimit(required(assignment.deliveryId)))).toBe(true);
     expect(currentRun(run.id).status).toBe("cancelled");
     expect(service.store.tasks("channel-1")).toEqual([expect.objectContaining({ state: "cancelled" })]);
 

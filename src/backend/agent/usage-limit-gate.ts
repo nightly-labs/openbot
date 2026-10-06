@@ -22,10 +22,10 @@ export interface UsageLimitHooks {
   scheduleDrain(agentId: string): void;
   /** The provider's usage reading for this model, or null when it gives none. */
   readUsage(provider: AgentProvider, model: string): Effect.Effect<AccountUsage | null, UsageReadFailed>;
-  /** The agents a limit now holds, each time a refused turn reports it. */
-  held(agentIds: readonly string[]): void;
-  /** A limit ended, after its agents' drains were scheduled. */
-  released(): void;
+  /** The agents a limit now holds, each time a refused turn reports it. Must not wait for their queues. */
+  held(agentIds: readonly string[]): Effect.Effect<void>;
+  /** A limit ended, after its agents' drains were scheduled. Must not wait for the work it starts. */
+  released(): Effect.Effect<void>;
 }
 
 export interface UsageLimitGateOptions {
@@ -101,7 +101,7 @@ export class UsageLimitGate {
     limit.resetsAt = future(resetsAt) ?? future(limit.resetsAt);
     this.#limits.set(key, limit);
     this.#arm(key, limit);
-    this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
+    yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
     this.#hooks.emitRuntimeSnapshot();
     if (limit.resetsAt !== null) {
       this.#announce(agentId, limit);
@@ -119,14 +119,18 @@ export class UsageLimitGate {
   }).bind(this);
 
   /** A turn of this agent completed on `model`, so its provider and model take turns again. */
-  completed(agentId: string, model: string | null = null): void {
+  readonly completed = Effect.fn("UsageLimitGate.completed")(function* (
+    this: UsageLimitGate,
+    agentId: string,
+    model: string | null = null,
+  ) {
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
     const key = limitKey(provider, model ?? agent.model);
-    if (this.#limits.has(key)) this.#release(key);
+    if (this.#limits.has(key)) yield* this.#release(key);
     if (![...this.#limits.values()].some((limit) => limit.provider === provider)) this.#announced.delete(provider);
-  }
+  }).bind(this);
 
   readonly dispose = Effect.fn("UsageLimitGate.dispose")(function* (this: UsageLimitGate) {
     for (const limit of this.#limits.values()) if (limit.timer) clearTimeout(limit.timer);
@@ -167,11 +171,11 @@ export class UsageLimitGate {
     limit.timer = null;
     if (limit.resetsAt !== null) {
       if (limit.resetsAt * 1_000 + RESET_GRACE_MS > Date.now()) this.#arm(key, limit);
-      else this.#release(key, true);
+      else yield* this.#release(key, true);
       return;
     }
     // A reading that still shows a spent window gives the reset; anything else lets one turn try.
-    if ((yield* this.#readReset(key, limit)) === null && this.#limits.get(key) === limit) this.#release(key);
+    if ((yield* this.#readReset(key, limit)) === null && this.#limits.get(key) === limit) yield* this.#release(key);
   });
 
   /** Reads the reset of the spent window into `limit` and arms it. Null when the reading shows none. */
@@ -197,7 +201,7 @@ export class UsageLimitGate {
    * again. A probe of a limit with no known reset keeps the announcement: the next refused turn may
    * only close the same limit again.
    */
-  #release(key: string, reset = false): void {
+  readonly #release = Effect.fn("UsageLimitGate.release")(function* (this: UsageLimitGate, key: string, reset = false) {
     const limit = this.#limits.get(key);
     if (!limit) return;
     if (limit.timer) clearTimeout(limit.timer);
@@ -206,8 +210,8 @@ export class UsageLimitGate {
       this.#announced.delete(limit.provider);
     this.#hooks.emitRuntimeSnapshot();
     for (const agent of this.#heldAgents(limit)) this.#hooks.scheduleDrain(agent.id);
-    this.#hooks.released();
-  }
+    yield* this.#hooks.released();
+  });
 
   #heldAgents(limit: UsageLimit) {
     return this.#store

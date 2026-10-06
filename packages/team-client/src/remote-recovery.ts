@@ -153,7 +153,12 @@ export function createRemoteConnectionRecovery(
     timer = null;
   }
 
-  function scheduleRetry() {
+  function startRun() {
+    void runTeamEffect(run());
+  }
+
+  /** `start` begins the attempt that is due now: a new run, or the next pass of the run that is ending. */
+  function scheduleRetry(start: () => void = startRun) {
     if (disposed || suspended) return;
     retryAt ??= Date.now() + remoteRetryDelay(attempt);
     if (!active) return;
@@ -161,7 +166,7 @@ export function createRemoteConnectionRecovery(
     if (remaining === 0 && !running) {
       retryAt = null;
       if (attempt >= REMOTE_RETRY_LIMIT) attempt = 0;
-      void runTeamEffect(run());
+      start();
       return;
     }
     onStatus({
@@ -182,8 +187,14 @@ export function createRemoteConnectionRecovery(
     );
   }
 
+  // An attempt that ends with a refresh or a due retry starts the next pass in the same run.
   const run = Effect.fn("RemoteRecovery.run")(function* () {
-    if (!active || disposed || running || suspended) return;
+    while (yield* attemptOnce()) {}
+  });
+
+  const attemptOnce = Effect.fn("RemoteRecovery.attempt")(function* () {
+    if (!active || disposed || running || suspended) return false;
+    let again = false;
     cancelTimer();
     running = true;
     const checkingConnection = online;
@@ -224,9 +235,12 @@ export function createRemoteConnectionRecovery(
           if (!disposed && !suspended && active) {
             if (refreshRequested) {
               retryAt = null;
-              void runTeamEffect(run());
-            } else if (retryRequested) scheduleRetry();
-            else if (interrupted) void runTeamEffect(run());
+              again = true;
+            } else if (retryRequested)
+              scheduleRetry(() => {
+                again = true;
+              });
+            else if (interrupted) again = true;
             else {
               online = true;
               attempt = 0;
@@ -237,6 +251,7 @@ export function createRemoteConnectionRecovery(
         }),
       ),
     );
+    return again;
   });
 
   return {
@@ -256,7 +271,7 @@ export function createRemoteConnectionRecovery(
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
-        else void runTeamEffect(run());
+        else startRun();
       }
     },
     offline(error?: unknown) {
@@ -278,7 +293,7 @@ export function createRemoteConnectionRecovery(
       retryAt = null;
       attempt = 0;
       cancelTimer();
-      if (active) void runTeamEffect(run());
+      if (active) startRun();
     },
     /**
      * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
@@ -303,7 +318,7 @@ export function createRemoteConnectionRecovery(
       attempt = 0;
       cancelTimer();
       if (running || !active) refreshRequested = true;
-      else void runTeamEffect(run());
+      else startRun();
     },
     dispose() {
       disposed = true;

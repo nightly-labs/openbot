@@ -40,6 +40,7 @@ import {
   writeMainWindowBounds,
 } from "./main-window-state";
 import type { RemoteServerManager } from "./remote-server-manager";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
@@ -91,8 +92,8 @@ export interface MainWindowController {
   openMainWindow: () => BrowserWindow;
   ensureMainWindow: () => Promise<BrowserWindow>;
   loadRenderer: (window: BrowserWindow) => Promise<void>;
-  restoreMainWindowBounds: () => Promise<void>;
-  flushMainWindowBounds: () => Promise<void>;
+  restoreMainWindowBounds: () => Effect.Effect<void>;
+  flushMainWindowBounds: () => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 export function createMainWindowController({

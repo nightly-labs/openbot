@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
@@ -194,10 +195,10 @@ describe("main window bounds recorder", () => {
 
     const recorder = createMainWindowBoundsRecorder(dependencies);
     recorder.rememberMainWindowBounds(moved);
-    await recorder.flushMainWindowBounds();
+    await runCauseEffect(recorder.flushMainWindowBounds());
 
     const relaunched = createMainWindowBoundsRecorder(dependencies);
-    await relaunched.restoreMainWindowBounds();
+    await Effect.runPromise(relaunched.restoreMainWindowBounds());
 
     expect(relaunched.currentMainWindowBounds()).toEqual(moved);
   });
@@ -214,7 +215,7 @@ describe("main window bounds recorder", () => {
     recorder.rememberMainWindowBounds(moved);
     // Windows session-end calls the flush from a synchronous handler and never awaits it, so the
     // debounce has to be gone by the time the call returns - not by the time the promise settles.
-    const settled = recorder.flushMainWindowBounds();
+    const settled = runCauseEffect(recorder.flushMainWindowBounds());
     vi.advanceTimersByTime(debounceMs);
     await settled;
     await vi.runAllTimersAsync();
@@ -242,7 +243,7 @@ describe("main window bounds recorder", () => {
     recorder.rememberMainWindowBounds(moved);
     await vi.advanceTimersByTimeAsync(debounceMs);
     recorder.rememberMainWindowBounds(quitting);
-    await recorder.flushMainWindowBounds();
+    await runCauseEffect(recorder.flushMainWindowBounds());
 
     expect(written).toEqual([quitting]);
     expect(reported).toEqual([

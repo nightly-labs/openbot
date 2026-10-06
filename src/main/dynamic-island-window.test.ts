@@ -14,9 +14,11 @@ import {
 import { createOpenBotLogger } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../backend/effect-boundary";
 import * as preferenceStore from "./dynamic-island-preference-store";
 import {
   DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS,
+  DynamicIslandFailed,
   DynamicIslandWindowController,
   dynamicIslandNotchSizeForDisplay,
   requireDynamicIslandSender,
@@ -146,10 +148,10 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    await controller.initialize();
+    await runCauseEffect(controller.initialize());
     expect(windows).toHaveLength(2);
     expect(windows[0]?.bounds).toEqual({ x: 449, y: 0, width: 614, height: 50 });
     expect(windows[1]?.bounds).toEqual({ x: 2165, y: -120, width: 614, height: 50 });
@@ -186,7 +188,7 @@ describe("dynamic island window geometry", () => {
         bounds: { x: 1200, y: 20, width: 1800, height: 1169 },
       }),
     ];
-    await controller.reconcileWindow();
+    await Effect.runPromise(controller.reconcileWindow());
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(windows[1]?.setBounds).toHaveBeenCalledWith({ x: 1793, y: 20, width: 614, height: 380 }, false);
 
@@ -222,26 +224,26 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    await controller.initialize();
+    await runCauseEffect(controller.initialize());
     expect(loadWindow).toHaveBeenCalledOnce();
 
     displays = [display({ id: 1, bounds: { x: 0, y: 0, width: 1800, height: 1169 } })];
-    await controller.reconcileWindow();
+    await Effect.runPromise(controller.reconcileWindow());
     expect(loadWindow).toHaveBeenCalledOnce();
     expect(windows[0]?.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.dynamicIsland.geometry.channel, {
       width: 220,
       height: 38,
     });
 
-    await controller.reconcileWindow();
+    await Effect.runPromise(controller.reconcileWindow());
     expect(loadWindow).toHaveBeenCalledOnce();
     expect(windows[0]?.webContents.send).toHaveBeenCalledTimes(1);
 
     displays = [display({ id: 1, bounds: { x: 0, y: 0, width: 2560, height: 1440 } })];
-    await controller.reconcileWindow();
+    await Effect.runPromise(controller.reconcileWindow());
     expect(loadWindow).toHaveBeenCalledOnce();
     expect(windows[0]?.webContents.send).toHaveBeenLastCalledWith(IPC_ENDPOINTS.dynamicIsland.geometry.channel, null);
   });
@@ -264,15 +266,15 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
-    await controller.initialize();
+    await runCauseEffect(controller.initialize());
     const window = windows[0];
     if (!window) throw new Error("Expected an overlay window.");
     window.webContents.isLoadingMainFrame.mockReturnValue(true);
     displays = [display({ id: 1, bounds: { x: 0, y: 0, width: 1800, height: 1169 } })];
 
-    await controller.reconcileWindow();
+    await Effect.runPromise(controller.reconcileWindow());
     expect(window.webContents.send).not.toHaveBeenCalled();
 
     window.webContents.isLoadingMainFrame.mockReturnValue(false);
@@ -304,10 +306,10 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    await expect(controller.initialize()).resolves.toBeUndefined();
+    await expect(runCauseEffect(controller.initialize())).resolves.toBeUndefined();
 
     expect(windows).toHaveLength(2);
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
@@ -344,12 +346,12 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    const initialize = controller.initialize();
+    const initialize = runCauseEffect(controller.initialize());
     await loadStarted;
-    const disable = controller.setPreference(preference({ enabled: false }));
+    const disable = runCauseEffect(controller.setPreference(preference({ enabled: false })));
     releaseLoad();
     await Promise.all([initialize, disable]);
 
@@ -382,14 +384,14 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
     const firstPreference = preference({ hapticsEnabled: false });
     const latestPreference = preference({ idleVisible: false });
 
-    const first = controller.setPreference(firstPreference);
+    const first = runCauseEffect(controller.setPreference(firstPreference));
     await vi.waitFor(() => expect(writes).toHaveLength(1));
-    const second = controller.setPreference(latestPreference);
+    const second = runCauseEffect(controller.setPreference(latestPreference));
     await Promise.resolve();
     expect(writes).toHaveLength(1);
 
@@ -418,26 +420,26 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    await controller.initialize();
+    await runCauseEffect(controller.initialize());
     controller.performHaptic();
     expect(performHaptic).toHaveBeenCalledOnce();
-    await controller.setPreference(preference({ enabled: false }));
+    await runCauseEffect(controller.setPreference(preference({ enabled: false })));
     expect(windows[0]?.destroy).toHaveBeenCalledOnce();
     expect(windows[1]?.destroy).toHaveBeenCalledOnce();
     controller.performHaptic();
     expect(performHaptic).toHaveBeenCalledOnce();
-    await controller.setPreference(preference({ hapticsEnabled: false }));
+    await runCauseEffect(controller.setPreference(preference({ hapticsEnabled: false })));
     expect(windows).toHaveLength(4);
     controller.performHaptic();
     expect(performHaptic).toHaveBeenCalledOnce();
-    await controller.setPreference(preference());
+    await runCauseEffect(controller.setPreference(preference()));
     controller.performHaptic();
     expect(performHaptic).toHaveBeenCalledTimes(2);
     // A taller island keeps its hover growth inside the compact window: 32 points at 125% is 40.
-    await controller.setPreference(preference({ heightPercent: 125 }));
+    await runCauseEffect(controller.setPreference(preference({ heightPercent: 125 })));
     expect(windows[3]?.setBounds).toHaveBeenLastCalledWith(expect.objectContaining({ height: 58 }), false);
   });
 
@@ -458,11 +460,11 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
 
-    await controller.initialize();
-    await controller.setPreference(preference({ additionalDisplaysEnabled: false }));
+    await runCauseEffect(controller.initialize());
+    await runCauseEffect(controller.setPreference(preference({ additionalDisplaysEnabled: false })));
 
     expect(windows[0]?.destroy).not.toHaveBeenCalled();
     expect(windows[1]?.destroy).toHaveBeenCalledOnce();
@@ -481,9 +483,9 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => null,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
-    await controller.initialize();
+    await runCauseEffect(controller.initialize());
     expect(createWindow).not.toHaveBeenCalled();
   });
 
@@ -491,7 +493,7 @@ describe("dynamic island window geometry", () => {
     const mainWindow = new FakeWindow(71, { x: 0, y: 0, width: 1200, height: 800 });
     // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the controller's BrowserWindow surface.
     const ensureMainWindow = vi.fn(async () => mainWindow as unknown as BrowserWindow);
-    const performCriticalAction = vi.fn(async () => undefined);
+    const performCriticalAction = vi.fn(() => Effect.void);
     const presentMainWindow = vi.fn();
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
@@ -516,7 +518,7 @@ describe("dynamic island window geometry", () => {
     };
     controller.publish(criticalPresentation("question", "prompt-1", "local", "research"));
 
-    await controller.performAction(action);
+    await runCauseEffect(controller.performAction(action));
 
     expect(performCriticalAction).toHaveBeenCalledWith(action);
     expect(ensureMainWindow).toHaveBeenCalledOnce();
@@ -529,11 +531,13 @@ describe("dynamic island window geometry", () => {
   it("deduplicates the same critical action across overlay displays", async () => {
     const mainWindow = new FakeWindow(73, { x: 0, y: 0, width: 1200, height: 800 });
     let completeAction: () => void = () => undefined;
-    const performCriticalAction = vi.fn(
-      async () =>
-        new Promise<void>((resolve) => {
-          completeAction = resolve;
-        }),
+    const performCriticalAction = vi.fn(() =>
+      Effect.promise(
+        () =>
+          new Promise<void>((resolve) => {
+            completeAction = resolve;
+          }),
+      ),
     );
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
@@ -559,10 +563,10 @@ describe("dynamic island window geometry", () => {
     const presentation = criticalPresentation("question", "prompt-shared");
     controller.publish(presentation);
 
-    const first = controller.performAction(action);
+    const first = runCauseEffect(controller.performAction(action));
     if (presentation.mode !== "question") throw new Error("Expected a question presentation.");
     controller.publish({ ...presentation, remainingCount: 2 });
-    const second = controller.performAction(action);
+    const second = runCauseEffect(controller.performAction(action));
     await vi.waitFor(() => expect(performCriticalAction).toHaveBeenCalledOnce());
     completeAction();
     await Promise.all([first, second]);
@@ -572,7 +576,7 @@ describe("dynamic island window geometry", () => {
 
   it("forwards a pinned question after global selection moves to another request", async () => {
     const mainWindow = new FakeWindow(74, { x: 0, y: 0, width: 1200, height: 800 });
-    const performCriticalAction = vi.fn(async () => undefined);
+    const performCriticalAction = vi.fn(() => Effect.void);
     const controller = new DynamicIslandWindowController({
       platform: "darwin",
       preferencePath: "/tmp/dynamic-island-preference.json",
@@ -596,7 +600,7 @@ describe("dynamic island window geometry", () => {
       requestId: "prompt-pinned",
       answers: { source: ["Official data"] },
     } satisfies DynamicIslandAction;
-    await controller.performAction(action);
+    await runCauseEffect(controller.performAction(action));
 
     expect(performCriticalAction).toHaveBeenCalledWith(action);
     expect(mainWindow.webContents.send).toHaveBeenCalledWith("dynamic-island:action", action);
@@ -616,9 +620,8 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
       presentMainWindow: () => undefined,
       performHaptic: () => undefined,
-      performCriticalAction: async () => {
-        throw new Error("The request is no longer active.");
-      },
+      performCriticalAction: () =>
+        Effect.fail(new DynamicIslandFailed({ cause: new Error("The request is no longer active.") })),
     });
     const action: DynamicIslandAction = {
       type: "answer-prompt",
@@ -629,7 +632,7 @@ describe("dynamic island window geometry", () => {
     };
     controller.publish(criticalPresentation("question", "prompt-stale", "remote", "research"));
 
-    await expect(controller.performAction(action)).rejects.toThrow("no longer active");
+    await expect(runCauseEffect(controller.performAction(action))).rejects.toThrow("no longer active");
     expect(mainWindow.webContents.send).not.toHaveBeenCalled();
     expect(mainWindow.show).not.toHaveBeenCalled();
   });
@@ -649,7 +652,7 @@ describe("dynamic island window geometry", () => {
       getMainWindow: () => mainWindow as unknown as BrowserWindow,
       presentMainWindow,
       performHaptic: () => undefined,
-      performCriticalAction: async () => undefined,
+      performCriticalAction: () => Effect.void,
     });
     const action = {
       type: "open-failure",
@@ -659,11 +662,11 @@ describe("dynamic island window geometry", () => {
     } satisfies DynamicIslandAction;
     mainWindow.webContents.isLoadingMainFrame.mockReturnValue(true);
 
-    await expect(controller.performAction(action)).rejects.toThrow("temporarily unavailable");
+    await expect(runCauseEffect(controller.performAction(action))).rejects.toThrow("temporarily unavailable");
     expect(mainWindow.webContents.send).not.toHaveBeenCalled();
 
     mainWindow.webContents.isLoadingMainFrame.mockReturnValue(false);
-    await expect(controller.performAction(action)).resolves.toBeUndefined();
+    await expect(runCauseEffect(controller.performAction(action))).resolves.toBeUndefined();
     expect(presentMainWindow).toHaveBeenCalledTimes(2);
     expect(presentMainWindow).toHaveBeenCalledWith(mainWindow);
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.dynamicIsland.action.channel, action);

@@ -24,14 +24,16 @@ interface SiteRouterRuntime {
 export default {
   async fetch(request: Request, env: SiteRouterEnv, ctx: ExecutionContext): Promise<Response> {
     try {
-      const assetCache = await Effect.runPromise(openAssetCache());
       return await Effect.runPromise(
-        routeRequest(
-          request,
-          env,
-          Date.now(),
-          assetCache ? { assetCache, schedule: (work) => ctx.waitUntil(Effect.runPromise(work)) } : undefined,
-        ),
+        Effect.gen(function* () {
+          const assetCache = yield* openAssetCache();
+          return yield* routeRequest(
+            request,
+            env,
+            Date.now(),
+            assetCache ? { assetCache, schedule: (work) => ctx.waitUntil(Effect.runPromise(work)) } : undefined,
+          );
+        }),
       );
     } catch (error) {
       console.error(JSON.stringify({ event: "site_router_error", message: errorMessage(error) }));

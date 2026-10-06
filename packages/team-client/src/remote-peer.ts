@@ -373,9 +373,19 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
     },
   };
-  function diagnose(state: PeerState, step: RemoteTeamDiagnostic["step"], detail?: string): void {
+  function diagnosticCall(state: PeerState, step: RemoteTeamDiagnostic["step"], detail?: string) {
     const diagnostic: RemoteTeamDiagnostic = { hostId: state.hostId, step, ...(detail ? { detail } : {}) };
-    void runPeerEffect(peerCall(() => actions.current.onDiagnostic?.(diagnostic))).catch(() => undefined);
+    return peerCall(() => actions.current.onDiagnostic?.(diagnostic));
+  }
+
+  /** For native callbacks. Effect code yields `notify(diagnosticCall(...))` instead. */
+  function diagnose(state: PeerState, step: RemoteTeamDiagnostic["step"], detail?: string): void {
+    void runPeerEffect(diagnosticCall(state, step, detail)).catch(() => undefined);
+  }
+
+  /** Starts a consumer callback in the peer's work scope without waiting for it; a failure is ignored. */
+  function notify<A, E>(operation: Effect.Effect<A, E, RemotePeerIO>) {
+    return Effect.forkIn(operation.pipe(Effect.ignore), workScope, { startImmediately: true });
   }
 
   /** The candidate types of the selected pair, such as `relay/udp -> host/udp`. Never the addresses. */
@@ -387,7 +397,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         if (route || report.type !== "candidate-pair" || report.state !== "succeeded" || !report.nominated) return;
         route = `${candidateRoute(stats.get(report.localCandidateId))} -> ${candidateRoute(stats.get(report.remoteCandidateId))}`;
       });
-      if (route) diagnose(state, "route", route);
+      if (route) yield* notify(diagnosticCall(state, "route", route));
     })();
   }
 
@@ -617,7 +627,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       try {
         openSignal(state, actions);
       } catch (error) {
-        failPeer(state, error, actions);
+        yield* failPeerEffect(state, error, actions);
       }
       yield* Deferred.await(connected);
     })();
@@ -656,7 +666,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
               // bytes to the reconnect this would otherwise ask for. `protocol_error` is what lets a
               // consumer stop instead: every other failure here is a connection that a retry can fix,
               // and a caller cannot tell them apart from an `offline` update alone.
-              return failPeer(state, error, actions, "protocol_error");
+              return yield* failPeerEffect(state, error, actions, "protocol_error");
             }
             // A frame type this build does not know is a newer Signal service, not a broken connection.
             if (message) yield* handleSignal(state, message, actions);
@@ -686,18 +696,18 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       if (state.closed || peer !== state) return;
       if (message.type === "account-profile-changed") {
         // Profile refresh failure must never break the RTC connection.
-        void runPeerEffect(peerCall(() => actions.current.onAccountProfileChanged?.())).catch(() => undefined);
+        yield* notify(peerCall(() => actions.current.onAccountProfileChanged?.()));
         return;
       }
       if (message.type === "account-servers-changed") {
         // A server list this phone cannot re-read must not break the connection the notice arrived
         // on either: that connection is to a server this phone already has.
-        void runPeerEffect(peerCall(() => actions.current.onAccountServersChanged?.())).catch(() => undefined);
+        yield* notify(peerCall(() => actions.current.onAccountServersChanged?.()));
         return;
       }
       if (message.type === "error") {
         if (message.code === "session_revoked")
-          return failPeer(state, new Error(message.message), actions, "session_revoked");
+          return yield* failPeerEffect(state, new Error(message.message), actions, "session_revoked");
         return yield* new RemotePeerError({ message: message.message });
       }
       if (message.type === "ready") {
@@ -710,7 +720,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           return yield* new RemotePeerError({ message: "Signal returned an incomplete connection." });
         const connectionId = state.connectionId;
         state.signalReady = true;
-        diagnose(state, "signal-ready", `${state.iceServers.length} ICE servers`);
+        yield* notify(diagnosticCall(state, "signal-ready", `${state.iceServers.length} ICE servers`));
         scheduleTurnRefresh(state);
         if (state.connection) {
           const connection = state.connection;
@@ -1038,7 +1048,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         return yield* new RemotePeerError({ message: "The desktop returned an invalid authentication confirmation." });
       }
       state.authenticated = true;
-      diagnose(state, "authenticated");
+      yield* notify(diagnosticCall(state, "authenticated"));
       settleConnected(state);
       yield* sendEventAckEffect(state);
       yield* RemotePeerIO.use((io) => io.connectionUpdate({ hostId: state.hostId, state: "online", message: null }));
@@ -1098,10 +1108,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
             },
           }),
         );
-        const response = yield* Effect.callback<{ status: number; body: TeamProtocolV2Json }, RemotePeerError>(
-          (resume) => {
-            const resolve = (value: { status: number; body: TeamProtocolV2Json }) => resume(Effect.succeed(value));
-            const reject = (error: Error) => resume(Effect.fail(peerError(error)));
+        const answer = Deferred.makeUnsafe<{ status: number; body: TeamProtocolV2Json }, RemotePeerError>();
+        const response = yield* Effect.acquireUseRelease(
+          // Registered before the send, so a fast response finds its request.
+          Effect.sync(() => {
+            const reject = (error: Error) => Deferred.doneUnsafe(answer, Effect.fail(peerError(error)));
             const timer = setTimeout(
               () => {
                 pendingRequests.delete(requestId);
@@ -1111,16 +1122,30 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
               },
               checksConnection ? compatibilityTimeout : REQUEST_TIMEOUT_MS,
             );
+            const resolve = (value: { status: number; body: TeamProtocolV2Json }) =>
+              Deferred.doneUnsafe(answer, Effect.succeed(value));
             pendingRequests.set(requestId, { method, path, resolve, reject, timer });
-            void runPeerEffect(sendPayload(state, "rpc", payload)).catch((error: unknown) => {
-              const pending = pendingRequests.get(requestId);
-              if (pending) pending.reject(peerError(error));
-            });
-            return Effect.sync(() => {
+            return timer;
+          }),
+          () =>
+            // The frame is sent in the work scope: a request that stops waiting does not cut a frame.
+            Effect.forkIn(
+              sendPayload(state, "rpc", payload).pipe(
+                Effect.catch((error) =>
+                  Effect.sync(() => {
+                    const pending = pendingRequests.get(requestId);
+                    if (pending) pending.reject(peerError(error));
+                  }),
+                ),
+              ),
+              workScope,
+              { startImmediately: true },
+            ).pipe(Effect.andThen(Deferred.await(answer))),
+          (timer) =>
+            Effect.sync(() => {
               clearTimeout(timer);
               pendingRequests.delete(requestId);
-            });
-          },
+            }),
         );
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
@@ -1322,21 +1347,50 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     code?: RemoteTeamConnectionUpdate["code"],
   ): void {
     if (state.closed || peer !== state) return;
-    const message = error instanceof Error ? error.message : sourceText("error.remote.webRtcConnectionFailed");
+    const message = failureMessage(error);
     diagnose(state, "failed", code ? `${code}: ${message}` : message);
     rejectConnection(state, new Error(message));
-    void runPeerEffect(
-      peerCall(() =>
-        actions.current.onConnectionUpdate({
-          hostId: state.hostId,
-          state: "offline",
-          message,
-          ...(code ? { code } : {}),
-        }),
-      ),
-    );
+    void runPeerEffect(connectionOffline(state, message, actions, code));
     // A revoked session or a host that broke the protocol starts again from a new session.
     void runPeerEffect(closePeer(actions.current.endSession, code === undefined));
+  }
+
+  /** `failPeer` for Effect code: the same steps in the same order, its notices forked into the work scope. */
+  function failPeerEffect(
+    state: PeerState,
+    error: unknown,
+    actions: ActionsRef,
+    code?: RemoteTeamConnectionUpdate["code"],
+  ) {
+    return Effect.gen(function* () {
+      if (state.closed || peer !== state) return;
+      const message = failureMessage(error);
+      yield* notify(diagnosticCall(state, "failed", code ? `${code}: ${message}` : message));
+      rejectConnection(state, new Error(message));
+      yield* notify(connectionOffline(state, message, actions, code));
+      // A revoked session or a host that broke the protocol starts again from a new session.
+      yield* notify(closePeer(actions.current.endSession, code === undefined));
+    });
+  }
+
+  function failureMessage(error: unknown): string {
+    return error instanceof Error ? error.message : sourceText("error.remote.webRtcConnectionFailed");
+  }
+
+  function connectionOffline(
+    state: PeerState,
+    message: string,
+    actions: ActionsRef,
+    code?: RemoteTeamConnectionUpdate["code"],
+  ) {
+    return peerCall(() =>
+      actions.current.onConnectionUpdate({
+        hostId: state.hostId,
+        state: "offline",
+        message,
+        ...(code ? { code } : {}),
+      }),
+    );
   }
 
   function rejectRequests(error: Error, readsOnly = false): void {

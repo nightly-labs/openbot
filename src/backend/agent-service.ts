@@ -861,26 +861,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#providers
             .usage({ provider, model })
             .pipe(Effect.mapError((failure) => new UsageReadFailed({ cause: failure.cause }))),
-        // The gate tells this synchronously, so the owned scope settles the queues.
-        held: (agentIds) => {
-          Effect.runFork(
-            this.#settleHeldQueues(agentIds).pipe(
-              Effect.catch((failure) => Effect.sync(() => this.#emitError("usage_limit_hold_failed", failure.cause))),
-              Effect.forkIn(this.#scope),
-            ),
-          );
-        },
+        // The refused turn's drain must not wait for the queues, so the owned scope settles them.
+        held: (agentIds) =>
+          this.#settleHeldQueues(agentIds).pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("usage_limit_hold_failed", failure.cause))),
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+            Effect.asVoid,
+          ),
         // A channel task that went back to its queue is assigned again only by a pump.
-        released: () => {
-          Effect.runFork(
-            this.channels.wake().pipe(
-              Effect.catch((failure) =>
-                Effect.sync(() => this.#emitError("usage_limit_release_failed", failure.cause)),
-              ),
-              Effect.forkIn(this.#scope),
-            ),
-          );
-        },
+        released: () =>
+          this.channels.wake().pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("usage_limit_release_failed", failure.cause))),
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+            Effect.asVoid,
+          ),
       },
     });
     this.#drain = new DrainScheduler({
@@ -2442,7 +2436,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * Gives a channel task that a spent plan holds back to its channel, so its assignment does not
    * reserve the host until the reset. A task of a channel routine set to skip is dropped instead.
    */
-  #requeueChannelDelivery(deliveryId: string): boolean {
+  #requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean> {
     return this.channels.requeueForLimit(deliveryId);
   }
 
@@ -2461,7 +2455,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* this.channels.wake().pipe(Effect.mapError(failed));
     for (const agentId of agentIds) {
       for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
-        if (!this.channels.store.assignmentForDelivery(deliveryId) || !this.#requeueChannelDelivery(deliveryId))
+        if (
+          !this.channels.store.assignmentForDelivery(deliveryId) ||
+          !(yield* this.#requeueChannelDelivery(deliveryId))
+        )
           continue;
         yield* this.#mailbox.cancel(agentId, deliveryId).pipe(Effect.mapError(failed));
         this.#mailboxSync.emitQueue(agentId);

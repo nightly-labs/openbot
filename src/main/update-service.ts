@@ -10,10 +10,13 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
-import type { OpenBotSiblingInstance } from "./update-sibling-instances";
+import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
+
+const logger = createOpenBotLogger("update");
 
 /** Only the part of electron-updater's cancellation token this service depends on. */
 export type UpdateCancellationToken = {
@@ -89,7 +92,7 @@ interface UpdateServiceOptions {
   enabled: boolean;
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
-  checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
+  checkSiblingInstances?: () => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>;
   /** The uid of this process. It tells a refusal in this account apart from another account. */
   currentUid?: number;
   platform?: NodeJS.Platform;
@@ -221,7 +224,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     };
     this.on("diagnostic", (event) => {
       const directory = this.#options.logDirectory;
-      if (directory) void runUpdate(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      if (directory) this.#fork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
     });
     this.#recordStatus();
   }
@@ -272,7 +275,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       }
     });
     if (this.#options.platform === "darwin" && this.#options.shipItDirectory) {
-      void runUpdate(pruneShipItLogs(this.#options.shipItDirectory));
+      this.#fork(pruneShipItLogs(this.#options.shipItDirectory));
     }
 
     if (scheduleChecks && this.#options.enabled) {
@@ -528,7 +531,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #install(): Effect.Effect<void, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
       this.#pendingInstallRequests += 1;
-      const siblings = yield* updateIO(async () => (await this.#options.checkSiblingInstances?.()) ?? []).pipe(
+      const siblings = yield* Effect.suspend(
+        () => this.#options.checkSiblingInstances?.() ?? Effect.succeed<readonly OpenBotSiblingInstance[]>([]),
+      ).pipe(
+        Effect.mapError(({ cause }) => new UpdateOperationFailure({ cause })),
         Effect.ensuring(
           Effect.sync(() => {
             this.#pendingInstallRequests -= 1;
@@ -681,8 +687,35 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
   #scheduleCheck(delayMs: number): void {
     if (this.#checkTimer) clearTimeout(this.#checkTimer);
-    this.#checkTimer = setTimeout(() => void runUpdate(this.#check(false)), delayMs);
+    this.#checkTimer = setTimeout(() => this.#fork(this.#check(false)), delayMs);
     this.#checkTimer.unref?.();
+  }
+
+  /**
+   * Background work that nobody waits for, kept in this service's scope. A failure that the work
+   * did not record in the status is logged.
+   */
+  #fork(work: Effect.Effect<unknown, UpdateOperationFailure>): void {
+    Effect.runFork(
+      Effect.forkIn(
+        // Logged as an error, as the unhandled rejection it replaces was; a stop is not a failure.
+        work.pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.void
+              : Effect.sync(() => {
+                  const error = Cause.squash(cause);
+                  logger.error(
+                    "Background update work failed.",
+                    toLogValue(error instanceof UpdateOperationFailure ? error.cause : error),
+                  );
+                }),
+          ),
+        ),
+        this.#workScope,
+        { startImmediately: true },
+      ),
+    );
   }
 
   #clearPhaseTimer(): void {
@@ -879,9 +912,4 @@ function updateIO<A>(operation: () => Promise<A>): Effect.Effect<A, UpdateOperat
 }
 function updateSync<A>(operation: () => A): Effect.Effect<A, UpdateOperationFailure> {
   return Effect.try({ try: operation, catch: (cause) => new UpdateOperationFailure({ cause }) });
-}
-async function runUpdate<A>(operation: Effect.Effect<A, UpdateOperationFailure>): Promise<A> {
-  const result = await Effect.runPromise(Effect.result(operation));
-  if (Result.isFailure(result)) throw result.failure.cause;
-  return result.success;
 }

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { UpdateBusyPhase } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase, UPDATE_BUSY_PHASES } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { UpdateCancellationToken, UpdateCheckOutcome } from "./update-service";
@@ -16,7 +17,7 @@ import {
   supportsInstalledUpdates,
   UpdateService,
 } from "./update-service";
-import type { OpenBotSiblingInstance } from "./update-sibling-instances";
+import { type OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const CHECK_TIMEOUT = 1_000;
 const CHECK_INTERVAL = 10_000;
@@ -62,7 +63,7 @@ function createService(
     beforeInstall?: () => Promise<void>;
     autoDownload?: boolean;
     checkIntervalMs?: number;
-    checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
+    checkSiblingInstances?: () => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>;
     currentUid?: number;
   } = {},
 ) {
@@ -270,7 +271,7 @@ describe("UpdateService", () => {
     makeUpdateAvailable(updater);
     completeDownload(updater);
     let siblings: readonly OpenBotSiblingInstance[] = [{ pid: 4242, uid: 502 }];
-    const checkSiblingInstances = vi.fn(async () => siblings);
+    const checkSiblingInstances = vi.fn(() => Effect.sync(() => siblings));
     const service = createService(updater, { platform: "darwin", beforeInstall, checkSiblingInstances });
     service.start(false);
 
@@ -296,10 +297,12 @@ describe("UpdateService", () => {
     const beforeInstall = vi.fn(async () => undefined);
     makeUpdateAvailable(updater);
     completeDownload(updater);
-    const checkSiblingInstances = vi.fn(async () => [
-      { pid: 4242, uid: 501 },
-      { pid: 4343, uid: 501 },
-    ]);
+    const checkSiblingInstances = vi.fn(() =>
+      Effect.succeed([
+        { pid: 4242, uid: 501 },
+        { pid: 4343, uid: 501 },
+      ]),
+    );
     const service = createService(updater, {
       platform: "darwin",
       beforeInstall,
@@ -325,10 +328,11 @@ describe("UpdateService", () => {
     const service = createService(updater, {
       platform: "darwin",
       beforeInstall,
-      checkSiblingInstances: async () => [
-        { pid: 4242, uid: 502 },
-        { pid: 4343, uid: 501 },
-      ],
+      checkSiblingInstances: () =>
+        Effect.succeed([
+          { pid: 4242, uid: 502 },
+          { pid: 4343, uid: 501 },
+        ]),
       currentUid: 501,
     });
     service.start(false);
@@ -364,9 +368,7 @@ describe("UpdateService", () => {
     const service = createService(updater, {
       platform: "darwin",
       beforeInstall,
-      checkSiblingInstances: async () => {
-        throw new Error("scan failed");
-      },
+      checkSiblingInstances: () => Effect.fail(new SiblingScanFailed({ cause: new Error("scan failed") })),
     });
     service.start(false);
     await runCauseEffect(service.checkForUpdates());
@@ -418,7 +420,7 @@ describe("UpdateService", () => {
       finishPrepare = resolve;
     });
     const beforeInstall = vi.fn(() => prepare);
-    const service = createService(updater, { beforeInstall, checkSiblingInstances: () => scan });
+    const service = createService(updater, { beforeInstall, checkSiblingInstances: () => Effect.promise(() => scan) });
     service.start(false);
     await runCauseEffect(service.checkForUpdates());
     await runCauseEffect(service.downloadUpdate());

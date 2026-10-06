@@ -77,16 +77,16 @@ import { TEAM_CURSOR_CLINE_CAPABILITY, TEAM_PROTOCOL_V6 } from "@openbot/contrac
 import { encodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Effect } from "effect";
+import { Deferred, Effect } from "effect";
 import type * as Ws from "ws";
-import { duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
+import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
 import { RemoteScreenError } from "./remote-screen-gateway";
-import { type RemoteWorkflowError, remoteCall } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { isClientUse } from "./team-api/client-use";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -183,7 +183,10 @@ export class TeamApiServer {
     ServerResponse,
     { method: string; path: string; protocol: number; capabilities: Set<string>; hiddenAgentIds?: ReadonlySet<string> }
   >();
-  readonly #duplicateRequests = new Map<string, { sourceAgentId: string; result: Promise<DuplicateAgentResult> }>();
+  readonly #duplicateRequests = new Map<
+    string,
+    { sourceAgentId: string; result: Deferred.Deferred<DuplicateAgentResult, AgentDuplicationFailed> }
+  >();
   readonly #webSockets = new webSockets.WebSocketServer({
     noServer: true,
     maxPayload: EVENT_PAYLOAD_LIMIT,
@@ -221,18 +224,19 @@ export class TeamApiServer {
 
   // Without the gate, two starts at once open two listeners and lose one, and a stop during a start
   // runs before the listener exists. A listener lost that way stays open for the previous account.
-  start(): Promise<number> {
-    return runCauseEffect(this.#lifecycle.start(() => remoteCall(() => this.#start())));
+  start(): Effect.Effect<number, RemoteWorkflowError> {
+    return this.#lifecycle.start(() => this.#start());
   }
 
-  stop(): Promise<void> {
-    return runCauseEffect(this.#lifecycle.stop(() => remoteCall(() => this.#stop())));
+  stop(): Effect.Effect<void, RemoteWorkflowError> {
+    return this.#lifecycle.stop(() => this.#stop());
   }
 
-  async #start(): Promise<number> {
+  readonly #start = Effect.fn("TeamApiServer.start")(function* (this: TeamApiServer) {
     if (this.#server && this.#port) return this.#port;
-    this.#server = createServer((request, response) => void this.#handle(request, response));
-    this.#server.on("upgrade", (request, socket, head) => {
+    const server = createServer((request, response) => void this.#handle(request, response));
+    this.#server = server;
+    server.on("upgrade", (request, socket, head) => {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
       if (this.#options.remoteScreen?.handlesUpgrade(url)) {
         this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
@@ -287,12 +291,17 @@ export class TeamApiServer {
       socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
       socket.destroy();
     });
-    await new Promise<void>((resolve, reject) => {
-      this.#server?.once("error", reject);
-      this.#server?.listen(0, "127.0.0.1", () => resolve());
-    });
-    const address = this.#server.address();
-    if (!address || isString(address)) throw new Error(sourceText("error.team.bindFailed"));
+    yield* remoteCall(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(0, "127.0.0.1", () => resolve());
+        }),
+    );
+    const address = server.address();
+    if (!address || isString(address)) {
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.bindFailed")) });
+    }
     this.#port = address.port;
     this.#agentListener = (event) => this.#broadcastAgentEvent(event);
     this.#options.agents.on("event", this.#agentListener);
@@ -307,10 +316,10 @@ export class TeamApiServer {
     }, 15_000);
     this.#heartbeat.unref?.();
     this.#publishPresence();
-    return this.#port;
-  }
+    return address.port;
+  }).bind(this);
 
-  async #stop(): Promise<void> {
+  readonly #stop = Effect.fn("TeamApiServer.stop")(function* (this: TeamApiServer) {
     if (this.#heartbeat) clearInterval(this.#heartbeat);
     this.#heartbeat = null;
     if (this.#agentListener) this.#options.agents.off("event", this.#agentListener);
@@ -324,20 +333,30 @@ export class TeamApiServer {
     }
     this.#eventClients.clear();
     this.#localTypingAgentId = null;
-    try {
-      await (this.#options.remoteScreen ? runCauseEffect(this.#options.remoteScreen.stop()) : undefined);
-      await (this.#options.browserView ? runCauseEffect(this.#options.browserView.stop()) : undefined);
-    } finally {
-      // The heartbeat and the event listeners are already gone. Leaving the socket open
-      // would let the next `start()` hand back its port unchanged, so the previous account
-      // keeps a listener that no longer checks a revoked session or delivers an event.
-      const server = this.#server;
-      this.#server = null;
-      this.#port = null;
-      if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
-      this.#publishPresence();
-    }
-  }
+    const { remoteScreen, browserView } = this.#options;
+    yield* Effect.gen(function* () {
+      if (remoteScreen) yield* remoteScreen.stop();
+      if (browserView) yield* browserView.stop();
+    }).pipe(
+      Effect.mapError((error) => new RemoteWorkflowError({ cause: error.cause })),
+      Effect.ensuring(
+        Effect.gen({ self: this }, function* () {
+          // The heartbeat and the event listeners are already gone. Leaving the socket open
+          // would let the next `start()` hand back its port unchanged, so the previous account
+          // keeps a listener that no longer checks a revoked session or delivers an event.
+          const server = this.#server;
+          this.#server = null;
+          this.#port = null;
+          if (server) {
+            yield* Effect.callback<void>((resume) => {
+              server.close(() => resume(Effect.void));
+            });
+          }
+          this.#publishPresence();
+        }),
+      ),
+    );
+  }).bind(this);
 
   getPresence(): TeamPresenceSnapshot {
     const identity = this.#options.store.getIdentity();
@@ -1155,25 +1174,43 @@ export class TeamApiServer {
     return this.#options.chat;
   }
 
-  #duplicateAgent(sourceAgentId: string, operationId: string): Promise<DuplicateAgentResult> {
-    const committed = this.#options.agents.committedAgentDuplication(operationId, sourceAgentId);
-    if (committed) {
-      return Promise.resolve({ agent: committed.agent, layout: this.#options.sidebarLayout.getSnapshot() });
-    }
-    const pending = this.#duplicateRequests.get(operationId);
-    if (pending) {
-      if (pending.sourceAgentId !== sourceAgentId) {
-        return Promise.reject(new Error("This agent duplication operation belongs to another source agent."));
+  /** Concurrent requests with one operation id share one duplication. */
+  #duplicateAgent(
+    sourceAgentId: string,
+    operationId: string,
+  ): Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed> {
+    return Effect.suspend(() => {
+      const committed = this.#options.agents.committedAgentDuplication(operationId, sourceAgentId);
+      if (committed) {
+        return Effect.succeed({ agent: committed.agent, layout: this.#options.sidebarLayout.getSnapshot() });
       }
-      return pending.result;
-    }
-    const result = runCauseEffect(
-      duplicateAgentIntoLayout(this.#options.agents, this.#options.sidebarLayout, sourceAgentId, operationId),
-    ).finally(() => {
-      this.#duplicateRequests.delete(operationId);
+      const pending = this.#duplicateRequests.get(operationId);
+      if (pending) {
+        if (pending.sourceAgentId !== sourceAgentId) {
+          return Effect.fail(
+            new AgentDuplicationFailed({
+              cause: new Error("This agent duplication operation belongs to another source agent."),
+            }),
+          );
+        }
+        return Deferred.await(pending.result);
+      }
+      const result = Deferred.makeUnsafe<DuplicateAgentResult, AgentDuplicationFailed>();
+      this.#duplicateRequests.set(operationId, { sourceAgentId, result });
+      return duplicateAgentIntoLayout(
+        this.#options.agents,
+        this.#options.sidebarLayout,
+        sourceAgentId,
+        operationId,
+      ).pipe(
+        Effect.onExit((exit) => {
+          this.#duplicateRequests.delete(operationId);
+          return Deferred.done(result, exit);
+        }),
+        // The first request owns the operation; the requests that share it wait for its end.
+        Effect.uninterruptible,
+      );
     });
-    this.#duplicateRequests.set(operationId, { sourceAgentId, result });
-    return result;
   }
 
   #requireDirectRecipient(senderMemberId: string, recipientMemberId: string): TeamMemberSummary {

@@ -111,7 +111,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #publishing = false;
   readonly #workScope = Scope.makeUnsafe();
   readonly #onStatus = (status: UpdateStatus) => {
-    void runCauseEffect(this.#advance(status));
+    Effect.runFork(Effect.forkIn(this.#advance(status), this.#workScope, { startImmediately: true }));
   };
 
   constructor(options: RequestedUpdateOptions) {

@@ -42,7 +42,7 @@ export interface DrainHooks {
    */
   redactMcp(text: string): string;
   /** Gives a channel task back to its channel after a spent plan refused it; false when it cannot go back. */
-  requeueChannelDelivery(deliveryId: string): boolean;
+  requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
 }
 
 export interface DrainSchedulerOptions {
@@ -574,7 +574,7 @@ export class DrainScheduler {
             }
             // Before the requeue, so the channel does not assign the task to this agent again at once.
             yield* this.#usageLimits.reached(delivery.recipientAgentId, null, requestedModel);
-            if (this.#hooks.requeueChannelDelivery(delivery.id)) {
+            if (yield* this.#hooks.requeueChannelDelivery(delivery.id)) {
               yield* this.#mailbox
                 .markTerminal(delivery.id, "interrupted", null)
                 .pipe(Effect.mapError((failure) => new DeliveryStartFailed({ cause: failure.cause })));

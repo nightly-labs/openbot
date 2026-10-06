@@ -27,6 +27,8 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
+import type { AgentDuplicationFailed } from "../../backend/agent/duplication-gate";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
@@ -58,7 +60,7 @@ export interface AgentRouteDependencies {
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
-  duplicateAgent: (agentId: string, operationId: string) => Promise<DuplicateAgentResult>;
+  duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
 }
 
 export async function routeAgents(
@@ -214,7 +216,7 @@ export async function routeAgents(
     }
     if (method === "POST" && action === "duplicate") {
       const body = await readJson(request);
-      return json(201, await duplicateAgent(agentId, stringField(body, "operationId")));
+      return json(201, await runCauseEffect(duplicateAgent(agentId, stringField(body, "operationId"))));
     }
     if (method === "DELETE" && !action) {
       if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));

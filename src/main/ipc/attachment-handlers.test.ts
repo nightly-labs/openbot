@@ -7,6 +7,7 @@ import { translateFor } from "@openbot/i18n";
 import { Effect } from "effect";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCauseEffect } from "../../backend/effect-boundary";
 
 type Invoke = (event: { senderFrame: { url: string } }, payload: unknown) => Promise<void>;
 const { bound, saveDialog, openPath, showItemInFolder, userData } = vi.hoisted(() => ({
@@ -22,7 +23,7 @@ vi.mock("electron", () => ({
   shell: { openPath, showItemInFolder },
   ipcMain: { handle: (channel: string, invoke: Invoke) => bound.set(channel, invoke) },
 }));
-const { saveAttachmentArchive, attachmentIpcHandlers } = await import("./attachment-handlers");
+const { AttachmentArchiveFailed, saveAttachmentArchive, attachmentIpcHandlers } = await import("./attachment-handlers");
 const directories: string[] = [];
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
@@ -43,10 +44,12 @@ const input = {
 describe("attachment ZIP downloads", () => {
   it("preserves bytes and order while making duplicate and unsafe names safe", async () => {
     const path = await destination();
-    await saveAttachmentArchive(
-      input,
-      async () => path,
-      async (item) => new TextEncoder().encode(item.id),
+    await runCauseEffect(
+      saveAttachmentArchive(
+        input,
+        () => Effect.succeed(path),
+        (item) => Effect.sync(() => new TextEncoder().encode(item.id)),
+      ),
     );
     const files = unzipSync(await readFile(path));
     expect(Object.keys(files)).toEqual(["./report.txt", "./report (2).txt", "./REPORT (2) (2).txt"]);
@@ -55,22 +58,26 @@ describe("attachment ZIP downloads", () => {
   });
   it("does not read any attachments when the save dialog is cancelled", async () => {
     const read = vi.fn();
-    await saveAttachmentArchive(input, async () => undefined, read);
+    await runCauseEffect(saveAttachmentArchive(input, () => Effect.succeed(undefined), read));
     expect(read).not.toHaveBeenCalled();
   });
   it.each(["missing", "file limit", "total limit"])("keeps the destination unchanged after %s", async (failure) => {
     const path = await destination();
     await writeFile(path, "existing");
     await expect(
-      saveAttachmentArchive(
-        input,
-        async () => path,
-        async () => {
-          if (failure === "missing") throw new Error("Attachment was not found.");
-          return new Uint8Array(
-            failure === "file limit" ? ATTACHMENT_LIMITS.fileBytes + 1 : ATTACHMENT_LIMITS.fileBytes,
-          );
-        },
+      runCauseEffect(
+        saveAttachmentArchive(
+          input,
+          () => Effect.succeed(path),
+          () =>
+            failure === "missing"
+              ? Effect.fail(new AttachmentArchiveFailed({ cause: new Error("Attachment was not found.") }))
+              : Effect.succeed(
+                  new Uint8Array(
+                    failure === "file limit" ? ATTACHMENT_LIMITS.fileBytes + 1 : ATTACHMENT_LIMITS.fileBytes,
+                  ),
+                ),
+        ),
       ),
     ).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe("existing");
@@ -80,10 +87,12 @@ describe("attachment ZIP downloads", () => {
     const path = await destination();
     const directory = join(path, "..");
     await expect(
-      saveAttachmentArchive(
-        input,
-        async () => directory,
-        async () => new Uint8Array([1]),
+      runCauseEffect(
+        saveAttachmentArchive(
+          input,
+          () => Effect.succeed(directory),
+          () => Effect.succeed(new Uint8Array([1])),
+        ),
       ),
     ).rejects.toThrow();
     expect(await readdir(directory)).toEqual([]);

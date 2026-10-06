@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { RemoteWorkflowError } from "./remote-service-effects";
 // @vitest-environment node
 
@@ -74,8 +75,8 @@ describe("TeamApiServer teardown", () => {
       browser: createBrowser(),
     });
 
-    const starts = Promise.all([api.start(), api.start()]);
-    await api.stop();
+    const starts = Promise.all([runCauseEffect(api.start()), runCauseEffect(api.start())]);
+    await runCauseEffect(api.stop());
     const [first, second] = await starts;
 
     expect(second).toBe(first);

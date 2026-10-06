@@ -21,7 +21,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await server?.close();
+  if (server) await Effect.runPromise(server.close());
   server = null;
   await rm(directory, { recursive: true, force: true });
 });
@@ -139,26 +139,26 @@ describe("ServerMode control socket", () => {
   it("refuses a runtime directory that another user can enter", async () => {
     await chmod(directory, 0o750);
     server = fixture().mode;
-    await expect(server.listen()).rejects.toThrow("private directory");
+    await expect(runCauseEffect(server.listen())).rejects.toThrow("private directory");
   });
 
   it("keeps a file at the socket path that is not a socket", async () => {
     await writeFile(join(directory, "control.sock"), "not ours");
     server = fixture().mode;
-    await expect(server.listen()).rejects.toThrow("another file");
+    await expect(runCauseEffect(server.listen())).rejects.toThrow("another file");
     expect((await stat(join(directory, "control.sock"))).isFile()).toBe(true);
   });
 
   it("makes a socket that only its owner can open", async () => {
     server = fixture().mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     expect((await stat(join(directory, "control.sock"))).mode & 0o777).toBe(0o600);
   });
 
   it("signs in with an email code, never sends the session back, and publishes once", async () => {
     const { mode, host, centralAuth } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
 
     const started = await send("POST", "/v1/login/start", "email=owner%40example.com");
     expect(started).toEqual({ status: 200, text: "challenge=challenge-1\nexpires_at=1\n" });
@@ -187,7 +187,7 @@ describe("ServerMode control socket", () => {
   it("shows why publishing failed, on one line", async () => {
     const { mode, host } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     await send("POST", "/v1/login/verify", "challenge=challenge-1&code=123456");
     host.configure.mockReturnValueOnce(
       Effect.fail(new RemoteWorkflowError({ cause: new Error("Refused.\naccount=x") })),
@@ -203,7 +203,7 @@ describe("ServerMode control socket", () => {
   it("refuses a body that is too large and an unknown request", async () => {
     const { mode, centralAuth } = fixture();
     server = mode;
-    await server.listen();
+    await runCauseEffect(server.listen());
     const large = await send("POST", "/v1/login/start", `email=${"a".repeat(5000)}%40example.com`);
     expect(large).toEqual({ status: 413, text: "error=too_large\n" });
     expect(centralAuth.requestEmailCode).not.toHaveBeenCalled();

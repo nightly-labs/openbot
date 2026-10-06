@@ -8,7 +8,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import type { Effect } from "effect";
+import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
@@ -22,6 +22,15 @@ const HOUR_MS = 60 * 60 * 1000;
 // A payload is at most 4,000 characters; four UTF-8 bytes each plus JSON escapes stay below this.
 const BODY_LIMIT_BYTES = 32 * 1024;
 const RUN_PATH = /^\/v1\/agents\/([^/]+)\/routines\/([^/]+)\/run$/;
+
+/** A start or close that failed. It is only logged; the next `sync` tries again. */
+class AutomationServerFailed extends Schema.TaggedError<AutomationServerFailed>()("AutomationServerFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+function automationIO<A>(operation: () => Promise<A>): Effect.Effect<A, AutomationServerFailed> {
+  return Effect.tryPromise({ try: operation, catch: (cause) => new AutomationServerFailed({ cause }) });
+}
 
 export interface AutomationServerOptions {
   /** The folder that holds the URL and token files. Only the user can read it. */
@@ -52,7 +61,10 @@ export class AutomationServer {
   #server: Server | null = null;
   #port = 0;
   #token: Buffer = Buffer.alloc(0);
-  #queue: Promise<void> = Promise.resolve();
+  /** One state change at a time, in the order the calls came. */
+  readonly #lock = Semaphore.makeUnsafe(1);
+  /** The background syncs that `requestSync` starts; `stop` interrupts those that still wait. */
+  readonly #scope = Scope.makeUnsafe();
   #stopped = false;
   /** False until the first close, which also removes files that a crash left behind. */
   #filesClean = false;
@@ -62,84 +74,104 @@ export class AutomationServer {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Starts or stops the listener to match the agents' setting. Calls run in order. */
-  sync(): Promise<void> {
-    return this.#enqueue(async () => {
-      const wanted = !this.#stopped && this.#options.listAgents().some(agentAutomationAllowed);
-      if (wanted && !this.#server) await this.#start();
-      else if (!wanted) await this.#close();
-    });
-  }
+  /** Starts or stops the listener to match the agents' setting. Calls run in order. Never fails. */
+  readonly sync = Effect.fn("AutomationServer.sync")(function* (this: AutomationServer) {
+    yield* this.#step(
+      Effect.suspend(() => {
+        const wanted = !this.#stopped && this.#options.listAgents().some(agentAutomationAllowed);
+        if (wanted && !this.#server) return this.#start();
+        if (!wanted) return this.#close();
+        return Effect.void;
+      }),
+    );
+  }).bind(this);
 
-  stop(): Promise<void> {
+  /** Starts a `sync` that nobody waits for. `stop` interrupts it while it waits for its turn. */
+  readonly requestSync = Effect.fn("AutomationServer.requestSync")(function* (this: AutomationServer) {
+    yield* Effect.forkIn(this.sync(), this.#scope, { startImmediately: true });
+  }).bind(this);
+
+  readonly stop = Effect.fn("AutomationServer.stop")(function* (this: AutomationServer) {
     this.#stopped = true;
-    return this.#enqueue(() => this.#close());
+    yield* Scope.close(this.#scope, Exit.void);
+    yield* this.#step(this.#close());
+  }).bind(this);
+
+  /** Never fails: a failed start is logged, and the next `sync` tries again. */
+  #step(step: Effect.Effect<void, AutomationServerFailed>): Effect.Effect<void> {
+    return this.#lock.withPermit(
+      step.pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The automation server could not change state.", error.cause)),
+        ),
+        // A step that started finishes, so the files and the listener always agree.
+        Effect.uninterruptible,
+      ),
+    );
   }
 
-  /** Never rejects: a failed start is logged, and the next `sync` tries again. */
-  #enqueue(step: () => Promise<void>): Promise<void> {
-    this.#queue = this.#queue
-      .then(step)
-      .catch((error) => logger.warn("The automation server could not change state.", error));
-    return this.#queue;
-  }
-
-  async #start(): Promise<void> {
+  readonly #start = Effect.fn("AutomationServer.start")(function* (this: AutomationServer) {
     const token = randomBytes(32).toString("base64url");
     registerSecretValue(token);
     const server = createServer((request, response) => void this.#handle(request, response));
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => {
-        server.off("error", reject);
-        resolve();
-      });
-    });
+    yield* automationIO(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(0, "127.0.0.1", () => {
+            server.off("error", reject);
+            resolve();
+          });
+        }),
+    );
     const address = server.address();
     if (!address || isString(address)) {
       server.close();
-      throw new Error("Unable to bind the automation server.");
+      return yield* new AutomationServerFailed({ cause: new Error("Unable to bind the automation server.") });
     }
     this.#server = server;
     this.#port = address.port;
     this.#token = Buffer.from(token);
     this.#filesClean = false;
-    try {
-      const { root } = this.#options;
-      await mkdir(root, { recursive: true, mode: 0o700 });
+    const { root } = this.#options;
+    const port = this.#port;
+    yield* Effect.gen(function* () {
+      yield* automationIO(() => mkdir(root, { recursive: true, mode: 0o700 }));
       // `mkdir` keeps the mode of a folder that already exists.
-      if (process.platform !== "win32") await chmod(root, 0o700);
+      if (process.platform !== "win32") yield* automationIO(() => chmod(root, 0o700));
       // The token first: a script that finds the new URL also finds the token that goes with it.
-      await runCauseEffect(writeFileAtomically(join(root, AUTOMATION_TOKEN_FILE), token));
-      await runCauseEffect(
-        writeFileAtomically(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`),
-      );
-      await runCauseEffect(writeFileAtomically(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${this.#port}`));
-    } catch (error) {
+      yield* writeAutomationFile(join(root, AUTOMATION_TOKEN_FILE), token);
+      yield* writeAutomationFile(join(root, AUTOMATION_HEADERS_FILE), `Authorization: Bearer ${token}\n`);
+      yield* writeAutomationFile(join(root, AUTOMATION_URL_FILE), `http://127.0.0.1:${port}`);
+    }).pipe(
       // Closed, so that the next `sync` starts again instead of keeping a door nobody can find.
-      await this.#close();
-      throw error;
-    }
+      Effect.catch((error) => Effect.andThen(this.#close(), Effect.fail(error))),
+    );
     logger.info(`The automation server listens on port ${this.#port}.`);
-  }
+  }).bind(this);
 
-  async #close(): Promise<void> {
+  readonly #close = Effect.fn("AutomationServer.close")(function* (this: AutomationServer) {
     const server = this.#server;
     if (!server && this.#filesClean) return;
     this.#server = null;
     this.#token = Buffer.alloc(0);
     this.#runs.clear();
-    await Promise.all(
-      [AUTOMATION_URL_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_HEADERS_FILE].map((name) =>
-        rm(join(this.#options.root, name), { force: true }),
+    const { root } = this.#options;
+    yield* automationIO(() =>
+      Promise.all(
+        [AUTOMATION_URL_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_HEADERS_FILE].map((name) =>
+          rm(join(root, name), { force: true }),
+        ),
       ),
     );
     this.#filesClean = true;
     if (!server) return;
     server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    yield* Effect.callback<void>((resume) => {
+      server.close(() => resume(Effect.void));
+    });
     logger.info("The automation server stopped.");
-  }
+  }).bind(this);
 
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     try {
@@ -235,6 +267,12 @@ export class AutomationServer {
     const candidate = Buffer.from(header.slice(7));
     return candidate.length === this.#token.length && timingSafeEqual(candidate, this.#token);
   }
+}
+
+function writeAutomationFile(path: string, content: string): Effect.Effect<void, AutomationServerFailed> {
+  return writeFileAtomically(path, content).pipe(
+    Effect.mapError((error) => new AutomationServerFailed({ cause: error.cause })),
+  );
 }
 
 /** A path segment, or null when its percent encoding is not valid. */

@@ -373,11 +373,9 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
     if (systemSessionEndFlushStarted) return;
     systemSessionEndFlushStarted = true;
     if (services) void Effect.runPromise(services.updater.stop());
-    void windows
-      .flushMainWindowBounds()
-      .catch((error) =>
-        logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
-      );
+    void runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
+      logger.error("Unable to save the main window position before Windows session end:", toLogValue(error)),
+    );
     if (services)
       void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
@@ -390,11 +388,9 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
   window.on("session-end", () => {
     systemSessionEnding = true;
     isQuitting = true;
-    void windows
-      .flushMainWindowBounds()
-      .catch((error) =>
-        logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
-      );
+    void runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
+      logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
+    );
     if (services)
       void runCauseEffect(services.browser.flushPersistentStorage()).catch((error) =>
         logger.error("Unable to flush browser storage during Windows session end:", toLogValue(error)),
@@ -829,7 +825,7 @@ if (!hasSingleInstanceLock) {
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
       configureContentSecurityPolicy();
       configureRendererPermissions();
-      await windows.restoreMainWindowBounds();
+      await Effect.runPromise(windows.restoreMainWindowBounds());
       const mainWindow = windows.openMainWindow();
 
       const built = await createApplicationServices({
@@ -940,16 +936,16 @@ if (!hasSingleInstanceLock) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLogoColorPreference, preference);
         }
       });
-      await dynamicIsland
-        .initialize()
-        .catch((error) => logger.error("Unable to initialize Dynamic Island:", toLogValue(error)));
+      await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
+        logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
+      );
       await windows.loadRenderer(mainWindow);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       const reconcileDynamicIsland = () =>
-        void dynamicIsland
-          .reconcileWindow()
-          .catch((error) => logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)));
+        void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
+          logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
+        );
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
@@ -1101,9 +1097,9 @@ async function prepareForShutdown(): Promise<void> {
   isQuitting = true;
   forceExitAfterShutdownDeadline();
   if (services) Effect.runFork(services.updater.stop());
-  await windows
-    .flushMainWindowBounds()
-    .catch((error) => logger.error("Unable to save the main window position:", toLogValue(error)));
+  await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
+    logger.error("Unable to save the main window position:", toLogValue(error)),
+  );
   services?.dynamicIsland.destroy();
   macHapticFeedback.destroy();
   await teardown.runAll();

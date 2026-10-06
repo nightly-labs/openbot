@@ -19,6 +19,7 @@ import { ChannelHistory, type ChannelTextModel } from "./channel-history";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { type ChannelHooks, ChannelService, resourcesConflict } from "./channel-service";
 import { runChannel } from "./channel-test-runtime";
+import { runCauseEffect } from "./effect-boundary";
 
 let root: string;
 let service: ChannelService;
@@ -103,7 +104,7 @@ describe("shared channel coordination", () => {
     expect(service.mayDrain("agent-b")).toBe(false);
 
     busy.mockImplementation((agentId) => agentId === "agent-a");
-    expect(service.requeueForLimit(required(first.deliveryId))).toBe(true);
+    expect(await runCauseEffect(service.requeueForLimit(required(first.deliveryId)))).toBe(true);
     await runChannel(service.wake("channel-1"));
 
     expect(service.store.assignments("channel-1")).toEqual([

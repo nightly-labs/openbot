@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import { type Zippable, zip } from "fflate";
 import type { AgentService } from "../../backend/agent-service";
@@ -33,6 +34,7 @@ import type { MailboxStore } from "../../backend/mailbox-store";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import { remoteCall, remoteDecode } from "../remote-service-effects";
 import {
   agentRequest,
   parseAttachmentId,
@@ -81,7 +83,7 @@ export function attachmentIpcHandlers({
     attachmentImports: {
       importAttachments: scopedHandler(parseImportAttachments, {
         local: (parsed) => runCauseEffect(service.prepareImportedAttachments(parsed.paths, parsed.data)),
-        remote: (parsed, serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
+        remote: (parsed, serverId) => runCauseEffect(uploadRemoteImports(remoteServers, serverId, parsed)),
       }),
     },
     agentAttachments: {
@@ -113,7 +115,7 @@ export function attachmentIpcHandlers({
         if (result.canceled) return [];
         return routeToServer(serverId, {
           local: () => runCauseEffect(service.prepareAttachments(result.filePaths)),
-          remote: (target) => uploadRemotePaths(remoteServers, target, result.filePaths),
+          remote: (target) => runCauseEffect(uploadRemotePaths(remoteServers, target, result.filePaths)),
         });
       }),
       discardDraftAttachment: scopedHandler(parseAttachmentId, {
@@ -125,21 +127,27 @@ export function attachmentIpcHandlers({
       }),
       downloadAttachments: payloadHandler(agentRequest(parseDownloadAttachments), async (scoped) => {
         const parsed = scoped.payload;
-        await saveAttachmentArchive(
-          parsed,
-          () => chooseSavePath(getMainWindow(), translate, "attachments.zip"),
-          (item) =>
-            routeToServer(scoped.serverId, {
-              local: async () => {
-                const attachment = await runCauseEffect(mailbox.resolveAttachment(item.id));
-                if (!attachment) throw new Error(sourceText("error.attachment.notFound"));
-                if ((await stat(attachment.path)).size > ATTACHMENT_LIMITS.fileBytes)
-                  throw new Error(sourceText("error.attachment.fileTooLarge"));
-                return readFile(attachment.path);
-              },
-              remote: async (serverId) =>
-                (await runCauseEffect(remoteServers.downloadAttachment(item.id, serverId))).bytes,
-            }),
+        await runCauseEffect(
+          saveAttachmentArchive(
+            parsed,
+            () => archiveIO(() => chooseSavePath(getMainWindow(), translate, "attachments.zip")),
+            // `routeToServer` answers a Promise, and this port takes an Effect, so the branch is written out.
+            (item) =>
+              scoped.serverId === LOCAL_SERVER_ID
+                ? Effect.gen(function* () {
+                    const attachment = yield* mailbox
+                      .resolveAttachment(item.id)
+                      .pipe(Effect.mapError(({ cause }) => new AttachmentArchiveFailed({ cause })));
+                    if (!attachment) return yield* archiveFailure(sourceText("error.attachment.notFound"));
+                    if ((yield* archiveIO(() => stat(attachment.path))).size > ATTACHMENT_LIMITS.fileBytes)
+                      return yield* archiveFailure(sourceText("error.attachment.fileTooLarge"));
+                    return yield* archiveIO(() => readFile(attachment.path));
+                  })
+                : remoteServers.downloadAttachment(item.id, scoped.serverId).pipe(
+                    Effect.map((downloaded) => downloaded.bytes),
+                    Effect.mapError(({ cause }) => new AttachmentArchiveFailed({ cause })),
+                  ),
+          ),
         );
       }),
       openAttachment: payloadHandler(agentRequest(parseOpenAttachment), (scoped) =>
@@ -291,58 +299,62 @@ async function chooseSavePath(
   return result.canceled ? undefined : result.filePath || undefined;
 }
 
-async function uploadRemotePaths(
+const uploadRemotePaths = Effect.fn("AttachmentIpc.uploadRemotePaths")(function* (
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   paths: string[],
 ) {
-  if (paths.length > INPUT_LIMITS.attachments) {
-    throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
-  }
-  assertRemoteAttachmentSupport(
-    remoteServers,
-    serverId,
-    paths.map((path) => basename(path)),
+  yield* remoteDecode(() => {
+    if (paths.length > INPUT_LIMITS.attachments) {
+      throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
+    }
+    assertRemoteAttachmentSupport(
+      remoteServers,
+      serverId,
+      paths.map((path) => basename(path)),
+    );
+    for (const path of paths) assertSupportedAttachmentName(basename(path));
+  });
+  const files = yield* Effect.forEach(
+    paths,
+    (path) =>
+      remoteCall(() => readFile(path)).pipe(
+        Effect.map((bytes) => ({
+          name: basename(path),
+          mimeType: mimeTypeForName(path),
+          bytes: new Uint8Array(bytes),
+        })),
+      ),
+    { concurrency: "unbounded" },
   );
-  for (const path of paths) assertSupportedAttachmentName(basename(path));
-  const files = await Promise.all(
-    paths.map(async (path) => ({
-      name: basename(path),
-      bytes: new Uint8Array(await readFile(path)),
-    })),
-  );
-  const total = files.reduce((sum, file) => sum + file.bytes.byteLength, 0);
-  if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
-    throw new Error(sourceText("error.attachment.fileTooLarge"));
-  }
-  if (total > ATTACHMENT_LIMITS.totalBytes) {
-    throw new Error(sourceText("error.attachment.totalTooLarge"));
-  }
-  return Promise.all(
-    files.map((file) =>
-      runCauseEffect(remoteServers.uploadAttachment(file.name, mimeTypeForName(file.name), file.bytes, serverId)),
-    ),
-  );
-}
+  return yield* uploadRemoteFiles(remoteServers, serverId, files);
+});
 
-async function uploadRemoteImports(
+const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(function* (
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   input: ImportAttachmentsInput,
 ) {
-  if (input.paths.length + input.data.length > INPUT_LIMITS.attachments) {
-    throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
-  }
-  assertRemoteAttachmentSupport(remoteServers, serverId, [
-    ...input.paths.map((path) => basename(path)),
-    ...input.data.map((item) => basename(item.name)),
-  ]);
-  const pathFiles = await Promise.all(
-    input.paths.map(async (path) => ({
-      name: basename(path),
-      mimeType: mimeTypeForName(path),
-      bytes: new Uint8Array(await readFile(path)),
-    })),
+  yield* remoteDecode(() => {
+    if (input.paths.length + input.data.length > INPUT_LIMITS.attachments) {
+      throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
+    }
+    assertRemoteAttachmentSupport(remoteServers, serverId, [
+      ...input.paths.map((path) => basename(path)),
+      ...input.data.map((item) => basename(item.name)),
+    ]);
+  });
+  const pathFiles = yield* Effect.forEach(
+    input.paths,
+    (path) =>
+      remoteCall(() => readFile(path)).pipe(
+        Effect.map((bytes) => ({
+          name: basename(path),
+          mimeType: mimeTypeForName(path),
+          bytes: new Uint8Array(bytes),
+        })),
+      ),
+    { concurrency: "unbounded" },
   );
   const files = [
     ...pathFiles,
@@ -352,15 +364,29 @@ async function uploadRemoteImports(
       bytes: item.bytes,
     })),
   ];
-  for (const file of files) assertSupportedAttachmentName(file.name);
-  if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
-    throw new Error(sourceText("error.attachment.fileTooLarge"));
-  }
-  if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > ATTACHMENT_LIMITS.totalBytes) {
-    throw new Error(sourceText("error.attachment.totalTooLarge"));
-  }
-  return Promise.all(
-    files.map((file) => runCauseEffect(remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId))),
+  return yield* uploadRemoteFiles(remoteServers, serverId, files);
+});
+
+/** Checks the names and sizes, then uploads every file at once, as one import. */
+function uploadRemoteFiles(
+  remoteServers: AttachmentIpcDependencies["remoteServers"],
+  serverId: string,
+  files: { name: string; mimeType: string; bytes: Uint8Array }[],
+) {
+  return remoteDecode(() => {
+    for (const file of files) assertSupportedAttachmentName(file.name);
+    if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
+      throw new Error(sourceText("error.attachment.fileTooLarge"));
+    }
+    if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > ATTACHMENT_LIMITS.totalBytes) {
+      throw new Error(sourceText("error.attachment.totalTooLarge"));
+    }
+  }).pipe(
+    Effect.andThen(
+      Effect.forEach(files, (file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId), {
+        concurrency: "unbounded",
+      }),
+    ),
   );
 }
 
@@ -382,22 +408,39 @@ function assertRemoteAttachmentSupport(
   throw new Error(sourceText("error.attachment.emlUnsupported"));
 }
 
+/** A ZIP download that failed. The cause is the error the renderer reads. */
+export class AttachmentArchiveFailed extends Schema.TaggedError<AttachmentArchiveFailed>()("AttachmentArchiveFailed", {
+  cause: Schema.Defect(),
+}) {}
+
+function archiveIO<A>(operation: () => Promise<A>): Effect.Effect<A, AttachmentArchiveFailed> {
+  return Effect.tryPromise({ try: operation, catch: (cause) => new AttachmentArchiveFailed({ cause }) });
+}
+
+function archiveFailure(message: string): Effect.Effect<never, AttachmentArchiveFailed> {
+  return Effect.fail(new AttachmentArchiveFailed({ cause: new Error(message) }));
+}
+
 // Names are archive labels only; file access always uses a managed attachment ID.
-export async function saveAttachmentArchive(
+export const saveAttachmentArchive = Effect.fn("Attachments.saveArchive")(function* (
   input: DownloadAttachmentsInput,
-  chooseDestination: () => Promise<string | undefined>,
-  readAttachment: (item: DownloadAttachmentsInput["attachments"][number]) => Promise<Uint8Array>,
-): Promise<void> {
-  const destination = await chooseDestination();
+  chooseDestination: () => Effect.Effect<string | undefined, AttachmentArchiveFailed>,
+  readAttachment: (
+    item: DownloadAttachmentsInput["attachments"][number],
+  ) => Effect.Effect<Uint8Array, AttachmentArchiveFailed>,
+) {
+  const destination = yield* chooseDestination();
   if (!destination) return;
   const files: Zippable = {};
   const usedNames = new Set<string>();
   let totalBytes = 0;
   for (const item of input.attachments) {
-    const bytes = await readAttachment(item);
+    const bytes = yield* readAttachment(item);
     totalBytes += bytes.byteLength;
-    if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) throw new Error(sourceText("error.attachment.fileTooLarge"));
-    if (totalBytes > ATTACHMENT_LIMITS.totalBytes) throw new Error(sourceText("error.attachment.totalTooLarge"));
+    if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)
+      return yield* archiveFailure(sourceText("error.attachment.fileTooLarge"));
+    if (totalBytes > ATTACHMENT_LIMITS.totalBytes)
+      return yield* archiveFailure(sourceText("error.attachment.totalTooLarge"));
     const safeName =
       item.name
         .replaceAll("\\", "/")
@@ -416,14 +459,14 @@ export async function saveAttachmentArchive(
     // A prefix prevents numeric filenames from being reordered by object enumeration.
     files[`./${name}`] = bytes;
   }
-  const archive = await new Promise<Uint8Array>((resolve, reject) => {
-    zip(files, { level: 6 }, (error, data) => (error ? reject(error) : resolve(data)));
+  const archive = yield* Effect.callback<Uint8Array, AttachmentArchiveFailed>((resume) => {
+    zip(files, { level: 6 }, (error, data) =>
+      resume(error ? Effect.fail(new AttachmentArchiveFailed({ cause: error })) : Effect.succeed(data)),
+    );
   });
   const temporary = `${destination}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, archive, { mode: 0o600, flag: "wx" });
-    await rename(temporary, destination);
-  } finally {
-    await rm(temporary, { force: true });
-  }
-}
+  yield* archiveIO(() => writeFile(temporary, archive, { mode: 0o600, flag: "wx" })).pipe(
+    Effect.andThen(archiveIO(() => rename(temporary, destination))),
+    Effect.ensuring(Effect.promise(() => rm(temporary, { force: true }))),
+  );
+});

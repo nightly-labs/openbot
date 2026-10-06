@@ -79,7 +79,7 @@ export interface TurnHooks {
    * Gives a channel task back to its channel's queue after a spent plan refused its turn. False
    * when the delivery is not an active channel assignment that can go back.
    */
-  requeueChannelDelivery(deliveryId: string): boolean;
+  requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
 }
 
 export interface TurnLifecycleOptions {
@@ -527,13 +527,16 @@ export class TurnLifecycle {
       return;
     }
     if (limited) yield* this.#usageLimits.reached(agentId, resetsAt, model);
-    else if (status === "completed") this.#usageLimits.completed(agentId, model);
+    else if (status === "completed") yield* this.#usageLimits.completed(agentId, model);
     // After the limit is recorded, so the channel does not assign the task to this agent again
     // before the reset. A channel that took the task back ends this turn as interrupted.
-    const outcome =
-      repeatable && channelTurn && deliveries.every(({ delivery }) => this.#hooks.requeueChannelDelivery(delivery.id))
-        ? "interrupted"
-        : status;
+    let requeued = repeatable && channelTurn;
+    for (const { delivery } of requeued ? deliveries : []) {
+      if (yield* this.#hooks.requeueChannelDelivery(delivery.id)) continue;
+      requeued = false;
+      break;
+    }
+    const outcome = requeued ? "interrupted" : status;
     if (outcome === "failed") this.#failedTurns.set(agentId, turnId);
     else this.#failedTurns.delete(agentId);
     const failure = refused
