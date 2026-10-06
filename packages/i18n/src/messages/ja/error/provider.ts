@@ -159,6 +159,8 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} は認証済みのアカウントを返しませんでした。",
   "error.provider.cliActivateFailed": "OpenBot は管理対象 CLI を有効にできませんでした。",
   "error.provider.cliBusyReconnect": "{provider} CLI はターンを処理中です。終わるまで待ってから再接続してください。",
+  "error.provider.opencodeCredentialsRejected":
+    "モデルプロバイダーが、選択したモデルの認証情報を拒否しました。OpenCode Zen または Go のモデルでは、設定で OpenCode のキーを更新または削除してください。Google など別のプロバイダーでは、`opencode auth login` を実行してもう一度サインインするか、環境変数の API キーを修正してください。その後、もう一度お試しいただくか、別のモデルを選択してください。\n{detail}",
   "error.provider.opencodeServiceFailure":
     "OpenCode のローカルサービスが失敗したため、このターンを完了できませんでした。もう一度お試しください。エラーが続く場合は、設定で OpenCode を再接続してください。",
   "error.provider.opencodeRateLimited":

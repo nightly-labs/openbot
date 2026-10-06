@@ -153,6 +153,8 @@ export const messages = {
   "error.provider.noAuthenticatedAccount": "{provider} não retornou uma conta autenticada.",
   "error.provider.cliActivateFailed": "O OpenBot não conseguiu ativar a CLI gerenciada.",
   "error.provider.cliBusyReconnect": "A CLI de {provider} está executando um turno. Aguarde o término e reconecte.",
+  "error.provider.opencodeCredentialsRejected":
+    "O provedor do modelo recusou as credenciais do modelo selecionado. Para um modelo OpenCode Zen ou Go, atualize ou remova a chave do OpenCode em Configurações. Para outro provedor, como o Google, execute `opencode auth login` para entrar novamente ou corrija a chave de API dele no ambiente. Depois, tente novamente ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeServiceFailure":
     "O OpenCode não conseguiu concluir este turno porque seu serviço local falhou. Tente novamente. Se o erro continuar, reconecte o OpenCode em Configurações.",
   "error.provider.opencodeRateLimited":

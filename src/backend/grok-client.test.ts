@@ -143,33 +143,43 @@ describe.sequential("GrokAgentClient", () => {
     }
   });
 
-  it("explains rejected OpenCode credentials and permits retry in the same session", async () => {
-    process.env.OPENBOT_FAKE_GROK_MODE = "opencode-auth-error";
-    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
-      provider: "opencode",
-      argv: ["acp"],
-      env: {},
-      signInMessage: "Connect OpenCode.",
-    });
-    const notifications: AppServerNotification[] = [];
-    client.on("notification", (event) => notifications.push(event));
-    client.start();
-    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
-    for (const text of ["Try", "Retry"]) {
-      await client.request("turn/start", { threadId: thread.id, input: [{ type: "text", text }] }, decodeTurnResponse);
-      await waitFor(
-        () => notifications.filter((event) => event.method === "turn/completed").length === (text === "Try" ? 1 : 2),
-      );
-    }
-    expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
-      expect.objectContaining({
-        message:
-          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
-      }),
-    ]);
-    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
-    expect(history.thread.turns?.map((turn) => turn.status)).toEqual(["failed", "completed"]);
-  });
+  // Google rejects a key with "API key not valid" (#1388).
+  it.each(["Invalid API key.", "API key not valid. Please pass a valid API key."])(
+    "explains rejected OpenCode credentials %s and permits retry in the same session",
+    async (reason) => {
+      process.env.OPENBOT_FAKE_GROK_MODE = "opencode-auth-error";
+      process.env.OPENBOT_FAKE_OPENCODE_ERROR = reason;
+      client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
+        provider: "opencode",
+        argv: ["acp"],
+        env: {},
+        signInMessage: "Connect OpenCode.",
+      });
+      const notifications: AppServerNotification[] = [];
+      client.on("notification", (event) => notifications.push(event));
+      client.start();
+      const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+      for (const text of ["Try", "Retry"]) {
+        await client.request(
+          "turn/start",
+          { threadId: thread.id, input: [{ type: "text", text }] },
+          decodeTurnResponse,
+        );
+        await waitFor(
+          () => notifications.filter((event) => event.method === "turn/completed").length === (text === "Try" ? 1 : 2),
+        );
+      }
+      expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
+        expect.objectContaining({
+          message: sourceText("error.provider.opencodeCredentialsRejected", {
+            detail: `RequestError: Internal error: ${reason}`,
+          }),
+        }),
+      ]);
+      const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+      expect(history.thread.turns?.map((turn) => turn.status)).toEqual(["failed", "completed"]);
+    },
+  );
 
   // Only the kind decides whether waiting helps, so a refusal must not read as a lost connection (#1163).
   it.each([
@@ -1009,7 +1019,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     if (mode.startsWith("opencode-")) {
       promptCounter += 1;
       if (mode === "opencode-auth-error" && promptCounter === 1) {
-        write({ id: message.id, error: { code: -32603, message: "Internal error: Invalid API key." } });
+        write({ id: message.id, error: { code: -32603, message: "Internal error: " + process.env.OPENBOT_FAKE_OPENCODE_ERROR } });
         return;
       }
       if (mode === "opencode-request-error") {

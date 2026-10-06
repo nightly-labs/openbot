@@ -1216,8 +1216,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = this.#redact(failureText(error));
       const message =
         this.provider === "opencode" &&
-        /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
-          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
+        // Google answers "API key not valid" (#1388).
+        /invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
+          ? sourceText("error.provider.opencodeCredentialsRejected", { detail })
           : this.provider === "opencode" && isOpenCodeServiceFailure(error)
             ? sourceText("error.provider.opencodeServiceFailure")
             : this.#openCodeRequestFailure(error, detail);
