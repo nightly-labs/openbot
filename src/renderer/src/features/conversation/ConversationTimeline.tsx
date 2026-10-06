@@ -26,7 +26,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
-import { PENDING_SEND_ID_PREFIX } from "./stores/pending-send-store";
+import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -342,6 +342,10 @@ export function ConversationTimeline() {
                   const state = pendingSend()?.state;
                   return state === "failed" || state === "waiting" ? state : "sending";
                 };
+                const pendingRetrySafe = () => {
+                  const send = pendingSend();
+                  return send ? pendingSendRetrySafe(send) : false;
+                };
                 const markerOnly = untrack(() => markerOnlyMessage(initialMessage));
                 // Consecutive markers keep the tighter marker gap so they read as one group.
                 const groupedWithMarker = createMemo(() => {
@@ -585,7 +589,7 @@ export function ConversationTimeline() {
                                 <PendingSendStatus
                                   state={pendingState()}
                                   error={pendingSend()?.error}
-                                  retrySafe={pendingSend()?.retrySafe ?? false}
+                                  retrySafe={pendingRetrySafe()}
                                   canEdit={!composerHasContent() && !editingDeliveryId()}
                                   onRetry={() => {
                                     const send = pendingSend();

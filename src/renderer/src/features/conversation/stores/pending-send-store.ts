@@ -32,6 +32,17 @@ export interface PendingSend {
 export type DeliverPendingSend = (send: PendingSend) => Promise<SendMessageResult>;
 
 /**
+ * How long Retry stays safe. The host answers a repeated `clientMessageId` for a day after it stored
+ * the message; half of that leaves room for a client clock that differs from the host's.
+ */
+const RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+/** Whether Retry cannot store the message twice: the host drops a repeat, and its window is still open. */
+export function pendingSendRetrySafe(send: PendingSend, now = Date.now()): boolean {
+  return send.retrySafe && now - Date.parse(send.createdAt) < RETRY_WINDOW_MS;
+}
+
+/**
  * Messages the user sent that the host has not drawn yet, per chat (`composerDraftKey`). They live
  * in memory only: after a reload the host transcript is the truth.
  */
@@ -108,6 +119,12 @@ export function createPendingSendStore() {
     const key = composerDraftKey(target);
     const send = find(key, clientMessageId);
     if (send?.state !== "failed" || !send.retrySafe) return;
+    if (!pendingSendRetrySafe(send)) {
+      // The host may have forgotten the id, so the row asks the user to check the chat instead.
+      send.retrySafe = false;
+      publish(key);
+      return;
+    }
     send.state = "waiting";
     send.error = null;
     publish(key);
