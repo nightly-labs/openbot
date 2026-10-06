@@ -1932,11 +1932,11 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 }
 
 /**
- * A message chunk that is the harness's own error report, such as "API Error: Connection lost
- * mid-response. The response above may be incomplete." A model streams small deltas, so its own
- * text does not start a chunk with this prefix.
+ * A message chunk that is the harness's own complete error report: "API Error: Connection lost
+ * mid-response. The response above may be incomplete." Only the full report matches, so answer text
+ * that starts with "API Error: " stays in the answer.
  */
-const HARNESS_ERROR_CHUNK = /^\s*API Error: /u;
+const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be incomplete\.\s*$/u;
 
 const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
 
