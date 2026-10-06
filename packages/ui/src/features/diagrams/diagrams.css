@@ -72,6 +72,8 @@
   left: var(--openbot-space-4);
   z-index: 2;
   width: min(360px, calc(100% - var(--openbot-space-8)));
+  /* The folded panel keeps its box, so the canvas under it still takes the pointer. */
+  pointer-events: none;
 }
 
 /* Canvas */
@@ -909,10 +911,45 @@
   backdrop-filter: blur(16px);
 }
 
+/* The launcher and the panel share one grid cell. Opening grows the panel out of the launcher's pill
+   with a clip that relaxes into the panel's own corners, with a little overshoot; closing folds it
+   back faster and without one. The panel's shadow sits outside its box, so the open clip leaves room. */
+.diagram-chat-morph {
+  --diagram-chat-open-duration: var(--openbot-duration-island-content);
+  --diagram-chat-close-duration: var(--openbot-duration-island-content-exit);
+  --diagram-chat-open-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --diagram-chat-launcher-height: 36px;
+  --diagram-chat-blur: 2px;
+  display: grid;
+  align-items: end;
+}
+
+.diagram-chat-morph > * {
+  grid-area: 1 / 1;
+}
+
 .diagram-chat-launcher.ui-button {
+  height: var(--diagram-chat-launcher-height);
+  justify-self: start;
   gap: var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
   padding-left: var(--openbot-space-1);
+  pointer-events: auto;
+  transition:
+    opacity var(--diagram-chat-open-duration) var(--openbot-ease-out),
+    filter var(--diagram-chat-open-duration) var(--openbot-ease-out),
+    scale var(--diagram-chat-open-duration) var(--openbot-ease-out);
+}
+
+.diagram-chat-morph[data-open="true"] .diagram-chat-launcher.ui-button {
+  scale: 0.97;
+  filter: blur(var(--diagram-chat-blur));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out),
+    filter var(--openbot-duration-fast) var(--openbot-ease-out),
+    scale var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 .diagram-chat {
@@ -921,6 +958,42 @@
   flex-direction: column;
   border-radius: var(--openbot-radius-xl);
   overflow: hidden;
+  clip-path: inset(calc(100% - var(--diagram-chat-launcher-height)) 24% 0 0 round var(--openbot-radius-pill));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    clip-path var(--diagram-chat-close-duration) var(--openbot-ease-out),
+    opacity var(--diagram-chat-close-duration) var(--openbot-ease-out);
+}
+
+.diagram-chat-morph[data-open="true"] .diagram-chat {
+  clip-path: inset(-32px round 0);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    clip-path var(--diagram-chat-open-duration) var(--diagram-chat-open-ease),
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+/* The content settles a beat after the shape, so the panel reads as opening, not appearing. */
+.diagram-chat > * {
+  filter: blur(var(--diagram-chat-blur));
+  opacity: 0;
+  translate: 0 var(--openbot-space-2);
+  transition:
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out),
+    filter var(--openbot-duration-fast) var(--openbot-ease-out),
+    translate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.diagram-chat-morph[data-open="true"] .diagram-chat > * {
+  filter: blur(0);
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity var(--diagram-chat-open-duration) var(--openbot-ease-out) var(--openbot-duration-fast),
+    filter var(--diagram-chat-open-duration) var(--openbot-ease-out) var(--openbot-duration-fast),
+    translate var(--diagram-chat-open-duration) var(--openbot-ease-out) var(--openbot-duration-fast);
 }
 
 .diagram-chat-avatar.agent-avatar {
@@ -1032,6 +1105,9 @@
     animation: none;
   }
 
+  .diagram-chat-launcher.ui-button,
+  .diagram-chat,
+  .diagram-chat > *,
   .diagram-board-world[data-settling],
   .diagram-node,
   .diagram-port.ui-button,

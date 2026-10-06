@@ -1,7 +1,9 @@
 /**
  * A small chat over the canvas, where the user asks an agent to change the diagram. The agent's
  * reply lists the edits it made, so the user can match each line to what moved on the canvas.
- * Collapsed, it is one button, and the canvas keeps the whole area.
+ * Collapsed, it is one button, and the canvas keeps the whole area. The button and the panel are
+ * both always mounted, so the panel can grow out of the button's shape and fold back into it; the
+ * hidden one is inert.
  */
 
 import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner, Textarea } from "@openbot/ui";
@@ -26,6 +28,13 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const { t } = useText();
   const [draft, setDraft] = createSignal("");
   const mood = (): AvatarMood => (props.working ? "working" : "idle");
+  let input: HTMLTextAreaElement | undefined;
+  let launcher: HTMLElement | undefined;
+  /** Focus follows the surface that is now shown, once it has stopped being inert. */
+  const setOpen = (open: boolean) => {
+    props.onOpenChange(open);
+    requestAnimationFrame(() => (open ? input : launcher)?.focus());
+  };
   const send = () => {
     const text = draft().trim();
     if (!text || props.working) return;
@@ -33,22 +42,21 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
     setDraft("");
   };
   return (
-    <Show
-      when={props.open}
-      fallback={
-        <Button
-          type="button"
-          variant="outline"
-          class="diagram-chat-launcher"
-          data-diagram-overlay=""
-          onClick={() => props.onOpenChange(true)}
-        >
-          <AgentAvatar agent={props.agent} class="diagram-chat-avatar" motion="idle" />
-          {t("diagram.chat.show")}
-        </Button>
-      }
-    >
-      <section class="diagram-chat" aria-label={t("diagram.chat.label")} data-diagram-overlay="">
+    <div class="diagram-chat-morph" data-open={props.open ? "true" : "false"} data-diagram-overlay="">
+      <Button
+        ref={(element) => (launcher = element)}
+        type="button"
+        variant="outline"
+        class="diagram-chat-launcher"
+        aria-expanded="false"
+        aria-hidden={props.open ? "true" : undefined}
+        tabindex={props.open ? -1 : 0}
+        onClick={() => setOpen(true)}
+      >
+        <AgentAvatar agent={props.agent} class="diagram-chat-avatar" motion="idle" />
+        {t("diagram.chat.show")}
+      </Button>
+      <section class="diagram-chat" aria-label={t("diagram.chat.label")} inert={!props.open}>
         <header class="diagram-chat-header">
           <AgentAvatar agent={props.agent} class="diagram-chat-avatar" motion="idle" mood={mood()} />
           <h2 class="diagram-chat-title">{t("diagram.chat.title", { name: props.agent.name })}</h2>
@@ -58,7 +66,7 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
             size="icon-sm"
             aria-label={t("diagram.chat.hide")}
             title={t("diagram.chat.hide")}
-            onClick={() => props.onOpenChange(false)}
+            onClick={() => setOpen(false)}
           >
             <Minimize2 aria-hidden="true" />
           </Button>
@@ -113,6 +121,7 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
           }}
         >
           <Textarea
+            ref={(element: HTMLTextAreaElement) => (input = element)}
             class="diagram-chat-input"
             rows={2}
             value={draft()}
@@ -137,6 +146,6 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
           </Button>
         </form>
       </section>
-    </Show>
+    </div>
   );
 }
