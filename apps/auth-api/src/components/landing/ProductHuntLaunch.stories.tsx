@@ -31,10 +31,10 @@ function LaunchStage(props: { variant: ProductHuntLaunchVariant }) {
   );
 }
 
-/** The live design: OpenBot beside an upvote tile, with confetti rising behind them. */
+/** OpenBot beside an upvote tile, with confetti rising behind them. */
 export const LaunchPad: Story = { render: () => <LaunchStage variant="launch-pad" /> };
 
-/** A torn launch-day ticket that admits one upvote. */
+/** The live design: a torn launch-day ticket that admits one upvote. */
 export const Ticket: Story = { render: () => <LaunchStage variant="ticket" /> };
 
 /** The agents ask themselves, one message at a time, the way they talk in the app. */

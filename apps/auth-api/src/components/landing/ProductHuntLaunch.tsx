@@ -18,7 +18,7 @@ let shownThisLoad = false;
 export type ProductHuntLaunchVariant = "launch-pad" | "ticket" | "team-chat" | "big-arrow" | "terminal";
 
 /** The design the site shows. */
-const LIVE_VARIANT: ProductHuntLaunchVariant = "launch-pad";
+const LIVE_VARIANT: ProductHuntLaunchVariant = "ticket";
 
 interface LaunchCopy {
   readonly eyebrow: string;
