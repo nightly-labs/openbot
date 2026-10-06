@@ -1,3 +1,6 @@
+import { Effect } from "effect";
+
+import { type ProviderClientOperationError, providerFailure } from "./provider-client-effects";
 // @vitest-environment node
 
 import { EventEmitter } from "node:events";
@@ -5,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isMissingProviderSessionError } from "./agent/thread-items";
 import type { AgentClient } from "./agent-client";
 import { CustomAcpAgentsClient, type CustomAgentConfig } from "./custom-acp-agents-client";
+import { runCauseEffect } from "./effect-boundary";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -36,14 +40,25 @@ class FakeChild extends EventEmitter<ClientEvents> implements AgentClient {
     this.running = true;
   }
 
-  async stop(): Promise<void> {
-    this.running = false;
+  stop(): Effect.Effect<void, ProviderClientOperationError> {
+    return Effect.sync(() => {
+      this.running = false;
+    });
   }
 
-  async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>): Promise<T> {
-    this.requests.push({ method, params });
-    const answer = this.answers[method];
-    return decoder(answer ? answer() : {});
+  request<T>(
+    method: string,
+    params: unknown,
+    decoder: ResponseDecoder<T>,
+  ): Effect.Effect<T, ProviderClientOperationError> {
+    return Effect.try({
+      try: () => {
+        this.requests.push({ method, params });
+        const answer = this.answers[method];
+        return decoder(answer ? answer() : {});
+      },
+      catch: providerFailure,
+    });
   }
 
   notify(): void {}
@@ -79,7 +94,7 @@ function router(configs: CustomAgentConfig[] = [config("goose"), config("qwen")]
       children.set(`${agent.id}@${folder ?? "models"}`, child);
       return child;
     },
-    async (command) => `/bin/${command}`,
+    (command) => Effect.succeed(`/bin/${command}`),
   );
   client.start();
   return { client, children, models, configs };
@@ -89,7 +104,7 @@ const record = (value: unknown) => value;
 
 /** The routed id of a new session. */
 async function startThread(client: CustomAcpAgentsClient, model: string, cwd = FOLDER): Promise<string> {
-  const response = await client.request("thread/start", { model, cwd }, decodeRecordResponse);
+  const response = await runCauseEffect(client.request("thread/start", { model, cwd }, decodeRecordResponse));
   const id = getString(getRecord(response, "thread"), "id");
   if (id === null) throw new Error("thread/start must give a thread id.");
   return id;
@@ -103,7 +118,9 @@ describe("CustomAcpAgentsClient", () => {
     expect(goose).toMatch(/^goose:[0-9a-f]{12}:s1$/);
     expect(qwen).toMatch(/^qwen:[0-9a-f]{12}:s1$/);
 
-    await client.request("turn/start", { threadId: qwen, model: "qwen/qwen3-coder", input: [] }, record);
+    await runCauseEffect(
+      client.request("turn/start", { threadId: qwen, model: "qwen/qwen3-coder", input: [] }, record),
+    );
     expect(children.get(`qwen@${FOLDER}`)?.requests.at(-1)).toEqual({
       method: "turn/start",
       params: { threadId: "s1", model: "qwen3-coder", input: [] },
@@ -119,7 +136,7 @@ describe("CustomAcpAgentsClient", () => {
     const { client, children } = router([config("goose")]);
     const work = await startThread(client, "goose/default");
     const other = await startThread(client, "goose/default", "/other");
-    await client.request("model/list", {}, record);
+    await runCauseEffect(client.request("model/list", {}, record));
 
     expect([...children.keys()]).toEqual([`goose@${FOLDER}`, "goose@/other", "goose@models"]);
     const listedOn = [...children].filter(([, child]) => child.requests.some((entry) => entry.method === "model/list"));
@@ -127,8 +144,8 @@ describe("CustomAcpAgentsClient", () => {
 
     // Both processes gave `s1`, and each turn still reaches the folder that opened its session.
     expect(work).not.toBe(other);
-    await client.request("turn/start", { threadId: work, input: [] }, record);
-    await client.request("turn/start", { threadId: other, input: [] }, record);
+    await runCauseEffect(client.request("turn/start", { threadId: work, input: [] }, record));
+    await runCauseEffect(client.request("turn/start", { threadId: other, input: [] }, record));
     for (const key of [`goose@${FOLDER}`, "goose@/other"]) {
       expect(children.get(key)?.requests.filter((entry) => entry.method === "turn/start")).toEqual([
         { method: "turn/start", params: { threadId: "s1", input: [] } },
@@ -141,20 +158,24 @@ describe("CustomAcpAgentsClient", () => {
     const seen: AppServerNotification[] = [];
     client.on("notification", (notification) => seen.push(notification));
 
-    await client.request("thread/resume", { threadId: "goose:s9", model: "goose/default", cwd: FOLDER }, record);
+    await runCauseEffect(
+      client.request("thread/resume", { threadId: "goose:s9", model: "goose/default", cwd: FOLDER }, record),
+    );
     const goose = children.get(`goose@${FOLDER}`);
     expect(goose?.requests.at(-1)).toEqual({ method: "thread/resume", params: { threadId: "s9", cwd: FOLDER } });
     goose?.emit("notification", { method: "item/agentMessage/delta", params: { threadId: "s9" } });
     expect(seen.map((notification) => notification.params)).toEqual([{ threadId: "goose:s9" }]);
 
-    await client.request("turn/start", { threadId: "goose:s9", input: [] }, record);
+    await runCauseEffect(client.request("turn/start", { threadId: "goose:s9", input: [] }, record));
     expect(goose?.requests.at(-1)).toEqual({ method: "turn/start", params: { threadId: "s9", input: [] } });
   });
 
   it("resumes a session with a folder in its id after a restart", async () => {
     const saved = await startThread(router([config("goose")]).client, "goose/default");
     const { client, children } = router([config("goose")]);
-    await client.request("thread/resume", { threadId: saved, model: "goose/default", cwd: FOLDER }, record);
+    await runCauseEffect(
+      client.request("thread/resume", { threadId: saved, model: "goose/default", cwd: FOLDER }, record),
+    );
     expect(children.get(`goose@${FOLDER}`)?.requests.at(-1)).toEqual({
       method: "thread/resume",
       params: { threadId: "s1", cwd: FOLDER },
@@ -187,17 +208,17 @@ describe("CustomAcpAgentsClient", () => {
   it("reads a session of another agent than the model as missing, so the caller hands over", async () => {
     const { client } = router();
     const goose = await startThread(client, "goose/default");
-    const error = await client
-      .request("turn/start", { threadId: goose, model: "qwen/default", input: [] }, record)
-      .catch((reason: unknown) => reason);
+    const error = await runCauseEffect(
+      client.request("turn/start", { threadId: goose, model: "qwen/default", input: [] }, record),
+    ).catch((reason: unknown) => reason);
     expect(isMissingProviderSessionError(error, "acp")).toBe(true);
   });
 
   it("refuses a model of an agent that is not saved", async () => {
     const { client } = router([config("goose")]);
-    await expect(client.request("thread/start", { model: "qwen/default", cwd: FOLDER }, record)).rejects.toThrow(
-      "not saved now",
-    );
+    await expect(
+      runCauseEffect(client.request("thread/start", { model: "qwen/default", cwd: FOLDER }, record)),
+    ).rejects.toThrow("not saved now");
   });
 
   it("lists one default model for an agent with no list, drops a bad id, and keeps the last list", async () => {
@@ -207,7 +228,7 @@ describe("CustomAcpAgentsClient", () => {
       data: [{ model: "qwen3-coder", displayName: "Qwen3 Coder" }, { model: "bad id with spaces" }],
     }));
 
-    const first = await client.request("model/list", {}, record);
+    const first = await runCauseEffect(client.request("model/list", {}, record));
     expect(first).toMatchObject({
       data: [
         { model: "goose/default", displayName: "Goose" },
@@ -218,18 +239,18 @@ describe("CustomAcpAgentsClient", () => {
     models.set("qwen", () => {
       throw new Error("list failed");
     });
-    expect(await client.request("model/list", {}, record)).toEqual(first);
+    expect(await runCauseEffect(client.request("model/list", {}, record))).toEqual(first);
   });
 
   it("stops the router when a process that serves a thread exits, and not when a model list's does", async () => {
     const { client, children } = router([config("goose")]);
-    await client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record);
-    await client.request("model/list", {}, record);
+    await runCauseEffect(client.request("thread/start", { model: "goose/default", cwd: FOLDER }, record));
+    await runCauseEffect(client.request("model/list", {}, record));
     const lister = children.get("goose@models");
     lister?.emit("exit", new Error("list process ended"));
     // The next list starts another process, so the first one's exit was handled and did not stop anything.
     await vi.waitFor(async () => {
-      await client.request("model/list", {}, record);
+      await runCauseEffect(client.request("model/list", {}, record));
       expect(children.get("goose@models")).not.toBe(lister);
     });
     expect(client.running).toBe(true);
@@ -255,8 +276,10 @@ describe("CustomAcpAgentsClient", () => {
       throw new Error(`bad token ${token}`);
     });
 
-    await expect(client.request("turn/start", { threadId: thread }, record)).rejects.toThrow("bad token [redacted]");
-    await client.request("model/list", {}, record);
+    await expect(runCauseEffect(client.request("turn/start", { threadId: thread }, record))).rejects.toThrow(
+      "bad token [redacted]",
+    );
+    await runCauseEffect(client.request("model/list", {}, record));
     goose.emit("diagnostic", `stderr ${token}`);
     const exited = new Promise<Error>((resolve) => client.once("exit", resolve));
     goose.emit("exit", new Error(`exited with ${token}`));

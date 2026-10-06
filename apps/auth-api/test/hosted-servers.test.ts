@@ -13,6 +13,7 @@ import { type AccountAnalyticsEvent, accountEventProperties } from "../src/serve
 import { BillingService } from "../src/server/billing-service";
 import { sha256 } from "../src/server/crypto";
 import { D1AuthRepository } from "../src/server/d1-auth-repository";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { HostedServerService, sandboxName } from "../src/server/hosted-server-service";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
 import { migratedDatabase, sqliteD1 } from "./sqlite-d1";
@@ -174,7 +175,7 @@ async function setup() {
     });
     const seconds = Math.floor(clock.now / 1_000);
     const signature = `t=${seconds},v1=${createHmac("sha256", STRIPE_WEBHOOK_SECRET).update(`${seconds}.${payload}`).digest("hex")}`;
-    return billing.handleWebhook(payload, signature);
+    return runApiEffect(billing.handleWebhook(payload, signature));
   };
   const state = (serverId: string) =>
     database
@@ -206,36 +207,41 @@ async function setup() {
 type Context = Awaited<ReturnType<typeof setup>>;
 
 async function createPaidServer(context: Context, key = "create-key-0000001") {
-  const { server } = await context.service.create(owner, STARTER, key, RETURN);
+  const { server } = await runApiEffect(context.service.create(owner, STARTER, key, RETURN));
   await context.stripeSync("sub_1", "active", server.serverId);
   return server;
 }
 
 async function createRunningServer(context: Context) {
   const server = await createPaidServer(context);
-  await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
-  await context.remote.registerHost(owner, {
-    hostId: server.serverId,
-    name: "Cloud one",
-    ownerMembershipId: `${server.serverId}:owner`,
-  });
+  await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
+  await runApiEffect(
+    context.remote.registerHost(owner, {
+      hostId: server.serverId,
+      name: "Cloud one",
+      ownerMembershipId: `${server.serverId}:owner`,
+    }),
+  );
   return server;
 }
 
 describe("hosted servers", () => {
   it("makes a sandbox only after Stripe confirms the payment, once, with a single-use claim", async () => {
     const context = await setup();
-    await expect(context.service.list(stranger)).resolves.toEqual({ available: false, servers: [], maxServers: 3 });
-    await expect(context.service.create(stranger, STARTER, "create-key-0000001", RETURN)).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.list(stranger))).resolves.toEqual({
+      available: false,
+      servers: [],
+      maxServers: 3,
+    });
+    await expect(
+      runApiEffect(context.service.create(stranger, STARTER, "create-key-0000001", RETURN)),
+    ).rejects.toMatchObject({
       status: 403,
       code: "hosting_unavailable",
     });
 
-    const first = await context.service.create(
-      owner,
-      { ...STARTER, name: " Cloud one " },
-      "create-key-0000001",
-      RETURN,
+    const first = await runApiEffect(
+      context.service.create(owner, { ...STARTER, name: " Cloud one " }, "create-key-0000001", RETURN),
     );
     const { server } = first;
     expect(server).toMatchObject({ name: "Cloud one", size: "small", plan: "starter", state: "awaiting_payment" });
@@ -253,7 +259,7 @@ describe("hosted servers", () => {
     });
 
     // A repeated submit closes the first page, so only one page can take a payment.
-    const again = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
+    const again = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000001", RETURN));
     expect(again.server.serverId).toBe(server.serverId);
     expect(again.checkoutUrl).toBe("https://checkout.stripe.com/c/pay/cs_2");
     expect(context.stripe.sessions.get("cs_1")).toBe("expired");
@@ -275,42 +281,54 @@ describe("hosted servers", () => {
     });
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "starting", checkout_session_id: null });
     // A paid page cannot open again.
-    await expect(context.service.checkout(owner, server.serverId, RETURN)).resolves.toMatchObject({
+    await expect(runApiEffect(context.service.checkout(owner, server.serverId, RETURN))).resolves.toMatchObject({
       checkoutUrl: null,
     });
 
     const [claim = ""] = context.claims;
     expect(JSON.stringify(context.database.prepare("SELECT * FROM hosted_servers").all())).not.toContain(claim);
-    const redeemed = await context.service.redeemClaim(claim);
+    const redeemed = await runApiEffect(context.service.redeemClaim(claim));
     expect(redeemed).toMatchObject({ hostId: server.serverId, name: "Cloud one", user: { id: "owner" } });
     await expect(
-      new D1AuthRepository(sqliteD1(context.database)).authenticate(redeemed.sessionToken, context.clock.now),
+      runApiEffect(
+        new D1AuthRepository(sqliteD1(context.database)).authenticate(redeemed.sessionToken, context.clock.now),
+      ),
     ).resolves.toMatchObject({ id: "owner" });
     // A server whose response was lost redeems again. The new session replaces the first one.
-    const retried = await context.service.redeemClaim(claim);
+    const retried = await runApiEffect(context.service.redeemClaim(claim));
     const auth = new D1AuthRepository(sqliteD1(context.database));
-    await expect(auth.authenticate(retried.sessionToken, context.clock.now)).resolves.toMatchObject({ id: "owner" });
-    await expect(auth.authenticate(redeemed.sessionToken, context.clock.now)).resolves.toBeNull();
+    await expect(runApiEffect(auth.authenticate(retried.sessionToken, context.clock.now))).resolves.toMatchObject({
+      id: "owner",
+    });
+    await expect(runApiEffect(auth.authenticate(redeemed.sessionToken, context.clock.now))).resolves.toBeNull();
     context.clock.now += 11 * MINUTE;
-    await expect(context.service.redeemClaim(claim)).rejects.toMatchObject({ code: "hosted_claim_invalid" });
-    await expect(auth.authenticate(retried.sessionToken, context.clock.now)).resolves.toMatchObject({ id: "owner" });
+    await expect(runApiEffect(context.service.redeemClaim(claim))).rejects.toMatchObject({
+      code: "hosted_claim_invalid",
+    });
+    await expect(runApiEffect(auth.authenticate(retried.sessionToken, context.clock.now))).resolves.toMatchObject({
+      id: "owner",
+    });
 
     // The claim lifetime counts from the payment, not from the create request.
-    const second = await context.service.create(owner, { ...STARTER, plan: "pro" }, "create-key-0000002", RETURN);
+    const second = await runApiEffect(
+      context.service.create(owner, { ...STARTER, plan: "pro" }, "create-key-0000002", RETURN),
+    );
     context.clock.now += 2 * 60 * MINUTE;
     await context.stripeSync("sub_2", "active", second.server.serverId, "cus_1", "pro");
     expect(context.sandboxCreates().at(-1)?.body).toMatchObject({ type: "large" });
     const secondClaim = context.claims.at(-1) ?? "";
     context.clock.now += 61 * MINUTE;
-    await expect(context.service.redeemClaim(secondClaim)).rejects.toMatchObject({ code: "hosted_claim_invalid" });
+    await expect(runApiEffect(context.service.redeemClaim(secondClaim))).rejects.toMatchObject({
+      code: "hosted_claim_invalid",
+    });
   });
 
   it("gives no sandbox to a server that the paid subscription's account does not own", async () => {
     const context = await setup();
-    const { server } = await context.service.create(member, STARTER, "create-key-0000001", RETURN);
+    const { server } = await runApiEffect(context.service.create(member, STARTER, "create-key-0000001", RETURN));
     // The owner's customer pays, and the metadata names the member's server.
     await context.stripeSync("sub_1", "active", server.serverId, "cus_owner");
-    await context.service.tick(context.clock.now + 5 * MINUTE);
+    await runApiEffect(context.service.tick(context.clock.now + 5 * MINUTE));
     expect(context.sandboxCreates()).toHaveLength(0);
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "awaiting_payment" });
   });
@@ -319,10 +337,12 @@ describe("hosted servers", () => {
     const context = await setup();
     for (const key of [null, "wrong-key-0123456789abcdef0123456789ab", DEVELOPER_KEY.slice(0, -1)]) {
       await expect(
-        context.serviceFor(key).create(stranger, STARTER, "create-key-0000001", RETURN),
+        runApiEffect(context.serviceFor(key).create(stranger, STARTER, "create-key-0000001", RETURN)),
       ).rejects.toMatchObject({ status: 403, code: "hosting_unavailable" });
     }
-    const { server } = await context.serviceFor(DEVELOPER_KEY).create(stranger, STARTER, "create-key-0000001", RETURN);
+    const { server } = await runApiEffect(
+      context.serviceFor(DEVELOPER_KEY).create(stranger, STARTER, "create-key-0000001", RETURN),
+    );
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "awaiting_payment" });
   });
 
@@ -345,12 +365,12 @@ describe("hosted servers", () => {
       observed_error: "plan_ended",
     });
     expect(calls("/sandboxes/bx_1/stop")).toBe(1);
-    await expect(context.service.wake(member, server.serverId)).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.wake(member, server.serverId))).rejects.toMatchObject({
       status: 402,
       code: "plan_required",
     });
     // An open plan that is not paid gets its payment in the Customer Portal, not a second plan.
-    await expect(context.service.checkout(owner, server.serverId, RETURN)).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.checkout(owner, server.serverId, RETURN))).rejects.toMatchObject({
       status: 409,
       code: "hosted_server_payment_due",
     });
@@ -358,17 +378,17 @@ describe("hosted servers", () => {
     expect(calls("/sandboxes/bx_1/stop")).toBe(1);
 
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await context.service.tick(context.clock.now + 5 * MINUTE);
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
+    await runApiEffect(context.service.tick(context.clock.now + 5 * MINUTE));
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "stopped", observed_error: "plan_ended" });
     expect(calls("/sandboxes/bx_1/resume")).toBe(0);
     expect(context.boatCalls.some((call) => call.method === "DELETE")).toBe(false);
-    await expect(context.service.list(owner)).resolves.toMatchObject({
+    await expect(runApiEffect(context.service.list(owner))).resolves.toMatchObject({
       servers: [{ serverId: server.serverId, state: "stopped", error: "plan_ended" }],
     });
 
     // A cancelled plan is renewed with a new Checkout page.
-    const renewal = await context.service.checkout(owner, server.serverId, RETURN);
+    const renewal = await runApiEffect(context.service.checkout(owner, server.serverId, RETURN));
     expect(renewal.checkoutUrl).toMatch(/^https:\/\/checkout\.stripe\.com\//u);
     context.clock.now += MINUTE;
     await context.stripeSync("sub_2", "active", server.serverId);
@@ -384,7 +404,7 @@ describe("hosted servers", () => {
     const context = await setup();
     const server = await createRunningServer(context);
     context.stripe.failCancel = true;
-    await expect(context.service.delete(owner, server.serverId, "Cloud one")).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.delete(owner, server.serverId, "Cloud one"))).rejects.toMatchObject({
       status: 502,
       code: "hosted_server_billing_failed",
     });
@@ -392,14 +412,14 @@ describe("hosted servers", () => {
     expect(context.boatCalls.some((call) => call.method === "DELETE")).toBe(false);
 
     context.stripe.failCancel = false;
-    await context.service.delete(owner, server.serverId, "Cloud one");
+    await runApiEffect(context.service.delete(owner, server.serverId, "Cloud one"));
     expect(context.stripe.cancelled).toEqual(["sub_1"]);
-    await expect(context.service.status(owner, server.serverId)).rejects.toMatchObject({ status: 404 });
+    await expect(runApiEffect(context.service.status(owner, server.serverId))).rejects.toMatchObject({ status: 404 });
     expect(context.boatCalls.find((call) => call.method === "DELETE")?.path).toBe("/sandboxes/bx_1");
 
     // A payment that finishes after the owner deleted the server is cancelled, and makes no sandbox.
-    const unpaid = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
-    await context.service.delete(owner, unpaid.server.serverId, "Cloud one");
+    const unpaid = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000002", RETURN));
+    await runApiEffect(context.service.delete(owner, unpaid.server.serverId, "Cloud one"));
     expect(context.stripe.sessions.get("cs_2")).toBe("expired");
     await context.stripeSync("sub_late", "active", unpaid.server.serverId);
     expect(context.stripe.cancelled).toEqual(["sub_1", "sub_late"]);
@@ -408,7 +428,7 @@ describe("hosted servers", () => {
 
   it("applies a missed payment or plan end on the cron, and removes a server that is not paid in a day", async () => {
     const context = await setup();
-    const paid = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
+    const paid = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000001", RETURN));
     // The webhook stored the subscription, but the hosting step failed.
     context.database
       .prepare(
@@ -419,9 +439,9 @@ describe("hosted servers", () => {
       )
       .run(paid.server.serverId, context.clock.now + 30 * 24 * 60 * MINUTE);
     // An account has one unpaid server, so the server that is never paid is of another account.
-    const unpaid = await context.service.create(member, STARTER, "create-key-0000002", RETURN);
+    const unpaid = await runApiEffect(context.service.create(member, STARTER, "create-key-0000002", RETURN));
     // Paid at the last minute, and each webhook delivery fails.
-    const paidLate = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    const paidLate = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000003", RETURN));
     context.stripe.sessions.set("cs_3", "complete");
     context.stripe.sessionSubscriptions.set("cs_3", "sub_late");
     context.stripe.subscriptions.set(
@@ -430,17 +450,21 @@ describe("hosted servers", () => {
     );
 
     context.clock.now += 5 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 1, abandoned: 0, failed: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({
+      provisioned: 1,
+      abandoned: 0,
+      failed: 0,
+    });
     expect(context.sandboxCreates()).toHaveLength(1);
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
 
     context.database.exec("UPDATE billing_subscriptions SET status = 'canceled'");
     context.clock.now += 5 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ stopped: 1 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ stopped: 1 });
     expect(context.state(paid.server.serverId)).toMatchObject({ desired_state: "stopped", observed_state: "stopping" });
 
     context.clock.now += 24 * 60 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ abandoned: 1 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ abandoned: 1 });
     expect(context.state(unpaid.server.serverId)).toMatchObject({
       desired_state: "deleted",
       observed_state: "deleted",
@@ -449,7 +473,7 @@ describe("hosted servers", () => {
     expect(context.state(paidLate.server.serverId)).toMatchObject({ desired_state: "running" });
     expect(context.sandboxCreates()).toHaveLength(2);
     // A server with a plan that ended keeps its data.
-    await expect(context.service.list(owner)).resolves.toMatchObject({
+    await expect(runApiEffect(context.service.list(owner))).resolves.toMatchObject({
       servers: [
         { serverId: paid.server.serverId, state: "stopping" },
         { serverId: paidLate.server.serverId, state: "starting" },
@@ -459,13 +483,17 @@ describe("hosted servers", () => {
 
   it("gives a new plan choice to the unpaid server, and keeps a server paid at the last minute", async () => {
     const context = await setup();
-    const { server } = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
+    const { server } = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000001", RETURN));
     // The user cancelled the page, the client lost its key, and the user chose another plan.
-    const changed = await context.service.create(owner, { ...STARTER, plan: "pro" }, "create-key-0000002", RETURN);
+    const changed = await runApiEffect(
+      context.service.create(owner, { ...STARTER, plan: "pro" }, "create-key-0000002", RETURN),
+    );
     expect(changed.server).toMatchObject({ serverId: server.serverId, plan: "pro", size: "large" });
     expect(changed.checkoutUrl).not.toBeNull();
     expect(context.stripe.sessions.get("cs_1")).toBe("expired");
-    await expect(context.service.list(owner)).resolves.toMatchObject({ servers: [{ serverId: server.serverId }] });
+    await expect(runApiEffect(context.service.list(owner))).resolves.toMatchObject({
+      servers: [{ serverId: server.serverId }],
+    });
 
     // The user paid on the new page, and its webhook did not come yet.
     context.stripe.sessions.set("cs_2", "complete");
@@ -474,20 +502,20 @@ describe("hosted servers", () => {
       "sub_late",
       subscription("sub_late", "active", server.serverId, "cus_1", context.clock.now, "pro"),
     );
-    const paid = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    const paid = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000003", RETURN));
     expect(paid).toMatchObject({ server: { serverId: server.serverId, plan: "pro" }, checkoutUrl: null });
     // A retry of that request returns the same server.
-    const retried = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    const retried = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000003", RETURN));
     expect(retried).toMatchObject({ server: { serverId: server.serverId }, checkoutUrl: null });
 
     // The paid server is not reused.
-    const next = await context.service.create(owner, STARTER, "create-key-0000004", RETURN);
+    const next = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000004", RETURN));
     expect(next.server.serverId).not.toBe(server.serverId);
   });
 
   it("recovers a setup that stopped before boat answered, and finishes a delete that came during it", async () => {
     const context = await setup();
-    const lost = await context.service.create(owner, STARTER, "create-key-0000001", RETURN);
+    const lost = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000001", RETURN));
     context.database
       .prepare(
         `INSERT INTO billing_subscriptions(
@@ -496,26 +524,26 @@ describe("hosted servers", () => {
          ) VALUES ('sub_1', 'owner', 'cus_1', ?, 'starter', 'month', 'eur', 'active', ?, 0, 1)`,
       )
       .run(lost.server.serverId, context.clock.now + 30 * 24 * 60 * MINUTE);
-    const deleted = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
+    const deleted = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000002", RETURN));
     // The Worker stopped after the claim and before boat answered.
     context.database.exec("UPDATE hosted_servers SET observed_state = 'creating', checkout_session_id = NULL");
 
     // A delete does not wait for the create, and does not forget a sandbox that it can still return.
-    await context.service.delete(owner, deleted.server.serverId, "Cloud one");
+    await runApiEffect(context.service.delete(owner, deleted.server.serverId, "Cloud one"));
     expect(context.state(deleted.server.serverId)).toMatchObject({
       desired_state: "deleted",
       observed_state: "creating",
     });
 
     context.clock.now += 10 * MINUTE;
-    await context.service.tick();
+    await runApiEffect(context.service.tick());
     expect(context.state(lost.server.serverId)).toMatchObject({
       observed_state: "error",
       observed_error: "provider_error",
     });
     expect(context.state(deleted.server.serverId)).toMatchObject({ observed_state: "deleted" });
     context.clock.now += 11 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 1 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ provisioned: 1 });
     expect(context.sandboxCreates()).toHaveLength(1);
     expect(context.state(lost.server.serverId)).toMatchObject({ observed_state: "starting", observed_error: null });
   });
@@ -523,7 +551,7 @@ describe("hosted servers", () => {
   it("sends account events with only allowlisted values, and no email or server ID", async () => {
     const context = await setup();
     const server = await createRunningServer(context);
-    await context.service.delete(owner, server.serverId, "Cloud one");
+    await runApiEffect(context.service.delete(owner, server.serverId, "Cloud one"));
     expect(context.events.map(({ accountId, event }) => [accountId, event.name, event.action])).toEqual([
       ["owner", "billing_action", "checkout_started"],
       ["owner", "billing_action", "plan_started"],
@@ -554,31 +582,33 @@ describe("hosted servers", () => {
     });
 
     // Retry in the dialog tries at once. The cron waits, so a failure does not repeat each minute.
-    await expect(context.service.wake(owner, server.serverId)).resolves.toMatchObject({ state: "error" });
+    await expect(runApiEffect(context.service.wake(owner, server.serverId))).resolves.toMatchObject({ state: "error" });
     expect(context.sandboxCreates()).toHaveLength(2);
     context.clock.now += 5 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ provisioned: 0 });
     context.clock.now += 6 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 1, failed: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ provisioned: 1, failed: 0 });
     const creates = context.sandboxCreates();
     expect(creates).toHaveLength(3);
     // Each attempt sends the same key and body, so boat makes at most one sandbox.
     expect(creates.map((call) => call.headers.get("Idempotency-Key"))).toEqual(Array(3).fill(server.serverId));
     expect(new Set(creates.map((call) => JSON.stringify(call.body))).size).toBe(1);
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "starting", observed_error: null });
-    await expect(context.service.redeemClaim(context.claims[0])).resolves.toMatchObject({ hostId: server.serverId });
+    await expect(runApiEffect(context.service.redeemClaim(context.claims[0]))).resolves.toMatchObject({
+      hostId: server.serverId,
+    });
 
     // A server whose setup failed and whose plan ended is not set up again until the plan is renewed.
-    const failed = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
+    const failed = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000002", RETURN));
     context.refusals.creates = 1;
     await context.stripeSync("sub_2", "active", failed.server.serverId);
     context.clock.now += MINUTE;
     await context.stripeSync("sub_2", "canceled", failed.server.serverId);
     expect(context.state(failed.server.serverId)).toMatchObject({ desired_state: "stopped", observed_state: "error" });
     context.clock.now += 11 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ provisioned: 0 });
     expect(context.sandboxCreates()).toHaveLength(4);
-    await context.service.checkout(owner, failed.server.serverId, RETURN);
+    await runApiEffect(context.service.checkout(owner, failed.server.serverId, RETURN));
     await context.stripeSync("sub_3", "active", failed.server.serverId);
     expect(context.sandboxCreates()).toHaveLength(5);
     expect(context.state(failed.server.serverId)).toMatchObject({
@@ -596,27 +626,31 @@ describe("hosted servers", () => {
     const server = await createPaidServer(context);
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "error", observed_error: "provider_error" });
     context.clock.now += 11 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ provisioned: 1, failed: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ provisioned: 1, failed: 0 });
     expect(context.sandboxCreates()).toHaveLength(3);
     expect(sandboxOf(server.serverId)).toEqual({ provider_sandbox_id: "bx_1" });
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "starting", observed_error: null });
 
     // The VM did not sign in within the hour. Its next start makes the claim work again, one time.
     const [claim = ""] = context.claims;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     context.clock.now += 61 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ idle: 1 });
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await expect(context.service.redeemClaim(claim)).rejects.toMatchObject({ code: "hosted_claim_invalid" });
-    await context.service.wake(owner, server.serverId);
-    await expect(context.service.redeemClaim(claim)).resolves.toMatchObject({ hostId: server.serverId });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ idle: 1 });
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
+    await expect(runApiEffect(context.service.redeemClaim(claim))).rejects.toMatchObject({
+      code: "hosted_claim_invalid",
+    });
+    await runApiEffect(context.service.wake(owner, server.serverId));
+    await expect(runApiEffect(context.service.redeemClaim(claim))).resolves.toMatchObject({ hostId: server.serverId });
     context.clock.now += 11 * MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     context.clock.now += 16 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ idle: 1 });
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await context.service.wake(owner, server.serverId);
-    await expect(context.service.redeemClaim(claim)).rejects.toMatchObject({ code: "hosted_claim_invalid" });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ idle: 1 });
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
+    await runApiEffect(context.service.wake(owner, server.serverId));
+    await expect(runApiEffect(context.service.redeemClaim(claim))).rejects.toMatchObject({
+      code: "hosted_claim_invalid",
+    });
 
     // The owner revoked the session of the server. Its next start makes the claim work again.
     context.database
@@ -624,15 +658,15 @@ describe("hosted servers", () => {
         "UPDATE auth_sessions SET revoked_at = 1 WHERE id = (SELECT auth_session_id FROM hosted_servers WHERE server_id = ?)",
       )
       .run(server.serverId);
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     context.clock.now += 16 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ idle: 1 });
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await context.service.wake(owner, server.serverId);
-    await expect(context.service.redeemClaim(claim)).resolves.toMatchObject({ hostId: server.serverId });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ idle: 1 });
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
+    await runApiEffect(context.service.wake(owner, server.serverId));
+    await expect(runApiEffect(context.service.redeemClaim(claim))).resolves.toMatchObject({ hostId: server.serverId });
 
     // The cron gave up on a create that boat answers later. The row keeps that sandbox.
-    const late = await context.service.create(owner, STARTER, "create-key-0000002", RETURN);
+    const late = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000002", RETURN));
     context.refusals.beforeAnswer = () => {
       context.database
         .prepare(
@@ -648,10 +682,10 @@ describe("hosted servers", () => {
     // A delete before the setup retry finds the sandbox of a lost create, and deletes it.
     context.refusals.beforeAnswer = () => {};
     context.refusals.lostAnswers = 2;
-    const lost = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    const lost = await runApiEffect(context.service.create(owner, STARTER, "create-key-0000003", RETURN));
     await context.stripeSync("sub_3", "active", lost.server.serverId);
     expect(context.state(lost.server.serverId)).toMatchObject({ observed_state: "error" });
-    await context.service.delete(owner, lost.server.serverId, lost.server.name);
+    await runApiEffect(context.service.delete(owner, lost.server.serverId, lost.server.name));
     expect(context.boatCalls.filter((call) => call.method === "DELETE").map((call) => call.path)).toEqual([
       "/sandboxes/bx_3",
     ]);
@@ -666,17 +700,17 @@ describe("hosted servers", () => {
     // server has no use: a start counts as use.
     await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "pro");
     expect(context.state(server.serverId)).toMatchObject({ size: "small", pending_size: "large" });
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     expect(calls("stop")).toHaveLength(0);
     context.clock.now += 3 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ resized: 0, failed: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ resized: 0, failed: 0 });
     expect(calls("stop")).toHaveLength(0);
     context.clock.now += 4 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ resized: 1, failed: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ resized: 1, failed: 0 });
     expect(calls("stop")).toHaveLength(1);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "stopping" });
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
     expect(calls("resume").map((call) => call.body)).toEqual([{ ttlSeconds: LEASE, type: "large" }]);
     expect(context.state(server.serverId)).toMatchObject({
       observed_state: "waking",
@@ -687,14 +721,14 @@ describe("hosted servers", () => {
     // boat refuses a smaller machine that cannot hold the data. The server starts on its machine.
     context.refusals.shrink = true;
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "starter");
     expect(calls("stop")).toHaveLength(1);
     context.clock.now += 7 * MINUTE;
     await context.stripeSync("sub_1", "active", server.serverId, "cus_1", "starter");
     expect(calls("stop")).toHaveLength(2);
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
     expect(calls("resume").map((call) => call.body)).toEqual([
       { ttlSeconds: LEASE, type: "large" },
       { ttlSeconds: LEASE, type: "small" },
@@ -706,11 +740,11 @@ describe("hosted servers", () => {
       pending_size: null,
     });
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     context.clock.now += 3 * MINUTE;
-    await expect(context.service.tick()).resolves.toMatchObject({ resized: 0 });
+    await expect(runApiEffect(context.service.tick())).resolves.toMatchObject({ resized: 0 });
     expect(calls("stop")).toHaveLength(2);
-    await expect(context.service.list(owner)).resolves.toMatchObject({
+    await expect(runApiEffect(context.service.list(owner))).resolves.toMatchObject({
       servers: [{ serverId: server.serverId, plan: "starter", size: "large", state: "running" }],
     });
   });
@@ -719,58 +753,60 @@ describe("hosted servers", () => {
     const context = await setup();
     const server = await createPaidServer(context);
     const [claim = ""] = context.claims;
-    const session = await context.service.redeemClaim(claim);
+    const session = await runApiEffect(context.service.redeemClaim(claim));
     const hostInput = { hostId: server.serverId, name: "Cloud one", ownerMembershipId: `${server.serverId}:owner` };
-    await expect(context.remote.registerHost(stranger, hostInput)).rejects.toMatchObject({
+    await expect(runApiEffect(context.remote.registerHost(stranger, hostInput))).rejects.toMatchObject({
       code: "host_owner_mismatch",
     });
-    await context.remote.registerHost(owner, hostInput);
+    await runApiEffect(context.remote.registerHost(owner, hostInput));
 
-    await expect(context.service.delete(stranger, server.serverId, "Cloud one")).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.delete(stranger, server.serverId, "Cloud one"))).rejects.toMatchObject({
       status: 404,
     });
-    await expect(context.service.delete(owner, server.serverId, "Cloud")).rejects.toMatchObject({
+    await expect(runApiEffect(context.service.delete(owner, server.serverId, "Cloud"))).rejects.toMatchObject({
       code: "hosted_server_confirm_mismatch",
     });
-    await context.service.delete(owner, server.serverId, "Cloud one");
+    await runApiEffect(context.service.delete(owner, server.serverId, "Cloud one"));
     const deletion = context.boatCalls.find((call) => call.method === "DELETE");
     expect(deletion?.path).toBe("/sandboxes/bx_1");
     expect(deletion?.headers.get("X-Ascii-Confirm-Delete")).toBe("bx_1");
     expect(context.database.prepare("SELECT host_id FROM remote_hosts").all()).toEqual([]);
     await expect(
-      new D1AuthRepository(sqliteD1(context.database)).authenticate(session.sessionToken, context.clock.now),
+      runApiEffect(
+        new D1AuthRepository(sqliteD1(context.database)).authenticate(session.sessionToken, context.clock.now),
+      ),
     ).resolves.toBeNull();
-    await expect(context.remote.registerHost(owner, hostInput)).rejects.toMatchObject({
+    await expect(runApiEffect(context.remote.registerHost(owner, hostInput))).rejects.toMatchObject({
       code: "host_owner_mismatch",
     });
-    await expect(context.service.list(owner)).resolves.toMatchObject({ servers: [] });
+    await expect(runApiEffect(context.service.list(owner))).resolves.toMatchObject({ servers: [] });
   });
 
   it("checks webhook signatures, applies each delivery once, and ignores older events", async () => {
     const context = await setup();
     const server = await createPaidServer(context);
     const forged = context.boatWebhook("sandbox.ready", "ready");
-    await expect(context.service.handleWebhook({ ...forged, signature: `v1=${"0".repeat(64)}` })).rejects.toMatchObject(
-      { status: 401 },
-    );
+    await expect(
+      runApiEffect(context.service.handleWebhook({ ...forged, signature: `v1=${"0".repeat(64)}` })),
+    ).rejects.toMatchObject({ status: 401 });
     const stale = context.boatWebhook("sandbox.ready", "ready", { timestamp: context.clock.now - 6 * MINUTE });
-    await expect(context.service.handleWebhook(stale)).rejects.toMatchObject({ status: 401 });
+    await expect(runApiEffect(context.service.handleWebhook(stale))).rejects.toMatchObject({ status: 401 });
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "starting" });
 
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "running" });
     const olderError = context.boatWebhook("sandbox.error", null, { createdAt: context.clock.now - MINUTE });
-    await context.service.handleWebhook(olderError);
+    await runApiEffect(context.service.handleWebhook(olderError));
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "running" });
 
     context.clock.now += MINUTE;
     const error = context.boatWebhook("sandbox.error", null);
-    await context.service.handleWebhook(error);
+    await runApiEffect(context.service.handleWebhook(error));
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "error" });
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     // The same delivery again changes nothing.
-    await context.service.handleWebhook(error);
+    await runApiEffect(context.service.handleWebhook(error));
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "running" });
   });
 
@@ -786,20 +822,24 @@ describe("hosted servers", () => {
     const resumes = () => context.boatCalls.filter((call) => call.path === "/sandboxes/bx_1/resume").length;
 
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "archiving"));
-    await expect(context.service.status(stranger, server.serverId)).rejects.toMatchObject({ status: 404 });
-    await expect(context.service.status(member, server.serverId)).resolves.toEqual({
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "archiving")));
+    await expect(runApiEffect(context.service.status(stranger, server.serverId))).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(runApiEffect(context.service.status(member, server.serverId))).resolves.toEqual({
       serverId: server.serverId,
       state: "stopping",
       error: null,
       sleeping: false,
     });
-    await expect(context.service.wake(stranger, server.serverId)).rejects.toMatchObject({ status: 404 });
-    await expect(context.service.wake(member, server.serverId)).resolves.toMatchObject({ state: "stopping" });
+    await expect(runApiEffect(context.service.wake(stranger, server.serverId))).rejects.toMatchObject({ status: 404 });
+    await expect(runApiEffect(context.service.wake(member, server.serverId))).resolves.toMatchObject({
+      state: "stopping",
+    });
     expect(resumes()).toBe(0);
 
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
     expect(resumes()).toBe(1);
     expect(context.state(server.serverId)).toMatchObject({
       desired_state: "running",
@@ -808,8 +848,10 @@ describe("hosted servers", () => {
     });
 
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.error", null));
-    await expect(context.service.wake(member, server.serverId)).resolves.toMatchObject({ state: "waking" });
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.error", null)));
+    await expect(runApiEffect(context.service.wake(member, server.serverId))).resolves.toMatchObject({
+      state: "waking",
+    });
     expect(resumes()).toBe(2);
     expect(context.state(server.serverId)).toMatchObject({ last_wake_reason: "message" });
   });
@@ -817,14 +859,14 @@ describe("hosted servers", () => {
   it("stops a server with no use for 15 minutes, keeps it, and starts it on the next use", async () => {
     const context = await setup();
     const server = await createRunningServer(context);
-    const { sessionToken } = await context.service.redeemClaim(context.claims[0]);
+    const { sessionToken } = await runApiEffect(context.service.redeemClaim(context.claims[0]));
     const ownerToken = "owner-session-token-0001";
     context.database
       .prepare(
         `INSERT INTO auth_sessions(id, user_id, token_hash, expires_at, created_at, last_used_at)
          VALUES ('owner-session', 'owner', ?, ?, 1, 1)`,
       )
-      .run(await sha256(ownerToken), context.clock.now + 60 * MINUTE);
+      .run(await runApiEffect(sha256(ownerToken)), context.clock.now + 60 * MINUTE);
     const calls = (path: string) => context.boatCalls.filter((call) => call.path === path);
     const leases = () =>
       calls("/sandboxes/bx_1").filter((call) => isDynamicRecord(call.body) && "ttlSeconds" in call.body);
@@ -837,31 +879,33 @@ describe("hosted servers", () => {
     );
 
     // Only the session of the server can keep it running.
-    await expect(context.service.reportActivity(ownerToken, server.serverId, { inUse: true })).rejects.toMatchObject({
+    await expect(
+      runApiEffect(context.service.reportActivity(ownerToken, server.serverId, { inUse: true })),
+    ).rejects.toMatchObject({
       status: 404,
     });
     context.clock.now += 14 * MINUTE;
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: true }));
     context.clock.now += 14 * MINUTE;
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "running" });
     expect(leases()).toHaveLength(0);
 
     // Use near the end of the boat lease moves the lease.
     context.clock.now += 33 * MINUTE;
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: true }));
     expect(leases().map((call) => [call.method, call.body])).toEqual([["PATCH", { ttlSeconds: LEASE }]]);
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: true }));
     expect(leases()).toHaveLength(1);
 
     context.clock.now += 15 * MINUTE;
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", observed_state: "stopping" });
     expect(calls("/sandboxes/bx_1/stop")).toHaveLength(1);
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
-    await context.service.tick(context.clock.now + 5 * MINUTE);
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: true }));
+    await runApiEffect(context.service.tick(context.clock.now + 5 * MINUTE));
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", observed_state: "stopped" });
     expect(calls("/sandboxes/bx_1/resume")).toHaveLength(0);
     expect(context.boatCalls.some((call) => call.method === "DELETE")).toBe(false);
@@ -875,14 +919,16 @@ describe("hosted servers", () => {
         .get(server.serverId);
     const before = row();
     expect(before).toMatchObject({ desired_state: "idle" });
-    await expect(context.service.status(owner, server.serverId)).resolves.toMatchObject({
+    await expect(runApiEffect(context.service.status(owner, server.serverId))).resolves.toMatchObject({
       state: "stopped",
       sleeping: true,
     });
     expect(row()).toEqual(before);
     expect(calls("/sandboxes/bx_1/resume")).toHaveLength(0);
 
-    await expect(context.service.wake(owner, server.serverId)).resolves.toMatchObject({ state: "waking" });
+    await expect(runApiEffect(context.service.wake(owner, server.serverId))).resolves.toMatchObject({
+      state: "waking",
+    });
     expect(calls("/sandboxes/bx_1/resume").map((call) => call.body)).toEqual([{ ttlSeconds: LEASE }]);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", last_wake_reason: "message" });
   });
@@ -890,26 +936,30 @@ describe("hosted servers", () => {
   it("starts an idle server before its next routine run, once for each reported run", async () => {
     const context = await setup();
     const server = await createRunningServer(context);
-    const { sessionToken } = await context.service.redeemClaim(context.claims[0]);
+    const { sessionToken } = await runApiEffect(context.service.redeemClaim(context.claims[0]));
     const resumes = () => context.boatCalls.filter((call) => call.path === "/sandboxes/bx_1/resume");
     const runAt = context.clock.now + 40 * MINUTE;
 
     // A report with no use keeps the idle time, and a run that is due now is not stored.
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: context.clock.now });
+    await runApiEffect(
+      context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: context.clock.now }),
+    );
     expect(context.state(server.serverId)).toMatchObject({ next_run_at: null });
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: runAt });
+    await runApiEffect(
+      context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: runAt }),
+    );
     context.clock.now += 16 * MINUTE;
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", next_run_at: runAt });
     context.clock.now += MINUTE;
-    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived")));
 
     context.clock.now = runAt - 11 * MINUTE;
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(resumes()).toHaveLength(0);
     context.clock.now = runAt - 9 * MINUTE;
-    await context.service.tick(context.clock.now);
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(resumes()).toHaveLength(1);
     expect(context.state(server.serverId)).toMatchObject({
       desired_state: "running",
@@ -919,15 +969,15 @@ describe("hosted servers", () => {
     });
 
     // A server with no use does not stop just before its next run.
-    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    await runApiEffect(context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready")));
     const nextRunAt = context.clock.now + 20 * MINUTE;
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt });
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt }));
     context.clock.now += 16 * MINUTE;
-    await context.service.tick(context.clock.now);
+    await runApiEffect(context.service.tick(context.clock.now));
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "running" });
 
     // A report with no body is from an older server: it is use and keeps the stored run.
-    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
+    await runApiEffect(context.service.reportActivity(sessionToken, server.serverId, { inUse: true }));
     expect(context.state(server.serverId)).toMatchObject({ next_run_at: nextRunAt });
   });
 });

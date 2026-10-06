@@ -4,7 +4,6 @@
 // The file holds addresses and folder paths, never a key. A file that this build cannot read is not
 // replaced: a newer build may have written it, so writes are refused until it is readable again.
 
-import { readFile } from "node:fs/promises";
 import {
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   isProviderDetectionSettings,
@@ -12,8 +11,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
+import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
 export const PROVIDER_DETECTION_SETTINGS_FILE = "openbot-provider-detection-v1.json";
 
@@ -30,31 +30,31 @@ export class ProviderDetectionSettingsStore {
   readonly #path: string;
   #settings: ProviderDetectionSettings = copy(DEFAULT_PROVIDER_DETECTION_SETTINGS);
   #readOnly = false;
-  #pendingWrite: Promise<unknown> = Promise.resolve();
+  #writes = Semaphore.makeUnsafe(1);
 
   constructor(path: string) {
     this.#path = path;
   }
 
   /** A missing file is a first run. Bad JSON or another version keeps the defaults, read only. */
-  async load(): Promise<void> {
-    let contents: string;
-    try {
-      contents = await readFile(this.#path, "utf8");
-    } catch (error) {
-      if (isMissingFileError(error)) return;
-      throw error;
-    }
-    try {
-      const parsed = JSON.parse(contents);
-      if (isDynamicRecord(parsed) && parsed.version === 1 && isProviderDetectionSettings(parsed.settings)) {
-        this.#settings = copy(parsed.settings);
+  load(): Effect.Effect<void, PreferenceFileFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const loaded = yield* Effect.result(
+        readPreferenceFile(this.#path, (parsed) => {
+          if (isDynamicRecord(parsed) && parsed.version === 1 && isProviderDetectionSettings(parsed.settings))
+            return copy(parsed.settings);
+          return null;
+        }),
+      );
+      if (Result.isFailure(loaded)) {
+        if (isMissingFileError(loaded.failure.cause)) return;
+        if (!(loaded.failure.cause instanceof SyntaxError)) return yield* loaded.failure;
+      } else if (loaded.success) {
+        this.#settings = loaded.success;
         return;
       }
-    } catch {
-      // Handled below, as for a file of another version.
-    }
-    this.#readOnly = true;
+      this.#readOnly = true;
+    });
   }
 
   get(): ProviderDetectionSettings {
@@ -62,15 +62,23 @@ export class ProviderDetectionSettingsStore {
   }
 
   /** Writes are chained, so a queued write never lands before the one that came before it. */
-  set(settings: ProviderDetectionSettings): Promise<ProviderDetectionSettings> {
-    if (this.#readOnly) return Promise.reject(new Error(sourceText("error.provider.detectionSettingsReadOnly")));
+  readonly set = Effect.fn("ProviderDetectionSettings.set")(function* (
+    this: ProviderDetectionSettingsStore,
+    settings: ProviderDetectionSettings,
+  ) {
+    if (this.#readOnly)
+      return yield* new PreferenceFileFailure({
+        cause: new Error(sourceText("error.provider.detectionSettingsReadOnly")),
+      });
     const next = copy(settings);
-    const write = this.#pendingWrite.then(async () => {
-      await writeJsonFileAtomically(this.#path, { version: 1, settings: next }, { createDirectory: true });
-      this.#settings = next;
-      return this.get();
-    });
-    this.#pendingWrite = write.catch(() => undefined);
-    return write;
-  }
+    return yield* this.#writes.withPermit(
+      Effect.uninterruptible(
+        Effect.gen({ self: this }, function* () {
+          yield* writePreferenceFile(this.#path, { version: 1, settings: next }, { createDirectory: true });
+          this.#settings = next;
+          return this.get();
+        }),
+      ),
+    );
+  }).bind(this);
 }

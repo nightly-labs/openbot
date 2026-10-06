@@ -1,4 +1,5 @@
 import { type ParseArgsOptionsConfig, parseArgs } from "node:util";
+import { redactText } from "@openbot/logging";
 
 // One strict parser for the dev scripts that change or read developer state. A
 // script that ignored a flag it did not know used to run anyway, so a mistyped
@@ -10,7 +11,8 @@ const HELP_OPTION = { help: { type: "boolean", short: "h" } } as const satisfies
 export interface ScriptArgumentsSpec<Options extends ParseArgsOptionsConfig> {
   usage: string;
   options: Options;
-  allowPositionals?: boolean;
+  /** How many positionals the script takes. Defaults to none. */
+  maxPositionals?: number;
 }
 
 /**
@@ -30,11 +32,11 @@ export function readScriptArguments<const Options extends ParseArgsOptionsConfig
       strict: true,
       allowPositionals: true,
     });
-    if (!spec.allowPositionals && parsed.positionals.length > 0) {
-      throw new Error(`Unexpected argument '${parsed.positionals[0]}'.`);
-    }
+    const extra = parsed.positionals[spec.maxPositionals ?? 0];
+    if (extra !== undefined) throw new Error(`Unexpected argument '${extra}'.`);
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${spec.usage}\n`);
+    // The message repeats what was typed, which can be a token pasted in the wrong place.
+    process.stderr.write(`${redactText(error instanceof Error ? error.message : String(error))}\n\n${spec.usage}\n`);
     process.exit(2);
   }
   // A boolean option is present in `values` only when it was passed.

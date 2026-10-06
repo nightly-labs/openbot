@@ -9,6 +9,7 @@ import {
 
 import type { AppTranslate } from "@openbot/i18n";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseInstallSkill,
@@ -33,14 +34,20 @@ export function skillIpcHandlers({
 }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
-      localList: handler(() => localSkillTools(skills).list()),
-      localGet: payloadHandler(parseReadLocalSkill, (input) => localSkillTools(skills).get(input)),
-      localCreate: payloadHandler(parseCreateLocalSkill, (input) => localSkillTools(skills).create(input)),
-      localRevise: payloadHandler(parseReviseLocalSkill, (input) => localSkillTools(skills).revise(input)),
-      localInstall: payloadHandler(parseInstallLocalSkill, (input) => localSkillTools(skills).install(input)),
-      list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => skills.list(query)),
-      get: payloadHandler(stringPayload("skillId"), (skillId) => skills.get(skillId)),
-      listMine: handler(() => skills.listMine()),
+      localList: handler(() => runCauseEffect(localSkillTools(skills).list())),
+      localGet: payloadHandler(parseReadLocalSkill, (input) => runCauseEffect(localSkillTools(skills).get(input))),
+      localCreate: payloadHandler(parseCreateLocalSkill, (input) =>
+        runCauseEffect(localSkillTools(skills).create(input)),
+      ),
+      localRevise: payloadHandler(parseReviseLocalSkill, (input) =>
+        runCauseEffect(localSkillTools(skills).revise(input)),
+      ),
+      localInstall: payloadHandler(parseInstallLocalSkill, (input) =>
+        runCauseEffect(localSkillTools(skills).install(input)),
+      ),
+      list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
+      get: payloadHandler(stringPayload("skillId"), (skillId) => runCauseEffect(skills.get(skillId))),
+      listMine: handler(() => runCauseEffect(skills.listMine())),
       choosePackage: handler(async () => {
         const mainWindow = getMainWindow();
         const options: OpenDialogOptions = {
@@ -51,13 +58,15 @@ export function skillIpcHandlers({
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
           : await dialog.showOpenDialog(options);
-        return result.canceled || !result.filePaths[0] ? null : skills.stage(result.filePaths[0]);
+        return result.canceled || !result.filePaths[0] ? null : runCauseEffect(skills.stage(result.filePaths[0]));
       }),
-      submit: payloadHandler(parseSubmitSkill, (submission) => skills.submit(submission)),
-      listInstalled: payloadHandler(stringPayload("agentId"), (agentId) => skills.listInstalled(agentId)),
-      install: payloadHandler(parseInstallSkill, (installation) => skills.install(installation)),
-      uninstall: payloadHandler(parseUninstallSkill, (removal) => skills.uninstall(removal)),
-      setEnabled: payloadHandler(parseSetEnabledSkill, (change) => skills.setEnabled(change)),
+      submit: payloadHandler(parseSubmitSkill, (submission) => runCauseEffect(skills.submit(submission))),
+      listInstalled: payloadHandler(stringPayload("agentId"), (agentId) =>
+        runCauseEffect(skills.listInstalled(agentId)),
+      ),
+      install: payloadHandler(parseInstallSkill, (installation) => runCauseEffect(skills.install(installation))),
+      uninstall: payloadHandler(parseUninstallSkill, (removal) => runCauseEffect(skills.uninstall(removal))),
+      setEnabled: payloadHandler(parseSetEnabledSkill, (change) => runCauseEffect(skills.setEnabled(change))),
     },
   };
 }

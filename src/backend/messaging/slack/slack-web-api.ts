@@ -1,6 +1,7 @@
 import { open, rm } from "node:fs/promises";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { MessagingConnectionError } from "../messaging-types";
+import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Schema } from "effect";
+import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
 
 const SLACK_API_ORIGIN = "https://slack.com";
 
@@ -10,7 +11,8 @@ const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_NOTICE_MS = 5_000;
 const REDIRECT_LIMIT = 3;
 
-export type SlackResponse = DynamicRecord & { ok: true };
+const SlackEnvelope = Schema.Record(Schema.String, Schema.Unknown);
+type SlackResponse = typeof SlackEnvelope.Type & { ok: true };
 
 export class SlackApiError extends Error {
   constructor(
@@ -39,152 +41,185 @@ export class SlackWebApi {
   readonly #token: string;
   readonly #origin: string;
   readonly #rateLimited: (retryAt: string) => void;
-  readonly #delay: (milliseconds: number) => Promise<void>;
+  readonly #delay: ((milliseconds: number) => Promise<void>) | undefined;
 
   constructor(options: SlackWebApiOptions) {
     this.#token = options.token;
     this.#origin = options.origin ?? SLACK_API_ORIGIN;
     this.#rateLimited = options.rateLimited ?? (() => undefined);
-    this.#delay = options.delay ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.#delay = options.delay;
   }
 
-  async call(method: string, params: DynamicRecord = {}): Promise<SlackResponse> {
+  readonly call = Effect.fnUntraced(function* (this: SlackWebApi, method: string, params: DynamicRecord = {}) {
     const body = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined || value === null) continue;
       body.set(key, typeof value === "string" ? value : JSON.stringify(value));
     }
-    const { payload } = await this.#send(method, body);
+    const { payload } = yield* this.#send(method, body);
     return payload;
-  }
+  });
 
-  /** A method that takes a file, such as `apps.icon.set`, as a multipart form. */
-  async upload(
+  readonly upload = Effect.fnUntraced(function* (
+    this: SlackWebApi,
     method: string,
     params: Record<string, string>,
     file: { field: string; name: string; type: string; bytes: Uint8Array },
-  ): Promise<SlackResponse> {
+  ) {
     const body = new FormData();
     for (const [key, value] of Object.entries(params)) body.set(key, value);
     body.set(file.field, new Blob([new Uint8Array(file.bytes)], { type: file.type }), file.name);
-    const response = await fetch(`${this.#origin}/api/${method}`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${this.#token}` },
-      body,
-      redirect: "error",
-    });
-    const payload = await response.json().catch(() => null);
-    if (!isDynamicRecord(payload)) throw new SlackApiError(method, `http_${response.status}`);
-    if (payload.ok !== true) {
-      const code = isString(payload.error) ? payload.error : `http_${response.status}`;
-      if (AUTH_ERRORS.has(code)) throw new MessagingConnectionError("invalid_token");
-      throw new SlackApiError(method, code);
-    }
-    return { ...payload, ok: true };
-  }
+    return yield* slackRequest(
+      `${this.#origin}/api/${method}`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${this.#token}` },
+        body,
+        redirect: "error",
+      },
+      (response) => slackPayload(method, response),
+    );
+  });
 
-  /** `auth.test` with the granted scopes, which Slack sends only as a response header. */
-  async authTest(): Promise<{ payload: SlackResponse; scopes: string[] }> {
-    const { payload, response } = await this.#send("auth.test", new URLSearchParams());
+  readonly authTest = Effect.fnUntraced(function* (this: SlackWebApi) {
+    const { payload, response } = yield* this.#send("auth.test", new URLSearchParams());
     const scopes = (response.headers.get("x-oauth-scopes") ?? "")
       .split(",")
       .map((scope) => scope.trim())
       .filter(Boolean);
     return { payload, scopes };
-  }
+  });
 
-  async #send(method: string, body: URLSearchParams): Promise<{ payload: SlackResponse; response: Response }> {
+  readonly #send = Effect.fnUntraced(function* (this: SlackWebApi, method: string, body: URLSearchParams) {
     for (let attempt = 0; ; attempt += 1) {
-      const response = await fetch(`${this.#origin}/api/${method}`, {
-        method: "POST",
-        headers: {
-          // `oauth.v2.access` has no token: the client id and secret are in the body.
-          ...(this.#token ? { authorization: `Bearer ${this.#token}` } : {}),
-          "content-type": "application/x-www-form-urlencoded; charset=utf-8",
+      const result = yield* slackRequest(
+        `${this.#origin}/api/${method}`,
+        {
+          method: "POST",
+          headers: {
+            ...(this.#token ? { authorization: `Bearer ${this.#token}` } : {}),
+            "content-type": "application/x-www-form-urlencoded; charset=utf-8",
+          },
+          body,
+          redirect: "error",
         },
-        body,
-        redirect: "error",
-      });
-      if (response.status === 429 && attempt < RATE_LIMIT_RETRIES) {
-        const waitMs = Math.max(1, Number(response.headers.get("retry-after") ?? "1")) * 1000;
-        if (waitMs > RATE_LIMIT_NOTICE_MS) this.#rateLimited(new Date(Date.now() + waitMs).toISOString());
-        await response.body?.cancel();
-        await this.#delay(waitMs);
-        continue;
-      }
-      const payload = await response.json().catch(() => null);
-      if (!isDynamicRecord(payload)) throw new SlackApiError(method, `http_${response.status}`);
-      if (payload.ok !== true) {
-        const code = isString(payload.error) ? payload.error : `http_${response.status}`;
-        if (AUTH_ERRORS.has(code)) throw new MessagingConnectionError("invalid_token");
-        throw new SlackApiError(method, code);
-      }
-      return { payload: { ...payload, ok: true }, response };
+        (response) =>
+          Effect.gen(function* () {
+            if (response.status === 429 && attempt < RATE_LIMIT_RETRIES) {
+              const waitMs = Math.max(1, Number(response.headers.get("retry-after") ?? "1")) * 1000;
+              yield* slackIo(async () => {
+                await response.body?.cancel();
+              });
+              return { retry: true as const, waitMs };
+            }
+            const payload = yield* slackPayload(method, response);
+            return { retry: false as const, payload, response };
+          }),
+      );
+      if (!result.retry) return { payload: result.payload, response: result.response };
+      if (result.waitMs > RATE_LIMIT_NOTICE_MS) this.#rateLimited(new Date(Date.now() + result.waitMs).toISOString());
+      const delay = this.#delay;
+      yield* delay ? slackIo(() => delay(result.waitMs)) : Effect.sleep(result.waitMs);
     }
-  }
+  });
 
-  /** Uploads bytes to the URL that `files.getUploadURLExternal` gave. It must be a Slack URL. */
-  async uploadBytes(uploadUrl: string, bytes: Uint8Array, mimeType: string): Promise<void> {
-    if (!this.#trusted(uploadUrl)) throw new SlackApiError("files.upload", "untrusted_upload_url");
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "content-type": mimeType || "application/octet-stream" },
-      body: new Uint8Array(bytes),
-      redirect: "error",
-    });
-    await response.body?.cancel();
-    if (!response.ok) throw new SlackApiError("files.upload", `http_${response.status}`);
-  }
+  readonly uploadBytes = Effect.fnUntraced(function* (
+    this: SlackWebApi,
+    uploadUrl: string,
+    bytes: Uint8Array,
+    mimeType: string,
+  ) {
+    if (!this.#trusted(uploadUrl))
+      return yield* slackFailure(new SlackApiError("files.upload", "untrusted_upload_url"));
+    yield* slackRequest(
+      uploadUrl,
+      {
+        method: "POST",
+        headers: { "content-type": mimeType || "application/octet-stream" },
+        body: new Uint8Array(bytes),
+        redirect: "error",
+      },
+      (response) =>
+        Effect.gen(function* () {
+          yield* slackIo(async () => {
+            await response.body?.cancel();
+          });
+          if (!response.ok) return yield* slackFailure(new SlackApiError("files.upload", `http_${response.status}`));
+        }),
+    );
+  });
 
-  /**
-   * Downloads a private Slack file to `destination`. The token goes only to Slack's own https hosts,
-   * a redirect is followed only to another of them, and the body is cut off at `maxBytes`.
-   */
-  async download(url: string, destination: string, maxBytes: number): Promise<void> {
+  readonly download = Effect.fnUntraced(function* (
+    this: SlackWebApi,
+    url: string,
+    destination: string,
+    maxBytes: number,
+  ) {
     let current = url;
     for (let redirects = 0; ; redirects += 1) {
-      if (!this.#trusted(current)) throw new SlackApiError("files.download", "untrusted_file_url");
-      const response = await fetch(current, {
-        headers: { authorization: `Bearer ${this.#token}` },
-        redirect: "manual",
-      });
-      if (response.status >= 300 && response.status < 400) {
-        await response.body?.cancel();
-        const location = response.headers.get("location");
-        if (!location || redirects >= REDIRECT_LIMIT) throw new SlackApiError("files.download", "redirect");
-        current = new URL(location, current).toString();
-        continue;
-      }
-      if (!response.ok || !response.body) {
-        await response.body?.cancel();
-        throw new SlackApiError("files.download", `http_${response.status}`);
-      }
-      const declared = Number(response.headers.get("content-length") ?? "0");
-      if (declared > maxBytes) {
-        await response.body.cancel();
-        throw new SlackApiError("files.download", "too_large");
-      }
-      const reader = response.body.getReader();
-      const file = await open(destination, "w", 0o600);
-      let received = 0;
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          received += value.byteLength;
-          if (received > maxBytes) throw new SlackApiError("files.download", "too_large");
-          await file.write(value);
-        }
-      } catch (error) {
-        await reader.cancel().catch(() => undefined);
-        await file.close();
-        await rm(destination, { force: true });
-        throw error;
-      }
-      await file.close();
-      return;
+      if (!this.#trusted(current))
+        return yield* slackFailure(new SlackApiError("files.download", "untrusted_file_url"));
+      const next = yield* slackRequest(
+        current,
+        {
+          headers: { authorization: `Bearer ${this.#token}` },
+          redirect: "manual",
+        },
+        (response) =>
+          Effect.gen(function* () {
+            if (response.status >= 300 && response.status < 400) {
+              yield* slackIo(async () => {
+                await response.body?.cancel();
+              });
+              const location = response.headers.get("location");
+              if (!location || redirects >= REDIRECT_LIMIT)
+                return yield* slackFailure(new SlackApiError("files.download", "redirect"));
+              return new URL(location, current).toString();
+            }
+            if (!response.ok || !response.body)
+              return yield* slackFailure(new SlackApiError("files.download", `http_${response.status}`));
+            if (Number(response.headers.get("content-length") ?? "0") > maxBytes)
+              return yield* slackFailure(new SlackApiError("files.download", "too_large"));
+            const reader = response.body.getReader();
+            let opened = false;
+            yield* Effect.acquireUseRelease(
+              Effect.succeed(reader),
+              () =>
+                Effect.acquireUseRelease(
+                  slackIo(() => open(destination, "w", 0o600)).pipe(
+                    Effect.tap(() =>
+                      Effect.sync(() => {
+                        opened = true;
+                      }),
+                    ),
+                  ),
+                  (file) =>
+                    Effect.gen(function* () {
+                      let received = 0;
+                      for (;;) {
+                        const { done, value } = yield* slackIo(() => reader.read());
+                        if (done) return;
+                        received += value.byteLength;
+                        if (received > maxBytes)
+                          return yield* slackFailure(new SlackApiError("files.download", "too_large"));
+                        yield* slackIo(() => file.write(value));
+                      }
+                    }),
+                  (file) => Effect.promise(() => file.close()),
+                ).pipe(
+                  Effect.onError(() =>
+                    opened ? slackIo(() => rm(destination, { force: true })).pipe(Effect.orDie) : Effect.void,
+                  ),
+                ),
+              () => slackIo(() => reader.cancel()).pipe(Effect.catch(() => Effect.void)),
+            );
+            return null;
+          }),
+      );
+      if (next === null) return;
+      current = next;
     }
-  }
+  });
 
   /** A Slack https host, or the test origin this client was built for. */
   #trusted(value: string): boolean {
@@ -197,4 +232,42 @@ export class SlackWebApi {
     if (this.#origin !== SLACK_API_ORIGIN) return url.origin === new URL(this.#origin).origin;
     return url.protocol === "https:" && (url.hostname === "slack.com" || url.hostname.endsWith(".slack.com"));
   }
+}
+
+// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
+function slackIo<A>(run: () => Promise<A>): Effect.Effect<A, MessagingAdapterError> {
+  return Effect.tryPromise({ try: run, catch: (cause) => new MessagingAdapterError({ cause }) });
+}
+
+function slackFailure(cause: Error): Effect.Effect<never, MessagingAdapterError> {
+  return Effect.fail(new MessagingAdapterError({ cause }));
+}
+
+const slackPayload = Effect.fnUntraced(function* (
+  method: string,
+  response: Response,
+): Effect.fn.Return<SlackResponse, MessagingAdapterError> {
+  const payload = yield* slackIo((): Promise<unknown> => response.json()).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(SlackEnvelope)),
+    Effect.mapError(() => new MessagingAdapterError({ cause: new SlackApiError(method, `http_${response.status}`) })),
+  );
+  if (payload.ok !== true) {
+    const code = isString(payload.error) ? payload.error : `http_${response.status}`;
+    return yield* slackFailure(
+      AUTH_ERRORS.has(code) ? new MessagingConnectionError("invalid_token") : new SlackApiError(method, code),
+    );
+  }
+  return { ...payload, ok: true as const };
+});
+
+function slackRequest<A>(
+  url: string,
+  init: RequestInit,
+  use: (response: Response) => Effect.Effect<A, MessagingAdapterError>,
+): Effect.Effect<A, MessagingAdapterError> {
+  return Effect.acquireUseRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) => slackIo(() => fetch(url, { ...init, signal: controller.signal })).pipe(Effect.flatMap(use)),
+    (controller) => Effect.sync(() => controller.abort()),
+  );
 }

@@ -106,7 +106,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.desktopDidNotConnect": "The desktop did not connect.",
   "error.remote.desktopRestarted": "The desktop restarted. Reconnecting with a new authenticated session.",
   "error.remote.dataBeforeAuth": "The host sent data before authentication.",
-  "error.remote.attachmentDownloadFailed": "The attachment download failed.",
   "error.remote.eventStreamGap": "The host event stream has a gap.",
   "error.remote.malformedEvent": "The host returned a malformed event.",
   "error.remote.desktopIdentityNotVerified": "The desktop identity could not be verified.",

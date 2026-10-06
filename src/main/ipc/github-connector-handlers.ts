@@ -1,6 +1,7 @@
 // The one GitHub connection of this computer: sign in with a device code, list the repositories it
 // reaches, and sign out.
 
+import { runCauseEffect } from "../../backend/effect-boundary";
 import type { GitHubConnectorService } from "../github-connector-service";
 import { handler, type IpcGroupHandlers } from "./define-ipc-group";
 
@@ -22,12 +23,12 @@ export function githubConnectorIpcHandlers({
   return {
     githubConnector: {
       status: handler(() => githubConnector.status()),
-      connect: handler(() => githubConnector.connect()),
+      connect: handler(() => runCauseEffect(githubConnector.connect())),
       cancel: handler(() => githubConnector.cancel()),
-      disconnect: handler(() => githubConnector.disconnect()),
-      repositories: handler(() => githubConnector.repositories()),
-      openVerification: handler(() => githubConnector.openVerification()),
-      openInstall: handler(() => githubConnector.openInstall()),
+      disconnect: handler(() => runCauseEffect(githubConnector.disconnect())),
+      repositories: handler(() => runCauseEffect(githubConnector.repositories())),
+      openVerification: handler(() => runCauseEffect(githubConnector.openVerification())),
+      openInstall: handler(() => runCauseEffect(githubConnector.openInstall())),
     },
   };
 }

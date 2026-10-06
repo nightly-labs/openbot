@@ -14,8 +14,10 @@ import {
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
-import { writeJsonFileAtomically } from "./atomic-json-file";
+import { Effect, Exit, Result, Semaphore } from "effect";
+import { writeFileAtomically } from "./atomic-json-file";
 import { isMissingFileError } from "./file-errors";
+import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 
 interface StoredSidebarLayout extends SidebarLayoutSnapshot {
   version: 2;
@@ -40,112 +42,136 @@ const DEFAULT_LAYOUT: SidebarLayoutSnapshot = {
 export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   readonly #path: string;
   #layout = structuredClone(DEFAULT_LAYOUT);
-  #operationQueue: Promise<void> = Promise.resolve();
+  readonly #operationQueue = Semaphore.makeUnsafe(1);
 
   constructor(path: string) {
     super();
     this.#path = path;
   }
 
-  async initialize(): Promise<void> {
-    await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
-    try {
-      const parsed = JSON.parse(await readFile(this.#path, "utf8"));
-      if (isStoredSidebarLayout(parsed)) this.#layout = snapshotFromStored(parsed);
-      else if (isLegacyStoredSidebarLayout(parsed))
-        this.#layout = { ...snapshotFromLegacyStored(parsed), agentOrder: [] };
-      else throw new Error("Invalid sidebar layout state.");
-    } catch (error) {
-      if (isMissingFileError(error)) return;
+  initialize() {
+    return Effect.gen({ self: this }, function* () {
+      yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
+      const loaded = yield* Effect.result(
+        Effect.gen({ self: this }, function* () {
+          const contents = yield* storedIO(() => readFile(this.#path, "utf8"));
+          return yield* storedSync(() => {
+            const parsed = JSON.parse(contents);
+            if (isStoredSidebarLayout(parsed)) return snapshotFromStored(parsed);
+            if (isLegacyStoredSidebarLayout(parsed)) return { ...snapshotFromLegacyStored(parsed), agentOrder: [] };
+            throw new Error("Invalid sidebar layout state.");
+          });
+        }),
+      );
+      if (Result.isSuccess(loaded)) {
+        this.#layout = loaded.success;
+        return;
+      }
+      if (isMissingFileError(loaded.failure.cause)) return;
       const backupPath = `${this.#path}.corrupt-${Date.now()}`;
-      await rename(this.#path, backupPath).catch(() => undefined);
+      yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
       this.#layout = structuredClone(DEFAULT_LAYOUT);
-    }
+    });
   }
 
   getSnapshot(): SidebarLayoutSnapshot {
     return structuredClone(this.#layout);
   }
 
-  mutate(action: SidebarLayoutAction, agentIds: ReadonlySet<string>): Promise<SidebarLayoutSnapshot> {
-    return this.#enqueue(async () => {
-      const next = applySidebarLayoutAction(this.#layout, action, agentIds);
-      if (next === this.#layout) return this.getSnapshot();
-      await this.#commit(next);
-      return this.getSnapshot();
-    });
-  }
-
-  withProfileAssignment<T>(
-    sectionId: string | null,
-    operation: (assign: (agentId: string) => Promise<SidebarLayoutSnapshot>) => Promise<T>,
-  ): Promise<T> {
-    return this.#enqueue(async () => {
-      if (sectionId !== null) requireCustomSection(this.#layout, sectionId);
-      const previous = this.getSnapshot();
-      try {
-        return await operation(async (agentId) => {
-          const next = applySidebarLayoutAction(
-            this.#layout,
-            { type: "assign", agentId, sectionId },
-            new Set([agentId]),
-          );
-          if (next !== this.#layout) await this.#commit(next);
-          return this.getSnapshot();
-        });
-      } catch (error) {
-        if (this.#layout.revision !== previous.revision) {
-          await this.#commit({ ...previous, revision: this.#layout.revision + 1 });
-        }
-        throw error;
-      }
-    });
-  }
-
-  removeAgent(agentId: string): Promise<SidebarLayoutSnapshot> {
-    return this.#enqueue(async () => {
-      if (!(agentId in this.#layout.agentAssignments) && !this.#layout.agentOrder.includes(agentId)) {
+  mutate(
+    action: SidebarLayoutAction,
+    agentIds: ReadonlySet<string>,
+  ): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        const next = yield* storedSync(() => applySidebarLayoutAction(this.#layout, action, agentIds));
+        if (next === this.#layout) return this.getSnapshot();
+        yield* this.#commit(next);
         return this.getSnapshot();
-      }
-      const agentAssignments = { ...this.#layout.agentAssignments };
-      delete agentAssignments[agentId];
-      await this.#commit({
-        ...this.#layout,
-        revision: this.#layout.revision + 1,
-        agentAssignments,
-        agentOrder: this.#layout.agentOrder.filter((candidate) => candidate !== agentId),
-      });
-      return this.getSnapshot();
-    });
+      }),
+    );
+  }
+
+  withProfileAssignment<T, E>(
+    sectionId: string | null,
+    operation: (
+      assign: (agentId: string) => Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure>,
+    ) => Effect.Effect<T, E>,
+  ): Effect.Effect<T, E | StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        if (sectionId !== null) yield* storedSync(() => requireCustomSection(this.#layout, sectionId));
+        const previous = this.getSnapshot();
+        const result = yield* Effect.exit(
+          operation((agentId) =>
+            Effect.gen({ self: this }, function* () {
+              const next = yield* storedSync(() =>
+                applySidebarLayoutAction(this.#layout, { type: "assign", agentId, sectionId }, new Set([agentId])),
+              );
+              if (next !== this.#layout) yield* this.#commit(next);
+              return this.getSnapshot();
+            }),
+          ),
+        );
+        if (Exit.isSuccess(result)) return result.value;
+        if (this.#layout.revision !== previous.revision)
+          yield* this.#commit({ ...previous, revision: this.#layout.revision + 1 });
+        return yield* Effect.failCause(result.cause);
+      }),
+    );
+  }
+
+  removeAgent(agentId: string): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        if (!(agentId in this.#layout.agentAssignments) && !this.#layout.agentOrder.includes(agentId)) {
+          return this.getSnapshot();
+        }
+        const agentAssignments = { ...this.#layout.agentAssignments };
+        delete agentAssignments[agentId];
+        yield* this.#commit({
+          ...this.#layout,
+          revision: this.#layout.revision + 1,
+          agentAssignments,
+          agentOrder: this.#layout.agentOrder.filter((candidate) => candidate !== agentId),
+        });
+        return this.getSnapshot();
+      }),
+    );
   }
 
   placeDuplicateAfter(
     sourceAgentId: string,
     duplicateAgentId: string,
     orderedAgentIds: readonly string[],
-  ): Promise<SidebarLayoutSnapshot> {
-    return this.#enqueue(async () => {
-      const agentIds = new Set(orderedAgentIds);
-      if (!agentIds.has(sourceAgentId) || !agentIds.has(duplicateAgentId)) throw new Error("Unknown agent.");
-      const sectionId = this.#layout.agentAssignments[sourceAgentId] ?? null;
-      const order = normalizedAgentOrder(this.#layout.agentOrder, agentIds).filter(
-        (agentId) => agentId !== duplicateAgentId,
-      );
-      const sourceIndex = order.indexOf(sourceAgentId);
-      if (sourceIndex < 0) throw new Error("Unknown source agent order.");
-      const beforeAgentId =
-        order
-          .slice(sourceIndex + 1)
-          .find((agentId) => (this.#layout.agentAssignments[agentId] ?? null) === sectionId) ?? null;
-      const next = applySidebarLayoutAction(
-        this.#layout,
-        { type: "move-agent", agentId: duplicateAgentId, sectionId, beforeAgentId },
-        agentIds,
-      );
-      if (next === this.#layout) return this.getSnapshot();
-      await this.#commit(next);
-      return this.getSnapshot();
-    });
+  ): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        const agentIds = new Set(orderedAgentIds);
+        if (!agentIds.has(sourceAgentId) || !agentIds.has(duplicateAgentId))
+          return yield* new StoredStateFailure({ cause: new Error("Unknown agent.") });
+        const sectionId = this.#layout.agentAssignments[sourceAgentId] ?? null;
+        const order = normalizedAgentOrder(this.#layout.agentOrder, agentIds).filter(
+          (agentId) => agentId !== duplicateAgentId,
+        );
+        const sourceIndex = order.indexOf(sourceAgentId);
+        if (sourceIndex < 0) return yield* new StoredStateFailure({ cause: new Error("Unknown source agent order.") });
+        const beforeAgentId =
+          order
+            .slice(sourceIndex + 1)
+            .find((agentId) => (this.#layout.agentAssignments[agentId] ?? null) === sectionId) ?? null;
+        const next = yield* storedSync(() =>
+          applySidebarLayoutAction(
+            this.#layout,
+            { type: "move-agent", agentId: duplicateAgentId, sectionId, beforeAgentId },
+            agentIds,
+          ),
+        );
+        if (next === this.#layout) return this.getSnapshot();
+        yield* this.#commit(next);
+        return this.getSnapshot();
+      }),
+    );
   }
 
   /**
@@ -155,61 +181,61 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
    * "these agents no longer exist" and commit the deletion, so a user with a dozen agents in named groups
    * comes back to all of them unassigned, in an order they never chose, with nothing to undo it.
    */
-  reconcileAgents(agentIds: ReadonlySet<string>): Promise<SidebarLayoutSnapshot> {
-    return this.#enqueue(async () => {
-      const renamedFrom = new Map<string, string>();
-      for (const agentId of agentIds) {
-        const legacyId = legacyAgentId(agentId);
-        if (legacyId !== agentId) renamedFrom.set(legacyId, agentId);
-      }
-      // An id still in the roster answers for itself, which is why that test comes first: v13 declines to
-      // rename onto an id that is taken, so an agent spelled `bot-<uuid>` can be sitting beside the
-      // `agent-<uuid>` it would otherwise have become, and this entry belongs to the one the user filed.
-      const currentId = (agentId: string) => (agentIds.has(agentId) ? agentId : (renamedFrom.get(agentId) ?? agentId));
-      // Two entries can land on one id -- the layout can hold a `bot-<uuid>` the user filed before the
-      // upgrade beside the `agent-<uuid>` it became -- and the layout is validated on the way back in.
-      // An unmerged pair leaves the same agent twice in `agentOrder`, the file is rejected on the next
-      // launch, and the user's sections and ordering are reset. The entry already spelled the way the
-      // roster spells it is the one the user filed most recently, so it wins.
-      const agentAssignments: Record<string, string> = {};
-      for (const [agentId, sectionId] of Object.entries(this.#layout.agentAssignments)) {
-        const id = currentId(agentId);
-        if (!agentIds.has(id) || (id !== agentId && this.#layout.agentAssignments[id] !== undefined)) continue;
-        agentAssignments[id] = sectionId;
-      }
-      const agentOrder: string[] = [];
-      for (const entry of this.#layout.agentOrder) {
-        const agentId = currentId(entry);
-        if (agentIds.has(agentId) && !agentOrder.includes(agentId)) agentOrder.push(agentId);
-      }
-      if (
-        Object.keys(agentAssignments).length === Object.keys(this.#layout.agentAssignments).length &&
-        Object.keys(agentAssignments).every((agentId) => agentId in this.#layout.agentAssignments) &&
-        agentOrder.length === this.#layout.agentOrder.length &&
-        agentOrder.every((agentId, index) => agentId === this.#layout.agentOrder[index])
-      ) {
+  reconcileAgents(agentIds: ReadonlySet<string>): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
+    return this.#enqueue(
+      Effect.gen({ self: this }, function* () {
+        const renamedFrom = new Map<string, string>();
+        for (const agentId of agentIds) {
+          const legacyId = legacyAgentId(agentId);
+          if (legacyId !== agentId) renamedFrom.set(legacyId, agentId);
+        }
+        // An id still in the roster answers for itself, which is why that test comes first: v13 declines to
+        // rename onto an id that is taken, so an agent spelled `bot-<uuid>` can be sitting beside the
+        // `agent-<uuid>` it would otherwise have become, and this entry belongs to the one the user filed.
+        const currentId = (agentId: string) =>
+          agentIds.has(agentId) ? agentId : (renamedFrom.get(agentId) ?? agentId);
+        // Two entries can land on one id -- the layout can hold a `bot-<uuid>` the user filed before the
+        // upgrade beside the `agent-<uuid>` it became -- and the layout is validated on the way back in.
+        // An unmerged pair leaves the same agent twice in `agentOrder`, the file is rejected on the next
+        // launch, and the user's sections and ordering are reset. The entry already spelled the way the
+        // roster spells it is the one the user filed most recently, so it wins.
+        const agentAssignments: Record<string, string> = {};
+        for (const [agentId, sectionId] of Object.entries(this.#layout.agentAssignments)) {
+          const id = currentId(agentId);
+          if (!agentIds.has(id) || (id !== agentId && this.#layout.agentAssignments[id] !== undefined)) continue;
+          agentAssignments[id] = sectionId;
+        }
+        const agentOrder: string[] = [];
+        for (const entry of this.#layout.agentOrder) {
+          const agentId = currentId(entry);
+          if (agentIds.has(agentId) && !agentOrder.includes(agentId)) agentOrder.push(agentId);
+        }
+        if (
+          Object.keys(agentAssignments).length === Object.keys(this.#layout.agentAssignments).length &&
+          Object.keys(agentAssignments).every((agentId) => agentId in this.#layout.agentAssignments) &&
+          agentOrder.length === this.#layout.agentOrder.length &&
+          agentOrder.every((agentId, index) => agentId === this.#layout.agentOrder[index])
+        ) {
+          return this.getSnapshot();
+        }
+        yield* this.#commit({ ...this.#layout, revision: this.#layout.revision + 1, agentAssignments, agentOrder });
         return this.getSnapshot();
-      }
-      await this.#commit({ ...this.#layout, revision: this.#layout.revision + 1, agentAssignments, agentOrder });
-      return this.getSnapshot();
-    });
-  }
-
-  #enqueue<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.#operationQueue.then(operation, operation);
-    this.#operationQueue = result.then(
-      () => undefined,
-      () => undefined,
+      }),
     );
-    return result;
   }
 
-  async #commit(next: SidebarLayoutSnapshot): Promise<void> {
+  #enqueue<T, E>(operation: Effect.Effect<T, E>): Effect.Effect<T, E> {
+    return this.#operationQueue.withPermit(operation.pipe(Effect.uninterruptible));
+  }
+
+  #commit = Effect.fn("SidebarLayout.commit")(function* (this: SidebarLayoutStore, next: SidebarLayoutSnapshot) {
     const stored: StoredSidebarLayout = { version: 2, ...next };
-    await writeJsonFileAtomically(this.#path, stored);
+    yield* writeFileAtomically(this.#path, `${JSON.stringify(stored)}\n`).pipe(
+      Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
+    );
     this.#layout = next;
     this.emit("changed", this.getSnapshot());
-  }
+  });
 }
 
 function applySidebarLayoutAction(

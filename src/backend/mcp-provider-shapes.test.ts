@@ -17,6 +17,7 @@ import {
   type UsableMcpServer,
   usableMcpServer,
 } from "./mcp-provider-shapes";
+import { runMcp } from "./mcp-test-runtime";
 
 function config(overrides: Partial<McpServerConfig>): McpServerConfig {
   return {
@@ -222,7 +223,7 @@ describe("mcpLaunchEnvironment", () => {
 
 describe("needsManagedRuntime", () => {
   it("ignores an http server", async () => {
-    await expect(needsManagedRuntime(config({}), NO_MCP_TOOL_RUNTIMES)).resolves.toBe(false);
+    await expect(runMcp(needsManagedRuntime(config({}), NO_MCP_TOOL_RUNTIMES))).resolves.toBe(false);
   });
 
   it("ignores a command this machine already resolves", async () => {
@@ -234,7 +235,7 @@ describe("needsManagedRuntime", () => {
       url: "",
       headers: [],
     });
-    await expect(needsManagedRuntime(absolute, NO_MCP_TOOL_RUNTIMES)).resolves.toBe(false);
+    await expect(runMcp(needsManagedRuntime(absolute, NO_MCP_TOOL_RUNTIMES))).resolves.toBe(false);
   });
 
   it("waits for a command nothing names", async () => {
@@ -244,7 +245,7 @@ describe("needsManagedRuntime", () => {
       url: "",
       headers: [],
     });
-    await expect(needsManagedRuntime(missing, NO_MCP_TOOL_RUNTIMES)).resolves.toBe(true);
+    await expect(runMcp(needsManagedRuntime(missing, NO_MCP_TOOL_RUNTIMES))).resolves.toBe(true);
   });
 
   it("skips the wait once the managed store names the command", async () => {
@@ -255,7 +256,7 @@ describe("needsManagedRuntime", () => {
       headers: [],
     });
     const tools = { binDirectories: [], commandAliases: { "openbot-no-such-command": "/managed/bin/tool" } };
-    await expect(needsManagedRuntime(missing, tools)).resolves.toBe(false);
+    await expect(runMcp(needsManagedRuntime(missing, tools))).resolves.toBe(false);
   });
 });
 
@@ -305,15 +306,15 @@ describe("resolveMcpCommand", () => {
     try {
       await writeFile(executable, "#!/bin/sh\nexit 0\n");
       await chmod(executable, 0o755);
-      expect(await resolveMcpCommand("openbot-fake-server", directory)).toBe(executable);
+      expect(await runMcp(resolveMcpCommand("openbot-fake-server", directory))).toBe(executable);
 
       // The login shell is what costs the time, so the second answer has to come from memory. A
       // deleted file proves it did: a fresh lookup would find nothing.
       await rm(executable);
-      expect(await resolveMcpCommand("openbot-fake-server", directory)).toBe(executable);
+      expect(await runMcp(resolveMcpCommand("openbot-fake-server", directory))).toBe(executable);
 
       clearMcpCommandCache();
-      expect(await resolveMcpCommand("openbot-fake-server", directory)).toBeNull();
+      expect(await runMcp(resolveMcpCommand("openbot-fake-server", directory))).toBeNull();
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -323,23 +324,23 @@ describe("resolveMcpCommand", () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-mcp-command-"));
     const executable = join(directory, "openbot-late-server");
     try {
-      expect(await resolveMcpCommand("openbot-late-server", directory)).toBeNull();
+      expect(await runMcp(resolveMcpCommand("openbot-late-server", directory))).toBeNull();
 
       // Installing the missing tool has to be enough. Remembering the miss would make a restart
       // the only way to be believed.
       await writeFile(executable, "#!/bin/sh\nexit 0\n");
       await chmod(executable, 0o755);
-      expect(await resolveMcpCommand("openbot-late-server", directory)).toBe(executable);
+      expect(await runMcp(resolveMcpCommand("openbot-late-server", directory))).toBe(executable);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
   });
 
   it("takes a path the user wrote as written, without a lookup", async () => {
-    expect(await resolveMcpCommand("/usr/local/bin/server")).toBe("/usr/local/bin/server");
+    expect(await runMcp(resolveMcpCommand("/usr/local/bin/server"))).toBe("/usr/local/bin/server");
     // The Paper listing names `~/.paper/bin/paper`. Providers spawn with no shell to expand it.
-    expect(await resolveMcpCommand("~/.paper/bin/paper")).toBe(join(homedir(), ".paper", "bin", "paper"));
-    expect(await resolveMcpCommand("  ")).toBeNull();
+    expect(await runMcp(resolveMcpCommand("~/.paper/bin/paper"))).toBe(join(homedir(), ".paper", "bin", "paper"));
+    expect(await runMcp(resolveMcpCommand("  "))).toBeNull();
   });
 });
 
@@ -378,12 +379,12 @@ describe("usableMcpServer with a managed tool runtime", () => {
 
       // Last on `PATH`, so the build the user installed is the one that starts. This is the whole
       // mitigation for shipping a runtime: no machine that works today starts a different program.
-      const installed = await usableMcpServer(stdio("openbot-fake-npx"), tools);
+      const installed = await runMcp(usableMcpServer(stdio("openbot-fake-npx"), tools));
       expect(installed.command).toBe(join(own, "openbot-fake-npx"));
       expect(installed.path).toBe(`${own}${delimiter}${managed}`);
 
       // And an alias is read only after that whole list found nothing, which is the clean machine.
-      const lent = await usableMcpServer(stdio("openbot-absent-npx"), tools);
+      const lent = await runMcp(usableMcpServer(stdio("openbot-absent-npx"), tools));
       expect(lent.command).toBe(join(managed, "bunx"));
     } finally {
       await rm(own, { recursive: true, force: true });

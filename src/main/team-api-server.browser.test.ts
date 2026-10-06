@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // The embedded browser over the wire: `src/main/team-api/route-browser.ts`.
@@ -10,11 +11,13 @@ afterEach(stopTeamApiFixtures);
 describe("TeamApiServer browser", () => {
   it("returns a bounded browser preview to an authenticated client", async () => {
     const { start, signIn } = await createTeamApiFixture("browser-preview", { configure: true });
-    const capturePreview = vi.fn(async () => ({
-      dataUrl: "data:image/jpeg;base64,YWJj",
-      width: 960,
-      height: 600,
-    }));
+    const capturePreview = vi.fn(() =>
+      Effect.sync(() => ({
+        dataUrl: "data:image/jpeg;base64,YWJj",
+        width: 960,
+        height: 600,
+      })),
+    );
     const { base } = await start({
       browser: createBrowser({ capturePreview }),
     });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
 import { describeMcpError, testMcpServer } from "./mcp-probe";
+import { runMcp } from "./mcp-test-runtime";
 
 // A newline-delimited JSON-RPC server, written here rather than built on the SDK so the child is
 // exactly what a real stdio server looks like on the wire and nothing else.
@@ -77,17 +78,17 @@ async function scriptConfig(source: string, overrides: Partial<McpServerConfig> 
 
 describe("testMcpServer", () => {
   it("reports a real tool count for a server that answers", async () => {
-    expect(await testMcpServer(await scriptConfig(FAKE_SERVER))).toEqual({ toolCount: 2, error: null });
+    expect(await runMcp(testMcpServer(await scriptConfig(FAKE_SERVER)))).toEqual({ toolCount: 2, error: null });
   });
 
   // The count answers "what would an agent get", and an agent is given every tool, not a first page.
   it("counts the tools on every page a server answers with", async () => {
-    expect(await testMcpServer(await scriptConfig(PAGED_SERVER))).toEqual({ toolCount: 3, error: null });
+    expect(await runMcp(testMcpServer(await scriptConfig(PAGED_SERVER)))).toEqual({ toolCount: 3, error: null });
   });
 
   // Nothing reads the child's stderr, so a piped one fills and holds the server before it answers.
   it("answers for a server that writes a long startup log to stderr", async () => {
-    expect(await testMcpServer(await scriptConfig(NOISY_SERVER), 2_000)).toEqual({ toolCount: 2, error: null });
+    expect(await runMcp(testMcpServer(await scriptConfig(NOISY_SERVER), 2_000))).toEqual({ toolCount: 2, error: null });
   });
 
   // A `PATH` in the configuration is what the server runs with - a virtual environment, a version
@@ -107,13 +108,15 @@ describe("testMcpServer", () => {
     await chmod(launcher, 0o755);
 
     expect(
-      await testMcpServer({ ...config, command: "openbot-fake-mcp", args: [], env: [{ key: "PATH", value: root }] }),
+      await runMcp(
+        testMcpServer({ ...config, command: "openbot-fake-mcp", args: [], env: [{ key: "PATH", value: root }] }),
+      ),
     ).toEqual({ toolCount: 2, error: null });
   });
 
   // A test answers for the configuration in front of the user, which they may not have enabled yet.
   it("tests a server that is turned off", async () => {
-    expect(await testMcpServer(await scriptConfig(FAKE_SERVER, { enabled: false }))).toEqual({
+    expect(await runMcp(testMcpServer(await scriptConfig(FAKE_SERVER, { enabled: false })))).toEqual({
       toolCount: 2,
       error: null,
     });
@@ -122,14 +125,14 @@ describe("testMcpServer", () => {
   // The form offers `~/code` as its example. Process creation takes the value as written, so a
   // literal `~` names a directory this machine does not have and the server never starts.
   it("starts a server in a home-relative working directory", async () => {
-    expect(await testMcpServer(await scriptConfig(FAKE_SERVER, { workingDirectory: "~" }))).toEqual({
+    expect(await runMcp(testMcpServer(await scriptConfig(FAKE_SERVER, { workingDirectory: "~" })))).toEqual({
       toolCount: 2,
       error: null,
     });
   });
 
   it("names the command that this machine does not have", async () => {
-    expect(await testMcpServer(config({ command: "openbot-no-such-command" }))).toEqual({
+    expect(await runMcp(testMcpServer(config({ command: "openbot-no-such-command" })))).toEqual({
       toolCount: 0,
       error: "Command not found: openbot-no-such-command",
     });
@@ -138,7 +141,7 @@ describe("testMcpServer", () => {
   // The IPC decoder and the remote codec both reject a longer text, so an unbounded failure would
   // reach the panel as "Invalid MCP server response." instead of the failure the user asked about.
   it("holds a long failure to the length the panel can be given", async () => {
-    const result = await testMcpServer(config({ command: `openbot-${"long".repeat(1_000)}` }));
+    const result = await runMcp(testMcpServer(config({ command: `openbot-${"long".repeat(1_000)}` })));
     expect(result.toolCount).toBe(0);
     expect(result.error).toMatch(/^Command not found: /u);
     expect(decodeMcpTestResult(result)).toBe(result);
@@ -150,7 +153,7 @@ describe("testMcpServer", () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-mcp-"));
     roots.push(root);
     const mark = join(root, "ran");
-    expect(await testMcpServer(config({ command: `node$(touch ${mark})` }))).toEqual({
+    expect(await runMcp(testMcpServer(config({ command: `node$(touch ${mark})` })))).toEqual({
       toolCount: 0,
       error: `Command not found: node$(touch ${mark})`,
     });
@@ -158,7 +161,7 @@ describe("testMcpServer", () => {
   });
 
   it("gives up on a server that never answers", async () => {
-    const result = await testMcpServer(await scriptConfig("process.stdin.resume();\n"), 200);
+    const result = await runMcp(testMcpServer(await scriptConfig("process.stdin.resume();\n"), 200));
     expect(result.toolCount).toBe(0);
     expect(result.error).toContain("The server did not answer in");
   });

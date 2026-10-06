@@ -1,83 +1,70 @@
-// The order of `start()` and `stop()` for one service that opens a process, a socket or a port.
-//
-// Starts and stops run one at a time, in the order of the calls, so the last call always decides
-// whether the service runs. A stop never returns while a start that came before it can still open
-// what the stop closed. A call that repeats the last queued action shares its promise, so two starts
-// at once do not open two listeners. A start that follows a finished start runs again: `run` must
-// return at once when the service already runs.
-//
-// A start that can take long can be told to give up: a stop queued behind a start calls
-// `interruptStart` while that start runs, then waits for it. Without it, a slow start delays the
-// stop, and the shutdown sequence stops each step after a fixed time.
+import { Deferred, Effect } from "effect";
 
-interface QueuedStart<T> {
+interface QueuedStart<T, E> {
   readonly kind: "start";
-  readonly promise: Promise<T>;
-  /** Runs `interrupt` now if the start runs, or when it begins. */
-  interrupt(interrupt: () => Promise<void>): void;
-  /** The interrupt that ran, for the stop behind this start to wait for. */
-  interrupted(): Promise<void>;
+  readonly began: Deferred.Deferred<void>;
+  readonly done: Deferred.Deferred<T, E>;
 }
-
-interface QueuedStop {
+interface QueuedStop<E> {
   readonly kind: "stop";
-  readonly promise: Promise<void>;
+  readonly done: Deferred.Deferred<void, E>;
 }
 
-export class LifecycleGate<T> {
-  #queue: Promise<unknown> = Promise.resolve();
-  #last: QueuedStart<T> | QueuedStop | null = null;
+/** Serialize lifecycle operations; repeated pending actions share their result. */
+export class LifecycleGate<T, E> {
+  #last: QueuedStart<T, E> | QueuedStop<E> | null = null;
 
-  start(run: () => Promise<T>): Promise<T> {
-    const last = this.#last;
-    if (last?.kind === "start") return last.promise;
-    let running = false;
-    let waiting: (() => Promise<void>) | null = null;
-    let interrupted: Promise<void> = Promise.resolve();
-    const interruptNow = (interrupt: () => Promise<void>): void => {
-      interrupted = interrupt();
-      // The stop behind this start awaits it and reports the error.
-      interrupted.catch(() => undefined);
-    };
-    const promise = this.#queue.then(() => {
-      running = true;
-      const starting = run();
-      if (waiting) interruptNow(waiting);
-      return starting;
-    });
-    this.#push({
-      kind: "start",
-      promise,
-      interrupt: (interrupt) => {
-        if (running) interruptNow(interrupt);
-        else waiting = interrupt;
-      },
-      interrupted: () => interrupted,
-    });
-    return promise;
+  start(run: () => Effect.Effect<T, E>): Effect.Effect<T, E> {
+    return Effect.gen({ self: this }, function* () {
+      const previous = this.#last;
+      if (previous?.kind === "start") return yield* Deferred.await(previous.done);
+      const operation: QueuedStart<T, E> = {
+        kind: "start",
+        began: Deferred.makeUnsafe(),
+        done: Deferred.makeUnsafe(),
+      };
+      this.#last = operation;
+      return yield* Effect.gen(function* () {
+        if (previous) yield* Effect.exit(Deferred.await(previous.done));
+        yield* Deferred.succeed(operation.began, undefined);
+        return yield* run();
+      }).pipe(
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            yield* Deferred.done(operation.done, exit);
+            if (this.#last === operation) this.#last = null;
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 
-  stop(run: () => Promise<void>, interruptStart?: () => Promise<void>): Promise<void> {
-    const last = this.#last;
-    if (last?.kind === "stop") return last.promise;
-    if (last?.kind === "start" && interruptStart) last.interrupt(interruptStart);
-    const promise = this.#queue.then(async () => {
-      try {
-        if (last?.kind === "start") await last.interrupted();
-      } finally {
-        await run();
-      }
-    });
-    this.#push({ kind: "stop", promise });
-    return promise;
-  }
-
-  #push(operation: QueuedStart<T> | QueuedStop): void {
-    this.#last = operation;
-    this.#queue = operation.promise.catch(() => undefined);
-    const clear = (): void => {
-      if (this.#last === operation) this.#last = null;
-    };
-    operation.promise.then(clear, clear);
+  stop(run: () => Effect.Effect<void, E>, interruptStart?: () => Effect.Effect<void, E>): Effect.Effect<void, E> {
+    return Effect.gen({ self: this }, function* () {
+      const previous = this.#last;
+      if (previous?.kind === "stop") return yield* Deferred.await(previous.done);
+      const operation: QueuedStop<E> = { kind: "stop", done: Deferred.makeUnsafe() };
+      this.#last = operation;
+      return yield* Effect.gen(function* () {
+        const interrupted = yield* Effect.exit(
+          Effect.gen(function* () {
+            if (previous?.kind === "start" && interruptStart) {
+              yield* Deferred.await(previous.began);
+              yield* interruptStart();
+            }
+          }),
+        );
+        if (previous) yield* Effect.exit(Deferred.await(previous.done));
+        yield* run();
+        yield* interrupted;
+      }).pipe(
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            yield* Deferred.done(operation.done, exit);
+            if (this.#last === operation) this.#last = null;
+          }),
+        ),
+      );
+    }).pipe(Effect.uninterruptible);
   }
 }

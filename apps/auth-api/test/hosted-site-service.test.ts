@@ -3,6 +3,7 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { HOSTED_SITE_HOST_ID_HEADER, HOSTED_SITE_HOST_TOKEN_HEADER } from "@openbot/contracts/hosted-sites";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
+import { runApiEffect } from "../src/server/effect-runtime";
 import { HOSTED_SITE_LIMITS, type HostedSiteUploadRequest } from "../src/server/hosted-site-contract";
 import { type HostedSiteScope, resolveHostedSiteScope } from "../src/server/hosted-site-server";
 import { HostedSiteService } from "../src/server/hosted-site-service";
@@ -19,31 +20,33 @@ afterEach(() => {
 describe("hosted site control plane", () => {
   it("keeps publication idempotent, enforces ownership, and replaces atomically", async () => {
     const fixture = serviceFixture();
-    const firstUpload = await fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1");
-    const repeated = await fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1");
+    const firstUpload = await runApiEffect(fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1"));
+    const repeated = await runApiEffect(fixture.service.createUpload(server("alice"), uploadRequest(), "publish-1"));
     expect(repeated.uploadId).toBe(firstUpload.uploadId);
 
     await uploadIndex(fixture.service, "alice", firstUpload.uploadId);
-    const first = await fixture.service.activate("alice", firstUpload.uploadId, "activate-1");
+    const first = await runApiEffect(fixture.service.activate("alice", firstUpload.uploadId, "activate-1"));
     const firstDeployment = firstUpload.uploadId;
 
     await expect(
-      fixture.service.createUpload(server("bob"), uploadRequest({ siteId: first.id }), "replace-by-bob"),
+      runApiEffect(fixture.service.createUpload(server("bob"), uploadRequest({ siteId: first.id }), "replace-by-bob")),
     ).rejects.toMatchObject({ code: "site_not_found" });
 
     fixture.setNow(NOW + 24 * 60 * 60_000);
-    const replacement = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: first.id, title: "Updated hosted budget planner" }),
-      "replace-1",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: first.id, title: "Updated hosted budget planner" }),
+        "replace-1",
+      ),
     );
     await uploadIndex(fixture.service, "alice", replacement.uploadId);
     fixture.database.failNextBatchContaining("UPDATE hosted_sites SET status = 'active'");
-    await expect(fixture.service.activate("alice", replacement.uploadId, "activate-2")).rejects.toThrow(
+    await expect(runApiEffect(fixture.service.activate("alice", replacement.uploadId, "activate-2"))).rejects.toThrow(
       "Injected D1 failure",
     );
 
-    const recovered = await fixture.service.activate("alice", replacement.uploadId, "activate-2");
+    const recovered = await runApiEffect(fixture.service.activate("alice", replacement.uploadId, "activate-2"));
     expect(recovered.hostname).toBe(first.hostname);
     expect(recovered.expiresAt).toBe(new Date(fixture.now() + 30 * 24 * 60 * 60_000).toISOString());
     expect(fixture.bucket.keys()).not.toContain(`sites/${first.id}/deployments/${firstDeployment}/index.html`);
@@ -52,15 +55,17 @@ describe("hosted site control plane", () => {
   it("rejects an idempotency key reused for another site or operation", async () => {
     const fixture = serviceFixture();
     const first = await publish(fixture.service, "alice", "receipt-first-publish", "shared-activation-key");
-    const replacement = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: first.id, title: "Replacement with reused activation key" }),
-      "receipt-replacement-publish",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: first.id, title: "Replacement with reused activation key" }),
+        "receipt-replacement-publish",
+      ),
     );
     await uploadIndex(fixture.service, "alice", replacement.uploadId);
 
     await expect(
-      fixture.service.activate("alice", replacement.uploadId, "shared-activation-key"),
+      runApiEffect(fixture.service.activate("alice", replacement.uploadId, "shared-activation-key")),
     ).rejects.toMatchObject({ code: "idempotency_conflict" });
     const replacementDeployment = await fixture.database
       .prepare("SELECT status FROM site_deployments WHERE id = ?")
@@ -68,9 +73,13 @@ describe("hosted site control plane", () => {
       .first<{ status: string }>();
     expect(replacementDeployment?.status).toBe("uploading");
 
-    const second = await fixture.service.createUpload(server("alice"), uploadRequest(), "receipt-second-publish");
-    await fixture.service.delete(server("alice"), first.id, "shared-delete-key");
-    await expect(fixture.service.delete(server("alice"), second.site.id, "shared-delete-key")).rejects.toMatchObject({
+    const second = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "receipt-second-publish"),
+    );
+    await runApiEffect(fixture.service.delete(server("alice"), first.id, "shared-delete-key"));
+    await expect(
+      runApiEffect(fixture.service.delete(server("alice"), second.site.id, "shared-delete-key")),
+    ).rejects.toMatchObject({
       code: "idempotency_conflict",
     });
     const secondSite = await fixture.database
@@ -82,30 +91,32 @@ describe("hosted site control plane", () => {
 
   it("claims an operation key before concurrent activation and deletion", async () => {
     const activationFixture = serviceFixture();
-    const firstUpload = await activationFixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ title: "First concurrent activation" }),
-      "concurrent-operation-first-upload",
+    const firstUpload = await runApiEffect(
+      activationFixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ title: "First concurrent activation" }),
+        "concurrent-operation-first-upload",
+      ),
     );
-    const secondUpload = await activationFixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ title: "Second concurrent activation" }),
-      "concurrent-operation-second-upload",
+    const secondUpload = await runApiEffect(
+      activationFixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ title: "Second concurrent activation" }),
+        "concurrent-operation-second-upload",
+      ),
     );
     await uploadIndex(activationFixture.service, "alice", firstUpload.uploadId);
     await uploadIndex(activationFixture.service, "alice", secondUpload.uploadId);
     const activationPause = activationFixture.database.pauseNextBatchContaining(
       "UPDATE hosted_sites SET status = 'active'",
     );
-    const firstActivation = activationFixture.service.activate(
-      "alice",
-      firstUpload.uploadId,
-      "concurrent-operation-key",
+    const firstActivation = runApiEffect(
+      activationFixture.service.activate("alice", firstUpload.uploadId, "concurrent-operation-key"),
     );
     await activationPause.started;
     try {
       await expect(
-        activationFixture.service.activate("alice", secondUpload.uploadId, "concurrent-operation-key"),
+        runApiEffect(activationFixture.service.activate("alice", secondUpload.uploadId, "concurrent-operation-key")),
       ).rejects.toMatchObject({ code: "idempotency_conflict" });
     } finally {
       activationPause.resume();
@@ -131,11 +142,13 @@ describe("hosted site control plane", () => {
       "concurrent-delete-second-activation",
     );
     const deletionPause = deletionFixture.database.pauseNextBatchContaining("SET status = 'deleted'");
-    const firstDeletion = deletionFixture.service.delete(server("alice"), firstSite.id, "concurrent-delete-key");
+    const firstDeletion = runApiEffect(
+      deletionFixture.service.delete(server("alice"), firstSite.id, "concurrent-delete-key"),
+    );
     await deletionPause.started;
     try {
       await expect(
-        deletionFixture.service.delete(server("alice"), secondSite.id, "concurrent-delete-key"),
+        runApiEffect(deletionFixture.service.delete(server("alice"), secondSite.id, "concurrent-delete-key")),
       ).rejects.toMatchObject({ code: "idempotency_conflict" });
     } finally {
       deletionPause.resume();
@@ -152,18 +165,22 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "rate-publish-0", "rate-activate-0");
     for (let index = 1; index < 20; index += 1) {
-      const replacement = await fixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ siteId: site.id, title: `Rate limited replacement ${index}` }),
-        `rate-publish-${index}`,
+      const replacement = await runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ siteId: site.id, title: `Rate limited replacement ${index}` }),
+          `rate-publish-${index}`,
+        ),
       );
       await uploadIndex(fixture.service, "alice", replacement.uploadId);
-      await fixture.service.activate("alice", replacement.uploadId, `rate-activate-${index}`);
+      await runApiEffect(fixture.service.activate("alice", replacement.uploadId, `rate-activate-${index}`));
     }
-    const limited = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: site.id, title: "Rate limited replacement twenty one" }),
-      "rate-publish-20",
+    const limited = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: site.id, title: "Rate limited replacement twenty one" }),
+        "rate-publish-20",
+      ),
     );
     await uploadIndex(fixture.service, "alice", limited.uploadId);
     await fixture.database
@@ -171,7 +188,9 @@ describe("hosted site control plane", () => {
       .bind(limited.uploadId)
       .run();
 
-    await expect(fixture.service.activate("alice", limited.uploadId, "rate-activate-20")).rejects.toMatchObject({
+    await expect(
+      runApiEffect(fixture.service.activate("alice", limited.uploadId, "rate-activate-20")),
+    ).rejects.toMatchObject({
       code: "activation_rate_limit",
     });
     const deployment = await fixture.database
@@ -188,22 +207,24 @@ describe("hosted site control plane", () => {
       .prepare("SELECT current_deployment_id FROM hosted_sites WHERE id = ?")
       .bind(site.id)
       .first<{ current_deployment_id: string }>();
-    const replacement = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: site.id, title: "Replacement after route failure" }),
-      "retry-replace",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: site.id, title: "Replacement after route failure" }),
+        "retry-replace",
+      ),
     );
     await uploadIndex(fixture.service, "alice", replacement.uploadId);
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
 
-    await expect(fixture.service.activate("alice", replacement.uploadId, "retry-replace-activate")).rejects.toThrow(
-      "Injected R2 put failure",
-    );
+    await expect(
+      runApiEffect(fixture.service.activate("alice", replacement.uploadId, "retry-replace-activate")),
+    ).rejects.toThrow("Injected R2 put failure");
     const initialAsset = `sites/${site.id}/deployments/${initialDeploymentId?.current_deployment_id}/index.html`;
     expect(fixture.bucket.keys()).toContain(initialAsset);
 
     await expect(
-      fixture.service.activate("alice", replacement.uploadId, "retry-replace-activate"),
+      runApiEffect(fixture.service.activate("alice", replacement.uploadId, "retry-replace-activate")),
     ).resolves.toMatchObject({ id: site.id });
     expect(fixture.bucket.keys()).not.toContain(initialAsset);
     const initialDeployment = await fixture.database
@@ -215,12 +236,18 @@ describe("hosted site control plane", () => {
 
   it("keeps the active objects when two requests finalize the same authorized upload", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-same-upload");
+    const upload = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-same-upload"),
+    );
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const pause = fixture.database.pauseNextBatchContaining("UPDATE hosted_sites SET status = 'active'");
-    const firstActivation = fixture.service.activate("alice", upload.uploadId, "concurrent-activate-first");
+    const firstActivation = runApiEffect(
+      fixture.service.activate("alice", upload.uploadId, "concurrent-activate-first"),
+    );
     await pause.started;
-    const secondActivation = await fixture.service.activate("alice", upload.uploadId, "concurrent-activate-second");
+    const secondActivation = await runApiEffect(
+      fixture.service.activate("alice", upload.uploadId, "concurrent-activate-second"),
+    );
     pause.resume();
     const firstResult = await firstActivation;
 
@@ -234,10 +261,12 @@ describe("hosted site control plane", () => {
 
   it("rejects missing or false content lengths before an oversized body reaches R2", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ files: [{ path: "index.html", size: 0, mimeType: "text/html" }] }),
-      "oversized-upload",
+    const upload = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ files: [{ path: "index.html", size: 0, mimeType: "text/html" }] }),
+        "oversized-upload",
+      ),
     );
     const request = (headers: HeadersInit) =>
       new Request("https://openbot.run/v1/sites/upload", {
@@ -247,14 +276,18 @@ describe("hosted site control plane", () => {
       });
 
     await expect(
-      fixture.service.uploadFile("alice", upload.uploadId, "index.html", request({ "Content-Type": "text/html" })),
+      runApiEffect(
+        fixture.service.uploadFile("alice", upload.uploadId, "index.html", request({ "Content-Type": "text/html" })),
+      ),
     ).rejects.toMatchObject({ code: "size_mismatch" });
     await expect(
-      fixture.service.uploadFile(
-        "alice",
-        upload.uploadId,
-        "index.html",
-        request({ "Content-Type": "text/html", "Content-Length": "0" }),
+      runApiEffect(
+        fixture.service.uploadFile(
+          "alice",
+          upload.uploadId,
+          "index.html",
+          request({ "Content-Type": "text/html", "Content-Length": "0" }),
+        ),
       ),
     ).rejects.toMatchObject({ code: "size_mismatch" });
     expect(fixture.bucket.keys()).not.toContain(`sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`);
@@ -262,7 +295,9 @@ describe("hosted site control plane", () => {
 
   it("does not activate while a file upload can still mutate the asset", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "active-file-upload");
+    const upload = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "active-file-upload"),
+    );
     const asset = `sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`;
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await fixture.bucket.delete(asset);
@@ -271,13 +306,13 @@ describe("hosted site control plane", () => {
     await pause.started;
 
     await expect(
-      fixture.service.activate("alice", upload.uploadId, "activate-during-file-upload"),
+      runApiEffect(fixture.service.activate("alice", upload.uploadId, "activate-during-file-upload")),
     ).rejects.toMatchObject({ code: "upload_in_progress" });
     pause.resume();
     await fileUpload;
 
     await expect(
-      fixture.service.activate("alice", upload.uploadId, "activate-after-file-upload"),
+      runApiEffect(fixture.service.activate("alice", upload.uploadId, "activate-after-file-upload")),
     ).resolves.toMatchObject({ status: "active" });
     expect(fixture.bucket.keys()).toContain(asset);
   });
@@ -285,8 +320,8 @@ describe("hosted site control plane", () => {
   it("caps simultaneous file uploads for an account", async () => {
     const fixture = serviceFixture();
     const [first, second] = await Promise.all([
-      fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-first"),
-      fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-second"),
+      runApiEffect(fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-first")),
+      runApiEffect(fixture.service.createUpload(server("alice"), uploadRequest(), "concurrent-file-limit-second")),
     ]);
     const firstPause = fixture.bucket.pauseNextPutContaining(
       `sites/${first.site.id}/deployments/${first.uploadId}/index.html`,
@@ -308,7 +343,9 @@ describe("hosted site control plane", () => {
 
   it("does not consume retry claims for an already completed file", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "completed-file-retry");
+    const upload = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "completed-file-retry"),
+    );
 
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await uploadIndex(fixture.service, "alice", upload.uploadId);
@@ -323,21 +360,25 @@ describe("hosted site control plane", () => {
   it("bounds failed upload bytes within one upload session", async () => {
     const fixture = serviceFixture();
     const content = "x".repeat(HOSTED_SITE_LIMITS.fileBytes);
-    const upload = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ files: [{ path: "index.html", size: content.length, mimeType: "text/html" }] }),
-      "upload-byte-limit",
+    const upload = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ files: [{ path: "index.html", size: content.length, mimeType: "text/html" }] }),
+        "upload-byte-limit",
+      ),
     );
     const put = () =>
-      fixture.service.uploadFile(
-        "alice",
-        upload.uploadId,
-        "index.html",
-        new Request("https://openbot.run/v1/sites/upload", {
-          method: "PUT",
-          headers: { "Content-Type": "text/html", "Content-Length": String(content.length) },
-          body: content,
-        }),
+      runApiEffect(
+        fixture.service.uploadFile(
+          "alice",
+          upload.uploadId,
+          "index.html",
+          new Request("https://openbot.run/v1/sites/upload", {
+            method: "PUT",
+            headers: { "Content-Type": "text/html", "Content-Length": String(content.length) },
+            body: content,
+          }),
+        ),
       );
 
     const asset = `sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`;
@@ -373,21 +414,23 @@ describe("hosted site control plane", () => {
       .prepare("SELECT current_deployment_id FROM hosted_sites WHERE id = ?")
       .bind(site.id)
       .first<{ current_deployment_id: string }>();
-    const replacement = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: site.id, title: "Cleanup route replacement" }),
-      "cleanup-route-replace",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: site.id, title: "Cleanup route replacement" }),
+        "cleanup-route-replace",
+      ),
     );
     await uploadIndex(fixture.service, "alice", replacement.uploadId);
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
     await expect(
-      fixture.service.activate("alice", replacement.uploadId, "cleanup-route-replace-activate"),
+      runApiEffect(fixture.service.activate("alice", replacement.uploadId, "cleanup-route-replace-activate")),
     ).rejects.toThrow("Injected R2 put failure");
 
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({
       deploymentId: priorDeployment?.current_deployment_id,
     });
-    await fixture.service.cleanup();
+    await runApiEffect(fixture.service.cleanup());
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ deploymentId: replacement.uploadId });
     expect(fixture.bucket.keys()).not.toContain(
       `sites/${site.id}/deployments/${priorDeployment?.current_deployment_id}/index.html`,
@@ -396,12 +439,14 @@ describe("hosted site control plane", () => {
 
   it("deletes a deployment activated after deletion reads its site snapshot", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "delete-activation-race");
+    const upload = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "delete-activation-race"),
+    );
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const pause = fixture.database.pauseNextBatchContaining("SET status = 'deleted'");
-    const deletion = fixture.service.delete(server("alice"), upload.site.id, "delete-after-activation");
+    const deletion = runApiEffect(fixture.service.delete(server("alice"), upload.site.id, "delete-after-activation"));
     await pause.started;
-    await fixture.service.activate("alice", upload.uploadId, "activate-before-delete-batch");
+    await runApiEffect(fixture.service.activate("alice", upload.uploadId, "activate-before-delete-batch"));
     pause.resume();
     await deletion;
 
@@ -417,9 +462,9 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "block-delete-publish", "block-delete-activate");
     const pause = fixture.database.pauseNextBatchContaining("UPDATE hosted_sites SET status = ?");
-    const blocking = fixture.service.setBlocked(site.id, true);
+    const blocking = runApiEffect(fixture.service.setBlocked(site.id, true));
     await pause.started;
-    await fixture.service.delete(server("alice"), site.id, "delete-during-block");
+    await runApiEffect(fixture.service.delete(server("alice"), site.id, "delete-during-block"));
     pause.resume();
 
     await expect(blocking).rejects.toMatchObject({ code: "site_deleted" });
@@ -436,7 +481,9 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const results = await Promise.allSettled(
       ["one", "two", "three"].map((key) =>
-        fixture.service.createUpload(server("alice"), uploadRequest({ title: `${key} hosted static project` }), key),
+        runApiEffect(
+          fixture.service.createUpload(server("alice"), uploadRequest({ title: `${key} hosted static project` }), key),
+        ),
       ),
     );
 
@@ -448,9 +495,13 @@ describe("hosted site control plane", () => {
   it("returns one upload session for concurrent requests with the same idempotency key", async () => {
     const fixture = serviceFixture();
     const pause = fixture.database.pauseNextBatchContaining("INSERT INTO hosted_sites");
-    const firstRequest = fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key");
+    const firstRequest = runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key"),
+    );
     await pause.started;
-    const secondSession = await fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key");
+    const secondSession = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "same-upload-key"),
+    );
     pause.resume();
     const firstSession = await firstRequest;
 
@@ -465,28 +516,34 @@ describe("hosted site control plane", () => {
 
   it("rejects an upload idempotency key reused for another payload or target", async () => {
     const payloadFixture = serviceFixture();
-    await payloadFixture.service.createUpload(server("alice"), uploadRequest(), "upload-request-key");
+    await runApiEffect(payloadFixture.service.createUpload(server("alice"), uploadRequest(), "upload-request-key"));
     await expect(
-      payloadFixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ title: "A different hosted site request" }),
-        "upload-request-key",
+      runApiEffect(
+        payloadFixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ title: "A different hosted site request" }),
+          "upload-request-key",
+        ),
       ),
     ).rejects.toMatchObject({ code: "idempotency_conflict" });
 
     const targetFixture = serviceFixture();
     const firstSite = await publish(targetFixture.service, "alice", "target-first-upload", "target-first-activate");
     const secondSite = await publish(targetFixture.service, "alice", "target-second-upload", "target-second-activate");
-    await targetFixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: firstSite.id }),
-      "replacement-request-key",
-    );
-    await expect(
+    await runApiEffect(
       targetFixture.service.createUpload(
         server("alice"),
-        uploadRequest({ siteId: secondSite.id }),
+        uploadRequest({ siteId: firstSite.id }),
         "replacement-request-key",
+      ),
+    );
+    await expect(
+      runApiEffect(
+        targetFixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ siteId: secondSite.id }),
+          "replacement-request-key",
+        ),
       ),
     ).rejects.toMatchObject({ code: "idempotency_conflict" });
   });
@@ -500,40 +557,50 @@ describe("hosted site control plane", () => {
     }
 
     await expect(
-      fixture.service.createUpload(server("alice"), uploadRequest({ title: "Eleventh hosted planner" }), "publish-11"),
+      runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ title: "Eleventh hosted planner" }),
+          "publish-11",
+        ),
+      ),
     ).rejects.toMatchObject({ code: "site_limit" });
   });
 
   it("does not let a pending upload resurrect a deleted or expired site", async () => {
     const deletedFixture = serviceFixture();
     const deletedSite = await publish(deletedFixture.service, "alice", "publish-delete", "activate-delete");
-    const pendingDelete = await deletedFixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: deletedSite.id }),
-      "replace-before-delete",
+    const pendingDelete = await runApiEffect(
+      deletedFixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: deletedSite.id }),
+        "replace-before-delete",
+      ),
     );
     await uploadIndex(deletedFixture.service, "alice", pendingDelete.uploadId);
 
-    await deletedFixture.service.delete(server("alice"), deletedSite.id, "delete-site-once");
+    await runApiEffect(deletedFixture.service.delete(server("alice"), deletedSite.id, "delete-site-once"));
     await expect(
-      deletedFixture.service.activate("alice", pendingDelete.uploadId, "activate-after-delete"),
+      runApiEffect(deletedFixture.service.activate("alice", pendingDelete.uploadId, "activate-after-delete")),
     ).rejects.toMatchObject({ code: "site_deleted" });
     expect(await deletedFixture.bucket.route(deletedSite.hostname)).toMatchObject({ status: "deleted" });
 
     const expiredFixture = serviceFixture();
     const expiredSite = await publish(expiredFixture.service, "alice", "publish-expiry", "activate-expiry");
     expiredFixture.setNow(NOW + 30 * 24 * 60 * 60_000 - 5 * 60_000);
-    const pendingExpiry = await expiredFixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: expiredSite.id }),
-      "replace-before-expiry",
+    const pendingExpiry = await runApiEffect(
+      expiredFixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: expiredSite.id }),
+        "replace-before-expiry",
+      ),
     );
     await uploadIndex(expiredFixture.service, "alice", pendingExpiry.uploadId);
     expiredFixture.setNow(NOW + 30 * 24 * 60 * 60_000 + 5 * 60_000);
 
-    await expiredFixture.service.cleanup();
+    await runApiEffect(expiredFixture.service.cleanup());
     await expect(
-      expiredFixture.service.activate("alice", pendingExpiry.uploadId, "activate-after-expiry"),
+      runApiEffect(expiredFixture.service.activate("alice", pendingExpiry.uploadId, "activate-after-expiry")),
     ).rejects.toMatchObject({ code: "site_expired" });
     expect(await expiredFixture.bucket.route(expiredSite.hostname)).toMatchObject({ status: "expired" });
   });
@@ -542,10 +609,10 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const expired = await publish(fixture.service, "alice", "list-expiry-upload", "list-expiry-activation");
     const deleted = await publish(fixture.service, "alice", "list-delete-upload", "list-delete-activation");
-    await fixture.service.delete(server("alice"), deleted.id, "list-delete-site");
+    await runApiEffect(fixture.service.delete(server("alice"), deleted.id, "list-delete-site"));
     fixture.setNow(NOW + 30 * 24 * 60 * 60_000 + 1);
 
-    await expect(fixture.service.list(server("alice"))).resolves.toMatchObject({ sites: [], used: 0 });
+    await expect(runApiEffect(fixture.service.list(server("alice")))).resolves.toMatchObject({ sites: [], used: 0 });
     const stored = await fixture.database
       .prepare("SELECT status FROM hosted_sites WHERE id = ?")
       .bind(expired.id)
@@ -557,15 +624,19 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "publish-race", "activate-race");
     const [first, second] = await Promise.all([
-      fixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ siteId: site.id, title: "First replacement site" }),
-        "replace-a",
+      runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ siteId: site.id, title: "First replacement site" }),
+          "replace-a",
+        ),
       ),
-      fixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ siteId: site.id, title: "Second replacement site" }),
-        "replace-b",
+      runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ siteId: site.id, title: "Second replacement site" }),
+          "replace-b",
+        ),
       ),
     ]);
     await Promise.all([
@@ -574,8 +645,8 @@ describe("hosted site control plane", () => {
     ]);
 
     const activations = await Promise.allSettled([
-      fixture.service.activate("alice", first.uploadId, "activate-replace-a"),
-      fixture.service.activate("alice", second.uploadId, "activate-replace-b"),
+      runApiEffect(fixture.service.activate("alice", first.uploadId, "activate-replace-a")),
+      runApiEffect(fixture.service.activate("alice", second.uploadId, "activate-replace-b")),
     ]);
 
     expect(activations.filter((result) => result.status === "fulfilled")).toHaveLength(1);
@@ -604,7 +675,7 @@ describe("hosted site control plane", () => {
     const site = await publish(fixture.service, "alice", "publish-block", "activate-block");
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
 
-    await expect(fixture.service.setBlocked(site.id, true)).rejects.toThrow("Injected R2 put failure");
+    await expect(runApiEffect(fixture.service.setBlocked(site.id, true))).rejects.toThrow("Injected R2 put failure");
     expect(fixture.bucket.keys()).toContain(`blocks/${site.hostname}`);
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "active" });
     const blocked = await fixture.database
@@ -613,7 +684,7 @@ describe("hosted site control plane", () => {
       .first<{ status: string; route_synced_at: number | null }>();
     expect(blocked).toEqual({ status: "blocked", route_synced_at: null });
 
-    await fixture.service.cleanup();
+    await runApiEffect(fixture.service.cleanup());
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "blocked" });
     const reconciled = await fixture.database
       .prepare("SELECT route_synced_at FROM hosted_sites WHERE id = ?")
@@ -622,7 +693,7 @@ describe("hosted site control plane", () => {
     expect(reconciled?.route_synced_at).toBe(fixture.now());
 
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
-    await expect(fixture.service.setBlocked(site.id, false)).rejects.toThrow("Injected R2 put failure");
+    await expect(runApiEffect(fixture.service.setBlocked(site.id, false))).rejects.toThrow("Injected R2 put failure");
     expect(fixture.bucket.keys()).toContain(`blocks/${site.hostname}`);
     const unsyncedUnblock = await fixture.database
       .prepare("SELECT status, route_synced_at FROM hosted_sites WHERE id = ?")
@@ -630,7 +701,7 @@ describe("hosted site control plane", () => {
       .first<{ status: string; route_synced_at: number | null }>();
     expect(unsyncedUnblock).toEqual({ status: "active", route_synced_at: null });
 
-    await fixture.service.cleanup();
+    await runApiEffect(fixture.service.cleanup());
     expect(fixture.bucket.keys()).not.toContain(`blocks/${site.hostname}`);
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "active" });
   });
@@ -638,13 +709,13 @@ describe("hosted site control plane", () => {
   it("does not recreate a block marker when cleanup races with an unblock", async () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "marker-race-publish", "marker-race-activate");
-    await fixture.service.setBlocked(site.id, true);
+    await runApiEffect(fixture.service.setBlocked(site.id, true));
     await fixture.database.prepare("UPDATE hosted_sites SET route_synced_at = NULL WHERE id = ?").bind(site.id).run();
     const pause = fixture.bucket.pauseNextPutContaining(`blocks/${site.hostname}`);
-    const cleanup = fixture.service.cleanup();
+    const cleanup = runApiEffect(fixture.service.cleanup());
     await pause.started;
 
-    await fixture.service.setBlocked(site.id, false);
+    await runApiEffect(fixture.service.setBlocked(site.id, false));
     expect(fixture.bucket.keys()).not.toContain(`blocks/${site.hostname}`);
     pause.resume();
     await cleanup;
@@ -657,10 +728,10 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "block-unblock-publish", "block-unblock-activate");
     const pause = fixture.bucket.pauseNextPutContaining(`routes/${site.hostname}.json`);
-    const blocking = fixture.service.setBlocked(site.id, true);
+    const blocking = runApiEffect(fixture.service.setBlocked(site.id, true));
     await pause.started;
 
-    await fixture.service.setBlocked(site.id, false);
+    await runApiEffect(fixture.service.setBlocked(site.id, false));
     pause.resume();
     await blocking;
 
@@ -676,26 +747,26 @@ describe("hosted site control plane", () => {
   it("accepts reports only for allocated hostnames, deduplicates them, and removes old rows", async () => {
     const fixture = serviceFixture();
     await expect(
-      fixture.service.report("unknown-project-name-k7m2q9tz.openbot.site", "abuse", null, "203.0.113.10"),
+      runApiEffect(fixture.service.report("unknown-project-name-k7m2q9tz.openbot.site", "abuse", null, "203.0.113.10")),
     ).rejects.toMatchObject({ code: "site_not_found" });
     const site = await publish(fixture.service, "alice", "publish-report", "activate-report");
 
-    await fixture.service.report(site.hostname, "phishing", "Suspicious form", "203.0.113.10");
-    await fixture.service.report(site.hostname, "phishing", "Repeated report", "203.0.113.10");
+    await runApiEffect(fixture.service.report(site.hostname, "phishing", "Suspicious form", "203.0.113.10"));
+    await runApiEffect(fixture.service.report(site.hostname, "phishing", "Repeated report", "203.0.113.10"));
     const initial = await fixture.database
       .prepare("SELECT COUNT(*) AS count FROM site_reports")
       .first<{ count: number }>();
     expect(initial?.count).toBe(1);
 
     fixture.setNow(NOW + 24 * 60 * 60_000);
-    await fixture.service.report(site.hostname, "phishing", "A report on the next day", "203.0.113.10");
+    await runApiEffect(fixture.service.report(site.hostname, "phishing", "A report on the next day", "203.0.113.10"));
     const rotated = await fixture.database
       .prepare("SELECT COUNT(*) AS count, COUNT(DISTINCT source_ip_hash) AS hashes FROM site_reports")
       .first<{ count: number; hashes: number }>();
     expect(rotated).toEqual({ count: 2, hashes: 2 });
 
     fixture.setNow(NOW + 182 * 24 * 60 * 60_000);
-    await fixture.service.cleanup();
+    await runApiEffect(fixture.service.cleanup());
     const retained = await fixture.database
       .prepare("SELECT COUNT(*) AS count FROM site_reports")
       .first<{ count: number }>();
@@ -704,22 +775,26 @@ describe("hosted site control plane", () => {
 
   it("keeps a live initial activation and abandons it only after its upload expires", async () => {
     const liveFixture = serviceFixture();
-    const live = await liveFixture.service.createUpload(server("alice"), uploadRequest(), "live-initial-upload");
+    const live = await runApiEffect(
+      liveFixture.service.createUpload(server("alice"), uploadRequest(), "live-initial-upload"),
+    );
     await uploadIndex(liveFixture.service, "alice", live.uploadId);
     await liveFixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
       .bind(live.uploadId)
       .run();
 
-    expect(await liveFixture.service.cleanup()).toMatchObject({ uploads: 0 });
-    await expect(liveFixture.service.activate("alice", live.uploadId, "finish-live-activation")).resolves.toMatchObject(
-      {
-        status: "active",
-      },
-    );
+    expect(await runApiEffect(liveFixture.service.cleanup())).toMatchObject({ uploads: 0 });
+    await expect(
+      runApiEffect(liveFixture.service.activate("alice", live.uploadId, "finish-live-activation")),
+    ).resolves.toMatchObject({
+      status: "active",
+    });
 
     const staleFixture = serviceFixture();
-    const stale = await staleFixture.service.createUpload(server("alice"), uploadRequest(), "stale-initial-upload");
+    const stale = await runApiEffect(
+      staleFixture.service.createUpload(server("alice"), uploadRequest(), "stale-initial-upload"),
+    );
     await uploadIndex(staleFixture.service, "alice", stale.uploadId);
     await staleFixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
@@ -727,7 +802,7 @@ describe("hosted site control plane", () => {
       .run();
     staleFixture.setNow(NOW + 16 * 60_000);
 
-    expect(await staleFixture.service.cleanup()).toMatchObject({ uploads: 1 });
+    expect(await runApiEffect(staleFixture.service.cleanup())).toMatchObject({ uploads: 1 });
     const removed = await staleFixture.database
       .prepare("SELECT id FROM hosted_sites WHERE id = ?")
       .bind(stale.site.id)
@@ -742,7 +817,7 @@ describe("hosted site control plane", () => {
 
   it("rejects a stuck activation after the upload session expires", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "stuck-upload");
+    const upload = await runApiEffect(fixture.service.createUpload(server("alice"), uploadRequest(), "stuck-upload"));
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     await fixture.database
       .prepare("UPDATE site_deployments SET status = 'activating' WHERE id = ?")
@@ -750,7 +825,9 @@ describe("hosted site control plane", () => {
       .run();
     fixture.setNow(NOW + 16 * 60_000);
 
-    await expect(fixture.service.activate("alice", upload.uploadId, "retry-stuck-upload")).rejects.toMatchObject({
+    await expect(
+      runApiEffect(fixture.service.activate("alice", upload.uploadId, "retry-stuck-upload")),
+    ).rejects.toMatchObject({
       code: "upload_expired",
     });
     expect(fixture.bucket.keys()).not.toContain(`sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`);
@@ -765,10 +842,8 @@ describe("hosted site control plane", () => {
     const fixture = serviceFixture();
     const expiring = await publish(fixture.service, "alice", "publish-expiring", "activate-expiring");
     fixture.setNow(NOW + 30 * 24 * 60 * 60_000 - 5 * 60_000);
-    const replacement = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: expiring.id }),
-      "replace-expiring",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest({ siteId: expiring.id }), "replace-expiring"),
     );
     await uploadIndex(fixture.service, "alice", replacement.uploadId);
     fixture.setNow(NOW + 30 * 24 * 60 * 60_000 + 60_000);
@@ -779,7 +854,7 @@ describe("hosted site control plane", () => {
     }
 
     await expect(
-      fixture.service.activate("alice", replacement.uploadId, "activate-expired-replacement"),
+      runApiEffect(fixture.service.activate("alice", replacement.uploadId, "activate-expired-replacement")),
     ).rejects.toMatchObject({ code: "site_expired" });
     const active = await fixture.database
       .prepare(
@@ -793,17 +868,19 @@ describe("hosted site control plane", () => {
 
   it("deletes every uploaded object when an unfinished site is deleted", async () => {
     const fixture = serviceFixture();
-    const upload = await fixture.service.createUpload(server("alice"), uploadRequest(), "unfinished-upload");
+    const upload = await runApiEffect(
+      fixture.service.createUpload(server("alice"), uploadRequest(), "unfinished-upload"),
+    );
     await uploadIndex(fixture.service, "alice", upload.uploadId);
     const assetKey = `sites/${upload.site.id}/deployments/${upload.uploadId}/index.html`;
     expect(fixture.bucket.keys()).toContain(assetKey);
 
-    await fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished");
+    await runApiEffect(fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished"));
 
     expect(fixture.bucket.keys()).not.toContain(assetKey);
     expect(await fixture.bucket.route(upload.site.hostname)).toMatchObject({ status: "deleted" });
 
-    await fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished-again");
+    await runApiEffect(fixture.service.delete(server("alice"), upload.site.id, "delete-unfinished-again"));
     const auditRows = await fixture.database
       .prepare("SELECT COUNT(*) AS count FROM site_audit_log WHERE site_id = ? AND operation = 'delete'")
       .bind(upload.site.id)
@@ -826,13 +903,13 @@ describe("hosted site control plane", () => {
     const asset = `sites/${site.id}/deployments/${deployment?.current_deployment_id}/index.html`;
     fixture.bucket.failNextPutContaining(`routes/${site.hostname}.json`);
 
-    await expect(fixture.service.delete(server("alice"), site.id, "failed-delete-key")).rejects.toThrow(
+    await expect(runApiEffect(fixture.service.delete(server("alice"), site.id, "failed-delete-key"))).rejects.toThrow(
       "Injected R2 put failure",
     );
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "active" });
     expect(fixture.bucket.keys()).toContain(asset);
 
-    await fixture.service.cleanup();
+    await runApiEffect(fixture.service.cleanup());
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ status: "deleted" });
     expect(fixture.bucket.keys()).not.toContain(asset);
   });
@@ -859,7 +936,7 @@ describe("hosted site control plane", () => {
         .run();
     }
 
-    await expect(fixture.service.cleanup()).resolves.toMatchObject({ expired: 51 });
+    await expect(runApiEffect(fixture.service.cleanup())).resolves.toMatchObject({ expired: 51 });
     const active = await fixture.database
       .prepare("SELECT COUNT(*) AS count FROM hosted_sites WHERE status = 'active' AND expires_at <= ?")
       .bind(fixture.now())
@@ -870,19 +947,23 @@ describe("hosted site control plane", () => {
   it("rate limits repeated new-site creation after deleted sites release their slots", async () => {
     const fixture = serviceFixture();
     for (let index = 0; index < 20; index += 1) {
-      const upload = await fixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ title: `Disposable hosted project ${index}` }),
-        `churn-${index}`,
+      const upload = await runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ title: `Disposable hosted project ${index}` }),
+          `churn-${index}`,
+        ),
       );
-      await fixture.service.delete(server("alice"), upload.site.id, `delete-churn-${index}`);
+      await runApiEffect(fixture.service.delete(server("alice"), upload.site.id, `delete-churn-${index}`));
     }
 
     await expect(
-      fixture.service.createUpload(
-        server("alice"),
-        uploadRequest({ title: "One more disposable project" }),
-        "churn-21",
+      runApiEffect(
+        fixture.service.createUpload(
+          server("alice"),
+          uploadRequest({ title: "One more disposable project" }),
+          "churn-21",
+        ),
       ),
     ).rejects.toMatchObject({ code: "site_creation_rate_limit" });
   });
@@ -890,22 +971,26 @@ describe("hosted site control plane", () => {
   it("preserves SPA fallback on replacement unless a new value is explicit", async () => {
     const fixture = serviceFixture();
     const site = await publish(fixture.service, "alice", "publish-spa", "activate-spa", { spaFallback: true });
-    const preserved = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: site.id, spaFallback: null }),
-      "replace-spa-preserved",
+    const preserved = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: site.id, spaFallback: null }),
+        "replace-spa-preserved",
+      ),
     );
     await uploadIndex(fixture.service, "alice", preserved.uploadId);
-    await fixture.service.activate("alice", preserved.uploadId, "activate-spa-preserved");
+    await runApiEffect(fixture.service.activate("alice", preserved.uploadId, "activate-spa-preserved"));
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ spaFallback: true });
 
-    const disabled = await fixture.service.createUpload(
-      server("alice"),
-      uploadRequest({ siteId: site.id, spaFallback: false }),
-      "replace-spa-disabled",
+    const disabled = await runApiEffect(
+      fixture.service.createUpload(
+        server("alice"),
+        uploadRequest({ siteId: site.id, spaFallback: false }),
+        "replace-spa-disabled",
+      ),
     );
     await uploadIndex(fixture.service, "alice", disabled.uploadId);
-    await fixture.service.activate("alice", disabled.uploadId, "activate-spa-disabled");
+    await runApiEffect(fixture.service.activate("alice", disabled.uploadId, "activate-spa-disabled"));
     expect(await fixture.bucket.route(site.hostname)).toMatchObject({ spaFallback: false });
   });
 });
@@ -924,30 +1009,30 @@ describe("hosted sites per server", () => {
       );
     }
     await expect(
-      fixture.service.createUpload(bob, uploadRequest({ title: "Fourth starter planner" }), "starter-3"),
+      runApiEffect(fixture.service.createUpload(bob, uploadRequest({ title: "Fourth starter planner" }), "starter-3")),
     ).rejects.toMatchObject({ status: 409, code: "site_limit" });
 
     // The unlinked bucket has its own single slot, and an account request creates into it.
     await publish(fixture.service, { kind: "unlinked", userId: "bob" }, "unlinked-1", "unlinked-activate-1");
     await expect(
-      fixture.service.createUpload({ kind: "account", userId: "bob" }, uploadRequest(), "unlinked-2"),
+      runApiEffect(fixture.service.createUpload({ kind: "account", userId: "bob" }, uploadRequest(), "unlinked-2")),
     ).rejects.toMatchObject({ code: "site_limit" });
 
     subscribe(fixture.sqlite, "bob-server", "bob", "starter", "canceled");
-    const downgraded = await fixture.service.list(bob);
+    const downgraded = await runApiEffect(fixture.service.list(bob));
     expect(downgraded).toMatchObject({ limit: 1, used: 3 });
     expect(downgraded.sites).toHaveLength(3);
     await expect(
-      fixture.service.createUpload(bob, uploadRequest({ title: "Planner after downgrade" }), "downgraded-create"),
+      runApiEffect(
+        fixture.service.createUpload(bob, uploadRequest({ title: "Planner after downgrade" }), "downgraded-create"),
+      ),
     ).rejects.toMatchObject({ code: "site_limit" });
-    const replacement = await fixture.service.createUpload(
-      bob,
-      uploadRequest({ siteId: sites[0]?.id ?? null }),
-      "downgraded-replace",
+    const replacement = await runApiEffect(
+      fixture.service.createUpload(bob, uploadRequest({ siteId: sites[0]?.id ?? null }), "downgraded-replace"),
     );
     await uploadIndex(fixture.service, "bob", replacement.uploadId);
     await expect(
-      fixture.service.activate("bob", replacement.uploadId, "downgraded-replace-activate"),
+      runApiEffect(fixture.service.activate("bob", replacement.uploadId, "downgraded-replace-activate")),
     ).resolves.toMatchObject({ id: sites[0]?.id, status: "active" });
   });
 
@@ -959,26 +1044,31 @@ describe("hosted sites per server", () => {
     const laptop: HostedSiteScope = { kind: "server", userId: "alice", serverId: "alice-laptop" };
 
     await expect(
-      fixture.service.createUpload(laptop, uploadRequest({ siteId: aliceServer.id }), "cross-replace"),
+      runApiEffect(fixture.service.createUpload(laptop, uploadRequest({ siteId: aliceServer.id }), "cross-replace")),
     ).rejects.toMatchObject({ status: 409, code: "site_other_server" });
     await expect(
-      fixture.service.createUpload(unlinkedScope, uploadRequest({ siteId: aliceServer.id }), "unlinked-replace"),
+      runApiEffect(
+        fixture.service.createUpload(unlinkedScope, uploadRequest({ siteId: aliceServer.id }), "unlinked-replace"),
+      ),
     ).rejects.toMatchObject({ code: "site_other_server" });
-    await expect(fixture.service.delete(laptop, aliceServer.id, "cross-delete")).rejects.toMatchObject({
+    await expect(runApiEffect(fixture.service.delete(laptop, aliceServer.id, "cross-delete"))).rejects.toMatchObject({
       code: "site_other_server",
     });
-    await expect(fixture.service.delete(server("alice"), unlinked.id, "unlinked-delete")).rejects.toMatchObject({
+    await expect(
+      runApiEffect(fixture.service.delete(server("alice"), unlinked.id, "unlinked-delete")),
+    ).rejects.toMatchObject({
       code: "site_other_server",
     });
 
-    const ids = async (scope: HostedSiteScope) => (await fixture.service.list(scope)).sites.map((site) => site.id);
+    const ids = async (scope: HostedSiteScope) =>
+      (await runApiEffect(fixture.service.list(scope))).sites.map((site) => site.id);
     expect(await ids(laptop)).toEqual([]);
     expect(await ids(server("alice"))).toEqual([aliceServer.id]);
     expect(await ids(unlinkedScope)).toEqual([unlinked.id]);
     const account: HostedSiteScope = { kind: "account", userId: "alice" };
     expect((await ids(account)).sort()).toEqual([aliceServer.id, unlinked.id].sort());
 
-    await fixture.service.delete(account, aliceServer.id, "account-delete");
+    await runApiEffect(fixture.service.delete(account, aliceServer.id, "account-delete"));
     expect(await ids(server("alice"))).toEqual([]);
   });
 
@@ -992,7 +1082,9 @@ describe("hosted sites per server", () => {
     });
 
     await expect(
-      resolveHostedSiteScope(fixture.database, "alice", request(credential("alice-server", "alice-token"))),
+      runApiEffect(
+        resolveHostedSiteScope(fixture.database, "alice", request(credential("alice-server", "alice-token"))),
+      ),
     ).resolves.toEqual(server("alice"));
     for (const headers of [
       credential("alice-server", "bob-token"),
@@ -1002,14 +1094,16 @@ describe("hosted sites per server", () => {
     ]) {
       // A bad credential never falls back to the unlinked bucket, even with `?scope=unlinked`.
       await expect(
-        resolveHostedSiteScope(fixture.database, "alice", request(headers, "?scope=unlinked")),
+        runApiEffect(resolveHostedSiteScope(fixture.database, "alice", request(headers, "?scope=unlinked"))),
       ).rejects.toMatchObject({ status: 401, code: "host_unauthorized" });
     }
-    await expect(resolveHostedSiteScope(fixture.database, "alice", request({}))).resolves.toEqual({
+    await expect(runApiEffect(resolveHostedSiteScope(fixture.database, "alice", request({})))).resolves.toEqual({
       kind: "account",
       userId: "alice",
     });
-    await expect(resolveHostedSiteScope(fixture.database, "alice", request({}, "?scope=unlinked"))).resolves.toEqual({
+    await expect(
+      runApiEffect(resolveHostedSiteScope(fixture.database, "alice", request({}, "?scope=unlinked"))),
+    ).resolves.toEqual({
       kind: "unlinked",
       userId: "alice",
     });
@@ -1078,9 +1172,9 @@ async function publish(
   changes: Partial<HostedSiteUploadRequest> = {},
 ) {
   const siteScope = typeof scope === "string" ? server(scope) : scope;
-  const session = await service.createUpload(siteScope, uploadRequest(changes), publishKey);
+  const session = await runApiEffect(service.createUpload(siteScope, uploadRequest(changes), publishKey));
   await uploadIndex(service, siteScope.userId, session.uploadId);
-  return service.activate(siteScope.userId, session.uploadId, activateKey);
+  return runApiEffect(service.activate(siteScope.userId, session.uploadId, activateKey));
 }
 
 function uploadRequest(changes: Partial<HostedSiteUploadRequest> = {}): HostedSiteUploadRequest {
@@ -1096,15 +1190,17 @@ function uploadRequest(changes: Partial<HostedSiteUploadRequest> = {}): HostedSi
 }
 
 async function uploadIndex(service: HostedSiteService, userId: string, uploadId: string): Promise<void> {
-  await service.uploadFile(
-    userId,
-    uploadId,
-    "index.html",
-    new Request("https://openbot.run/v1/sites/upload", {
-      method: "PUT",
-      headers: { "Content-Type": "text/html", "Content-Length": String(new TextEncoder().encode(HTML).byteLength) },
-      body: HTML,
-    }),
+  await runApiEffect(
+    service.uploadFile(
+      userId,
+      uploadId,
+      "index.html",
+      new Request("https://openbot.run/v1/sites/upload", {
+        method: "PUT",
+        headers: { "Content-Type": "text/html", "Content-Length": String(new TextEncoder().encode(HTML).byteLength) },
+        body: HTML,
+      }),
+    ),
   );
 }
 

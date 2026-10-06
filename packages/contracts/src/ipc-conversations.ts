@@ -136,6 +136,11 @@ export interface SendMessageInput {
   text: string;
   attachmentDraftIds?: string[];
   replyToMessageId?: string | null;
+  /**
+   * The sender's id for this message. A second send with the same id, from the same sender to the
+   * same agent, returns the first receipt instead of a new message, so a lost reply can be retried.
+   */
+  clientMessageId?: string;
 }
 
 export interface SetMessageReactionInput {

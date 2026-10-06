@@ -62,10 +62,30 @@ compares these values with the reports of the last green `main` CI run
 as data, so it can write the comment without running pull request code.
 
 The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
-`bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
-`bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
-lint, desktop typecheck, build and preload check) takes about a minute, and each other typecheck takes a few
-seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
+`scripts/staged-typecheck.ts`. The last two run only when the commit stages code, style, GritQL,
+`tsconfig*.json`, `package.json`, `biome.json`, `apps/mobile/app.json` or `bun.lock` files, so a commit
+of only text or data JSON is fast.
+
+`scripts/staged-typecheck.ts` reads the root `typecheck:*` scripts and selects each project that can
+see a staged file: the file is under a fixed part of the project's tsconfig `include`, in its
+workspace package, in a workspace package that it depends on (also through other workspace
+packages), or in a folder that it imports through a relative path. That last list is in the script:
+`scripts` imports mobile and account Worker modules, the account Worker imports the site router, a
+renderer story imports a preload helper, and `.storybook/preview.tsx` imports the renderer.
+A root `tsconfig*.json`, `package.json` or `bun.lock` selects all projects. A mobile codegen input,
+such as `app.json` or the brand CSS, selects mobile. `biome.json` and GritQL files select no project:
+TypeScript does not read them. The script runs the projects one at a time and reports each one that
+fails. `--dry-run` prints each selected script with the path that selected it; paths after the flag
+replace the index. A JSON file that a module imports, such as a Team API fixture, does not start a
+type check in the hook; CI checks it.
+
+`apps/mobile` `typecheck` calls `scripts/mobile-codegen.ts`. It runs `codegen` only when a hash of
+the codegen inputs and of the route file names differs from `.expo/codegen-inputs.sha256`, or when
+an output is missing. File times do not decide: a checkout changes them, and Uniwind does not write a
+file whose content is the same.
+
+In CI, `check:desktop:static` (the UI check, lint, desktop typecheck, build and preload check) takes
+about a minute, and each other typecheck takes a few seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
 `check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
@@ -75,14 +95,15 @@ the hook stops the commit and names the file. `scripts/pre-commit-hook.test.ts` 
 
 One project typecheck, such as `typecheck:node` or `typecheck:renderer`, takes under 10 seconds and
 less than 1.5 GB of memory. The load that the check rules prevent comes from the aggregate command,
-which starts all projects at the same time.
+which starts all projects at the same time. The hook used it until it selected projects: about
+33 CPU-seconds and 8 GB of memory for each commit of code.
 
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run lint:ratchet`, `bun run types:ratchet` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run types:ratchet` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
@@ -104,17 +125,37 @@ All of these jobs except the preview build gate Cloudflare production deployment
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
-The `Detect changed areas` job lets a pull request skip four lanes it cannot affect: Tests (sites),
-Tests (remote), Surfaces and Storybook build. It compares the merge commit with its first parent, and
-runs a lane when a path the lane reads changed. A path every workspace reads (`package.json`,
-`bun.lock`, `tsconfig*.json`, `biome.json`, `.github/`, `packages/`, `tools/`, `patches/`, `vendor/`)
-runs all four. A push to `main` and a manual run always run every lane, because a skipped need would
-skip `deploy-production`. When a new lane reads another directory, add it to that lane's pattern in
-the `detect` job.
+The `Detect changed areas` job lets a pull request skip the lanes it cannot affect. It compares the
+merge commit with its first parent and first removes Markdown that no build or test reads: `docs/`,
+`plans/` and `changelog.d/` Markdown, every `AGENTS.md`, and the root Markdown files except
+`CHANGELOG.md`, which the API bundles. Markdown under `resources/` is not removed either, because the
+renderer bundles it. Then it selects the lanes:
+
+| Lane | Jobs | Runs when a changed path is |
+| --- | --- | --- |
+| `code` | Check, Tests (desktop) | anything that is left |
+| `desktop` | Browser smoke | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `remote` and `docker` |
+| `api` | API, Cloudflare preview build | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
+| `sites` | Tests (sites) | in `apps/site-router` |
+| `remote` | Tests (remote) | in `remote` or `scripts` |
+| `storybook` | Storybook build | in `src`, `apps/auth-api`, `.storybook`, `resources`, `marketplace` or `build` |
+| `surfaces` | Surfaces | in `apps/mobile`, `apps/site-router`, `remote` or `scripts` |
+
+A path every workspace reads (`package.json`, `bun.lock`, `tsconfig*.json`, `biome.json`,
+`.github/`, `packages/`, `tools/`, `patches/`, `vendor/`) runs every lane. `code` runs for a
+mobile-only pull request: the desktop test run holds the mobile unit tests, desktop tests read
+mobile, API and remote files, and lint and knip cover every workspace. The API Worker bundles the
+renderer preview and web client and imports `apps/site-router/src`, so `api` reads them. A push to
+`main` and a manual run always run every lane, because a skipped need would skip
+`deploy-production`. When a lane reads another directory, add it to that lane's pattern in the
+`detect` job. When in doubt, let the lane run.
 
 `All required checks pass` needs every other check job and fails when one of them failed or was
-cancelled; a skipped lane counts as a pass. Branch protection requires only this job, so a new lane
-needs no change in the repository settings: add it to the gate's `needs` list.
+cancelled; a skipped lane counts as a pass. Add a new lane to its `needs` list. Branch protection on
+`main` requires only `Check`, not this job. A skipped required check counts as passed, so `Check`
+runs when `detect` did not succeed, and skips only when `detect` found no code change. The list of
+changed paths uses `git diff --no-renames`: a moved file then lists its old path as well, so a move
+of a file that a lane reads into `docs/` still runs the lane.
 
 `verify:preload` reads `out/preload` after the build. TypeScript checks the preload source, but
 the renderer gets the bundle. The script runs each bundle in a `node:vm` context with a fake
@@ -146,6 +187,33 @@ break a destructured export.
 `restore-keys`, so a lockfile change re-downloads only what moved. The Electron download is
 deliberately not cached: `install-electron` takes 2.6s on a runner, and a measured cache hit
 restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no cache at all.
+
+## Focused tests
+
+`bun run test:changed` is `vitest run --changed origin/main --maxWorkers=1`. First it runs
+`git merge-base origin/main HEAD`, and stops with an error when `origin/main` or a common commit is
+missing. Without this guard, Vitest ignores the failed `git diff`, finds no test files and exits
+with code 0, so a broken test would pass. Vitest takes the files
+in `git diff origin/main...HEAD`, the staged files, and the unstaged and untracked files. Then it
+runs each test file whose import graph contains one of them. It uses the root `vitest.config.ts`,
+so each file goes to its usual project (`node`, `renderer` or `mobile-ui`) and environment. When
+no test imports a changed file, it finds no test files and exits with code 0. Fetch `origin/main`
+first if it is old: an old base selects tests for changes that are already on `main`.
+
+`bun run test:related -- <source>...` is `vitest related --run --maxWorkers=1`. It runs the test
+files that import the named source files, with no Git query.
+
+A change to `vitest.config.ts`, a setup file or `package.json` selects no test. The root config
+sets `forceRerunTriggers: []`. The Vitest default (`**/package.json/**`,
+`**/{vitest,vite}.config.*/**`) selects every test for such a change, but only when the checkout
+path has no dot directory: `**` does not match a dot directory such as `.t3` or `.claude`. A full
+run on one worker is not a focused check. A setup file is not in a test's import graph. After such
+a change, run the test files that it can affect with
+`bun run test:desktop -- <path>`.
+
+A shared module can have many dependents. For example, `packages/ui/src/digit-roll.ts` selects 16
+files, including the `App.*.test.tsx` files. Do a list first to see the set without a run:
+`bun x vitest list --filesOnly --changed origin/main`.
 
 ## Test environment guard
 
@@ -262,33 +330,29 @@ It rejects direct `window.openbot` and `globalThis.openbot` access, including op
 literal indexed forms. Browser APIs, comments, and string documentation remain valid.
 Its positive and negative fixtures run in `scripts/ui-foundation-check.test.ts`.
 
-### Lint debt ratchet
+### Promise rules
 
-`bun run lint:ratchet` runs the Biome rules in `tools/biome/lint-baseline.json` and compares the
-findings of each file to the baseline. A higher count fails, so a rule stops new debt before the old
-debt is fixed. A lower count also fails until `--write` lowers the baseline: this keeps the baseline
-tight. The script never raises a count; a higher count is a hand edit that a reviewer sees. When a
-rule has no findings left, turn it on in `biome.json` and remove it from the baseline.
+`nursery/noFloatingPromises` is an error in `biome.json`. Await a promise, or write `void` when the
+call is fire-and-forget and the called function handles its own errors. Until 2026-10 a separate
+`lint:ratchet` script held this rule to a per-file baseline. That cost a second full Biome pass in
+CI, so the last findings were fixed and the script was removed.
+`nursery/noMisusedPromises` was rejected: its 37 findings were all `if (cachedPromise)` presence
+checks.
 
-`nursery/noFloatingPromises` is the first rule. `nursery/noMisusedPromises` was rejected: its 37
-findings were all `if (cachedPromise)` presence checks.
-
-Biome cannot select a GritQL plugin with `--only`, and it reports every plugin under the one
-category `plugin`. So a plugin rule enters the baseline as `plugin/<name>`, and its message must
-start with `[<name>]`. The ratchet runs Biome once more with every built-in group skipped, and counts
-each plugin by that prefix. `plugin/no-hardcoded-ui-text`
-(`tools/ui-foundation/no-hardcoded-ui-text.grit`) used this path until its last finding was fixed;
-it is now an error. See [i18n.md](i18n.md). Other new GritQL rules must start clean.
+Biome reports every GritQL plugin under the one category `plugin`, so each plugin message starts
+with `[<name>]`. A new GritQL rule must start with no findings.
 
 ### Type debt ratchet
 
-`bun run types:ratchet` does the same for TypeScript options. For each option in
-`tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
+`bun run types:ratchet` holds TypeScript options that are not on yet to a baseline. For each option
+in `tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
 extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares the errors of each
 file to the baseline. An error that two projects report counts once. `apps/mobile` extends the Expo
-base config, so the ratchet does not check it. The rules for `--write` and `--add=<option>` are the
-same as for the lint ratchet: `scripts/debt-ratchet.ts` holds them for both. The run takes about 4
-seconds. When an option has no errors left, turn it on in
+base config, so the ratchet does not check it. A higher count fails, so an option stops new debt
+before the old debt is fixed. A lower count also fails until `--write` lowers the baseline: this
+keeps the baseline tight. The script never raises a count; a higher count is a hand edit that a
+reviewer sees. `--add=<option>` starts an option at its current counts. `scripts/debt-ratchet.ts`
+holds these rules. The run takes about 4 seconds. When an option has no errors left, turn it on in
 `tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
 

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { runMcp } from "./mcp-test-runtime";
 // @vitest-environment node
 
 import { request } from "node:http";
@@ -33,21 +35,24 @@ const clients: Client[] = [];
 
 afterEach(async () => {
   await Promise.allSettled(clients.splice(0).map((client) => client.close()));
-  await Promise.allSettled(bridges.splice(0).map((bridge) => bridge.close()));
+  await Promise.allSettled(bridges.splice(0).map((bridge) => runMcp(bridge.close())));
 });
 
 describe("LocalMcpBridge", () => {
   it("does not expose request parsing failures", async () => {
     const bridge = new LocalMcpBridge();
     bridges.push(bridge);
-    const session = await bridge.createSession(
-      "thread-1",
-      TOOLS,
-      () => "turn-1",
-      async () => ({
-        success: true,
-        contentItems: [],
-      }),
+    const session = await runMcp(
+      bridge.createSession(
+        "thread-1",
+        TOOLS,
+        () => "turn-1",
+        () =>
+          Effect.sync(() => ({
+            success: true,
+            contentItems: [],
+          })),
+      ),
     );
     const server = session.servers[0];
     if (!server) throw new Error("The MCP server was not created.");
@@ -73,28 +78,34 @@ describe("LocalMcpBridge", () => {
     const bridge = new LocalMcpBridge();
     bridges.push(bridge);
     const calls: string[] = [];
-    const first = await bridge.createSession(
-      "thread-1",
-      TOOLS,
-      () => "turn-1",
-      async (call) => {
-        calls.push(`${call.threadId}:${call.turnId}`);
-        return isDynamicRecord(call.arguments) && "image" in call.arguments
-          ? {
-              success: true,
-              contentItems: [{ type: "inputImage", imageUrl: "data:image/png;base64,aGVsbG8=" }],
-            }
-          : { success: true, contentItems: [{ type: "inputText", text: "hello" }] };
-      },
+    const first = await runMcp(
+      bridge.createSession(
+        "thread-1",
+        TOOLS,
+        () => "turn-1",
+        (call) =>
+          Effect.sync(() => {
+            calls.push(`${call.threadId}:${call.turnId}`);
+            return isDynamicRecord(call.arguments) && "image" in call.arguments
+              ? {
+                  success: true,
+                  contentItems: [{ type: "inputImage", imageUrl: "data:image/png;base64,aGVsbG8=" }],
+                }
+              : { success: true, contentItems: [{ type: "inputText", text: "hello" }] };
+          }),
+      ),
     );
-    const second = await bridge.createSession(
-      "thread-2",
-      TOOLS,
-      () => "turn-2",
-      async () => ({
-        success: true,
-        contentItems: [{ type: "inputText", text: "second" }],
-      }),
+    const second = await runMcp(
+      bridge.createSession(
+        "thread-2",
+        TOOLS,
+        () => "turn-2",
+        () =>
+          Effect.sync(() => ({
+            success: true,
+            contentItems: [{ type: "inputText", text: "second" }],
+          })),
+      ),
     );
 
     const [firstServer] = first.servers;
@@ -149,16 +160,19 @@ describe("LocalMcpBridge", () => {
       const started = new Promise<void>((resolve) => {
         start = resolve;
       });
-      const session = await bridge.createSession(
-        "thread-1",
-        TOOLS,
-        () => "turn-1",
-        () => {
-          start();
-          return new Promise<DynamicToolResult>((resolve) => {
-            answer = resolve;
-          });
-        },
+      const session = await runMcp(
+        bridge.createSession(
+          "thread-1",
+          TOOLS,
+          () => "turn-1",
+          () =>
+            Effect.promise(() => {
+              start();
+              return new Promise<DynamicToolResult>((resolve) => {
+                answer = resolve;
+              });
+            }),
+        ),
       );
       const [server] = session.servers;
       assert(server);
@@ -186,14 +200,17 @@ describe("LocalMcpBridge", () => {
     const bridge = new LocalMcpBridge();
     bridges.push(bridge);
     const signals: AbortSignal[] = [];
-    const session = await bridge.createSession(
-      "thread-1",
-      TOOLS,
-      () => "turn-1",
-      (_call, signal) => {
-        signals.push(signal);
-        return new Promise<DynamicToolResult>(() => undefined);
-      },
+    const session = await runMcp(
+      bridge.createSession(
+        "thread-1",
+        TOOLS,
+        () => "turn-1",
+        (_call, signal) =>
+          Effect.promise(() => {
+            signals.push(signal);
+            return new Promise<DynamicToolResult>(() => undefined);
+          }),
+      ),
     );
     const [server] = session.servers;
     assert(server);

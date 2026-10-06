@@ -47,6 +47,31 @@ adding a module or moving ownership between workspaces.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
 
+## Effect
+
+- Use Effect 4.0.0 for migrated server and desktop domain services, schemas, typed errors,
+  asynchronous workflows, and external I/O. Keep the Bun catalog and lockfile aligned.
+- Read the installed Effect source and documentation. Do not use v3 compatibility aliases.
+- Prefer named `Effect.fn`, `Effect.gen`, `Context.Service`, explicit layers, and `Schema.TaggedError`.
+- Derive validated domain types from schemas. Decode untrusted values at their boundary;
+  preserve released decoder behavior. Do not validate trusted internal values again.
+- Wrap expected I/O failures with `Effect.tryPromise` or `Effect.try` at the adapter.
+  Keep causes private and safe. Preserve public error codes and localized messages.
+- Run Effects at framework boundaries. Keep routing, request schemas, rendering, and callbacks native.
+  Expose one Effect-returning operation per async service method. Do not add paired Promise methods
+  or run an Effect only to wrap its Promise in another Effect. Adapt browser and mobile native
+  callbacks at their call sites; preserve released wire and event contracts.
+- Reuse process-owned managed runtimes and await disposal in existing shutdown paths. Preserve
+  desktop teardown ordinals. Worker bindings and background I/O belong to their invocation;
+  retain `waitUntil` and streaming lifetimes rather than adding a process shutdown hook.
+- Tie owned resources to finalizers. Preserve existing deadlines and retries, and forward cancellation
+  where the API supports it. Do not add generic retry, fallback, or service-wrapper policies.
+- Keep business authorization and validation in domain operations, and centralize public error mapping.
+- The database host may import `effect` in addition to `node:*`. It remains a separate killable process
+  and must not import Electron or the application database. Effect cannot interrupt blocked SQLite.
+- Test through injected boundaries and include affected tests in CI selections. Mobile and browser
+  application workflow migration is outside this change; shared package consumers still need checks.
+
 ## Shared UI
 
 `packages/ui` (`@openbot/ui`) owns shared SolidJS controls and feature components used by
@@ -77,7 +102,9 @@ as a routine completion or PR step.
 
 1. In a fresh worktree, run `bun install --frozen-lockfile` first.
 2. Run only the narrowest relevant test file and lint the changed files. Run checks one at a time, with one test worker where supported.
-   Use `bun run test:desktop -- <path>` for one desktop or mobile test file.
+   Use `bun run test:changed` by default: it runs, on one worker, only the desktop and mobile test
+   files that import a file you changed since `origin/main`. Use `bun run test:related -- <source>`
+   for the tests of named source files, and `bun run test:desktop -- <path>` for one test file.
 3. To check types, run one project for the code you changed, one at a time:
    `bun run typecheck:node` (`src/main`, `src/backend`, `src/preload`, `scripts`),
    `bun run typecheck:renderer` (`src/renderer`, `packages/ui`), or the `typecheck` script of the
@@ -87,10 +114,13 @@ as a routine completion or PR step.
 4. Do not run `bun run format`: it rewrites the whole repository. Use
    `biome check --write --max-diagnostics=none <paths>` for changed files.
 5. The pre-commit hook (`.githooks/pre-commit`) runs `check:staged`, `check:ui`, and
-   `bun run typecheck` when the commit stages code. This is the only exception to rule 3. Do not run
-   these checks by hand, and do not bypass the hook with `--no-verify`. The hook also runs the schema
-   parity test when a database schema file in `src/backend` is staged. It stops the commit if Biome
-   fixes a file that also has unstaged changes; stage the fixes you want and commit again.
+   `scripts/staged-typecheck.ts` when the commit stages code. The script runs, one at a time, only
+   the `typecheck:*` projects that can see a staged file; a root `package.json`, `tsconfig*.json` or
+   `bun.lock` selects all of them. `--dry-run [<path>...]` shows the selection. This is the only
+   exception to rule 3. Do not run these checks by hand, and do not bypass the hook with
+   `--no-verify`. The hook also runs the schema parity test when a database schema file in
+   `src/backend` is staged. It stops the commit if Biome fixes a file that also has unstaged
+   changes; stage the fixes you want and commit again.
 
 [Check design notes](docs/development-checks.md#check-coverage) explain CI coverage, command aliases,
 and the separate Node and Bun type environments. Read them when changing checks or dependencies.

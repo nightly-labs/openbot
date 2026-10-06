@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Who may manage the host machine's MCP servers from a joined server, and what leaves the machine.
@@ -42,21 +43,24 @@ function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
     tested,
     testOptions,
     listMcpServers: () => stored,
-    saveMcpServer: (input) => {
-      saved.push(input.config);
-      stored.push(input.config);
-      return stored;
-    },
-    removeMcpServer: (input) => stored.filter((config) => config.id !== input.mcpServerId),
-    setMcpServerEnabled: (input) => {
-      for (const config of stored) if (config.id === input.mcpServerId) config.enabled = input.enabled;
-      return stored;
-    },
-    testMcpServer: async (input, options) => {
-      tested.push(input.config);
-      testOptions.push(options);
-      return { toolCount: 3, error: null };
-    },
+    saveMcpServer: (input) =>
+      Effect.sync(() => {
+        saved.push(input.config);
+        stored.push(input.config);
+        return stored;
+      }),
+    removeMcpServer: (input) => Effect.sync(() => stored.filter((config) => config.id !== input.mcpServerId)),
+    setMcpServerEnabled: (input) =>
+      Effect.sync(() => {
+        for (const config of stored) if (config.id === input.mcpServerId) config.enabled = input.enabled;
+        return stored;
+      }),
+    testMcpServer: (input, options) =>
+      Effect.sync(() => {
+        tested.push(input.config);
+        testOptions.push(options);
+        return { toolCount: 3, error: null };
+      }),
   };
 }
 
@@ -82,8 +86,8 @@ describe("Team API MCP server access", () => {
       (await fetch(`${base}/v1/mcp-servers`, { headers: { ...headers, "OpenBot-Capabilities": "" } })).status,
     ).toBe(400);
 
-    const invite = await fixture.store.createInvite("member");
-    const member = await fixture.store.acceptInvite(invite.token, "member", "member password");
+    const invite = await Effect.runPromise(fixture.store.createInvite("member"));
+    const member = await Effect.runPromise(fixture.store.acceptInvite(invite.token, "member", "member password"));
     const asMember = await fetch(`${base}/v1/mcp-servers`, {
       headers: { ...headers, Authorization: `Bearer ${member.sessionToken}` },
     });
@@ -191,9 +195,10 @@ describe("Team API MCP server access", () => {
         startToolRuntimes: () => {
           started.push("start");
         },
-        ensureToolRuntimesReady: async () => {
-          ensured += 1;
-        },
+        ensureToolRuntimesReady: () =>
+          Effect.sync(() => {
+            ensured += 1;
+          }),
         toolRuntimes: () => NO_MCP_TOOL_RUNTIMES,
       },
     });

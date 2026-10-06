@@ -6,13 +6,14 @@ import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodexAppServerClient } from "./app-server-client";
+import { runCauseEffect } from "./effect-boundary";
 import { decodeRecordResponse, isRecord } from "./protocol";
 
 const temporaryRoots: string[] = [];
 const clients: CodexAppServerClient[] = [];
 
 afterEach(async () => {
-  await Promise.all(clients.splice(0).map((client) => client.stop()));
+  await Promise.all(clients.splice(0).map((client) => runCauseEffect(client.stop())));
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true })));
 });
 
@@ -24,10 +25,21 @@ describe("CodexAppServerClient", () => {
     client.on("notification", (notification) => notifications.push(notification.method));
     client.start();
 
-    const result = await client.request("test/echo", { text: "hello" }, decodeEchoResponse);
+    const result = await runCauseEffect(client.request("test/echo", { text: "hello" }, decodeEchoResponse));
 
     expect(result).toEqual({ echoed: "hello" });
     await vi.waitFor(() => expect(notifications).toContain("test/notification"));
+  });
+
+  it("rejects an invalid response without leaving its caller pending", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    client.start();
+    await expect(runCauseEffect(client.request("test/echo", { text: 42 }, decodeEchoResponse))).rejects.toThrow(
+      "Invalid echo response.",
+    );
+    await expect(runCauseEffect(client.request("test/echo", { text: "valid" }, decodeEchoResponse))).resolves.toEqual({
+      echoed: "valid",
+    });
   });
 
   it("rejects timed out requests", async () => {
@@ -35,14 +47,14 @@ describe("CodexAppServerClient", () => {
     const client = createClient(executable, 30);
     client.start();
 
-    await expect(client.request("test/timeout", {}, decodeRecordResponse)).rejects.toThrow("timed out");
+    await expect(runCauseEffect(client.request("test/timeout", {}, decodeRecordResponse))).rejects.toThrow("timed out");
   });
 
   it("surfaces RPC errors with their code", async () => {
     const client = createClient(await createFakeCodex(), 5_000);
     client.start();
 
-    await expect(client.request("test/error", {}, decodeRecordResponse)).rejects.toMatchObject({
+    await expect(runCauseEffect(client.request("test/error", {}, decodeRecordResponse))).rejects.toMatchObject({
       name: "AppServerError",
       code: 412,
       message: "Fake RPC failure",
@@ -57,12 +69,14 @@ describe("CodexAppServerClient", () => {
     });
     client.start();
 
-    await client.releaseThread("thread-7");
+    await runCauseEffect(client.releaseThread("thread-7"));
 
     // The app server keeps the thread and its history; it unloads the thread, with the MCP servers
     // it started, once nothing is subscribed to it.
     await vi.waitFor(() => expect(observed).toEqual([{ threadId: "thread-7" }]));
-    await expect(client.request("test/echo", { text: "still serving" }, decodeEchoResponse)).resolves.toEqual({
+    await expect(
+      runCauseEffect(client.request("test/echo", { text: "still serving" }, decodeEchoResponse)),
+    ).resolves.toEqual({
       echoed: "still serving",
     });
   });
@@ -70,10 +84,14 @@ describe("CodexAppServerClient", () => {
   it("resets fragmented JSON state when restarted after a process crash", async () => {
     const client = createClient(await createFakeCodex(), 5_000);
     client.start();
-    await expect(client.request("test/partial-exit", {}, decodeRecordResponse)).rejects.toThrow("exited");
+    await expect(runCauseEffect(client.request("test/partial-exit", {}, decodeRecordResponse))).rejects.toThrow(
+      "exited",
+    );
 
     client.start();
-    await expect(client.request("test/echo", { text: "after restart" }, decodeEchoResponse)).resolves.toEqual({
+    await expect(
+      runCauseEffect(client.request("test/echo", { text: "after restart" }, decodeEchoResponse)),
+    ).resolves.toEqual({
       echoed: "after restart",
     });
   });

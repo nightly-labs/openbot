@@ -8,6 +8,7 @@ import {
   type DevelopmentCommandRunner,
   prepareDevelopmentEnvironment,
   prepareDevelopmentWorktree,
+  writeInstallStamp,
 } from "./prepare-dev-environment";
 
 const temporaryRoots: string[] = [];
@@ -60,6 +61,39 @@ describe("development environment preparation", () => {
       ["install", "--frozen-lockfile"],
       ["run", "api:migrate:local"],
     ]);
+  });
+
+  it("skips the install and the migration while their inputs are unchanged", () => {
+    const root = createTemporaryRoot();
+    writeFileSync(join(root, "bun.lock"), "lock v1");
+    mkdirSync(join(root, "apps", "auth-api", "migrations"));
+    writeFileSync(join(root, "apps", "auth-api", "migrations", "0001_init.sql"), "create table a (id text);");
+    const calls: string[] = [];
+    const run: DevelopmentCommandRunner = (_executable, args) => {
+      calls.push(args.join(" "));
+      // Wrangler creates the local D1 state on the first migration.
+      mkdirSync(join(root, "apps", "auth-api", ".wrangler", "state", "v3", "d1"), { recursive: true });
+    };
+    const prepare = () =>
+      prepareDevelopmentEnvironment({ projectRoot: root, mainCheckoutRoot: root, bunVersion: "1.4.0", run });
+
+    prepare();
+    prepare();
+    expect(calls).toEqual(["install --frozen-lockfile", "run api:migrate:local"]);
+
+    writeFileSync(join(root, "bun.lock"), "lock v2");
+    writeFileSync(join(root, "apps", "auth-api", "migrations", "0002_next.sql"), "create table b (id text);");
+    prepare();
+    rmSync(join(root, "apps", "auth-api", ".wrangler", "state"), { recursive: true });
+    prepare();
+    expect(calls.slice(2)).toEqual(["install --frozen-lockfile", "run api:migrate:local", "run api:migrate:local"]);
+
+    // A plain `bun install` on another branch stamps that branch, so the return installs again.
+    writeFileSync(join(root, "bun.lock"), "lock v3");
+    writeInstallStamp(root);
+    writeFileSync(join(root, "bun.lock"), "lock v2");
+    prepare();
+    expect(calls.slice(5)).toEqual(["install --frozen-lockfile"]);
   });
 
   it("prepares the isolated worktree fixtures after the base environment", () => {

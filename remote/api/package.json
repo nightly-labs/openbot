@@ -14,7 +14,8 @@
     "@openbot/contracts": "workspace:*",
     "elysia": "1.4.30",
     "jose": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

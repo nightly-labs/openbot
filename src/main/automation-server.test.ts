@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -20,7 +21,7 @@ const servers: AutomationServer[] = [];
 const roots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => server.stop()));
+  await Promise.all(servers.splice(0).map((server) => Effect.runPromise(server.stop())));
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -30,7 +31,9 @@ async function startServer(overrides: Partial<AutomationServerOptions> = {}) {
   const agents: { id: string; name: string; allowAutomation?: boolean }[] = [
     { id: "agent-1", name: "Ada", allowAutomation: true },
   ];
-  const runRoutine = vi.fn<AutomationServerOptions["runRoutine"]>(async () => ({ id: "run-1", deliveryId: "d-1" }));
+  const runRoutine = vi.fn<AutomationServerOptions["runRoutine"]>(() =>
+    Effect.succeed({ id: "run-1", deliveryId: "d-1" }),
+  );
   const server = new AutomationServer({
     root,
     listAgents: () => agents,
@@ -39,7 +42,7 @@ async function startServer(overrides: Partial<AutomationServerOptions> = {}) {
     ...overrides,
   });
   servers.push(server);
-  await server.sync();
+  await Effect.runPromise(server.sync());
   const url = (await readFile(join(root, AUTOMATION_URL_FILE), "utf8")).trim();
   const token = (await readFile(join(root, AUTOMATION_TOKEN_FILE), "utf8")).trim();
   return { server, root, agents, runRoutine, url, token };
@@ -172,13 +175,13 @@ describe("AutomationServer", () => {
     const { server, root, agents, url, token } = await startServer();
 
     agents[0] = { id: "agent-1", name: "Ada", allowAutomation: false };
-    await server.sync();
+    await Effect.runPromise(server.sync());
 
     for (const name of FILES) await expect(stat(join(root, name))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(run(url, token, {})).rejects.toMatchObject({ code: "ECONNREFUSED" });
 
     agents[0] = { id: "agent-1", name: "Ada", allowAutomation: true };
-    await server.sync();
+    await Effect.runPromise(server.sync());
     const nextUrl = (await readFile(join(root, AUTOMATION_URL_FILE), "utf8")).trim();
     expect((await run(nextUrl, token, {})).status).toBe(401);
   });

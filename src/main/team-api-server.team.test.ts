@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 // @vitest-environment node
 
 // Joining, membership, invitations, sessions and passwords: `src/main/team-api/route-team.ts`.
@@ -22,40 +23,43 @@ afterEach(stopTeamApiFixtures);
 describe("TeamApiServer team", () => {
   it("joins an email-bound invitation with a verified OpenBot account", async () => {
     const { root, store, start } = await createTeamApiFixture("account");
-    await store.configureWithAccount("Studio Mac", {
-      id: "owner-account",
-      email: "owner@example.com",
-      name: "Owner",
-      avatarUrl: null,
-    });
-    const invite = await store.createInvite("member", "alice@example.com");
+    await Effect.runPromise(
+      store.configureWithAccount("Studio Mac", {
+        id: "owner-account",
+        email: "owner@example.com",
+        name: "Owner",
+        avatarUrl: null,
+      }),
+    );
+    const invite = await Effect.runPromise(store.createInvite("member", "alice@example.com"));
     const database = new OpenBotDatabase(root);
-    await database.initialize();
+    await Effect.runPromise(database.initialize());
     const chat = new TeamChatStore(database);
     const agentEvents = new EventEmitter();
     const presenceSnapshots: TeamPresenceSnapshot[] = [];
     const agents = createAgents({}, agentEvents);
     const { port } = await start({
       agents,
-      redeemCentralTicket: async (ticket, serverId) => {
-        if (serverId !== store.getIdentity()?.serverId) return null;
-        if (ticket === "valid-team-ticket") {
-          return {
-            id: "alice-account",
-            email: "alice@example.com",
-            name: "Alice",
-            avatarUrl: "https://api.openbot.run/v1/avatars/alice-account?v=image-1",
-          };
-        }
-        return ticket === "owner-team-ticket"
-          ? {
-              id: "owner-account",
-              email: "owner@example.com",
-              name: "Owner on another Mac",
-              avatarUrl: null,
-            }
-          : null;
-      },
+      redeemCentralTicket: (ticket, serverId) =>
+        Effect.sync(() => {
+          if (serverId !== store.getIdentity()?.serverId) return null;
+          if (ticket === "valid-team-ticket") {
+            return {
+              id: "alice-account",
+              email: "alice@example.com",
+              name: "Alice",
+              avatarUrl: "https://api.openbot.run/v1/avatars/alice-account?v=image-1",
+            };
+          }
+          return ticket === "owner-team-ticket"
+            ? {
+                id: "owner-account",
+                email: "owner@example.com",
+                name: "Owner on another Mac",
+                avatarUrl: null,
+              }
+            : null;
+        }),
       onPresence: (snapshot) => presenceSnapshots.push(snapshot),
       chat,
     });
@@ -102,7 +106,7 @@ describe("TeamApiServer team", () => {
       });
       expect(usedPreview.status).toBe(400);
 
-      const ownerInvite = await store.createInvite("member");
+      const ownerInvite = await Effect.runPromise(store.createInvite("member"));
       const ownerResponse = await fetch(`http://127.0.0.1:${port}/v1/join/account`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -238,7 +242,7 @@ describe("TeamApiServer team", () => {
     const ownerLogin = await jsonRequest<{ sessionToken: string }>(base, "/v1/auth/login", {
       body: { username: "owner", password: "correct horse battery" },
     });
-    const invite = await store.createInvite("member");
+    const invite = await Effect.runPromise(store.createInvite("member"));
     const joined = await jsonRequest<{ sessionToken: string }>(base, "/v1/join", {
       body: { inviteToken: invite.token, username: "alice", password: "a secure team password" },
     });
@@ -266,19 +270,20 @@ describe("TeamApiServer team", () => {
     const agents = createAgents();
     const { base } = await start({
       agents,
-      createInvite: async (input) => {
-        const created = await store.createInvite(input.role, input.email, { permanent: input.permanent });
-        return {
-          id: created.id,
-          role: created.role,
-          expiresAt: created.expiresAt,
-          usedAt: null,
-          inviteUrl: `https://openbot.run/join?token=${created.token}`,
-          email: created.email,
-          permanent: created.permanent,
-          useCount: created.useCount,
-        };
-      },
+      createInvite: (input) =>
+        Effect.gen(function* () {
+          const created = yield* store.createInvite(input.role, input.email, { permanent: input.permanent });
+          return {
+            id: created.id,
+            role: created.role,
+            expiresAt: created.expiresAt,
+            usedAt: null,
+            inviteUrl: `https://openbot.run/join?token=${created.token}`,
+            email: created.email,
+            permanent: created.permanent,
+            useCount: created.useCount,
+          };
+        }),
     });
 
     const ownerLogin = await jsonRequest<{ sessionToken: string }>(base, "/v1/auth/login", {

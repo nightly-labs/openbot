@@ -4,6 +4,8 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { delimiter, isAbsolute, join } from "node:path";
+import { Effect } from "effect";
+import { cuaIO } from "./cua-driver-effects";
 
 /**
  * The targets `cua-driver` ships a binary for.
@@ -42,29 +44,20 @@ export function isSupportedCuaDriverTarget(platform: NodeJS.Platform, architectu
   return SUPPORTED_TARGETS[platform]?.includes(architecture) ?? false;
 }
 
-/**
- * The driver executable, or `null` when this computer has none.
- *
- * `null` is a status, not a failure: Computer Use is a feature the app works without, so a missing
- * binary must never throw out of startup. Every candidate is checked for the execute bit rather
- * than for existence, because a half-extracted download is a file that cannot be spawned.
- *
- * A packaged build carries the binary under `resources/cua-driver/<platform>/<architecture>` and
- * reads nothing else: the release is pinned and signed against that build, so an override or an
- * install the user already had must not take its place. A checkout reads
- * `build/cua-driver/<platform>/<architecture>` first and then an override, an install directory and
- * `PATH`, because a developer does pin a driver by hand. `scripts/install-cua-driver.ts` writes the
- * checkout path from the pin in `native-runtime.lock.json`, and `electron-builder.yml` copies it to
- * the packaged one.
- */
-export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<string | null> {
+export const resolveCuaDriver = Effect.fn("CuaDriver.resolve")(function* (input: CuaDriverArtifactInput) {
   if (!isSupportedCuaDriverTarget(input.platform, input.architecture)) return null;
 
   for (const candidate of candidatePaths(input)) {
-    if (await isExecutable(candidate)) return candidate;
+    if (
+      yield* cuaIO(() => access(candidate, constants.X_OK)).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      )
+    )
+      return candidate;
   }
   return null;
-}
+});
 
 /**
  * The two calls the driver makes to its own vendor, off for every copy OpenBot starts.
@@ -139,18 +132,5 @@ function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
   for (const entry of input.pathVariable?.split(delimiter) ?? []) {
     const trimmed = entry.trim();
     if (trimmed) yield join(trimmed, name);
-  }
-}
-
-async function isExecutable(path: string): Promise<boolean> {
-  return await isAccessible(path, constants.X_OK);
-}
-
-async function isAccessible(path: string, mode: number): Promise<boolean> {
-  try {
-    await access(path, mode);
-    return true;
-  } catch {
-    return false;
   }
 }

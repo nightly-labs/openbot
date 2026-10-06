@@ -8,7 +8,6 @@ import {
   isRoutineSchedule,
   isSkillCategory,
   type MarketplaceAgentDetail,
-  type MarketplaceAgentPage,
   type MarketplaceAgentQuery,
   type MarketplaceAgentRoutine,
   type MarketplaceAgentSkill,
@@ -16,6 +15,7 @@ import {
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Result, Schema } from "effect";
 import {
   decodeMarketplaceCursor,
   encodeMarketplaceCursor,
@@ -24,6 +24,7 @@ import {
   normalizeMarketplaceLimit,
   normalizeMarketplaceQuery,
 } from "./marketplace-pagination";
+import { MarketplaceStorage } from "./marketplace-storage";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const MAX_AGENTS_PER_USER = 5;
@@ -57,56 +58,63 @@ interface AgentRow {
   rejection_note?: string | null;
 }
 
-export class AgentMarketplaceError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
+export class AgentMarketplaceError extends Schema.TaggedError<AgentMarketplaceError>()("AgentMarketplaceError", {
+  status: Schema.Number,
+  code: Schema.String,
+  message: Schema.String,
+}) {
+  constructor(status: number, code: string, message: string) {
+    super({ status, code, message });
   }
 }
 
 export class AgentMarketplace {
   constructor(private readonly bindings: Pick<WorkerBindings, "DB" | "SKILLS">) {}
 
-  async list(input: MarketplaceAgentQuery = {}): Promise<MarketplaceAgentPage> {
-    const limit = normalizeMarketplaceLimit(input.limit);
-    const clauses = ["agents.approved_version_id = versions.id"];
-    const values: Array<string | number> = [];
-    const queryInput = normalizeMarketplaceQuery(input.query);
-    if (queryInput) {
-      clauses.push(
-        "(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.title) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\' OR lower(coalesce(nullif(trim(users.name), ''), users.email)) LIKE ? ESCAPE '\\')",
-      );
-      const query = marketplaceLikePattern(queryInput);
-      values.push(query, query, query, query);
-    }
-    if (input.category !== undefined) {
-      if (!isSkillCategory(input.category))
-        throw new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.");
-      clauses.push("versions.category = ?");
-      values.push(input.category);
-    }
-    if (input.featured) clauses.push("agents.featured = 1");
-    const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
-    const cursor = decodeMarketplaceCursor(input.cursor, sort);
-    // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
-    // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
-    // and its v1 cursor then pages the rest, which costs one request and loses no agent.
-    if (cursor && !("legacyUpdatedAt" in cursor)) {
-      const primary = sort === "installs" ? "agents.installs" : "agents.featured";
-      clauses.push(
-        `(${primary} < ? OR (${primary} = ? AND (agents.updated_at < ? OR (agents.updated_at = ? AND agents.id < ?))))`,
-      );
-      values.push(cursor.primary, cursor.primary, cursor.updatedAt, cursor.updatedAt, cursor.id);
-    }
-    const order =
-      sort === "installs"
-        ? "agents.installs DESC, agents.updated_at DESC, agents.id DESC"
-        : "agents.featured DESC, agents.updated_at DESC, agents.id DESC";
-    const result = await this.bindings.DB.prepare(
-      `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
+  list(input: MarketplaceAgentQuery = {}) {
+    return Effect.fn("AgentMarketplace.list")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const limit = normalizeMarketplaceLimit(input.limit);
+        const clauses = ["agents.approved_version_id = versions.id"];
+        const values: Array<string | number> = [];
+        const queryInput = normalizeMarketplaceQuery(input.query);
+        if (queryInput) {
+          clauses.push(
+            "(lower(versions.name) LIKE ? ESCAPE '\\' OR lower(versions.title) LIKE ? ESCAPE '\\' OR lower(versions.description) LIKE ? ESCAPE '\\' OR lower(coalesce(nullif(trim(users.name), ''), users.email)) LIKE ? ESCAPE '\\')",
+          );
+          const query = marketplaceLikePattern(queryInput);
+          values.push(query, query, query, query);
+        }
+        if (input.category !== undefined) {
+          if (!isSkillCategory(input.category))
+            return yield* Effect.fail(
+              marketplaceError(new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.")),
+            );
+          clauses.push("versions.category = ?");
+          values.push(input.category);
+        }
+        if (input.featured) clauses.push("agents.featured = 1");
+        const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
+        const cursor = decodeMarketplaceCursor(input.cursor, sort);
+        // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
+        // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
+        // and its v1 cursor then pages the rest, which costs one request and loses no agent.
+        if (cursor && !("legacyUpdatedAt" in cursor)) {
+          const primary = sort === "installs" ? "agents.installs" : "agents.featured";
+          clauses.push(
+            `(${primary} < ? OR (${primary} = ? AND (agents.updated_at < ? OR (agents.updated_at = ? AND agents.id < ?))))`,
+          );
+          values.push(cursor.primary, cursor.primary, cursor.updatedAt, cursor.updatedAt, cursor.id);
+        }
+        const order =
+          sort === "installs"
+            ? "agents.installs DESC, agents.updated_at DESC, agents.id DESC"
+            : "agents.featured DESC, agents.updated_at DESC, agents.id DESC";
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key,
               versions.skills_json, versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
@@ -114,43 +122,69 @@ export class AgentMarketplace {
        JOIN marketplace_agent_versions versions ON ${clauses.join(" AND ")}
        JOIN users ON users.id = agents.owner_user_id
        ORDER BY ${order} LIMIT ?`,
-    )
-      .bind(...values, limit + 1)
-      .all<AgentRow>();
-    const rows = result.results ?? [];
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
-    return {
-      agents: page.map((row) => publicSummary(row)),
-      nextCursor:
-        rows.length > limit && last
-          ? encodeMarketplaceCursor(sort, {
-              primary: sort === "installs" ? last.installs : last.featured,
-              updatedAt: last.updated_at,
-              id: last.id,
-            })
-          : null,
-    };
+          )
+            .bind(...values, limit + 1)
+            .all<AgentRow>(),
+        );
+        const rows = result.results ?? [];
+        const page = rows.slice(0, limit);
+        const last = page.at(-1);
+        return {
+          agents: yield* marketplaceDecode(() => page.map((row) => publicSummary(row))),
+          nextCursor:
+            rows.length > limit && last
+              ? encodeMarketplaceCursor(sort, {
+                  primary: sort === "installs" ? last.installs : last.featured,
+                  updatedAt: last.updated_at,
+                  id: last.id,
+                })
+              : null,
+        };
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async get(agentId: string): Promise<MarketplaceAgentDetail> {
-    const row = await this.approvedRow(agentId);
-    if (!row) throw new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.");
-    return publicDetail(row);
+  get(agentId: string) {
+    return Effect.fn("AgentMarketplace.get")(() =>
+      Effect.gen({ self: this }, function* () {
+        const row = yield* this.approvedRowEffect(agentId);
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
+          );
+        return yield* marketplaceDecode(() => publicDetail(row));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async setCreatorAvatar(userId: string, listingId: string, show: boolean): Promise<void> {
-    const result = await this.bindings.DB.prepare(
-      "UPDATE marketplace_agents SET show_creator_avatar = ? WHERE id = ? AND owner_user_id = ?",
-    )
-      .bind(show ? 1 : 0, listingId, userId)
-      .run();
-    if (!result.meta.changes) throw new AgentMarketplaceError(404, "agent_not_found", "The owned agent was not found.");
+  setCreatorAvatar(userId: string, listingId: string, show: boolean) {
+    return Effect.fn("AgentMarketplace.setCreatorAvatar")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            "UPDATE marketplace_agents SET show_creator_avatar = ? WHERE id = ? AND owner_user_id = ?",
+          )
+            .bind(show ? 1 : 0, listingId, userId)
+            .run(),
+        );
+        if (!result.meta.changes)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The owned agent was not found.")),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async listMine(userId: string): Promise<AgentSubmissionWire[]> {
-    const result = await this.bindings.DB.prepare(
-      `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
+  listMine(userId: string) {
+    return Effect.fn("AgentMarketplace.listMine")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
               agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
@@ -158,224 +192,371 @@ export class AgentMarketplace {
        JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id
        WHERE agents.owner_user_id = ? ORDER BY versions.created_at DESC`,
-    )
-      .bind(userId)
-      .all<AgentRow>();
-    return (result.results ?? []).map(submission);
+          )
+            .bind(userId)
+            .all<AgentRow>(),
+        );
+        return yield* marketplaceDecode(() => (result.results ?? []).map(submission));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async submit(input: {
+  submit(input: {
     user: AuthUser;
     snapshot: unknown;
     avatar: { bytes: Uint8Array; mimeType: string } | null;
     agentId?: string;
     category?: SkillCategory;
     showCreatorAvatar?: boolean;
-  }): Promise<AgentSubmissionWire> {
-    const snapshot = validateSnapshot(input.snapshot);
-    if (input.category !== undefined && !isSkillCategory(input.category))
-      throw new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.");
-    const recent = await this.bindings.DB.prepare(
-      `SELECT count(*) AS count FROM marketplace_agent_versions versions
+  }) {
+    return Effect.fn("AgentMarketplace.submit")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const snapshot = yield* marketplaceDecode(() => validateSnapshot(input.snapshot));
+        if (input.category !== undefined && !isSkillCategory(input.category))
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(400, "invalid_category", "Unknown agent category.")),
+          );
+        const recent = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT count(*) AS count FROM marketplace_agent_versions versions
        JOIN marketplace_agents agents ON agents.id = versions.agent_id
        WHERE agents.owner_user_id = ? AND versions.created_at >= ?`,
-    )
-      .bind(input.user.id, Date.now() - DAY_MS)
-      .first<{ count: number }>();
-    if ((recent?.count ?? 0) >= MAX_SUBMISSIONS_PER_DAY)
-      throw new AgentMarketplaceError(429, "submission_limit", "You can submit up to 10 agent versions per day.");
+          )
+            .bind(input.user.id, Date.now() - DAY_MS)
+            .first<{ count: number }>(),
+        );
+        if ((recent?.count ?? 0) >= MAX_SUBMISSIONS_PER_DAY)
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(429, "submission_limit", "You can submit up to 10 agent versions per day."),
+            ),
+          );
 
-    const agentId = input.agentId ?? crypto.randomUUID();
-    let version = 1;
-    if (input.agentId) {
-      const owned = await this.bindings.DB.prepare(
-        "SELECT id FROM marketplace_agents WHERE id = ? AND owner_user_id = ?",
-      )
-        .bind(input.agentId, input.user.id)
-        .first();
-      if (!owned) throw new AgentMarketplaceError(404, "agent_not_found", "The owned agent was not found.");
-      const latest = await this.bindings.DB.prepare(
-        "SELECT max(version) AS version FROM marketplace_agent_versions WHERE agent_id = ?",
-      )
-        .bind(agentId)
-        .first<{ version: number | null }>();
-      version = (latest?.version ?? 0) + 1;
-      if (version > MAX_VERSIONS_PER_AGENT)
-        throw new AgentMarketplaceError(409, "agent_version_limit", "Each agent can have up to 5 submitted versions.");
-    } else {
-      const count = await this.bindings.DB.prepare(
-        "SELECT count(*) AS count FROM marketplace_agents WHERE owner_user_id = ?",
-      )
-        .bind(input.user.id)
-        .first<{ count: number }>();
-      if ((count?.count ?? 0) >= MAX_AGENTS_PER_USER)
-        throw new AgentMarketplaceError(409, "agent_limit", "You can submit up to 5 agents.");
-    }
+        const agentId = input.agentId ?? crypto.randomUUID();
+        let version = 1;
+        if (input.agentId) {
+          const owned = yield* marketplaceCall(() =>
+            bindings.DB.prepare("SELECT id FROM marketplace_agents WHERE id = ? AND owner_user_id = ?")
+              .bind(input.agentId, input.user.id)
+              .first(),
+          );
+          if (!owned)
+            return yield* Effect.fail(
+              marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The owned agent was not found.")),
+            );
+          const latest = yield* marketplaceCall(() =>
+            bindings.DB.prepare("SELECT max(version) AS version FROM marketplace_agent_versions WHERE agent_id = ?")
+              .bind(agentId)
+              .first<{ version: number | null }>(),
+          );
+          version = (latest?.version ?? 0) + 1;
+          if (version > MAX_VERSIONS_PER_AGENT)
+            return yield* Effect.fail(
+              marketplaceError(
+                new AgentMarketplaceError(
+                  409,
+                  "agent_version_limit",
+                  "Each agent can have up to 5 submitted versions.",
+                ),
+              ),
+            );
+        } else {
+          const count = yield* marketplaceCall(() =>
+            bindings.DB.prepare("SELECT count(*) AS count FROM marketplace_agents WHERE owner_user_id = ?")
+              .bind(input.user.id)
+              .first<{ count: number }>(),
+          );
+          if ((count?.count ?? 0) >= MAX_AGENTS_PER_USER)
+            return yield* Effect.fail(
+              marketplaceError(new AgentMarketplaceError(409, "agent_limit", "You can submit up to 5 agents.")),
+            );
+        }
 
-    await this.validateSkills(snapshot.skills);
-    const versionId = crypto.randomUUID();
-    const now = Date.now();
-    let avatarKey: string | null = null;
-    if (input.avatar) {
-      if (!isValidAvatarImage(input.avatar.mimeType, input.avatar.bytes))
-        throw new AgentMarketplaceError(400, "invalid_avatar", "Choose a valid PNG, JPEG, or WebP avatar.");
-      avatarKey = `agents/${agentId}/versions/${versionId}.avatar`;
-      await this.bindings.SKILLS.put(avatarKey, input.avatar.bytes, {
-        httpMetadata: { contentType: input.avatar.mimeType },
-      });
-    }
-    try {
-      if (!input.agentId) {
-        await this.bindings.DB.prepare(
-          "INSERT INTO marketplace_agents(id, owner_user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        )
-          .bind(agentId, input.user.id, now, now)
-          .run();
-      }
-      await this.bindings.DB.prepare(
-        `INSERT INTO marketplace_agent_versions(
+        yield* this.validateSkillsEffect(snapshot.skills);
+        const versionId = crypto.randomUUID();
+        const now = Date.now();
+        let avatarKey: string | null = null;
+        const avatar = input.avatar;
+        if (avatar) {
+          if (!isValidAvatarImage(avatar.mimeType, avatar.bytes))
+            return yield* Effect.fail(
+              marketplaceError(
+                new AgentMarketplaceError(400, "invalid_avatar", "Choose a valid PNG, JPEG, or WebP avatar."),
+              ),
+            );
+          avatarKey = `agents/${agentId}/versions/${versionId}.avatar`;
+          const key = avatarKey;
+          yield* marketplaceCall(() =>
+            bindings.SKILLS.put(key, avatar.bytes, {
+              httpMetadata: { contentType: avatar.mimeType },
+            }),
+          );
+        }
+        const operationResult = yield* Effect.gen({ self: this }, function* () {
+          if (!input.agentId) {
+            yield* marketplaceCall(() =>
+              bindings.DB.prepare(
+                "INSERT INTO marketplace_agents(id, owner_user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+              )
+                .bind(agentId, input.user.id, now, now)
+                .run(),
+            );
+          }
+          yield* marketplaceCall(() =>
+            bindings.DB.prepare(
+              `INSERT INTO marketplace_agent_versions(
            id, agent_id, version, name, title, description, avatar_seed, avatar_hue, avatar_key,
            skills_json, routines_json, status, created_at, category
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      )
-        .bind(
-          versionId,
-          agentId,
-          version,
-          snapshot.name,
-          snapshot.title,
-          snapshot.description,
-          snapshot.avatarSeed,
-          snapshot.avatarHue,
-          avatarKey,
-          JSON.stringify(snapshot.skills),
-          JSON.stringify(snapshot.routines),
-          now,
-          input.category ?? "other",
-        )
-        .run();
-      if (input.showCreatorAvatar !== undefined)
-        await this.setCreatorAvatar(input.user.id, agentId, input.showCreatorAvatar);
-      await this.bindings.DB.prepare("UPDATE marketplace_agents SET updated_at = ? WHERE id = ?")
-        .bind(now, agentId)
-        .run();
-    } catch (error) {
-      if (avatarKey) await this.bindings.SKILLS.delete(avatarKey);
-      if (!input.agentId)
-        await this.bindings.DB.prepare("DELETE FROM marketplace_agents WHERE id = ? AND approved_version_id IS NULL")
-          .bind(agentId)
-          .run();
-      throw error;
-    }
-    const row = await this.versionRow(versionId);
-    if (!row) throw new AgentMarketplaceError(500, "submission_failed", "The agent submission could not be read.");
-    return submission(row);
+            )
+              .bind(
+                versionId,
+                agentId,
+                version,
+                snapshot.name,
+                snapshot.title,
+                snapshot.description,
+                snapshot.avatarSeed,
+                snapshot.avatarHue,
+                avatarKey,
+                JSON.stringify(snapshot.skills),
+                JSON.stringify(snapshot.routines),
+                now,
+                input.category ?? "other",
+              )
+              .run(),
+          );
+          if (input.showCreatorAvatar !== undefined)
+            yield* this.setCreatorAvatar(input.user.id, agentId, input.showCreatorAvatar);
+          yield* marketplaceCall(() =>
+            bindings.DB.prepare("UPDATE marketplace_agents SET updated_at = ? WHERE id = ?").bind(now, agentId).run(),
+          );
+        }).pipe(Effect.result);
+        if (Result.isFailure(operationResult)) {
+          const error = operationResult.failure;
+          if (avatarKey) yield* marketplaceCall(() => bindings.SKILLS.delete(avatarKey));
+          if (!input.agentId)
+            yield* marketplaceCall(() =>
+              bindings.DB.prepare("DELETE FROM marketplace_agents WHERE id = ? AND approved_version_id IS NULL")
+                .bind(agentId)
+                .run(),
+            );
+          return yield* Effect.fail(marketplaceError(error));
+        }
+        const row = yield* this.versionRowEffect(versionId);
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(500, "submission_failed", "The agent submission could not be read."),
+            ),
+          );
+        return yield* marketplaceDecode(() => submission(row));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async avatar(agentId: string) {
-    const row = await this.approvedRow(agentId);
-    if (!row?.avatar_key) throw new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.");
-    const object = await this.bindings.SKILLS.get(row.avatar_key);
-    if (!object) throw new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.");
-    return object;
+  avatar(agentId: string) {
+    return Effect.fn("AgentMarketplace.avatar")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const row = yield* this.approvedRowEffect(agentId);
+        if (!row?.avatar_key)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.")),
+          );
+        const key = row.avatar_key;
+        const object = yield* marketplaceCall(() => bindings.SKILLS.get(key));
+        if (!object)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.")),
+          );
+        return object;
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async recordInstall(agentId: string, userId: string, receiptId: string): Promise<void> {
-    if (!(await this.approvedRow(agentId)))
-      throw new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.");
-    const result = await this.bindings.DB.prepare(
-      "INSERT OR IGNORE INTO marketplace_agent_install_receipts(receipt_id, agent_id, user_id, created_at) VALUES (?, ?, ?, ?)",
-    )
-      .bind(receiptId, agentId, userId, Date.now())
-      .run();
-    if (result.meta.changes === 1)
-      await this.bindings.DB.prepare("UPDATE marketplace_agents SET installs = installs + 1 WHERE id = ?")
-        .bind(agentId)
-        .run();
+  recordInstall(agentId: string, userId: string, receiptId: string) {
+    return Effect.fn("AgentMarketplace.recordInstall")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        if (!(yield* this.approvedRowEffect(agentId)))
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
+          );
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            "INSERT OR IGNORE INTO marketplace_agent_install_receipts(receipt_id, agent_id, user_id, created_at) VALUES (?, ?, ?, ?)",
+          )
+            .bind(receiptId, agentId, userId, Date.now())
+            .run(),
+        );
+        if (result.meta.changes === 1)
+          yield* marketplaceCall(() =>
+            bindings.DB.prepare("UPDATE marketplace_agents SET installs = installs + 1 WHERE id = ?")
+              .bind(agentId)
+              .run(),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async listPending(): Promise<AgentSubmissionWire[]> {
-    const result = await this.bindings.DB.prepare(
-      `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
+  listPending() {
+    return Effect.fn("AgentMarketplace.listPending")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
               agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agent_versions versions JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id WHERE versions.status = 'pending' ORDER BY versions.created_at`,
-    ).all<AgentRow>();
-    return (result.results ?? []).map(submission);
+          ).all<AgentRow>(),
+        );
+        return yield* marketplaceDecode(() => (result.results ?? []).map(submission));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async review(versionId: string, status: "approved" | "rejected", note: string | null): Promise<void> {
-    const row = await this.bindings.DB.prepare("SELECT agent_id, status FROM marketplace_agent_versions WHERE id = ?")
-      .bind(versionId)
-      .first<{ agent_id: string; status: string }>();
-    if (!row) throw new AgentMarketplaceError(404, "submission_not_found", "The submission was not found.");
-    if (row.status !== "pending")
-      throw new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed.");
-    const now = Date.now();
-    // The status guard and RETURNING make a second, concurrent review lose instead of overwriting.
-    const reviewed = await this.bindings.DB.prepare(
-      "UPDATE marketplace_agent_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' RETURNING id",
-    )
-      .bind(status, status === "rejected" ? note : null, now, versionId)
-      .first<{ id: string }>();
-    if (!reviewed) throw new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed.");
-    if (status === "approved")
-      await this.bindings.DB.prepare(
-        "UPDATE marketplace_agents SET approved_version_id = ?, updated_at = ? WHERE id = ?",
-      )
-        .bind(versionId, now, row.agent_id)
-        .run();
+  review(versionId: string, status: "approved" | "rejected", note: string | null) {
+    return Effect.fn("AgentMarketplace.review")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const row = yield* marketplaceCall(() =>
+          bindings.DB.prepare("SELECT agent_id, status FROM marketplace_agent_versions WHERE id = ?")
+            .bind(versionId)
+            .first<{ agent_id: string; status: string }>(),
+        );
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "submission_not_found", "The submission was not found.")),
+          );
+        if (row.status !== "pending")
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed."),
+            ),
+          );
+        const now = Date.now();
+        // The status guard and RETURNING make a second, concurrent review lose instead of overwriting.
+        const reviewed = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            "UPDATE marketplace_agent_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' RETURNING id",
+          )
+            .bind(status, status === "rejected" ? note : null, now, versionId)
+            .first<{ id: string }>(),
+        );
+        if (!reviewed)
+          return yield* Effect.fail(
+            marketplaceError(
+              new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed."),
+            ),
+          );
+        if (status === "approved")
+          yield* marketplaceCall(() =>
+            bindings.DB.prepare("UPDATE marketplace_agents SET approved_version_id = ?, updated_at = ? WHERE id = ?")
+              .bind(versionId, now, row.agent_id)
+              .run(),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  async setFeatured(agentId: string, featured: boolean): Promise<void> {
-    const result = await this.bindings.DB.prepare(
-      "UPDATE marketplace_agents SET featured = ?, updated_at = ? WHERE id = ? AND approved_version_id IS NOT NULL",
-    )
-      .bind(featured ? 1 : 0, Date.now(), agentId)
-      .run();
-    if (result.meta.changes !== 1) throw new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.");
+  setFeatured(agentId: string, featured: boolean) {
+    return Effect.fn("AgentMarketplace.setFeatured")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            "UPDATE marketplace_agents SET featured = ?, updated_at = ? WHERE id = ? AND approved_version_id IS NOT NULL",
+          )
+            .bind(featured ? 1 : 0, Date.now(), agentId)
+            .run(),
+        );
+        if (result.meta.changes !== 1)
+          return yield* Effect.fail(
+            marketplaceError(new AgentMarketplaceError(404, "agent_not_found", "The agent was not found.")),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  private async validateSkills(skills: MarketplaceAgentSkill[]): Promise<void> {
-    for (const skill of skills) {
-      const row = await this.bindings.DB.prepare(
-        `SELECT versions.id, versions.skill_id, versions.version, skills.slug, versions.name
+  private validateSkillsEffect(
+    skills: MarketplaceAgentSkill[],
+  ): Effect.Effect<void, AgentMarketplaceError | AgentMarketplaceStorageError, MarketplaceStorage> {
+    return Effect.fn("AgentMarketplace.validateSkills")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        for (const skill of skills) {
+          const row = yield* marketplaceCall(() =>
+            bindings.DB.prepare(
+              `SELECT versions.id, versions.skill_id, versions.version, skills.slug, versions.name
          FROM marketplace_skill_versions versions JOIN marketplace_skills skills ON skills.id = versions.skill_id
          WHERE versions.id = ? AND versions.skill_id = ? AND versions.status = 'approved'`,
-      )
-        .bind(skill.versionId, skill.skillId)
-        .first<{ id: string; skill_id: string; version: number; slug: string; name: string }>();
-      if (!row || row.version !== skill.version || row.slug !== skill.slug || row.name !== skill.name)
-        throw new AgentMarketplaceError(400, "invalid_skill", `The skill ${skill.name} is not an approved version.`);
-    }
+            )
+              .bind(skill.versionId, skill.skillId)
+              .first<{ id: string; skill_id: string; version: number; slug: string; name: string }>(),
+          );
+          if (!row || row.version !== skill.version || row.slug !== skill.slug || row.name !== skill.name)
+            return yield* Effect.fail(
+              marketplaceError(
+                new AgentMarketplaceError(400, "invalid_skill", `The skill ${skill.name} is not an approved version.`),
+              ),
+            );
+        }
+      }),
+    )();
   }
 
-  private approvedRow(agentId: string) {
-    return this.bindings.DB.prepare(
-      `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
+  private approvedRowEffect(agentId: string) {
+    return Effect.fn("AgentMarketplace.approvedRow")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        return yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT agents.id, agents.installs, agents.featured, agents.updated_at,
               versions.id AS version_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agents agents JOIN marketplace_agent_versions versions ON versions.id = agents.approved_version_id
        JOIN users ON users.id = agents.owner_user_id WHERE agents.id = ?`,
-    )
-      .bind(agentId)
-      .first<AgentRow>();
+          )
+            .bind(agentId)
+            .first<AgentRow>(),
+        );
+      }),
+    )();
   }
 
-  private versionRow(versionId: string) {
-    return this.bindings.DB.prepare(
-      `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
+  private versionRowEffect(versionId: string) {
+    return Effect.fn("AgentMarketplace.versionRow")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        return yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT versions.id, versions.agent_id, versions.version, versions.name, versions.title, versions.description,
               versions.avatar_seed, versions.avatar_hue, versions.avatar_key, versions.skills_json,
               versions.routines_json, versions.status, versions.rejection_note, versions.created_at,
               agents.installs, agents.featured, agents.updated_at, versions.category, agents.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name, users.email AS creator_email
        FROM marketplace_agent_versions versions JOIN marketplace_agents agents ON agents.id = versions.agent_id
        JOIN users ON users.id = agents.owner_user_id WHERE versions.id = ?`,
-    )
-      .bind(versionId)
-      .first<AgentRow>();
+          )
+            .bind(versionId)
+            .first<AgentRow>(),
+        );
+      }),
+    )();
   }
 }
 
@@ -519,3 +700,17 @@ function submission(row: AgentRow): AgentSubmissionWire {
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
+
+class AgentMarketplaceStorageError extends Schema.TaggedError<AgentMarketplaceStorageError>()(
+  "AgentMarketplaceStorageError",
+  { message: Schema.String },
+) {}
+const marketplaceError = (error: unknown): AgentMarketplaceError | AgentMarketplaceStorageError =>
+  error instanceof AgentMarketplaceError
+    ? error
+    : new AgentMarketplaceStorageError({
+        message: error instanceof Error ? error.message : "Marketplace operation failed.",
+      });
+const marketplaceCall = <A>(operation: () => Promise<A>) =>
+  Effect.tryPromise({ try: operation, catch: marketplaceError });
+const marketplaceDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch: marketplaceError });

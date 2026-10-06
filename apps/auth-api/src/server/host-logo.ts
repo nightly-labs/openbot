@@ -1,3 +1,7 @@
+import { Effect, Schema } from "effect";
+
+class HostLogoError extends Schema.TaggedError<HostLogoError>()("HostLogoError", {}) {}
+
 import { isUuidV4 } from "@openbot/contracts/validation";
 
 export function hostLogoObjectKey(hostId: string, version: string): string {
@@ -9,8 +13,11 @@ export function hostLogoObjectKey(hostId: string, version: string): string {
  * The stored logo of one host version. The caller checks that the reader is a member and that
  * `version` is the current logo key. Null when the object is missing.
  */
-export async function readHostLogo(bucket: R2Bucket, hostId: string, version: string): Promise<Response | null> {
-  const object = await bucket.get(hostLogoObjectKey(hostId, version));
+export const readHostLogo = Effect.fn("HostLogo.read")(function* (bucket: R2Bucket, hostId: string, version: string) {
+  const object = yield* Effect.tryPromise({
+    try: () => bucket.get(hostLogoObjectKey(hostId, version)),
+    catch: () => new HostLogoError({}),
+  });
   if (!object) return null;
   return new Response(object.body, {
     headers: {
@@ -20,4 +27,4 @@ export async function readHostLogo(bucket: R2Bucket, hostId: string, version: st
       "X-Content-Type-Options": "nosniff",
     },
   });
-}
+});
