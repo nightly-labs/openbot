@@ -207,7 +207,6 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     }
     if (!target) {
       this.#hide();
-      if (this.#hiddenAt !== null && Date.now() - this.#hiddenAt >= IDLE_OVERLAY_MS) this.#retireAll();
       return;
     }
     const displays = this.#options.displays();
@@ -258,9 +257,17 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
     this.#hiddenAt = null;
   }
 
+  /**
+   * Hides the rim, and closes the overlays after `IDLE_OVERLAY_MS` of it. A failed driver read hides
+   * too, so a driver that stopped answering does not keep them either.
+   */
   #hide(): void {
     this.#target = null;
     this.#hiddenAt ??= Date.now();
+    if (Date.now() - this.#hiddenAt >= IDLE_OVERLAY_MS) {
+      this.#retireAll();
+      return;
+    }
     for (const overlay of this.#overlays.values()) {
       if (!overlay.window.isDestroyed() && overlay.window.isVisible()) overlay.window.hide();
     }

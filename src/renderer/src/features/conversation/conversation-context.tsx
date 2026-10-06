@@ -492,10 +492,12 @@ const Conversation = createSimpleContext({
       if (snapshot.revision < (conversations[agentId]?.revision ?? -1)) return;
       const initialLoad = conversations[agentId]?.loaded !== true;
       const inactive = agentId !== activeAgentId();
+      const windowMode = conversations[agentId]?.windowMode ?? "latest";
       // A snapshot carries the whole thread. An agent that is not open shows none of it, and opening
-      // it reads the latest page again, so only the tail is converted and kept.
+      // it reads the latest page again, so only the tail is converted and kept. A window around an
+      // older message, from a search, is not in the tail, so it keeps the whole snapshot.
       const sourceMessages =
-        inactive && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
+        inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
           ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
           : snapshot.messages;
       updateConversation(agentId, (conversation) => {
@@ -505,7 +507,6 @@ const Conversation = createSimpleContext({
         const previousById = new Map(previous.map((message) => [message.id, message]));
         const allMappedMessages = toAgentMessages(sourceMessages, snapshot.agentId);
         const pageInfo = conversations[agentId]?.page;
-        const windowMode = conversations[agentId]?.windowMode ?? "latest";
         const mappedMessages = retainThinkingMessages(
           previous,
           windowedSnapshotMessages(previous, allMappedMessages, {
