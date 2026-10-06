@@ -315,7 +315,7 @@ export function createStableConversationState(
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy`, `submitting` and `selectionSending` are
+ * `attachmentBusy` and `submitting` are
  * here for the same reason by a different route: they carry no key at all. Each
  * describes the composer on screen right now - "a send is in flight" - so a
  * shared owner would disable the arriving server's composer for the length of
@@ -331,7 +331,6 @@ export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
-  const [selectionSending, setSelectionSending] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
@@ -361,8 +360,6 @@ export function createServerConversationState() {
     setAttachmentBusy,
     submitting,
     setSubmitting,
-    selectionSending,
-    setSelectionSending,
     markingRead,
     setMarkingRead,
     dropActive,

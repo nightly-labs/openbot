@@ -84,7 +84,6 @@ export function MarketplaceOverlay(props: {
       manage() &&
       props.composerAvailable &&
       !controller.submitting() &&
-      !controller.selectionSending() &&
       controller.voicePhase() === "idle" &&
       !controller.editingDeliveryId(),
   );

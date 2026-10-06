@@ -36,8 +36,6 @@ export interface ComposerActionsDeps {
   setEditingPendingSave: (save: StoredQueueEdit["pendingSave"] | null) => void;
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
-  selectionSending: () => boolean;
-  setSelectionSending: (sending: boolean) => void;
   voicePhase: () => string;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
@@ -499,7 +497,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     targetOverride?: ConversationTarget,
     submittedSnapshot?: ComposerDraft,
   ): Promise<boolean> {
-    if (deps.selectionSending() || deps.attachmentBusy()) return false;
+    if (deps.attachmentBusy()) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
       return saveQueuedMessageEdit();
     }
@@ -509,11 +507,20 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const text = expandComposerMentions(draft.text);
     if (!agentId || !target || deps.submitting() || (!text.trim() && draft.attachments.length === 0)) return false;
     stopTeamTyping();
-    deps.setStickToLatest(true);
     deps.setComposerError(null, target);
     deps.clearConversationError(target);
-    // The message shows at once and the composer is free for the next one. Read the send function
-    // now: the send outlives this view when the user switches server.
+    queueSend(target, draft, text);
+    deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
+    return true;
+  }
+
+  /**
+   * Shows a message at once and sends it after the earlier sends of its chat, so the host stores the
+   * chat's messages in the order the user sent them. `draft` is what Edit puts back in the composer.
+   */
+  function queueSend(target: ConversationTarget, draft: ComposerDraft, text: string): void {
+    deps.setStickToLatest(true);
+    // Read the send function now: the send outlives this view when the user switches server.
     const send = deps.props.onSendMessage;
     const server = deps.props.server;
     // A deferred voice send can name a server that is no longer on screen. Its capabilities are not
@@ -534,8 +541,6 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       if ("error" in result) playActionSound("error");
       return result;
     });
-    deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
-    return true;
   }
 
   function retryPendingSend(clientMessageId: string): void {
@@ -604,19 +609,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
+  /** An instruction about selected text is a reply to that message. A failure shows on its row. */
   async function sendSelectionInstruction(messageId: string, body: string): Promise<boolean> {
-    if (!deps.props.agent || deps.submitting() || deps.selectionSending() || !deps.agentReady()) {
-      return false;
-    }
-    deps.setSelectionSending(true);
-    try {
-      const result = await deps.props.onSendMessage(body, [], messageId);
-      if ("messageId" in result) return true;
-      deps.setComposerError(result.error);
-      return false;
-    } finally {
-      deps.setSelectionSending(false);
-    }
+    const target = deps.currentTarget();
+    if (!target || deps.submitting() || !deps.agentReady()) return false;
+    queueSend(target, { text: body, attachments: [], replyToMessageId: messageId }, body);
+    return true;
   }
 
   return {

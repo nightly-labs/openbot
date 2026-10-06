@@ -405,6 +405,7 @@ describe("OpenBot connected desktop shell", () => {
           text: "Improve this selected text.\n\n> friendlier closing sentence",
           attachmentDraftIds: [],
           replyToMessageId: "assistant-selection",
+          clientMessageId: expect.any(String),
         },
         "local",
       ),
