@@ -20,11 +20,13 @@ publishes. Where the terms are not clear, this page tells you the lower-risk opt
   npm `dist.integrity` hash and does not change it. If you installed `claude` yourself, or set
   `OPENBOT_CLAUDE_PATH`, OpenBot runs that executable. OpenBot turns off the CLI's own updater only
   for the copy that OpenBot downloads, because OpenBot updates that copy.
-- The CLI owns the sign-in. OpenBot does not read, copy or store the Claude credentials in
-  `~/.claude` or the macOS Keychain. It runs `claude auth status` to show whether Claude is ready.
+- Connect on the Claude row runs `claude auth login --claudeai`. The CLI opens Anthropic's sign-in
+  page in your browser and stores the result. OpenBot does not read, copy or store the Claude
+  credentials in `~/.claude` or the macOS Keychain. It runs `claude auth status` to show whether
+  Claude is ready. You can also run `claude auth login` in a terminal.
 - OpenBot names itself to the CLI with the `CLAUDE_AGENT_SDK_CLIENT_APP` variable.
 - On a Linux host with no browser, a host admin can sign in Claude from another computer. The host
-  runs `claude auth login`, the admin opens Anthropic's sign-in page, and OpenBot sends the code
+  runs `claude auth login --claudeai`, the admin opens Anthropic's sign-in page, and OpenBot sends the code
   that the page shows to the CLI on the host. See [hosted servers](hosted-servers.md).
 - Team members can send messages to the Claude agents on your computer or host. These turns use
   your Claude sign-in, not the team member's sign-in.
@@ -59,7 +61,7 @@ permitted. For a decision about your use case, Anthropic tells you to
 
 | Use | Sign-in | Risk |
 | --- | --- | --- |
-| You use OpenBot on your own computer | Your Claude subscription, signed in with `claude auth login` in a terminal | Not clear. You sign in to the unmodified CLI through Anthropic's flow, which Anthropic permits. But OpenBot is a third-party product built on the Agent SDK, and Anthropic tells such products to use API keys. Persistent agents that run without you can go past "ordinary, individual usage". |
+| You use OpenBot on your own computer | Your Claude subscription, signed in with Connect or `claude auth login` | Not clear. You sign in to the unmodified CLI through Anthropic's flow, which Anthropic permits. But OpenBot is a third-party product built on the Agent SDK, and Anthropic tells such products to use API keys and not to offer Claude.ai login. Connect starts that login from OpenBot; `claude auth login` in a terminal does not. Persistent agents that run without you can go past "ordinary, individual usage". |
 | A host that you sign in from another computer | Your Claude subscription, with the code sign-in | Higher. OpenBot sends the sign-in code from your browser to the host, and Anthropic can read that as a third party that offers Claude login or intermediates credentials. |
 | Team members use Claude agents on your host | The host owner's Claude subscription | High. Other people's requests use one person's plan, which Anthropic does not permit. |
 | Any of the above | An Anthropic API key, Amazon Bedrock, Google Cloud's Agent Platform or Microsoft Foundry | Low. This is the method that Anthropic tells Agent SDK products to use. Usage is billed to the key owner. Do not resell it. |
