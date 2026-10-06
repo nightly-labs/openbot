@@ -991,9 +991,8 @@ export class AttentionRegistry {
   }
 }
 
-export class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()(
-  "AttentionOperationFailed",
-  { cause: Schema.Defect() },
-) {}
+class AttentionOperationFailed extends Schema.TaggedError<AttentionOperationFailed>()("AttentionOperationFailed", {
+  cause: Schema.Defect(),
+}) {}
 
 const { sync: attentionStep, rewrap: toAttentionOperationFailed } = causeHelpers(AttentionOperationFailed);

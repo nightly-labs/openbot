@@ -8,7 +8,7 @@ import { causeHelpers } from "../effect-boundary";
 const SIZE_ERROR =
   "The avatar exceeds 512 KB. Resize or compress a copy with your available tools, then retry with its path.";
 
-export class AvatarFileFailed extends Schema.TaggedError<AvatarFileFailed>()("AvatarFileFailed", {
+class AvatarFileFailed extends Schema.TaggedError<AvatarFileFailed>()("AvatarFileFailed", {
   cause: Schema.Defect(),
 }) {}
 
