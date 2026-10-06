@@ -44,6 +44,8 @@ export const messages = {
   "agentSettings.runtime.selectReasoning": "Selecionar raciocínio",
   "agentSettings.runtime.access": "Acesso",
   "agentSettings.runtime.accessLabel": "Acesso do agente",
+  "agentSettings.runtime.busyMessage": "Durante o trabalho",
+  "agentSettings.runtime.busyMessageLabel": "Mensagens enquanto o agente trabalha",
   "agentSettings.runtime.workingDirectory": "Diretório de trabalho",
   "agentSettings.runtime.notAvailable": "Ainda não disponível",
   "agentSettings.runtime.fullAccessNote":
@@ -54,6 +56,12 @@ export const messages = {
     "Dependendo do provedor, comandos sensíveis podem pedir aprovação antes de executar.",
   "agentSettings.access.workspace": "Somente o espaço de trabalho",
   "agentSettings.access.full": "Acesso completo",
+  "agentSettings.busyMessage.appDefaultQueue": "Padrão do app (Fila)",
+  "agentSettings.busyMessage.appDefaultSteer": "Padrão do app (Redirecionar)",
+  "agentSettings.busyMessage.queue": "Fila",
+  "agentSettings.busyMessage.steer": "Redirecionar",
+  "agentSettings.busyMessage.steerUnsupported":
+    "{provider} não pode redirecionar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
   "agentSettings.notifications.title": "Notificações",
   "agentSettings.notifications.description":
     "Receba uma notificação quando este agente terminar ou precisar de uma resposta",
@@ -92,12 +100,4 @@ export const messages = {
   "agentSettings.computerUse.description": "Permitir que este agente controle aplicativos neste computador",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo o processo do {provider} é executado em um ambiente isolado, por isso a gravação fora desses locais falha. Disponível somente no macOS.",
-  "agentSettings.runtime.busyMessage": "Durante o trabalho",
-  "agentSettings.runtime.busyMessageLabel": "Mensagens enquanto o agente trabalha",
-  "agentSettings.busyMessage.appDefaultQueue": "Padrão do app (Fila)",
-  "agentSettings.busyMessage.appDefaultSteer": "Padrão do app (Redirecionar)",
-  "agentSettings.busyMessage.queue": "Fila",
-  "agentSettings.busyMessage.steer": "Redirecionar",
-  "agentSettings.busyMessage.steerUnsupported":
-    "{provider} não pode redirecionar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
 } as const satisfies PartialTranslation<typeof source>;

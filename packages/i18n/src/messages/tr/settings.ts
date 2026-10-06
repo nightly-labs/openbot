@@ -32,6 +32,9 @@ export const messages = {
   "settings.externalLinks.description": "Konuşmalardaki bağlantıların nerede açılacağını seçin.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
+  "settings.busyMessage.description":
+    "Ajan çalışırken gönderdiğiniz mesaj, kuyrukta beklemek yerine bir sonraki adımda mevcut işe eklenir. ChatGPT ve Claude yönlendirebilir; diğer sağlayıcılar mesajı kuyruğa alır.",
   "settings.autonomy.title": "Ajan özerkliği",
   "settings.turbo.title": "Turbo modu",
   "settings.turbo.description":
@@ -319,7 +322,4 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
-  "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
-  "settings.busyMessage.description":
-    "Ajan çalışırken gönderdiğiniz mesaj, kuyrukta beklemek yerine bir sonraki adımda mevcut işe eklenir. ChatGPT ve Claude yönlendirebilir; diğer sağlayıcılar mesajı kuyruğa alır.",
 } as const satisfies PartialTranslation<typeof source>;
