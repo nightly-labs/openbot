@@ -586,7 +586,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         deliveryId && targetIsActive ? deps.props.queue?.deliveries.find((item) => item.id === deliveryId) : undefined;
       if (deliveryId && targetIsActive && !deps.editingEditId() && delivery?.status !== "queued") {
         deps.setComposerError(t("composer.error.queuedUnavailable"), target);
-        cancelQueuedMessageEdit();
+        void cancelQueuedMessageEdit();
         return;
       }
       deps.voice.submitRequest = {

@@ -102,7 +102,9 @@ as a routine completion or PR step.
 
 1. In a fresh worktree, run `bun install --frozen-lockfile` first.
 2. Run only the narrowest relevant test file and lint the changed files. Run checks one at a time, with one test worker where supported.
-   Use `bun run test:desktop -- <path>` for one desktop or mobile test file.
+   Use `bun run test:changed` by default: it runs, on one worker, only the desktop and mobile test
+   files that import a file you changed since `origin/main`. Use `bun run test:related -- <source>`
+   for the tests of named source files, and `bun run test:desktop -- <path>` for one test file.
 3. To check types, run one project for the code you changed, one at a time:
    `bun run typecheck:node` (`src/main`, `src/backend`, `src/preload`, `scripts`),
    `bun run typecheck:renderer` (`src/renderer`, `packages/ui`), or the `typecheck` script of the

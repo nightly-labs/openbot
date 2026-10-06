@@ -186,6 +186,9 @@ authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
 about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
+Migrations 17, 22, 23, 24 and 26 widen the table's provider `CHECK`. Migration 28 removes it, so a
+new provider needs no table rebuild. `ProviderSessions.bindProviderSession` and the thread replay
+accept only `AGENT_PROVIDERS` and reject other values before they write an event or a row.
 
 ### Gemini
 
@@ -277,6 +280,12 @@ Team API v6 is the v5 schema with `cursor` and `cline` added to the providers an
 event stream select it when the peer advertises `local-providers-v2`, and HTTPS negotiates it from
 the protocol range. `GET /v1/agents/models` sends a v1–v5 peer only the ids its charset accepts. A
 v5 peer still gets the filtered view.
+
+The v4, v5 and v6 base schemas are one codec, `provider-aware-codec.ts`. Each `v<N>-base.ts` passes
+`createProviderAwareCodec` a frozen profile: the providers, the signed-in auth kinds and the agent
+model charset. Nothing else differs between these versions. `provider-aware-codec.test.ts` holds
+what each released profile accepts. Do not edit a released profile; a new provider needs a new
+protocol version.
 
 ### Custom agents
 

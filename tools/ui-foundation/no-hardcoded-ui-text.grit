@@ -5,7 +5,8 @@ language js(typescript)
 // User-facing text written as a literal: JSX text, a literal accessible name, label or
 // placeholder, a literal toast or alert, and a literal fallback to `errorMessage`. Each one shows
 // English to a reader who chose another language. Text without a letter, such as "·" or "/", is not
-// matched. The message starts with the rule name, so `lint:ratchet` can count this rule.
+// matched. The message starts with the rule name, because Biome reports every plugin under the one
+// category `plugin`.
 
 or {
   JsxText() as $text where {
