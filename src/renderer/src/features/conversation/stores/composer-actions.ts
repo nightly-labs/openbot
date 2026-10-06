@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
+import { type DraftAttachment, LOCAL_SERVER_ID, type QueueDelivery } from "@openbot/contracts/ipc";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -516,27 +516,24 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     // now: the send outlives this view when the user switches server.
     const send = deps.props.onSendMessage;
     const server = deps.props.server;
-    deps.pendingSends.add(
-      target,
-      {
-        draft,
-        text,
-        retrySafe:
-          server?.kind !== "remote" ||
-          Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY)),
-      },
-      async (pending) => {
-        const result = await send(
-          pending.text,
-          pending.draft.attachments.map((item) => item.id),
-          pending.draft.replyToMessageId,
-          target,
-          pending.clientMessageId,
-        );
-        if ("error" in result) playActionSound("error");
-        return result;
-      },
-    );
+    // A deferred voice send can name a server that is no longer on screen. Its capabilities are not
+    // known here, so only the local host, which always drops a repeat, is safe to retry then.
+    const retrySafe =
+      target.serverId === LOCAL_SERVER_ID ||
+      (server?.id === target.serverId &&
+        (server.kind !== "remote" ||
+          Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY))));
+    deps.pendingSends.add(target, { draft, text, retrySafe }, async (pending) => {
+      const result = await send(
+        pending.text,
+        pending.draft.attachments.map((item) => item.id),
+        pending.draft.replyToMessageId,
+        target,
+        pending.clientMessageId,
+      );
+      if ("error" in result) playActionSound("error");
+      return result;
+    });
     deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
     return true;
   }
@@ -613,7 +610,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     }
     deps.setSelectionSending(true);
     try {
-      return "messageId" in (await deps.props.onSendMessage(body, [], messageId));
+      const result = await deps.props.onSendMessage(body, [], messageId);
+      if ("messageId" in result) return true;
+      deps.setComposerError(result.error);
+      return false;
     } finally {
       deps.setSelectionSending(false);
     }

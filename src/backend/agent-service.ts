@@ -237,6 +237,9 @@ export interface AgentServiceOptions {
   hostMemory?: HostMemory | null;
 }
 
+/** How long a user send's `clientMessageId` answers a retry. A retry follows a lost reply, not a day. */
+const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly messaging: MessagingThreads;
@@ -1907,7 +1910,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * that input, a renderer or a Team API body, never names who it is. `timezone` is the zone of a
    * Team API member's client, when it sent one.
    *
-   * A `clientMessageId` the same sender already used for this agent returns the first receipt. The
+   * A `clientMessageId` the same sender used for this agent within a day returns the first receipt. The
    * key is a hash, so it fits the identifier bound whatever the ids are, and has no `:`-separated
    * turn id for the mailbox to read.
    */
@@ -1920,6 +1923,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const idempotencyKey = `user-send:${createHash("sha256")
       .update(JSON.stringify([sender?.id ?? null, input.agentId, input.clientMessageId]))
       .digest("hex")}`;
+    // Every user message adds a key, and the map is persisted whole, so keys older than the window go.
+    this.#mailbox.forgetIdempotencyKeys("user-send:", new Date(Date.now() - USER_SEND_RETRY_WINDOW_MS));
     const stored = this.#mailbox.receiptForKey(idempotencyKey);
     if (stored) return Promise.resolve(stored);
     const pending = this.#pendingUserSends.get(idempotencyKey);

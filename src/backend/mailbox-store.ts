@@ -263,6 +263,21 @@ export class MailboxStore {
     return this.#deliveryGate.prepare(agentIds);
   }
 
+  /**
+   * Forgets the idempotency keys with `prefix` whose message is older than `createdBefore`, or gone.
+   * The next persist writes the shorter map, so a key kind that grows with every message stays bounded.
+   */
+  forgetIdempotencyKeys(prefix: string, createdBefore: Date): void {
+    const createdAt = new Map(this.#state.messages.map((message) => [message.id, Date.parse(message.createdAt)]));
+    const cutoff = createdBefore.getTime();
+    this.#state.idempotency = Object.fromEntries(
+      Object.entries(this.#state.idempotency).filter(
+        ([key, messageId]) =>
+          !key.startsWith(prefix) || (createdAt.get(messageId) ?? Number.NEGATIVE_INFINITY) >= cutoff,
+      ),
+    );
+  }
+
   /** The receipt of the message an idempotency key already stored, or null. */
   receiptForKey(key: string): QueuedMessageReceipt | null {
     const messageId = this.#state.idempotency[key];

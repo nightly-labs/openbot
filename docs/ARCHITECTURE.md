@@ -132,8 +132,8 @@ the shared file panel's width, and for each account and host the pinned item ids
 ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
 desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
-Host switches discard the prior host's chat state. Temporary connection loss keeps drafts;
-uncertain sends require an explicit user check before another send. BroadcastChannel, account
+Host switches discard the prior host's chat state. Temporary connection loss keeps drafts; a
+failed send stays in the chat and is never sent again on its own. BroadcastChannel, account
 checks on focus, and signed session invalidation clear access when a session ends.
 
 MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import

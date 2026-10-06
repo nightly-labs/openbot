@@ -26,6 +26,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { RoutineChatCard } from "./RoutineChatCard";
+import { PENDING_SEND_ID_PREFIX } from "./stores/pending-send-store";
 
 /**
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
@@ -328,7 +329,9 @@ export function ConversationTimeline() {
                   const sender = otherSender(referencedMessage());
                   return sender ? memberAuthor(sender).name : undefined;
                 };
-                // A message the host has not stored has no reactions, replies or menu yet.
+                // A row the host has not drawn yet has no reactions, replies or menu: its id is not the
+                // host's, even after the host answered.
+                const hostless = createMemo(() => message()?.id.startsWith(PENDING_SEND_ID_PREFIX) === true);
                 const pendingSend = createMemo(() => {
                   const send = pendingSendFor(message()?.id);
                   return send && send.state !== "sent" ? send : undefined;
@@ -600,7 +603,7 @@ export function ConversationTimeline() {
                               ) : undefined
                             }
                             actions={
-                              <Show when={!pending()}>
+                              <Show when={!hostless()}>
                                 <MessageActions
                                   message={message() ?? initialMessage}
                                   pickerOpen={openReactionMessageId() === message()?.id}

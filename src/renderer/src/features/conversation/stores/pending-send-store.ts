@@ -5,7 +5,7 @@ import { formatMessageTime } from "../../../app-message-projection";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationTarget, SendMessageResult } from "../conversation-types";
 
-/** A pending row's id. The read boundary and the reply picker skip it: the host never stored it. */
+/** A pending row's id. The row has no message actions: the host never stored this id. */
 export const PENDING_SEND_ID_PREFIX = "pending:";
 
 /**

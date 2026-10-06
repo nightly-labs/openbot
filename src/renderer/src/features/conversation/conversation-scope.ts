@@ -289,12 +289,14 @@ export function createConversationViewScope(props: ConversationProps) {
   let contextAttachmentPicker: HTMLInputElement | undefined;
   const currentPendingSends = createMemo(() => pendingSends.list(currentTarget()));
   // The host rows on screen: a sent message hands over to its row in the transcript or the queue.
-  const drawnHostIds = createMemo(
-    () =>
-      new Set([
-        ...props.messages.map((message) => message.id),
-        ...presentedQueueDeliveries().map((delivery) => delivery.id),
-      ]),
+  // Built only while a send waits for its row, so a streaming reply does not rebuild it for nothing.
+  const drawnHostIds = createMemo(() =>
+    currentPendingSends().some((send) => send.messageId)
+      ? new Set([
+          ...props.messages.map((message) => message.id),
+          ...presentedQueueDeliveries().map((delivery) => delivery.id),
+        ])
+      : new Set<string>(),
   );
   // Filtered here as well as settled below, so the two rows never stand together for a frame.
   const pendingMessages = createMemo(() =>

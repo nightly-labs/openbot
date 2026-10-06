@@ -978,13 +978,11 @@ export function createWebWorkspace(
     } catch (error) {
       return { error: errorMessage(error, t("webClient.error.deliveryUnconfirmed")) };
     }
-    if (current === generation && !disposed) {
-      try {
-        await refresh();
-      } catch (error) {
+    // The next pending send of the chat waits for this answer, so the history reload runs beside it.
+    if (current === generation && !disposed)
+      refresh().catch((error: unknown) => {
         if (current === generation) report(error);
-      }
-    }
+      });
     return { messageId };
   }
   /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
