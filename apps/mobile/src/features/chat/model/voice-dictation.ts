@@ -152,7 +152,7 @@ export function retriesWithSystemService(code: ExpoSpeechRecognitionErrorCode): 
 
 export interface ComposerControlsInput {
   disabled: boolean;
-  /** Text or attachments. Live dictation counts, because it is already in the draft. */
+  /** Text or attachments. */
   hasDraft: boolean;
   /** A send or an attachment preparation is in progress. */
   busy: boolean;
@@ -160,12 +160,14 @@ export interface ComposerControlsInput {
   canStop: boolean;
   stopping: boolean;
   voiceAvailable: boolean;
-  dictation: DictationPhase;
 }
 
-/** The one control at the end of the composer, and what it does now. */
+/**
+ * The one control at the end of the composer, and what it does now. The voice
+ * mode replaces it with its own round button while it is open.
+ */
 export interface ComposerAction {
-  mode: "send" | "stop" | "dictate" | "finish-dictation";
+  mode: "send" | "stop" | "dictate";
   pressable: boolean;
   spinner: boolean;
   /** Filled with the action colour. */
@@ -173,16 +175,6 @@ export interface ComposerAction {
 }
 
 export function composerAction(input: ComposerControlsInput): ComposerAction {
-  // Dictation holds the control until it ends, so the user can always stop it.
-  // The text then stays in the draft and the control becomes send.
-  if (input.dictation !== "idle") {
-    return {
-      mode: "finish-dictation",
-      pressable: input.dictation === "listening",
-      spinner: input.dictation === "starting" || input.dictation === "stopping",
-      primed: true,
-    };
-  }
   const empty = !input.hasDraft && !input.busy;
   // A draft still sends while the agent works: the host queues it. So stop only
   // takes the control when there is nothing to send. It wins over the mic: a
