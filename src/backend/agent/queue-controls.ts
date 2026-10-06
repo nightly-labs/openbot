@@ -205,14 +205,18 @@ export class QueueControls {
         },
         decodeRecordResponse,
       );
-      await this.#mailbox.markRunning(input.deliveryId, turnId);
+    } catch (error) {
+      // The turn may have ended while the request was in flight, and found nothing else to start
+      // with this message out of the queue, so the drain is asked again.
+      await this.#mailbox.restoreUnsteered(input.deliveryId, turnId);
       this.#mailboxSync.syncMailboxMessages(snapshot);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
-    } catch (error) {
-      await this.#mailbox.restoreQueued(input.deliveryId);
-      this.#mailboxSync.emitQueue(agent.id);
+      this.#drain.scheduleDrain(agent.id);
       throw error;
     }
+    await this.#mailbox.markRunning(input.deliveryId, turnId);
+    this.#mailboxSync.syncMailboxMessages(snapshot);
+    this.#mailboxSync.emitQueue(agent.id);
+    this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
   }
 }

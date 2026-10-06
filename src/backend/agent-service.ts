@@ -85,6 +85,7 @@ import {
   CONTEXT_RESET_ITEM_TYPE,
   DEFAULT_BUSY_MESSAGE_MODE,
   isContextResetMarker,
+  type QueueSteerFallback,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -286,6 +287,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #localSkillTools?: () => LocalSkillTools;
   readonly #developmentDefaults: boolean;
   readonly #busyMessageMode: () => BusyMessageMode;
+  /** The last turn of each agent's chat that the user stopped. One per agent, so it needs no clean-up. */
+  readonly #stoppedTurns = new Map<string, string>();
   #initialized = false;
   #stopping = false;
 
@@ -1949,12 +1952,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agentNamesById(this.#store.list()),
       ) || delivery.delivery.attachments.map((item) => item.name).join(", "),
     );
+    // A turn the user stopped is ending, and a message steered into it would end with it.
+    const steerTurnId =
+      snapshot.activeTurnId &&
+      snapshot.activeTurnId !== this.#stoppedTurns.get(agent.id) &&
+      (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer"
+        ? snapshot.activeTurnId
+        : null;
+    const steers = steerTurnId !== null && agentProviderDescriptor(providerForAgent(agent)).steer === "native";
+    if (steerTurnId && !steers) await this.#markSteerFallback(agent.id, delivery.delivery.id, "provider-unsupported");
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
     this.#conversation.emitConversation(snapshot);
     this.#mailboxSync.emitQueue(agent.id);
-    if (snapshot.activeTurnId && (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer") {
-      await this.#steerSentMessage(agent, delivery.delivery.id, snapshot.activeTurnId);
-    }
+    // Not awaited: the message is already queued, and the sender is answered without the wait for
+    // the provider.
+    if (steerTurnId && steers) void this.#steerSentMessage(agent, delivery.delivery.id, steerTurnId);
     this.#drain.scheduleDrain(agent.id);
     return receipt;
   }
@@ -1966,20 +1978,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * hold a second prompt until the turn ends, which is a queue the user cannot see.
    */
   async #steerSentMessage(agent: AgentSummary, deliveryId: string, turnId: string): Promise<void> {
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
-      await this.#mailbox.markSteerFallback(deliveryId, "provider-unsupported");
-      this.#mailboxSync.emitQueue(agent.id);
-      return;
-    }
     try {
       await this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId });
     } catch (error) {
       logger.warn("A message sent to steer the running turn waits in the queue.", { agentId: agent.id, error });
-      // The turn may have ended in between. The message then starts as the next turn, which is no
-      // fallback worth naming.
-      if (!this.#conversation.ensureSnapshot(agent.id, agent.threadId).activeTurnId) return;
-      await this.#mailbox.markSteerFallback(deliveryId, "steer-failed");
+      // When the turn ended in between, the message starts as the next turn or waits behind it
+      // like any other, which is no fallback worth naming.
+      if (this.#conversation.ensureSnapshot(agent.id, agent.threadId).activeTurnId !== turnId) return;
+      await this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
       this.#mailboxSync.emitQueue(agent.id);
+    }
+  }
+
+  /** The reason is a label on the queue row, so a failed write leaves the message queued without it. */
+  async #markSteerFallback(agentId: string, deliveryId: string, reason: QueueSteerFallback): Promise<void> {
+    try {
+      await this.#mailbox.markSteerFallback(deliveryId, reason);
+    } catch (error) {
+      logger.warn("Could not record why a message waits in the queue.", { agentId, error });
     }
   }
 
@@ -1999,6 +2015,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
+    if (!executionThreadId) this.#stoppedTurns.set(agentId, turnId);
     await this.#interruptTurn(agentId, turnId, executionThreadId);
   }
 

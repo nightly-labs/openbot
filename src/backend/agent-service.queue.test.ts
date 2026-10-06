@@ -1266,12 +1266,9 @@ describe.sequential("AgentService: queue", () => {
       const { service: agentService, client, turnId } = await startBusyAgent("codex");
       const receipt = await agentService.sendMessage({ agentId: "chief", text: "Use staging" });
 
+      await waitForQueue(agentService, "chief", (queue) => queue.deliveries[1]?.status === "running");
       const steer = client.requests.find((request) => request.method === "turn/steer");
       expect(steer?.params).toMatchObject({ expectedTurnId: turnId, clientUserMessageId: receipt.deliveries[0]?.id });
-      expect(agentService.listQueue("chief").deliveries.map((delivery) => delivery.status)).toEqual([
-        "running",
-        "running",
-      ]);
     });
 
     it("waits in the queue with a reason on a provider that cannot steer, then starts", async () => {
@@ -1299,11 +1296,8 @@ describe.sequential("AgentService: queue", () => {
       });
       await agentService.sendMessage({ agentId: "chief", text: "Use staging" });
 
-      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({
-        text: "Use staging",
-        status: "queued",
-        steerFallback: "steer-failed",
-      });
+      await waitForQueue(agentService, "chief", (queue) => queue.deliveries[1]?.steerFallback === "steer-failed");
+      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({ text: "Use staging", status: "queued" });
 
       completeTurn();
       await waitFor(() => turnStarts(client) === 2);
@@ -1321,7 +1315,35 @@ describe.sequential("AgentService: queue", () => {
       await agentService.updateAgent({ agentId: "chief", busyMessageMode: null });
       expect(agentService.listAgents().find((agent) => agent.id === "chief")).not.toHaveProperty("busyMessageMode");
       await agentService.sendMessage({ agentId: "chief", text: "Steer this one" });
-      expect(client.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
+      await waitFor(() => client.requests.filter((request) => request.method === "turn/steer").length === 1);
+    });
+
+    it("runs a message whose turn ended while the steer request was in flight", async () => {
+      let endTurnDuringSteer = async () => undefined;
+      const busy = await startBusyAgent("codex", async (method) => {
+        if (method !== "turn/steer") return;
+        await endTurnDuringSteer();
+        throw new Error("The turn ended before the steer.");
+      });
+      endTurnDuringSteer = async () => {
+        busy.completeTurn();
+        // The end of the turn stamps every delivery of that turn, the one being steered too.
+        await waitForQueue(busy.service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+      };
+      await busy.service.sendMessage({ agentId: "chief", text: "Use staging" });
+
+      await waitFor(() => turnStarts(busy.client) === 2);
+      expect(busy.service.listQueue("chief").deliveries[1]).toMatchObject({ text: "Use staging", status: "running" });
+    });
+
+    it("does not steer into a turn the user stopped", async () => {
+      const { service: agentService, client, turnId } = await startBusyAgent("codex");
+      await agentService.interrupt("chief", turnId);
+      await agentService.sendMessage({ agentId: "chief", text: "Start over" });
+
+      expect(client.requests.some((request) => request.method === "turn/steer")).toBe(false);
+      expect(agentService.listQueue("chief").deliveries[1]).toMatchObject({ status: "queued" });
+      expect(agentService.listQueue("chief").deliveries[1]).not.toHaveProperty("steerFallback");
     });
   });
 

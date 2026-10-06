@@ -1045,7 +1045,7 @@ export class MailboxStore {
 
   async markStarting(deliveryId: string): Promise<void> {
     this.#assertQueueNotEditing(deliveryId);
-    await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null });
+    await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null, steerFallback: undefined });
   }
 
   async markRunning(deliveryId: string, turnId: string): Promise<void> {
@@ -1384,7 +1384,22 @@ export class MailboxStore {
       status: "starting",
       turnId,
       error: null,
+      steerFallback: undefined,
     });
+  }
+
+  /**
+   * A steer the provider did not take, back at its place in the queue. The turn it was sent to can
+   * end while the request is in flight, and its end stamps every delivery of that turn, this one
+   * too, so a terminal state from that turn is undone as well: the agent never read the message.
+   */
+  async restoreUnsteered(deliveryId: string, turnId: string): Promise<void> {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery || delivery.turnId !== turnId || delivery.status === "queued" || delivery.status === "cancelled") {
+      return;
+    }
+    Object.assign(delivery, { status: "queued", turnId: null, error: null });
+    await this.#persist("delivery.updated");
   }
 
   /** Says why a message sent to steer waits in the queue. A message that has left the queue keeps its state. */

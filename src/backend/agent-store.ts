@@ -333,6 +333,7 @@ export class AgentStore {
     record.reasoningEffort = source.reasoningEffort;
     record.access = source.access;
     record.computerUse = source.computerUse;
+    if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
     record.avatarSeed = source.avatarSeed;
     record.avatarHue = source.avatarHue;
 
