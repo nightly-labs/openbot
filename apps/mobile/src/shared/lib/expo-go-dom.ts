@@ -1,8 +1,14 @@
-import Constants, { ExecutionEnvironment } from "expo-constants";
 import { isAndroid } from "@/shared/lib/platform";
 
+/** Expo Go on Android. The constants load only on Android, so iOS and tests do not load them here. */
+function expoGoOnAndroid(): boolean {
+  if (!isAndroid) return false;
+  const constants: typeof import("expo-constants") = require("expo-constants");
+  return constants.default.executionEnvironment === constants.ExecutionEnvironment.StoreClient;
+}
+
 // Expo Go on Android does not include @expo/dom-webview. It includes react-native-webview.
-const useExpoDOMWebView = !(isAndroid && Constants.executionEnvironment === ExecutionEnvironment.StoreClient);
+const useExpoDOMWebView = !expoGoOnAndroid();
 // Expo's DOM page reads the host values from react-native-webview in an inline script. On Android the
 // values arrive in onPageStarted, after that script and before the DOM bundle. This script runs there and
 // gives the bundle the values. The props come again when the DOM side reports that it is ready.

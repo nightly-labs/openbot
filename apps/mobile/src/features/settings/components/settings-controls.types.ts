@@ -1,4 +1,4 @@
-export interface SettingsPickerOption<T extends string | number> {
+interface SettingsPickerOption<T extends string | number> {
   value: T;
   label: string;
 }

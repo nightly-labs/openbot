@@ -30,7 +30,7 @@ vi.mock("react-native", () => ({
     accessibilityLabel: string;
   }) => <textarea aria-label={accessibilityLabel} value={value} readOnly={!editable} />,
 }));
-vi.mock("@/shared/lib/platform", () => ({ isIOS: true }));
+vi.mock("@/shared/lib/platform", () => ({ isIOS: true, isAndroid: false }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: mocks.copy }));
 vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {}, notification: async () => {} } }));
 vi.mock("react-native-reanimated", async () => {
