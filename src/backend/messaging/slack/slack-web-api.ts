@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect";
 import { causeHelpers } from "../../effect-boundary";
 import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
 
+// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
 const { io: slackIo } = causeHelpers(MessagingAdapterError);
 
 const SLACK_API_ORIGIN = "https://slack.com";
@@ -236,8 +237,6 @@ export class SlackWebApi {
     return url.protocol === "https:" && (url.hostname === "slack.com" || url.hostname.endsWith(".slack.com"));
   }
 }
-
-// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
 
 function slackFailure(cause: Error): Effect.Effect<never, MessagingAdapterError> {
   return Effect.fail(new MessagingAdapterError({ cause }));
