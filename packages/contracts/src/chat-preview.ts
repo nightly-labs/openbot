@@ -5,18 +5,19 @@
  */
 export type ChatPreviewKind = "html" | "mermaid";
 
-const PREVIEW_LANGUAGES: Record<string, ChatPreviewKind> = {
-  html: "html",
-  htm: "html",
-  xhtml: "html",
-  mermaid: "mermaid",
-  mmd: "mermaid",
-};
+// A Map, so a fence named `constructor` or `__proto__` finds nothing.
+const PREVIEW_LANGUAGES = new Map<string, ChatPreviewKind>([
+  ["html", "html"],
+  ["htm", "html"],
+  ["xhtml", "html"],
+  ["mermaid", "mermaid"],
+  ["mmd", "mermaid"],
+]);
 
 /** The preview for the info string of a fenced code block, or null when the block stays code. */
 export function chatPreviewKind(language: string | undefined): ChatPreviewKind | null {
   const name = language?.trim().split(/\s+/u)[0]?.toLowerCase() ?? "";
-  return PREVIEW_LANGUAGES[name] ?? null;
+  return PREVIEW_LANGUAGES.get(name) ?? null;
 }
 
 /**

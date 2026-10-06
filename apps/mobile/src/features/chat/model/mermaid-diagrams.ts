@@ -98,8 +98,9 @@ export function useMermaidJobs(): readonly MermaidJob[] {
 export function useMermaidDiagram(source: string, dark: boolean, enabled = true): MermaidDiagram | undefined {
   const key = diagramKey(source, dark);
   const diagram = useSyncExternalStore(subscribe, () => diagrams.get(key));
+  // `diagram` is a dependency, so a diagram that the cache let go while this card shows it draws again.
   useEffect(() => {
-    if (enabled) requestMermaidDiagram(source, dark);
-  }, [enabled, source, dark]);
+    if (enabled && !diagram) requestMermaidDiagram(source, dark);
+  }, [enabled, source, dark, diagram]);
   return enabled ? (diagram ?? DRAWING) : undefined;
 }

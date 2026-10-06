@@ -280,7 +280,7 @@ function HtmlPreviewFrame(props: { html: string; title: string; fill: boolean; o
     const page = frame?.contentDocument;
     if (!page) return;
     const path = event.composedPath();
-    const link = [...page.querySelectorAll("a")].find((anchor) => path.includes(anchor));
+    const link = [...page.querySelectorAll("a, area")].find((anchor) => path.includes(anchor));
     if (!link) return;
     event.preventDefault();
     const href = link.getAttribute("href") ?? "";
