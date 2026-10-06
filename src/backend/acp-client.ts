@@ -1218,7 +1218,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.provider === "opencode" &&
         // Google answers "API key not valid" (#1388).
         /invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
-          ? sourceText("error.provider.opencodeCredentialsRejected", { detail })
+          ? sourceText("error.provider.opencodeCredentialsRejected", {
+              detail: shownFailureDetail(detail.replace(/^RequestError:\s*Internal error:\s*/u, "")),
+            })
           : this.provider === "opencode" && isOpenCodeServiceFailure(error)
             ? sourceText("error.provider.opencodeServiceFailure")
             : this.#openCodeRequestFailure(error, detail);
@@ -1249,13 +1251,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (isUsageLimitDiagnostic(reason)) return detail;
     const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
     if (!key) return detail;
-    // The renderer shows its generic sentence for text over 400 characters.
-    const characters = Array.from(this.#redact(reason));
-    const shown =
-      characters.length > OPENCODE_FAILURE_DETAIL_LIMIT
-        ? `${characters.slice(0, OPENCODE_FAILURE_DETAIL_LIMIT - 1).join("")}…`
-        : characters.join("");
-    return sourceText(key, { detail: shown });
+    return sourceText(key, { detail: shownFailureDetail(this.#redact(reason)) });
   }
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -1658,6 +1654,14 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 }
 
 const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
+
+/** The provider's text after a failure kind. The renderer shows its generic sentence for text over 400 characters. */
+function shownFailureDetail(text: string): string {
+  const characters = Array.from(text);
+  return characters.length > OPENCODE_FAILURE_DETAIL_LIMIT
+    ? `${characters.slice(0, OPENCODE_FAILURE_DETAIL_LIMIT - 1).join("")}…`
+    : characters.join("");
+}
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway

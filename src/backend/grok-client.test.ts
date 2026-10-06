@@ -171,9 +171,7 @@ describe.sequential("GrokAgentClient", () => {
       }
       expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
         expect.objectContaining({
-          message: sourceText("error.provider.opencodeCredentialsRejected", {
-            detail: `RequestError: Internal error: ${reason}`,
-          }),
+          message: sourceText("error.provider.opencodeCredentialsRejected", { detail: reason }),
         }),
       ]);
       const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
